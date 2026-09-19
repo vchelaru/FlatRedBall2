@@ -452,6 +452,17 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
         }
 
+        public async Task AddAssociatedTiledTilesetViaDialogAsync()
+        {
+            if (string.IsNullOrEmpty(_pm.FileName)) return;
+
+            var path = await FileDialogService.PickOpenFileAsync(
+                "Associate Tiled Tileset", "tsx", "Tiled Tileset (*.tsx)");
+            if (string.IsNullOrEmpty(path)) return;
+
+            AddAssociatedTiledTileset(path);
+        }
+
         /// <summary>
         /// Runs on every successful .achx/.achj save (including autosave, so this must stay cheap
         /// when nothing is associated -- see <see cref="AddAssociatedTiledTileset"/>). Runs

@@ -192,6 +192,42 @@ public class MainWindowMenuFlowTests
         }
     }
 
+    // ── Edit → Associate Tiled Tileset ───────────────────────────────────────
+
+    /// <summary>
+    /// Issue #1133: proves the "Associate Tiled Tileset…" menu item actually reaches
+    /// <c>AppCommands.AddAssociatedTiledTilesetViaDialogAsync</c> -- the mapping/apply/write
+    /// logic itself is covered headlessly in AnimationEditor.Core.Tests; this only proves the
+    /// real click routes to it (see the animation-editor-testing skill on why reflection-invoking
+    /// a handler doesn't prove that on its own).
+    /// </summary>
+    [AvaloniaFact]
+    public void AssociateTiledTileset_WithStubDialog_AssociatesPickedTsxWithCurrentAchx()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var achxPath = Path.Combine(dir, "Hero.achx");
+        var tsxPath = Path.Combine(dir, "Heroes.tsx");
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.ProjectManager.FileName = achxPath;
+            ctx.AppCommands.FileDialogService = new MenuFlowStubFileDialogService(tsxPath);
+
+            window.FindControl<MenuItem>("MenuAssociateTiledTileset")!
+                  .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            var associated = ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath);
+            Assert.Single(associated);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
     // ── Edit → Undo ───────────────────────────────────────────────────────────
 
     [AvaloniaFact]

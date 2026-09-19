@@ -466,6 +466,14 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddAssociatedTiledTileset(string tsxAbsolutePath);
 
         /// <summary>
+        /// Shows an open-file dialog (via <see cref="FileDialogService"/>) for the user to pick a
+        /// <c>.tsx</c> file, then associates it via <see cref="AddAssociatedTiledTileset"/>. The
+        /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled or the
+        /// project has never been saved.
+        /// </summary>
+        Task AddAssociatedTiledTilesetViaDialogAsync();
+
+        /// <summary>
         /// Raised when syncing to one associated .tsx tileset fails after a save (missing file, an
         /// unsupported <c>TsxWriter</c> feature, etc.). The first argument is the .tsx path; the
         /// second is the exception. A failure here never affects the .achx save itself, which has

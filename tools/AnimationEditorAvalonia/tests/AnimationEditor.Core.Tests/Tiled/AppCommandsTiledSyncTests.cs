@@ -1,9 +1,11 @@
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Tests;
 using DotTiled;
 using DotTiled.Serialization;
 using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -67,6 +69,47 @@ public class AppCommandsTiledSyncTests
         var reloaded = Loader.Default().LoadTileset(tsxPath);
         var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
+    }
+
+    [Fact]
+    public async Task AddAssociatedTiledTilesetViaDialogAsync_DialogCancelled_DoesNotAssociate()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "Hero.achx");
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(null);
+
+        await ctx.AppCommands.AddAssociatedTiledTilesetViaDialogAsync();
+
+        Assert.Empty(ctx.IoManager.GetAssociatedTiledTilesetPaths(ctx.ProjectManager.FileName));
+    }
+
+    [Fact]
+    public async Task AddAssociatedTiledTilesetViaDialogAsync_DialogReturnsPath_AssociatesTileset()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "Hero.achx");
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(tsxPath);
+
+        await ctx.AppCommands.AddAssociatedTiledTilesetViaDialogAsync();
+
+        var associated = ctx.IoManager.GetAssociatedTiledTilesetPaths(ctx.ProjectManager.FileName);
+        Assert.Single(associated);
+        Assert.Equal(new FilePath(tsxPath), new FilePath(associated[0]));
+    }
+
+    [Fact]
+    public async Task AddAssociatedTiledTilesetViaDialogAsync_NoProjectSavedYet_DoesNotThrow()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.ProjectManager.FileName = null;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService("C:/Some/Heroes.tsx");
+
+        var ex = await Record.ExceptionAsync(() => ctx.AppCommands.AddAssociatedTiledTilesetViaDialogAsync());
+
+        Assert.Null(ex);
     }
 
     [Fact]

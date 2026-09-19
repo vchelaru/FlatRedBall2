@@ -119,6 +119,7 @@
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                         <Separator />
                         <MenuItem Header="Install _Tiled Integration…" x:Name="MenuInstallTiledExtension" />
+                        <MenuItem Header="Associate _Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
                         <Separator />
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>

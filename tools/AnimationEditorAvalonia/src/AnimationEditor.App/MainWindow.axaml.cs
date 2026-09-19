@@ -2448,6 +2448,7 @@ public partial class MainWindow : Window
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         MenuSettings.Click += OnSettingsClick;
         MenuInstallTiledExtension.Click += OnInstallTiledExtensionClick;
+        MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuCut.Click           += (_, _) => _ = HandleCutAsync();
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
@@ -2807,6 +2808,12 @@ public partial class MainWindow : Window
 
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
+
+    /// <summary>"Associate Tiled Tileset…" menu command (issue #1133) -- picks a .tsx via the
+    /// same open-file dialog seam as everything else, then hands off to
+    /// <see cref="IAppCommands.AddAssociatedTiledTilesetViaDialogAsync"/>.</summary>
+    private void OnAssociateTiledTilesetClick(object? sender, RoutedEventArgs e) =>
+        _ = _appCommands.AddAssociatedTiledTilesetViaDialogAsync();
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.ExportToPixiJsAsync();
