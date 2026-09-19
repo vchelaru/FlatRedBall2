@@ -182,4 +182,40 @@ public class BrowserIoManagerTests
 
         Assert.False(ioManager.RecoveryFileExists());
     }
+
+    // ── Associated Tiled tilesets ─────────────────────────────────────────────
+
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_WritesToStoreUnderTiledSyncCompanionName()
+    {
+        var (ioManager, store, _) = Setup();
+
+        ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Heroes.tsx");
+
+        Assert.True(store.Written.ContainsKey("hero.tiledsync"));
+        Assert.False(store.Written.ContainsKey("hero.aeproperties"));
+    }
+
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_SecondDifferentPath_IsAppendedToStoredList()
+    {
+        var (ioManager, store, _) = Setup();
+
+        ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Heroes.tsx");
+        ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Enemies.tsx");
+
+        var xml = store.Written["hero.tiledsync"];
+        var deserialized = XmlFile.DeserializeFromString<AETiledSyncSave>(xml);
+        Assert.Equal(["Heroes.tsx", "Enemies.tsx"], deserialized.TiledTilesetPaths);
+    }
+
+    [Fact]
+    public void GetAssociatedTiledTilesetPaths_AlwaysReturnsEmpty_SynchronousReadNotSupported()
+    {
+        var (ioManager, _, _) = Setup();
+        ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Heroes.tsx");
+
+        // Unlike desktop's IoManager, the browser store is async-only -- documented limitation.
+        Assert.Empty(ioManager.GetAssociatedTiledTilesetPaths("hero.achx"));
+    }
 }

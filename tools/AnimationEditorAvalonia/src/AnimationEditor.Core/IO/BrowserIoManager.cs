@@ -3,6 +3,7 @@ using AnimationEditor.Core.Data;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -59,6 +60,15 @@ public class BrowserIoManager : IIoManager
         var bareName = achxFile.NoPath;
         var bareNameNoExtension = new FilePath(bareName).RemoveExtension().Original ?? bareName;
         return bareNameNoExtension + ".aeproperties";
+    }
+
+    /// <summary>Same bare-name extension swap as <see cref="GetCompanionFileName"/>, but for the
+    /// <c>.tiledsync</c> companion file (see <see cref="AETiledSyncSave"/>).</summary>
+    internal static string GetTiledSyncCompanionFileName(FilePath achxFile)
+    {
+        var bareName = achxFile.NoPath;
+        var bareNameNoExtension = new FilePath(bareName).RemoveExtension().Original ?? bareName;
+        return bareNameNoExtension + ".tiledsync";
     }
 
     public void SaveCompanionFileFor(FilePath fileName, AESettingsSave settings)
@@ -124,11 +134,51 @@ public class BrowserIoManager : IIoManager
         }
     }
 
-    // Tiled tileset sync is a desktop-only feature (DotTiled reads/writes real files; see
-    // AnimationEditor.Core/Tiled/) -- these exist only to satisfy IIoManager. Reading back
-    // associations synchronously inherits TryLoadCompanionSettings's null-on-browser limit above.
+    // Running the actual sync (DotTiled reads/writes real .tsx files; see
+    // AnimationEditor.Core/Tiled/) is desktop-only, but the association itself is still stored
+    // here so it round-trips if a project is later opened on desktop -- same store-backed pattern
+    // as the .aeproperties methods above.
+
+    /// <summary>
+    /// Always returns empty -- reading the <c>.tiledsync</c> companion file requires an async
+    /// round trip through <see cref="ICompanionFileStore"/>, which this synchronous method has no
+    /// way to wait on (see <see cref="TryLoadCompanionSettings"/> for the same limitation).
+    /// </summary>
     public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile) => Array.Empty<string>();
-    public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile) { }
+
+    public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile)
+    {
+        _ = AddAssociatedTiledTilesetPathAsync(achxFile, tsxFile);
+    }
+
+    private async Task AddAssociatedTiledTilesetPathAsync(string achxFile, string tsxFile)
+    {
+        try
+        {
+            var achxFilePath = new FilePath(achxFile);
+            var achxFolder = achxFilePath.GetDirectoryContainingThis();
+            var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
+
+            var companionName = GetTiledSyncCompanionFileName(achxFilePath);
+            var existingXml = await _store.TryReadAsync(companionName);
+            var settings = existingXml is null
+                ? new AETiledSyncSave()
+                : XmlFile.DeserializeFromString<AETiledSyncSave>(existingXml);
+
+            var alreadyAssociated = settings.TiledTilesetPaths
+                .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
+            if (!alreadyAssociated)
+            {
+                settings.TiledTilesetPaths.Add(relativeTsxPath);
+                XmlFile.SerializeToString(settings, out var xml);
+                await _store.WriteAsync(companionName, xml);
+            }
+        }
+        catch (Exception e)
+        {
+            SaveFailed?.Invoke("Could not save Tiled sync companion file " + achxFile + "\n\n" + e, e);
+        }
+    }
 
     private void ApplySettings(AESettingsSave settings)
     {

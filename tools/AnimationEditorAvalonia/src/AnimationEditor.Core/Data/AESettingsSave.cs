@@ -23,14 +23,6 @@ namespace AnimationEditor.Core.Data
         [XmlElement("ExpandedNode")]
         public List<string> ExpandedNodes { get; set; } = new List<string>();
 
-        /// <summary>
-        /// Tiled <c>.tsx</c> tileset paths, relative to this .achx's own folder, that
-        /// <c>ProjectManager.SaveAnimationChainListAsync</c> should sync this project's animation
-        /// chains into on every save (issue #1133). Populated via <c>IIoManager.AddAssociatedTiledTilesetPath</c>.
-        /// </summary>
-        [XmlElement("TiledTilesetPath")]
-        public List<string> TiledTilesetPaths { get; set; } = new List<string>();
-
         public bool SnapToGrid { get; set; }
         public int GridSize { get; set; } = 16;
         public int WireframeZoomPercent { get; set; } = 100;

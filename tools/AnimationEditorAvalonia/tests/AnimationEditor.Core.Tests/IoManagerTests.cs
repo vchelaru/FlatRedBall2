@@ -171,6 +171,22 @@ public class IoManagerTests
     // ── Associated Tiled tilesets ─────────────────────────────────────────────
 
     [Fact]
+    public void AddAssociatedTiledTilesetPath_NewPath_CreatesTiledSyncFile_DistinctFromAeproperties()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = dir.Path + "/hero.achx";
+        var tsxPath = dir.Path + "/Heroes.tsx";
+        var expectedTiledSyncPath = dir.Path + "/hero.tiledsync";
+        var expectedAePropsPath = dir.Path + "/hero.aeproperties";
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+
+        Assert.True(File.Exists(expectedTiledSyncPath));
+        Assert.False(File.Exists(expectedAePropsPath));
+    }
+
+    [Fact]
     public void AddAssociatedTiledTilesetPath_NewPath_IsReturnedByGetAssociatedTiledTilesetPaths()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -198,6 +214,24 @@ public class IoManagerTests
         ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
 
         Assert.Single(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
+    }
+
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_SecondDifferentPath_IsAppendedAlongsideFirst()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = dir.Path + "/hero.achx";
+        var firstTsxPath = dir.Path + "/Heroes.tsx";
+        var secondTsxPath = dir.Path + "/Enemies.tsx";
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, firstTsxPath);
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, secondTsxPath);
+        var associated = ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath);
+
+        Assert.Equal(2, associated.Count);
+        Assert.Contains(new FilePath(firstTsxPath), associated.Select(p => new FilePath(p)));
+        Assert.Contains(new FilePath(secondTsxPath), associated.Select(p => new FilePath(p)));
     }
 
     [Fact]

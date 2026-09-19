@@ -105,20 +105,6 @@ public class AESettingsSaveRoundTripTests
         Assert.Equal("B", loaded.ExpandedNodes[2]);
     }
 
-    // ── Associated Tiled tilesets ────────────────────────────────────────────
-
-    [Fact]
-    public void TiledTilesetPaths_RoundTrip_PreservesAllPathsAndOrder()
-    {
-        var s = new AESettingsSave();
-        s.TiledTilesetPaths.Add("../Tilesets/Heroes.tsx");
-        s.TiledTilesetPaths.Add("../Tilesets/Enemies.tsx");
-
-        var loaded = Deserialize(Serialize(s));
-
-        Assert.Equal(["../Tilesets/Heroes.tsx", "../Tilesets/Enemies.tsx"], loaded.TiledTilesetPaths);
-    }
-
     // ── Grid settings ─────────────────────────────────────────────────────────
 
     [Fact]

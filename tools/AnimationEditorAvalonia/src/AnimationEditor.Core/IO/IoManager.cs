@@ -27,6 +27,11 @@ namespace AnimationEditor.Core.IO
             return new FilePath(fileName.RemoveExtension().FullPath + ".aeproperties");
         }
 
+        private FilePath GetTiledSyncCompanionFileFor(FilePath fileName)
+        {
+            return new FilePath(fileName.RemoveExtension().FullPath + ".tiledsync");
+        }
+
         public void SaveCompanionFileFor(FilePath fileName, AESettingsSave settings)
         {
             var location = GetCompanionFileFor(fileName);
@@ -65,9 +70,25 @@ namespace AnimationEditor.Core.IO
             }
         }
 
+        private AETiledSyncSave? TryLoadTiledSyncSettings(string achxFile)
+        {
+            var fileToLoad = GetTiledSyncCompanionFileFor(new FilePath(achxFile));
+
+            if (!fileToLoad.Exists()) return null;
+
+            try
+            {
+                return XmlFile.Deserialize<AETiledSyncSave>(fileToLoad.FullPath);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile)
         {
-            var settings = TryLoadCompanionSettings(achxFile);
+            var settings = TryLoadTiledSyncSettings(achxFile);
             if (settings == null || settings.TiledTilesetPaths.Count == 0)
                 return Array.Empty<string>();
 
@@ -83,13 +104,21 @@ namespace AnimationEditor.Core.IO
             var achxFolder = achxFilePath.GetDirectoryContainingThis();
             var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
 
-            var settings = TryLoadCompanionSettings(achxFile) ?? new AESettingsSave();
+            var settings = TryLoadTiledSyncSettings(achxFile) ?? new AETiledSyncSave();
             var alreadyAssociated = settings.TiledTilesetPaths
                 .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
             if (!alreadyAssociated)
             {
                 settings.TiledTilesetPaths.Add(relativeTsxPath);
-                SaveCompanionFileFor(achxFilePath, settings);
+                var location = GetTiledSyncCompanionFileFor(achxFilePath);
+                try
+                {
+                    XmlFile.Serialize(settings, location.FullPath);
+                }
+                catch (Exception e)
+                {
+                    SaveFailed?.Invoke("Could not save Tiled sync companion file " + location + "\n\n" + e, e);
+                }
             }
         }
 

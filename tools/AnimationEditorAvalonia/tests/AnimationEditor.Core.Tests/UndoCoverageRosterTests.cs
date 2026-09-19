@@ -53,8 +53,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.ExportToPixiJsAsync)]                = Category.MutatingNotUndoable, // writes a PixiJS json; no model change
         [nameof(IAppCommands.HandleApplicationClosing)]           = Category.MutatingNotUndoable, // deletes a recovery file; no model change
-        [nameof(IAppCommands.AddAssociatedTiledTileset)]          = Category.MutatingNotUndoable, // writes a companion .aeproperties file; no project model change
-        [nameof(IAppCommands.AddAssociatedTiledTilesetViaDialogAsync)] = Category.MutatingNotUndoable, // dialog + writes a companion .aeproperties file; no project model change
+        [nameof(IAppCommands.AddAssociatedTiledTileset)]          = Category.MutatingNotUndoable, // writes a companion .tiledsync file; no project model change
+        [nameof(IAppCommands.AddAssociatedTiledTilesetViaDialogAsync)] = Category.MutatingNotUndoable, // dialog + writes a companion .tiledsync file; no project model change
 
         // Non-mutating -----------------------------------------------------------
         [nameof(IAppCommands.RefreshTreeNode)]              = Category.NonMutating,
