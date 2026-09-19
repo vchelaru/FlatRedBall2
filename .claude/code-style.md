@@ -51,3 +51,7 @@ Every test must explicitly declare all values it will assert against in its Arra
 Helper methods are fine for common setup (file creation, object initialization), but should accept parameters for the specific values being tested. This makes tests self-contained and prevents hidden dependencies.
 
 **Pattern**: If you assert a specific value, that value must be explicitly declared in the test's Arrange section.
+
+## File Formats
+
+New file formats introduced by this repo default to JSON, not XML. This doesn't apply to a format owned by an external tool (Tiled's `.tsx`/`.tmx`) or to `.achx`/`.achj`, which the Prerelease Status section of `CLAUDE.md` already carves out for byte-compatibility with Gum/FRB1.
