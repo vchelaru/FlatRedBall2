@@ -199,6 +199,20 @@ public class BrowserIoManagerTests
     }
 
     [Fact]
+    public void AddAssociatedTiledTilesetPath_CorruptExistingTiledSyncFile_RaisesTiledSyncParseFailed()
+    {
+        var (ioManager, store, _) = Setup();
+        store.Written["hero.tiledsync"] = "{ not valid json";
+
+        (string achxFile, Exception ex)? captured = null;
+        ioManager.TiledSyncParseFailed += (achxFile, ex) => captured = (achxFile, ex);
+        ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Heroes.tsx");
+
+        Assert.NotNull(captured);
+        Assert.Equal("hero.achx", captured!.Value.achxFile);
+    }
+
+    [Fact]
     public void AddAssociatedTiledTilesetPath_SecondDifferentPath_IsAppendedToStoredList()
     {
         var (ioManager, store, _) = Setup();

@@ -10,6 +10,16 @@ namespace AnimationEditor.Core.IO
     {
         event Action<string, Exception> SaveFailed;
         event Action<AESettingsSave> SettingsLoaded;
+
+        /// <summary>
+        /// Raised when a <c>.tiledsync</c> companion file exists on disk but fails to parse --
+        /// distinct from "the file doesn't exist," which legitimately means "no associations
+        /// configured" and stays silent. Without this, a corrupted <c>.tiledsync</c> silently
+        /// disables Tiled sync for that .achx with zero indication anything is wrong (issue
+        /// #1139). The first argument is the .achx path; the second is the exception.
+        /// </summary>
+        event Action<string, Exception> TiledSyncParseFailed;
+
         string RecoveryFilePath { get; set; }
 
         void SaveCompanionFileFor(FilePath fileName, AESettingsSave settings);

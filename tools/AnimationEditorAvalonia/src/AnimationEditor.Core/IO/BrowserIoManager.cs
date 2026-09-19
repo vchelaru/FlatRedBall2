@@ -41,6 +41,12 @@ public class BrowserIoManager : IIoManager
     public event Action<string, Exception>? SaveFailed;
     public event Action<AESettingsSave>? SettingsLoaded;
 
+    /// <inheritdoc/>
+    /// <remarks>Only fired from <see cref="AddAssociatedTiledTilesetPathAsync"/> today -- see
+    /// <see cref="GetAssociatedTiledTilesetPaths"/>'s doc comment for why the synchronous read
+    /// path never attempts a parse at all on this implementation.</remarks>
+    public event Action<string, Exception>? TiledSyncParseFailed;
+
     // The browser has no local-temp-file crash-recovery story yet (no filesystem outside a
     // user-granted directory handle) -- these members exist only to satisfy IIoManager and are
     // no-ops. Revisit if/when browser recovery is designed.
@@ -162,10 +168,26 @@ public class BrowserIoManager : IIoManager
 
             var companionName = GetTiledSyncCompanionFileName(achxFilePath);
             var existingJson = await _store.TryReadAsync(companionName);
-            var settings = existingJson is null
-                ? new AETiledSyncSave()
-                : JsonSerializer.Deserialize(existingJson, AETiledSyncJsonContext.Default.AETiledSyncSave)
-                    ?? new AETiledSyncSave();
+            AETiledSyncSave settings;
+            if (existingJson is null)
+            {
+                settings = new AETiledSyncSave();
+            }
+            else
+            {
+                try
+                {
+                    settings = JsonSerializer.Deserialize(existingJson, AETiledSyncJsonContext.Default.AETiledSyncSave)
+                        ?? new AETiledSyncSave();
+                }
+                catch (Exception parseEx)
+                {
+                    // The file exists but is corrupt -- distinct from "no associations yet," which
+                    // the null-check above already handles silently.
+                    TiledSyncParseFailed?.Invoke(achxFile, parseEx);
+                    return;
+                }
+            }
 
             var alreadyAssociated = settings.TiledTilesetPaths
                 .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));

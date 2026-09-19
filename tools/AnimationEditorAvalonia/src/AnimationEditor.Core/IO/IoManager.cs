@@ -20,6 +20,10 @@ namespace AnimationEditor.Core.IO
         }
         /// <summary>Raised when saving the companion file fails. The app layer should display the error.</summary>
         public event Action<string, Exception>? SaveFailed;
+
+        /// <inheritdoc/>
+        public event Action<string, Exception>? TiledSyncParseFailed;
+
         public string RecoveryFilePath { get; set; } =
             Path.Combine(Path.GetTempPath(), "AnimationEditor_Recovery.achx");
 
@@ -75,6 +79,7 @@ namespace AnimationEditor.Core.IO
         {
             var fileToLoad = GetTiledSyncCompanionFileFor(new FilePath(achxFile));
 
+            // No file at all legitimately means "no associations configured" -- stay silent.
             if (!fileToLoad.Exists()) return null;
 
             try
@@ -82,8 +87,11 @@ namespace AnimationEditor.Core.IO
                 var json = File.ReadAllText(fileToLoad.FullPath);
                 return JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
             }
-            catch
+            catch (Exception e)
             {
+                // The file exists but is corrupt -- this must not look identical to "no
+                // associations," or Tiled sync silently disables itself with zero indication.
+                TiledSyncParseFailed?.Invoke(achxFile, e);
                 return null;
             }
         }
