@@ -175,7 +175,9 @@ public static class AchjToTiledAnimationMapper
         return new MappedFrame(tileId, FrameDurationMs(frame.FrameLength, timeUnit));
     }
 
-    private static (float Left, float Top, float Width, float Height) FrameRectPixels(
+    /// <summary>Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse
+    /// the same pixel-rect math instead of duplicating the UV-to-pixel conversion.</summary>
+    internal static (float Left, float Top, float Width, float Height) FrameRectPixels(
         AnimationFrameSave frame, TextureCoordinateType coordinateType, TilesetAnimationInfo tilesetInfo)
     {
         if (coordinateType == TextureCoordinateType.UV)
@@ -198,7 +200,8 @@ public static class AchjToTiledAnimationMapper
 
     /// <summary>Converts a frame's display length to milliseconds -- "Second" and "Undefined" both
     /// mean seconds (matching how the runtime treats "Undefined"), "Millisecond" passes through.</summary>
-    private static int FrameDurationMs(float frameLength, TimeMeasurementUnit timeUnit) =>
+    /// <summary>Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse it.</summary>
+    internal static int FrameDurationMs(float frameLength, TimeMeasurementUnit timeUnit) =>
         timeUnit == TimeMeasurementUnit.Millisecond
             ? (int)Math.Round(frameLength)
             : (int)Math.Round(frameLength * 1000f);
