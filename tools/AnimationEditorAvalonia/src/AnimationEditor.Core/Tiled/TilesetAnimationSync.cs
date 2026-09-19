@@ -12,8 +12,9 @@ public sealed record TilesetAnimationSyncResult(int AppliedCount, IReadOnlyList<
 /// Applies <see cref="AchjToTiledAnimationMapper.Map"/> results onto a <see cref="Tileset"/>'s
 /// tiles, source-scoped so re-syncing from the same achx/achj never disturbs tiles owned by a
 /// different source, and so a chain that's since been removed or renamed away from its tile gets
-/// that tile's stale animation and tracking properties cleared rather than left behind (the gap
-/// the pull-based Tiled extension in <c>tools/tiled-achj-import/</c> has -- see issue #1133).
+/// that tile's stale animation and tracking properties cleared rather than left behind -- the gap
+/// the old pull-based Tiled scripting extension had, and the reason it was replaced by this push
+/// model entirely (issue #1133).
 /// </summary>
 public static class TilesetAnimationSync
 {

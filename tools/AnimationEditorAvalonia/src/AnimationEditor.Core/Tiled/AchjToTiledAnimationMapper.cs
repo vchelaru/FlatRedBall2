@@ -52,10 +52,11 @@ public sealed record TilesetAnimationInfo
 /// <summary>
 /// Maps a FlatRedBall2 AnimationEditor <see cref="AnimationChainListSave"/> (.achx/.achj) onto
 /// Tiled tile-animation frames (<c>{ tileId, duration }[]</c> per tile), for tileset <see
-/// cref="TilesetAnimationInfo"/>. FRB2/achx-specific glue -- ported from
-/// <c>tools/tiled-achj-import/achj-mapper.mjs</c>'s <c>mapAchjToTiledAnimations</c>, adapted to
-/// consume the already-parsed <see cref="AnimationChainListSave"/> model directly instead of
-/// re-parsing achx XML/achj JSON text.
+/// cref="TilesetAnimationInfo"/>. FRB2/achx-specific glue -- ported from the (now-removed) pull-based
+/// Tiled scripting extension's <c>mapAchjToTiledAnimations</c>, adapted to consume the
+/// already-parsed <see cref="AnimationChainListSave"/> model directly instead of re-parsing achx
+/// XML/achj JSON text. Replaces that extension entirely (issue #1133): this runs as a push from
+/// <c>AppCommands.SaveCurrentAnimationChainList</c> instead of a pull triggered from inside Tiled.
 /// </summary>
 /// <remarks>
 /// A frame is skipped (excluded from the mapped result) for one of four reasons: it references a

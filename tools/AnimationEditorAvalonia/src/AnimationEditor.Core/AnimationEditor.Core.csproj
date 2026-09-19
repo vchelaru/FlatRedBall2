@@ -29,20 +29,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
-  <!--
-    Baked into the assembly (#1128) so TiledExtensionInstaller can install the Tiled scripting
-    extension without depending on tools/tiled-achj-import/ being present alongside the shipped
-    app: only this repo's build needs that source location.
-  -->
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\..\tiled-achj-import\achj-mapper.mjs"
-                       LogicalName="AnimationEditor.Core.TiledExtension.achj-mapper.mjs"
-                       Link="TiledExtension\achj-mapper.mjs" />
-    <EmbeddedResource Include="..\..\..\tiled-achj-import\achj-import.mjs"
-                       LogicalName="AnimationEditor.Core.TiledExtension.achj-import.mjs"
-                       Link="TiledExtension\achj-import.mjs" />
-  </ItemGroup>
-
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>AnimationEditor.Core.Tests</_Parameter1>

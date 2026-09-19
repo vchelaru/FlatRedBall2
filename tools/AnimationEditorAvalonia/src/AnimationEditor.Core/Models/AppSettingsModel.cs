@@ -56,20 +56,6 @@ namespace AnimationEditor.Core.Models
         public bool SuppressDefaultHandlerPrompt { get; set; }
 
         /// <summary>
-        /// When <c>true</c>, the editor never offers to install the Tiled <c>.achj</c> import
-        /// extension. Set when the user clicks "Don't ask again" on the Tiled-install prompt
-        /// (#1128). Defaults to <c>false</c> so the prompt can appear when Tiled is detected.
-        /// </summary>
-        public bool SuppressTiledInstallPrompt { get; set; }
-
-        /// <summary>
-        /// A Tiled extensions folder the user manually picked (#1128), remembered for future
-        /// launches so they aren't asked to re-pick it. Only consulted when auto-detection of
-        /// Tiled's well-known per-OS folder fails -- see <c>MainWindow.ResolveTiledExtensionsFolder</c>.
-        /// </summary>
-        public string? TiledExtensionsFolderOverride { get; set; }
-
-        /// <summary>
         /// The folder last picked via File → Open Project Folder (#770). Rescanned on the next
         /// launch to repopulate the Project tab without requiring a re-pick. Left stale (not
         /// cleared) if the folder no longer exists -- the startup check just skips it, same as

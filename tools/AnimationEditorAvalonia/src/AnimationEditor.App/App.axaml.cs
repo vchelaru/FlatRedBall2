@@ -280,10 +280,6 @@ public partial class App : Application
 
         sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
 
-        // Installing the Tiled extension is a plain file copy -- identical on every OS, only
-        // the well-known candidate folder differs (handled inside the installer itself).
-        sc.AddSingleton<ITiledExtensionInstaller, TiledExtensionInstaller>();
-
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
             sp.GetRequiredService<ISelectedState>(),
@@ -298,8 +294,7 @@ public partial class App : Application
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            sp.GetRequiredService<IApplicationUpdater>(),
-            sp.GetRequiredService<ITiledExtensionInstaller>()));
+            sp.GetRequiredService<IApplicationUpdater>()));
 
         return sc.BuildServiceProvider();
     }

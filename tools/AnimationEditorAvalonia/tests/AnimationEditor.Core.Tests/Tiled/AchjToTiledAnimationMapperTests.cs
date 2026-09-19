@@ -7,7 +7,8 @@ namespace AnimationEditor.Core.Tests.Tiled;
 
 public class AchjToTiledAnimationMapperTests
 {
-    // 4 columns, 16x32 tiles -- matches the achj-mapper.mjs test fixture this class ports.
+    // 4 columns, 16x32 tiles -- matches the fixture the old JS extension's test suite used
+    // before this class replaced it (issue #1133).
     private static readonly TilesetAnimationInfo TilesetInfo = new()
     {
         TileWidth = 16,

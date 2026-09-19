@@ -58,7 +58,6 @@ public partial class MainWindow : Window
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
     private readonly IFileAssociationService _fileAssociation;
     private readonly IApplicationUpdater _applicationUpdater;
-    private readonly ITiledExtensionInstaller _tiledExtensionInstaller;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
 
@@ -214,8 +213,7 @@ public partial class MainWindow : Window
         ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
         string applicationDataRoot,
-        IApplicationUpdater? applicationUpdater = null,
-        ITiledExtensionInstaller? tiledExtensionInstaller = null)
+        IApplicationUpdater? applicationUpdater = null)
     {
         _applicationDataRoot = applicationDataRoot;
 
@@ -232,7 +230,6 @@ public partial class MainWindow : Window
         _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
-        _tiledExtensionInstaller = tiledExtensionInstaller ?? new TiledExtensionInstaller();
         _dialogHost = new WindowEditorDialogHost(this);
         // Desktop renders the tree with its own _treeRoots collection, so the controller
         // reads expand state from there (browser reads its AnimationTreeControl instead).
@@ -269,7 +266,6 @@ public partial class MainWindow : Window
         WireDefaultHandlerBanner();
         WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
-        WireTiledInstallBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
@@ -1039,11 +1035,6 @@ public partial class MainWindow : Window
         // default" / "Don't show again" controls in Settings still work for anyone who
         // wants to try it.
         _ = RunStartupUpdateDownloadAsync();
-
-        // Unlike the default-handler banner above, installing the Tiled extension is a plain
-        // file copy that works today (no installer/distribution blocker), so this one is shown
-        // automatically (#1128).
-        ShowTiledInstallBannerIfAppropriate();
     }
 
     /// <summary>
@@ -1110,113 +1101,6 @@ public partial class MainWindow : Window
         {
             DefaultHandlerBanner.IsVisible = true;
         }
-    }
-
-    // ── Tiled-extension install banner (issue #1128) ──────────────────────────
-
-    private void WireTiledInstallBanner()
-    {
-        InstallTiledExtensionBtn.Click += (_, _) => InstallTiledExtensionFromBanner();
-
-        RemindLaterTiledInstallBtn.Click += (_, _) => TiledInstallBanner.IsVisible = false;
-
-        DismissTiledInstallBtn.Click += (_, _) =>
-        {
-            _appSettings.SuppressTiledInstallPrompt = true;
-            SaveSettingsFile();
-            TiledInstallBanner.IsVisible = false;
-        };
-    }
-
-    /// <summary>
-    /// A remembered manual pick (<see cref="AppSettingsModel.TiledExtensionsFolderOverride"/>)
-    /// only matters once auto-detection fails -- if Tiled's well-known folder is now detected
-    /// (e.g. Tiled was installed since the user last picked a folder by hand), that live result
-    /// always wins.
-    /// </summary>
-    private string? ResolveTiledExtensionsFolder() =>
-        _tiledExtensionInstaller.DetectExtensionsFolder() ?? _appSettings.TiledExtensionsFolderOverride;
-
-    private void ShowTiledInstallBannerIfAppropriate()
-    {
-        string? folder = ResolveTiledExtensionsFolder();
-        var status = folder is null
-            ? TiledExtensionInstallStatus.NotDetected
-            : _tiledExtensionInstaller.GetStatus(folder);
-
-        if (TiledExtensionInstallPromptDecider.ShouldPrompt(
-                tiledDetected: folder is not null, status, _appSettings.SuppressTiledInstallPrompt))
-        {
-            TiledInstallBannerText.Text =
-                $"Tiled was detected on this machine. Install the FlatRedBall2 .achj import extension into {folder}?";
-            TiledInstallBanner.IsVisible = true;
-        }
-    }
-
-    /// <summary>Install button on the banner: the folder was already resolved to show the banner
-    /// in the first place, so this never needs the folder picker.</summary>
-    private void InstallTiledExtensionFromBanner()
-    {
-        string? folder = ResolveTiledExtensionsFolder();
-        TiledInstallBanner.IsVisible = false;
-        if (folder is not null)
-            InstallTiledExtensionAndReport(folder);
-    }
-
-    /// <summary>
-    /// "Install Tiled Integration…" menu command. Installs straight to a known folder
-    /// (detected, or previously chosen by the user); when no folder is known, opens a folder
-    /// picker and validates the pick before installing and remembering it for next time (#1128).
-    /// </summary>
-    private async void OnInstallTiledExtensionClick(object? sender, RoutedEventArgs e) =>
-        await InstallTiledExtensionViaMenuAsync();
-
-    private async Task InstallTiledExtensionViaMenuAsync()
-    {
-        string? folder = ResolveTiledExtensionsFolder();
-        if (folder is not null)
-        {
-            InstallTiledExtensionAndReport(folder);
-            return;
-        }
-
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Choose Tiled's extensions folder",
-            AllowMultiple = false,
-        });
-        if (folders.Count == 0 || folders[0].Path.LocalPath is not { } pickedPath) return;
-
-        InstallTiledExtensionToPickedFolder(pickedPath);
-    }
-
-    /// <summary>Test seam: exercises the same validate+install+remember path as
-    /// <see cref="InstallTiledExtensionViaMenuAsync"/>'s manual-pick branch without the native
-    /// folder picker, which headless tests can't drive.</summary>
-    internal void InstallTiledExtensionToPickedFolder(string pickedFolderPath)
-    {
-        string? validationError = _tiledExtensionInstaller.ValidateFolder(pickedFolderPath);
-        if (validationError is not null)
-        {
-            ShowStatusMessage(validationError, isError: true);
-            return;
-        }
-
-        _appSettings.TiledExtensionsFolderOverride = pickedFolderPath;
-        SaveSettingsFile();
-        InstallTiledExtensionAndReport(pickedFolderPath);
-    }
-
-    private void InstallTiledExtensionAndReport(string folder)
-    {
-        string? error = _tiledExtensionInstaller.Install(folder);
-        if (error is not null)
-        {
-            ShowStatusMessage(error, isError: true);
-            return;
-        }
-
-        Notifications.ShowToast($"Installed the Tiled .achj import extension to {folder}.");
     }
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────
@@ -2447,7 +2331,6 @@ public partial class MainWindow : Window
         // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         MenuSettings.Click += OnSettingsClick;
-        MenuInstallTiledExtension.Click += OnInstallTiledExtensionClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuCut.Click           += (_, _) => _ = HandleCutAsync();
