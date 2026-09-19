@@ -485,20 +485,13 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string, Exception>? TiledSyncFailed;
 
         /// <summary>
-        /// Raised when syncing to one associated .tsx tileset succeeds after a save -- including
-        /// when nothing needed to change (see <see cref="Tiled.TilesetAnimationSyncResult.Changed"/>).
+        /// Raised when syncing to one associated .tsx tileset actually writes a change (see
+        /// <see cref="Tiled.TilesetAnimationSyncResult.Changed"/>) -- not on every sync, since
+        /// autosave runs this on nearly every edit and most saves have nothing new to write; firing
+        /// on every one would be a meaningless constant flicker rather than useful confirmation.
         /// The first argument is the .tsx path; the second is how many chains were applied. Pairs
         /// with <see cref="TiledSyncFailed"/> for a UI status indicator that needs both outcomes.
         /// </summary>
         event Action<string, int>? TiledSyncSucceeded;
-
-        /// <summary>
-        /// Raised when the .tiledsync companion file or a currently-associated .tsx changes on
-        /// disk outside the app (e.g. a teammate's git pull) -- see
-        /// <see cref="IHotReloadWatcher.TiledSyncChangedOnDisk"/>/<see cref="IHotReloadWatcher.AssociatedTsxChangedOnDisk"/>.
-        /// Purely a live-feedback signal: the sync pipeline already re-reads both fresh on every
-        /// save, so this never needs to trigger a reload by itself. Arg: the changed file's path.
-        /// </summary>
-        event Action<string>? TiledSyncSourceChangedOnDisk;
     }
 }

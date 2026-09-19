@@ -309,12 +309,10 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
 
-            // Start watching the loaded file, its referenced PNGs, its .tiledsync companion, and
-            // any currently-associated .tsx tilesets.
+            // Start watching the loaded file and its referenced PNGs.
             var achxDir = System.IO.Path.GetDirectoryName(fileName) ?? string.Empty;
             var pngPaths = GetReferencedAbsolutePngPaths(fileName, achxDir);
-            var tsxPaths = _ioManager.GetAssociatedTiledTilesetPaths(fileName);
-            HotReloadWatcher.StartWatching(fileName, pngPaths, tsxPaths);
+            HotReloadWatcher.StartWatching(fileName, pngPaths);
 
             EditorProjectModelChanged?.Invoke(fileName);
         }
@@ -456,19 +454,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc/>
         public event Action<string, int>? TiledSyncSucceeded;
 
-        /// <inheritdoc/>
-        public event Action<string>? TiledSyncSourceChangedOnDisk;
-
         public void AddAssociatedTiledTileset(string tsxAbsolutePath)
         {
             if (string.IsNullOrEmpty(_pm.FileName)) return;
-            // Must happen before the write below, or the watcher (already watching this achx's
-            // directory) sees our own .tiledsync write as an external change and misreports it.
-            HotReloadWatcher.RecordOwnSave(_ioManager.GetTiledSyncCompanionFilePath(_pm.FileName));
             _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
-            // Start watching the newly-associated .tsx immediately rather than waiting for the
-            // next SyncHotReloadWatcher/achx-load call.
-            HotReloadWatcher.UpdateAssociatedTsxPaths(_ioManager.GetAssociatedTiledTilesetPaths(_pm.FileName));
         }
 
         public async Task AddAssociatedTiledTilesetViaDialogAsync()
@@ -508,15 +497,6 @@ namespace AnimationEditor.Core.CommandsAndState
             }
             if (tsxPaths.Count == 0) return;
 
-            // Must happen before SyncAll (which may write to some of these) runs, or the watcher
-            // sees our own .tsx write as an external change and misreports it -- same reasoning as
-            // the RecordOwnSave call in AddAssociatedTiledTileset. Recorded for every candidate path
-            // up front rather than only the ones actually written, matching the achx save's
-            // record-before-write pattern; an unused entry for a path that turns out unchanged (see
-            // TilesetAnimationSyncResult.Changed) is harmless.
-            foreach (var tsxPath in tsxPaths)
-                HotReloadWatcher.RecordOwnSave(tsxPath);
-
             // Snapshot rather than hand the live model to the mapper: defensive even though this
             // runs synchronously today, so this stays safe if a future change backgrounds it.
             var snapshot = AchjSyncSnapshot.Clone(acls);
@@ -534,7 +514,10 @@ namespace AnimationEditor.Core.CommandsAndState
             foreach (var outcome in outcomes)
             {
                 if (outcome.Success)
-                    TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
+                {
+                    if (outcome.Changed)
+                        TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
+                }
                 else
                     TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
             }
@@ -2217,20 +2200,6 @@ namespace AnimationEditor.Core.CommandsAndState
 
             HotReloadWatcher.AchxDeletedOnDisk += path =>
                 DoOnUiThread(() => _events.RaiseAchxDeletedOnDisk(path));
-
-            HotReloadWatcher.TiledSyncChangedOnDisk += path =>
-                DoOnUiThread(() =>
-                {
-                    // The association list may have changed -- refresh the watch list itself
-                    // (not just notify), so a newly-added .tsx starts getting watched too,
-                    // rather than only picking it up on the next achx save.
-                    if (!string.IsNullOrEmpty(_pm.FileName))
-                        HotReloadWatcher.UpdateAssociatedTsxPaths(_ioManager.GetAssociatedTiledTilesetPaths(_pm.FileName));
-                    TiledSyncSourceChangedOnDisk?.Invoke(path);
-                });
-
-            HotReloadWatcher.AssociatedTsxChangedOnDisk += path =>
-                DoOnUiThread(() => TiledSyncSourceChangedOnDisk?.Invoke(path));
         }
 
         /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
@@ -2284,10 +2253,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var achxDir  = !string.IsNullOrEmpty(achxPath)
                 ? System.IO.Path.GetDirectoryName(achxPath) ?? string.Empty
                 : string.Empty;
-            var tsxPaths = string.IsNullOrEmpty(achxPath)
-                ? Array.Empty<string>()
-                : _ioManager.GetAssociatedTiledTilesetPaths(achxPath);
-            HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir), tsxPaths);
+            HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir));
         }
 
         private IEnumerable<string> GetReferencedAbsolutePngPaths(string _, string achxDir)

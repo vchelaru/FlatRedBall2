@@ -391,8 +391,8 @@
                                FontFamily="Consolas,Menlo,Monospace"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
-                    <!-- Tiled tileset sync status (issue #1139), hidden until a sync has run,
-                         associations changed on disk, or an association was just added. -->
+                    <!-- Tiled tileset sync status (issue #1139), hidden until a sync has
+                         actually written a change or failed. -->
                     <StackPanel x:Name="TiledSyncStatusPanel"
                                 Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                                 IsVisible="False">

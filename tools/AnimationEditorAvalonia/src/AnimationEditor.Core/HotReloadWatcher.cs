@@ -22,17 +22,12 @@ namespace AnimationEditor.Core.HotReload
             new(StringComparer.OrdinalIgnoreCase);
 
         private string? _achxPath;
-        private string? _tiledSyncPath;
         private readonly HashSet<string> _watchedPngPaths =
-            new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _watchedTsxPaths =
             new(StringComparer.OrdinalIgnoreCase);
 
         public event Action<string>? AchxChangedOnDisk;
         public event Action<string>? PngChangedOnDisk;
         public event Action<string>? AchxDeletedOnDisk;
-        public event Action<string>? TiledSyncChangedOnDisk;
-        public event Action<string>? AssociatedTsxChangedOnDisk;
 
         public bool IsEnabled { get; set; } = true;
 
@@ -42,28 +37,31 @@ namespace AnimationEditor.Core.HotReload
             _flushTimer = new Timer(_ => FlushCoalescer(), null, Timeout.Infinite, Timeout.Infinite);
         }
 
-        public void StartWatching(string achxPath, IEnumerable<string> pngPaths, IEnumerable<string> tsxPaths)
+        public void StartWatching(string achxPath, IEnumerable<string> pngPaths)
         {
             StopWatching();
 
             lock (_lock)
             {
                 _achxPath = Canonicalize(achxPath);
-                // .tiledsync is always the achx's own extension swapped -- same convention as
-                // IoManager.GetTiledSyncCompanionFileFor -- so no separate path needs passing in.
-                _tiledSyncPath = string.IsNullOrEmpty(achxPath)
-                    ? null
-                    : Canonicalize(Path.ChangeExtension(_achxPath, ".tiledsync"));
-
                 _watchedPngPaths.Clear();
                 foreach (var p in pngPaths)
                     _watchedPngPaths.Add(Canonicalize(p));
 
-                _watchedTsxPaths.Clear();
-                foreach (var t in tsxPaths)
-                    _watchedTsxPaths.Add(Canonicalize(t));
+                var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var dir in ComputeWatchedDirectories())
+                var achxDir = Path.GetDirectoryName(_achxPath);
+                if (!string.IsNullOrEmpty(achxDir) && Directory.Exists(achxDir))
+                    dirs.Add(achxDir);
+
+                foreach (var png in _watchedPngPaths)
+                {
+                    var dir = Path.GetDirectoryName(png);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                        dirs.Add(dir);
+                }
+
+                foreach (var dir in dirs)
                     AddWatcher(dir);
             }
 
@@ -82,63 +80,31 @@ namespace AnimationEditor.Core.HotReload
                 foreach (var p in added)   _watchedPngPaths.Add(p);
                 foreach (var p in removed) _watchedPngPaths.Remove(p);
 
-                SyncWatchersToCurrentDirectories();
-            }
-        }
+                // Add watchers for newly-referenced directories
+                foreach (var png in added)
+                {
+                    var dir = Path.GetDirectoryName(png);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir) &&
+                        !_watchers.ContainsKey(dir))
+                        AddWatcher(dir);
+                }
 
-        public void UpdateAssociatedTsxPaths(IEnumerable<string> newTsxPaths)
-        {
-            lock (_lock)
-            {
-                var newSet = new HashSet<string>(
-                    newTsxPaths.Select(Canonicalize),
-                    StringComparer.OrdinalIgnoreCase);
-                var (added, removed) = ReferencedFileDiff.Diff(_watchedTsxPaths, newSet);
+                // Remove watchers for directories no longer needed
+                var achxDir = _achxPath != null ? Path.GetDirectoryName(_achxPath) : null;
+                var stillNeeded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrEmpty(achxDir)) stillNeeded.Add(achxDir);
+                foreach (var p in _watchedPngPaths)
+                {
+                    var dir = Path.GetDirectoryName(p);
+                    if (!string.IsNullOrEmpty(dir)) stillNeeded.Add(dir);
+                }
 
-                foreach (var p in added)   _watchedTsxPaths.Add(p);
-                foreach (var p in removed) _watchedTsxPaths.Remove(p);
-
-                SyncWatchersToCurrentDirectories();
-            }
-        }
-
-        /// <summary>Every directory that must currently be watched: the achx's own directory
-        /// (also home to <c>.tiledsync</c>), plus every watched PNG's and .tsx's directory.
-        /// Caller must hold <see cref="_lock"/>.</summary>
-        private HashSet<string> ComputeWatchedDirectories()
-        {
-            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var achxDir = _achxPath != null ? Path.GetDirectoryName(_achxPath) : null;
-            if (!string.IsNullOrEmpty(achxDir) && Directory.Exists(achxDir))
-                dirs.Add(achxDir);
-
-            foreach (var path in _watchedPngPaths.Concat(_watchedTsxPaths))
-            {
-                var dir = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                    dirs.Add(dir);
-            }
-
-            return dirs;
-        }
-
-        /// <summary>Adds watchers for any newly-needed directory and disposes watchers for any
-        /// directory no longer referenced by the achx, a PNG, or a .tsx. Caller must hold
-        /// <see cref="_lock"/>.</summary>
-        private void SyncWatchersToCurrentDirectories()
-        {
-            var stillNeeded = ComputeWatchedDirectories();
-
-            foreach (var dir in stillNeeded)
-                if (!_watchers.ContainsKey(dir))
-                    AddWatcher(dir);
-
-            var toRemove = _watchers.Keys.Where(d => !stillNeeded.Contains(d)).ToList();
-            foreach (var d in toRemove)
-            {
-                _watchers[d].Dispose();
-                _watchers.Remove(d);
+                var toRemove = _watchers.Keys.Where(d => !stillNeeded.Contains(d)).ToList();
+                foreach (var d in toRemove)
+                {
+                    _watchers[d].Dispose();
+                    _watchers.Remove(d);
+                }
             }
         }
 
@@ -151,9 +117,7 @@ namespace AnimationEditor.Core.HotReload
                 foreach (var w in _watchers.Values) w.Dispose();
                 _watchers.Clear();
                 _achxPath = null;
-                _tiledSyncPath = null;
                 _watchedPngPaths.Clear();
-                _watchedTsxPaths.Clear();
             }
         }
 
@@ -218,16 +182,12 @@ namespace AnimationEditor.Core.HotReload
             if (!IsEnabled) return;
 
             string? achxPath;
-            string? tiledSyncPath;
             HashSet<string> pngPaths;
-            HashSet<string> tsxPaths;
 
             lock (_lock)
             {
                 achxPath = _achxPath;
-                tiledSyncPath = _tiledSyncPath;
                 pngPaths = new HashSet<string>(_watchedPngPaths, StringComparer.OrdinalIgnoreCase);
-                tsxPaths = new HashSet<string>(_watchedTsxPaths, StringComparer.OrdinalIgnoreCase);
             }
 
             long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -239,11 +199,8 @@ namespace AnimationEditor.Core.HotReload
                 bool isAchx = achxPath != null &&
                     string.Equals(normalizedPath, achxPath, StringComparison.OrdinalIgnoreCase);
                 bool isPng = pngPaths.Contains(normalizedPath);
-                bool isTiledSync = tiledSyncPath != null &&
-                    string.Equals(normalizedPath, tiledSyncPath, StringComparison.OrdinalIgnoreCase);
-                bool isTsx = tsxPaths.Contains(normalizedPath);
 
-                if (!isAchx && !isPng && !isTiledSync && !isTsx) continue;
+                if (!isAchx && !isPng) continue;
 
                 if (isAchx)
                 {
@@ -257,16 +214,6 @@ namespace AnimationEditor.Core.HotReload
                     if (type != WatcherChangeType.Deleted)
                         PngChangedOnDisk?.Invoke(normalizedPath);
                     // PNG deleted: future frames referencing it will just show as missing
-                }
-                else if (isTiledSync)
-                {
-                    if (type != WatcherChangeType.Deleted)
-                        TiledSyncChangedOnDisk?.Invoke(normalizedPath);
-                }
-                else if (isTsx)
-                {
-                    if (type != WatcherChangeType.Deleted)
-                        AssociatedTsxChangedOnDisk?.Invoke(normalizedPath);
                 }
             }
         }

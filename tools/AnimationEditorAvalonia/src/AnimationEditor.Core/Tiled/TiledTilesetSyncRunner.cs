@@ -12,11 +12,12 @@ public sealed record TiledTilesetSyncOutcome
     public required string TsxPath { get; init; }
     public required bool Success { get; init; }
     public int AppliedCount { get; init; }
+    public bool Changed { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public Exception? Error { get; init; }
 
-    public static TiledTilesetSyncOutcome SuccessOutcome(string tsxPath, int appliedCount, IReadOnlyList<string> warnings) =>
-        new() { TsxPath = tsxPath, Success = true, AppliedCount = appliedCount, Warnings = warnings };
+    public static TiledTilesetSyncOutcome SuccessOutcome(string tsxPath, int appliedCount, bool changed, IReadOnlyList<string> warnings) =>
+        new() { TsxPath = tsxPath, Success = true, AppliedCount = appliedCount, Changed = changed, Warnings = warnings };
 
     public static TiledTilesetSyncOutcome FailureOutcome(string tsxPath, Exception error) =>
         new() { TsxPath = tsxPath, Success = false, Error = error };
@@ -54,7 +55,7 @@ public static class TiledTilesetSyncRunner
                 if (syncResult.Changed)
                     TsxWriter.Write(tileset, tsxPath);
 
-                outcomes.Add(TiledTilesetSyncOutcome.SuccessOutcome(tsxPath, syncResult.AppliedCount, syncResult.Warnings));
+                outcomes.Add(TiledTilesetSyncOutcome.SuccessOutcome(tsxPath, syncResult.AppliedCount, syncResult.Changed, syncResult.Warnings));
             }
             catch (Exception ex)
             {

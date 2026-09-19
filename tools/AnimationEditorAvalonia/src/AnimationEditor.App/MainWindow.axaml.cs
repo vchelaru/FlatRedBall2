@@ -1172,9 +1172,6 @@ public partial class MainWindow : Window
         _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
                 "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {appliedCount} chain(s) applied"));
-        _appCommands.TiledSyncSourceChangedOnDisk += path =>
-            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
-                "Tileset associations changed on disk", _unsavedBrush, $"{Path.GetFileName(path)} changed on disk -- will re-sync on next save"));
 
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>

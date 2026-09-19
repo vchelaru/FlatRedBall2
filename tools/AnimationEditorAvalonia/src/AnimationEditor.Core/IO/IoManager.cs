@@ -96,10 +96,6 @@ namespace AnimationEditor.Core.IO
             }
         }
 
-        /// <inheritdoc/>
-        public string GetTiledSyncCompanionFilePath(string achxFile) =>
-            GetTiledSyncCompanionFileFor(new FilePath(achxFile)).FullPath;
-
         public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile)
         {
             var settings = TryLoadTiledSyncSettings(achxFile);
