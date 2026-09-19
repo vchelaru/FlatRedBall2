@@ -2,6 +2,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -122,6 +123,12 @@ public class BrowserIoManager : IIoManager
             return null;
         }
     }
+
+    // Tiled tileset sync is a desktop-only feature (DotTiled reads/writes real files; see
+    // AnimationEditor.Core/Tiled/) -- these exist only to satisfy IIoManager. Reading back
+    // associations synchronously inherits TryLoadCompanionSettings's null-on-browser limit above.
+    public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile) => Array.Empty<string>();
+    public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile) { }
 
     private void ApplySettings(AESettingsSave settings)
     {

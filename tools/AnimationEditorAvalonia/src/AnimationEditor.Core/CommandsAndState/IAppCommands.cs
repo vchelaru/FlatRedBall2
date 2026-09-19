@@ -454,5 +454,24 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
         void DuplicateSelection(CopySelectionPayload payload);
+
+        // ── Tiled tileset sync (issue #1133) ─────────────────────────────────────
+
+        /// <summary>
+        /// Associates <paramref name="tsxAbsolutePath"/> with the current project (via
+        /// <see cref="IIoManager.AddAssociatedTiledTilesetPath"/>) so every future save syncs this
+        /// project's animation chains into that Tiled tileset. No-op if the project has never been
+        /// saved (<c>ProjectManager.FileName</c> is null) or the path is already associated.
+        /// </summary>
+        void AddAssociatedTiledTileset(string tsxAbsolutePath);
+
+        /// <summary>
+        /// Raised when syncing to one associated .tsx tileset fails after a save (missing file, an
+        /// unsupported <c>TsxWriter</c> feature, etc.). The first argument is the .tsx path; the
+        /// second is the exception. A failure here never affects the .achx save itself, which has
+        /// already completed by the time this fires -- the app layer should surface it as a
+        /// non-blocking toast/log entry, not retry the .achx save.
+        /// </summary>
+        event Action<string, Exception>? TiledSyncFailed;
     }
 }

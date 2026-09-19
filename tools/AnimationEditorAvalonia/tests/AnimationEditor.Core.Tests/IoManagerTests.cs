@@ -168,6 +168,49 @@ public class IoManagerTests
         Assert.Equal(150, loaded?.PreviewZoomPercent);
     }
 
+    // ── Associated Tiled tilesets ─────────────────────────────────────────────
+
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_NewPath_IsReturnedByGetAssociatedTiledTilesetPaths()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        Directory.CreateDirectory(dir.Path + "/Tilesets");
+        var achxPath = dir.Path + "/hero.achx";
+        var tsxPath = dir.Path + "/Tilesets/Heroes.tsx";
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+        var associated = ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath);
+
+        Assert.Single(associated);
+        Assert.Equal(new FilePath(tsxPath), new FilePath(associated[0]));
+    }
+
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_SamePathTwice_IsNotDuplicated()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = dir.Path + "/hero.achx";
+        var tsxPath = dir.Path + "/Heroes.tsx";
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+
+        Assert.Single(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
+    }
+
+    [Fact]
+    public void GetAssociatedTiledTilesetPaths_NoCompanionFile_ReturnsEmpty()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+
+        var associated = ctx.IoManager.GetAssociatedTiledTilesetPaths(dir.Path + "/never-saved.achx");
+
+        Assert.Empty(associated);
+    }
+
     [Fact]
     public void SaveCompanionFileFor_WhenDirectoryDoesNotExist_FiresSaveFailed()
     {

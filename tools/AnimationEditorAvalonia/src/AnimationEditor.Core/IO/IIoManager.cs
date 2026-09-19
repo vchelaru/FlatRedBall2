@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Data;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.Collections.Generic;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
@@ -22,6 +23,22 @@ namespace AnimationEditor.Core.IO
         /// on tab switch — should use this instead of <see cref="LoadAndApplyCompanionFileFor"/>.
         /// </summary>
         AESettingsSave? TryLoadCompanionSettings(string achxFile);
+
+        /// <summary>
+        /// Returns the absolute paths of every Tiled <c>.tsx</c> tileset associated with
+        /// <paramref name="achxFile"/> via <see cref="AddAssociatedTiledTilesetPath"/> -- the
+        /// files <c>ProjectManager.SaveAnimationChainListAsync</c> should sync this project's
+        /// animation chains into on save. Empty when no companion file exists or none are set.
+        /// </summary>
+        IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile);
+
+        /// <summary>
+        /// Records <paramref name="tsxFile"/> (stored relative to <paramref name="achxFile"/>'s
+        /// folder) as a tileset that should be kept in sync with this .achx/.achj's animation
+        /// chains. A no-op if already associated.
+        /// </summary>
+        void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile);
+
         void WriteRecoveryFile(AnimationChainListSave? animationChainListSave);
         void DeleteRecoveryFile();
         bool RecoveryFileExists();

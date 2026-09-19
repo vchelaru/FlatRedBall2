@@ -4,6 +4,7 @@ using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Tiled;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
@@ -431,12 +432,69 @@ namespace AnimationEditor.Core.CommandsAndState
                 catch
                 {
                     _undoManager.MarkSaveFailed();
+                    return;
                 }
+
+                SyncAssociatedTiledTilesets(target);
             }
             else
             {
                 _ioManager.WriteRecoveryFile(_pm.AnimationChainListSave);
             }
+        }
+
+        /// <inheritdoc/>
+        public event Action<string, Exception>? TiledSyncFailed;
+
+        public void AddAssociatedTiledTileset(string tsxAbsolutePath)
+        {
+            if (string.IsNullOrEmpty(_pm.FileName)) return;
+            _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
+        }
+
+        /// <summary>
+        /// Runs on every successful .achx/.achj save (including autosave, so this must stay cheap
+        /// when nothing is associated -- see <see cref="AddAssociatedTiledTileset"/>). Runs
+        /// synchronously rather than backgrounded: the common case (no associated tilesets) is a
+        /// single list lookup, and even the rare case (a handful of .tsx files) is small XML
+        /// DotTiled I/O -- not slow enough to justify the complexity of coordinating a background
+        /// task against a project model the user may keep editing while it runs. A failure for one
+        /// .tsx never rolls back or retries the .achx save, which has already succeeded by this point.
+        /// </summary>
+        private void SyncAssociatedTiledTilesets(string achxPath)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null) return;
+
+            IReadOnlyList<string> tsxPaths;
+            try
+            {
+                tsxPaths = _ioManager.GetAssociatedTiledTilesetPaths(achxPath);
+            }
+            catch (Exception ex)
+            {
+                TiledSyncFailed?.Invoke(achxPath, ex);
+                return;
+            }
+            if (tsxPaths.Count == 0) return;
+
+            // Snapshot rather than hand the live model to the mapper: defensive even though this
+            // runs synchronously today, so this stays safe if a future change backgrounds it.
+            var snapshot = AchjSyncSnapshot.Clone(acls);
+            IReadOnlyList<TiledTilesetSyncOutcome> outcomes;
+            try
+            {
+                outcomes = TiledTilesetSyncRunner.SyncAll(snapshot, achxPath, tsxPaths);
+            }
+            catch (Exception ex)
+            {
+                TiledSyncFailed?.Invoke(achxPath, ex);
+                return;
+            }
+
+            foreach (var outcome in outcomes)
+                if (!outcome.Success)
+                    TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
         }
 
         /// <summary>

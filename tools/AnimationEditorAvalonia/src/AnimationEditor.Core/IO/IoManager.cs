@@ -2,7 +2,9 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
@@ -60,6 +62,34 @@ namespace AnimationEditor.Core.IO
             catch
             {
                 return null;
+            }
+        }
+
+        public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile)
+        {
+            var settings = TryLoadCompanionSettings(achxFile);
+            if (settings == null || settings.TiledTilesetPaths.Count == 0)
+                return Array.Empty<string>();
+
+            var achxFolder = new FilePath(achxFile).GetDirectoryContainingThis();
+            return settings.TiledTilesetPaths
+                .Select(relative => new FilePath(achxFolder.FullPath + relative).FullPath)
+                .ToList();
+        }
+
+        public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile)
+        {
+            var achxFilePath = new FilePath(achxFile);
+            var achxFolder = achxFilePath.GetDirectoryContainingThis();
+            var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
+
+            var settings = TryLoadCompanionSettings(achxFile) ?? new AESettingsSave();
+            var alreadyAssociated = settings.TiledTilesetPaths
+                .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
+            if (!alreadyAssociated)
+            {
+                settings.TiledTilesetPaths.Add(relativeTsxPath);
+                SaveCompanionFileFor(achxFilePath, settings);
             }
         }
 
