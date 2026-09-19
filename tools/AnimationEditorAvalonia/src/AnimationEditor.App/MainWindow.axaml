@@ -1018,7 +1018,8 @@
                                         </Border>
 
                                         <!-- TRANSFORM section -->
-                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                        <Border x:Name="PropTransformSection"
+                                                BorderBrush="{DynamicResource LineBrush}"
                                                 BorderThickness="0,0,0,1"
                                                 Padding="12,8,12,10">
                                             <StackPanel Spacing="8">
@@ -1100,7 +1101,8 @@
                                         </Border>
 
                                         <!-- COLOR section: per-frame tint. Mode previews as a reference; runtimes apply it as they choose. -->
-                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                        <Border x:Name="PropColorSection"
+                                                BorderBrush="{DynamicResource LineBrush}"
                                                 BorderThickness="0,0,0,1"
                                                 Padding="12,8,12,10">
                                             <StackPanel Spacing="8">

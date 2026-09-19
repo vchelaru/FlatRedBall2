@@ -5234,8 +5234,16 @@ public partial class MainWindow : Window
             if (selectedChain is not null)
                 LoopToggle.IsChecked = selectedChain.Loop;
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
-            PropRectPanel.IsVisible   = rect  is not null;
-            PropCirclePanel.IsVisible = circ  is not null;
+            PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
+            PropCirclePanel.IsVisible = circ  is not null && !_projectManager.IsNativeTsxProject;
+
+            // A native tsx project can't express flip/relative-offset/color data (issue #1140) --
+            // hide the sections that would let a user set values that get silently dropped on save.
+            // These never actually contain data for a tsx-originated frame (the reverse mapper
+            // never populates them), so this is about not offering the controls at all, not about
+            // clearing anything.
+            PropTransformSection.IsVisible = !_projectManager.IsNativeTsxProject;
+            PropColorSection.IsVisible     = !_projectManager.IsNativeTsxProject;
 
             // Disable (not just visually leave typeable) whichever panel is showing when its
             // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled

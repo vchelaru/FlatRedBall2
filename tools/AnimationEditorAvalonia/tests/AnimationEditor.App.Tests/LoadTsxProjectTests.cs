@@ -118,4 +118,38 @@ public class LoadTsxProjectTests
             Directory.Delete(dir, true);
         }
     }
+
+    [AvaloniaFact]
+    public void SelectingFrame_NativeTsxProject_HidesTransformAndColorSections()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var path = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(path, TsxFixtureXml);
+
+            typeof(MainWindow)
+                .GetMethod("LoadAnimationFileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, [path, false]);
+            Dispatcher.UIThread.RunJobs();
+
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
+            ctx.SelectedState.SelectedFrame = chain.Frames[0];
+            Dispatcher.UIThread.RunJobs();
+
+            var framePanel = window.FindControl<StackPanel>("PropFramePanel")!;
+            var transformSection = window.FindControl<Border>("PropTransformSection")!;
+            var colorSection = window.FindControl<Border>("PropColorSection")!;
+            Assert.True(framePanel.IsVisible);
+            Assert.False(transformSection.IsVisible);
+            Assert.False(colorSection.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
 }
