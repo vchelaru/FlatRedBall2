@@ -80,4 +80,42 @@ public class LoadTsxProjectTests
             Directory.Delete(dir, true);
         }
     }
+
+    [AvaloniaFact]
+    public void LoadAnimationFileAsync_TsxFile_ForcesGridSizeToTsxTileSizeAndLocksSnapToGrid()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var path = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(path, TsxFixtureXml);
+
+            typeof(MainWindow)
+                .GetMethod("LoadAnimationFileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, [path, false]);
+            Dispatcher.UIThread.RunJobs();
+
+            var gridSizeInput = window.FindControl<AnimationEditor.Views.Controls.FlankerNumericField>("GridSizeInput")!;
+            var snapToGridCheck = window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("SnapToGridCheck")!;
+            Assert.Equal(16m, gridSizeInput.Value);
+            Assert.True(snapToGridCheck.IsChecked);
+
+            // Editing the grid size for a native tsx project must revert.
+            gridSizeInput.Value = 32m;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(16m, gridSizeInput.Value);
+
+            // Unchecking snap-to-grid must revert too -- the tsx grid can't be turned off.
+            snapToGridCheck.IsChecked = false;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(snapToGridCheck.IsChecked);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
 }

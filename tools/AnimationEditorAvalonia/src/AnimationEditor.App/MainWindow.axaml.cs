@@ -1208,6 +1208,7 @@ public partial class MainWindow : Window
                 UpdateTitle();
                 UpdateStatusBar();
                 RefreshFilesPanel();
+                SyncGridControlsToProject();
 
                 // If that tab was an Untitled sentinel, promote it to the real file path.
                 if (toPromote != null && IsUntitledTab(toPromote))
@@ -1331,6 +1332,13 @@ public partial class MainWindow : Window
 
     private void OnSnapToGridChanged(object? sender, RoutedEventArgs e)
     {
+        // A native tsx project's grid can't be turned off (issue #1140) -- revert the uncheck.
+        if (_projectManager.IsNativeTsxProject && SnapToGridCheck.IsChecked != true)
+        {
+            SnapToGridCheck.IsChecked = true;
+            return;
+        }
+
         WireframeCtrl.SetGrid(
             SnapToGridCheck.IsChecked == true,
             GetGridSizeFromInput());
@@ -1339,8 +1347,41 @@ public partial class MainWindow : Window
 
     private int GetGridSizeFromInput() => (int)(GridSizeInput.Value ?? 16m);
 
+    /// <summary>
+    /// A native tsx project's grid is fixed to the tsx's own tile size, not user-configurable
+    /// (issue #1140): sets the toolbar grid controls to match and turns snap-to-grid on. Any
+    /// further edit to the size is reverted by <see cref="ApplyGridSize"/>. Deliberately doesn't
+    /// touch <see cref="Avalonia.Controls.Control.IsEnabled"/> on either control -- GridSizeInput's
+    /// IsEnabled is XAML-bound to SnapToGridCheck.IsChecked, and setting it directly here would
+    /// permanently replace that binding with a local value (Avalonia clears an active binding when
+    /// its target property is set imperatively), breaking the enable/disable-by-checkbox behavior
+    /// for every achx/achj project opened afterward. <see
+    /// cref="AnimationEditor.Core.ProjectManager.TsxTileSize"/> only exposes one size because <see
+    /// cref="AnimationEditor.Views.Controls.WireframeControl.SetGrid"/> only takes one -- a
+    /// non-square tsx tile can't be represented by this grid today, same limitation as before this
+    /// feature.
+    /// </summary>
+    private void SyncGridControlsToProject()
+    {
+        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileSize is { } tileSize)
+        {
+            GridSizeInput.Value = tileSize.Width;
+            SnapToGridCheck.IsChecked = true;
+            WireframeCtrl.SetGrid(true, tileSize.Width);
+        }
+    }
+
     private void ApplyGridSize()
     {
+        // A native tsx project's grid size is fixed to the tsx's own tile size (issue #1140) --
+        // revert any edit rather than applying it.
+        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileSize is { } lockedSize
+            && GetGridSizeFromInput() != lockedSize.Width)
+        {
+            GridSizeInput.Value = lockedSize.Width;
+            return;
+        }
+
         if (SnapToGridCheck.IsChecked == true)
             WireframeCtrl.SetGrid(true, GetGridSizeFromInput());
         SaveCompanionFile();
