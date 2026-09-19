@@ -20,11 +20,27 @@ namespace AnimationEditor.Core
 
         TextureCoordinateType OnDiskCoordinateType { get; set; }
 
+        /// <summary>Whether the currently loaded project is a native <c>.tsx</c> project (see
+        /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
+        bool IsNativeTsxProject { get; }
+
+        /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
+        /// project. Not user-configurable for a native tsx project (issue #1140).</summary>
+        (int Width, int Height)? TsxTileSize { get; }
+
         void LoadAnimationChain(
             FilePath fileName,
             AnimationChainListSave? preParsed = null,
             IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null);
         void SaveAnimationChainList(string targetPath);
+
+        /// <summary>Opens <paramref name="fileName"/> as a native AnimationEditor project -- see
+        /// <see cref="ProjectManager.LoadTsxProject"/>.</summary>
+        void LoadTsxProject(FilePath fileName);
+
+        /// <summary>Saves back to the tsx opened by <see cref="LoadTsxProject"/>; no-op if none is
+        /// loaded. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
+        void SaveTsxProject(string? targetPath = null);
 
         /// <summary>
         /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms

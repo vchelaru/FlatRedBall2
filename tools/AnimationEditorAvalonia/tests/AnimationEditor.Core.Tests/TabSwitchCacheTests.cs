@@ -155,6 +155,11 @@ public class TabSwitchCacheTests : IDisposable
             set => _inner.OnDiskCoordinateType = value;
         }
 
+        public bool IsNativeTsxProject => _inner.IsNativeTsxProject;
+        public (int Width, int Height)? TsxTileSize => _inner.TsxTileSize;
+        public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
+        public void SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
+
         public void LoadAnimationChain(
             FilePath fileName,
             AnimationChainListSave? preParsed = null,

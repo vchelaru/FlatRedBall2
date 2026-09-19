@@ -31,6 +31,10 @@ public class AdjustFrameTimeLiveEditTests
         public string? FileName { get; set; }
         public string? ProjectFolderPath { get; set; }
         public TextureCoordinateType OnDiskCoordinateType { get; set; }
+        public bool IsNativeTsxProject => false;
+        public (int Width, int Height)? TsxTileSize => null;
+        public void LoadTsxProject(FilePath fileName) { }
+        public void SaveTsxProject(string? targetPath = null) { }
 
         public void LoadAnimationChain(
             FilePath fileName,
