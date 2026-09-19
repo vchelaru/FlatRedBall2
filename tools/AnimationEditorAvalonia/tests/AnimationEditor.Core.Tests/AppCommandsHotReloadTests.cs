@@ -5,7 +5,9 @@ using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Tests;
 
@@ -231,26 +233,119 @@ public class AppCommandsHotReloadTests : IDisposable
         Assert.Contains(expectedAbs, spy.LastStartPngPaths!, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void SyncHotReloadWatcher_SavedProjectWithAssociatedTsx_PassesTsxPaths()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(_dir.Path, "anim.achx");
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.NotNull(spy.LastStartTsxPaths);
+        Assert.Contains(new FilePath(tsxPath), spy.LastStartTsxPaths!.Select(p => new FilePath(p)));
+    }
+
+    // ── AddAssociatedTiledTileset: watcher sync ───────────────────────────────
+
+    [Fact]
+    public void AddAssociatedTiledTileset_NewAssociation_UpdatesWatcherTsxList()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(_dir.Path, "hero.achx");
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        _ctx.ProjectManager.FileName = achxPath;
+
+        _ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+
+        Assert.NotNull(spy.LastUpdateAssociatedTsxPaths);
+        Assert.Contains(new FilePath(tsxPath), spy.LastUpdateAssociatedTsxPaths!.Select(p => new FilePath(p)));
+    }
+
+    // ── WireHotReloadWatcher: Tiled-sync-source-changed wiring (issue #1139) ─
+
+    [Fact]
+    public void WireHotReloadWatcher_AssociatedTsxChangedOnDisk_RaisesTiledSyncSourceChangedOnDisk()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        _ctx.AppCommands.WireHotReloadWatcher();
+
+        string? raisedPath = null;
+        _ctx.AppCommands.TiledSyncSourceChangedOnDisk += p => raisedPath = p;
+        spy.RaiseAssociatedTsxChangedOnDisk("/some/Heroes.tsx");
+
+        Assert.Equal("/some/Heroes.tsx", raisedPath);
+    }
+
+    [Fact]
+    public void WireHotReloadWatcher_TiledSyncChangedOnDisk_RaisesTiledSyncSourceChangedOnDisk()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        _ctx.ProjectManager.FileName = Path.Combine(_dir.Path, "hero.achx");
+        _ctx.AppCommands.WireHotReloadWatcher();
+
+        string? raisedPath = null;
+        _ctx.AppCommands.TiledSyncSourceChangedOnDisk += p => raisedPath = p;
+        spy.RaiseTiledSyncChangedOnDisk(Path.Combine(_dir.Path, "hero.tiledsync"));
+
+        Assert.Equal(Path.Combine(_dir.Path, "hero.tiledsync"), raisedPath);
+    }
+
+    [Fact]
+    public void WireHotReloadWatcher_TiledSyncChangedOnDisk_RefreshesWatcherTsxList()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(_dir.Path, "hero.achx");
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        _ctx.ProjectManager.FileName = achxPath;
+        // Simulates a teammate's git pull adding this association directly to disk.
+        _ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+        _ctx.AppCommands.WireHotReloadWatcher();
+
+        spy.RaiseTiledSyncChangedOnDisk(Path.Combine(_dir.Path, "hero.tiledsync"));
+
+        Assert.NotNull(spy.LastUpdateAssociatedTsxPaths);
+        Assert.Contains(new FilePath(tsxPath), spy.LastUpdateAssociatedTsxPaths!.Select(p => new FilePath(p)));
+    }
+
     private sealed class SpyHotReloadWatcher : IHotReloadWatcher
     {
         public string? LastStartAchxPath;
         public List<string>? LastStartPngPaths;
+        public List<string>? LastStartTsxPaths;
+        public List<string>? LastUpdateAssociatedTsxPaths;
 
         public event Action<string>? AchxChangedOnDisk { add { } remove { } }
         public event Action<string>? PngChangedOnDisk { add { } remove { } }
         public event Action<string>? AchxDeletedOnDisk { add { } remove { } }
+        public event Action<string>? TiledSyncChangedOnDisk;
+        public event Action<string>? AssociatedTsxChangedOnDisk;
 
         public bool IsEnabled { get; set; } = true;
 
-        public void StartWatching(string achxPath, IEnumerable<string> pngPaths)
+        public void StartWatching(string achxPath, IEnumerable<string> pngPaths, IEnumerable<string> tsxPaths)
         {
             LastStartAchxPath = achxPath;
             LastStartPngPaths = new List<string>(pngPaths);
+            LastStartTsxPaths = new List<string>(tsxPaths);
         }
 
         public void UpdatePngList(IEnumerable<string> newPngPaths) { }
+        public void UpdateAssociatedTsxPaths(IEnumerable<string> newTsxPaths) =>
+            LastUpdateAssociatedTsxPaths = new List<string>(newTsxPaths);
         public void StopWatching() { }
         public void RecordOwnSave(string filePath) { }
         public void Dispose() { }
+
+        public void RaiseTiledSyncChangedOnDisk(string path) => TiledSyncChangedOnDisk?.Invoke(path);
+        public void RaiseAssociatedTsxChangedOnDisk(string path) => AssociatedTsxChangedOnDisk?.Invoke(path);
     }
 }

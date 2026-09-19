@@ -1166,6 +1166,16 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
 
+        _appCommands.TiledSyncFailed += (tsxPath, ex) =>
+            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
+                "Tiled sync failed", _failedBrush, $"{Path.GetFileName(tsxPath)}: {ex.Message}"));
+        _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
+            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
+                "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {appliedCount} chain(s) applied"));
+        _appCommands.TiledSyncSourceChangedOnDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
+                "Tileset associations changed on disk", _unsavedBrush, $"{Path.GetFileName(path)} changed on disk -- will re-sync on next save"));
+
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
             {
@@ -1927,6 +1937,21 @@ public partial class MainWindow : Window
         new(Avalonia.Media.Color.FromRgb(0xf0, 0xc6, 0x74));
     private static readonly Avalonia.Media.SolidColorBrush _failedBrush =
         new(Avalonia.Media.Color.FromRgb(0xe0, 0x55, 0x55));
+
+    /// <summary>
+    /// Shows the Tiled tileset sync status indicator next to the autosave dot (issue #1139).
+    /// Stays visible once first shown -- reflects the most recent sync outcome or external-change
+    /// note, updated in place as further events arrive. <paramref name="tooltip"/> carries the
+    /// full detail (which .tsx, what happened) since the label itself stays short.
+    /// </summary>
+    private void UpdateTiledSyncStatus(string label, Avalonia.Media.IBrush brush, string tooltip)
+    {
+        TiledSyncStatusPanel.IsVisible = true;
+        TiledSyncDot.Fill = brush;
+        TiledSyncLabel.Text = label;
+        ToolTip.SetTip(TiledSyncDot, tooltip);
+        ToolTip.SetTip(TiledSyncLabel, tooltip);
+    }
 
     private void UpdateStatusBar()
     {

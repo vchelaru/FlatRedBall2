@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -6,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
 using Xunit;
+using Ellipse = Avalonia.Controls.Shapes.Ellipse;
 
 namespace AnimationEditor.App.Tests;
 
@@ -261,5 +264,150 @@ public class StatusBarTests
             Assert.Equal("Auto Save Failed", label.Text);
         }
         finally { window.Close(); }
+    }
+
+    // ── Tiled sync status (issue #1139) ───────────────────────────────────────
+
+    private static string WriteFixtureTileset(string dir)
+    {
+        var tileset = new DotTiled.Tileset
+        {
+            Name = "Heroes", TileWidth = 16, TileHeight = 16, TileCount = 64, Columns = 4,
+            // Width/height let the mapper convert the achx's UV frame coordinates back to
+            // pixels -- ProjectManager.AnimationChainListSave is always UV in memory.
+            Image = new DotTiled.Image { Source = "Heroes.png", Width = 64, Height = 16 },
+        };
+        var path = Path.Combine(dir, "Heroes.tsx");
+        AnimationEditor.Core.Tiled.TsxWriter.Write(tileset, path);
+        return path;
+    }
+
+    [AvaloniaFact]
+    public void TiledSyncStatus_HiddenInitially()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
+            Assert.False(panel.IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void TiledSyncStatus_ShowsFailureDetail_AfterAssociatedTsxMissingFromDisk()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var achxPath = WriteAchx(dir, "Walk");
+            ctx.AppCommands.LoadAnimationChain(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            var missingTsxPath = Path.Combine(dir, "DoesNotExist.tsx");
+            ctx.AppCommands.AddAssociatedTiledTileset(missingTsxPath);
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
+            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
+            Assert.True(panel.IsVisible);
+            Assert.Contains("failed", label.Text, System.StringComparison.OrdinalIgnoreCase);
+            var tip = ToolTip.GetTip(window.FindControl<Ellipse>("TiledSyncDot")!) as string;
+            Assert.Contains("DoesNotExist.tsx", tip);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void TiledSyncStatus_ShowsOk_AfterAssociatedTsxSyncsSuccessfully()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tsxPath = WriteFixtureTileset(dir);
+            var achxPath = Path.Combine(dir, "Hero.achx");
+            ctx.ProjectManager.FileName = achxPath;
+            ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+
+            // Tile 0 occupies pixels [0,16)x[0,16) of the 64x16 fixture texture -> UV [0,0.25)x[0,1).
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave
+            {
+                TextureName = "Heroes.png", FrameLength = 0.1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 0.25f, BottomCoordinate = 1f,
+            });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
+            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
+            Assert.True(panel.IsVisible);
+            Assert.DoesNotContain("failed", label.Text, System.StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    /// <summary>
+    /// The real trigger is a background <see cref="System.IO.FileSystemWatcher"/> plus the hot
+    /// reload watcher's own 100ms debounce timer -- poll until <paramref name="condition"/> holds
+    /// or <paramref name="timeout"/> elapses (same reasoning as ProjectFolderExternalWatchTests's
+    /// PumpUntilAsync for the equivalent project-folder watcher).
+    /// </summary>
+    private static async Task PumpUntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (condition()) return;
+            await Task.Delay(50);
+        }
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public async Task TiledSyncStatus_ShowsChangedOnDiskNote_AfterTiledSyncFileModifiedExternally()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var achxPath = WriteAchx(dir, "Walk");
+            ctx.AppCommands.LoadAnimationChain(achxPath);
+            Dispatcher.UIThread.RunJobs();
+            File.WriteAllText(Path.Combine(dir, "test.tiledsync"), "{}");
+
+            // Simulates a teammate's git pull changing the association file while open.
+            File.WriteAllText(Path.Combine(dir, "test.tiledsync"), "{ \"TiledTilesetPaths\": [] }");
+
+            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
+            await PumpUntilAsync(() => label.Text?.Contains("changed on disk", System.StringComparison.OrdinalIgnoreCase) == true,
+                TimeSpan.FromSeconds(5));
+
+            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
+            Assert.True(panel.IsVisible);
+            Assert.Contains("changed on disk", label.Text, System.StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
     }
 }

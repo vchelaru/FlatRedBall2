@@ -391,6 +391,20 @@
                                FontFamily="Consolas,Menlo,Monospace"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
+                    <!-- Tiled tileset sync status (issue #1139), hidden until a sync has run,
+                         associations changed on disk, or an association was just added. -->
+                    <StackPanel x:Name="TiledSyncStatusPanel"
+                                Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                                IsVisible="False">
+                        <Ellipse x:Name="TiledSyncDot"
+                                 Width="6" Height="6"
+                                 Fill="{DynamicResource AccentSoft}" />
+                        <TextBlock x:Name="TiledSyncLabel"
+                                   FontSize="11"
+                                   FontFamily="Consolas,Menlo,Monospace"
+                                   Foreground="{DynamicResource InkMid}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </StackPanel>
                 <!-- right: cursor, selection -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="16"

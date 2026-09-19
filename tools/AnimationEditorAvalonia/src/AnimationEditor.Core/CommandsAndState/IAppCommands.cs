@@ -475,11 +475,30 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Raised when syncing to one associated .tsx tileset fails after a save (missing file, an
-        /// unsupported <c>TsxWriter</c> feature, etc.). The first argument is the .tsx path; the
+        /// unsupported <c>TsxWriter</c> feature, etc.), or when the .tiledsync companion file
+        /// itself exists but fails to parse (see <see cref="IIoManager.TiledSyncParseFailed"/>).
+        /// The first argument is the .tsx (or .achx, for a .tiledsync parse failure) path; the
         /// second is the exception. A failure here never affects the .achx save itself, which has
         /// already completed by the time this fires -- the app layer should surface it as a
         /// non-blocking toast/log entry, not retry the .achx save.
         /// </summary>
         event Action<string, Exception>? TiledSyncFailed;
+
+        /// <summary>
+        /// Raised when syncing to one associated .tsx tileset succeeds after a save -- including
+        /// when nothing needed to change (see <see cref="Tiled.TilesetAnimationSyncResult.Changed"/>).
+        /// The first argument is the .tsx path; the second is how many chains were applied. Pairs
+        /// with <see cref="TiledSyncFailed"/> for a UI status indicator that needs both outcomes.
+        /// </summary>
+        event Action<string, int>? TiledSyncSucceeded;
+
+        /// <summary>
+        /// Raised when the .tiledsync companion file or a currently-associated .tsx changes on
+        /// disk outside the app (e.g. a teammate's git pull) -- see
+        /// <see cref="IHotReloadWatcher.TiledSyncChangedOnDisk"/>/<see cref="IHotReloadWatcher.AssociatedTsxChangedOnDisk"/>.
+        /// Purely a live-feedback signal: the sync pipeline already re-reads both fresh on every
+        /// save, so this never needs to trigger a reload by itself. Arg: the changed file's path.
+        /// </summary>
+        event Action<string>? TiledSyncSourceChangedOnDisk;
     }
 }

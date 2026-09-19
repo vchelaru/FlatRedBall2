@@ -143,4 +143,22 @@ public class AppCommandsTiledSyncTests
         // The .achx save itself must still have succeeded despite the Tiled sync failure.
         Assert.True(File.Exists(achxPath));
     }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_CorruptTiledSyncFile_RaisesTiledSyncFailed()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        File.WriteAllText(Path.Combine(dir.Path, "Hero.tiledsync"), "{ not valid json");
+        ctx.ProjectManager.FileName = achxPath;
+
+        string? failedPath = null;
+        ctx.AppCommands.TiledSyncFailed += (path, _) => failedPath = path;
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        Assert.Equal(new FilePath(achxPath), new FilePath(failedPath!));
+        // The .achx save itself must still have succeeded despite the corrupt .tiledsync.
+        Assert.True(File.Exists(achxPath));
+    }
 }
