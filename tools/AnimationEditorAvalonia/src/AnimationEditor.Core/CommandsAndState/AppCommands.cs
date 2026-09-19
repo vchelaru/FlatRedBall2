@@ -462,6 +462,9 @@ namespace AnimationEditor.Core.CommandsAndState
         public void AddAssociatedTiledTileset(string tsxAbsolutePath)
         {
             if (string.IsNullOrEmpty(_pm.FileName)) return;
+            // Must happen before the write below, or the watcher (already watching this achx's
+            // directory) sees our own .tiledsync write as an external change and misreports it.
+            HotReloadWatcher.RecordOwnSave(_ioManager.GetTiledSyncCompanionFilePath(_pm.FileName));
             _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
             // Start watching the newly-associated .tsx immediately rather than waiting for the
             // next SyncHotReloadWatcher/achx-load call.
@@ -504,6 +507,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
             if (tsxPaths.Count == 0) return;
+
+            // Must happen before SyncAll (which may write to some of these) runs, or the watcher
+            // sees our own .tsx write as an external change and misreports it -- same reasoning as
+            // the RecordOwnSave call in AddAssociatedTiledTileset. Recorded for every candidate path
+            // up front rather than only the ones actually written, matching the achx save's
+            // record-before-write pattern; an unused entry for a path that turns out unchanged (see
+            // TilesetAnimationSyncResult.Changed) is harmless.
+            foreach (var tsxPath in tsxPaths)
+                HotReloadWatcher.RecordOwnSave(tsxPath);
 
             // Snapshot rather than hand the live model to the mapper: defensive even though this
             // runs synchronously today, so this stays safe if a future change backgrounds it.

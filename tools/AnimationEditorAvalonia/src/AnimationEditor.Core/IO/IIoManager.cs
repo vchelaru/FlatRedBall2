@@ -49,6 +49,14 @@ namespace AnimationEditor.Core.IO
         /// </summary>
         void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile);
 
+        /// <summary>
+        /// The absolute path of the <c>.tiledsync</c> companion file for <paramref name="achxFile"/>,
+        /// whether or not it exists yet. Callers that are about to write that file (e.g. to record
+        /// it as an own-save with the hot reload watcher first, so the write isn't misreported as an
+        /// external change) need this without going through a full load.
+        /// </summary>
+        string GetTiledSyncCompanionFilePath(string achxFile);
+
         void WriteRecoveryFile(AnimationChainListSave? animationChainListSave);
         void DeleteRecoveryFile();
         bool RecoveryFileExists();

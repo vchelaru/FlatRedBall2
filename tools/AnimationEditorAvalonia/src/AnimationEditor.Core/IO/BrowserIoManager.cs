@@ -153,6 +153,12 @@ public class BrowserIoManager : IIoManager
     /// </summary>
     public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile) => Array.Empty<string>();
 
+    /// <inheritdoc/>
+    /// <remarks>Returns the bare companion file name (see <see cref="GetTiledSyncCompanionFileName"/>),
+    /// not a full path -- the browser store addresses files by name within one flat folder.</remarks>
+    public string GetTiledSyncCompanionFilePath(string achxFile) =>
+        GetTiledSyncCompanionFileName(new FilePath(achxFile));
+
     public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile)
     {
         _ = AddAssociatedTiledTilesetPathAsync(achxFile, tsxFile);

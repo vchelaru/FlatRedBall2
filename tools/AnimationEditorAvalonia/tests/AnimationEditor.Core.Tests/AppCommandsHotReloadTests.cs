@@ -267,6 +267,41 @@ public class AppCommandsHotReloadTests : IDisposable
         Assert.Contains(new FilePath(tsxPath), spy.LastUpdateAssociatedTsxPaths!.Select(p => new FilePath(p)));
     }
 
+    // ── RecordOwnSave: the app's own writes must not self-report as external changes ──
+    // Without this, every write this app makes to a watched .tsx/.tiledsync file gets
+    // picked up by the FileSystemWatcher and misreported as "changed on disk" -- the same
+    // class of bug RecordOwnSave already prevents for .achx saves (see SaveCurrentAnimationChainList).
+
+    [Fact]
+    public void AddAssociatedTiledTileset_NewAssociation_RecordsOwnSaveForTiledSyncFile()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(_dir.Path, "hero.achx");
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        _ctx.ProjectManager.FileName = achxPath;
+        var expectedTiledSyncPath = new FilePath(Path.Combine(_dir.Path, "hero.tiledsync"));
+
+        _ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+
+        Assert.Contains(expectedTiledSyncPath, spy.RecordedOwnSavePaths.Select(p => new FilePath(p)));
+    }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_AssociatedTsx_RecordsOwnSaveForEachAssociatedTsx()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = WriteMinimalAchx("Idle");
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        _ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+        _ctx.ProjectManager.FileName = achxPath;
+
+        _ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        Assert.Contains(new FilePath(tsxPath), spy.RecordedOwnSavePaths.Select(p => new FilePath(p)));
+    }
+
     // ── WireHotReloadWatcher: Tiled-sync-source-changed wiring (issue #1139) ─
 
     [Fact]
@@ -322,6 +357,7 @@ public class AppCommandsHotReloadTests : IDisposable
         public List<string>? LastStartPngPaths;
         public List<string>? LastStartTsxPaths;
         public List<string>? LastUpdateAssociatedTsxPaths;
+        public List<string> RecordedOwnSavePaths { get; } = new();
 
         public event Action<string>? AchxChangedOnDisk { add { } remove { } }
         public event Action<string>? PngChangedOnDisk { add { } remove { } }
@@ -342,7 +378,7 @@ public class AppCommandsHotReloadTests : IDisposable
         public void UpdateAssociatedTsxPaths(IEnumerable<string> newTsxPaths) =>
             LastUpdateAssociatedTsxPaths = new List<string>(newTsxPaths);
         public void StopWatching() { }
-        public void RecordOwnSave(string filePath) { }
+        public void RecordOwnSave(string filePath) => RecordedOwnSavePaths.Add(filePath);
         public void Dispose() { }
 
         public void RaiseTiledSyncChangedOnDisk(string path) => TiledSyncChangedOnDisk?.Invoke(path);
