@@ -1,6 +1,5 @@
 using AnimationEditor.Core.Data;
-using System.IO;
-using System.Xml.Serialization;
+using System.Text.Json;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -8,20 +7,11 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class AETiledSyncSaveRoundTripTests
 {
-    private static string Serialize(AETiledSyncSave s)
-    {
-        var xs = new XmlSerializer(typeof(AETiledSyncSave));
-        using var sw = new StringWriter();
-        xs.Serialize(sw, s);
-        return sw.ToString();
-    }
+    private static string Serialize(AETiledSyncSave s) =>
+        JsonSerializer.Serialize(s, AETiledSyncJsonContext.Default.AETiledSyncSave);
 
-    private static AETiledSyncSave Deserialize(string xml)
-    {
-        var xs = new XmlSerializer(typeof(AETiledSyncSave));
-        using var sr = new StringReader(xml);
-        return (AETiledSyncSave)xs.Deserialize(sr)!;
-    }
+    private static AETiledSyncSave Deserialize(string json) =>
+        JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave)!;
 
     [Fact]
     public void TiledTilesetPaths_RoundTrip_PreservesAllPathsAndOrder()

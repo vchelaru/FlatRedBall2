@@ -4,6 +4,7 @@ using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -160,18 +161,19 @@ public class BrowserIoManager : IIoManager
             var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
 
             var companionName = GetTiledSyncCompanionFileName(achxFilePath);
-            var existingXml = await _store.TryReadAsync(companionName);
-            var settings = existingXml is null
+            var existingJson = await _store.TryReadAsync(companionName);
+            var settings = existingJson is null
                 ? new AETiledSyncSave()
-                : XmlFile.DeserializeFromString<AETiledSyncSave>(existingXml);
+                : JsonSerializer.Deserialize(existingJson, AETiledSyncJsonContext.Default.AETiledSyncSave)
+                    ?? new AETiledSyncSave();
 
             var alreadyAssociated = settings.TiledTilesetPaths
                 .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
             if (!alreadyAssociated)
             {
                 settings.TiledTilesetPaths.Add(relativeTsxPath);
-                XmlFile.SerializeToString(settings, out var xml);
-                await _store.WriteAsync(companionName, xml);
+                var json = JsonSerializer.Serialize(settings, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                await _store.WriteAsync(companionName, json);
             }
         }
         catch (Exception e)
