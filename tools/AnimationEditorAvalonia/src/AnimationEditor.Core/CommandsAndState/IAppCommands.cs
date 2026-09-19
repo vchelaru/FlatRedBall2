@@ -84,6 +84,14 @@ namespace AnimationEditor.Core.CommandsAndState
         void LoadAnimationChain(string fileName);
 
         /// <summary>
+        /// Opens <paramref name="path"/> (a <c>.tsx</c>) as a native AnimationEditor project (issue
+        /// #1140) -- see <see cref="ProjectManager.LoadTsxProject"/>. Unlike <see
+        /// cref="OpenAchxWorkflowAsync"/>, there is no conversion prompt: an incompatible tsx
+        /// (wangsets/transformations/etc.) fires <see cref="LoadFailed"/> and aborts immediately.
+        /// </summary>
+        Task OpenTsxWorkflowAsync(string path);
+
+        /// <summary>
         /// Stores the current project model and chain/frame selection on <paramref name="tab"/>
         /// for later tab switches.
         /// </summary>

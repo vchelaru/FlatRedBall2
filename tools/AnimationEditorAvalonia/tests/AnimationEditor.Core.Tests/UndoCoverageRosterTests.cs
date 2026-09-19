@@ -41,6 +41,7 @@ public class UndoCoverageRosterTests
     {
         // Mutating, deliberately NOT undoable -------------------------------------
         [nameof(IAppCommands.OpenAchxWorkflowAsync)]              = Category.MutatingNotUndoable, // loads a file; clears the undo stack
+        [nameof(IAppCommands.OpenTsxWorkflowAsync)]               = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.LoadAnimationChain)]                 = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.CaptureTabEditorState)]              = Category.NonMutating,
         [nameof(IAppCommands.RestoreTabSelection)]                = Category.NonMutating,

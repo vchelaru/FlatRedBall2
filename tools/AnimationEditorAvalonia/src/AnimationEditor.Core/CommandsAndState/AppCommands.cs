@@ -260,6 +260,36 @@ namespace AnimationEditor.Core.CommandsAndState
             _events.RaiseAvailableTexturesChanged();
         }
 
+        /// <inheritdoc cref="IAppCommands.OpenTsxWorkflowAsync"/>
+        public Task OpenTsxWorkflowAsync(string path)
+        {
+            try
+            {
+                _pm.LoadTsxProject(new FilePath(path));
+            }
+            catch (Exception ex)
+            {
+                LoadFailed?.Invoke(path, ex);
+                return Task.CompletedTask;
+            }
+
+            _undoManager.Clear();
+            _undoManager.MarkSaved();
+            _selectedState.Reset();
+            _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
+            RebuildTreeViewRequested?.Invoke(Array.Empty<string>());
+            RefreshWireframeRequested?.Invoke();
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+
+            // Reuses the achx-named event -- both mean "a project file finished loading,"
+            // and every current subscriber (recent files, window title, etc.) treats it generically.
+            _events.CallAchxLoaded(path);
+            _events.RaiseCurrentFileChanged(path);
+            _events.RaiseAvailableTexturesChanged();
+            EditorProjectModelChanged?.Invoke(path);
+            return Task.CompletedTask;
+        }
+
         // -------------------------------------------------------------------------
 
         public void LoadAnimationChain(string fileName)
@@ -430,7 +460,10 @@ namespace AnimationEditor.Core.CommandsAndState
                 HotReloadWatcher.RecordOwnSave(target);
                 try
                 {
-                    _pm.SaveAnimationChainList(target);
+                    if (_pm.IsNativeTsxProject)
+                        _pm.SaveTsxProject(target);
+                    else
+                        _pm.SaveAnimationChainList(target);
                     _undoManager.MarkSaved();
                     EditorProjectModelChanged?.Invoke(target);
                 }
@@ -440,7 +473,10 @@ namespace AnimationEditor.Core.CommandsAndState
                     return;
                 }
 
-                SyncAssociatedTiledTilesets(target);
+                // A native tsx project has no achx to push from -- the achj-push feature
+                // (issue #1133) doesn't apply to it.
+                if (!_pm.IsNativeTsxProject)
+                    SyncAssociatedTiledTilesets(target);
             }
             else
             {
