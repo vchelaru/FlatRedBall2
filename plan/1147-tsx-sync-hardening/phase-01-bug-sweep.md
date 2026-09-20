@@ -335,6 +335,18 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
+- [ ] **Fresh-eyes pass #9 was interrupted mid-pass (agent stalled/crashed) and needs finishing.**
+  It was doing a full line-by-line read of `MainWindow.axaml.cs` (the same "full read, not a
+  targeted re-trace" approach that found real bugs in `AppCommands.cs`/`ProjectManager.cs` in
+  passes #7/#8). Before stalling it found and fixed one real bug (see DONE: drag-and-drop silently
+  ignoring `.tsx` files) and confirmed category 6 (direct `TabEntry` construction bypassing
+  `TabEditorCache`) is a non-issue in this file. It had just started reading `HandleStartupAsync`
+  (lines ~976-1060) and the crash-recovery restore flow when it stopped — categories 2-5 and 7 from
+  the original pass #9 brief (recent-files/MRU menu, window/tab title staleness, menu-item
+  enable/disable gating on project type, crash-recovery restore tsx-awareness, keyboard-shortcut/
+  command-palette dispatch bypassing `AppCommands`) were never reached. Re-run this pass rather than
+  treating it as a completed clean pass — it isn't one, it's an incomplete one.
+
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1299,3 +1311,19 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     `AnimationEditor.Views.Tests` 144/144 (unchanged), `AnimationEditor.App.Tests` 988/988 (was
     985, +3 new), `AnimationEditor.Browser` builds clean (0 warnings/0 errors; no test project to
     run).
+
+- [x] **Drag-and-drop silently ignored `.tsx` files (found mid-pass by the interrupted fresh-eyes
+  pass #9 -- see the TODO entry above for why pass #9 itself isn't done).** `AchxDropProcessor.
+  SelectAchxFiles` (the "OS file dropped onto the window" classifier) only recognized `.achx`/
+  `.achj`, so dropping a native `.tsx` project onto the AnimationEditor window did nothing --
+  `OnWindowDrop` filtered it out before `LoadAnimationFileAsync` (which already dispatches
+  correctly by extension via `OpenProjectWorkflowAsync`, same as `File > Open`) ever saw it. Real
+  bug, confirmed red first (`ContainsAchx_TsxOnly_ReturnsTrue`/
+  `SelectAchxFiles_TsxFile_IsIncludedAlongsideAchx` both failed against the original filter, then
+  passed after adding the `tsx` extension check). Fixed in
+  `tools/AnimationEditorAvalonia/src/AnimationEditor.Core/DragDrop/AchxDropProcessor.cs`;
+  `MainWindow.axaml.cs`'s `OnWindowDrop` needed no logic change (just a variable-name/comment
+  update), since it already delegates the actual open to the already-tsx-aware
+  `LoadAnimationFileAsync`. Tests: `AchxDropProcessorTests.ContainsAchx_TsxOnly_ReturnsTrue`,
+  `SelectAchxFiles_TsxFile_IsIncludedAlongsideAchx`. Full suite after this fix:
+  `AnimationEditor.Core.Tests` 2178/2178, `AnimationEditor.App` builds clean.
