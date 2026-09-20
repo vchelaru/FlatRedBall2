@@ -20,6 +20,7 @@ public sealed record SkipCounts
     public int FlipDropped { get; init; }
     public int NegativeCoordinate { get; init; }
     public int ColumnOutOfRange { get; init; }
+    public int RowOutOfRange { get; init; }
 }
 
 /// <summary>Result of mapping one <see cref="AnimationChainSave"/> onto a tileset's tile grid.</summary>
@@ -42,6 +43,11 @@ public sealed record TilesetAnimationInfo
     public required int TileWidth { get; init; }
     public required int TileHeight { get; init; }
     public required int ColumnCount { get; init; }
+    /// <summary>Total number of tiles the tileset declares (Tiled's <c>tilecount</c> attribute).
+    /// A partial last row is normal -- this is not necessarily <c>ColumnCount</c> times a whole
+    /// number of rows -- so a computed tile id is only ever validated against this directly,
+    /// never against a derived row count.</summary>
+    public required int TileCount { get; init; }
     public int Margin { get; init; }
     public int TileSpacing { get; init; }
     public required string ImageFileName { get; init; }
@@ -69,7 +75,11 @@ public sealed record TilesetAnimationInfo
 /// grid-alignment check but would otherwise unchecked-cast to a huge bogus tile id (<see
 /// cref="SkipCounts.NegativeCoordinate"/>); its rect origin resolves to a column at or past the
 /// tileset's own column count, which would otherwise compute a tileId that lands on a real tile in
-/// the next row instead of failing (<see cref="SkipCounts.ColumnOutOfRange"/>); or it uses
+/// the next row instead of failing (<see cref="SkipCounts.ColumnOutOfRange"/>); its resolved tile id
+/// is at or past the tileset's own <see cref="TilesetAnimationInfo.TileCount"/> -- a row past the
+/// tileset's last (possibly partial) row doesn't wrap into an existing tile the way column overflow
+/// does, so without this check the sync step would fabricate a brand-new out-of-range
+/// <c>&lt;tile&gt;</c> element instead of failing (<see cref="SkipCounts.RowOutOfRange"/>); or it uses
 /// <see cref="TextureCoordinateType.UV"/>
 /// coordinates but the tileset's pixel size wasn't supplied (<see
 /// cref="SkipCounts.UvMissingPixelSize"/>). A flipped frame is not skipped -- Tiled tile animation
@@ -197,6 +207,14 @@ public static class AchjToTiledAnimationMapper
 
         var tileId = (uint)((row * tilesetInfo.ColumnCount) + column);
 
+        // A row past the tileset's own tile count doesn't wrap into an existing tile the way
+        // column overflow does -- it computes a tileId that simply doesn't correspond to any real
+        // cell. Checking the final tileId against TileCount (rather than deriving a row bound from
+        // ColumnCount) is also correct for a tileset whose last row is partial.
+        if (tileId >= tilesetInfo.TileCount)
+            return Skip(s => s.RowOutOfRange++,
+                $"{label}: frame rect origin ({left}, {top}) resolves to tile id {tileId}, which is past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
+
         return new MappedFrame(tileId, FrameDurationMs(frame.FrameLength, timeUnit));
     }
 
@@ -240,6 +258,7 @@ public static class AchjToTiledAnimationMapper
         public int FlipDropped;
         public int NegativeCoordinate;
         public int ColumnOutOfRange;
+        public int RowOutOfRange;
 
         public SkipCounts Build() => new()
         {
@@ -250,6 +269,7 @@ public static class AchjToTiledAnimationMapper
             FlipDropped = FlipDropped,
             NegativeCoordinate = NegativeCoordinate,
             ColumnOutOfRange = ColumnOutOfRange,
+            RowOutOfRange = RowOutOfRange,
         };
     }
 }

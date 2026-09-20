@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
 using DotTiled.Serialization;
+using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -67,6 +68,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -87,6 +89,53 @@ public class NativeTsxProjectRoundTripTests
         var reloadedSatellite = reloaded.Tiles.Single(t => t.ID == 9);
         Assert.Equal(8, reloadedSatellite.GetProperty<IntProperty>("ParentId").Value);
         Assert.Equal([((uint)9, 150), ((uint)13, 150)], reloadedSatellite.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    [Fact]
+    public void LoadMapApplySave_FrameBeyondTilesetTileCount_SkipsInsteadOfFabricatingPhantomTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, FixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        // FixtureXml is tilecount=64, columns=4 -> valid rows are 0-15 (ids 0-63). Row 16, column
+        // 0 is column-in-range but resolves to tile id 64 -- at/past TileCount, with no real cell
+        // in the tileset's image to correspond to it.
+        var achj = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        var chain = new AnimationChainSave { Name = "Corrupt" };
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png",
+            LeftCoordinate = 0,
+            TopCoordinate = 256,
+            RightCoordinate = 16,
+            BottomCoordinate = 272,
+            FrameLength = 100,
+        });
+        achj.AnimationChains.Add(chain);
+
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+        var mapped = MultiTileToTiledAnimationMapper.Map(achj, tilesetInfo);
+        Assert.Empty(mapped[0].AnchorFrames);
+        Assert.Null(mapped[0].EntryTileId);
+
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 64);
     }
 
     // Tile 5 owns an animation whose frames are [6, 7] -- 5 itself never appears as a frame. This
@@ -129,6 +178,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -203,6 +253,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -279,6 +330,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -335,6 +387,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -399,6 +452,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,
@@ -474,6 +528,7 @@ public class NativeTsxProjectRoundTripTests
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             ImageFileName = tileset.Image.Value.Source.Value,
             TextureWidth = tileset.Image.Value.Width.Value,
             TextureHeight = tileset.Image.Value.Height.Value,

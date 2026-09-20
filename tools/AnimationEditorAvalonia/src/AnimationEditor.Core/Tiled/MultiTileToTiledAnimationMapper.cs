@@ -144,6 +144,14 @@ public static class MultiTileToTiledAnimationMapper
             if (originColumn + footprintColumns > tilesetInfo.ColumnCount)
                 return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
 
+            // The footprint's bottom-right cell (the largest tile id any cell in this footprint can
+            // compute to, since the column bound above already guarantees every cell's column is
+            // in range) doesn't wrap into an existing tile the way column overflow does -- it's
+            // simply past the tileset's declared tile count, including a partial last row.
+            var maxTileId = (uint)(((originRow + footprintRows - 1) * tilesetInfo.ColumnCount) + (originColumn + footprintColumns - 1));
+            if (maxTileId >= tilesetInfo.TileCount)
+                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
+
             for (var dy = 0; dy < footprintRows; dy++)
                 for (var dx = 0; dx < footprintColumns; dx++)
                 {

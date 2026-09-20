@@ -328,21 +328,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **Row/`TileCount` bottom-edge overflow — the row equivalent of the column-overflow bug fixed
-  in this same pass (see "Fresh-eyes pass #1" in DONE below).**
-  `AchjToTiledAnimationMapper.MapFrame` and `MultiTileToTiledAnimationMapper.MapChain`
-  now both reject a frame whose column (or footprint's right-hand column) is at or past the
-  tileset's `ColumnCount`, but neither checks the equivalent bound on `row` (or
-  `originRow + footprintRows - 1`) against the tileset's actual row count — equivalently, that the
-  computed tile id stays `< TileCount`. Unlike the column case, this can't be validated from
-  `ColumnCount` alone: `TilesetAnimationInfo` has no `TileCount` field today. Fixing this means
-  adding one and threading it through both call sites that build a `TilesetAnimationInfo`
-  (`ProjectManager.BuildTsxTilesetInfo`, `TiledTilesetSyncRunner.BuildTilesetInfo`). Symptom if
-  triggered: `NativeTsxAnimationSync.ApplyTile`'s `tileset.Tiles.FirstOrDefault(t => t.ID == tileId)`
-  finds nothing for an out-of-range id and *creates a brand-new `Tile`* with that id, so a corrupt/
-  malformed achx frame rect (or a multi-tile footprint anchored near the last row) would silently
-  fabricate a `<tile id="...">` entry beyond the tileset's declared `tilecount` instead of being
-  skipped with a warning.
 - [ ] **`TiledAnimationToAchjMapper`'s satellite offset math assumes every satellite sits at or
   below/right of its anchor.** `dx`/`dy` in `Map` are computed as `uint` subtraction
   (`satellite.ID % columns - anchorCol`, `satellite.ID / columns - anchorRow`); a hand-edited
@@ -412,6 +397,45 @@ subsystem), achj-vs-achx serialization interaction with the entry/satellite trac
   `achjAnimationName = "OldChain"`, no `achjSourceFile`, empty `Animation` is claimed by a new achx
   chain, ending up with the new chain's name and `achjSourceFile` set. Test:
   `TilesetAnimationSyncTests.Apply_TileHasStaleAnimationNamePropertyButEmptyAnimationAndNoSourceProperty_IsClaimedNotPermanentlyBlocked`.
+
+- [x] **Row/`TileCount` bottom-edge overflow — the row equivalent of the column-overflow bug fixed
+  in the same pass (fresh-eyes pass #1, see below).** Real bug, confirmed red first: with the row
+  check temporarily disabled (`if (false && ...)`), `Map_RowBeyondTilesetTileCount_...` failed with
+  a mapped frame carrying `TileId = 16` against a 16-tile tileset, and (crucially, at the
+  integration layer) `NativeTsxAnimationSync.ApplyTile`/`TsxWriter.Write` were caught concretely
+  fabricating a phantom `Tile { ID = 64, Animation = [Frame { TileID = 64 }] }` in the *reloaded*
+  output file for a 64-tile fixture -- confirming the suspected severity (a silently-corrupt but
+  plausible-looking `.tsx`, not a crash) rather than assuming it. `AchjToTiledAnimationMapper.MapFrame`
+  and `MultiTileToTiledAnimationMapper.MapChain` already rejected a column at or past `ColumnCount`,
+  but neither checked the equivalent bound on the row axis, and unlike column overflow this doesn't
+  wrap into an existing tile -- it computes a tile id with no real cell at all. Fixed:
+  - `TilesetAnimationInfo` gained a required `TileCount` field (Tiled's `tilecount`), threaded
+    through both builders that construct it (`ProjectManager.BuildTsxTilesetInfo`,
+    `TiledTilesetSyncRunner.BuildTilesetInfo`, both already had a `DotTiled.Tileset` in scope to read
+    it from).
+  - `AchjToTiledAnimationMapper.MapFrame` checks the final computed `tileId >= TileCount` (a new
+    `SkipCounts.RowOutOfRange` bucket) rather than deriving a row bound from `ColumnCount` --
+    deliberately, since a tileset's last row can be partial (`TileCount` not a whole multiple of
+    `ColumnCount`), and checking the final id is correct in that case while a row-count bound
+    derived via `ceil(TileCount / ColumnCount)` would not be.
+  - `MultiTileToTiledAnimationMapper.MapChain` checks the footprint's bottom-right cell's tile id
+    (`(originRow + footprintRows - 1) * ColumnCount + (originColumn + footprintColumns - 1)`) against
+    `TileCount`, aborting the whole chain with a warning (matching its existing per-chain-abort
+    pattern) -- this is the single largest tile id any cell in the footprint can compute to, since
+    the existing column-bound check already guarantees every cell's column is in range.
+  - Verified the already-landed column-overflow fix's footprint handling in the same pass, per the
+    task's request: `MultiTileToTiledAnimationMapper` already checked
+    `originColumn + footprintColumns > ColumnCount` (the full right-hand extent, not just the
+    origin), so no residual gap was found there -- the column check was already correct for
+    footprints.
+  Existing test fixtures constructing `TilesetAnimationInfo` directly (two mapper-test static
+  fixtures, seven sites in `NativeTsxProjectRoundTripTests.cs`) needed a `TileCount` value added to
+  compile; all nine sites had a real tile count available (a fixture constant or `tileset.TileCount`)
+  so no synthetic/arbitrary values were needed. Tests:
+  `AchjToTiledAnimationMapperTests.Map_RowBeyondTilesetTileCount_SkipsFrameAndWarnsInsteadOfFabricatingOutOfRangeTile`,
+  `Map_TallySkipsTrue_RowOutOfRangeTalliedInSkipCounts`,
+  `MultiTileToTiledAnimationMapperTests.Map_FootprintBottomRowBeyondTilesetTileCount_SkipsChainAndWarnsInsteadOfFabricatingOutOfRangeTile`,
+  `NativeTsxProjectRoundTripTests.LoadMapApplySave_FrameBeyondTilesetTileCount_SkipsInsteadOfFabricatingPhantomTile`.
 
 - [x] **Fresh-eyes pass #1.** Re-read every file in "Files in scope" end to end (not just the
   diffs from prior fixes), working through the phase doc's four suggested categories

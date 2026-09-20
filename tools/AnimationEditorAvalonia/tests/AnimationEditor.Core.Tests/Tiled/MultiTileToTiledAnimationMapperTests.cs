@@ -13,6 +13,7 @@ public class MultiTileToTiledAnimationMapperTests
         TileWidth = 16,
         TileHeight = 16,
         ColumnCount = 4,
+        TileCount = 16,
         ImageFileName = "Heroes.png",
     };
 
@@ -98,6 +99,21 @@ public class MultiTileToTiledAnimationMapperTests
 
         Assert.Empty(results[0].AnchorFrames);
         Assert.Contains("column", results[0].Warnings[0]);
+    }
+
+    [Fact]
+    public void Map_FootprintBottomRowBeyondTilesetTileCount_SkipsChainAndWarnsInsteadOfFabricatingOutOfRangeTile()
+    {
+        // 1-wide x 2-tall footprint anchored at row 3, column 0 (TileCount=16 -> valid rows are
+        // 0-3, ids 0-15). The origin cell (row 3, id 12) is in range, but the footprint's bottom
+        // cell is row 4 -> id 4*4+0 = 16, at/past TileCount. Column bound alone can't catch this --
+        // it only checks originColumn+footprintColumns against ColumnCount, never the row axis.
+        var achj = AchjWithChain("BadBottomEdge", PixelFrame(0, 48, 16, 80));
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].AnchorFrames);
+        Assert.Contains("tile(s)", results[0].Warnings[0]);
     }
 
     [Fact]

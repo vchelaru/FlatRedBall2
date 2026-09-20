@@ -14,6 +14,7 @@ public class AchjToTiledAnimationMapperTests
         TileWidth = 16,
         TileHeight = 32,
         ColumnCount = 4,
+        TileCount = 16,
         ImageFileName = "AnimatedSpritesheet.png",
     };
 
@@ -56,6 +57,21 @@ public class AchjToTiledAnimationMapperTests
 
         Assert.Empty(results[0].Frames);
         Assert.Contains("column", results[0].Warnings[0]);
+    }
+
+    [Fact]
+    public void Map_RowBeyondTilesetTileCount_SkipsFrameAndWarnsInsteadOfFabricatingOutOfRangeTile()
+    {
+        // Row 4 (top=128, tile height 32), column 0 -- column 0 is in range, but tileId = 4*4+0 =
+        // 16, which is at/past this tileset's declared TileCount (16, tile ids 0-15). Unlike
+        // column overflow, this doesn't wrap into an existing tile -- it's a tile id with no real
+        // cell at all, which the sync step would otherwise fabricate a phantom <tile> for.
+        var achj = AchjWithChain("Corrupt", PixelFrame(0, 128, 16, 160));
+
+        var results = AchjToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].Frames);
+        Assert.Contains("tile id 16", results[0].Warnings[0]);
     }
 
     [Fact]
@@ -164,6 +180,17 @@ public class AchjToTiledAnimationMapperTests
 
         Assert.Empty(results[0].Frames);
         Assert.Contains("doesn't match tile size", results[0].Warnings[0]);
+    }
+
+    [Fact]
+    public void Map_TallySkipsTrue_RowOutOfRangeTalliedInSkipCounts()
+    {
+        var achj = AchjWithChain("Corrupt", PixelFrame(0, 128, 16, 160));
+
+        var results = AchjToTiledAnimationMapper.Map(achj, TilesetInfo, tallySkips: true);
+
+        Assert.Empty(results[0].Warnings);
+        Assert.Equal(1, results[0].SkipCounts.RowOutOfRange);
     }
 
     [Fact]

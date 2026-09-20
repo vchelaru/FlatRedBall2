@@ -74,6 +74,7 @@ public static class TiledTilesetSyncRunner
             TileWidth = tileset.TileWidth,
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
+            TileCount = tileset.TileCount,
             Margin = tileset.Margin,
             TileSpacing = tileset.Spacing,
             ImageFileName = image?.Source.HasValue == true ? image.Source.Value : "",
