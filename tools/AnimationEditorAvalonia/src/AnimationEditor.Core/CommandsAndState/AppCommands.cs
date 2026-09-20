@@ -1830,6 +1830,9 @@ namespace AnimationEditor.Core.CommandsAndState
             _pm.FileName = null;
             _pm.ProjectFolderPath = null;
             _pm.OnDiskCoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel;
+            // See the matching comment in NewFile -- a closed project is never a native tsx
+            // project either.
+            _pm.RestoreTsxState(null);
             _selectedState.Reset();
             _undoManager.Clear();
             // No content survives a close, so remove any crash-recovery file rather than
