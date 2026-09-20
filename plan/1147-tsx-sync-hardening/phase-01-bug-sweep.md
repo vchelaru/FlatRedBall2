@@ -328,21 +328,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`TiledAnimationToAchjMapper`'s satellite offset math assumes every satellite sits at or
-  below/right of its anchor.** `dx`/`dy` in `Map` are computed as `uint` subtraction
-  (`satellite.ID % columns - anchorCol`, `satellite.ID / columns - anchorRow`); a hand-edited
-  `ParentId` that points a "satellite" at a tile id *smaller* than its anchor (physically above or
-  left of the anchor in the grid — never producible by AnimationEditor's own UI, which only ever
-  grows a footprint to the right/down from its anchor) underflows that subtraction. Casting the
-  wrapped value back to `int` for the `satelliteTileIdsForChain` dictionary key happens to recover
-  the correct negative offset (two's-complement reinterpretation), but `footprintColumns`/
-  `footprintRows` (also `uint`) then compute `dx + 1`/`dy + 1`, which wraps back to 0 instead of
-  actually expanding — so the anchor's own mapped frame rect (`RightCoordinate`/`BottomCoordinate`)
-  never grows to include that satellite's real position, silently excluding it from the loaded
-  model instead of surfacing a warning the way `TsxAnimationValidator` does for other broken-group
-  shapes. Needs a decision on the right response (treat as an invalid/orphaned `ParentId` like the
-  existing "doesn't resolve to a true anchor" cases? clamp to non-negative? flag via the
-  validator?) before writing the fix.
 - [ ] **`ProjectManager.SaveTsxProject`'s `targetPath` "Save As to a new file" branch has no test
   at the `ProjectManager` layer.** `TsxWriter`'s full-rewrite code path itself is well covered
   (`TsxWriterTests`' `Write_RoundTrip_*` tests write to a fresh `outputPath` that doesn't exist yet),
@@ -436,6 +421,44 @@ subsystem), achj-vs-achx serialization interaction with the entry/satellite trac
   `Map_TallySkipsTrue_RowOutOfRangeTalliedInSkipCounts`,
   `MultiTileToTiledAnimationMapperTests.Map_FootprintBottomRowBeyondTilesetTileCount_SkipsChainAndWarnsInsteadOfFabricatingOutOfRangeTile`,
   `NativeTsxProjectRoundTripTests.LoadMapApplySave_FrameBeyondTilesetTileCount_SkipsInsteadOfFabricatingPhantomTile`.
+
+- [x] **`TiledAnimationToAchjMapper`'s satellite offset math assumed every satellite sits at or
+  below/right of its anchor.** Real bug, confirmed red first —
+  `TiledAnimationToAchjMapperTests.Map_BackwardParentId_SatelliteAboveAnchorSurfacesAsItsOwnChainInsteadOfBeingSilentlyExcluded`
+  failed against the old code (1 chain instead of 2 — the backward tile's animation data completely
+  absent from the returned model, not just miscomputed), and a second red test at the validator
+  layer confirmed the danger of the "silently excluded" framing was understated: with the anchor
+  and backward tile's frame counts equal, the validator's own dx/dy lockstep math (same uint-
+  subtraction shape as the mapper's bug) happened to wrap back around to the tile's own correct
+  `TileID` and report **zero issues** for `TsxAnimationValidatorTests.Validate_BackwardParentId_ReferencesAnchorAtLargerColumnOrRow_ReturnsIssue`,
+  i.e. the pre-existing lockstep check was not a reliable safety net for this case either. Decision:
+  **option (a), treat a backward ParentId as invalid/orphaned** — same "structurally impossible via
+  AnimationEditor's own UI, only reachable via hand-editing" pattern as every other broken-`ParentId`
+  fix on this branch (orphaned, chained/nested). Reasoning: AnimationEditor's own UI only ever grows
+  a multi-tile footprint to the right/down from its anchor, so a backward-pointing `ParentId` has no
+  real semantics to preserve as a satellite; making the tile its own anchor/chain (rather than
+  clamping the offset to non-negative, which would just misplace it differently without fixing
+  anything) keeps its animation data fully intact and matches every prior decision in this sweep.
+  Combined with **option (c)**, a dedicated `TsxAnimationValidator` check, following the exact
+  precedent set by the chained-ParentId fix's own added validator check. Fixed:
+  - `TiledAnimationToAchjMapper.Map` gained an `IsBackwardOffset(anchorId, satelliteId)` local
+    function (`(satelliteId % columns) < (anchorId % columns) || (satelliteId / columns) < (anchorId
+    / columns)`) and extended the existing `IsAnchor` eligibility check (already covering orphaned/
+    chained `ParentId`) to also treat a backward offset as "not a real satellite" — the tile falls
+    through to become an anchor of its own instead of ever entering the uint dx/dy subtraction that
+    was silently underflowing. `satellitesByAnchor` was reordered to filter via `!IsAnchor(t)`
+    (previously it filtered only on "has a ParentId at all," independently of the anchor-eligibility
+    checks used one loop later, which is what let a backward tile slip through as a satellite in the
+    first place).
+  - `TsxAnimationValidator.Validate` gained a dedicated backward-offset check
+    (`(tile.ID % columns) < (anchorId % columns) || (tile.ID / columns) < (anchorId / columns)`),
+    placed before the per-frame lockstep loop for the same reason the mapper fix orders `IsAnchor`
+    checks before the dx/dy math — the lockstep loop's own uint arithmetic has the identical
+    underflow shape and can't be trusted to catch this case on its own (confirmed above: it
+    coincidentally reported zero issues for the red test's frame-count-equal scenario).
+  Tests:
+  `TiledAnimationToAchjMapperTests.Map_BackwardParentId_SatelliteAboveAnchorSurfacesAsItsOwnChainInsteadOfBeingSilentlyExcluded`,
+  `TsxAnimationValidatorTests.Validate_BackwardParentId_ReferencesAnchorAtLargerColumnOrRow_ReturnsIssue`.
 
 - [x] **Fresh-eyes pass #1.** Re-read every file in "Files in scope" end to end (not just the
   diffs from prior fixes), working through the phase doc's four suggested categories

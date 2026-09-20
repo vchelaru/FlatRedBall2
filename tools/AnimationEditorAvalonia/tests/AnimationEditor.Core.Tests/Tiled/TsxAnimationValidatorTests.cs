@@ -86,6 +86,32 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_BackwardParentId_ReferencesAnchorAtLargerColumnOrRow_ReturnsIssue()
+    {
+        // Anchor at tile 9 (column 1, row 2, 4 columns/tileset). Tile 8 (column 0, same row)
+        // points ParentId at it -- physically to the LEFT of the anchor, a footprint shape
+        // AnimationEditor's own UI can never produce (a group only ever grows right/down from its
+        // anchor). TiledAnimationToAchjMapper now surfaces tile 8 as its own independent chain (its
+        // ParentId grouping never takes effect), so the validator must flag it.
+        var tileset = TilesetWithColumns(4);
+        var anchor = new Tile { ID = 9, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var backwardTile = new Tile { ID = 8, Width = 0, Height = 0 };
+        backwardTile.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        backwardTile.Properties.Add(new IntProperty { Name = "ParentId", Value = 9 });
+        tileset.Tiles.Add(backwardTile);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)9, issue.AnchorTileId);
+        Assert.Equal((uint)8, issue.TileId);
+        Assert.Contains("backward", issue.Message);
+    }
+
+    [Fact]
     public void Validate_ChainedParentId_ReferencesTileThatIsItselfASatellite_ReturnsIssue()
     {
         // A -- true anchor. B -- ParentId=A.ID, a legitimate satellite. C -- ParentId=B.ID,

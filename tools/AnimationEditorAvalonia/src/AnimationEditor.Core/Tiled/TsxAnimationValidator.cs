@@ -55,6 +55,19 @@ public static class TsxAnimationValidator
                 continue;
             }
 
+            // A ParentId pointing "backward" -- to an anchor with a larger column or row than the
+            // satellite itself -- is a footprint shape AnimationEditor's own UI can never produce
+            // (a group only ever grows right/down from its anchor). Must be checked before the
+            // dx/dy lockstep math below: that math is uint subtraction and underflows for exactly
+            // this case, which can coincidentally wrap back around to the tile's own correct
+            // TileID and report zero issues instead of flagging the broken reference.
+            if ((tile.ID % columns) < (anchorId % columns) || (tile.ID / columns) < (anchorId / columns))
+            {
+                issues.Add(new TsxGroupIssue(anchorId, tile.ID,
+                    $"tile {tile.ID}: ParentId {anchorId} references an anchor at a larger column or row than tile {tile.ID} itself (backward offset) -- AnimationEditor's own UI only ever grows a group's footprint to the right/below its anchor."));
+                continue;
+            }
+
             if (anchor.Animation.Count != tile.Animation.Count)
             {
                 issues.Add(new TsxGroupIssue(anchorId, tile.ID,

@@ -203,6 +203,39 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_BackwardParentId_SatelliteAboveAnchorSurfacesAsItsOwnChainInsteadOfBeingSilentlyExcluded()
+    {
+        // Anchor at tile 5 (column 1, row 1, 4 columns/tileset). "Satellite" at tile 1 (column 1,
+        // row 0) -- directly ABOVE the anchor, a footprint shape AnimationEditor's own UI can
+        // never produce (a group only ever grows right/down from its anchor). Its dy relative to
+        // the anchor is -1; the mapper's uint dy/footprintRows arithmetic underflows for this case
+        // and silently excludes tile 1 from the anchor's mapped frame rect instead of preserving
+        // its data. Tile 1 must not vanish: it should surface as its own independent chain, same
+        // treatment as an orphaned/chained ParentId.
+        var tileset = EmptyTileset();
+
+        var anchor = new Tile { ID = 5, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        tileset.Tiles.Add(anchor);
+
+        var backwardSatellite = new Tile { ID = 1, Width = 0, Height = 0 };
+        backwardSatellite.Animation.Add(new Frame { TileID = 1, Duration = 100 });
+        backwardSatellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 5 });
+        tileset.Tiles.Add(backwardSatellite);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+
+        Assert.Equal(2, acls.AnimationChains.Count);
+        var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
+        Assert.Contains("ID:5", chainNames);
+        Assert.Contains("ID:1", chainNames);
+
+        var backwardChain = acls.AnimationChains.Single(c => c.Name == "ID:1");
+        Assert.Single(backwardChain.Frames);
+        Assert.Equal((uint)1, entryTileIdsByChain[backwardChain]);
+    }
+
+    [Fact]
     public void Map_ChainedParentId_SatelliteOfASatelliteSurfacesAsItsOwnChainInsteadOfDropped()
     {
         // A -- no ParentId, a true top-level anchor.
