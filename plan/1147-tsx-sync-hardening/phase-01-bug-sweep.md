@@ -99,12 +99,15 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   `NativeTsxProjectRoundTripTests.LoadShrinkGroupFootprintSave_UnusedSatelliteCleared_ButUnrelatedPropertyKept`,
   `LoadGrowChainFootprintSave_NewSatelliteCreated_ButUnrelatedPropertyOnExistingTileKept`.
 
+- [x] **Two different multi-tile chains have overlapping satellite/anchor footprints in the
+  spritesheet.** Already correct — `ValidateNoTileIdCollisions` claims every result's entry tile id
+  and every satellite tile id generically in one pass, so a satellite-vs-satellite collision throws
+  the same way anchor-vs-anchor already did, and the message names both chains and the tile id. No
+  source change; test added to pin the behavior:
+  `NativeTsxAnimationSyncTests.Apply_TwoMultiTileChainsSatellitesCollide_ThrowsNamingBothChainsAndTileId`.
+
 ## TODO
 
-- [ ] **Two different multi-tile chains have overlapping satellite/anchor footprints in the
-  spritesheet** (legitimate geometry collision, not an authoring mistake) — confirm this is caught
-  by the same collision detection as the identical-entry-tile case, with a clear message identifying
-  both chains.
 - [ ] **`TsxWriter` tile ordering**: when the original `.tsx` file's `<tile>` elements are *not* in
   ascending id order (Tiled doesn't strictly guarantee this), does
   `NativeTsxAnimationSync`/`TilesetAnimationSync`'s `tileset.Tiles.Sort(...)` cause every untouched

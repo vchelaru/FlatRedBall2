@@ -131,6 +131,28 @@ public class NativeTsxAnimationSyncTests
     }
 
     [Fact]
+    public void Apply_TwoMultiTileChainsSatellitesCollide_ThrowsNamingBothChainsAndTileId()
+    {
+        // Two genuinely multi-tile groups (anchor + satellite each) whose footprints happen to
+        // overlap in the spritesheet such that only the *satellites* collide -- distinct from the
+        // already-covered anchor-vs-anchor and satellite-vs-anchor cases.
+        var tileset = EmptyTileset();
+        var walkSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)]);
+        var runSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)]);
+        var results = new[]
+        {
+            Result("Walk", 0, [new MappedFrame(0, 100)], walkSatellite),
+            Result("Run", 10, [new MappedFrame(10, 100)], runSatellite),
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+
+        Assert.Contains("Walk", exception.Message);
+        Assert.Contains("Run", exception.Message);
+        Assert.Contains("5", exception.Message);
+    }
+
+    [Fact]
     public void Apply_ExistingNamePropertyHasWrongType_IsReplacedNotDuplicated()
     {
         var tileset = EmptyTileset();
