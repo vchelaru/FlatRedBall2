@@ -81,27 +81,34 @@ public static class TsxWriter
         var originalTileElements = xdoc.Root!.Elements("tile").ToList();
         var originalTilesById = original.Tiles.ToDictionary(t => t.ID);
 
-        var tileStartOffsets = originalTileElements
-            .Select(e => CharOffset(lineStarts, ((IXmlLineInfo)e).LineNumber, ((IXmlLineInfo)e).LinePosition))
+        // Anchored on each <tile>'s own LINE START (not its "<" column) so every slice -- reused
+        // or freshly rendered -- carries its own leading indentation and trailing newline the same
+        // way. That symmetry is what lets tiles be concatenated back to back with no position-
+        // dependent special casing (first/last/only tile all behave identically). This assumes
+        // Tiled's/this writer's one-node-per-line convention; TileLineLooksLikeATile guards it.
+        var tileLineStarts = originalTileElements
+            .Select(e => lineStarts[((IXmlLineInfo)e).LineNumber - 1])
             .ToList();
 
         var originalSlicesById = new Dictionary<uint, string>();
         for (var i = 0; i < originalTileElements.Count; i++)
         {
+            var start = tileLineStarts[i];
+            var end = i + 1 < tileLineStarts.Count ? tileLineStarts[i + 1] : closingTagOffset;
+            if (!TileLineLooksLikeATile(rawText, start))
+                return false;
+
             var id = uint.Parse(originalTileElements[i].Attribute("id")!.Value);
-            var end = i + 1 < tileStartOffsets.Count ? tileStartOffsets[i + 1] : closingTagOffset;
-            originalSlicesById[id] = rawText[tileStartOffsets[i]..end];
+            originalSlicesById[id] = rawText[start..end];
         }
 
-        var prologueEnd = tileStartOffsets.Count > 0 ? tileStartOffsets[0] : closingTagOffset;
+        var prologueEnd = tileLineStarts.Count > 0 ? tileLineStarts[0] : closingTagOffset;
         var newline = rawText.Contains("\r\n") ? "\r\n" : "\n";
 
         var sb = new StringBuilder(rawText[..prologueEnd]);
-        for (var i = 0; i < tileset.Tiles.Count; i++)
+        foreach (var tile in tileset.Tiles)
         {
-            var tile = tileset.Tiles[i];
-            var hasOriginalSlice = originalSlicesById.TryGetValue(tile.ID, out var originalSlice);
-            if (hasOriginalSlice
+            if (originalSlicesById.TryGetValue(tile.ID, out var originalSlice)
                 && originalTilesById.TryGetValue(tile.ID, out var originalTile)
                 && TileContentEquals(originalTile, tile))
             {
@@ -109,13 +116,7 @@ public static class TsxWriter
                 continue;
             }
 
-            // No original gap to borrow (a brand-new tile): the next sibling is another
-            // 1-space-indented <tile>, unless this is the last one, in which case what follows is
-            // the 0-indented </tileset> and needs no leading space at all.
-            var trailingGap = i == tileset.Tiles.Count - 1 ? newline : newline + " ";
-            if (hasOriginalSlice && originalSlice is not null)
-                trailingGap = originalSlice[(originalSlice.LastIndexOf('>') + 1)..];
-            sb.Append(RenderTileFragment(tile, newline)).Append(trailingGap);
+            sb.Append(RenderTileFragment(tile, newline)).Append(newline);
         }
         sb.Append(rawText[closingTagOffset..]);
 
@@ -123,8 +124,19 @@ public static class TsxWriter
         return true;
     }
 
+    /// <summary>
+    /// Guards the one-node-per-line assumption <see cref="TryWritePatched"/> relies on to slice by
+    /// line start: a line that (after leading whitespace) doesn't actually begin with "&lt;tile"
+    /// means something is sharing that line in a way this writer doesn't understand, so the caller
+    /// should fall back to a full rewrite instead of slicing garbage.
+    /// </summary>
+    private static bool TileLineLooksLikeATile(string rawText, int lineStart) =>
+        rawText[lineStart..].TrimStart(' ').StartsWith("<tile", StringComparison.Ordinal);
+
     /// <summary>Renders one &lt;tile&gt; element (no trailing newline) at the indentation depth it
-    /// has as a direct child of &lt;tileset&gt;.</summary>
+    /// has as a direct child of &lt;tileset&gt;, including its own leading indentation -- callers
+    /// never add indentation of their own, matching how a reused original slice already carries
+    /// its leading space.</summary>
     private static string RenderTileFragment(Tile tile, string newline)
     {
         var settings = new XmlWriterSettings
@@ -152,11 +164,6 @@ public static class TsxWriter
                 starts.Add(i + 1);
         return [.. starts];
     }
-
-    // IXmlLineInfo.LinePosition for an element points one character past its "<" (at the tag
-    // name), not at "<" itself -- verified against System.Xml.Linq directly, not assumed.
-    private static int CharOffset(int[] lineStarts, int lineNumber, int linePosition) =>
-        lineStarts[lineNumber - 1] + (linePosition - 2);
 
     private static bool TopLevelEquals(Tileset a, Tileset b) =>
         a.Version == b.Version &&
