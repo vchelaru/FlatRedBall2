@@ -156,6 +156,29 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_ParentIdDoesNotResolveToAnimatedTile_SurfacesAsItsOwnChainInsteadOfDropped()
+    {
+        // ParentId 99 doesn't reference any animated tile in this tileset (typo, hand-edit
+        // mistake, or the anchor it used to point to was separately deleted). Prior behavior
+        // silently dropped this tile's animation from the returned model entirely -- it was
+        // excluded from the anchor loop (it has a ParentId) but never folded into any anchor's
+        // satellites either (no anchor with ID 99 exists to claim it). It must now surface as its
+        // own chain so the data survives into what the user can edit/save.
+        var tileset = EmptyTileset();
+        var orphan = new Tile { ID = 5, Width = 0, Height = 0 };
+        orphan.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        orphan.Properties.Add(new IntProperty { Name = "ParentId", Value = 99 });
+        tileset.Tiles.Add(orphan);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+
+        var chain = Assert.Single(acls.AnimationChains);
+        Assert.Equal("ID:5", chain.Name);
+        Assert.Single(chain.Frames);
+        Assert.Equal((uint)5, entryTileIdsByChain[chain]);
+    }
+
+    [Fact]
     public void Map_ReturnsEntryTileIdForEachChainKeyedByChainReference()
     {
         var tileset = EmptyTileset();

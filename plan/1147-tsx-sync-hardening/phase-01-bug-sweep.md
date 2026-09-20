@@ -133,6 +133,23 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   fully completes before tsx #2's iteration starts, so tsx #2 throwing can't touch tsx #1's already
   -written file. No source change; test added to pin the behavior:
   `TiledTilesetSyncRunnerTests.SyncAll_SecondTsxInBatchThrows_FirstTsxWriteAlreadyOnDiskStaysFullyCorrect`.
+- [x] **`TsxAnimationValidator` orphaned-`ParentId` satellite**: real bug, confirmed red first —
+  `Map_ParentIdDoesNotResolveToAnimatedTile_SurfacesAsItsOwnChainInsteadOfDropped` failed against the
+  old code (`Assert.Single()` on an empty chain collection), proving the tile's animation data was
+  completely absent from the returned model, not just unedited. Decision: **option 2, surface as its
+  own independent chain**, not warn-and-drop. Reasoning: the fix is small and localized (only changes
+  which tiles count as anchor-eligible in `TiledAnimationToAchjMapper.Map` — a tile whose `ParentId`
+  doesn't resolve to an animated tile is now treated the same as having no `ParentId`, matching the
+  existing negative-`ParentId` precedent in the same method); it doesn't touch
+  `TsxAnimationValidator`, which keeps flagging the dangling `ParentId` as a warning so the user still
+  learns their group is broken; and on the next save, `MultiTileToTiledAnimationMapper`/
+  `NativeTsxAnimationSync.ApplyTile` writes the now-standalone chain with `parentId: null`, which
+  `SetOrRemoveIntProperty` clears from the tile — so the stale `ParentId` property doesn't linger as
+  half-broken state, it's cleanly removed once the tile is no longer a satellite. The "confusingly
+  auto-fixes a Tiled authoring mistake" downside is real but minor: the tile keeps its exact
+  animation, just as its own chain instead of vanishing, and the validator warning still tells the
+  user their intended grouping didn't take effect. Test:
+  `TiledAnimationToAchjMapperTests.Map_ParentIdDoesNotResolveToAnimatedTile_SurfacesAsItsOwnChainInsteadOfDropped`.
 
 ## TODO
 
@@ -143,12 +160,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   Confirm whether the UI layer that displays `Error` actually surfaces enough detail (message +
   exception type, not just a generic "sync failed" toast) for a user/developer to diagnose — this is
   a UI-surfacing question more than a sync-logic bug, so scope accordingly.
-- [ ] **`TsxAnimationValidator` orphaned-`ParentId` satellite**: `TiledAnimationToAchjMapper.Map`
-  silently drops a satellite tile's animation data from the editable model entirely when its
-  `ParentId` doesn't resolve to an animated anchor (the validator flags it as a UI warning, but the
-  data is still gone from what the user can edit/save). Decide and pin whether this is acceptable
-  (warn-and-drop) or whether the tile should surface as its own independent chain instead so no data
-  is silently unrecoverable.
 - [ ] **Satellite tile's own `<animation>` content is never read on load** — only its static grid
   position relative to the anchor is trusted (`TiledAnimationToAchjMapper.Map`, satellites branch).
   A hand-edit to a satellite's frames directly in Tiled would be silently discarded on the next

@@ -13,12 +13,17 @@ namespace AnimationEditor.Core.Tiled;
 /// </summary>
 /// <remarks>
 /// One animated tile with no <see cref="ParentIdPropertyName"/> property becomes one chain (an
-/// "anchor"). A tile carrying a <see cref="ParentIdPropertyName"/> property is a multi-tile-group
-/// "satellite" -- it is folded into its anchor's chain as part of a wider per-frame rect instead of
-/// becoming its own chain; the satellite's own <c>Animation</c> frames are not read here, only its
-/// static grid position relative to the anchor (see <see cref="MultiTileToTiledAnimationMapper"/>
-/// for why that's safe to trust). A chain's name is the tile's <see cref="NamePropertyName"/>
-/// property when present, otherwise a synthetic <c>"ID:{tileId}"</c> label.
+/// "anchor"). A tile carrying a <see cref="ParentIdPropertyName"/> property that resolves to
+/// another animated tile is a multi-tile-group "satellite" -- it is folded into its anchor's chain
+/// as part of a wider per-frame rect instead of becoming its own chain; the satellite's own
+/// <c>Animation</c> frames are not read here, only its static grid position relative to the anchor
+/// (see <see cref="MultiTileToTiledAnimationMapper"/> for why that's safe to trust). A
+/// <see cref="ParentIdPropertyName"/> that does *not* resolve to an animated tile (typo, hand-edit
+/// mistake, or the anchor was separately deleted) is treated as an anchor of its own rather than
+/// dropped -- <see cref="TsxAnimationValidator"/> still flags the dangling reference as a warning,
+/// but the tile's own animation data is never silently unrecoverable. A chain's name is the tile's
+/// <see cref="NamePropertyName"/> property when present, otherwise a synthetic <c>"ID:{tileId}"</c>
+/// label.
 /// </remarks>
 public static class TiledAnimationToAchjMapper
 {
@@ -51,6 +56,7 @@ public static class TiledAnimationToAchjMapper
         var entryTileIds = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
 
         var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
+        var animatedTileIds = animatedTiles.Select(t => t.ID).ToHashSet();
         var parentIdByTileId = animatedTiles.ToDictionary(t => t.ID, GetParentId);
         var satellitesByAnchor = animatedTiles
             .Where(t => parentIdByTileId[t.ID].HasValue)
@@ -58,7 +64,14 @@ public static class TiledAnimationToAchjMapper
 
         var columns = (uint)tileset.Columns;
 
-        foreach (var anchor in animatedTiles.Where(t => !parentIdByTileId[t.ID].HasValue))
+        // A tile whose ParentId doesn't resolve to an animated tile (typo, hand-edit mistake, or the
+        // anchor's own animation was separately deleted) is an orphaned satellite. Treat it as an
+        // anchor of its own rather than dropping it: TsxAnimationValidator already flags the broken
+        // ParentId as a warning, but the tile's animation data must still survive into the editable
+        // model so it isn't silently unrecoverable on save.
+        bool IsAnchor(Tile t) => parentIdByTileId[t.ID] is not { } parentId || !animatedTileIds.Contains(parentId);
+
+        foreach (var anchor in animatedTiles.Where(IsAnchor))
         {
             var chain = new AnimationChainSave { Name = ChainName(anchor) };
 
