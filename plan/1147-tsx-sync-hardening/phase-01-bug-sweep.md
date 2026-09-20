@@ -173,16 +173,23 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   satellite (chained/nested ParentId) rather than a true anchor." Tests:
   `TiledAnimationToAchjMapperTests.Map_ChainedParentId_SatelliteOfASatelliteSurfacesAsItsOwnChainInsteadOfDropped`,
   `TsxAnimationValidatorTests.Validate_ChainedParentId_ReferencesTileThatIsItselfASatellite_ReturnsIssue`.
+- [x] **`TiledTilesetSyncRunner.SyncAll`'s per-tsx `catch (Exception ex)` is a blanket catch.**
+  Traced the full chain: `Error` is the raw `Exception` instance passed straight into
+  `FailureOutcome` (no stringify/flatten), consumed by `AppCommands.SyncAssociatedTiledTilesets`
+  (which forwards it unchanged via `TiledSyncFailed`), and finally displayed in
+  `MainWindow.axaml.cs` (`AnimationEditor.App`, not `.Core`) as
+  `$"{fileName}: {ex.Message}"` — message only, no exception type name. That last hop is outside
+  this sweep's scope (`AnimationEditor.Core` only, per "Files in scope" above) and outside what
+  `AnimationEditor.Core.Tests` can exercise; it's also arguably fine as-is, since a collision's
+  `InvalidOperationException` message already names both chains and the tile id while a genuine bug's
+  message (e.g. an NRE's "Object reference not set...") reads nothing like it, even without the type
+  name printed. Confirmed the testable core at the `.Core` layer: `SyncAll` never flattens the
+  exception before storing it, so type + message survive intact for any future consumer that wants
+  to branch on exception kind. Test (pinning, not a fix):
+  `TiledTilesetSyncRunnerTests.SyncAll_TwoChainsClaimSameEntryTile_OutcomeErrorPreservesExactExceptionTypeAndMessage`.
 
 ## TODO
 
-- [ ] **`TiledTilesetSyncRunner.SyncAll`'s per-tsx `catch (Exception ex)` is a blanket catch** — a
-  genuine programming bug inside `AchjToTiledAnimationMapper.Map` (e.g. a `NullReferenceException`
-  from malformed achj data) gets silently downgraded to a per-tsx "failure" outcome
-  (`TiledTilesetSyncOutcome.Error`) indistinguishable in kind from an expected/recoverable failure.
-  Confirm whether the UI layer that displays `Error` actually surfaces enough detail (message +
-  exception type, not just a generic "sync failed" toast) for a user/developer to diagnose — this is
-  a UI-surfacing question more than a sync-logic bug, so scope accordingly.
 - [ ] **Satellite tile's own `<animation>` content is never read on load** — only its static grid
   position relative to the anchor is trusted (`TiledAnimationToAchjMapper.Map`, satellites branch).
   A hand-edit to a satellite's frames directly in Tiled would be silently discarded on the next

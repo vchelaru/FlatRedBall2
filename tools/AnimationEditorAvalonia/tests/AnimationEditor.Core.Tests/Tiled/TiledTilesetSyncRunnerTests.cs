@@ -141,4 +141,40 @@ public class TiledTilesetSyncRunnerTests
         Assert.Equal([((uint)0, 100), ((uint)1, 100)], tile0.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
     }
+
+    // Pins that SyncAll's blanket `catch (Exception ex)` doesn't flatten the failure to a generic
+    // message -- it stores the exact original exception (type + message intact) on the outcome, so
+    // a genuine collision (InvalidOperationException, from TilesetAnimationSync's ownership check)
+    // stays distinguishable from an I/O failure (e.g. FileNotFoundException, asserted separately
+    // above in SyncAll_UnreadableTsxPath_ReportsFailureWithoutThrowing) by callers that inspect
+    // outcome.Error's runtime type rather than just its Message.
+    [Fact]
+    public void SyncAll_TwoChainsClaimSameEntryTile_OutcomeErrorPreservesExactExceptionTypeAndMessage()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var save = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        var walk = new AnimationChainSave { Name = "Walk" };
+        walk.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png", FrameLength = 0.1f,
+            LeftCoordinate = 0, TopCoordinate = 0, RightCoordinate = 16, BottomCoordinate = 16,
+        });
+        var idle = new AnimationChainSave { Name = "Idle" };
+        idle.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png", FrameLength = 0.1f,
+            LeftCoordinate = 0, TopCoordinate = 0, RightCoordinate = 16, BottomCoordinate = 16,
+        });
+        save.AnimationChains.Add(walk);
+        save.AnimationChains.Add(idle);
+
+        var outcomes = TiledTilesetSyncRunner.SyncAll(save, achxPath, [tsxPath]);
+
+        Assert.False(outcomes[0].Success);
+        var error = Assert.IsType<System.InvalidOperationException>(outcomes[0].Error);
+        Assert.Contains("Walk", error.Message);
+        Assert.Contains("Idle", error.Message);
+    }
 }
