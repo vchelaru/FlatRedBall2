@@ -225,6 +225,28 @@ public static class CanvasTransform
         return (cpx, cpy, nz);
     }
 
+    /// <summary>
+    /// Rounds pan to the nearest whole screen pixel when point-sampling would otherwise land
+    /// exactly (or near-exactly) on a texel boundary -- only relevant at <paramref name="zoom"/>
+    /// &gt;= 1, the threshold at which <c>TextureViewport</c> switches to nearest-neighbor
+    /// sampling for pixel-art fidelity. Below that, bilinear sampling blends continuously across
+    /// any offset, so there's no boundary ambiguity to fix and the pan is returned unchanged.
+    /// Uses <see cref="MathF.Round(float)"/> (round-to-nearest, ties-to-even), not floor/ceiling
+    /// -- floor or ceiling would bias every fit-to-view in the same direction, while round-to-
+    /// nearest's worst case is an imperceptible &lt;= 0.5 screen-pixel shift with no consistent
+    /// direction across different fits.
+    /// </summary>
+    /// <remarks>
+    /// Issue #1140 follow-up: a fit-to-view centering computation landed on an exact half-pixel
+    /// pan (<c>panY = -3446.5</c> at <c>zoom = 4</c>) for a real animation chain. Nearest-neighbor
+    /// sampling exactly on a texel boundary is a genuine tie, and GPU/driver tie-breaking for that
+    /// case isn't guaranteed stable frame-to-frame -- visible as shimmer on the rendered image
+    /// even though the camera itself never changed (confirmed via logging: pan/zoom were
+    /// bit-identical across every render during the reported jitter).
+    /// </remarks>
+    public static (float PanX, float PanY) SnapPanForPointSampling(float panX, float panY, float zoom) =>
+        zoom >= 1f ? (MathF.Round(panX), MathF.Round(panY)) : (panX, panY);
+
     // ── Drag auto-pan (#540) ──────────────────────────────────────────────────
 
     /// <summary>

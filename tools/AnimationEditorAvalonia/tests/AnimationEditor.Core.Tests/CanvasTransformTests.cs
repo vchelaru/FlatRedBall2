@@ -567,4 +567,42 @@ public class CanvasTransformTests
         // 2048×2048 frame at 1× → 2048 px, far larger than an 800×600 viewport.
         Assert.True(CanvasTransform.RectExceedsViewport(2048f, 2048f, 1f, 800f, 600f));
     }
+
+    // ── SnapPanForPointSampling ───────────────────────────────────────────────
+    // Point-sampling (nearest-neighbor, used at zoom >= 1 for pixel-art fidelity) is exactly
+    // ambiguous when a destination pixel lands precisely on a texel boundary -- e.g. an exact
+    // half-pixel pan from a fit-to-view centering computation. GPU/driver tie-breaking for that
+    // case isn't guaranteed stable frame-to-frame, which showed up as visible shimmer with a
+    // provably unchanged camera (issue #1140 follow-up, repro: FitChainToView on a real tsx
+    // chain landed on panY=-3446.5 at zoom=4).
+
+    [Fact]
+    public void SnapPanForPointSampling_ExactReproValues_RoundsToWholePixel()
+    {
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(-4312f, -3446.5f, 4f);
+
+        Assert.Equal(-4312f, panX);
+        Assert.Equal(-3446f, panY); // banker's rounding: -3446.5 rounds to the nearest even integer
+    }
+
+    [Fact]
+    public void SnapPanForPointSampling_ZoomBelowOne_ReturnsPanUnchanged()
+    {
+        // Bilinear sampling below 1x blends continuously across any offset -- no boundary
+        // ambiguity to fix, so snapping would only needlessly move the image.
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.5f, 20.5f, 0.5f);
+
+        Assert.Equal(10.5f, panX);
+        Assert.Equal(20.5f, panY);
+    }
+
+    [Fact]
+    public void SnapPanForPointSampling_ZoomAtLeastOne_RoundsToNearestNotAlwaysDown()
+    {
+        // Math.Round, not Floor -- Floor/Ceiling would bias every fit in the same direction.
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.9f, 20.1f, 1f);
+
+        Assert.Equal(11f, panX);
+        Assert.Equal(20f, panY);
+    }
 }
