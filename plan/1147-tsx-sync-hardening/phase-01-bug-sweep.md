@@ -328,15 +328,32 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`TilesetAnimationSync` ownership check keys off `Animation.Count > 0`, not `achjAnimationName`**
-  — a tile with `achjAnimationName` set but no `achjSourceFile` (e.g. a partially-written tile from
-  an older schema, or a crash mid-write) and an *empty* `Animation` list would currently be treated
-  as unowned and silently claimed/overwritten, since the new hand-authored check only looks at
-  `Animation.Count`. Decide whether `achjAnimationName` alone should also count as "already tracked,
-  needs matching achjSourceFile to overwrite" and pin it.
 - [ ] **Fresh-eyes pass #1**: once the above are done, do a dedicated pass (self or subagent)
   re-reading every file in scope end to end asking "what haven't we tried yet" — new categories to
   consider: concurrent edits (two `ProjectManager` instances / two AnimationEditor windows open on
   the same tsx), very large tilesets (performance, not just correctness), non-Latin/unicode chain
   names round-tripping through the `Name` property, and the achj (JSON) vs achx (XML) serialization
   paths for anything this phase touches.
+
+## DONE (continued)
+
+- [x] **`TilesetAnimationSync` ownership check keys off `Animation.Count > 0`, not
+  `achjAnimationName`.** Decision: **do not extend the check** — `achjAnimationName` alone stays
+  outside the ownership test; only `Animation.Count > 0` (actual frame data) or a set
+  `achjSourceFile` count as "owned." Reasoning: the scenario is a tile with `achjAnimationName` set,
+  no `achjSourceFile`, and an *empty* `Animation` list (partially-written/crashed save, pre-
+  `achjSourceFile` schema, or a hand-edit that cleared frames but left the name property). Extending
+  the check to treat `achjAnimationName` alone as "tracked" would skip+warn on this tile forever with
+  no way out: the skip path never writes `achjSourceFile` (that only happens on a successful claim),
+  so `owningSource` stays `null` on every future sync attempt and the tile can never satisfy its own
+  "needs matching achjSourceFile to overwrite" condition — a permanent, unresolvable warning trap for
+  metadata that protects zero actual animation data. Contrast with the existing
+  `Animation.Count > 0` check this extends from: that one also never sets `achjSourceFile` on skip,
+  but it is guarding real frame content a human might have drawn, so "requires manual intervention to
+  reclaim" is the correct tradeoff there. Here there's nothing to protect but a stale string, so
+  self-healing (claim the tile, overwrite `achjAnimationName` to the new chain, and *do* set
+  `achjSourceFile` this time) is strictly better than a warning that can never resolve. Confirmed via
+  a pinning test (passes unmodified against current code — no source change): a tile with
+  `achjAnimationName = "OldChain"`, no `achjSourceFile`, empty `Animation` is claimed by a new achx
+  chain, ending up with the new chain's name and `achjSourceFile` set. Test:
+  `TilesetAnimationSyncTests.Apply_TileHasStaleAnimationNamePropertyButEmptyAnimationAndNoSourceProperty_IsClaimedNotPermanentlyBlocked`.

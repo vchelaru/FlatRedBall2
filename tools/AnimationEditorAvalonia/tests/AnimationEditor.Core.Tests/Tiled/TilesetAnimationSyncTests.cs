@@ -178,6 +178,32 @@ public class TilesetAnimationSyncTests
     }
 
     [Fact]
+    public void Apply_TileHasStaleAnimationNamePropertyButEmptyAnimationAndNoSourceProperty_IsClaimedNotPermanentlyBlocked()
+    {
+        var tileset = EmptyTileset();
+        var staleTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        // Simulates a partially-written/crashed save or a pre-achjSourceFile schema version:
+        // achjAnimationName survived but the animation frames and achjSourceFile did not.
+        // Deliberately NOT treated as "owned" the way a tile with actual Animation.Count > 0 is
+        // (see Apply_TileHasHandAuthoredAnimationNoSourceProperty_IsSkippedNotOverwritten above) --
+        // there is no achjSourceFile value a future sync could ever match to un-block this tile, so
+        // keying the ownership check off achjAnimationName alone would make it permanently
+        // unreclaimable (skip+warn forever, never able to write achjSourceFile to satisfy its own
+        // check). With no actual animation data at risk, self-healing by claiming and overwriting
+        // the stale name is safer than a warning that can never resolve.
+        staleTile.Properties.Add(new StringProperty { Name = "achjAnimationName", Value = "OldChain" });
+        tileset.Tiles.Add(staleTile);
+
+        var results = new[] { Result("Walk", 0, new MappedFrame(4, 100)) };
+        var syncResult = TilesetAnimationSync.Apply(tileset, results, SourceLabel);
+
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Equal(1, syncResult.AppliedCount);
+        Assert.Equal("Walk", tile.GetProperty<StringProperty>("achjAnimationName").Value);
+        Assert.Equal(SourceLabel, tile.GetProperty<StringProperty>("achjSourceFile").Value);
+    }
+
+    [Fact]
     public void Apply_ExistingAnimationNamePropertyHasWrongType_IsReplacedNotDuplicated()
     {
         var tileset = EmptyTileset();
