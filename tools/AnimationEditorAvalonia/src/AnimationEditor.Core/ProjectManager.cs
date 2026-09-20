@@ -85,6 +85,9 @@ namespace AnimationEditor.Core
         /// around so <see cref="SaveAnimationChainList(Stream)"/> can convert back to Pixel
         /// coordinates without a filesystem to re-read PNG headers from (the browser-wasm build
         /// has no disk at all, unlike <see cref="SaveAnimationChainList(string)"/>'s directory).
+        /// Plain per-load instance state with no public getter, same shape as the tsx fields
+        /// below -- see <see cref="CaptureTextureSizeState"/>/<see cref="RestoreTextureSizeState"/>
+        /// for why a tab-switch cache also needs to round-trip this.
         /// </summary>
         private IReadOnlyDictionary<string, (int Width, int Height)>? _knownTextureSizes;
 
@@ -750,6 +753,13 @@ namespace AnimationEditor.Core
                 _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
             }
         }
+
+        /// <inheritdoc/>
+        public object? CaptureTextureSizeState() => _knownTextureSizes;
+
+        /// <inheritdoc/>
+        public void RestoreTextureSizeState(object? state) =>
+            _knownTextureSizes = state as IReadOnlyDictionary<string, (int Width, int Height)>;
 
         /// <summary>
         /// Names of chains that have a <see cref="Tiled.TsxAnimationValidator"/> issue -- a

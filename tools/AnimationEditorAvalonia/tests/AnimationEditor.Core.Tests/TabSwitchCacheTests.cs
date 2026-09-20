@@ -162,6 +162,8 @@ public class TabSwitchCacheTests : IDisposable
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();
         public object? CaptureTsxState() => _inner.CaptureTsxState();
         public void RestoreTsxState(object? state) => _inner.RestoreTsxState(state);
+        public object? CaptureTextureSizeState() => _inner.CaptureTextureSizeState();
+        public void RestoreTextureSizeState(object? state) => _inner.RestoreTextureSizeState(state);
 
         public void LoadAnimationChain(
             FilePath fileName,

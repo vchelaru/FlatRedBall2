@@ -78,6 +78,15 @@ namespace AnimationEditor.Core.Models
         public object? CachedTsxState { get; set; }
 
         /// <summary>
+        /// Snapshot of this tab's known texture sizes (see
+        /// <see cref="IProjectManager.CaptureTextureSizeState"/>), captured alongside
+        /// <see cref="CachedEditorModel"/> so a cache-hit tab switch restores THIS tab's texture
+        /// sizes on the browser-wasm build instead of leaving whatever tab was loaded last. Null
+        /// when no known texture sizes were supplied for this tab.
+        /// </summary>
+        public object? CachedTextureSizeState { get; set; }
+
+        /// <summary>
         /// Name of the selected animation chain when this tab was last deactivated.
         /// Session-only (not written to <c>.aeproperties</c>).
         /// </summary>

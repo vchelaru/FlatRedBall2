@@ -361,26 +361,6 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **`ProjectManager._knownTextureSizes` has the identical "private per-load state
-  `TabEditorCache` can't see" shape as the tsx fields just fixed, on the browser-wasm build
-  specifically.** Found while checking whether the `TabEditorCache` fix's root cause (a long-lived
-  `ProjectManager` with private state no cache layer can round-trip) generalizes past the tsx
-  fields. `LoadAnimationChain`'s `knownTextureSizes` parameter (texture pixel sizes supplied by the
-  caller instead of a disk read, needed because the browser-wasm build has no filesystem to read PNG
-  headers from) is stashed into the private field `_knownTextureSizes`, which
-  `SaveAnimationChainList(Stream)` and `GetTextureSizeInPixels` depend on to convert UV coordinates
-  back to Pixel on save. Like the tsx fields, it's plain per-load instance state with no public
-  surface, so `TabEditorCache.CaptureFromProject`/`ApplyToProject` never touch it -- a browser-wasm
-  cache-hit tab switch (tab A loaded with known texture sizes, tab B loaded, switch back to A via
-  `TryActivateTabFromCache`) would restore tab A's `AnimationChainListSave` correctly but leave
-  `_knownTextureSizes` at whatever tab B's load left it (or `null`), so a save on tab A would use
-  wrong/missing texture sizes converting back to Pixel coordinates. Traced by reading only, not
-  reduced to a failing test yet -- `SaveAnimationChainList(string)` (the desktop path, not affected,
-  since it re-reads PNG headers from disk instead of relying on this field) has no equivalent gap.
-  Confirm on a browser-wasm-specific test harness (or by adding a `Stream`-based
-  `IProjectManager.CaptureTsxState`-shaped snapshot for this field too) before deciding whether this
-  needs the same opaque-snapshot treatment.
-
 - [ ] **Fresh-eyes pass #5 needed**: pass #4 found two new real, confirmed bugs (fixed, see DONE) plus
   the TODO above, so per the phase doc's stop condition ("finds nothing new to add, twice in a row")
   this phase is not yet exhausted -- this was not a clean pass. Suggested starting points for pass
@@ -890,3 +870,32 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   proves a save against the cache-restored tab writes a real edit to the correct tsx file, not a
   no-op against cleared state) and
   `TryActivateTabFromCache_AchxThenTsxThenBackToAchx_ClearsNativeTsxStateThenRestoresTsxOnReturn`.
+
+- [x] **`ProjectManager._knownTextureSizes` has the identical "private per-load state
+  `TabEditorCache` can't see" shape as the tsx fields just fixed, on the browser-wasm build
+  specifically.** Real bug, confirmed red first --
+  `TabSwitchCacheTextureSizeTests.TryActivateTabFromCache_SwitchBackAfterAnotherTabLoaded_SaveUsesThisTabsKnownTextureSizesNotTheOtherTabs`
+  failed against the old code with `InvalidOperationException: Cannot save with
+  CoordinateType=Pixel: texture size could not be resolved for: TexA.png` -- tab A is loaded with a
+  known texture size for its own texture, tab B is loaded next with none, and switching back to tab
+  A via `TryActivateTabFromCache` left `_knownTextureSizes` at tab B's (`null`) instead of tab A's,
+  so `SaveAnimationChainList(Stream)`'s Pixel conversion had nothing to resolve `TexA.png` against.
+  (Traced `GetTextureSizeInPixels`, the TODO's other named suspect, and found it does *not* read
+  `_knownTextureSizes` at all -- it always reads a PNG header off disk via `FileName`'s directory --
+  so only `SaveAnimationChainList(Stream)`/`SaveAnimationChainListAsync(Stream)` were actually
+  affected.) Fixed with the exact same opaque-snapshot pattern as `CaptureTsxState`/`RestoreTsxState`,
+  as a sibling pair rather than folding it into `TsxState` (unrelated concept -- texture sizes apply
+  to achx/achj tabs too, not just native-tsx ones):
+  - `IProjectManager` gained `object? CaptureTextureSizeState()` (returns the current
+    `_knownTextureSizes` reference, or `null`) and `void RestoreTextureSizeState(object? state)`
+    (restores it, or clears to `null` for anything that isn't the right dictionary type). No
+    cloning needed -- same reasoning already documented on the tsx tracking dictionaries:
+    `LoadAnimationChain` always replaces `_knownTextureSizes` wholesale, never mutates it in place.
+  - `TabEntry` gained `object? CachedTextureSizeState`; `TabEditorCache.CaptureFromProject`/
+    `ApplyToProject` call `pm.CaptureTextureSizeState()`/`pm.RestoreTextureSizeState(tab.
+    CachedTextureSizeState)` alongside the existing `CachedTsxState` round-trip.
+  - All 8 `IProjectManager` implementations (`ProjectManager` itself, `TabSwitchCacheTests`'
+    `CountingProjectManager` passthrough, and 6 no-op test fakes across `AnimationEditor.Views.Tests`
+    and `AnimationEditor.Core.Tests`) updated to match.
+  Test: `TabSwitchCacheTextureSizeTests.
+  TryActivateTabFromCache_SwitchBackAfterAnotherTabLoaded_SaveUsesThisTabsKnownTextureSizesNotTheOtherTabs`.

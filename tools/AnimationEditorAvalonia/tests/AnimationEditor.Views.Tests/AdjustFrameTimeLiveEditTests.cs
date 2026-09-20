@@ -38,6 +38,8 @@ public class AdjustFrameTimeLiveEditTests
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
         public object? CaptureTsxState() => null;
         public void RestoreTsxState(object? state) { }
+        public object? CaptureTextureSizeState() => null;
+        public void RestoreTextureSizeState(object? state) { }
 
         public void LoadAnimationChain(
             FilePath fileName,

@@ -66,6 +66,26 @@ namespace AnimationEditor.Core
         void RestoreTsxState(object? state);
 
         /// <summary>
+        /// Captures the texture sizes supplied to the most recent <see cref="LoadAnimationChain"/>
+        /// call as an opaque snapshot, or <see langword="null"/> if none were supplied. Same
+        /// tab-switch-cache shape as <see cref="CaptureTsxState"/>: without this,
+        /// <see cref="AnimationEditor.Core.Models.TabEditorCache"/>'s cache-hit tab switch
+        /// (<c>TryActivateTabFromCache</c>) leaves this project's known texture sizes at
+        /// whichever tab was most recently loaded from disk, so <see
+        /// cref="SaveAnimationChainList(Stream)"/> on the reactivated tab converts back to Pixel
+        /// using the wrong (or missing) sizes on the browser-wasm build, which has no filesystem
+        /// to fall back to.
+        /// </summary>
+        object? CaptureTextureSizeState();
+
+        /// <summary>
+        /// Restores a snapshot previously returned by <see cref="CaptureTextureSizeState"/> on
+        /// this same instance, or clears the known texture sizes when <paramref name="state"/> is
+        /// <see langword="null"/>.
+        /// </summary>
+        void RestoreTextureSizeState(object? state);
+
+        /// <summary>
         /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
         /// with no filesystem path to write (the browser-wasm build). Uses the
         /// <c>knownTextureSizes</c> from the most recent <see cref="LoadAnimationChain"/> call
