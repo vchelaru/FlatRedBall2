@@ -271,6 +271,33 @@ public class ProjectManagerTsxProjectTests : IDisposable
             t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "Renamed"));
     }
 
+    // A ProjectManager instance is reused across File > Open calls (it's a single long-lived
+    // instance per app window/tab-set, not recreated per file -- see TabSwitchCacheTests). Loading
+    // a plain .achx after a native tsx project was open must clear every tsx-specific field, or
+    // IsNativeTsxProject/TsxTileSize keep reporting the *previous* tsx's state even though the
+    // currently-loaded project is no longer a tsx at all -- and worse, AppCommands.
+    // SaveCurrentAnimationChainList branches on IsNativeTsxProject to decide whether to call
+    // SaveTsxProject (writing Tiled tileset XML, sourced from the stale _tsxTileset) instead of
+    // SaveAnimationChainList for what the user believes is a plain achx save.
+    [Fact]
+    public void LoadAnimationChain_AfterLoadTsxProject_ClearsNativeTsxState()
+    {
+        var pm = new ProjectManager();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(tsxPath));
+        Assert.True(pm.IsNativeTsxProject);
+
+        var achxPath = Path.Combine(_dir.Path, "Plain.achx");
+        var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Idle" });
+        acls.Save(achxPath);
+
+        pm.LoadAnimationChain(new FilePath(achxPath));
+
+        Assert.False(pm.IsNativeTsxProject);
+        Assert.Null(pm.TsxTileSize);
+    }
+
     private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
         tileset.Tiles
             .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))

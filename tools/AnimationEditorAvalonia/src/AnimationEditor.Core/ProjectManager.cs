@@ -129,6 +129,15 @@ namespace AnimationEditor.Core
             AnimationChainListSave = acls;
             FileName = fileName.FullPath;
 
+            // This ProjectManager instance is reused across File > Open calls (one instance per
+            // app window/tab-set, not recreated per file -- see TabSwitchCacheTests), so a prior
+            // LoadTsxProject's tileset/identity-tracking state must not leak into a now-plain achx
+            // project: IsNativeTsxProject must go false, or SaveCurrentAnimationChainList would
+            // route this achx's save through SaveTsxProject against the stale tileset.
+            _tsxTileset = null;
+            _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+            _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+
             if (!string.IsNullOrEmpty(acls.ProjectFile))
                 TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
         }
