@@ -60,6 +60,37 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_ChainedParentId_ReferencesTileThatIsItselfASatellite_ReturnsIssue()
+    {
+        // A -- true anchor. B -- ParentId=A.ID, a legitimate satellite. C -- ParentId=B.ID,
+        // chained through a satellite rather than a true anchor. TiledAnimationToAchjMapper now
+        // surfaces C as its own independent chain (its ParentId grouping doesn't take effect), so
+        // the validator must flag this instead of silently treating it as a valid group -- same
+        // spirit as the "ParentId doesn't reference an animated tile" check just above.
+        var tileset = TilesetWithColumns(4);
+        var anchorA = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchorA.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(anchorA);
+
+        var satelliteB = new Tile { ID = 9, Width = 0, Height = 0 };
+        satelliteB.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        satelliteB.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satelliteB);
+
+        var chainedC = new Tile { ID = 10, Width = 0, Height = 0 };
+        chainedC.Animation.Add(new Frame { TileID = 10, Duration = 150 });
+        chainedC.Properties.Add(new IntProperty { Name = "ParentId", Value = 9 });
+        tileset.Tiles.Add(chainedC);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)9, issue.AnchorTileId);
+        Assert.Equal((uint)10, issue.TileId);
+        Assert.Contains("itself a satellite", issue.Message);
+    }
+
+    [Fact]
     public void Validate_ParentIdReferencesNonAnimatedTile_ReturnsIssue()
     {
         var tileset = TilesetWithColumns(4);

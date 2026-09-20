@@ -150,6 +150,29 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   animation, just as its own chain instead of vanishing, and the validator warning still tells the
   user their intended grouping didn't take effect. Test:
   `TiledAnimationToAchjMapperTests.Map_ParentIdDoesNotResolveToAnimatedTile_SurfacesAsItsOwnChainInsteadOfDropped`.
+- [x] **Chained/nested `ParentId` (satellite-of-a-satellite) silently drops the innermost tile**:
+  real bug, confirmed red first —
+  `Map_ChainedParentId_SatelliteOfASatelliteSurfacesAsItsOwnChainInsteadOfDropped` failed against
+  the old code (only 1 chain instead of 2 — tile C's data completely absent). Decision: **option
+  (b), treat a chained ParentId as invalid** (same "structurally-invalid ParentId is treated as no
+  ParentId" pattern as the orphan fix above) rather than resolving it to its ultimate root anchor —
+  a satellite-of-a-satellite has no corresponding multi-tile-group shape AnimationEditor's own UI
+  could ever produce (a footprint is always one simple rectangle relative to a single anchor), and
+  AnimationEditor's UI never writes chained `ParentId` in the first place, so there's no real
+  semantics to preserve by resolving the chain. Fixed in
+  `TiledAnimationToAchjMapper.Map` by replacing the "resolves to any animated tile" anchor-eligibility
+  check with "resolves to a *true* (unchained) anchor" — `trueAnchorTileIds` now holds only animated
+  tiles with no `ParentId` of their own, so a tile whose `ParentId` points at a tile that is itself a
+  satellite falls through to `IsAnchor` the same way an orphaned/unresolvable `ParentId` already did.
+  Also fixed `TsxAnimationValidator`, which previously did not detect this case at all — a chained
+  `ParentId` resolves to an *animated* tile, so the existing "does not reference an animated tile"
+  check passed, and the per-frame lockstep check happened to also pass whenever the chained tile's
+  frames matched its immediate (non-root) parent's frames, meaning the validator could report zero
+  issues for a group the mapper was silently splitting apart. Added a check: if the referenced
+  anchor tile itself has a `ParentId` that resolves to an animated tile, flag it as "itself a
+  satellite (chained/nested ParentId) rather than a true anchor." Tests:
+  `TiledAnimationToAchjMapperTests.Map_ChainedParentId_SatelliteOfASatelliteSurfacesAsItsOwnChainInsteadOfDropped`,
+  `TsxAnimationValidatorTests.Validate_ChainedParentId_ReferencesTileThatIsItselfASatellite_ReturnsIssue`.
 
 ## TODO
 
@@ -185,18 +208,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   as unowned and silently claimed/overwritten, since the new hand-authored check only looks at
   `Animation.Count`. Decide whether `achjAnimationName` alone should also count as "already tracked,
   needs matching achjSourceFile to overwrite" and pin it.
-- [ ] **Chained/nested `ParentId` (satellite-of-a-satellite) silently drops the innermost tile** —
-  found while fixing the orphaned-`ParentId` gap above. `TiledAnimationToAchjMapper.Map`'s
-  `IsAnchor`/`satellitesByAnchor` only look one level deep: if tile C's `ParentId` points at tile B,
-  and B's `ParentId` points at real anchor A (so B is itself a satellite, not a top-level anchor),
-  then C is correctly excluded from the anchor loop (its `ParentId` *does* resolve to an animated
-  tile, so the orphan fix above doesn't catch it) but is never folded into any anchor's satellites
-  either, since `satellitesByAnchor[A.ID]` only contains tiles whose `ParentId` is literally `A.ID`
-  (i.e. just B), not tiles transitively chained through B. C's animation data silently vanishes from
-  the returned model exactly like the orphan case, just one level removed. Needs a test proving the
-  gap, then a decision on the fix shape (walk `ParentId` to its root anchor when computing
-  `satellitesByAnchor`? reject/flag chained `ParentId` as invalid since AnimationEditor's own UI
-  never produces it?).
 - [ ] **Fresh-eyes pass #1**: once the above are done, do a dedicated pass (self or subagent)
   re-reading every file in scope end to end asking "what haven't we tried yet" — new categories to
   consider: concurrent edits (two `ProjectManager` instances / two AnimationEditor windows open on

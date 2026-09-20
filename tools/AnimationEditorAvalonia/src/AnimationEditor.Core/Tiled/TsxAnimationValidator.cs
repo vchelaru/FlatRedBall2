@@ -38,6 +38,14 @@ public static class TsxAnimationValidator
                 continue;
             }
 
+            if (TiledAnimationToAchjMapper.GetParentId(anchor) is { } anchorsOwnParentId
+                && animatedTilesById.ContainsKey(anchorsOwnParentId))
+            {
+                issues.Add(new TsxGroupIssue(anchorId, tile.ID,
+                    $"tile {tile.ID}: ParentId {anchorId} references tile {anchorId}, which is itself a satellite (chained/nested ParentId) rather than a true anchor."));
+                continue;
+            }
+
             if (anchor.Animation.Count != tile.Animation.Count)
             {
                 issues.Add(new TsxGroupIssue(anchorId, tile.ID,

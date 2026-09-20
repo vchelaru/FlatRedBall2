@@ -179,6 +179,44 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_ChainedParentId_SatelliteOfASatelliteSurfacesAsItsOwnChainInsteadOfDropped()
+    {
+        // A -- no ParentId, a true top-level anchor.
+        // B -- ParentId=A.ID, a legitimate satellite of A.
+        // C -- ParentId=B.ID, chained through a satellite rather than a true anchor. This has no
+        // corresponding multi-tile-group shape AnimationEditor's own UI could ever produce (a
+        // footprint is always a simple rectangle relative to ONE anchor), so C must not be silently
+        // dropped: it should surface as its own independent chain, the same treatment as an
+        // orphaned/unresolvable ParentId.
+        var tileset = EmptyTileset();
+
+        var anchorA = new Tile { ID = 0, Width = 0, Height = 0 };
+        anchorA.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        tileset.Tiles.Add(anchorA);
+
+        var satelliteB = new Tile { ID = 1, Width = 0, Height = 0 };
+        satelliteB.Animation.Add(new Frame { TileID = 1, Duration = 100 });
+        satelliteB.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
+        tileset.Tiles.Add(satelliteB);
+
+        var chainedC = new Tile { ID = 2, Width = 0, Height = 0 };
+        chainedC.Animation.Add(new Frame { TileID = 2, Duration = 100 });
+        chainedC.Properties.Add(new IntProperty { Name = "ParentId", Value = 1 });
+        tileset.Tiles.Add(chainedC);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+
+        Assert.Equal(2, acls.AnimationChains.Count);
+        var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
+        Assert.Contains("ID:0", chainNames);
+        Assert.Contains("ID:2", chainNames);
+
+        var cChain = acls.AnimationChains.Single(c => c.Name == "ID:2");
+        Assert.Single(cChain.Frames);
+        Assert.Equal((uint)2, entryTileIdsByChain[cChain]);
+    }
+
+    [Fact]
     public void Map_ReturnsEntryTileIdForEachChainKeyedByChainReference()
     {
         var tileset = EmptyTileset();
