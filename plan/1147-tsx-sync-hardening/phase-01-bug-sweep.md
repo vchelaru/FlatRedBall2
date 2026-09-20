@@ -128,13 +128,14 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   also skipping+warning when `achjSourceFile` is unset but the tile already has a non-empty
   `Animation`. Test:
   `TilesetAnimationSyncTests.Apply_TileHasHandAuthoredAnimationNoSourceProperty_IsSkippedNotOverwritten`.
+- [x] **`TiledTilesetSyncRunner.SyncAll` partial-batch failure ordering.** Already correct — each
+  loop iteration's `tileset`/`results` are per-iteration locals and `TsxWriter.Write` for tsx #1
+  fully completes before tsx #2's iteration starts, so tsx #2 throwing can't touch tsx #1's already
+  -written file. No source change; test added to pin the behavior:
+  `TiledTilesetSyncRunnerTests.SyncAll_SecondTsxInBatchThrows_FirstTsxWriteAlreadyOnDiskStaysFullyCorrect`.
 
 ## TODO
 
-- [ ] **`TiledTilesetSyncRunner.SyncAll` partial-batch failure ordering**: if tsx #2 in the
-  association list throws, are any writes already made to tsx #1 in the same batch left in a
-  correct, self-consistent state (not half-applied)? Should already be fine (each tsx is
-  independent) — write a test that pins it rather than assuming.
 - [ ] **`TsxAnimationValidator` orphaned-`ParentId` satellite**: `TiledAnimationToAchjMapper.Map`
   silently drops a satellite tile's animation data from the editable model entirely when its
   `ParentId` doesn't resolve to an animated anchor (the validator flags it as a UI warning, but the

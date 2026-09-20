@@ -119,4 +119,26 @@ public class TiledTilesetSyncRunnerTests
         Assert.False(outcomes[0].Success);
         Assert.NotNull(outcomes[0].Error);
     }
+
+    [Fact]
+    public void SyncAll_SecondTsxInBatchThrows_FirstTsxWriteAlreadyOnDiskStaysFullyCorrect()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var goodTsxPath = WriteFixtureTileset(tempDir, "Heroes.tsx");
+        var brokenTsxPath = Path.Combine(tempDir, "DoesNotExist.tsx");
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+
+        var outcomes = TiledTilesetSyncRunner.SyncAll(AchjWithWalkChain(), achxPath, [goodTsxPath, brokenTsxPath]);
+
+        Assert.True(outcomes[0].Success);
+        Assert.False(outcomes[1].Success);
+        Assert.NotNull(outcomes[1].Error);
+
+        // Reload from disk (not the in-memory outcome) to prove tsx #1's completed write wasn't
+        // half-applied or corrupted by tsx #2's later failure in the same batch.
+        var reloaded = Loader.Default().LoadTileset(goodTsxPath);
+        var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 100), ((uint)1, 100)], tile0.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
+    }
 }
