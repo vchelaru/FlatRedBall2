@@ -26,7 +26,12 @@ namespace AnimationEditor.Core.Tiled;
 /// the satellite itself (backward offset -- a footprint shape AnimationEditor's own UI never
 /// produces) -- is treated as an anchor of its own rather than dropped -- <see
 /// cref="TsxAnimationValidator"/> still flags the dangling/chained/backward reference as a
-/// warning, but the tile's own animation data is never silently unrecoverable. A chain's name is the tile's
+/// warning, but the tile's own animation data is never silently unrecoverable. An anchor's
+/// satellites are only folded in as a group when they collectively fill every cell of the
+/// rectangle their bounding box implies; a gap (AnimationEditor's own UI never writes one) means
+/// every satellite in that group is treated as its own independent anchor instead, since taking
+/// the bounding box at face value would silently claim the missing cell's tile on the next save.
+/// A chain's name is the tile's
 /// <see cref="NamePropertyName"/> property when present, otherwise a synthetic <c>"ID:{tileId}"</c>
 /// label.
 /// </remarks>
@@ -112,11 +117,55 @@ public static class TiledAnimationToAchjMapper
             || !trueAnchorTileIds.Contains(parentId)
             || IsBackwardOffset(parentId, t.ID);
 
-        var satellitesByAnchor = animatedTiles
+        var tentativeSatellitesByAnchor = animatedTiles
             .Where(t => !IsAnchor(t))
             .ToLookup(t => parentIdByTileId[t.ID]!.Value);
 
-        foreach (var anchor in animatedTiles.Where(IsAnchor))
+        // An anchor's satellites are only trustworthy as a group when they collectively fill
+        // every cell of the rectangle their own bounding box implies -- AnimationEditor's own UI
+        // only ever writes a fully-populated NxM footprint, so a gap (e.g. one satellite's
+        // ParentId hand-deleted without updating the others) is only reachable by hand-editing.
+        // Each existing satellite in a gappy group is individually valid on its own terms
+        // (forward offset, resolves to a true anchor, own frames in lockstep) so none of the
+        // per-satellite checks above or in TsxAnimationValidator catch this -- only looking at the
+        // group as a whole does. Taking the bounding box at face value here would silently claim
+        // the missing cell's tile into this chain's footprint on the very next save (see
+        // NativeTsxAnimationSync.Apply / MultiTileToTiledAnimationMapper, which always fill every
+        // cell of the computed footprint), corrupting a tile that was never part of any group.
+        var incompleteAnchorIds = new HashSet<uint>();
+        foreach (var group in tentativeSatellitesByAnchor)
+        {
+            var anchorCol = group.Key % columns;
+            var anchorRow = group.Key / columns;
+            var offsets = new HashSet<(uint Dx, uint Dy)>();
+            var footprintColumns = 1u;
+            var footprintRows = 1u;
+            foreach (var satellite in group)
+            {
+                var dx = (satellite.ID % columns) - anchorCol;
+                var dy = (satellite.ID / columns) - anchorRow;
+                footprintColumns = System.Math.Max(footprintColumns, dx + 1);
+                footprintRows = System.Math.Max(footprintRows, dy + 1);
+                offsets.Add((dx, dy));
+            }
+
+            for (var dy = 0u; dy < footprintRows; dy++)
+                for (var dx = 0u; dx < footprintColumns; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    if (!offsets.Contains((dx, dy)))
+                        incompleteAnchorIds.Add(group.Key);
+                }
+        }
+
+        bool IsEffectiveAnchor(Tile t) => IsAnchor(t)
+            || (parentIdByTileId[t.ID] is { } parentId && incompleteAnchorIds.Contains(parentId));
+
+        var satellitesByAnchor = animatedTiles
+            .Where(t => !IsEffectiveAnchor(t))
+            .ToLookup(t => parentIdByTileId[t.ID]!.Value);
+
+        foreach (var anchor in animatedTiles.Where(IsEffectiveAnchor))
         {
             var chain = new AnimationChainSave { Name = ChainName(anchor) };
 

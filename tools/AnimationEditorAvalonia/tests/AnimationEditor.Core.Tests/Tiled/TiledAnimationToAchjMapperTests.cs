@@ -274,6 +274,51 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_SatellitesFormNonRectangularFootprint_EachTileSurfacesAsItsOwnChainInsteadOfWrongFootprint()
+    {
+        // Anchor at tile 0. Two satellites, each individually valid (forward offset, resolves to
+        // a true anchor, own animation in lockstep with the anchor): tile 1 at offset (1,0) and
+        // tile 4 at offset (0,1). No tile exists at offset (1,1) -- the corner needed to complete
+        // the 2x2 rectangle their bounding box implies. AnimationEditor's own UI only ever writes
+        // a fully-populated NxM rectangle, so this L-shape is only reachable by hand-editing (e.g.
+        // deleting one satellite's ParentId without updating the others). Taking the satellites'
+        // bounding box at face value would silently claim tile 5 -- which was never marked as part
+        // of any group -- into this chain's footprint on the very next save.
+        var tileset = EmptyTileset();
+
+        var anchor = new Tile { ID = 0, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        anchor.Animation.Add(new Frame { TileID = 1, Duration = 100 });
+        tileset.Tiles.Add(anchor);
+
+        var satelliteRight = new Tile { ID = 1, Width = 0, Height = 0 };
+        satelliteRight.Animation.Add(new Frame { TileID = 1, Duration = 100 });
+        satelliteRight.Animation.Add(new Frame { TileID = 2, Duration = 100 });
+        satelliteRight.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
+        tileset.Tiles.Add(satelliteRight);
+
+        var satelliteBelow = new Tile { ID = 4, Width = 0, Height = 0 };
+        satelliteBelow.Animation.Add(new Frame { TileID = 4, Duration = 100 });
+        satelliteBelow.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        satelliteBelow.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
+        tileset.Tiles.Add(satelliteBelow);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+
+        Assert.Equal(3, acls.AnimationChains.Count);
+        var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
+        Assert.Contains("ID:0", chainNames);
+        Assert.Contains("ID:1", chainNames);
+        Assert.Contains("ID:4", chainNames);
+
+        var anchorChain = acls.AnimationChains.Single(c => c.Name == "ID:0");
+        Assert.False(satelliteTileIdsByChain.ContainsKey(anchorChain));
+        // Anchor's own frame rect must stay 1x1 -- not the wrongly-implied 2x2 footprint.
+        Assert.Equal(16f / 64f, anchorChain.Frames[0].RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f / 64f, anchorChain.Frames[0].BottomCoordinate, tolerance: 0.0001f);
+    }
+
+    [Fact]
     public void Map_ReturnsEntryTileIdForEachChainKeyedByChainReference()
     {
         var tileset = EmptyTileset();
