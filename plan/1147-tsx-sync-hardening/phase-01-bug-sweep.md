@@ -361,25 +361,19 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **`ProjectManager.ReferencedPngs` has the same "reused-instance state leaks across tab
+- [x] **`ProjectManager.ReferencedPngs` has the same "reused-instance state leaks across tab
   switches" shape as `_tsxTileset`/`_knownTextureSizes`, but only for the `TabEditorCache` cache-hit
-  path (`TryActivateTabFromCache`), not for a fresh `LoadAnimationChain` call (that leak is now
-  fixed -- see fresh-eyes pass #5 below).** `IProjectManager.ReferencedPngs` is read-only (`{ get;
-  }`), so `TabEditorCache.CaptureFromProject`/`ApplyToProject` has no way to round-trip it the way
-  it now does for `CaptureTsxState`/`CaptureTextureSizeState`. Concretely: switch from a tab whose
-  achx has a `ProjectFile` (populates `ReferencedPngs`) to a tab with none, via the tab-switch cache
-  (not File > Open) -- `ReferencedPngs` keeps reporting the previous tab's textures. Severity traced
-  precisely: the only production consumer is `MainWindow.axaml.cs`'s `RefreshTextureCombo` (unions
-  frame textures with `ReferencedPngs` for the texture-picker dropdown), called after a texture
-  drag-drop or a texture resize -- never on tab activation itself. So the effect is a polluted
-  texture-picker dropdown showing extra, still-valid-but-wrong-project PNG paths after a tab-switch
-  + edit, not data loss, corruption, or a wrong save -- meaningfully lower severity than the
-  `_tsxTileset`/`_knownTextureSizes` leaks (which broke `SaveTsxProject` routing and pixel-conversion
-  correctness). Left as TODO rather than fixed in this pass: the fix shape is simple (add a setter to
-  `IProjectManager.ReferencedPngs`, or a `Capture`/`Restore` pair matching the existing two, then
-  update `TabEditorCache` + all 8 `IProjectManager` implementations), but it's a UI-cosmetic-only
-  gap in `AnimationEditor.App` (outside this sweep's `.Core`-focused file scope) and a deliberate
-  scope call, not an oversight.
+  path (`TryActivateTabFromCache`).** Fixed in fresh-eyes pass #6 (see below) -- pass #5's severity
+  assessment ("only consumer never called on tab activation") turned out to be wrong: `AppCommands.
+  TryActivateTabFromCache` itself raises `AvailableTexturesChanged` (line 384), which is wired
+  straight to `MainWindow.RefreshTextureCombo`, so the stale dropdown *does* refresh on every
+  cache-hit tab switch, not just after a texture drag-drop/resize. Fixed by making
+  `IProjectManager.ReferencedPngs` settable and round-tripping it directly through
+  `TabEditorCache.CaptureFromProject`/`ApplyToProject` (a new `TabEntry.CachedReferencedPngs`
+  field) -- simpler than the opaque-snapshot pattern used for `CaptureTsxState`/
+  `CaptureTextureSizeState`, since `FilePath[]` is already a public interface type with nothing to
+  hide. Test:
+  `TabSwitchCacheReferencedPngTests.TryActivateTabFromCache_SwitchBackAfterAnotherTabLoaded_RestoresThisTabsReferencedPngsNotTheOtherTabs`.
 
 - [x] **Fresh-eyes pass #5.** Investigated both of pass #4's suggested targets to a firm conclusion,
   re-read `TiledAnimationToAchjMapper.cs`'s anchor/satellite/footprint logic end to end for internal
@@ -989,3 +983,62 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     and `AnimationEditor.Core.Tests`) updated to match.
   Test: `TabSwitchCacheTextureSizeTests.
   TryActivateTabFromCache_SwitchBackAfterAnotherTabLoaded_SaveUsesThisTabsKnownTextureSizesNotTheOtherTabs`.
+
+- [x] **Fresh-eyes pass #6.** Resolved pass #5's `ReferencedPngs` TODO (fixed, see its own DONE
+  entry above -- the "never called on tab activation" severity assessment was wrong) and did a
+  fresh, focused re-trace of `AppCommands.cs`'s tsx-adjacent command paths as directed. Found and
+  fixed two new real, confirmed bugs, both in `AppCommands.cs` itself -- territory prior passes had
+  only checked for *stale-reference* leaks (`_tsxTileset` held past its validity), never for
+  *missing* tsx-awareness in a command that should have branched on it:
+  - **Real bug, confirmed red first -- `ReloadAchxFromDisk` (the hot-reload handler wired to
+    `IHotReloadWatcher.AchxChangedOnDisk`) unconditionally called `IProjectManager.
+    LoadAnimationChain`, never `LoadTsxProject`, even when the changed file is a native tsx.**
+    `AppCommands.SyncHotReloadWatcher` watches whatever path `IProjectManager.FileName` currently
+    is with no extension check, and `TryActivateTabFromCache` calls it after restoring a tsx tab
+    from the cache -- so a tsx tab, once visited, is watched exactly like an achx tab. Traced the
+    consequence precisely rather than assuming a thrown exception: `AnimationChainListSave.
+    FromString`'s hand-rolled XML parser (`ParseXml`) never validates the root element name, so
+    parsing a tsx's `<tileset>` root as an achx does not throw -- it silently succeeds with an
+    empty `AnimationChainListSave` (zero chains), wiping the tab's animation data with no error
+    surfaced anywhere. Fixed by branching on the reloaded path's extension (`FilePath.Extension ==
+    "tsx"`), mirroring the exact pattern `OpenProjectWorkflowAsync` already uses one screen away.
+    Test: `AppCommandsHotReloadTsxTests.ReloadAchxFromDisk_NativeTsxPath_ReloadsAsTsxNotAsAnEmptyAchx`
+    (failed with `IsNativeTsxProject` flipping to `false` and chains wiped to empty before the fix).
+  - **Real bug, confirmed red first -- `SaveCurrentAnimationChainListAsync`'s ("Save As") file-type
+    dropdown unconditionally offered only `achj`/`achx` choices, even for a native tsx project.**
+    `SaveCurrentAnimationChainList(path)` already correctly routes a tsx project's save through
+    `_pm.SaveTsxProject(target)` regardless of `target`'s extension, so letting the achj/achx
+    choices through here would let a user save real Tiled-tileset-XML content under a misleadingly
+    -named `.achx`/`.achj` file -- and nothing in `MainWindow.axaml`/`.axaml.cs` gates the Save As
+    menu item off for a native tsx project, so this is reachable, not just theoretical. (The
+    *default* extension was already correct by construction -- it falls back to whatever extension
+    is already loaded, which is `tsx` for a tsx project -- only the dropdown's fixed choice list
+    was wrong.) Fixed by branching the `FileTypeChoice` list on `_pm.IsNativeTsxProject`, offering a
+    single `tsx` choice instead. Test:
+    `AppCommandsSaveAsTests.SaveCurrentAnimationChainListAsync_NativeTsxProject_OffersOnlyTsxChoice`
+    (failed, offering `["achj", "achx"]`, before the fix).
+  - **Traced, not a bug: `SaveCurrentAnimationChainList`'s own tsx/achx branch, `TiledTilesetSyncRunner
+    .SyncAll`'s per-tsx isolation, and `GetChainNamesWithTsxIssues`'s call sites -- all safe.** No
+    other call site in `AppCommands.cs` calls `LoadTsxProject`/`SaveTsxProject`/`LoadAnimationChain`/
+    `SyncAll`/`GetChainNamesWithTsxIssues` outside the ones already covered by this pass or prior
+    ones; `CaptureTsxState`/`RestoreTsxState`/`CaptureTextureSizeState`/`RestoreTextureSizeState` are
+    called only from `TabEditorCache`, never directly from `AppCommands.cs` (confirmed zero
+    references). Traced whether `SyncAssociatedTiledTilesets` writing to an associated tsx file that
+    happens to be open (and hot-reload-watched) in a *different* editor window could cause a
+    surprising reload: it can, but confirmed this is the hot-reload watcher's own correct, intended
+    behavior (an external process changed the file on disk, so the open tab should pick it up) -- not
+    a gap, and now handled correctly by the `ReloadAchxFromDisk` fix above instead of misparsing.
+    `AddAssociatedTiledTilesetViaDialogAsync` lets a user associate a Tiled tileset from within an
+    already-native-tsx project's own tab; harmless since `SaveCurrentAnimationChainList` already
+    skips `SyncAssociatedTiledTilesets` whenever `IsNativeTsxProject` is true (line 482), so the
+    association is stored but never acted on -- a UI affordance that does nothing useful, not a
+    functional bug, and not chased further.
+  - **Honest assessment: not a clean pass, and a stronger one than pass #5.** Two new real,
+    confirmed bugs were found (plus the `ReferencedPngs` TODO resolved), both surfaced specifically
+    by the task's directed re-trace of `AppCommands.cs` rather than the `.Core`-only mapper/sync
+    files most prior passes focused on -- confirming that file was a real gap in this sweep's
+    coverage, not exhausted territory. Per the stop condition, a pass #7 is needed. The bug class
+    found this pass (a command method silently missing a tsx/achx branch it should have had) is
+    distinct from every prior pass's bug class (broken `ParentId` geometry, unchecked casts,
+    reused-instance state leaks) -- worth another `AppCommands.cs`-focused look before assuming the
+    command layer is now exhausted too.
