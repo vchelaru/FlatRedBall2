@@ -136,6 +136,13 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
+- [ ] **`TiledTilesetSyncRunner.SyncAll`'s per-tsx `catch (Exception ex)` is a blanket catch** — a
+  genuine programming bug inside `AchjToTiledAnimationMapper.Map` (e.g. a `NullReferenceException`
+  from malformed achj data) gets silently downgraded to a per-tsx "failure" outcome
+  (`TiledTilesetSyncOutcome.Error`) indistinguishable in kind from an expected/recoverable failure.
+  Confirm whether the UI layer that displays `Error` actually surfaces enough detail (message +
+  exception type, not just a generic "sync failed" toast) for a user/developer to diagnose — this is
+  a UI-surfacing question more than a sync-logic bug, so scope accordingly.
 - [ ] **`TsxAnimationValidator` orphaned-`ParentId` satellite**: `TiledAnimationToAchjMapper.Map`
   silently drops a satellite tile's animation data from the editable model entirely when its
   `ParentId` doesn't resolve to an animated anchor (the validator flags it as a UI warning, but the
