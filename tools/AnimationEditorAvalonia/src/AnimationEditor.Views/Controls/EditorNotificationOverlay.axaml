@@ -54,15 +54,21 @@
                 Padding="14,10"
                 ZIndex="60">
             <DockPanel>
+                <!-- #1130 follow-up: a Path icon, not a Unicode "✕" glyph; see ToastDismissBtn's
+                     comment below for why. -->
                 <Button x:Name="ErrorBannerDismissBtn" x:FieldModifier="Public"
                         DockPanel.Dock="Right"
-                        Content="✕"
                         Width="24" Height="22"
                         Margin="10,0,0,0"
                         Padding="0" BorderThickness="0"
                         Background="Transparent"
-                        Foreground="#E8B0A8"
-                        VerticalAlignment="Top" />
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Top">
+                    <Path Width="10" Height="10" Stretch="Uniform"
+                          Fill="#E8B0A8"
+                          Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                </Button>
                 <TextBlock DockPanel.Dock="Left"
                            Text="⚠"
                            FontSize="15"
@@ -110,14 +116,31 @@
                         Width="3"
                         Background="{DynamicResource AccentCool}" />
                 <DockPanel Margin="10,8">
+                    <!-- #1130 follow-up: Content="✕" (the Unicode MULTIPLICATION X glyph) rendered
+                         visibly off-center in this button's 28x22 box; the visible ink sat left
+                         of the TextBlock's own (correctly centered) layout bounds, with empty
+                         space on the right, even with HorizontalContentAlignment/
+                         VerticalContentAlignment explicitly set to Center. Root cause: this app's
+                         "Inter" font has no glyph for U+2715, so it silently falls back to the
+                         system font for just that character, and the fallback glyph's advance
+                         width doesn't match its visible ink width; most visible on this button's
+                         small, tight box (MainWindow's CloseBtn uses the same glyph and the same
+                         font fallback, but its much larger 46x36 box hides the same absolute pixel
+                         offset). A Path with our own geometry has no font/fallback involved, so its
+                         bounds are exactly its visible ink, so it centers correctly regardless of
+                         box size. See NotificationDismissGlyphCenteredTests. -->
                     <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
                             DockPanel.Dock="Right"
-                            Content="✕"
                             Width="28" Height="22"
                             Padding="0" BorderThickness="0"
                             Background="Transparent"
-                            Foreground="{DynamicResource InkMid}"
-                            VerticalAlignment="Top" />
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Top">
+                        <Path Width="10" Height="10" Stretch="Uniform"
+                              Fill="{DynamicResource InkMid}"
+                              Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                    </Button>
                     <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
                             DockPanel.Dock="Right"
                             Content="Retry"
