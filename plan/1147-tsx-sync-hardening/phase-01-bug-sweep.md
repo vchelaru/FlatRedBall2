@@ -336,12 +336,48 @@ non-Latin/unicode chain names (plain string passthrough, no char-level manipulat
 subsystem), achj-vs-achx serialization interaction with the entry/satellite tracking dictionaries
 (confirmed these never touch disk in either format).
 
-- [ ] **Fresh-eyes pass #2 needed**: pass #1 (above) found new gaps, so per the phase doc's stop
-  condition ("finds nothing new to add, twice in a row") at least one more fresh-eyes pass is
-  required before this phase can be considered exhausted. Re-read every file in scope end to end
-  again once the TODO items above are resolved, looking for anything pass #1 didn't have time to
-  chase down (see its "honest assessment" note in the DONE entry below for what's likely still
-  under-explored).
+Traced, not added as new TODO items (fresh-eyes pass #2, see DONE below for the full reasoning):
+`TsxAnimationValidator.Validate` is O(n) not O(n²) (its two dictionary builds/lookups are all O(1)
+per tile, same shape as the already-fixed sync classes); duplicate chain names in an
+`AnimationChainListSave` can't be conflated anywhere in this subsystem (`TiledAnimationToAchjMapper`
+keys its identity-tracking dictionaries by chain *object reference*, and
+`AchjToTiledAnimationMapper`/`MultiTileToTiledAnimationMapper`'s results are plain lists, never
+keyed by name); a duplicate tsx path appearing twice in `TiledTilesetSyncRunner.SyncAll`'s
+association list is harmless -- the second iteration reloads the now-already-synced file fresh,
+computes an identical `Apply` result, and `TilesetAnimationSyncResult.Changed` comes back `false`,
+so `TsxWriter.Write` is never called a second time (already covered by this subsystem's existing
+"reapplying an unchanged sync is a no-op" tests, so no new pinning test added); `MainWindow.axaml.cs`'s
+`SyncTsxValidationIssuesIntoTree` calls `GetChainNamesWithTsxIssues` (and therefore
+`TsxAnimationValidator.Validate`, which can throw `InvalidOperationException` for `Columns <= 0` or a
+duplicate tile id) with no surrounding try/catch, but this is unreachable in practice now that
+`LoadTsxProject` is all-or-nothing (see DONE below): those corruption conditions can only exist in a
+tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
+introduce a duplicate tile id or change `Columns` after a successful load.
+
+- [ ] **`ProjectManager.SaveTsxProject` mutates the live `_tsxTileset` in place before
+  `TsxWriter.Write` is attempted, so a write failure leaves the in-memory model changed while the
+  on-disk file (and this instance's `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`
+  bookkeeping) stay at the pre-save state.** `NativeTsxAnimationSync.Apply(_tsxTileset, mapped)` runs
+  and mutates `_tsxTileset.Tiles` in place *before* `TsxWriter.Write(_tsxTileset, ...)` is even
+  called; if `Write` throws (e.g. `NotSupportedException` for a construct that isn't supported for
+  writing), the exception propagates out of `SaveTsxProject`, but `_tsxTileset` is left holding the
+  post-`Apply` state even though nothing was actually written to disk, and a subsequent successful
+  save would silently include that never-persisted mutation as if it had already landed on a prior
+  save. Currently unreachable via the app's own UI (there's no way to introduce a
+  `TsxWriter`-unsupported construct into an already-open native project through
+  AnimationEditor's own controls), so not an active bug today, but the same shape as the
+  `LoadTsxProject` all-or-nothing bug fixed in this pass -- and a future `Write` failure mode (disk
+  full, permissions, a newly-added unsupported construct) would hit it. Fixing cleanly needs the
+  mutation to happen on a copy that only replaces `_tsxTileset` after `Write` succeeds; DotTiled's
+  `Tileset` has no built-in deep-clone support, so building one (tiles, properties, image, grid,
+  tile offset, wangsets/transformations presence) is real, non-trivial work rather than a one-line
+  fix -- left for a dedicated pass rather than rushed here.
+
+- [ ] **Fresh-eyes pass #3 needed**: pass #2 (this pass) found one new confirmed bug (fixed, see
+  DONE) and one new plausible-but-deferred gap (above), so per the phase doc's stop condition
+  ("finds nothing new to add, twice in a row") this phase is not yet exhausted. A pass #3 should
+  start by resolving or re-evaluating the `SaveTsxProject` item above, then do another full
+  fresh-eyes read of every file in scope.
 
 ## DONE (continued)
 
@@ -499,6 +535,61 @@ subsystem), achj-vs-achx serialization interaction with the entry/satellite trac
     leaks through), or a line-by-line audit of `TsxWriter`'s XML-escaping behavior for property
     values containing characters that are special in XML (`<`, `&`, `"`) — plausible but not
     investigated this pass. A second fresh-eyes pass should pick up here.
+
+- [x] **Fresh-eyes pass #2.** Re-read every file in "Files in scope" end to end, working through
+  pass #1's own explicitly-flagged under-explored areas (combined/simultaneous corruption
+  conditions, `TsxWriter`'s XML-escaping, the `AnimationEditor.App` UI layer's exception handling
+  for this sweep's new throw sites) plus general fresh-eyes tracing. Found and fixed two real bugs
+  (below), confirmed one "already correct" behavior with a teeth-tested pinning test, and traced
+  several other angles to "not a gap" (see the "Traced, not added" note above the TODO list). One
+  plausible gap was deferred to TODO as genuinely needing more design work (see above).
+  - **Real bug, confirmed red first — a tsx with two `<tile>` elements sharing one id crashed with
+    `Dictionary`'s own raw `ArgumentException` ("An item with the same key has already been added")
+    instead of this codebase's established "fail loud with a clear message" precedent
+    (`Columns <= 0`, tile-id collisions between chains, etc).** This is exactly the kind of
+    "combined corruption condition" pass #1 flagged not having chased down: any of the four places
+    in this subsystem that key a dictionary by tile id (`NativeTsxAnimationSync.Apply`,
+    `TilesetAnimationSync.Apply` -- both key *every* tile in the tileset;
+    `TiledAnimationToAchjMapper.Map`, `TsxAnimationValidator.Validate` -- both key only *animated*
+    tiles) had this gap; `TsxWriter.TryWritePatchedCore`'s own equivalent dictionary build was
+    already safe (wrapped in the surrounding try/catch that falls back to a full rewrite -- see its
+    existing comment). Fixed all four by replacing the raw `.ToDictionary(t => t.ID)` call with a
+    loop using `Dictionary.TryAdd`, throwing a clear `InvalidOperationException` naming the tileset
+    and the colliding tile id the first time a duplicate is seen. Tests:
+    `NativeTsxAnimationSyncTests.Apply_TilesetHasDuplicateTileIds_ThrowsClearErrorInsteadOfRawDictionaryException`,
+    `TilesetAnimationSyncTests.Apply_TilesetHasDuplicateTileIds_ThrowsClearErrorInsteadOfRawDictionaryException`,
+    `TiledAnimationToAchjMapperTests.Map_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException`,
+    `TsxAnimationValidatorTests.Validate_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException`.
+  - **Real bug, confirmed red first — `ProjectManager.LoadTsxProject` could leave the project in a
+    half-loaded, internally-inconsistent state when it threw.** Its own doc comment promised "the
+    project is left unchanged when this is thrown," and that held for the one exception type it
+    documented (`NotSupportedException` from `TsxCompatibilityChecker`, which runs *before*
+    `_tsxTileset` is assigned) -- but not for an exception thrown by
+    `TiledAnimationToAchjMapper.Map` itself (`Columns <= 0`, or the duplicate-tile-id guard just
+    added above), because the old code assigned `_tsxTileset = tileset` *before* calling `Map`. A
+    `Map` throw left `_tsxTileset` pointing at the new (corrupt) tileset while
+    `AnimationChainListSave` stayed at whatever the *previous* project's chains were (or `null`) --
+    `IsNativeTsxProject` would report `true` for a tileset with no matching chain data at all.
+    Fixed by computing `Map`'s result into a local variable first and only assigning
+    `_tsxTileset`/`AnimationChainListSave`/the tracking dictionaries after every step that can throw
+    has already succeeded -- this generalizes to *any* future exception `Map` might throw, not just
+    the two guards known today. Test:
+    `ProjectManagerTsxProjectTests.LoadTsxProject_MapThrows_ThrowsAndLeavesProjectUnchanged`.
+  - **Traced (not a bug), but pinned since it's genuinely non-obvious: `TsxWriter`'s patch-mode path
+    (`TryWritePatchedCore` -> `RenderTileFragment` -> `WriteTile`) correctly escapes XML-special
+    characters (`&`, `<`, `"`) in a chain `Name` value, with no naive string manipulation of its own
+    (concatenation, slicing) that could bypass `XmlWriter.WriteAttributeString`'s built-in
+    escaping.** Confirmed the test has teeth by temporarily replacing the `WriteAttributeString`
+    call with a raw, unescaped `WriteRaw` and observing the reload throw `XmlException` (`"An error
+    occurred while parsing EntityName"`) instead of the value round-tripping, then reverting. Also
+    traced `PropertySignature`'s pipe-delimited comparison string (used only for patch-mode's
+    unchanged-vs-changed diffing, never written to disk) for a theoretical name/value boundary
+    collision (`"X"` + `"Y|Z"` vs `"X|Y"` + `"Z"` both producing `"string|X|Y|Z"`) -- unreachable in
+    practice because every property *name* this subsystem writes is a fixed compile-time constant
+    (`"Name"`, `"ParentId"`, `"achjAnimationName"`, `"achjSourceFile"`) that never itself contains a
+    pipe, so only the value side can vary and a full-string equality check can't be fooled by a
+    fixed, pipe-free prefix. No source change; test:
+    `NativeTsxProjectRoundTripTests.LoadRenameChainToNameWithXmlSpecialCharacters_SaveInPlacePatchMode_EscapesCorrectlyAndReloadsExactValue`.
 
 - [x] **O(n) tile lookups inside per-result loops could become O(n²) on a large tileset.**
   Decision: **fixed**, not deferred — the dictionary rewrite was genuinely straightforward once
