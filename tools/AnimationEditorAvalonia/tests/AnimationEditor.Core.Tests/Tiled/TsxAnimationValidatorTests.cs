@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests.Tiled;
@@ -140,6 +141,39 @@ public class TsxAnimationValidatorTests
         Assert.Equal((uint)9, issue.AnchorTileId);
         Assert.Equal((uint)10, issue.TileId);
         Assert.Contains("itself a satellite", issue.Message);
+    }
+
+    [Fact]
+    public void Validate_SatellitesFormNonRectangularFootprint_ReturnsIssuePerSatellite()
+    {
+        // Anchor at tile 8. Two satellites, each individually valid on its own (forward offset,
+        // resolves to a true anchor, own frames in lockstep): tile 9 at offset (1,0) and tile 12
+        // at offset (0,1). No tile exists at offset (1,1) -- the corner needed to complete the 2x2
+        // rectangle their bounding box implies. Every per-satellite check above passes for both, so
+        // only a group-level completeness check can catch this.
+        var tileset = TilesetWithColumns(4);
+        var anchor = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var satelliteRight = new Tile { ID = 9, Width = 0, Height = 0 };
+        satelliteRight.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        satelliteRight.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satelliteRight);
+
+        var satelliteBelow = new Tile { ID = 12, Width = 0, Height = 0 };
+        satelliteBelow.Animation.Add(new Frame { TileID = 12, Duration = 150 });
+        satelliteBelow.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satelliteBelow);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        Assert.Equal(2, issues.Count);
+        Assert.All(issues, i => Assert.Equal((uint)8, i.AnchorTileId));
+        var tileIds = issues.Select(i => i.TileId).ToList();
+        Assert.Contains((uint)9, tileIds);
+        Assert.Contains((uint)12, tileIds);
+        Assert.All(issues, i => Assert.Contains("don't fill every cell", i.Message));
     }
 
     [Fact]
