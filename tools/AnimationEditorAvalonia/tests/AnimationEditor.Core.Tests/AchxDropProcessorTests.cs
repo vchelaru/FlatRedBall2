@@ -63,4 +63,26 @@ public class AchxDropProcessorTests
 
         Assert.Equal(new[] { @"C:\anims\hero.achx" }, result);
     }
+
+    // Native-tsx projects (#1140) open through the identical File > Open path as achx/achj (see
+    // MainWindow.LoadAsync's FileTypeFilter, which already lists *.tsx alongside *.achx/*.achj) --
+    // but dropping the same .tsx file onto the window was never taught the same extension, so it
+    // was silently ignored instead of opening the file (#1147).
+    [Fact]
+    public void ContainsAchx_TsxOnly_ReturnsTrue()
+    {
+        var paths = new[] { @"C:\tilesets\hero.tsx" };
+
+        Assert.True(AchxDropProcessor.ContainsAchx(paths));
+    }
+
+    [Fact]
+    public void SelectAchxFiles_TsxFile_IsIncludedAlongsideAchx()
+    {
+        var paths = new[] { @"C:\anims\hero.achx", @"C:\tilesets\hero.tsx" };
+
+        var result = AchxDropProcessor.SelectAchxFiles(paths);
+
+        Assert.Equal(new[] { @"C:\anims\hero.achx", @"C:\tilesets\hero.tsx" }, result);
+    }
 }

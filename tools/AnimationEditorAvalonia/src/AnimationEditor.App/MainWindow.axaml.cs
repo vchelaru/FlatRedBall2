@@ -4047,13 +4047,15 @@ public partial class MainWindow : Window
 
     private async void OnWindowDrop(object? sender, DragEventArgs e)
     {
-        var achxFiles = AchxDropProcessor.SelectAchxFiles(DroppedFilePaths(e));
-        if (achxFiles.Count == 0) return;  // not ours — leave the tree's PNG drop to run
+        // Includes native-tsx (#1140) paths alongside achx/achj (#1147) -- LoadAnimationFileAsync
+        // dispatches either kind to the correct workflow via OpenProjectWorkflowAsync.
+        var projectFiles = AchxDropProcessor.SelectAchxFiles(DroppedFilePaths(e));
+        if (projectFiles.Count == 0) return;  // not ours — leave the tree's PNG drop to run
 
         e.Handled = true;
         // LoadAnimationFileAsync de-dupes against already-open tabs (focuses instead of
         // duplicating); awaiting in sequence opens each file and leaves the last active.
-        foreach (var path in achxFiles)
+        foreach (var path in projectFiles)
             await LoadAnimationFileAsync(path);
     }
 
