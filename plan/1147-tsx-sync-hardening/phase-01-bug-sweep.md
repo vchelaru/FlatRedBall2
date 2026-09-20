@@ -328,14 +328,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`ProjectManager.SaveTsxProject`'s `targetPath` "Save As to a new file" branch has no test
-  at the `ProjectManager` layer.** `TsxWriter`'s full-rewrite code path itself is well covered
-  (`TsxWriterTests`' `Write_RoundTrip_*` tests write to a fresh `outputPath` that doesn't exist yet),
-  but every native-tsx `ProjectManager`-level test in this sweep saves back to the same `FileName` a
-  project was loaded from. No test calls `SaveTsxProject(targetPath: <new path>)` on an
-  already-loaded native-tsx project and confirms the file written to that new path is a complete,
-  correct tsx (as opposed to, say, a partial write reusing stale `_tsxEntryTileIdsByChain`/
-  `_tsxSatelliteTileIdsByChain` state from the original path in some unexpected way).
 - [ ] **O(n) tile lookups inside per-result loops could become O(n²) on a large tileset.**
   `NativeTsxAnimationSync.Apply`/`ApplyTile` (`tileset.Tiles.Single(...)`/`.FirstOrDefault(...)`) and
   `TilesetAnimationSync.Apply` (the same pattern) both scan `tileset.Tiles` — a `List<Tile>` — once
@@ -459,6 +451,22 @@ subsystem), achj-vs-achx serialization interaction with the entry/satellite trac
   Tests:
   `TiledAnimationToAchjMapperTests.Map_BackwardParentId_SatelliteAboveAnchorSurfacesAsItsOwnChainInsteadOfBeingSilentlyExcluded`,
   `TsxAnimationValidatorTests.Validate_BackwardParentId_ReferencesAnchorAtLargerColumnOrRow_ReturnsIssue`.
+
+- [x] **`ProjectManager.SaveTsxProject`'s `targetPath` "Save As to a new file" branch had no test
+  at the `ProjectManager` layer.** Already correct, confirmed with two new tests, no source change.
+  `SaveTsxProject(targetPath: <new path>)` writes a complete tsx to the new path (via `TsxWriter`'s
+  full-rewrite branch, since a brand-new path never satisfies its `File.Exists(path)` patch-mode
+  gate) and leaves the source file byte-for-byte untouched. Traced the `FileName`-after-Save-As
+  question precisely: `SaveTsxProject` never updates `FileName` itself -- same as
+  `SaveAnimationChainList(string)`, the achx/achj equivalent, which also never updates it. That's
+  intentional layering, not a gap: `AppCommands.SaveCurrentAnimationChainListAsync` (the UI's actual
+  Save-As command) is the layer that sets `_pm.FileName = path` after a successful save, uniformly
+  for both tsx and achx. So a subsequent no-args `SaveTsxProject()` call correctly keeps targeting
+  the original file, not the Save-As path -- verified by renaming a chain after a Save-As, saving
+  with no args, and confirming the rename landed in the original file while the Save-As copy stayed
+  unchanged. Tests:
+  `ProjectManagerTsxProjectTests.SaveTsxProject_TargetPath_WritesCompleteFileAtNewPathWithoutModifyingOriginal`,
+  `SaveTsxProject_TargetPath_DoesNotUpdateFileNameAndSubsequentNoArgSaveStaysOnOriginalFile`.
 
 - [x] **Fresh-eyes pass #1.** Re-read every file in "Files in scope" end to end (not just the
   diffs from prior fixes), working through the phase doc's four suggested categories

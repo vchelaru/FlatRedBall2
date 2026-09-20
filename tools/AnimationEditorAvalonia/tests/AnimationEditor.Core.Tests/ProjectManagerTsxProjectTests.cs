@@ -173,6 +173,70 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Empty(tileZeroAfterResave.Animation);
     }
 
+    // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at
+    // the new path -- via TsxWriter's full-rewrite branch, since a brand-new path never satisfies
+    // TsxWriter.Write's `File.Exists(path)` patch-mode gate -- and must leave the file the project
+    // was loaded from completely untouched.
+    [Fact]
+    public void SaveTsxProject_TargetPath_WritesCompleteFileAtNewPathWithoutModifyingOriginal()
+    {
+        var pm = new ProjectManager();
+        var originalPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(originalPath));
+        var originalContentBeforeSaveAs = File.ReadAllText(originalPath);
+
+        var newPath = Path.Combine(_dir.Path, "HeroesSaveAs.tsx");
+        Assert.False(File.Exists(newPath));
+
+        pm.SaveTsxProject(targetPath: newPath);
+
+        Assert.True(File.Exists(newPath));
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(newPath);
+        var tile = reloaded.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 200), ((uint)1, 200)], tile.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal(4, reloaded.Columns);
+        Assert.Equal(16, reloaded.TileWidth);
+
+        Assert.Equal(originalContentBeforeSaveAs, File.ReadAllText(originalPath));
+    }
+
+    // SaveTsxProject never updates FileName itself -- SaveAnimationChainList(string) (the
+    // achx/achj equivalent) doesn't either; AppCommands.SaveCurrentAnimationChainListAsync is the
+    // layer that repoints _pm.FileName = path after a successful Save-As dialog. So a subsequent
+    // no-args SaveTsxProject() call must still target the file the project was originally loaded
+    // from, not the Save-As path -- pin both halves of that contract.
+    [Fact]
+    public void SaveTsxProject_TargetPath_DoesNotUpdateFileNameAndSubsequentNoArgSaveStaysOnOriginalFile()
+    {
+        var pm = new ProjectManager();
+        var originalPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(originalPath));
+
+        var newPath = Path.Combine(_dir.Path, "HeroesSaveAs.tsx");
+        pm.SaveTsxProject(targetPath: newPath);
+
+        // FullPath normalizes slashes/casing, so compare via FilePath rather than raw strings.
+        Assert.Equal(new FilePath(originalPath).FullPath, new FilePath(pm.FileName!).FullPath);
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        chain.Name = "Renamed";
+
+        pm.SaveTsxProject(); // no targetPath -- must go to originalPath, not newPath
+
+        var reloadedOriginal = DotTiled.Serialization.Loader.Default().LoadTileset(originalPath);
+        Assert.Equal((uint)0, EntryTileIdNamed(reloadedOriginal, "Renamed"));
+
+        // The Save-As copy must not have received the post-Save-As edit -- it was never touched
+        // again after the initial Save-As write. ("ID:0" is the synthetic default name, which is
+        // never written as a real "Name" property -- see NativeTsxAnimationSync's explicitName
+        // logic -- so check the untouched animation data and the absence of the rename instead.)
+        var reloadedSaveAsCopy = DotTiled.Serialization.Loader.Default().LoadTileset(newPath);
+        var saveAsTileZero = reloadedSaveAsCopy.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 200), ((uint)1, 200)], saveAsTileZero.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.DoesNotContain(reloadedSaveAsCopy.Tiles,
+            t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "Renamed"));
+    }
+
     private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
         tileset.Tiles
             .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))
