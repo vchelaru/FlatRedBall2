@@ -43,11 +43,61 @@ public class TsxWriterTests
         </tileset>
         """;
 
+    // Predates Tiled 1.12's own conventions (space before "/>", format="png", lowercase
+    // "utf-8") -- the exact shape that made a single-tile edit reformat a whole real-world
+    // tileset (#1146). This fixture writes to the SAME path it reads from, since that's the
+    // in-place-save pattern every real caller (ProjectManager.SaveTsxProject,
+    // TiledTilesetSyncRunner.SyncAll) uses.
+    private const string LegacyStyleFixtureXml =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+        "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
+        " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
+        " <tile id=\"5\">\n" +
+        "  <animation>\n" +
+        "   <frame tileid=\"5\" duration=\"200\"/>\n" +
+        "   <frame tileid=\"6\" duration=\"200\"/>\n" +
+        "  </animation>\n" +
+        " </tile>\n" +
+        " <tile id=\"12\" type=\"Chest\"/>\n" +
+        "</tileset>\n";
+
     private static string WriteFixture(string tempDir)
     {
         var path = Path.Combine(tempDir, "Heroes.tsx");
         File.WriteAllText(path, FixtureXml);
         return path;
+    }
+
+    [Fact]
+    public void Write_ExistingFileNoContentChange_PreservesOriginalFormatting()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var path = Path.Combine(tempDir, "Legacy.tsx");
+        File.WriteAllText(path, LegacyStyleFixtureXml);
+
+        var tileset = Loader.Default().LoadTileset(path);
+        TsxWriter.Write(tileset, path);
+
+        Assert.Equal(LegacyStyleFixtureXml, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Write_ExistingFileTileChanged_OnlyRewritesThatTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var path = Path.Combine(tempDir, "Legacy.tsx");
+        File.WriteAllText(path, LegacyStyleFixtureXml);
+
+        var tileset = Loader.Default().LoadTileset(path);
+        tileset.Tiles.Single(t => t.ID == 5).Animation.Clear();
+        TsxWriter.Write(tileset, path);
+
+        var written = File.ReadAllText(path);
+        Assert.Contains("<tile id=\"12\" type=\"Chest\"/>", written);
+        Assert.Contains("encoding=\"UTF-8\"", written);
+        Assert.Contains("<image source=\"Legacy.png\" width=\"128\" height=\"128\"/>", written);
+        Assert.Contains("<tile id=\"5\" />", written);
+        Assert.DoesNotContain("<animation>", written);
     }
 
     [Fact]

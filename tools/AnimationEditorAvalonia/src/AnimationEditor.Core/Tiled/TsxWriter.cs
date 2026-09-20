@@ -1,8 +1,12 @@
 using DotTiled;
+using DotTiled.Serialization;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
+using System.Xml.Linq;
 
 namespace AnimationEditor.Core.Tiled;
 
@@ -19,11 +23,24 @@ namespace AnimationEditor.Core.Tiled;
 /// Wangsets, transformations, per-tile object layers, and custom class/enum properties are not
 /// supported -- writing a <see cref="Tileset"/> that uses any of those throws
 /// <see cref="NotSupportedException"/> rather than silently dropping data.
+///
+/// <para>Writing to a path that already exists patches in place: every unchanged &lt;tile&gt;
+/// keeps its original file text byte-for-byte, and only tiles whose content actually differs get
+/// regenerated. Real Tiled does the same -- it edits its in-memory document and only reserializes
+/// what changed, so a one-tile edit costs one changed line, not a whole-file reformat. Without
+/// this, every save from this writer looked like it had rewritten the entire tileset, because
+/// full-model regeneration has no way to know (or preserve) how the original file happened to be
+/// formatted. In-place patching only tracks tile-level content; if a tileset's top-level
+/// attributes/image/grid/properties differ from the file on disk (nothing in this codebase does
+/// that today), it falls back to the old full rewrite instead of guessing how to patch those.</para>
 /// </remarks>
 public static class TsxWriter
 {
     public static void Write(Tileset tileset, string path)
     {
+        if (File.Exists(path) && TryWritePatched(tileset, path))
+            return;
+
         using var stream = File.Create(path);
         Write(tileset, stream);
     }
@@ -41,6 +58,185 @@ public static class TsxWriter
         WriteTileset(writer, tileset);
         writer.WriteEndDocument();
     }
+
+    /// <summary>
+    /// Reuses <paramref name="path"/>'s original text for every &lt;tile&gt; whose content is
+    /// unchanged, and only regenerates the ones that differ (added, removed, or edited). Returns
+    /// false -- meaning the caller should fall back to <see cref="Write(Tileset, Stream)"/> -- when
+    /// anything outside tile content changed, since only tile-level patching is implemented.
+    /// </summary>
+    private static bool TryWritePatched(Tileset tileset, string path)
+    {
+        var original = Loader.Default().LoadTileset(path);
+        if (!TopLevelEquals(original, tileset))
+            return false;
+
+        var rawText = File.ReadAllText(path);
+        var closingTagOffset = rawText.LastIndexOf("</tileset>", StringComparison.Ordinal);
+        if (closingTagOffset < 0)
+            return false;
+
+        var lineStarts = ComputeLineStartOffsets(rawText);
+        var xdoc = XDocument.Load(new StringReader(rawText), LoadOptions.SetLineInfo);
+        var originalTileElements = xdoc.Root!.Elements("tile").ToList();
+        var originalTilesById = original.Tiles.ToDictionary(t => t.ID);
+
+        var tileStartOffsets = originalTileElements
+            .Select(e => CharOffset(lineStarts, ((IXmlLineInfo)e).LineNumber, ((IXmlLineInfo)e).LinePosition))
+            .ToList();
+
+        var originalSlicesById = new Dictionary<uint, string>();
+        for (var i = 0; i < originalTileElements.Count; i++)
+        {
+            var id = uint.Parse(originalTileElements[i].Attribute("id")!.Value);
+            var end = i + 1 < tileStartOffsets.Count ? tileStartOffsets[i + 1] : closingTagOffset;
+            originalSlicesById[id] = rawText[tileStartOffsets[i]..end];
+        }
+
+        var prologueEnd = tileStartOffsets.Count > 0 ? tileStartOffsets[0] : closingTagOffset;
+        var newline = rawText.Contains("\r\n") ? "\r\n" : "\n";
+
+        var sb = new StringBuilder(rawText[..prologueEnd]);
+        for (var i = 0; i < tileset.Tiles.Count; i++)
+        {
+            var tile = tileset.Tiles[i];
+            var hasOriginalSlice = originalSlicesById.TryGetValue(tile.ID, out var originalSlice);
+            if (hasOriginalSlice
+                && originalTilesById.TryGetValue(tile.ID, out var originalTile)
+                && TileContentEquals(originalTile, tile))
+            {
+                sb.Append(originalSlice);
+                continue;
+            }
+
+            // No original gap to borrow (a brand-new tile): the next sibling is another
+            // 1-space-indented <tile>, unless this is the last one, in which case what follows is
+            // the 0-indented </tileset> and needs no leading space at all.
+            var trailingGap = i == tileset.Tiles.Count - 1 ? newline : newline + " ";
+            if (hasOriginalSlice && originalSlice is not null)
+                trailingGap = originalSlice[(originalSlice.LastIndexOf('>') + 1)..];
+            sb.Append(RenderTileFragment(tile, newline)).Append(trailingGap);
+        }
+        sb.Append(rawText[closingTagOffset..]);
+
+        File.WriteAllText(path, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return true;
+    }
+
+    /// <summary>Renders one &lt;tile&gt; element (no trailing newline) at the indentation depth it
+    /// has as a direct child of &lt;tileset&gt;.</summary>
+    private static string RenderTileFragment(Tile tile, string newline)
+    {
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = " ",
+            NewLineChars = newline,
+            OmitXmlDeclaration = true,
+            ConformanceLevel = ConformanceLevel.Fragment,
+            Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+        };
+        using var ms = new MemoryStream();
+        using (var writer = XmlWriter.Create(ms, settings))
+            WriteTile(writer, tile);
+
+        var text = Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r', '\n');
+        return string.Join(newline, text.Split([newline], StringSplitOptions.None).Select(line => " " + line));
+    }
+
+    private static int[] ComputeLineStartOffsets(string text)
+    {
+        var starts = new List<int> { 0 };
+        for (var i = 0; i < text.Length; i++)
+            if (text[i] == '\n')
+                starts.Add(i + 1);
+        return [.. starts];
+    }
+
+    // IXmlLineInfo.LinePosition for an element points one character past its "<" (at the tag
+    // name), not at "<" itself -- verified against System.Xml.Linq directly, not assumed.
+    private static int CharOffset(int[] lineStarts, int lineNumber, int linePosition) =>
+        lineStarts[lineNumber - 1] + (linePosition - 2);
+
+    private static bool TopLevelEquals(Tileset a, Tileset b) =>
+        a.Version == b.Version &&
+        a.TiledVersion == b.TiledVersion &&
+        a.Name == b.Name &&
+        a.Class == b.Class &&
+        a.TileWidth == b.TileWidth &&
+        a.TileHeight == b.TileHeight &&
+        a.Spacing == b.Spacing &&
+        a.Margin == b.Margin &&
+        a.TileCount == b.TileCount &&
+        a.Columns == b.Columns &&
+        a.ObjectAlignment == b.ObjectAlignment &&
+        a.RenderSize == b.RenderSize &&
+        a.FillMode == b.FillMode &&
+        ImagesEqual(a.Image, b.Image) &&
+        TileOffsetsEqual(a.TileOffset, b.TileOffset) &&
+        GridsEqual(a.Grid, b.Grid) &&
+        PropertiesEqual(a.Properties, b.Properties) &&
+        a.Wangsets.Count == b.Wangsets.Count &&
+        a.Transformations.HasValue == b.Transformations.HasValue;
+
+    private static bool TileContentEquals(Tile a, Tile b) =>
+        a.Type == b.Type &&
+        a.Probability == b.Probability &&
+        a.X == b.X &&
+        a.Y == b.Y &&
+        a.Width == b.Width &&
+        a.Height == b.Height &&
+        a.ObjectLayer.HasValue == b.ObjectLayer.HasValue &&
+        PropertiesEqual(a.Properties, b.Properties) &&
+        ImagesEqual(a.Image, b.Image) &&
+        AnimationEqual(a.Animation, b.Animation);
+
+    private static bool ImagesEqual(Optional<Image> a, Optional<Image> b)
+    {
+        if (a.HasValue != b.HasValue)
+            return false;
+        if (!a.HasValue)
+            return true;
+
+        var x = a.Value;
+        var y = b.Value;
+        return x.Format == y.Format && x.Source == y.Source && x.TransparentColor == y.TransparentColor
+            && x.Width == y.Width && x.Height == y.Height;
+    }
+
+    private static bool TileOffsetsEqual(Optional<TileOffset> a, Optional<TileOffset> b)
+    {
+        if (a.HasValue != b.HasValue)
+            return false;
+        return !a.HasValue || (a.Value.X == b.Value.X && a.Value.Y == b.Value.Y);
+    }
+
+    private static bool GridsEqual(Optional<Grid> a, Optional<Grid> b)
+    {
+        if (a.HasValue != b.HasValue)
+            return false;
+        return !a.HasValue
+            || (a.Value.Orientation == b.Value.Orientation && a.Value.Width == b.Value.Width && a.Value.Height == b.Value.Height);
+    }
+
+    private static bool AnimationEqual(List<Frame> a, List<Frame> b) =>
+        a.Count == b.Count && a.Zip(b).All(pair => pair.First.TileID == pair.Second.TileID && pair.First.Duration == pair.Second.Duration);
+
+    private static bool PropertiesEqual(List<IProperty> a, List<IProperty> b) =>
+        a.Count == b.Count && a.Zip(b).All(pair => PropertySignature(pair.First) == PropertySignature(pair.Second));
+
+    private static string PropertySignature(IProperty property) => property switch
+    {
+        StringProperty p => $"string|{p.Name}|{p.Value}",
+        IntProperty p => $"int|{p.Name}|{p.Value}",
+        FloatProperty p => $"float|{p.Name}|{p.Value}",
+        BoolProperty p => $"bool|{p.Name}|{p.Value}",
+        ColorProperty p => $"color|{p.Name}|{(p.Value.HasValue ? p.Value.Value.ToString() : "")}",
+        FileProperty p => $"file|{p.Name}|{p.Value}",
+        ObjectProperty p => $"object|{p.Name}|{p.Value}",
+        _ => throw new NotSupportedException(
+            $"TsxWriter does not yet support '{property.Type}' properties (property '{property.Name}')."),
+    };
 
     private static void WriteTileset(XmlWriter writer, Tileset tileset)
     {
@@ -151,7 +347,7 @@ public static class TsxWriter
         writer.WriteEndElement();
     }
 
-    private static void WriteAnimation(XmlWriter writer, System.Collections.Generic.List<Frame> frames)
+    private static void WriteAnimation(XmlWriter writer, List<Frame> frames)
     {
         if (frames.Count == 0)
             return;
@@ -167,7 +363,7 @@ public static class TsxWriter
         writer.WriteEndElement();
     }
 
-    private static void WriteProperties(XmlWriter writer, System.Collections.Generic.List<IProperty> properties)
+    private static void WriteProperties(XmlWriter writer, List<IProperty> properties)
     {
         if (properties.Count == 0)
             return;
