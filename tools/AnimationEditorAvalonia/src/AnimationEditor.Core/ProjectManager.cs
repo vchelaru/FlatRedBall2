@@ -646,8 +646,15 @@ namespace AnimationEditor.Core
         /// </summary>
         /// <exception cref="NotSupportedException">The tsx uses a construct (wangsets,
         /// transformations, per-tile object layers, unsupported property types) that would be lost
-        /// on the first save -- see <see cref="Tiled.TsxCompatibilityChecker"/>. The project is left
-        /// unchanged when this is thrown.</exception>
+        /// on the first save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
+        /// <exception cref="InvalidOperationException">The tsx is corrupt in a way <see
+        /// cref="Tiled.TiledAnimationToAchjMapper.Map"/> can't tolerate (e.g. <c>Columns &lt;= 0</c>
+        /// or a duplicate tile id).</exception>
+        /// <remarks>The project is left unchanged when either exception is thrown -- <see
+        /// cref="AnimationChainListSave"/> is mapped into local variables first and only committed
+        /// to this instance's fields after every step that can throw has already succeeded, so a
+        /// rejected load can never leave <see cref="IsNativeTsxProject"/> pointing at a tileset with
+        /// no matching chain data.</remarks>
         public void LoadTsxProject(FilePath fileName)
         {
             var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(fileName.FullPath);
@@ -656,8 +663,10 @@ namespace AnimationEditor.Core
                 throw new NotSupportedException(
                     $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
 
+            var acls = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+
             _tsxTileset = tileset;
-            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+            AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
             FileName = fileName.FullPath;

@@ -28,6 +28,22 @@ public class ProjectManagerTsxProjectTests : IDisposable
         </tileset>
         """;
 
+    // Columns=0 makes every "% columns"/"/ columns" tile-position computation in
+    // TiledAnimationToAchjMapper.Map fail loudly (InvalidOperationException) rather than
+    // divide-by-zero or wrap into nonsense -- unlike the wangset case below, this throw happens
+    // from inside Map, called *after* LoadTsxProject has already assigned _tsxTileset.
+    private const string ColumnsZeroFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Corrupt" tilewidth="16" tileheight="16" tilecount="16" columns="0">
+         <image source="Corrupt.png" width="64" height="64"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="200"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
     private const string WangsetFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Terrain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
@@ -70,6 +86,24 @@ public class ProjectManagerTsxProjectTests : IDisposable
         var ex = Assert.Throws<NotSupportedException>(() => pm.LoadTsxProject(new FilePath(path)));
 
         Assert.Contains("wangsets", ex.Message);
+        Assert.False(pm.IsNativeTsxProject);
+        Assert.Null(pm.AnimationChainListSave);
+    }
+
+    [Fact]
+    public void LoadTsxProject_MapThrows_ThrowsAndLeavesProjectUnchanged()
+    {
+        // Unlike the wangset case above (rejected before _tsxTileset is ever assigned, by the
+        // TsxCompatibilityChecker dry-run), a Columns=0 tsx passes that check fine -- TsxWriter
+        // never divides by Columns -- so the throw comes from TiledAnimationToAchjMapper.Map,
+        // called *after* LoadTsxProject already set _tsxTileset. The load must still be all-or-
+        // nothing: IsNativeTsxProject/AnimationChainListSave must reflect "nothing loaded", not a
+        // half-applied tileset with no matching chain data.
+        var pm = new ProjectManager();
+        var path = WriteFixture(ColumnsZeroFixtureXml, "Corrupt.tsx");
+
+        Assert.Throws<InvalidOperationException>(() => pm.LoadTsxProject(new FilePath(path)));
+
         Assert.False(pm.IsNativeTsxProject);
         Assert.Null(pm.AnimationChainListSave);
     }
