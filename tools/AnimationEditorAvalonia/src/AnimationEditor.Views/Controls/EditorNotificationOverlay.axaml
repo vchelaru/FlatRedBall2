@@ -1,17 +1,27 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="AnimationEditor.Views.Controls.EditorNotificationOverlay"
-             IsHitTestVisible="False">
+             x:Class="AnimationEditor.Views.Controls.EditorNotificationOverlay">
     <!--
         Phase 15: item-deleted undo toast, generic status toast, and error banner lifted from
         desktop MainWindow.axaml overlays so the browser build can host them without duplicating
-        timer/dismiss logic. IsHitTestVisible=False on the root so hidden overlays never block
-        the editor; each visible panel re-enables hit-testing on itself.
+        timer/dismiss logic.
+
+        #1130 follow-up: this root UserControl (and the Panel below it) used to carry
+        IsHitTestVisible="False", on the theory that each panel's own IsHitTestVisible="True"
+        would "re-enable" hit-testing for itself. It doesn't: Avalonia's hit-test walk prunes an
+        element's entire subtree once an ancestor is IsHitTestVisible=False, so none of
+        ToastDismissBtn/ToastRetryBtn/ErrorBannerDismissBtn/ItemDeletedToastUndoBtn were ever
+        reachable by a real pointer click (confirmed by simulating a click at the actual button
+        bounds in a headless test; it did nothing until this was removed). The "pass clicks
+        through when nothing is shown" goal this was trying to achieve doesn't need it anyway:
+        neither the UserControl nor the Panel sets a Background, and an element with no Background
+        brush is already excluded from hit-testing on its own account, so empty overlay space was
+        always click-through. Each Border's own IsVisible="False" default (not IsHitTestVisible)
+        is what keeps a hidden panel out of the way.
     -->
     <Panel>
         <Border x:Name="ItemDeletedToastPanel" x:FieldModifier="Public"
                 IsVisible="False"
-                IsHitTestVisible="True"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,30"
@@ -33,7 +43,6 @@
 
         <Border x:Name="ErrorBanner" x:FieldModifier="Public"
                 IsVisible="False"
-                IsHitTestVisible="True"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
                 Margin="0,16,0,0"
@@ -86,7 +95,6 @@
              nothing. See ToastCloseButtonOverlapTests. -->
         <Border x:Name="ToastPanel" x:FieldModifier="Public"
                 IsVisible="False"
-                IsHitTestVisible="True"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
                 Margin="0,44,16,0"
