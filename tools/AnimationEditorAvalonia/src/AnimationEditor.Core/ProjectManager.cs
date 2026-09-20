@@ -141,8 +141,13 @@ namespace AnimationEditor.Core
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
 
+            // Same reused-instance hazard as the tsx fields just above: ReferencedPngs is driven
+            // entirely by the *current* achx's own ProjectFile reference, so a file with none must
+            // clear whatever a previously loaded achx populated here rather than leaving it stale.
             if (!string.IsNullOrEmpty(acls.ProjectFile))
                 TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
+            else
+                ReferencedPngs = new FilePath[0];
         }
 
         /// <summary>

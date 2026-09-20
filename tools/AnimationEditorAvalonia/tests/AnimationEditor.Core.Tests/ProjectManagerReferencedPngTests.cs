@@ -1,4 +1,5 @@
 using AnimationEditor.Core;
+using FlatRedBall2.AnimationEditorCommon;
 using System.Reflection;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 using Xunit;
@@ -7,6 +8,51 @@ namespace AnimationEditor.Core.Tests;
 
 public class ProjectManagerReferencedPngTests
 {
+    // ProjectManager is a single long-lived instance reused across File > Open calls (see
+    // TabSwitchCacheTests / the LoadAnimationChain_AfterLoadTsxProject_ClearsNativeTsxState fix),
+    // and ReferencedPngs is per-load state driven by the *current* achx's own ProjectFile
+    // reference -- LoadAnimationChain only ever calls TryLoadProjectFile (which repopulates
+    // ReferencedPngs) when the newly loaded achx declares a ProjectFile, so a second achx with no
+    // ProjectFile at all must not keep reporting the first achx's referenced textures.
+    [Fact]
+    public void LoadAnimationChain_SecondFileHasNoProjectFile_ClearsPreviouslyLoadedReferencedPngs()
+    {
+        using var temp = new TempDir();
+        var contentDir = Path.Combine(temp.Path, "Content");
+        Directory.CreateDirectory(contentDir);
+        File.WriteAllText(Path.Combine(contentDir, "Hero.png"), "");
+
+        var projectFile = Path.Combine(temp.Path, "Game.gluj");
+        File.WriteAllText(projectFile,
+            """
+            <Project>
+              <GlobalFiles>
+                <ReferencedFileSave><Name>Hero.png</Name></ReferencedFileSave>
+              </GlobalFiles>
+            </Project>
+            """);
+
+        var pm = new ProjectManager();
+
+        var achxWithProject = Path.Combine(temp.Path, "WithProject.achx");
+        var aclsWithProject = new AnimationChainListSave
+        {
+            CoordinateType = TextureCoordinateType.Pixel,
+            ProjectFile = "Game.gluj",
+        };
+        aclsWithProject.Save(achxWithProject);
+        pm.LoadAnimationChain(new FilePath(achxWithProject));
+        Assert.NotEmpty(pm.ReferencedPngs);
+
+        var achxWithoutProject = Path.Combine(temp.Path, "Plain.achx");
+        var aclsWithoutProject = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        aclsWithoutProject.Save(achxWithoutProject);
+
+        pm.LoadAnimationChain(new FilePath(achxWithoutProject));
+
+        Assert.Empty(pm.ReferencedPngs);
+    }
+
     [Fact]
     public void TryLoadProjectFile_UsesReferencedFilesAndFiltersToPng()
     {
