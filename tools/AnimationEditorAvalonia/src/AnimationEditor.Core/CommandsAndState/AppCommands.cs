@@ -1812,6 +1812,10 @@ namespace AnimationEditor.Core.CommandsAndState
             _pm.AnimationChainListSave = new AnimationChainListSave();
             _pm.FileName = string.Empty;
             _pm.OnDiskCoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel;
+            // A brand-new document is never a native tsx project, even if the previously-active
+            // tab was one -- RestoreTsxState(null) is the same reset LoadAnimationChain/
+            // TabEditorCache already use to clear _tsxTileset and its tracking dictionaries.
+            _pm.RestoreTsxState(null);
             _selectedState.SelectedChain = null;
             _selectedState.SelectedFrame = null;
             _undoManager.Clear();
