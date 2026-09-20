@@ -180,6 +180,53 @@ public class NewAndLoadResetTests
         }
     }
 
+    // Issue #1147: OpenAsNewUnsavedDocument (which OnNewClick calls) never called UpdateTitle.
+    // ActivateUntitledTabContent and the "all tabs closed" branch both call it explicitly right
+    // after resetting, but OnNewClick's own follow-up (SaveCurrentAnimationChainListAsync) only
+    // updates the title on a *successful* Save As -- if the user cancels the dialog (simulated
+    // here by the default NullFileDialogService), the title bar was left showing the just-closed
+    // tsx file's name even though FileName/IsNativeTsxProject had already reset underneath it.
+    [AvaloniaFact]
+    public async Task New_AfterOpeningTsxTabAndCancelingSaveAs_TitleNoLongerShowsOldFileName()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tsxPath = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(tsxPath,
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+                 <image source="Heroes.png" width="64" height="64"/>
+                 <tile id="0">
+                  <animation>
+                   <frame tileid="0" duration="200"/>
+                   <frame tileid="1" duration="200"/>
+                  </animation>
+                 </tile>
+                </tileset>
+                """);
+            await window.OpenFileAsTab(tsxPath);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains("Heroes.tsx", window.Title);
+
+            // NullFileDialogService (the default here) always cancels, so the Save As
+            // OnNewClick triggers never completes.
+            window.FindControl<MenuItem>("MenuNew")!
+                  .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.DoesNotContain("Heroes.tsx", window.Title);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
     // ── File → Load ───────────────────────────────────────────────────────────
 
     /// <summary>

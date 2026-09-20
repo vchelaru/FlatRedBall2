@@ -2527,6 +2527,12 @@ public partial class MainWindow : Window
             _selectedState.SelectedChain = selectedChain;
         _undoManager.Clear();
         RefreshTreeView();
+        // ResetToBlankDocument above doesn't raise CurrentFileChanged (it's a plain field
+        // reset, not a load), so the title bar needs an explicit refresh here -- otherwise it
+        // keeps showing whatever file was open before (#1147: reachable via File > New when the
+        // follow-up Save As dialog is cancelled, since that's the only other path that would
+        // have updated it).
+        UpdateTitle();
 
         // Open a new numbered Untitled tab and activate it.
         var displayName = TabManager.ComputeUntitledDisplayName(
