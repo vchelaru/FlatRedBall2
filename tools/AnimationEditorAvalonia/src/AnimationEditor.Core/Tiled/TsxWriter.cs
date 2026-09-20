@@ -63,9 +63,26 @@ public static class TsxWriter
     /// Reuses <paramref name="path"/>'s original text for every &lt;tile&gt; whose content is
     /// unchanged, and only regenerates the ones that differ (added, removed, or edited). Returns
     /// false -- meaning the caller should fall back to <see cref="Write(Tileset, Stream)"/> -- when
-    /// anything outside tile content changed, since only tile-level patching is implemented.
+    /// anything outside tile content changed (only tile-level patching is implemented), when the
+    /// file's shape doesn't match the one-node-per-line assumption this relies on, or when
+    /// anything about the existing file is unexpected in a way this hasn't anticipated. Patching is
+    /// purely an optimization: any failure here must be safe to treat as "couldn't patch," never as
+    /// "the save failed" or "here's some corrupted output" -- so every exit path, including
+    /// exceptions, falls back to the full rewrite instead.
     /// </summary>
     private static bool TryWritePatched(Tileset tileset, string path)
+    {
+        try
+        {
+            return TryWritePatchedCore(tileset, path);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryWritePatchedCore(Tileset tileset, string path)
     {
         var original = Loader.Default().LoadTileset(path);
         if (!TopLevelEquals(original, tileset))
@@ -79,16 +96,22 @@ public static class TsxWriter
         var lineStarts = ComputeLineStartOffsets(rawText);
         var xdoc = XDocument.Load(new StringReader(rawText), LoadOptions.SetLineInfo);
         var originalTileElements = xdoc.Root!.Elements("tile").ToList();
+        // Throws (caught above) if the file has two <tile> elements sharing one id -- already
+        // invalid TSX, and not something worth a bespoke recovery path for.
         var originalTilesById = original.Tiles.ToDictionary(t => t.ID);
 
         // Anchored on each <tile>'s own LINE START (not its "<" column) so every slice -- reused
         // or freshly rendered -- carries its own leading indentation and trailing newline the same
         // way. That symmetry is what lets tiles be concatenated back to back with no position-
         // dependent special casing (first/last/only tile all behave identically). This assumes
-        // Tiled's/this writer's one-node-per-line convention; TileLineLooksLikeATile guards it.
+        // Tiled's/this writer's one-node-per-line convention; TileLineLooksLikeATile guards it, and
+        // the duplicate check just below catches two <tile>s sharing one line (same line start)
+        // even when TileLineLooksLikeATile can't tell them apart from the outside.
         var tileLineStarts = originalTileElements
             .Select(e => lineStarts[((IXmlLineInfo)e).LineNumber - 1])
             .ToList();
+        if (tileLineStarts.Count != tileLineStarts.Distinct().Count())
+            return false;
 
         var originalSlicesById = new Dictionary<uint, string>();
         for (var i = 0; i < originalTileElements.Count; i++)
@@ -125,13 +148,26 @@ public static class TsxWriter
     }
 
     /// <summary>
-    /// Guards the one-node-per-line assumption <see cref="TryWritePatched"/> relies on to slice by
-    /// line start: a line that (after leading whitespace) doesn't actually begin with "&lt;tile"
+    /// Guards the one-node-per-line assumption <see cref="TryWritePatchedCore"/> relies on to slice
+    /// by line start: a line that (after leading whitespace) doesn't actually begin with a "&lt;tile"
+    /// element -- on its own, not as a prefix of some other element name like "&lt;tileoffset" --
     /// means something is sharing that line in a way this writer doesn't understand, so the caller
-    /// should fall back to a full rewrite instead of slicing garbage.
+    /// should fall back to a full rewrite instead of slicing garbage. Without the word-boundary
+    /// check, a &lt;tileoffset&gt; sharing a line with the first &lt;tile&gt; would pass this check
+    /// (it does start with the literal text "&lt;tile"), and if that tile were then edited, the
+    /// &lt;tileoffset&gt; sitting before it on the same line would be silently dropped -- it belongs
+    /// to neither the prologue (which ends before that line) nor the regenerated tile fragment
+    /// (which only knows about the tile itself).
     /// </summary>
-    private static bool TileLineLooksLikeATile(string rawText, int lineStart) =>
-        rawText[lineStart..].TrimStart(' ').StartsWith("<tile", StringComparison.Ordinal);
+    private static bool TileLineLooksLikeATile(string rawText, int lineStart)
+    {
+        var trimmed = rawText[lineStart..].TrimStart(' ');
+        if (!trimmed.StartsWith("<tile", StringComparison.Ordinal))
+            return false;
+
+        var afterPrefix = trimmed.Length > 5 ? trimmed[5] : ' ';
+        return afterPrefix is ' ' or '>' or '\t';
+    }
 
     /// <summary>Renders one &lt;tile&gt; element (no trailing newline) at the indentation depth it
     /// has as a direct child of &lt;tileset&gt;, including its own leading indentation -- callers
@@ -186,6 +222,14 @@ public static class TsxWriter
         a.Wangsets.Count == b.Wangsets.Count &&
         a.Transformations.HasValue == b.Transformations.HasValue;
 
+    // ObjectLayer content itself is never compared (DotTiled gives no cheap equality for it,
+    // and WriteTile throws NotSupportedException the moment it actually has to render one) --
+    // only presence is. That's deliberate, not an oversight: nothing in this codebase mutates a
+    // tile's collision data, so an unchanged ObjectLayer-bearing tile round-trips by reusing its
+    // original slice, verbatim, without ever hitting that throw. If a future caller starts
+    // editing ObjectLayer content, this stays correct (the edited tile just fails to match on
+    // some other field too) right up until the day a change touches ObjectLayer and nothing
+    // else, at which point it would need updating to compare it for real.
     private static bool TileContentEquals(Tile a, Tile b) =>
         a.Type == b.Type &&
         a.Probability == b.Probability &&
