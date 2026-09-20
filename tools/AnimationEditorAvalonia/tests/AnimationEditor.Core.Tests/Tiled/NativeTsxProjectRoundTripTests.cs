@@ -226,6 +226,74 @@ public class NativeTsxProjectRoundTripTests
         Assert.True(formerSatellite.GetProperty<BoolProperty>("Collidable").Value);
     }
 
+    // Tile 8 is the anchor of a 2-tile-wide group. Tile 9's on-disk <animation> was hand-edited in
+    // Tiled directly and is now inconsistent with what the anchor+its own grid offset would derive
+    // (1 frame with duration 999 instead of the 2 frames of duration 150 lockstep would produce).
+    private const string SatelliteHandEditedFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="8">
+          <animation>
+           <frame tileid="8" duration="150"/>
+           <frame tileid="12" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="9">
+          <properties>
+           <property name="ParentId" type="int" value="8"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="999"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void LoadMapApplySave_SatelliteHandEditedFramesInconsistentWithAnchor_IgnoredOnLoadWarnedByValidatorOverwrittenOnSave()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, SatelliteHandEditedFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        // (b) The safety net: the validator must flag tile 9's on-disk content as wrong, even
+        // though nothing downstream will ever read it.
+        var issues = TsxAnimationValidator.Validate(tileset);
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)9, issue.TileId);
+        Assert.Contains("has 1 animation frame(s) but its group anchor (tile 8) has 2", issue.Message);
+
+        // (a) The satellite's actual on-disk frames (1 frame, duration 999) never make it into the
+        // editable model -- only the anchor's frames (2 frames, duration 150) do.
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var chain = Assert.Single(acls.AnimationChains);
+        Assert.Equal(2, chain.Frames.Count);
+        Assert.All(chain.Frames, f => Assert.Equal(0.15f, f.FrameLength, tolerance: 0.0001f));
+
+        // (c) Saving without addressing the warning overwrites tile 9's on-disk content to the
+        // correctly-derived sequence -- ignored, then overwritten to correct, never corrupted.
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        var reloadedSatellite = reloaded.Tiles.Single(t => t.ID == 9);
+        Assert.Equal([((uint)9, 150), ((uint)13, 150)], reloadedSatellite.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
     // Tile 0 is a plain single-tile animation. Tile 1 pre-exists with an unrelated hand-authored
     // property but no animation -- it's exactly where the new satellite will need to land once
     // the chain grows to a 2-tile-wide footprint.

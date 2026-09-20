@@ -187,14 +187,32 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   exception before storing it, so type + message survive intact for any future consumer that wants
   to branch on exception kind. Test (pinning, not a fix):
   `TiledTilesetSyncRunnerTests.SyncAll_TwoChainsClaimSameEntryTile_OutcomeErrorPreservesExactExceptionTypeAndMessage`.
+- [x] **Satellite tile's own `<animation>` content is never read on load.** Confirmed
+  documented/intended, not a bug: `TiledAnimationToAchjMapper.Map` folds a satellite's frames from
+  its anchor + its own static grid offset, never from the satellite's on-disk `Animation`; on save,
+  `NativeTsxAnimationSync.ApplyTile` always writes that anchor-derived sequence back onto the
+  satellite tile, overwriting whatever was there. Verified the safety net that makes this
+  acceptable ("ignore, not corrupt") actually fires for a hand-edited satellite with a shorter frame
+  count than its anchor: `TsxAnimationValidator.Validate` reports the count-mismatch issue on the
+  originally-loaded tileset (a validator branch that existed but had no dedicated test), the bad
+  on-disk frame data never leaks into the mapped `AnimationChainListSave`, and a save without
+  addressing the warning overwrites the satellite to the correctly-derived sequence rather than
+  leaving the bad data or crashing. Confirmed the test has teeth by temporarily disabling the
+  satellite-overwrite loop in `NativeTsxAnimationSync.Apply` and observing the assertion fail with
+  the original (999ms, 1-frame) data instead of the derived one, then reverting. No source change.
+  Test:
+  `NativeTsxProjectRoundTripTests.LoadMapApplySave_SatelliteHandEditedFramesInconsistentWithAnchor_IgnoredOnLoadWarnedByValidatorOverwrittenOnSave`.
 
 ## TODO
 
-- [ ] **Satellite tile's own `<animation>` content is never read on load** — only its static grid
-  position relative to the anchor is trusted (`TiledAnimationToAchjMapper.Map`, satellites branch).
-  A hand-edit to a satellite's frames directly in Tiled would be silently discarded on the next
-  native-tsx load+save. Pin this as documented/intended behavior with an explicit test (not a
-  behavior change) so it can't regress into something worse (e.g. corrupting instead of ignoring).
+- [ ] **`TsxAnimationValidator`'s per-frame lockstep check only compares `TileID`, never
+  `Duration`.** A satellite hand-edited with the correct tile-id sequence but a different duration
+  per frame passes validation silently (no warning at all), even though `NativeTsxAnimationSync`
+  will still silently discard that duration on load and overwrite it to the anchor's own duration
+  on save -- unlike the tile-id-mismatch case, this specific edit gets no warning today. Not
+  necessarily a bug (the "ignore, don't corrupt" design still holds), but it's a real gap in the
+  warning coverage versus what's silently discarded; decide whether the lockstep check should also
+  compare `Duration` per frame.
 - [ ] **Zero-frame chain that used to have an entry tile** (user deletes all frames from a chain but
   doesn't delete the chain itself) — confirm this correctly clears the previously-owned tile on
   save, same as deleting the chain outright.
