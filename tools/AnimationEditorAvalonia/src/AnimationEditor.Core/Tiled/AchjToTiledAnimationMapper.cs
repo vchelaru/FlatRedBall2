@@ -18,6 +18,7 @@ public sealed record SkipCounts
     public int SizeMismatch { get; init; }
     public int NotGridAligned { get; init; }
     public int FlipDropped { get; init; }
+    public int NegativeCoordinate { get; init; }
 }
 
 /// <summary>Result of mapping one <see cref="AnimationChainSave"/> onto a tileset's tile grid.</summary>
@@ -59,16 +60,19 @@ public sealed record TilesetAnimationInfo
 /// <c>AppCommands.SaveCurrentAnimationChainList</c> instead of a pull triggered from inside Tiled.
 /// </summary>
 /// <remarks>
-/// A frame is skipped (excluded from the mapped result) for one of four reasons: it references a
+/// A frame is skipped (excluded from the mapped result) for one of these reasons: it references a
 /// different texture than the tileset's image (<see cref="SkipCounts.TextureMismatch"/>); its
 /// rect doesn't match the tileset's tile size (<see cref="SkipCounts.SizeMismatch"/>); its rect
-/// origin isn't aligned to the tile grid (<see cref="SkipCounts.NotGridAligned"/>); or it uses
-/// <see cref="TextureCoordinateType.UV"/> coordinates but the tileset's pixel size wasn't
-/// supplied (<see cref="SkipCounts.UvMissingPixelSize"/>). A flipped frame is not skipped -- Tiled
-/// tile animation frames can't flip per-frame, so the flip is dropped and tallied separately
-/// (<see cref="SkipCounts.FlipDropped"/>). A tileset with non-zero margin or spacing can't be
-/// mapped at all (tile-id arithmetic assumes none), so every chain comes back empty with one
-/// warning instead of being scanned frame by frame.
+/// origin isn't aligned to the tile grid (<see cref="SkipCounts.NotGridAligned"/>); its rect origin
+/// resolves to a negative column/row -- an exact negative multiple of the tile size passes the
+/// grid-alignment check but would otherwise unchecked-cast to a huge bogus tile id (<see
+/// cref="SkipCounts.NegativeCoordinate"/>); or it uses <see cref="TextureCoordinateType.UV"/>
+/// coordinates but the tileset's pixel size wasn't supplied (<see
+/// cref="SkipCounts.UvMissingPixelSize"/>). A flipped frame is not skipped -- Tiled tile animation
+/// frames can't flip per-frame, so the flip is dropped and tallied separately (<see
+/// cref="SkipCounts.FlipDropped"/>). A tileset with non-zero margin or spacing can't be mapped at
+/// all (tile-id arithmetic assumes none), so every chain comes back empty with one warning instead
+/// of being scanned frame by frame.
 /// </remarks>
 public static class AchjToTiledAnimationMapper
 {
@@ -170,6 +174,15 @@ public static class AchjToTiledAnimationMapper
 
         var column = (int)Math.Round(left / tilesetInfo.TileWidth);
         var row = (int)Math.Round(top / tilesetInfo.TileHeight);
+
+        // A left/top that's an exact negative multiple of the tile size (e.g. -16 with a 16px
+        // tile) passes the grid-alignment check above (remainder is 0 -- "%" keeps the dividend's
+        // sign for negative operands) yet resolves to a negative column/row. Casting that straight
+        // to uint would wrap to a huge bogus tile id instead of failing gracefully.
+        if (column < 0 || row < 0)
+            return Skip(s => s.NegativeCoordinate++,
+                $"{label}: frame rect origin ({left}, {top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
+
         var tileId = (uint)((row * tilesetInfo.ColumnCount) + column);
 
         return new MappedFrame(tileId, FrameDurationMs(frame.FrameLength, timeUnit));
@@ -213,6 +226,7 @@ public static class AchjToTiledAnimationMapper
         public int SizeMismatch;
         public int NotGridAligned;
         public int FlipDropped;
+        public int NegativeCoordinate;
 
         public SkipCounts Build() => new()
         {
@@ -221,6 +235,7 @@ public static class AchjToTiledAnimationMapper
             SizeMismatch = SizeMismatch,
             NotGridAligned = NotGridAligned,
             FlipDropped = FlipDropped,
+            NegativeCoordinate = NegativeCoordinate,
         };
     }
 }

@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
+using System;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests.Tiled;
@@ -113,6 +114,22 @@ public class TsxAnimationValidatorTests
         Assert.Equal((uint)9, issue.AnchorTileId);
         Assert.Equal((uint)10, issue.TileId);
         Assert.Contains("itself a satellite", issue.Message);
+    }
+
+    [Fact]
+    public void Validate_ColumnsIsZero_ThrowsInsteadOfDivideByZero()
+    {
+        var tileset = TilesetWithColumns(0);
+        var anchor = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var satellite = new Tile { ID = 9, Width = 0, Height = 0 };
+        satellite.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satellite);
+
+        Assert.Throws<InvalidOperationException>(() => TsxAnimationValidator.Validate(tileset));
     }
 
     [Fact]

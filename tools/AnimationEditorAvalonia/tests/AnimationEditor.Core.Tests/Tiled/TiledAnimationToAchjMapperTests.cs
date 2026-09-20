@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -135,6 +136,29 @@ public class TiledAnimationToAchjMapperTests
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:5", chain.Name);
+    }
+
+    [Fact]
+    public void Map_ColumnsIsZero_ThrowsInsteadOfDivideByZero()
+    {
+        // A corrupt/hand-edited tsx with Columns=0 makes every tile-position "% columns"/"/
+        // columns" computation in this method either divide by zero (uint DivideByZeroException)
+        // or, for a negative Columns, unchecked-wrap into nonsense positions -- fail loudly
+        // instead, same "fail loud, not corrupt" precedent as the negative-ParentId fix.
+        var tileset = new Tileset
+        {
+            Name = "Corrupt",
+            TileWidth = 16,
+            TileHeight = 16,
+            TileCount = 16,
+            Columns = 0,
+            Image = new Image { Source = "Corrupt.png", Width = 64, Height = 64 },
+        };
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        tileset.Tiles.Add(tile);
+
+        Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _));
     }
 
     [Fact]

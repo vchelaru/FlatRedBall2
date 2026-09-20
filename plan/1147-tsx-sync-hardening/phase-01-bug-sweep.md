@@ -288,12 +288,46 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   `ProjectManagerTsxValidationIssuesTests.GetChainNamesWithTsxIssues_ThenSaveTsxProject_AgreeOnEntryTileIdForFlaggedChain`,
   `GetChainNamesWithTsxIssues_AfterSaveFixesLockstep_ReturnsEmpty`.
 
+- [x] **Corrupt/negative or out-of-range values elsewhere.** Audited
+  `AchjToTiledAnimationMapper.MapFrame`, `MultiTileToTiledAnimationMapper.MapChain`,
+  `TiledAnimationToAchjMapper.Map`, and `TsxAnimationValidator.Validate` for unchecked casts/
+  unvalidated arithmetic on corruption-controlled input. Two real bugs found and fixed, one
+  category already safe:
+  - **achx-side: a frame rect origin that's an exact negative multiple of the tile size** (e.g.
+    `LeftCoordinate = -16` with a 16px tile) passes the existing grid-alignment check (`left %
+    tileWidth == 0` -- C#'s `%` keeps the dividend's sign, so a negative-but-aligned value has
+    remainder 0) yet resolves to a negative column/row, which both mappers then unchecked-cast to
+    `uint`, wrapping to 4294967295 -- same bug shape as the already-fixed `ParentId` cast. Fixed by
+    checking `column < 0 || row < 0` (resp. `originColumn`/`originRow`) right after computing them
+    and skipping (achj mapper: per-frame, new `SkipCounts.NegativeCoordinate` bucket) or aborting
+    the whole chain with a warning (multi-tile mapper, matching its existing per-chain-abort
+    pattern for other geometry failures) instead of proceeding to the cast. Tests:
+    `AchjToTiledAnimationMapperTests.Map_NegativeAlignedCoordinate_SkipsFrameAndWarnsInsteadOfUncheckedCastToHugeId`,
+    `MultiTileToTiledAnimationMapperTests.Map_NegativeAlignedFrameOrigin_SkipsChainAndWarnsInsteadOfUncheckedCastToHugeTileId`.
+  - **Tiled-side: `Columns <= 0`** in a corrupt/hand-edited tsx. Both `TiledAnimationToAchjMapper.Map`
+    and `TsxAnimationValidator.Validate` do `tileId % columns` / `tileId / columns` unconditionally;
+    `Columns == 0` throws an unhandled `DivideByZeroException` (uint division/modulo by zero
+    throws, unlike float), and a negative `Columns` unchecked-casts to a huge `uint` divisor,
+    silently misplacing every tile instead of crashing. Neither was previously guarded --
+    confirmed both crash for the right reason before fixing. Fixed with an
+    `InvalidOperationException` guard at the top of each method (`Columns <= 0` -> throw with a
+    clear message), matching the existing "fail loud, not corrupt" `InvalidOperationException`
+    precedent in `NativeTsxAnimationSync`. Verified this integrates cleanly with the existing UI
+    error path: `AppCommands.OpenTsxWorkflowAsync` already wraps `LoadTsxProject` in a blanket
+    `catch (Exception ex)` that surfaces `ex.Message` to the user, and `TsxAnimationValidator` is
+    only ever called on a tileset that already loaded successfully (so its own guard is
+    defense-in-depth for any future/independent caller, not reachable via the current
+    `ProjectManager` flow). Tests:
+    `TiledAnimationToAchjMapperTests.Map_ColumnsIsZero_ThrowsInsteadOfDivideByZero`,
+    `TsxAnimationValidatorTests.Validate_ColumnsIsZero_ThrowsInsteadOfDivideByZero`.
+  - **Already safe: `MultiTileToTiledAnimationMapper`'s footprint-size computation.** A negative or
+    zero `firstRect.Width`/`Height` (e.g. from a corrupt achx with `RightCoordinate < LeftCoordinate`)
+    is already caught by the existing `footprintColumns < 1 || footprintRows < 1` check before any
+    cast happens -- no gap here, no test added (already covered by
+    `Map_FrameSizeNotWholeMultipleOfTile_SkipsChainAndWarns`'s existing coverage of that guard).
+
 ## TODO
 
-- [ ] **Corrupt/negative or out-of-range values elsewhere**: audit `MultiTileToTiledAnimationMapper`
-  and `AchjToTiledAnimationMapper` for other unchecked casts or unvalidated arithmetic on
-  attacker/corruption-controlled input (frame rects producing negative or huge tile ids from
-  malformed achx coordinates), similar in spirit to the `ParentId` fix above.
 - [ ] **`TilesetAnimationSync` ownership check keys off `Animation.Count > 0`, not `achjAnimationName`**
   — a tile with `achjAnimationName` set but no `achjSourceFile` (e.g. a partially-written tile from
   an older schema, or a crash mid-write) and an *empty* `Animation` list would currently be treated

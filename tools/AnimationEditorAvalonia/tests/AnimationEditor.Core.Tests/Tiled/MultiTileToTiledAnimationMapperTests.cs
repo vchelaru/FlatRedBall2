@@ -72,6 +72,20 @@ public class MultiTileToTiledAnimationMapperTests
     }
 
     [Fact]
+    public void Map_NegativeAlignedFrameOrigin_SkipsChainAndWarnsInsteadOfUncheckedCastToHugeTileId()
+    {
+        // Left=-16 is an exact multiple of tile width 16 (remainder 0), so it isn't caught by the
+        // grid-alignment check, but resolves to column -1 -- an unchecked cast to uint would wrap
+        // to 4294967295 for the anchor tile id.
+        var achj = AchjWithChain("Corrupt", PixelFrame(-16, 0, 0, 16));
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].AnchorFrames);
+        Assert.Contains("negative", results[0].Warnings[0]);
+    }
+
+    [Fact]
     public void Map_FrameSizeNotWholeMultipleOfTile_SkipsChainAndWarns()
     {
         var achj = AchjWithChain("Bad", PixelFrame(0, 0, 20, 16));

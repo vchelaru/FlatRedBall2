@@ -131,6 +131,12 @@ public static class MultiTileToTiledAnimationMapper
             var originColumn = (int)Math.Round(rect.Left / tilesetInfo.TileWidth);
             var originRow = (int)Math.Round(rect.Top / tilesetInfo.TileHeight);
 
+            // An exact negative multiple of the tile size (e.g. -16 with a 16px tile) passes the
+            // grid-alignment check above (remainder is 0) yet resolves to a negative
+            // column/row -- an unchecked cast to uint below would wrap to a huge bogus tile id.
+            if (originColumn < 0 || originRow < 0)
+                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
+
             for (var dy = 0; dy < footprintRows; dy++)
                 for (var dx = 0; dx < footprintColumns; dx++)
                 {

@@ -104,6 +104,21 @@ public class AchjToTiledAnimationMapperTests
     }
 
     [Fact]
+    public void Map_NegativeAlignedCoordinate_SkipsFrameAndWarnsInsteadOfUncheckedCastToHugeId()
+    {
+        // Left=-16 is an exact multiple of tile width 16, so it passes the grid-alignment check
+        // (remainder is 0 -- C#'s "%" keeps the dividend's sign) yet resolves to column -1.
+        // Casting that straight to uint would wrap to 4294967295, same bug shape as the
+        // negative-ParentId fix in TiledAnimationToAchjMapper.
+        var achj = AchjWithChain("Corrupt", PixelFrame(-16, 0, 0, 32));
+
+        var results = AchjToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].Frames);
+        Assert.Contains("negative", results[0].Warnings[0]);
+    }
+
+    [Fact]
     public void Map_NotGridAligned_SkipsFrameAndWarns()
     {
         var achj = AchjWithChain("Unaligned", PixelFrame(4, 0, 20, 32));

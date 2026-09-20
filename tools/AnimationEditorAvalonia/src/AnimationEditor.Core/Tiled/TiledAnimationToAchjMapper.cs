@@ -1,5 +1,6 @@
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -64,6 +65,14 @@ public static class TiledAnimationToAchjMapper
         out IReadOnlyDictionary<AnimationChainSave, uint> entryTileIdsByChain,
         out IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> satelliteTileIdsByChain)
     {
+        // Every tile-position computation below is "% columns" / "/ columns" -- a corrupt/hand-
+        // edited tsx with Columns <= 0 would either divide by zero (Columns == 0) or unchecked-cast
+        // a negative value into a huge uint, silently misplacing every tile instead of failing
+        // loudly. A real Tiled-authored tsx always has Columns >= 1.
+        if (tileset.Columns <= 0)
+            throw new InvalidOperationException(
+                $"Can't map tile animations: tileset \"{tileset.Name}\" has Columns={tileset.Columns}, which isn't a valid tile-grid width.");
+
         var imageFileName = tileset.Image.HasValue ? (tileset.Image.Value.Source.HasValue ? tileset.Image.Value.Source.Value : string.Empty) : string.Empty;
         var (textureWidth, textureHeight) = GetTextureSize(tileset);
         var acls = new AnimationChainListSave();

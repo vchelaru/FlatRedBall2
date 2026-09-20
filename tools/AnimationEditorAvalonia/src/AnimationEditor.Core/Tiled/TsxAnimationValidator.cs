@@ -1,4 +1,5 @@
 using DotTiled;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -22,6 +23,14 @@ public static class TsxAnimationValidator
 {
     public static IReadOnlyList<TsxGroupIssue> Validate(Tileset tileset)
     {
+        // Every dx/dy/expectedTileId computation below is "% columns" / "/ columns" -- a corrupt
+        // tsx with Columns <= 0 would either divide by zero or unchecked-cast a negative value
+        // into a huge uint. Same guard as TiledAnimationToAchjMapper.Map, which this validator's
+        // math mirrors.
+        if (tileset.Columns <= 0)
+            throw new InvalidOperationException(
+                $"Can't validate tile animations: tileset \"{tileset.Name}\" has Columns={tileset.Columns}, which isn't a valid tile-grid width.");
+
         var issues = new List<TsxGroupIssue>();
         var animatedTilesById = tileset.Tiles.Where(t => t.Animation.Count > 0).ToDictionary(t => t.ID);
         var columns = (uint)tileset.Columns;
