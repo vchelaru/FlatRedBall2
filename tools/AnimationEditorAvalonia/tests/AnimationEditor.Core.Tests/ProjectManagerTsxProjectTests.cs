@@ -1,4 +1,5 @@
 using AnimationEditor.Core;
+using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.IO;
 using System.Linq;
@@ -86,4 +87,52 @@ public class ProjectManagerTsxProjectTests : IDisposable
         var tile = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], tile.Animation.Select(f => (f.TileID, f.Duration)));
     }
+
+    // A chain the user creates in-session (never loaded from disk) has no prior
+    // _tsxEntryTileIdsByChain entry, so its first save must compute an entry tile id from its
+    // first frame -- but every save after that must reuse the id it committed on that first save,
+    // not recompute, even if the chain's own frame order later changes what frame[0] would map to.
+    [Fact]
+    public void SaveTsxProject_BrandNewChain_EntryTileIdStaysStableAcrossRepeatedSaves()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        // Tiles 4 and 5 (row 1) carry no animation in the fixture, so this is a genuinely new chain.
+        var newChain = new AnimationChainSave { Name = "NewChain" };
+        newChain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png",
+            LeftCoordinate = 0f, RightCoordinate = 0.25f,
+            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            FrameLength = 0.1f,
+        });
+        newChain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png",
+            LeftCoordinate = 0.25f, RightCoordinate = 0.5f,
+            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            FrameLength = 0.1f,
+        });
+        pm.AnimationChainListSave!.AnimationChains.Add(newChain);
+
+        pm.SaveTsxProject();
+
+        var afterFirstSave = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal((uint)4, EntryTileIdNamed(afterFirstSave, "NewChain"));
+
+        // Reverse frame order: frame[0] now maps to tile 5, not tile 4. Without identity tracking
+        // this save would relocate the animation from tile 4 to tile 5.
+        newChain.Frames.Reverse();
+        pm.SaveTsxProject();
+
+        var afterSecondSave = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal((uint)4, EntryTileIdNamed(afterSecondSave, "NewChain"));
+    }
+
+    private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
+        tileset.Tiles
+            .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))
+            .ID;
 }

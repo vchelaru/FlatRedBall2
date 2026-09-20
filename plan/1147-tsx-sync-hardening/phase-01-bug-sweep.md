@@ -84,14 +84,15 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   loudly. Now treated as "no ParentId." Test:
   `TiledAnimationToAchjMapperTests.Map_NegativeParentId_TreatedAsAnchorNotUncheckedCastToHugeId`.
 
+- [x] **Brand-new chain's entry-tile id must stay stable across repeated saves.** Already correct —
+  `ProjectManager.SaveTsxProject`'s post-save bookkeeping loop commits `mapped`'s `EntryTileId`
+  (keyed by `SourceChain` reference) into `_tsxEntryTileIdsByChain` every save, so a chain's
+  first-save id feeds back in as the next save's `knownEntryTileIds` hint. No source change; test
+  added to pin the behavior (confirmed red when the hint was stubbed out, green against real code):
+  `ProjectManagerTsxProjectTests.SaveTsxProject_BrandNewChain_EntryTileIdStaysStableAcrossRepeatedSaves`.
+
 ## TODO
 
-- [ ] **Brand-new chain's entry-tile id must stay stable across repeated saves.** Once
-  `MultiTileToTiledAnimationMapper` picks a first-frame id for a chain that has no prior
-  `knownEntryTileIds` entry, confirm (via `ProjectManager`, not just the mapper in isolation) that a
-  *second* save of the same unmodified project reuses that committed id rather than recomputing —
-  and that this holds even when the chain's frame order changes in a way that would recompute to a
-  different id if identity weren't tracked.
 - [ ] **Multi-tile group footprint shrinks or grows across a save** (e.g. 2×1 → 1×1): confirm the
   now-unused satellite tile is actually cleared (not left with a stale animation) and the newly
   needed satellite tile is actually created, in one native-tsx round trip.
