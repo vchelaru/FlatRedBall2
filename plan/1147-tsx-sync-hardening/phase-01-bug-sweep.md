@@ -354,15 +354,45 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **Fresh-eyes pass #4 needed**: pass #3 found two new real, confirmed bugs (fixed, see DONE),
-  so per the phase doc's stop condition ("finds nothing new to add, twice in a row") this phase is
-  not yet exhausted -- this was not a clean pass. A pass #4 should do another full fresh-eyes read
-  of every file in scope, focusing on areas pass #3 did not have time to chase deeply: a
-  line-by-line audit of `TiledTilesetSyncRunner`/`AppCommands.cs`'s remaining ~1800 lines outside
-  the tsx-specific call sites (skimmed for `_tsxTileset`/`Tsx`/`ProjectManager` references only,
-  not read end-to-end), and whether `GetChainNamesWithTsxIssues`'s new either-id matching
-  (`AnchorTileId` OR `TileId`) has any false-positive edge case beyond the "also flags the
-  innocent referenced anchor" one already called out and accepted.
+- [ ] **`TabEditorCache`'s tab-switch cache restore bypasses `LoadTsxProject`/`LoadAnimationChain`
+  entirely, so it can't apply the `LoadAnimationChain` fix from fresh-eyes pass #4 (see DONE) --
+  switching between a cached tsx tab and a cached achx tab can still leave stale native-tsx state.**
+  Confirmed by reading (not yet reduced to a failing test -- the fix touches files outside this
+  sweep's declared "Files in scope" list, so left as a TODO rather than expanding scope
+  mid-sweep). `ProjectManager` is a single instance reused across tabs (see `TabSwitchCacheTests.cs`);
+  `TabEditorCache.ApplyToProject`/`CaptureFromProject` (`AnimationEditor.Core/Models/TabEditorCache.cs`)
+  round-trip a tab's editor state through `IProjectManager`'s public surface only
+  (`AnimationChainListSave`, `OnDiskCoordinateType`, `FileName`) -- there is no public surface at all
+  for `_tsxTileset`/`_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`, so a tab switch that hits
+  the cache (`TryActivateTabFromCache`, when `TabEditorCache.HasFreshCache` is true -- i.e. every
+  switch back to a tab already visited once, since the file on disk hasn't changed) never touches
+  those fields at all, regardless of whether the tab being switched to/from is a tsx or achx project.
+  Concretely: open tsx tab A, open achx tab B (first visit to each goes through
+  `OpenProjectWorkflowAsync` -> `LoadTsxProject`/`LoadAnimationChain`, so `_tsxTileset` is set for A's
+  visit and -- after this pass's fix -- cleared for B's), switch back to tab A via
+  `TryActivateTabFromCache` (fresh cache, no reload) -- `_tsxTileset` is still whatever
+  `LoadAnimationChain` last left it (cleared, from loading B), not tab A's tileset, so
+  `IsNativeTsxProject` now wrongly reports `false` while tab A is active and its
+  `AnimationChainListSave` is actually tab A's tsx-derived chains. A full fix needs `IProjectManager`
+  to expose enough surface for `TabEditorCache` to capture/restore the tsx-specific state per tab
+  (or an explicit tsx/achx flag + cached tileset on `TabEntry`), which touches `IProjectManager.cs`,
+  `TabEditorCache.cs`, and possibly `TabEntry.cs`/`TabController.cs` -- none of which are in this
+  sweep's declared scope.
+
+- [ ] **Fresh-eyes pass #5 needed**: pass #4 found two new real, confirmed bugs (fixed, see DONE) plus
+  the TODO above, so per the phase doc's stop condition ("finds nothing new to add, twice in a row")
+  this phase is not yet exhausted -- this was not a clean pass. Suggested starting points for pass
+  #5: the achx-push mapper's per-frame (not per-chain) skip semantics in `AchjToTiledAnimationMapper.
+  MapFrame` -- `ChainMappingResult.EntryTileId` is always the *first non-skipped* frame's tile id, so
+  a chain whose frame 0 is skipped (texture mismatch, size mismatch, etc.) but has other valid frames
+  writes its animation starting from frame 1's tile instead of frame 0's; traced this pass as
+  probably pre-existing/intentional single-cell achj-push behavior (not part of the native-tsx
+  identity-preservation bug class this sweep targets), but not chased to a firm conclusion -- worth
+  a deliberate look. Also worth another look: whether `TsxWriter`'s patch-mode `TopLevelEquals` should
+  compare `Tileset.Properties` order-sensitively or order-insensitively (currently order-sensitive
+  via `PropertiesEqual`'s `Zip` -- a hand-reordered-but-otherwise-identical tileset-level properties
+  list would be seen as "different," falling back to a full rewrite; likely harmless since a full
+  rewrite is always a safe fallback, but not explicitly traced this pass).
 
 ## DONE (continued)
 
@@ -740,3 +770,86 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     "a successful multi-tile save through `ProjectManager` works" would have no discriminating power
     (it would pass identically whether or not properties are deep-cloned), so it would be padding,
     not a pinning test.
+
+- [x] **Fresh-eyes pass #4.** Started from the task's two suggested targets, then read every file in
+  scope end to end one more time. Found and fixed two new real, confirmed bugs (both in territory no
+  prior pass touched -- cross-project-type reuse of one `ProjectManager` instance, and a validator
+  check that didn't fully mirror its mapper counterpart's rule), confirmed one composition (two
+  earlier fixes interacting) with a teeth-tested pinning test, and traced the two suggested targets
+  plus a full re-read of the remaining files to "safe, no gap":
+  - **Real bug, confirmed red first -- `ProjectManager.LoadAnimationChain` never cleared
+    `_tsxTileset`/`_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`, so opening a plain achx
+    project after a native tsx project (in the same `ProjectManager` instance -- confirmed via
+    `TabSwitchCacheTests.cs` that this instance is reused across `File > Open` calls and tab
+    switches, never recreated per file) left `IsNativeTsxProject`/`TsxTileSize` reporting the
+    *previous* tsx project's state.** Traced the severity precisely: `AppCommands.
+    SaveCurrentAnimationChainList` branches on `IsNativeTsxProject` to choose `SaveTsxProject` vs.
+    `SaveAnimationChainList`, so this would route a plain achx save through the tsx writer against a
+    stale tileset. Fixed by clearing all three fields at the same commit point `LoadAnimationChain`
+    already uses for `AnimationChainListSave`/`FileName`. Test:
+    `ProjectManagerTsxProjectTests.LoadAnimationChain_AfterLoadTsxProject_ClearsNativeTsxState`.
+    Traced a deeper, more severe manifestation of the same root cause (tab-switch cache restore,
+    which bypasses `LoadAnimationChain` entirely and so isn't fixed by this change) but left it as a
+    TODO above rather than expanding scope into `TabEditorCache.cs`/`TabController.cs`, which aren't
+    in this sweep's declared file scope.
+  - **Real bug, confirmed red first -- `TsxAnimationValidator`'s chained-ParentId check
+    (`TryGetValidForwardAnchor` and the per-tile issue-reporting loop) only treated a satellite's
+    referenced tile as "itself a satellite, not a true anchor" when that tile's *own* ParentId
+    resolved to a real animated tile.** `TiledAnimationToAchjMapper.Map`'s actual rule
+    (`trueAnchorTileIds`) is simpler and stricter: a tile is a true anchor only if it has *no*
+    ParentId at all, regardless of whether that ParentId resolves to anything. So a tile whose own
+    ParentId is dangling (set, but not resolving to any animated tile -- itself flagged separately as
+    an orphaned-ParentId issue) was still wrongly accepted by the validator as a valid forward anchor
+    for anything satellite-pointing at it, silently reporting zero issues for that satellite even
+    though the mapper never actually folds it into a group -- same failure class as the already-fixed
+    chained/backward/orphaned-ParentId gaps, just for the specific sub-case where the intermediate
+    tile's own broken reference is *dangling* rather than *resolving to a real satellite*. Fixed both
+    checks to require only "the referenced tile has a ParentId of its own," matching the mapper's
+    simpler rule exactly. Test:
+    `TsxAnimationValidatorTests.Validate_ChainedParentId_IntermediateTilesOwnParentIdIsDanglingRatherThanResolving_StillFlagsTheSatellite`.
+  - **Composition check requested by the task (non-rectangular footprint + chained ParentId in the
+    same group) -- already correct, confirmed with a teeth-tested pinning test, no source change.**
+    Traced precisely: `IsAnchor` (which already excludes chained-ParentId tiles) runs *before*
+    `tentativeSatellitesByAnchor` is built, so a chained-ParentId tile sitting at the exact grid cell
+    that would complete a footprint's rectangle is never counted as filling that cell -- the
+    completeness check correctly sees the gap and un-folds the group, while the chained tile
+    independently surfaces as its own chain via the pre-existing chained-ParentId handling. Confirmed
+    the test has teeth by temporarily broadening `IsAnchor` (dropping the chained-ParentId condition)
+    and observing the assertion fail (3 chains instead of 4), then reverting. Test:
+    `TiledAnimationToAchjMapperTests.Map_NonRectangularFootprintGapFilledByChainedParentIdTile_AllFourTilesSurfaceAsIndependentChains`.
+  - **Task's target 1 (`GetChainNamesWithTsxIssues`'s either-id match false-positive risk) -- safe,
+    no new gap beyond the one already accepted.** Traced concretely: tile ids are unique within a
+    tileset (enforced at load by the duplicate-tile-id guard from fresh-eyes pass #2), so
+    `AnchorTileId`/`TileId` always name one specific physical tile, and a chain's own computed entry
+    tile id can only equal that value when the chain genuinely owns that exact tile -- there's no
+    room for a numerically-coincidental match against a truly unrelated tile. The only additional
+    angle found (two chains transiently computing the *same* not-yet-saved entry tile id mid-edit,
+    before `SaveTsxProject`'s own `NativeTsxAnimationSync.Apply` collision guard would ever run)
+    exists identically whether matching on `AnchorTileId` alone or on either id -- it's a property of
+    correlating "any chain whose entry tile id equals a flagged real tile id," not something the
+    either-id change introduced or worsened -- and it would (correctly, not confusingly) flag a chain
+    that genuinely has a forthcoming collision problem, not an unrelated healthy one. Not added to
+    TODO: too narrow/pre-existing to be worth tracking on its own, and it doesn't answer "did the
+    either-id fix specifically introduce a new false positive" (it didn't).
+  - **Task's target 2 (full `ProjectManager.cs` re-read for accumulated cross-patch inconsistency,
+    specifically load-different-file-after-save) -- safe, no gap.** Traced `LoadTsxProject` on a
+    second, different file after a prior `LoadTsxProject`+`SaveTsxProject`: all four tsx-specific
+    fields (`_tsxTileset`, `AnimationChainListSave`, `_tsxEntryTileIdsByChain`,
+    `_tsxSatelliteTileIdsByChain`) are computed into locals first and only committed together after
+    `TiledAnimationToAchjMapper.Map` has already succeeded for the *new* file -- there is no partial
+    reset or leftover-from-the-previous-file state possible, since every field is unconditionally
+    reassigned in the same commit, not merged/updated in place. (This re-read is what surfaced the
+    `LoadAnimationChain` bug above -- the gap wasn't in this reassignment pattern itself, but in the
+    *other* load method, which has no equivalent reassignment for these fields at all.)
+  - **Fresh re-read of `TsxWriter.cs`, `NativeTsxAnimationSync.cs`, `AchjToTiledAnimationMapper.cs`,
+    `TilesetAnimationSync.cs`, `TiledTilesetSyncRunner.cs` end to end -- no new gaps found** beyond
+    the two bugs above. `TsxWriter`'s `TopLevelEquals`/`TileContentEquals` field lists were checked
+    field-by-field against `NativeTsxAnimationSync.CloneForSave`/`CloneTile`'s field lists for
+    completeness (consistent); `NativeTsxAnimationSync.ValidateNoTileIdCollisions`,
+    `TilesetAnimationSync.Apply`'s ownership/ordering, and `TiledTilesetSyncRunner.SyncAll`'s
+    per-tsx isolation were all re-verified against the current source and found consistent with the
+    DONE items that already cover them.
+  - **Honest assessment: not a clean pass.** Two new real, confirmed bugs were found and fixed, plus
+    one new TODO item describing a deeper (but out-of-declared-scope) manifestation of one of them.
+    Per the stop condition, a pass #5 is needed; see the TODO items above for suggested starting
+    points.
