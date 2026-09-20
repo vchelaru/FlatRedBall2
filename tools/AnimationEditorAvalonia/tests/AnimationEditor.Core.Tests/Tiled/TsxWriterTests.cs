@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
 using DotTiled.Serialization;
+using System;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -593,6 +594,45 @@ public class TsxWriterTests
         Assert.Equal("2", reloaded.GetProperty<StringProperty>("schemaVersion").Value);
         var tile5 = reloaded.Tiles.Single(t => t.ID == 5);
         Assert.Equal([((uint)5, 200), ((uint)6, 200)], tile5.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    [Fact]
+    public void Write_TopLevelPropertiesReorderedButContentUnchanged_FallsBackButStaysCorrect()
+    {
+        // TopLevelEquals's PropertiesEqual compares tileset-level properties position-by-position
+        // (Zip), so a hand-edit (or another tool) that reorders them without changing their
+        // content is seen as "different" and triggers the same full-rewrite fallback as an actual
+        // content change -- accepted as a known cosmetic limitation, same "full rewrite is always
+        // a safe fallback" tradeoff already accepted for tileset.Tiles ordering. Pins that the
+        // fallback still produces correct content (not corruption), and that it really is the
+        // fallback path that ran: the written file's property order matches the in-memory
+        // (reversed) order, not the original on-disk order, which only a full rewrite -- not a
+        // patch reusing the original prologue byte-for-byte -- would produce.
+        const string xmlWithProperties =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
+            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
+            " <properties>\n" +
+            "  <property name=\"schemaVersion\" value=\"1\"/>\n" +
+            "  <property name=\"author\" value=\"Vic\"/>\n" +
+            " </properties>\n" +
+            " <tile id=\"5\" type=\"Rock\"/>\n" +
+            "</tileset>\n";
+        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, xmlWithProperties);
+
+        // Same two properties, reversed order, no actual content edit.
+        var reordered = tileset.Properties.AsEnumerable().Reverse().ToList();
+        tileset.Properties.Clear();
+        tileset.Properties.AddRange(reordered);
+
+        TsxWriter.Write(tileset, path);
+        var written = File.ReadAllText(path);
+        var reloaded = Loader.Default().LoadTileset(path);
+
+        Assert.True(written.IndexOf("author", StringComparison.Ordinal) < written.IndexOf("schemaVersion", StringComparison.Ordinal));
+        Assert.Equal("1", reloaded.GetProperty<StringProperty>("schemaVersion").Value);
+        Assert.Equal("Vic", reloaded.GetProperty<StringProperty>("author").Value);
+        Assert.Equal("Rock", reloaded.Tiles.Single(t => t.ID == 5).Type);
     }
 
     [Fact]
