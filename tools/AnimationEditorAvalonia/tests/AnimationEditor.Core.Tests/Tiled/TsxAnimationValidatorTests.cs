@@ -173,4 +173,23 @@ public class TsxAnimationValidatorTests
         Assert.Equal((uint)8, issue.AnchorTileId);
         Assert.Contains("does not reference an animated tile", issue.Message);
     }
+
+    [Fact]
+    public void Validate_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException()
+    {
+        // Two animated <tile> elements sharing one id used to hit the internal id-keyed
+        // dictionary's own unchecked ArgumentException instead of this codebase's "fail loud with
+        // a clear message" precedent (same category as the Columns<=0 guard above).
+        var tileset = TilesetWithColumns(4);
+        var first = new Tile { ID = 8, Width = 0, Height = 0 };
+        first.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(first);
+        var second = new Tile { ID = 8, Width = 0, Height = 0 };
+        second.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(second);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => TsxAnimationValidator.Validate(tileset));
+
+        Assert.Contains("8", exception.Message);
+    }
 }

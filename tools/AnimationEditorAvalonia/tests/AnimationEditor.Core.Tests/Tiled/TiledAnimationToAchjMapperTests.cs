@@ -287,4 +287,23 @@ public class TiledAnimationToAchjMapperTests
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal((uint)5, entryTileIdsByChain[chain]);
     }
+
+    [Fact]
+    public void Map_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException()
+    {
+        // Two animated <tile> elements sharing one id used to hit the internal id-keyed
+        // dictionary's own unchecked ArgumentException instead of this codebase's "fail loud with
+        // a clear message" precedent (same category as the Columns<=0 guard right above).
+        var tileset = EmptyTileset();
+        var first = new Tile { ID = 5, Width = 0, Height = 0 };
+        first.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        tileset.Tiles.Add(first);
+        var second = new Tile { ID = 5, Width = 0, Height = 0 };
+        second.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        tileset.Tiles.Add(second);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _));
+
+        Assert.Contains("5", exception.Message);
+    }
 }

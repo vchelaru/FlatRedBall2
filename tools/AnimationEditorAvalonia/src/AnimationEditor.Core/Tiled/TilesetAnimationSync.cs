@@ -61,7 +61,11 @@ public static class TilesetAnimationSync
         // tiles. Kept in sync whenever a brand-new tile is added below; the claimedBy check above
         // already guarantees every entry tile id in this call's results is unique, so no lookup
         // ever needs to see a tile created earlier in the same call.
-        var tilesById = tileset.Tiles.ToDictionary(t => t.ID);
+        var tilesById = new Dictionary<uint, Tile>();
+        foreach (var tile in tileset.Tiles)
+            if (!tilesById.TryAdd(tile.ID, tile))
+                throw new System.InvalidOperationException(
+                    $"Can't sync \"{sourceLabel}\": tileset \"{tileset.Name}\" has more than one tile with id {tile.ID}, which isn't valid Tiled data.");
 
         var changed = false;
 

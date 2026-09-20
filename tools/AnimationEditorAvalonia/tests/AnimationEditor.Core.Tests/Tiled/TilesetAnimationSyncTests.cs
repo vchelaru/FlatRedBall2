@@ -255,4 +255,20 @@ public class TilesetAnimationSyncTests
         var stringProperty = Assert.IsType<StringProperty>(single);
         Assert.Equal("Walk", stringProperty.Value);
     }
+
+    [Fact]
+    public void Apply_TilesetHasDuplicateTileIds_ThrowsClearErrorInsteadOfRawDictionaryException()
+    {
+        // Apply builds a tile-id-keyed dictionary once up front (for O(1) lookups). A corrupt/
+        // hand-edited tsx with two <tile> elements sharing one id used to hit .ToDictionary's own
+        // unchecked ArgumentException instead of this codebase's "fail loud with a clear message"
+        // precedent (Columns<=0, tile-id collisions between chains, etc).
+        var tileset = EmptyTileset();
+        tileset.Tiles.Add(new Tile { ID = 5, Width = 0, Height = 0 });
+        tileset.Tiles.Add(new Tile { ID = 5, Width = 0, Height = 0 });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => TilesetAnimationSync.Apply(tileset, [], SourceLabel));
+
+        Assert.Contains("5", exception.Message);
+    }
 }

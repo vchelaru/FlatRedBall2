@@ -60,7 +60,7 @@ public static class NativeTsxAnimationSync
         // thousands of tiles. Kept in sync by ApplyTile whenever it adds a brand-new tile;
         // ValidateNoTileIdCollisions above already guarantees every id touched in this call is
         // unique, so no lookup ever needs to see a tile created earlier in the same call.
-        var tilesById = tileset.Tiles.ToDictionary(t => t.ID);
+        var tilesById = BuildTilesById(tileset);
 
         var previouslyAnimatedTileIds = tileset.Tiles
             .Where(t => t.Animation.Count > 0)
@@ -97,6 +97,19 @@ public static class NativeTsxAnimationSync
 
         tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
         return new NativeTsxAnimationSyncResult(changed);
+    }
+
+    /// <summary>Builds a tile-id-keyed dictionary of every tile, throwing a clear error instead of
+    /// <see cref="Dictionary{TKey,TValue}"/>'s own opaque "item with the same key" exception when a
+    /// corrupt/hand-edited tsx has two &lt;tile&gt; elements sharing one id.</summary>
+    private static Dictionary<uint, Tile> BuildTilesById(Tileset tileset)
+    {
+        var tilesById = new Dictionary<uint, Tile>();
+        foreach (var tile in tileset.Tiles)
+            if (!tilesById.TryAdd(tile.ID, tile))
+                throw new InvalidOperationException(
+                    $"Can't sync: tileset \"{tileset.Name}\" has more than one tile with id {tile.ID}, which isn't valid Tiled data.");
+        return tilesById;
     }
 
     private static string SyntheticName(uint tileId) => $"ID:{tileId}";

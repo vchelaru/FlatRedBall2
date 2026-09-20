@@ -82,7 +82,11 @@ public static class TiledAnimationToAchjMapper
         var satelliteTileIds = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
 
         var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
-        var parentIdByTileId = animatedTiles.ToDictionary(t => t.ID, GetParentId);
+        var parentIdByTileId = new Dictionary<uint, uint?>();
+        foreach (var tile in animatedTiles)
+            if (!parentIdByTileId.TryAdd(tile.ID, GetParentId(tile)))
+                throw new InvalidOperationException(
+                    $"Can't map tile animations: tileset \"{tileset.Name}\" has more than one animated tile with id {tile.ID}, which isn't valid Tiled data.");
         var trueAnchorTileIds = animatedTiles.Where(t => !parentIdByTileId[t.ID].HasValue).Select(t => t.ID).ToHashSet();
 
         var columns = (uint)tileset.Columns;

@@ -32,7 +32,11 @@ public static class TsxAnimationValidator
                 $"Can't validate tile animations: tileset \"{tileset.Name}\" has Columns={tileset.Columns}, which isn't a valid tile-grid width.");
 
         var issues = new List<TsxGroupIssue>();
-        var animatedTilesById = tileset.Tiles.Where(t => t.Animation.Count > 0).ToDictionary(t => t.ID);
+        var animatedTilesById = new Dictionary<uint, Tile>();
+        foreach (var tile in tileset.Tiles.Where(t => t.Animation.Count > 0))
+            if (!animatedTilesById.TryAdd(tile.ID, tile))
+                throw new InvalidOperationException(
+                    $"Can't validate tile animations: tileset \"{tileset.Name}\" has more than one animated tile with id {tile.ID}, which isn't valid Tiled data.");
         var columns = (uint)tileset.Columns;
 
         foreach (var tile in tileset.Tiles)
