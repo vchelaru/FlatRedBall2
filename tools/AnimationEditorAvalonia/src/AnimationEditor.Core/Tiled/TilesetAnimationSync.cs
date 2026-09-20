@@ -56,10 +56,17 @@ public static class TilesetAnimationSync
             .Select(r => r.EntryTileId!.Value)
             .ToHashSet();
 
+        // Built once so every lookup below is O(1) instead of an O(n) scan of tileset.Tiles per
+        // stale tile cleared and per chain applied -- matters on a tileset with thousands of
+        // tiles. Kept in sync whenever a brand-new tile is added below; the claimedBy check above
+        // already guarantees every entry tile id in this call's results is unique, so no lookup
+        // ever needs to see a tile created earlier in the same call.
+        var tilesById = tileset.Tiles.ToDictionary(t => t.ID);
+
         var changed = false;
 
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
-            if (ClearTile(tileset.Tiles.Single(t => t.ID == staleTileId)))
+            if (ClearTile(tilesById[staleTileId]))
                 changed = true;
 
         var appliedCount = 0;
@@ -70,8 +77,7 @@ public static class TilesetAnimationSync
             if (result.EntryTileId is not { } tileId)
                 continue;
 
-            var tile = tileset.Tiles.FirstOrDefault(t => t.ID == tileId);
-            var isNewTile = tile == null;
+            var isNewTile = !tilesById.TryGetValue(tileId, out var tile);
 
             // A tile another achx source already owns (tracked by a *different* achjSourceFile)
             // is off-limits -- the class doc's "never disturbs tiles owned by a different source"
@@ -100,6 +106,7 @@ public static class TilesetAnimationSync
             {
                 tile = new Tile { ID = tileId, Width = 0, Height = 0 };
                 tileset.Tiles.Add(tile);
+                tilesById[tileId] = tile;
             }
 
             var newAnimation = result.Frames.Select(f => new Frame { TileID = f.TileId, Duration = f.Duration }).ToList();

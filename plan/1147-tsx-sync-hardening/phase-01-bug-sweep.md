@@ -328,15 +328,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **O(n) tile lookups inside per-result loops could become O(n²) on a large tileset.**
-  `NativeTsxAnimationSync.Apply`/`ApplyTile` (`tileset.Tiles.Single(...)`/`.FirstOrDefault(...)`) and
-  `TilesetAnimationSync.Apply` (the same pattern) both scan `tileset.Tiles` — a `List<Tile>` — once
-  per stale tile cleared and once per anchor/satellite applied. Correctness is unaffected, but a
-  tileset with thousands of tiles and many animated chains (real Tiled tilesets can have 10,000+
-  tiles) turns every save into a quadratic scan. Not fixed here (this sweep is correctness-first
-  per the phase doc), but a `ToDictionary(t => t.ID)` lookup built once per `Apply` call would make
-  each lookup O(1) if this ever becomes a measured problem.
-
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -508,3 +499,23 @@ subsystem), achj-vs-achx serialization interaction with the entry/satellite trac
     leaks through), or a line-by-line audit of `TsxWriter`'s XML-escaping behavior for property
     values containing characters that are special in XML (`<`, `&`, `"`) — plausible but not
     investigated this pass. A second fresh-eyes pass should pick up here.
+
+- [x] **O(n) tile lookups inside per-result loops could become O(n²) on a large tileset.**
+  Decision: **fixed**, not deferred — the dictionary rewrite was genuinely straightforward once
+  traced. Both `NativeTsxAnimationSync.Apply` and `TilesetAnimationSync.Apply` now build
+  `tilesById = tileset.Tiles.ToDictionary(t => t.ID)` once at the top of `Apply`, and every
+  `.Single(t => t.ID == ...)`/`.FirstOrDefault(t => t.ID == ...)` scan (stale-tile-clear loop,
+  `ApplyTile`'s per-tile lookup) now does an O(1) dictionary lookup instead. Traced the one risk
+  called out up front — `ApplyTile` (native) and the inline creation branch (achj-push) both
+  sometimes *add* a brand-new tile mid-`Apply`-call — and confirmed no lookup within the same call
+  ever needs to see a tile created earlier in that same call: `ValidateNoTileIdCollisions`
+  (native)/the `claimedBy` check (achj-push) already guarantee every entry/satellite tile id
+  touched in one `Apply` invocation is unique, and the stale-clear loop (which only reads, never
+  creates) always runs before the apply loop. Still updated `tilesById[tileId] = tile` at both
+  tile-creation sites anyway, defensively, so the dictionary can't silently drift out of sync with
+  `tileset.Tiles` for any future caller that adds another lookup later in the method. Tests
+  (correctness-equivalence, not a perf benchmark — pin that the dictionary-based lookup produces
+  the exact same result as the old sequential scan on a single `Apply` call that mixes all three
+  code paths: stale-clear, existing-tile update, and new-tile creation):
+  `NativeTsxAnimationSyncTests.Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan`,
+  `TilesetAnimationSyncTests.Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan`.

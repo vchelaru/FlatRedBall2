@@ -111,6 +111,42 @@ public class TilesetAnimationSyncTests
     }
 
     [Fact]
+    public void Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan()
+    {
+        // Exercises Apply's dictionary-based tile lookup against all three code paths in a single
+        // call: a stale tile that must be found and cleared, an existing tile that must be found
+        // and updated, and a brand-new tile added mid-loop -- pinning that the O(1) dictionary
+        // lookup (built once from tileset.Tiles at the top of Apply) produces the exact same
+        // result as the prior O(n) Single/FirstOrDefault scan of tileset.Tiles.
+        var tileset = EmptyTileset();
+        var firstSync = new[]
+        {
+            Result("Walk", 0, new MappedFrame(0, 100)),
+            Result("Old", 5, new MappedFrame(5, 100)),
+        };
+        TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
+
+        var secondSync = new[]
+        {
+            Result("Walk", 0, new MappedFrame(0, 200), new MappedFrame(1, 200)),
+            Result("New", 10, new MappedFrame(10, 100)),
+        };
+        var syncResult = TilesetAnimationSync.Apply(tileset, secondSync, SourceLabel);
+
+        var updatedTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 200), ((uint)1, 200)], updatedTile.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var staleTile = tileset.Tiles.Single(t => t.ID == 5);
+        Assert.Empty(staleTile.Animation);
+        Assert.DoesNotContain(staleTile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+
+        var newTile = tileset.Tiles.Single(t => t.ID == 10);
+        Assert.Equal([((uint)10, 100)], newTile.Animation.Select(f => (f.TileID, f.Duration)));
+
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
     public void Apply_UpdatedChainTiming_ReplacesFramesOnSameTile()
     {
         var tileset = EmptyTileset();

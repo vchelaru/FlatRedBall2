@@ -55,6 +55,13 @@ public static class NativeTsxAnimationSync
     {
         ValidateNoTileIdCollisions(results);
 
+        // Built once so every lookup below is O(1) instead of an O(n) scan of tileset.Tiles per
+        // stale tile cleared and per anchor/satellite applied -- matters on a tileset with
+        // thousands of tiles. Kept in sync by ApplyTile whenever it adds a brand-new tile;
+        // ValidateNoTileIdCollisions above already guarantees every id touched in this call is
+        // unique, so no lookup ever needs to see a tile created earlier in the same call.
+        var tilesById = tileset.Tiles.ToDictionary(t => t.ID);
+
         var previouslyAnimatedTileIds = tileset.Tiles
             .Where(t => t.Animation.Count > 0)
             .Select(t => t.ID)
@@ -72,7 +79,7 @@ public static class NativeTsxAnimationSync
         var changed = false;
 
         foreach (var staleTileId in previouslyAnimatedTileIds.Except(newTileIds))
-            if (ClearTile(tileset.Tiles.Single(t => t.ID == staleTileId)))
+            if (ClearTile(tilesById[staleTileId]))
                 changed = true;
 
         foreach (var result in results)
@@ -80,11 +87,11 @@ public static class NativeTsxAnimationSync
             if (result.EntryTileId is not { } entryTileId)
                 continue;
 
-            if (ApplyTile(tileset, entryTileId, result.AnchorFrames, explicitName: SyntheticName(entryTileId) == result.ChainName ? null : result.ChainName))
+            if (ApplyTile(tileset, tilesById, entryTileId, result.AnchorFrames, explicitName: SyntheticName(entryTileId) == result.ChainName ? null : result.ChainName))
                 changed = true;
 
             foreach (var satellite in result.Satellites)
-                if (ApplyTile(tileset, satellite.TileId, satellite.Frames, explicitName: null, parentId: entryTileId))
+                if (ApplyTile(tileset, tilesById, satellite.TileId, satellite.Frames, explicitName: null, parentId: entryTileId))
                     changed = true;
         }
 
@@ -95,14 +102,16 @@ public static class NativeTsxAnimationSync
     private static string SyntheticName(uint tileId) => $"ID:{tileId}";
 
     private static bool ApplyTile(
-        Tileset tileset, uint tileId, IReadOnlyList<MappedFrame> frames, string? explicitName, uint? parentId = null)
+        Tileset tileset, Dictionary<uint, Tile> tilesById, uint tileId, IReadOnlyList<MappedFrame> frames,
+        string? explicitName, uint? parentId = null)
     {
-        var tile = tileset.Tiles.FirstOrDefault(t => t.ID == tileId);
-        var isNewTile = tile == null;
-        if (tile == null)
+        var isNewTile = false;
+        if (!tilesById.TryGetValue(tileId, out var tile))
         {
+            isNewTile = true;
             tile = new Tile { ID = tileId, Width = 0, Height = 0 };
             tileset.Tiles.Add(tile);
+            tilesById[tileId] = tile;
         }
 
         var changed = isNewTile;
