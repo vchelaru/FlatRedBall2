@@ -275,12 +275,21 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   fail (`KeyNotFoundException: Property 'Name' not found`), then reverting. No source change.
   Test: `NativeTsxProjectRoundTripTests.LoadRenameChainWithMultiTileSatelliteSave_AnchorNameUpdatedInPlace_SatelliteParentIdStaysOnSameAnchor`.
 
+- [x] **`GetChainNamesWithTsxIssues` and `SaveTsxProject` must agree on entry tile ids.** Already
+  correct -- both already pass the same `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`
+  hints into `MultiTileToTiledAnimationMapper.Map`. Confirmed with a `ProjectManager`-level test
+  using an owner-not-first-frame anchor (tile 9, frame 0 is tile 8) with a satellite hand-edited
+  out of lockstep: `GetChainNamesWithTsxIssues()` names the chain via its hint-derived entry tile
+  id (9), and a subsequent `SaveTsxProject()` keeps writing to that same tile 9 (not the
+  frame-0-derived 8) while correcting the satellite. Confirmed the test has teeth by temporarily
+  passing empty dictionaries in `GetChainNamesWithTsxIssues`'s `Map` call and observing both new
+  tests fail (the hint-less recompute lands on tile 8, no longer matching the validator's
+  anchor-tile-9 issue), then reverting -- no source change. Tests:
+  `ProjectManagerTsxValidationIssuesTests.GetChainNamesWithTsxIssues_ThenSaveTsxProject_AgreeOnEntryTileIdForFlaggedChain`,
+  `GetChainNamesWithTsxIssues_AfterSaveFixesLockstep_ReturnsEmpty`.
+
 ## TODO
 
-- [ ] **`GetChainNamesWithTsxIssues` and `SaveTsxProject` must agree on entry tile ids** — now that
-  both pass `_tsxEntryTileIdsByChain`, confirm with a `ProjectManager`-level test (not just the
-  mapper) that the validator-driven UI warning list never disagrees with what an actual save would
-  do.
 - [ ] **Corrupt/negative or out-of-range values elsewhere**: audit `MultiTileToTiledAnimationMapper`
   and `AchjToTiledAnimationMapper` for other unchecked casts or unvalidated arithmetic on
   attacker/corruption-controlled input (frame rects producing negative or huge tile ids from
