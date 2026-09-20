@@ -777,10 +777,13 @@ public partial class MainWindow : Window
 
     private void ActivateUntitledTabContent(TabEntry tab)
     {
+        // ResetToBlankDocument (#1147) clears any native-tsx/texture-size/ReferencedPngs state
+        // the previously-active tab left behind -- an untitled tab is never a tsx project, so
+        // switching to one must not keep reporting IsNativeTsxProject true.
+        _projectManager.ResetToBlankDocument();
         // See the comment in ActivateTabAsync (#1026) -- a pending cut survives this switch too.
-        _projectManager.AnimationChainListSave =
-            tab.CachedEditorModel ?? new AnimationChainListSave();
-        _projectManager.FileName = null;
+        if (tab.CachedEditorModel is not null)
+            _projectManager.AnimationChainListSave = tab.CachedEditorModel;
         _appCommands.RestoreTabSelection(tab);
         _undoManager.Clear();
         if (tab.UndoSnapshot != null)
@@ -906,10 +909,10 @@ public partial class MainWindow : Window
         }
         else
         {
-            // All tabs closed — start fresh
+            // All tabs closed — start fresh. ResetToBlankDocument (#1147) also clears any
+            // native-tsx/texture-size/ReferencedPngs state the just-closed tab left behind.
             ShowAchxPane();
-            _projectManager.AnimationChainListSave = new AnimationChainListSave();
-            _projectManager.FileName = null;
+            _projectManager.ResetToBlankDocument();
             _selectedState.Reset();
             _undoManager.Clear();
             ProjectPanel.SyncSelectionToActiveFile(null);
@@ -1005,8 +1008,7 @@ public partial class MainWindow : Window
         }
         else if (recovered is null)
         {
-            _projectManager.AnimationChainListSave =
-                new AnimationChainListSave();
+            _projectManager.AnimationChainListSave = new AnimationChainListSave();
         }
 
         if (recovered is not null)
@@ -2516,8 +2518,10 @@ public partial class MainWindow : Window
     /// </summary>
     private void OpenAsNewUnsavedDocument(AnimationChainListSave content, AnimationChainSave? selectedChain = null)
     {
+        // ResetToBlankDocument (#1147) clears any native-tsx/texture-size/ReferencedPngs state
+        // the previously-active tab left behind before content replaces the fresh blank ACLS.
+        _projectManager.ResetToBlankDocument();
         _projectManager.AnimationChainListSave = content;
-        _projectManager.FileName = null;
         _selectedState.Reset();
         if (selectedChain is not null)
             _selectedState.SelectedChain = selectedChain;

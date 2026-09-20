@@ -1809,13 +1809,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void NewFile()
         {
-            _pm.AnimationChainListSave = new AnimationChainListSave();
-            _pm.FileName = string.Empty;
-            _pm.OnDiskCoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel;
-            // A brand-new document is never a native tsx project, even if the previously-active
-            // tab was one -- RestoreTsxState(null) is the same reset LoadAnimationChain/
-            // TabEditorCache already use to clear _tsxTileset and its tracking dictionaries.
-            _pm.RestoreTsxState(null);
+            // ResetToBlankDocument covers AnimationChainListSave/FileName/OnDiskCoordinateType
+            // plus every native-tsx/texture-size/ReferencedPngs tracking field a reused
+            // ProjectManager instance could otherwise leak from the previously-active tab (#1147).
+            _pm.ResetToBlankDocument();
             _selectedState.SelectedChain = null;
             _selectedState.SelectedFrame = null;
             _undoManager.Clear();
@@ -1826,13 +1823,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.CloseProject"/>
         public void CloseProject()
         {
-            _pm.AnimationChainListSave = new AnimationChainListSave();
-            _pm.FileName = null;
+            // See the matching comment in NewFile -- ResetToBlankDocument covers everything a
+            // closed project needs cleared except ProjectFolderPath, which is session-wide (see
+            // its own doc comment) and reset separately here.
+            _pm.ResetToBlankDocument();
             _pm.ProjectFolderPath = null;
-            _pm.OnDiskCoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel;
-            // See the matching comment in NewFile -- a closed project is never a native tsx
-            // project either.
-            _pm.RestoreTsxState(null);
             _selectedState.Reset();
             _undoManager.Clear();
             // No content survives a close, so remove any crash-recovery file rather than

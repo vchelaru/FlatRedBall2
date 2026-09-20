@@ -110,4 +110,55 @@ public class CloseLastTabTests
             Directory.Delete(dir, true);
         }
     }
+
+    // Issue #1147: CloseTabCore's "all tabs closed -- start fresh" branch used to assign
+    // AnimationChainListSave/FileName directly, bypassing the RestoreTsxState(null) reset
+    // NewFile/CloseProject already had -- closing the last tab of a native tsx project left
+    // IsNativeTsxProject stuck true for the brand-new blank document that replaced it.
+    [AvaloniaFact]
+    public async System.Threading.Tasks.Task ClosingLastTsxTab_ClearsNativeTsxState()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        ctx.AppCommands.ConfirmAsync = (_, _) => System.Threading.Tasks.Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var tsxPath = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(tsxPath,
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+                 <image source="Heroes.png" width="64" height="64"/>
+                 <tile id="0">
+                  <animation>
+                   <frame tileid="0" duration="200"/>
+                   <frame tileid="1" duration="200"/>
+                  </animation>
+                 </tile>
+                </tileset>
+                """);
+            await window.OpenFileAsTab(tsxPath);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(ctx.ProjectManager.IsNativeTsxProject);
+
+            var tabManager = GetTabManager(window);
+            var tsxTab = tabManager.Tabs.First(t => t.Path == new FilePath(tsxPath));
+
+            await CloseTabAsync(window, tsxTab);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Empty(tabManager.Tabs);
+            Assert.False(ctx.ProjectManager.IsNativeTsxProject);
+            Assert.Null(ctx.ProjectManager.TsxTileSize);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
 }

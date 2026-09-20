@@ -793,6 +793,17 @@ namespace AnimationEditor.Core
         public void RestoreTextureSizeState(object? state) =>
             _knownTextureSizes = state as IReadOnlyDictionary<string, (int Width, int Height)>;
 
+        /// <inheritdoc/>
+        public void ResetToBlankDocument()
+        {
+            AnimationChainListSave = new AnimationChainListSave();
+            FileName = null;
+            OnDiskCoordinateType = TextureCoordinateType.Pixel;
+            RestoreTsxState(null);
+            RestoreTextureSizeState(null);
+            ReferencedPngs = new FilePath[0];
+        }
+
         /// <summary>
         /// Names of chains that have a <see cref="Tiled.TsxAnimationValidator"/> issue -- a
         /// multi-tile group whose satellite tile has drifted out of lockstep with its anchor, or a

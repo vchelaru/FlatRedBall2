@@ -136,6 +136,50 @@ public class NewAndLoadResetTests
         finally { window.Close(); }
     }
 
+    // Issue #1147: OpenAsNewUnsavedDocument (which OnNewClick calls) used to assign
+    // AnimationChainListSave/FileName directly, bypassing the RestoreTsxState(null) reset
+    // NewFile/CloseProject already had -- File > New from an active native tsx tab left
+    // IsNativeTsxProject stuck true for the brand-new blank document.
+    [AvaloniaFact]
+    public async Task New_AfterOpeningTsxTab_ClearsNativeTsxState()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tsxPath = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(tsxPath,
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+                 <image source="Heroes.png" width="64" height="64"/>
+                 <tile id="0">
+                  <animation>
+                   <frame tileid="0" duration="200"/>
+                   <frame tileid="1" duration="200"/>
+                  </animation>
+                 </tile>
+                </tileset>
+                """);
+            await window.OpenFileAsTab(tsxPath);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(ctx.ProjectManager.IsNativeTsxProject);
+
+            window.FindControl<MenuItem>("MenuNew")!
+                  .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(ctx.ProjectManager.IsNativeTsxProject);
+            Assert.Null(ctx.ProjectManager.TsxTileSize);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
     // ── File → Load ───────────────────────────────────────────────────────────
 
     /// <summary>

@@ -631,8 +631,11 @@ public partial class App : Application
             }
             else
             {
-                projectManager.AnimationChainListSave = new AnimationChainListSave();
-                projectManager.FileName = null;
+                // ResetToBlankDocument (#1147) also clears native-tsx/texture-size/
+                // ReferencedPngs state -- not reachable via this build today (nothing here calls
+                // LoadTsxProject), but kept consistent with every other "start fresh" site so a
+                // future tsx-on-browser extension doesn't reintroduce the leak.
+                projectManager.ResetToBlankDocument();
                 selectedState.Reset();
                 undoManager.Clear();
             }

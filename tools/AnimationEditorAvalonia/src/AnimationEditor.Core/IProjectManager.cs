@@ -86,6 +86,18 @@ namespace AnimationEditor.Core
         void RestoreTextureSizeState(object? state);
 
         /// <summary>
+        /// Resets this instance to a brand-new, unsaved, non-tsx document: a fresh empty <see
+        /// cref="AnimationChainListSave"/>, <see cref="FileName"/> cleared to <see
+        /// langword="null"/>, <see cref="OnDiskCoordinateType"/> back to its Pixel default, and
+        /// every native-tsx/texture-size/<see cref="ReferencedPngs"/> tracking field cleared (the
+        /// same reset <see cref="RestoreTsxState"/>/<see cref="RestoreTextureSizeState"/> apply
+        /// individually) -- one call instead of repeating that field list at every "start a fresh
+        /// document" call site (issue #1147). Leaves <see cref="ProjectFolderPath"/>, tab/undo/
+        /// selection state untouched; callers own those.
+        /// </summary>
+        void ResetToBlankDocument();
+
+        /// <summary>
         /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
         /// with no filesystem path to write (the browser-wasm build). Uses the
         /// <c>knownTextureSizes</c> from the most recent <see cref="LoadAnimationChain"/> call

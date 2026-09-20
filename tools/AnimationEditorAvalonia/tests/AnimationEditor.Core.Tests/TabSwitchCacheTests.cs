@@ -164,6 +164,7 @@ public class TabSwitchCacheTests : IDisposable
         public void RestoreTsxState(object? state) => _inner.RestoreTsxState(state);
         public object? CaptureTextureSizeState() => _inner.CaptureTextureSizeState();
         public void RestoreTextureSizeState(object? state) => _inner.RestoreTextureSizeState(state);
+        public void ResetToBlankDocument() => _inner.ResetToBlankDocument();
 
         public void LoadAnimationChain(
             FilePath fileName,

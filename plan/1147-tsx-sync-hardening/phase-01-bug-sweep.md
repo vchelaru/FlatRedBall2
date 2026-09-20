@@ -335,36 +335,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- **UI layer (`AnimationEditor.App`/`.Views`/`.Browser`, out of this sweep's declared file scope)
-  has multiple direct `AnimationChainListSave =`/`FileName =` assignment sites that bypass
-  `AppCommands.NewFile`/`CloseProject` (both already call `RestoreTsxState(null)`, fixed in fresh-
-  eyes pass #7) -- the identical bug class, just reached through a different code path. Found
-  during fresh-eyes pass #8's audit of every `ProjectManager.AnimationChainListSave =`/`.FileName
-  =` call site repo-wide (task item 5). Confirmed sites, none of which call `RestoreTsxState(null)`
-  first:
-  - `MainWindow.axaml.cs`'s `ActivateUntitledTabContent` (~line 781, switching to an Untitled tab)
-    and its "all tabs closed -- start fresh" branch (~line 911).
-  - `MainWindow.axaml.cs`'s `OpenAsNewUnsavedDocument` (~line 2519, shared by File > New and the
-    crash-recovery-restore path) and `HandleStartupAsync`'s empty-state branches (~lines 984, 1008
-    -- these run before any project can ever have been loaded, so likely unreachable in practice,
-    unlike the other sites here).
-  - `AnimationEditor.Views\Controls\AnimationTreeControl.axaml.cs`'s `AddAnimationChainAndBeginInlineRename`
-    (~line 679) and its `AnimationEditor.App` sibling (~line 3372 in `MainWindow.axaml.cs`) -- both
-    only fire when `AnimationChainListSave` is already `null`, so can't affect an active tsx project
-    (which always has a non-null `AnimationChainListSave`); lower risk than the others above.
-  - `AnimationEditor.Browser\App.axaml.cs`'s `CloseTab` (~line 634, "last tab closed" branch) --
-    confirmed the browser build never calls `LoadTsxProject` anywhere (grepped the whole project,
-    zero matches), so `IsNativeTsxProject` can never be true there today; not currently reachable,
-    but the same latent gap if tsx support is ever extended to the browser build.
-  Not fixed here: these files are outside "Files in scope" above (`AnimationEditor.App`/`.Views`/
-  `.Browser`, not `.Core`), and fixing them well likely means giving `TabController`/`MainWindow`
-  a single shared "reset to a fresh document" helper that always calls `RestoreTsxState(null)`,
-  rather than patching each site individually -- a small design decision worth its own dedicated
-  pass rather than folding into this one. `ProjectManager.ThrowIfNativeTsxProject` (added this pass,
-  see DONE below) does not cover this class of bug: assigning `AnimationChainListSave` directly is
-  a plain property setter with no guard surface, unlike the `SaveAnimationChainList` methods it
-  does protect.
-
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1240,3 +1210,92 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     #7's own prediction exactly -- not somewhere in `.Core` that a ninth pass of the same files is
     likely to find. A ninth `ProjectManager.cs`- or `AppCommands.cs`-focused pass is not recommended;
     the UI-layer TODO item is the highest-value next target if this sweep continues.
+
+- [x] **UI layer (`AnimationEditor.App`/`.Views`/`.Browser`) had multiple direct
+  `AnimationChainListSave =`/`FileName =` assignment sites that bypassed
+  `AppCommands.NewFile`/`CloseProject` (both already call `RestoreTsxState(null)`, fixed in pass
+  #7) -- the identical bug class, reached through a different code path (pass #8's TODO above).
+  **Design chosen:** a single `IProjectManager.ResetToBlankDocument()` method (implemented on
+  `ProjectManager`), rather than repeating the field list at every call site. It resets everything
+  a reused `ProjectManager` instance can leak between documents/tabs: `AnimationChainListSave`
+  (fresh empty), `FileName` (`null`), `OnDiskCoordinateType` (back to `Pixel`), and every native-
+  tsx/texture-size/`ReferencedPngs` tracking field via the existing `RestoreTsxState(null)`/
+  `RestoreTextureSizeState(null)` (`ReferencedPngs` had no existing round-trip helper, so
+  `ResetToBlankDocument` clears it directly). It deliberately leaves `ProjectFolderPath` alone --
+  that field is session-wide by its own doc comment, not per-document state -- and leaves tab/
+  undo/selection state to the caller, since those differ per site (some preserve a caller-supplied
+  selection, some reset unconditionally).
+  - **`NewFile`/`CloseProject` refactored onto the same helper**, closing the audit gap the task
+    asked for: neither previously reset `ReferencedPngs` or the texture-size-state field, both
+    latent leaks of the same class already fixed for `LoadAnimationChain` (see pass #5's DONE
+    entry). `NewFile` also silently changed `FileName` from `string.Empty` to `null` as a side
+    effect of sharing the helper -- confirmed safe: every consumer in this codebase reads
+    `FileName` via `string.IsNullOrEmpty`, never an exact-`null`/exact-`""` comparison (grepped),
+    and `AppCommandsNewFileTests.NewFile_ClearsFileName` already asserts via `IsNullOrEmpty`.
+  - **Sites fixed** (all via `_projectManager.ResetToBlankDocument()`/`projectManager.
+    ResetToBlankDocument()`):
+    - `MainWindow.axaml.cs`'s `ActivateUntitledTabContent` -- switching to an already-open
+      Untitled tab while a native tsx tab was active left `IsNativeTsxProject` stuck true, since
+      this path bypasses `TryActivateTabFromCache`/`RestoreTsxState` entirely. Confirmed reachable
+      and real (not merely theoretical): a red-first UI test reproduced it end-to-end.
+    - `MainWindow.axaml.cs`'s `CloseTabCore`'s "all tabs closed -- start fresh" branch -- same
+      leak, reached by closing the last tab of a native tsx project.
+    - `MainWindow.axaml.cs`'s `OpenAsNewUnsavedDocument` (shared by File > New and the crash-
+      recovery-restore path) -- same leak, reached by File > New from an active tsx tab.
+    - `AnimationEditor.Browser\App.axaml.cs`'s `CloseTab`'s "last tab closed" branch -- not
+      reachable today (confirmed: the browser build never calls `LoadTsxProject` anywhere, grepped
+      zero matches), fixed anyway for consistency with every other "start fresh" site so a future
+      tsx-on-browser extension doesn't reintroduce the leak. Cheapest possible fix (a drop-in
+      method-call swap), no meaningful cost to matching the pattern.
+  - **Sites deliberately left unfixed:**
+    - `HandleStartupAsync`'s two empty-state branches (the memory-probe branch and the
+      no-recovery/no-CLI-arg/no-saved-tabs branch) -- **initially routed through
+      `ResetToBlankDocument()` for "defense-in-depth consistency" per the task's suggestion, then
+      reverted after this caused 5 real `AnimationEditor.App.Tests` failures**
+      (`PngDropApplyTests`, `FramePixelCoordsMultiSelectTests` x2, `FrameTextureNameMultiSelectTests`).
+      Root cause: several existing tests construct a `MainWindow` and pre-seed
+      `ctx.ProjectManager.FileName`/`AnimationChainListSave` *before* `window.Show()` fires
+      `OnOpened` -> `HandleStartupAsync` (fire-and-forget, but runs synchronously to completion in
+      this branch since no `await` is reached first); the original code's fallback branch only
+      ever reset `AnimationChainListSave`, deliberately leaving `FileName` alone, and those tests
+      depend on that narrower behavior surviving startup. This is exactly the "verified vs.
+      inferred" trap: the original per-site reachability read (a freshly-constructed
+      `ProjectManager` has no prior tsx/`FileName` state, so the extra resets are a no-op in
+      *production*) was correct but incomplete -- it didn't check *test* reachability, where
+      state is deliberately pre-seeded ahead of the exact code path being widened. Reverted both
+      branches to their original narrow form (`_projectManager.AnimationChainListSave = new
+      AnimationChainListSave();`, `FileName`/tsx/texture-size/`ReferencedPngs` untouched). Full
+      `AnimationEditor.App.Tests` suite confirmed green (985/985) after reverting. This vindicates
+      the prior pass's original "likely unreachable, leave as-is" assessment -- confirmed correct,
+      and it should not have been revisited without new evidence.
+    - `AnimationTreeControl.axaml.cs`'s `AddAnimationChainAndBeginInlineRename` and its
+      `MainWindow.axaml.cs` sibling -- confirmed low-risk, not fixed: both only assign
+      `AnimationChainListSave = new AnimationChainListSave()` when it is already `null`, and
+      `AnimationChainListSave`/`_tsxTileset` are always set together by every code path that sets
+      either (`LoadTsxProject`, `RestoreTsxState`, `TabEditorCache.ApplyToProject`,
+      `ResetToBlankDocument` itself) -- so `AnimationChainListSave is null` implies
+      `IsNativeTsxProject` is already false, making this guard structurally unreachable while a
+      tsx project is active. Also semantically different from a "start a fresh document" site
+      (mid-session null-guard, not a document-identity reset), so it doesn't belong in
+      `ResetToBlankDocument`'s call list even if it were reachable.
+  - **Testable core, `ProjectManager.ResetToBlankDocument()`** (TDD: confirmed red against a
+    temporary no-op stub, then green against the real implementation):
+    `ProjectManagerResetToBlankDocumentTests.ResetToBlankDocument_AfterLoadTsxProject_ClearsNativeTsxState`,
+    `ResetToBlankDocument_AfterLoadAchxWithProjectFileAndKnownTextureSizes_ClearsReferencedPngsAndTextureSizeState`.
+  - **UI-layer verification: exercised through real `MainWindow`/window-level tests, not just
+    eyeballed.** Each fixed site got a dedicated headless Avalonia test (`AnimationEditor.App.
+    Tests`, using the `AvaloniaFact`/`ctx.CreateMainWindow()`/reflection-invoked-private-method
+    pattern already established by `CloseLastTabTests`/`TabSwitchUndoTests`/`LoadTsxProjectTests`
+    in that project), each confirmed red-first by temporarily reverting the corresponding
+    production fix and observing the assertion fail for the intended reason, then re-confirmed
+    green: `CloseLastTabTests.ClosingLastTsxTab_ClearsNativeTsxState`,
+    `NewAndLoadResetTests.New_AfterOpeningTsxTab_ClearsNativeTsxState`,
+    `ActivateUntitledTabTsxStateTests.ActivateTabAsync_SwitchBackToUntitledTabAfterViewingTsxTab_ClearsNativeTsxState`.
+    The Browser `CloseTab` fix has no equivalent test (no `AnimationEditor.Browser` test project
+    exists in this repo, confirmed by search) -- left as a thin, visually-reviewed wiring
+    call-site swap, consistent with this being a not-currently-reachable defense-in-depth fix
+    rather than a live bug.
+  - **Full suite confirmation:** `AnimationEditor.Core.Tests` 2176/2176 (was 2174, +2 new),
+    `AnimationEditor.Views.Tests` 144/144 (unchanged), `AnimationEditor.App.Tests` 988/988 (was
+    985, +3 new), `AnimationEditor.Browser` builds clean (0 warnings/0 errors; no test project to
+    run).

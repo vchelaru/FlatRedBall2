@@ -40,6 +40,7 @@ public class AdjustFrameTimeLiveEditTests
         public void RestoreTsxState(object? state) { }
         public object? CaptureTextureSizeState() => null;
         public void RestoreTextureSizeState(object? state) { }
+        public void ResetToBlankDocument() { }
 
         public void LoadAnimationChain(
             FilePath fileName,
