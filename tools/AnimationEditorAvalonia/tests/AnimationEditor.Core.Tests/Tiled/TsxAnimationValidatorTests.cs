@@ -37,6 +37,31 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_SatelliteDurationOutOfLockstep_ReturnsIssue()
+    {
+        var tileset = TilesetWithColumns(4);
+        var anchor = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        anchor.Animation.Add(new Frame { TileID = 12, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        // Tile ids stay in lockstep, but frame 1's duration was hand-edited to 999 -- this
+        // duration is silently discarded and overwritten to the anchor's on the next save
+        // (NativeTsxAnimationSync never reads a satellite's own Duration), so it must be flagged.
+        var satellite = new Tile { ID = 9, Width = 0, Height = 0 };
+        satellite.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        satellite.Animation.Add(new Frame { TileID = 13, Duration = 999 });
+        satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satellite);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)9, issue.TileId);
+        Assert.Contains("lockstep", issue.Message);
+    }
+
+    [Fact]
     public void Validate_SatelliteFrameOutOfLockstep_ReturnsIssue()
     {
         var tileset = TilesetWithColumns(4);

@@ -65,6 +65,13 @@ public static class TsxAnimationValidator
                     issues.Add(new TsxGroupIssue(anchorId, tile.ID,
                         $"tile {tile.ID}: frame {i} is tile {tile.Animation[i].TileID}, expected {expectedTileId} to stay in lockstep with anchor tile {anchorId}."));
                 }
+
+                var expectedDuration = anchor.Animation[i].Duration;
+                if (tile.Animation[i].Duration != expectedDuration)
+                {
+                    issues.Add(new TsxGroupIssue(anchorId, tile.ID,
+                        $"tile {tile.ID}: frame {i} has duration {tile.Animation[i].Duration}, expected {expectedDuration} to stay in lockstep with anchor tile {anchorId}."));
+                }
             }
         }
 

@@ -248,6 +248,23 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   so there's no satellite-offset computation for this class of drift to affect. Test:
   `NativeTsxProjectRoundTripTests.LoadSaveWithNoEdits_OwnerNotFirstFrameAnchorWithMultiTileSatellite_SatelliteStaysOnItsOriginalTile`.
 
+- [x] **`TsxAnimationValidator`'s per-frame lockstep check only compared `TileID`, never
+  `Duration`.** Real gap, confirmed red first --
+  `Validate_SatelliteDurationOutOfLockstep_ReturnsIssue` failed against the old code
+  (`Assert.Single()` on an empty issue list) for a satellite with the correct tile-id sequence but
+  a hand-edited duration on one frame. Decision: **add the `Duration` comparison**, matching the
+  recommendation -- it's a small, consistent extension of a check that already exists for exactly
+  this purpose (warning the user their hand-edit will be silently discarded), doesn't touch the
+  "ignore, don't corrupt" load/save design at all, and closes a real coverage gap with the same
+  shape as the tile-id-mismatch check right next to it. No plausible false-positive scenario found:
+  every legitimate satellite is expected to match its anchor's duration per frame exactly, same as
+  it must match tile id. Fixed in `TsxAnimationValidator.Validate`'s per-frame loop, which now also
+  compares `tile.Animation[i].Duration` against `anchor.Animation[i].Duration` and reports
+  `"tile {id}: frame {i} has duration {actual}, expected {expected} to stay in lockstep with anchor
+  tile {anchorId}."` (same message shape as the existing tile-id check). No existing test
+  regressed -- the "satellites match" tests already used identical durations across anchor and
+  satellite by construction. Test:
+  `TsxAnimationValidatorTests.Validate_SatelliteDurationOutOfLockstep_ReturnsIssue`.
 - [x] **Rename a chain that has multi-tile satellites.** Already correct -- a satellite's tile id
   and `ParentId` are derived purely from frame geometry (never from the chain's `Name`), and a
   rename touches no frame geometry, so both the anchor's tile id and the satellite's `ParentId`
@@ -260,14 +277,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`TsxAnimationValidator`'s per-frame lockstep check only compares `TileID`, never
-  `Duration`.** A satellite hand-edited with the correct tile-id sequence but a different duration
-  per frame passes validation silently (no warning at all), even though `NativeTsxAnimationSync`
-  will still silently discard that duration on load and overwrite it to the anchor's own duration
-  on save -- unlike the tile-id-mismatch case, this specific edit gets no warning today. Not
-  necessarily a bug (the "ignore, don't corrupt" design still holds), but it's a real gap in the
-  warning coverage versus what's silently discarded; decide whether the lockstep check should also
-  compare `Duration` per frame.
 - [ ] **`GetChainNamesWithTsxIssues` and `SaveTsxProject` must agree on entry tile ids** — now that
   both pass `_tsxEntryTileIdsByChain`, confirm with a `ProjectManager`-level test (not just the
   mapper) that the validator-driven UI warning list never disagrees with what an actual save would
