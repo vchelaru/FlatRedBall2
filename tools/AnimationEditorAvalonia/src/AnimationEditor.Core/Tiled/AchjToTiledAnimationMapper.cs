@@ -242,8 +242,8 @@ public static class AchjToTiledAnimationMapper
     }
 
     /// <summary>Converts a frame's display length to milliseconds -- "Second" and "Undefined" both
-    /// mean seconds (matching how the runtime treats "Undefined"), "Millisecond" passes through.</summary>
-    /// <summary>Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse it.</summary>
+    /// mean seconds (matching how the runtime treats "Undefined"), "Millisecond" passes through.
+    /// Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse it.</summary>
     internal static int FrameDurationMs(float frameLength, TimeMeasurementUnit timeUnit) =>
         timeUnit == TimeMeasurementUnit.Millisecond
             ? (int)Math.Round(frameLength)
