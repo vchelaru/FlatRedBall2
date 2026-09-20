@@ -2260,7 +2260,16 @@ namespace AnimationEditor.Core.CommandsAndState
 
             try
             {
-                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(path));
+                // SyncHotReloadWatcher watches whatever IProjectManager.FileName currently is,
+                // tsx or achx/achj alike, with no extension check -- so this must route a tsx
+                // path to LoadTsxProject. LoadAnimationChain's hand-rolled XML parser doesn't
+                // validate the root element name, so it would silently "succeed" against a
+                // tsx's <tileset> root with zero chains instead of throwing.
+                var filePath = new AnimationEditor.Core.Paths.FilePath(path);
+                if (filePath.Extension == "tsx")
+                    _pm.LoadTsxProject(filePath);
+                else
+                    _pm.LoadAnimationChain(filePath);
             }
             catch (Exception ex)
             {
