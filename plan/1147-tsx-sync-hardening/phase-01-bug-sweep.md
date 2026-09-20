@@ -354,10 +354,15 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **Fresh-eyes pass #3 needed**: pass #2 found one new confirmed bug (fixed, see DONE) and one
-  new plausible gap (the `SaveTsxProject` mutate-before-write item, since resolved -- see DONE), so
-  per the phase doc's stop condition ("finds nothing new to add, twice in a row") this phase is not
-  yet exhausted. A pass #3 should do another full fresh-eyes read of every file in scope.
+- [ ] **Fresh-eyes pass #4 needed**: pass #3 found two new real, confirmed bugs (fixed, see DONE),
+  so per the phase doc's stop condition ("finds nothing new to add, twice in a row") this phase is
+  not yet exhausted -- this was not a clean pass. A pass #4 should do another full fresh-eyes read
+  of every file in scope, focusing on areas pass #3 did not have time to chase deeply: a
+  line-by-line audit of `TiledTilesetSyncRunner`/`AppCommands.cs`'s remaining ~1800 lines outside
+  the tsx-specific call sites (skimmed for `_tsxTileset`/`Tsx`/`ProjectManager` references only,
+  not read end-to-end), and whether `GetChainNamesWithTsxIssues`'s new either-id matching
+  (`AnchorTileId` OR `TileId`) has any false-positive edge case beyond the "also flags the
+  innocent referenced anchor" one already called out and accepted.
 
 ## DONE (continued)
 
@@ -632,3 +637,106 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     (targets a save path inside a nonexistent directory so `TsxWriter.Write`'s `File.Create` throws
     before any bytes reach disk, asserts the validator issue is still reported and the on-disk
     satellite frames are still the original hand-edited ones).
+
+- [x] **Fresh-eyes pass #3.** Investigated the 5 areas the task specifically called out, plus a
+  general fresh read of `TiledTilesetSyncRunner.cs`, `TilesetAnimationSync.cs`, and
+  `AchjToTiledAnimationMapper.cs`. Found and fixed two new real, confirmed bugs, both in territory
+  the first two passes never covered (multi-satellite group *shape*, as opposed to any single
+  satellite's own `ParentId` validity), plus one doc defect, and traced the 5 suggested areas to
+  "safe" with no source change:
+  - **Real bug, confirmed red first -- an anchor's satellites are folded into one wide chain based
+    only on their bounding box, never checking that every cell inside that box is actually
+    populated.** Two satellites individually pass every existing check (forward offset, resolves to
+    a true anchor, own frames in lockstep) yet together imply a rectangle larger than what's
+    actually declared -- e.g. a satellite at (1,0) and another at (0,1) with nothing at (1,1).
+    `TiledAnimationToAchjMapper.Map` took the bounding box at face value, producing a chain whose
+    frame rect silently spanned a fourth tile that was never marked as part of any group -- which
+    `NativeTsxAnimationSync.Apply`/`MultiTileToTiledAnimationMapper` (which always fill every cell of
+    a computed footprint) would then silently claim on the very next save, corrupting a tile that
+    had nothing to do with the chain. Same failure shape as every other broken-`ParentId` fix on this
+    branch, just evaluated at the group level instead of per-tile. Fixed by adding a completeness
+    pass: for each tentative anchor, check whether its satellites' offsets fill every cell of the
+    rectangle their own bounding box implies; if not, every satellite in that group is reclassified
+    as its own independent anchor (same "surface as its own chain instead of silently
+    misinterpreted" precedent as orphaned/chained/backward `ParentId`). Added the matching
+    `TsxAnimationValidator` check (same shape as the existing backward/chained checks) since none of
+    the existing per-satellite validator checks catch this either -- confirmed both new tests have
+    teeth (mapper test failed 1-chain-instead-of-3 before the fix; validator test failed
+    0-issues-instead-of-2 with the check temporarily disabled, then reverted). Tests:
+    `TiledAnimationToAchjMapperTests.Map_SatellitesFormNonRectangularFootprint_EachTileSurfacesAsItsOwnChainInsteadOfWrongFootprint`,
+    `TsxAnimationValidatorTests.Validate_SatellitesFormNonRectangularFootprint_ReturnsIssuePerSatellite`.
+  - **Real bug, confirmed with two probe tests first -- `GetChainNamesWithTsxIssues`'s chain-name
+    correlation matched only a `TsxGroupIssue`'s `AnchorTileId`, which is correct for a
+    lockstep-mismatch issue but wrong for a broken-`ParentId` issue (dangling/chained/backward/
+    incomplete-footprint).** Those issues report `AnchorTileId` as "the tile `ParentId` names," not
+    "the chain this issue is about" -- the actually-broken tile (`TileId`) is the one
+    `TiledAnimationToAchjMapper.Map` makes its own independent chain in these cases, never a
+    satellite of `AnchorTileId`'s chain. Two distinct failure modes confirmed: a **chained** `ParentId`
+    (tile 2 -> tile 1 -> tile 0, where tile 1 is a legitimate satellite with no chain of its own) was
+    silently dropped entirely -- `AnchorTileId=1` never matches any chain's entry tile id, so
+    `GetChainNamesWithTsxIssues()` returned empty despite the validator reporting a real issue. A
+    **backward** `ParentId` (tile 8 -> tile 9, where tile 9 is itself a real, perfectly consistent
+    anchor with its own chain) flagged the *wrong* chain -- `AnchorTileId=9` coincidentally matches
+    "ID:9"'s entry tile id, so the innocent chain got flagged while "ID:8" (the actually-broken one)
+    never did. Fixed by matching a chain if its entry tile id equals *either* `AnchorTileId` or
+    `TileId` -- catches the actually-broken chain in both cases, at the acceptable cost of also
+    (correctly) flagging the referenced anchor's chain when it has one, since one of its would-be
+    satellites failing to attach is worth surfacing there too. Tests:
+    `ProjectManagerTsxValidationIssuesTests.GetChainNamesWithTsxIssues_BackwardParentId_IncludesTheActuallyBrokenChain`,
+    `GetChainNamesWithTsxIssues_ChainedParentId_DoesNotSilentlyDropTheBrokenChain`.
+  - **Doc defect, fixed on sight (not a behavior bug):** `AchjToTiledAnimationMapper.FrameDurationMs`
+    had two consecutive `<summary>` XML doc tags (a leftover from an earlier edit); merged into one.
+  - **Investigation area 1 (`TsxCompatibilityChecker`) -- safe, no gap.** Traced concretely:
+    `CheckOpenCompatibility` calls `TsxWriter.Write(tileset, Stream.Null)` (the `Stream` overload),
+    which never goes through `TryWritePatchedCore` (only the path-based `Write(tileset, string)`
+    overload does) and never throws `InvalidOperationException` for any of this sweep's new guards
+    (`Columns <= 0`, duplicate tile id) -- those guards live in `TiledAnimationToAchjMapper.Map`/
+    `TsxAnimationValidator`/the sync classes, never in `TsxWriter`. So the compatibility checker
+    can't throw an uncaught exception, but it also can't *detect* those corruption conditions --
+    confirmed this is already documented and tested as intentional, not a gap:
+    `LoadTsxProject`'s own doc comment and
+    `ProjectManagerTsxProjectTests.LoadTsxProject_MapThrows_ThrowsAndLeavesProjectUnchanged` already
+    establish that `Map` (called right after the compatibility check passes) is the layer that
+    rejects these cases with a clear `InvalidOperationException`, and the load stays all-or-nothing
+    either way.
+  - **Investigation area 2 (`AppCommands.cs`) -- safe, no gap.** Read the full ~2300-line file.
+    `_tsxTileset` is a private `ProjectManager` field with no public getter (grepped the whole tool
+    for `TsxTileset`/`_tsxTileset` -- zero references outside `ProjectManager.cs` itself), so no
+    external caller (including `AppCommands.cs`) can hold a stale reference to it across a
+    `CloneForSave`-driven save. `AppCommands.cs` only ever reads current state through `_pm`'s public
+    surface (`AnimationChainListSave`, `IsNativeTsxProject`, `FileName`) fresh each call, and every
+    tsx-touching path (`OpenTsxWorkflowAsync`, `SaveCurrentAnimationChainList`,
+    `SyncAssociatedTiledTilesets`) already has its own try/catch around the `ProjectManager` call.
+  - **Investigation area 3 (`GetChainNamesWithTsxIssues` idempotence) -- safe, no gap.** Traced
+    concretely: the method and everything it calls (`TsxAnimationValidator.Validate`,
+    `MultiTileToTiledAnimationMapper.Map`) are pure reads over `_tsxTileset`/`AnimationChainListSave`/
+    the tracking dictionaries -- nothing in the call chain mutates any of them, and
+    `MultiTileToTiledAnimationMapper.MapChain`'s `perOffset` dictionary is rebuilt fresh with the
+    same deterministic insertion order every call. Two calls with no intervening edit are
+    byte-for-byte identical by construction; no test added (this is a structural guarantee of the
+    code, not a subtle behavioral invariant worth pinning).
+  - **Investigation area 4 (`CloneForSave` vs. the entry/satellite tracking dictionaries) -- safe, no
+    gap.** Confirmed by reading `SaveTsxProject`'s exact order of operations:
+    `MultiTileToTiledAnimationMapper.Map` (which reads the tracking dictionaries) runs *before*
+    `CloneForSave` is even called, and the post-save commit-forward loop rebuilds the dictionaries
+    from `mapped`'s `SourceChain` references, never from the tileset/clone at all. The two data
+    structures never interact in either direction. No test added -- already exhaustively traced by
+    this exact reasoning.
+  - **Investigation area 5 (`CloneForSave` test coverage for a multi-tile/satellite scenario) --
+    traced thoroughly, no gap found, no test added.** Confirmed `IntProperty.Clone()` is correct by
+    reading DotTiled's actual v1.0.0 source (`new IntProperty { Name = Name, Value = Value }` -- a
+    genuinely independent instance, since both fields are value/immutable types) rather than
+    assuming. Separately confirmed a real, previously-unnoticed coverage gap: every multi-tile-group
+    test in `NativeTsxProjectRoundTripTests.cs` calls `NativeTsxAnimationSync.Apply`/`TsxWriter.Write`
+    directly, bypassing `ProjectManager`/`CloneForSave` entirely, so `CloneForSave` has in fact never
+    been exercised by a successful save with satellites (only by the one failed-save
+    `GetChainNamesWithTsxIssues_AfterSaveFails` test, which uses a satellite fixture but never
+    reaches a successful `Apply`+`Write`). Did not add a test for it: traced that property-level
+    cloning (vs. a hypothetical shallow/shared-reference clone) has **no observable difference in
+    behavior on a successful save** -- the only place it would matter is a failed save leaving
+    `_tsxTileset` mutated-but-unwritten, which is already covered (for the one field where in-place
+    mutation vs. reassignment actually differs -- `Tile.Animation`) by the existing
+    `GetChainNamesWithTsxIssues_AfterSaveFails_StillReflectsUnsavedOnDiskState` test. A test asserting
+    "a successful multi-tile save through `ProjectManager` works" would have no discriminating power
+    (it would pass identically whether or not properties are deep-cloned), so it would be padding,
+    not a pinning test.
