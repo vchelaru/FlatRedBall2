@@ -68,38 +68,54 @@
             </DockPanel>
         </Border>
 
+        <!-- #1130: floating top-right card instead of a bottom chrome-colored bar, so a
+             confirmation reads like a phone/desktop notification instead of blending into the
+             window rail. ZIndex above ErrorBanner (60) since this is the most frequent overlay
+             and must never end up hidden behind it; top-right (not ErrorBanner's top-center)
+             so the two never occupy the same screen region if both are visible at once.
+             InfoBannerBg + AccentCool left stripe reuses MainWindow's existing "tier-2
+             actionable info" styling (see DefaultHandlerBanner) instead of inventing a new
+             color language, while staying distinct from ErrorBanner's red and
+             ItemDeletedToastPanel's plain #333. -->
         <Border x:Name="ToastPanel" x:FieldModifier="Public"
                 IsVisible="False"
                 IsHitTestVisible="True"
-                VerticalAlignment="Bottom"
-                HorizontalAlignment="Stretch"
-                Margin="0,0,0,22"
-                Background="{DynamicResource BgRail}"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,16,16,0"
+                MaxWidth="420"
+                Background="{DynamicResource InfoBannerBg}"
                 BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="0,1,0,0"
-                Height="36"
-                ZIndex="10">
-            <DockPanel Margin="16,0">
-                <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
-                        DockPanel.Dock="Right"
-                        Content="✕"
-                        Width="28" Height="22"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        Foreground="{DynamicResource InkMid}"
-                        VerticalAlignment="Center" />
-                <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
-                        DockPanel.Dock="Right"
-                        Content="Retry"
-                        Height="22"
-                        Padding="8,0"
-                        Margin="0,0,4,0"
-                        VerticalAlignment="Center" />
-                <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
-                           VerticalAlignment="Center"
-                           FontSize="11"
-                           Foreground="{DynamicResource InkMid}"
-                           TextTrimming="CharacterEllipsis" />
+                BorderThickness="1"
+                CornerRadius="6"
+                BoxShadow="0 4 16 0 #4D000000"
+                ZIndex="70">
+            <DockPanel>
+                <Border DockPanel.Dock="Left"
+                        Width="3"
+                        Background="{DynamicResource AccentCool}" />
+                <DockPanel Margin="10,8">
+                    <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
+                            DockPanel.Dock="Right"
+                            Content="✕"
+                            Width="28" Height="22"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            Foreground="{DynamicResource InkMid}"
+                            VerticalAlignment="Top" />
+                    <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
+                            DockPanel.Dock="Right"
+                            Content="Retry"
+                            Height="22"
+                            Padding="8,0"
+                            Margin="0,0,4,0"
+                            VerticalAlignment="Top" />
+                    <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Ink}"
+                               TextWrapping="Wrap" />
+                </DockPanel>
             </DockPanel>
         </Border>
     </Panel>
