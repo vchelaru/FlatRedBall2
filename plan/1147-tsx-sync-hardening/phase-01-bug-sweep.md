@@ -1042,3 +1042,73 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     distinct from every prior pass's bug class (broken `ParentId` geometry, unchecked casts,
     reused-instance state leaks) -- worth another `AppCommands.cs`-focused look before assuming the
     command layer is now exhausted too.
+
+- [x] **Fresh-eyes pass #7 -- full line-by-line read of `AppCommands.cs` end to end (not just
+  re-tracing known tsx call sites, per the task's explicit instruction), plus a check of
+  `TabController.cs`.** Found and fixed two new real, confirmed bugs, both in the exact bug class
+  pass #6 introduced (a command silently missing a tsx-awareness branch that `OpenProjectWorkflowAsync`
+  /`ReloadAchxFromDisk`/`SaveCurrentAnimationChainListAsync` already have) but in call sites pass #6's
+  narrower re-trace never reached because they never call `LoadTsxProject`/`SaveTsxProject` directly --
+  they bypass `IProjectManager` entirely for the fields that matter:
+  - **Real bug, confirmed red first -- `NewFile` (File > New) never cleared `ProjectManager`'s
+    private native-tsx state (`_tsxTileset` and its two tracking dictionaries).** It sets
+    `AnimationChainListSave`/`FileName`/`OnDiskCoordinateType` directly instead of going through
+    `LoadAnimationChain` (which already resets tsx state as part of its own earlier fix), so
+    `IsNativeTsxProject` stayed `true` after File > New from an active tsx tab. Consequence traced
+    concretely, not assumed: a subsequent Save As would offer only the `tsx` file-type choice
+    (`SaveCurrentAnimationChainListAsync`'s branch on `IsNativeTsxProject`), and
+    `SaveCurrentAnimationChainList` would route the brand-new, empty document through
+    `SaveTsxProject` against the *stale* tileset instead of a plain achx/achj save -- the same
+    "silent misparse/mishandle, not a crash" severity as every other bug in this class. Fixed with
+    one line, `_pm.RestoreTsxState(null)`, reusing the exact reset seam `TabEditorCache`/
+    `LoadAnimationChain` already use. Test:
+    `AppCommandsNewFileTests.NewFile_AfterOpenTsxWorkflow_ClearsNativeTsxState`.
+  - **Real bug, confirmed red first -- `CloseProject` (File > Close Project) had the identical
+    gap**, for the identical reason (sets `AnimationChainListSave`/`FileName` directly, never calls
+    `LoadAnimationChain`). Fixed the same way. Test:
+    `AppCommandsCloseProjectTests.CloseProject_AfterOpenTsxWorkflow_ClearsNativeTsxState`.
+  - **Every other command/method in the ~2300-line file traced and confirmed safe** against the
+    question "does this correctly branch on `IsNativeTsxProject`/extension wherever it needs to, or
+    does it silently mishandle a tsx project?": the open/load family
+    (`OpenAchxWorkflowAsync`/`OpenTsxWorkflowAsync`/`OpenProjectWorkflowAsync`/`LoadAnimationChain`/
+    `LoadAnimationChainFromParsed`/`FinishLoadIntoEditor`) already branches correctly or delegates to
+    a `ProjectManager` method that already resets tsx state; the tab-cache family
+    (`CaptureTabEditorState`/`TryActivateTabFromCache`/`ActivateTabContentAsync`/
+    `RestoreTabSelection`/`RestoreSelection`) already round-trips tsx state via `TabEditorCache`
+    (fixed in an earlier pass); the save family (`SaveCurrentAnimationChainList`,
+    `SaveCurrentAnimationChainListAsync`, `SyncAssociatedTiledTilesets`,
+    `AddAssociatedTiledTileset(ViaDialogAsync)`) already branches correctly (pass #6) or was already
+    traced as a harmless no-op for a tsx project (pass #6); `ExportToPixiJsAsync` and
+    `AdjustUVAfterResize` operate on the already-mapped abstract `AnimationChainListSave` model and
+    have no tsx/achx-specific behavior to get wrong; every chain/frame/shape mutation command (add,
+    delete, move, duplicate, flip, paste, cut, reorder, set-props, lock) mutates the same abstract
+    model regardless of its tsx-or-achx origin and is picked up by the already-correct
+    `OnAnimationChainsChanged` -> `SaveCurrentAnimationChainList` autosave path; the hot-reload
+    family (`WireHotReloadWatcher`, `ReloadAchxFromDisk` -- fixed pass #6, `ReloadPngFromDisk`,
+    `SyncHotReloadWatcher`, `GetReferencedAbsolutePngPaths`) is either already fixed or has no
+    tsx-specific branch to add (PNG-list watching is format-agnostic by design). No "New Animation
+    Chain" command exists separate from the traced `AddAnimationChain`/`AddNewAnimationChain`
+    family, and none of them have a tsx-specific gap -- adding a chain to a tsx-derived ACLS is
+    ordinary ACLS mutation, already covered by the save-routing fixes. No recent-files/MRU logic
+    exists in this file at all (grepped for `Recent`/`MRU` -- zero matches); that lives elsewhere,
+    out of this file's scope.
+  - **`TabController.cs` -- safe, no gap.** `CaptureLeavingTab` delegates to
+    `IAppCommands.CaptureTabEditorState`, which is already fully tsx-aware (captures via
+    `TabEditorCache.CaptureFromProject`, fixed in an earlier pass); `EnsureCurrentDocumentHasTab`
+    only reads `IProjectManager.FileName`/`AnimationChainListSave` to decide tab bookkeeping and
+    never touches tsx-specific state. No "Close Tab"/"Close All Tabs" command exists in
+    `AnimationEditor.Core` at all -- `TabManager.Close` (a different file, not in this sweep's
+    scope) only removes the tab from its own list and reactivates whichever tab was previously
+    active; it never calls `CaptureTabEditorState` for the tab being discarded, which is correct
+    (there is nothing worth capturing for state about to be thrown away) rather than a gap.
+  - **Honest assessment: `AppCommands.cs` now reads exhausted for this specific bug class.** This
+    was a genuine full re-read (not a targeted re-trace), and it found real bugs in exactly the two
+    places that share the shape "sets `ProjectManager` fields directly instead of going through one
+    of the three already-audited choke points (`LoadAnimationChain`/`LoadTsxProject`/
+    `TabEditorCache`)" -- both now fixed, and every other call site either already routes through
+    one of those choke points or operates on the tsx-agnostic abstract model where no branch is
+    needed. Unlike pass #6 (which found gaps precisely because it hadn't yet done a full read),
+    this pass *was* the full read, and it surfaced exactly two hits before running out -- a real
+    signal the file's coverage for "missing tsx branch" is now complete, not just quiet. The
+    remaining risk in this bug class, if any, is more likely in the Avalonia `.App`/`.Views` UI
+    layer (out of this sweep's declared scope) than in `AppCommands.cs` itself.
