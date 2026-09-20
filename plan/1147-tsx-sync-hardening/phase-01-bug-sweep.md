@@ -105,15 +105,24 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   the same way anchor-vs-anchor already did, and the message names both chains and the tile id. No
   source change; test added to pin the behavior:
   `NativeTsxAnimationSyncTests.Apply_TwoMultiTileChainsSatellitesCollide_ThrowsNamingBothChainsAndTileId`.
+- [x] **`TsxWriter` tile ordering.** Already correct, and not fixable-as-cheap even for the
+  cosmetic reordering — `TryWritePatchedCore` keys `originalSlicesById`/`originalTilesById` by tile
+  id (dictionaries built from the original file's document order), and the final emission loop
+  walks `tileset.Tiles` (whatever order the caller sorted it into) doing id lookups into those
+  dictionaries. Slicing itself (`tileLineStarts`, `prologueEnd`, `closingTagOffset`) is computed
+  purely from original-file line positions and never touches `tileset.Tiles`' order, so an
+  ascending `Sort()` before `Write` is order-independent for correctness: every unchanged tile's
+  original text is reused byte-for-byte, just re-emitted in the new (sorted) position — no content
+  loss, merging, or corruption. The known cosmetic side effect (an out-of-order original file
+  produces a reordering diff for untouched tiles, defeating the "minimal diff" goal for that one
+  save) is not trivial to avoid: it would require patch mode to preserve each unchanged tile's
+  *original* position while only relocating changed/new tiles, which means diffing two id orderings
+  and deciding insertion points for new ids — real restructuring, not a one-line fix — so left as a
+  known limitation. Test:
+  `TsxWriterTests.Write_OriginalFileTilesNotInAscendingIdOrder_SortBeforeWriteReusesSlicesReorderedNotCorrupted`.
 
 ## TODO
 
-- [ ] **`TsxWriter` tile ordering**: when the original `.tsx` file's `<tile>` elements are *not* in
-  ascending id order (Tiled doesn't strictly guarantee this), does
-  `NativeTsxAnimationSync`/`TilesetAnimationSync`'s `tileset.Tiles.Sort(...)` cause every untouched
-  tile to move position in the file (pure reordering diff, not a content bug, but defeats the
-  "minimal diff" goal `TsxWriter`'s own doc comment promises)? Pin current behavior with a test; fix
-  if cheap, otherwise document as a known limitation with a reason.
 - [ ] **`TilesetAnimationSync`/achx-push against a tsx with pre-existing hand-authored animations
   and *no* prior `.tiledsync` association** (the very first sync ever run against a real file) —
   same shape as the native-tsx root cause, but for the achx-push path specifically. Confirm whether

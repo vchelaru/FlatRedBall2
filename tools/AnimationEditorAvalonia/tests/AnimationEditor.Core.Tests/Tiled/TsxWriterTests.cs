@@ -476,6 +476,59 @@ public class TsxWriterTests
     }
 
     [Fact]
+    public void Write_OriginalFileTilesNotInAscendingIdOrder_SortBeforeWriteReusesSlicesReorderedNotCorrupted()
+    {
+        // Tiled doesn't strictly guarantee ascending <tile> order in a real file, and both
+        // NativeTsxAnimationSync.Apply and TilesetAnimationSync.Apply always run
+        // tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID)) before handing the tileset to
+        // TsxWriter.Write. originalSlicesById/originalTilesById are keyed by id (not by original
+        // position), so lookups during the final foreach (over the now-sorted list) are
+        // order-independent -- this pins that no corruption/loss occurs, only a reordering.
+        const string outOfOrderXml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"OutOfOrder\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
+            " <image source=\"OutOfOrder.png\" width=\"128\" height=\"128\"/>\n" +
+            " <tile id=\"12\" type=\"Chest\"/>\n" +
+            " <tile id=\"5\">\n" +
+            "  <animation>\n" +
+            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
+            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
+            "  </animation>\n" +
+            " </tile>\n" +
+            " <tile id=\"8\" type=\"Rock\"/>\n" +
+            "</tileset>\n";
+        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, outOfOrderXml);
+        tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
+
+        TsxWriter.Write(tileset, path);
+        var written = File.ReadAllText(path);
+
+        // Each unchanged tile's original slice text reused verbatim, just re-emitted in the new
+        // (ascending) order -- not regenerated, not merged, not dropped.
+        Assert.Equal(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"OutOfOrder\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
+            " <image source=\"OutOfOrder.png\" width=\"128\" height=\"128\"/>\n" +
+            " <tile id=\"5\">\n" +
+            "  <animation>\n" +
+            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
+            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
+            "  </animation>\n" +
+            " </tile>\n" +
+            " <tile id=\"8\" type=\"Rock\"/>\n" +
+            " <tile id=\"12\" type=\"Chest\"/>\n" +
+            "</tileset>\n",
+            written);
+
+        var reloaded = Loader.Default().LoadTileset(path);
+        Assert.Equal(3, reloaded.Tiles.Count);
+        Assert.Equal([((uint)5, 200), ((uint)6, 200)],
+            reloaded.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal("Rock", reloaded.Tiles.Single(t => t.ID == 8).Type);
+        Assert.Equal("Chest", reloaded.Tiles.Single(t => t.ID == 12).Type);
+    }
+
+    [Fact]
     public void Write_TileRemoved_OmitsThatTileExactly()
     {
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
