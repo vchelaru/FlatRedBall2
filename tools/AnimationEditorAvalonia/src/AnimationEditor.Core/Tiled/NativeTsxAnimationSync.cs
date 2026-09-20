@@ -112,6 +112,65 @@ public static class NativeTsxAnimationSync
         return tilesById;
     }
 
+    /// <summary>
+    /// Deep-clones exactly the parts of <paramref name="tileset"/> that <see cref="Apply"/> ever
+    /// mutates: the <see cref="Tileset.Tiles"/> list itself (membership -- tiles get added), and
+    /// per tile, its <see cref="Tile.Properties"/> list and the <see cref="IProperty"/> instances
+    /// within it (mutated in place via add/remove/<c>.Value =</c>). <see cref="Tile.Animation"/> is
+    /// never mutated in place by <see cref="Apply"/> -- only wholesale-reassigned -- so copying the
+    /// list without cloning each <see cref="Frame"/> is enough. Every other field (tileset name/
+    /// size/image/wangsets/transformations/properties; per-tile type/probability/x/y/width/height/
+    /// image/object layer) is never touched by <see cref="Apply"/> and is shared by reference with
+    /// the original.
+    /// </summary>
+    /// <remarks>
+    /// Lets a caller run <see cref="Apply"/> against a working copy and only adopt it once writing
+    /// the result has actually succeeded, so a write failure can't leave the caller's own tileset
+    /// reflecting computed-but-never-persisted state -- see <see cref="ProjectManager.SaveTsxProject"/>.
+    /// If <see cref="Apply"/> is ever extended to mutate a field this method doesn't copy, that
+    /// field must be added here too.
+    /// </remarks>
+    internal static Tileset CloneForSave(Tileset tileset) => new()
+    {
+        Version = tileset.Version,
+        TiledVersion = tileset.TiledVersion,
+        FirstGID = tileset.FirstGID,
+        Source = tileset.Source,
+        Name = tileset.Name,
+        Class = tileset.Class,
+        TileWidth = tileset.TileWidth,
+        TileHeight = tileset.TileHeight,
+        Spacing = tileset.Spacing,
+        Margin = tileset.Margin,
+        TileCount = tileset.TileCount,
+        Columns = tileset.Columns,
+        ObjectAlignment = tileset.ObjectAlignment,
+        RenderSize = tileset.RenderSize,
+        FillMode = tileset.FillMode,
+        Image = tileset.Image,
+        TileOffset = tileset.TileOffset,
+        Grid = tileset.Grid,
+        Properties = tileset.Properties,
+        Wangsets = tileset.Wangsets,
+        Transformations = tileset.Transformations,
+        Tiles = tileset.Tiles.Select(CloneTile).ToList(),
+    };
+
+    private static Tile CloneTile(Tile tile) => new()
+    {
+        ID = tile.ID,
+        Type = tile.Type,
+        Probability = tile.Probability,
+        X = tile.X,
+        Y = tile.Y,
+        Width = tile.Width,
+        Height = tile.Height,
+        Properties = tile.Properties.Select(p => p.Clone()).ToList(),
+        Image = tile.Image,
+        ObjectLayer = tile.ObjectLayer,
+        Animation = tile.Animation.ToList(),
+    };
+
     private static string SyntheticName(uint tileId) => $"ID:{tileId}";
 
     private static bool ApplyTile(

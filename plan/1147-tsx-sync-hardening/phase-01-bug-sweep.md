@@ -354,30 +354,10 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **`ProjectManager.SaveTsxProject` mutates the live `_tsxTileset` in place before
-  `TsxWriter.Write` is attempted, so a write failure leaves the in-memory model changed while the
-  on-disk file (and this instance's `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`
-  bookkeeping) stay at the pre-save state.** `NativeTsxAnimationSync.Apply(_tsxTileset, mapped)` runs
-  and mutates `_tsxTileset.Tiles` in place *before* `TsxWriter.Write(_tsxTileset, ...)` is even
-  called; if `Write` throws (e.g. `NotSupportedException` for a construct that isn't supported for
-  writing), the exception propagates out of `SaveTsxProject`, but `_tsxTileset` is left holding the
-  post-`Apply` state even though nothing was actually written to disk, and a subsequent successful
-  save would silently include that never-persisted mutation as if it had already landed on a prior
-  save. Currently unreachable via the app's own UI (there's no way to introduce a
-  `TsxWriter`-unsupported construct into an already-open native project through
-  AnimationEditor's own controls), so not an active bug today, but the same shape as the
-  `LoadTsxProject` all-or-nothing bug fixed in this pass -- and a future `Write` failure mode (disk
-  full, permissions, a newly-added unsupported construct) would hit it. Fixing cleanly needs the
-  mutation to happen on a copy that only replaces `_tsxTileset` after `Write` succeeds; DotTiled's
-  `Tileset` has no built-in deep-clone support, so building one (tiles, properties, image, grid,
-  tile offset, wangsets/transformations presence) is real, non-trivial work rather than a one-line
-  fix -- left for a dedicated pass rather than rushed here.
-
-- [ ] **Fresh-eyes pass #3 needed**: pass #2 (this pass) found one new confirmed bug (fixed, see
-  DONE) and one new plausible-but-deferred gap (above), so per the phase doc's stop condition
-  ("finds nothing new to add, twice in a row") this phase is not yet exhausted. A pass #3 should
-  start by resolving or re-evaluating the `SaveTsxProject` item above, then do another full
-  fresh-eyes read of every file in scope.
+- [ ] **Fresh-eyes pass #3 needed**: pass #2 found one new confirmed bug (fixed, see DONE) and one
+  new plausible gap (the `SaveTsxProject` mutate-before-write item, since resolved -- see DONE), so
+  per the phase doc's stop condition ("finds nothing new to add, twice in a row") this phase is not
+  yet exhausted. A pass #3 should do another full fresh-eyes read of every file in scope.
 
 ## DONE (continued)
 
@@ -610,3 +590,45 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   code paths: stale-clear, existing-tile update, and new-tile creation):
   `NativeTsxAnimationSyncTests.Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan`,
   `TilesetAnimationSyncTests.Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan`.
+
+- [x] **`ProjectManager.SaveTsxProject` mutated the live `_tsxTileset` in place before
+  `TsxWriter.Write` was attempted.** Decision: **fixed**, not deferred -- re-scoped investigation
+  (per this item's own instructions) found the clone was much smaller than the original assessment
+  assumed. `NativeTsxAnimationSync.Apply` only ever mutates three things: `Tileset.Tiles`
+  (membership -- `ApplyTile` adds new tiles), and per tile, `Tile.Properties` (add/remove/`.Value =`
+  in place) and `Tile.Animation` (always wholesale-reassigned, never appended to in place). Every
+  other `Tileset`/`Tile` field (name, size, image, wangsets, transformations, tileset-level
+  properties, per-tile type/probability/x/y/width/height/image/object layer) is read-only for
+  `Apply`'s purposes. Confirmed via DotTiled's own source (`v1.0.0` tag, read directly -- not
+  decompiled) that `Tile`/`Tileset`/`Frame` are plain mutable classes with settable properties, and
+  that `IProperty` already ships a `Clone()` method built for exactly this purpose ("cloning
+  properties when performing overriding with templates"). That combination made a minimal, exactly-
+  scoped clone -- new `Tileset`/`Tile` objects with a fresh `Tiles` list, fresh per-tile `Properties`
+  list of cloned `IProperty` instances, and a fresh (but Frame-instance-sharing) `Animation` list;
+  every other field shared by reference with the original -- genuinely small, not the "real,
+  non-trivial work" the original assessment expected. Added `NativeTsxAnimationSync.CloneForSave`
+  (plus a private `CloneTile` helper) and changed `SaveTsxProject` to run
+  `MultiTileToTiledAnimationMapper.Map` + `NativeTsxAnimationSync.Apply` against a working copy,
+  calling `TsxWriter.Write` with that copy and only assigning `_tsxTileset = workingTileset` after
+  `Write` returns -- mirroring `LoadTsxProject`'s existing "compute into locals, commit only after
+  every throwable step succeeds" pattern exactly.
+  - **The originally-suspected failure mode (a subsequent successful save silently persisting the
+    phantom mutation to disk) does not actually reproduce.** Traced exhaustively, then confirmed
+    with a throwaway probe test (not kept -- it passed both before and after the fix, so it had no
+    discriminating power): `Apply`'s stale-tile diff (`previouslyAnimatedTileIds`) is recomputed
+    fresh from `tileset.Tiles`'s *live* state on every call, and `ApplyTile` fully overwrites (never
+    incrementally patches) every property/animation it touches. That makes every phantom mutation
+    left by a failed attempt self-heal the moment any later call re-runs `Apply` against the current
+    `AnimationChainListSave` -- confirmed by temporarily disabling the stale-tile-clear loop and
+    observing the probe test fail, then reverting.
+  - **The real, user-visible bug was in `GetChainNamesWithTsxIssues`, not final file content.**
+    `TsxAnimationValidator.Validate` reads tile content directly off `_tsxTileset`, and
+    `NativeTsxAnimationSync.ApplyTile` always overwrites a satellite's frames to match its anchor.
+    So without this fix, a failed save would leave `_tsxTileset`'s satellite tile already "fixed" in
+    memory even though nothing reached disk -- `GetChainNamesWithTsxIssues()` called right after
+    would wrongly report zero issues for a tsx that, on disk, still has the exact problem it was
+    reporting a moment earlier. Confirmed red before the fix, green after:
+    `ProjectManagerTsxValidationIssuesTests.GetChainNamesWithTsxIssues_AfterSaveFails_StillReflectsUnsavedOnDiskState`
+    (targets a save path inside a nonexistent directory so `TsxWriter.Write`'s `File.Create` throws
+    before any bytes reach disk, asserts the validator issue is still reported and the on-disk
+    satellite frames are still the original hand-edited ones).

@@ -167,4 +167,26 @@ public class ProjectManagerTsxValidationIssuesTests : IDisposable
         pm2.LoadTsxProject(new FilePath(path));
         Assert.Empty(pm2.GetChainNamesWithTsxIssues());
     }
+
+    // NativeTsxAnimationSync.Apply always overwrites a satellite's on-disk frames to match its
+    // anchor -- so if SaveTsxProject runs Apply against the *live* _tsxTileset before TsxWriter.Write
+    // is attempted, a write failure (bad target path here; a future disk/permissions failure in
+    // general) would leave the in-memory tileset already "fixed" even though nothing was actually
+    // persisted, and a subsequent GetChainNamesWithTsxIssues() call would wrongly report no issues.
+    [Fact]
+    public void GetChainNamesWithTsxIssues_AfterSaveFails_StillReflectsUnsavedOnDiskState()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(InconsistentGroupFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+        Assert.Equal(["ID:8"], pm.GetChainNamesWithTsxIssues());
+
+        var badPath = Path.Combine(_dir.Path, "does-not-exist", "Heroes.tsx");
+        Assert.ThrowsAny<Exception>(() => pm.SaveTsxProject(targetPath: badPath));
+
+        Assert.Equal(["ID:8"], pm.GetChainNamesWithTsxIssues());
+        var onDisk = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var satellite = onDisk.Tiles.Single(t => t.ID == 9);
+        Assert.Equal([((uint)9, 150), ((uint)14, 150)], satellite.Animation.Select(f => (f.TileID, f.Duration)));
+    }
 }

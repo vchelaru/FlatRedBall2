@@ -677,6 +677,12 @@ namespace AnimationEditor.Core
         /// cref="LoadTsxProject"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and <see
         /// cref="Tiled.NativeTsxAnimationSync"/>. No-op if no tsx project is loaded.
         /// </summary>
+        /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
+        /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
+        /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), and this instance only adopts it
+        /// after <see cref="Tiled.TsxWriter.Write(DotTiled.Tileset, string)"/> has actually
+        /// succeeded -- so a write failure (an unsupported construct, a disk/permissions error)
+        /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
         public void SaveTsxProject(string? targetPath = null)
         {
             if (_tsxTileset == null || AnimationChainListSave == null)
@@ -684,8 +690,10 @@ namespace AnimationEditor.Core
 
             var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
                 AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain);
-            Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
-            Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
+            var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
+            Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped);
+            Tiled.TsxWriter.Write(workingTileset, targetPath ?? FileName!);
+            _tsxTileset = workingTileset;
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
             // id) so the *next* save reuses them instead of recomputing from geometry again -- see
