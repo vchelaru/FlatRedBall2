@@ -329,6 +329,10 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     // from its owning container without requiring a back-reference to the factory or screen.
     internal Action? _onDestroy;
 
+    // The pristine pool-return action assigned on first creation by Factory<T>.
+    // Restored on each pool recycle to reset _onDestroy and prevent multicast delegate accumulation across lives.
+    internal Action? _poolReturnAction;
+
     // Set by Factory<T> when the owning factory has pooling enabled. When true, Destroy() routes
     // to the pool path (_onDestroy is the factory's pool-return hook) without tearing down
     // children, shapes, or Gum visuals — those are reused on recycle.

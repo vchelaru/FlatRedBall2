@@ -285,6 +285,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
             _instances.Add(recycled);
             recycled.AttachRenderablesToScreen();
             recycled.ResetEngineState();
+            recycled._onDestroy = recycled._poolReturnAction;
             if (_screen.Layer != null)
                 recycled.Layer = _screen.Layer;
             configure?.Invoke(recycled);
@@ -321,6 +322,8 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
                 _freeList!.Push(entity);
             }
         };
+        if (_poolingEnabled)
+            entity._poolReturnAction = entity._onDestroy;
         if (_screen.Layer != null)
             entity.Layer = _screen.Layer;
         configure?.Invoke(entity);
