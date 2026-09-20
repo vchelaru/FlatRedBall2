@@ -54,6 +54,9 @@ public class AppCommandsTiledSyncTests
         var tsxPath = WriteFixtureTileset(dir.Path);
         var achxPath = Path.Combine(dir.Path, "Hero.achx");
         ctx.ProjectManager.FileName = achxPath;
+        // "Heroes.png" isn't a real file on disk (only the .tsx fixture is) -- this test is about
+        // Tiled sync wiring, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
         ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
 
         // Tile 0 occupies pixels [0,16)x[0,16) of the 64x16 fixture texture -> UV [0,0.25)x[0,1).
@@ -158,6 +161,9 @@ public class AppCommandsTiledSyncTests
         var tsxPath = WriteFixtureTileset(dir.Path);
         var achxPath = Path.Combine(dir.Path, "Hero.achx");
         ctx.ProjectManager.FileName = achxPath;
+        // "Heroes.png" isn't a real file on disk (only the .tsx fixture is) -- this test is about
+        // Tiled sync wiring, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
         ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         chain.Frames.Add(new AnimationFrameSave

@@ -25,6 +25,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_AbsoluteTextureNameInSaveFolder_RewrittenToSimpleRelative()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
 
@@ -44,6 +47,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_AbsoluteTextureNameInSubfolder_RewrittenToForwardSlashRelative()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
         var absoluteTexture = Path.Combine(dir.Path, "Sprites", "items.png");
@@ -64,6 +70,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_MixedAbsoluteAndRelativeTextureNames_AllForwardSlashAfterSave()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
 
@@ -85,6 +94,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_RewritesInMemoryTextureName_NotJustSavedFile()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
 
@@ -105,6 +117,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_TextureNameCasePreserved_WhenRewrittenToRelative()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
 
@@ -124,6 +139,9 @@ public class ProjectManagerTexturePathPortabilityTests
     public void SaveAnimationChainList_AlreadyRelativeBackslashTextureName_NormalizedToForwardSlash()
     {
         var pm = new ProjectManager();
+        // These fixtures reference textures that don't exist on disk -- this file is about
+        // TextureName path rewriting, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
         using var dir = new TestHelpers.TempDir();
         var achxPath = Path.Combine(dir.Path, "Props.achx");
 

@@ -282,6 +282,16 @@ namespace AnimationEditor.Core
         /// in place and return the per-texture size cache used (so a paired round-trip
         /// can reuse it). No-op if already in <paramref name="target"/> space.
         /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Converting toward <see cref="TextureCoordinateType.Pixel"/> (i.e. preparing a persisted
+        /// on-disk write) needs every referenced texture's pixel size resolved up front: writing a
+        /// file with <c>CoordinateType=Pixel</c> while a frame's texture size couldn't be resolved
+        /// would leave that frame's coordinates un-converted (still UV-scale) under a header that
+        /// claims otherwise, corrupting the file (#1135). Converting toward UV -- on load, or when
+        /// reversing an in-memory model back after a successful Pixel save -- stays lenient: a
+        /// texture that hasn't been built yet is an expected, tolerated state while editing, and no
+        /// persisted artifact is at risk.
+        /// </exception>
         private static Dictionary<string, (int W, int H)> ConvertCoordinates(
             AnimationChainListSave acls,
             string achxDirectory,
@@ -294,6 +304,32 @@ namespace AnimationEditor.Core
 
             bool toPixel = target == TextureCoordinateType.Pixel;
 
+            if (toPixel)
+            {
+                var unresolved = new List<string>();
+                foreach (var chain in acls.AnimationChains)
+                {
+                    foreach (var frame in chain.Frames)
+                    {
+                        if (string.IsNullOrEmpty(frame.TextureName)) continue;
+                        if (sizeCache.ContainsKey(frame.TextureName)) continue;
+
+                        if (TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out var size))
+                            sizeCache[frame.TextureName] = size;
+                        else
+                            unresolved.Add(frame.TextureName);
+                    }
+                }
+
+                if (unresolved.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot save with CoordinateType=Pixel: texture size could not be resolved " +
+                        $"for: {string.Join(", ", unresolved.Distinct())}. Fix or rebuild the missing " +
+                        "texture(s), or switch the on-disk coordinate format to UV.");
+                }
+            }
+
             foreach (var chain in acls.AnimationChains)
             {
                 foreach (var frame in chain.Frames)
@@ -302,26 +338,11 @@ namespace AnimationEditor.Core
 
                     if (!sizeCache.TryGetValue(frame.TextureName, out var size))
                     {
-                        // Browser callers (#768) key knownTextureSizes by the frame's own
-                        // TextureName, so the TryGetValue above normally already succeeds. This
-                        // bare-filename fallback covers any other caller-supplied sizeCache keyed
-                        // by leaf name instead, before assuming a real disk read is possible.
-                        var bareName = System.IO.Path.GetFileName(frame.TextureName);
-                        if (bareName != frame.TextureName && sizeCache.TryGetValue(bareName, out size))
-                        {
-                            sizeCache[frame.TextureName] = size;
-                        }
-                        else
-                        {
-                            var path = System.IO.Path.IsPathRooted(frame.TextureName)
-                                ? frame.TextureName
-                                : System.IO.Path.Combine(achxDirectory, frame.TextureName);
-
-                            var read = TryReadPngSize(path);
-                            if (read == null) continue;
-                            size = read.Value;
-                            sizeCache[frame.TextureName] = size;
-                        }
+                        // Only reached when target == UV -- the toPixel branch above already
+                        // guaranteed every frame's texture is in sizeCache or threw.
+                        if (!TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out size))
+                            continue;
+                        sizeCache[frame.TextureName] = size;
                     }
 
                     if (size.W <= 0 || size.H <= 0) continue;
@@ -345,6 +366,39 @@ namespace AnimationEditor.Core
 
             acls.CoordinateType = target;
             return sizeCache;
+        }
+
+        /// <summary>
+        /// Resolves <paramref name="textureName"/> to a pixel size via <paramref name="sizeCache"/>
+        /// (including the bare-filename fallback for callers -- e.g. #768's browser path -- that key
+        /// the cache by leaf name instead of the frame's own <c>TextureName</c>), falling back to a
+        /// PNG header read under <paramref name="achxDirectory"/>. Returns <see langword="false"/>
+        /// without touching <paramref name="sizeCache"/> when neither resolves.
+        /// </summary>
+        private static bool TryResolveTextureSize(
+            string textureName,
+            string achxDirectory,
+            Dictionary<string, (int W, int H)> sizeCache,
+            out (int W, int H) size)
+        {
+            if (sizeCache.TryGetValue(textureName, out size)) return true;
+
+            var bareName = System.IO.Path.GetFileName(textureName);
+            if (bareName != textureName && sizeCache.TryGetValue(bareName, out size)) return true;
+
+            var path = System.IO.Path.IsPathRooted(textureName)
+                ? textureName
+                : System.IO.Path.Combine(achxDirectory, textureName);
+
+            var read = TryReadPngSize(path);
+            if (read == null)
+            {
+                size = default;
+                return false;
+            }
+
+            size = read.Value;
+            return true;
         }
 
         /// <summary>

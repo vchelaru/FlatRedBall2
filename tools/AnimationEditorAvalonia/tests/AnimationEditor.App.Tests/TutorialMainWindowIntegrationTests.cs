@@ -330,6 +330,9 @@ public class TutorialMainWindowIntegrationTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             ctx.ProjectManager.FileName = achx;
+            // "idle.png" isn't a real file on disk -- this test is about the save flow creating a
+            // file, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+            ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
             ctx.AppCommands.SaveCurrentAnimationChainList(achx);
 
             Assert.True(System.IO.File.Exists(achx),

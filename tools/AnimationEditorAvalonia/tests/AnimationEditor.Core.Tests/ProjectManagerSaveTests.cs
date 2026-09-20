@@ -85,6 +85,62 @@ public class ProjectManagerSaveTests
         Assert.Equal(1f, frame.RightCoordinate);
     }
 
+    // #1135: a frame whose texture size can't be resolved (missing/unbuilt PNG, and absent from
+    // knownTextureSizes) must not silently fall through the Pixel conversion loop -- the old
+    // behavior left that one frame's coordinates in UV scale while still flipping
+    // acls.CoordinateType to Pixel, producing a file whose header lies about that frame's
+    // coordinate scale. Saving to Pixel format is a persisted artifact, so this must fail loudly
+    // instead, and it must not mutate any frame (including ones whose texture *did* resolve) on
+    // the way to failing.
+    [Fact]
+    public void SaveAnimationChainList_Stream_Throws_WhenPixelSaveCannotResolveATextureSize()
+    {
+        var pm = new ProjectManager();
+        var knownFrame = new AnimationFrameSave
+        {
+            TextureName = "sprite.png",
+            LeftCoordinate = 0f,
+            RightCoordinate = 1f,
+            TopCoordinate = 0f,
+            BottomCoordinate = 1f,
+        };
+        var unresolvedFrame = new AnimationFrameSave
+        {
+            TextureName = "missing.png",
+            LeftCoordinate = 0f,
+            RightCoordinate = 0.5f,
+            TopCoordinate = 0f,
+            BottomCoordinate = 0.5f,
+        };
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(knownFrame);
+        chain.Frames.Add(unresolvedFrame);
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        preParsed.AnimationChains.Add(chain);
+
+        // "missing.png" is intentionally absent from knownTextureSizes, and no file exists on
+        // disk for it either (the stream overload has no achxDirectory to read from at all).
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>
+        {
+            ["sprite.png"] = (32, 64),
+        };
+
+        // Loaded as UV (no conversion needed on load), so the failure surfaces on save, not load.
+        pm.LoadAnimationChain(
+            new FilePath(TestPaths.Abs("browser", "does-not-exist.achx")), preParsed, knownTextureSizes);
+        pm.OnDiskCoordinateType = TextureCoordinateType.Pixel;
+
+        using var stream = new MemoryStream();
+        Assert.ThrowsAny<Exception>(() => pm.SaveAnimationChainList(stream));
+
+        // The failed save must not have mutated anything, including the frame that did resolve.
+        Assert.Equal(TextureCoordinateType.UV, pm.AnimationChainListSave!.CoordinateType);
+        Assert.Equal(0f, knownFrame.LeftCoordinate);
+        Assert.Equal(1f, knownFrame.RightCoordinate);
+        Assert.Equal(0f, unresolvedFrame.LeftCoordinate);
+        Assert.Equal(0.5f, unresolvedFrame.RightCoordinate);
+    }
+
     [Fact]
     public void SaveAnimationChainList_Stream_WritesUvCoordinates_WhenOnDiskFormatIsUv()
     {
@@ -140,6 +196,10 @@ public class ProjectManagerSaveTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Coin");
 
         ctx.AppCommands.AddFrame(chain, "items.png");
+
+        // "items.png" isn't a real file on disk -- this test is about the ShapesSave omission,
+        // not on-disk pixel-coordinate conversion (#1135), so stay in UV.
+        ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
 
         using var stream = new MemoryStream();
         ctx.ProjectManager.SaveAnimationChainList(stream);
