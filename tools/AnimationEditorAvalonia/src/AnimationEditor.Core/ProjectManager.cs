@@ -715,13 +715,29 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Names of chains that have a <see cref="Tiled.TsxAnimationValidator"/> issue -- a
         /// multi-tile group whose satellite tile has drifted out of lockstep with its anchor, or a
-        /// dangling <c>ParentId</c> (issue #1140). Empty when no tsx project is loaded or nothing
-        /// is wrong. Correlates the validator's tile-id-keyed issues back to chain names by
-        /// re-running <see cref="Tiled.MultiTileToTiledAnimationMapper"/> on the current in-memory
-        /// chains and matching each chain's own computed entry tile id against an issue's anchor id
-        /// -- the same id math <see cref="SaveTsxProject"/> uses, so this always reflects the
-        /// chains as they'd actually be written, not just as they were on load.
+        /// dangling/chained/backward/incomplete-footprint <c>ParentId</c> (issue #1140). Empty when
+        /// no tsx project is loaded or nothing is wrong. Correlates the validator's tile-id-keyed
+        /// issues back to chain names by re-running <see cref="Tiled.MultiTileToTiledAnimationMapper"/>
+        /// on the current in-memory chains and matching each chain's own computed entry tile id
+        /// against either an issue's <c>AnchorTileId</c> or its <c>TileId</c> -- the same id math
+        /// <see cref="SaveTsxProject"/> uses, so this always reflects the chains as they'd actually
+        /// be written, not just as they were on load.
         /// </summary>
+        /// <remarks>
+        /// Matching only <c>AnchorTileId</c> is correct for a lockstep-mismatch issue (the satellite
+        /// itself is folded into its anchor's chain, never its own) but wrong for a broken-ParentId
+        /// issue (dangling/chained/backward/incomplete-footprint): <see
+        /// cref="Tiled.TiledAnimationToAchjMapper.Map"/> makes the *referencing* tile (<c>TileId</c>)
+        /// its own independent chain in those cases, not a satellite of <c>AnchorTileId</c>'s chain --
+        /// matching only <c>AnchorTileId</c> either misses the actually-broken chain entirely (a
+        /// chained ParentId, where the immediate parent is itself just a normal folded-in satellite
+        /// with no chain of its own) or flags an unrelated, perfectly consistent chain instead (a
+        /// backward ParentId, when the tile it names happens to be a real anchor with its own
+        /// chain). Matching either id catches the actually-broken chain in every case, at the cost of
+        /// also (correctly, not just incidentally) flagging the referenced anchor's chain too when it
+        /// happens to have one -- reasonable, since one of its would-be satellites failing to attach
+        /// is worth surfacing on the anchor as well.
+        /// </remarks>
         public IReadOnlyList<string> GetChainNamesWithTsxIssues()
         {
             if (_tsxTileset == null || AnimationChainListSave == null)
@@ -731,11 +747,11 @@ namespace AnimationEditor.Core
             if (issues.Count == 0)
                 return Array.Empty<string>();
 
-            var anchorTileIdsWithIssues = issues.Select(i => i.AnchorTileId).ToHashSet();
+            var flaggedTileIds = issues.SelectMany(i => new[] { i.AnchorTileId, i.TileId }).ToHashSet();
 
             return Tiled.MultiTileToTiledAnimationMapper.Map(
                     AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain)
-                .Where(r => r.EntryTileId.HasValue && anchorTileIdsWithIssues.Contains(r.EntryTileId.Value))
+                .Where(r => r.EntryTileId.HasValue && flaggedTileIds.Contains(r.EntryTileId.Value))
                 .Select(r => r.ChainName)
                 .ToList();
         }

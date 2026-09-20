@@ -106,6 +106,85 @@ public class ProjectManagerTsxValidationIssuesTests : IDisposable
         Assert.Empty(issueChainNames);
     }
 
+    // Anchor is tile 9 (no ParentId). Tile 8's ParentId=9 points "backward" (a footprint shape
+    // AnimationEditor's own UI never produces), so TiledAnimationToAchjMapper surfaces tile 8 as
+    // its own independent chain ("ID:8"), not a satellite of tile 9's chain. The validator reports
+    // this issue with AnchorTileId=9 (the tile ParentId names) and TileId=8 (the actually-broken
+    // tile) -- matching only AnchorTileId would flag the wrong, perfectly consistent chain ("ID:9")
+    // and never mention "ID:8", where the real problem is.
+    [Fact]
+    public void GetChainNamesWithTsxIssues_BackwardParentId_IncludesTheActuallyBrokenChain()
+    {
+        const string xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="Heroes.png" width="64" height="64"/>
+             <tile id="9">
+              <animation>
+               <frame tileid="9" duration="150"/>
+              </animation>
+             </tile>
+             <tile id="8">
+              <properties>
+               <property name="ParentId" type="int" value="9"/>
+              </properties>
+              <animation>
+               <frame tileid="8" duration="150"/>
+              </animation>
+             </tile>
+            </tileset>
+            """;
+        var pm = new ProjectManager();
+        pm.LoadTsxProject(new FilePath(WriteFixture(xml, "Heroes.tsx")));
+
+        var issueChainNames = pm.GetChainNamesWithTsxIssues();
+
+        Assert.Contains("ID:8", issueChainNames);
+    }
+
+    // A (tile 0) -- true anchor. B (tile 1) -- ParentId=0, a legitimate satellite folded into A's
+    // chain (no chain of its own). C (tile 2) -- ParentId=1, chained through B rather than a true
+    // anchor, so it surfaces as its own independent chain ("ID:2"). The validator reports this
+    // issue with AnchorTileId=1 (B's id) -- but B was never its own chain to begin with, so
+    // matching only AnchorTileId can never find a match and silently drops the warning entirely.
+    [Fact]
+    public void GetChainNamesWithTsxIssues_ChainedParentId_DoesNotSilentlyDropTheBrokenChain()
+    {
+        const string xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="Heroes.png" width="64" height="64"/>
+             <tile id="0">
+              <animation>
+               <frame tileid="0" duration="150"/>
+              </animation>
+             </tile>
+             <tile id="1">
+              <properties>
+               <property name="ParentId" type="int" value="0"/>
+              </properties>
+              <animation>
+               <frame tileid="1" duration="150"/>
+              </animation>
+             </tile>
+             <tile id="2">
+              <properties>
+               <property name="ParentId" type="int" value="1"/>
+              </properties>
+              <animation>
+               <frame tileid="2" duration="150"/>
+              </animation>
+             </tile>
+            </tileset>
+            """;
+        var pm = new ProjectManager();
+        pm.LoadTsxProject(new FilePath(WriteFixture(xml, "Heroes.tsx")));
+
+        var issueChainNames = pm.GetChainNamesWithTsxIssues();
+
+        Assert.Contains("ID:2", issueChainNames);
+    }
+
     [Fact]
     public void GetChainNamesWithTsxIssues_NotATsxProject_ReturnsEmpty()
     {
