@@ -144,6 +144,36 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_ChainedParentId_IntermediateTilesOwnParentIdIsDanglingRatherThanResolving_StillFlagsTheSatellite()
+    {
+        // Y -- has an animation, but its own ParentId (999) is dangling (doesn't resolve to any
+        // animated tile) -- Y itself is flagged for that below. T -- ParentId=Y.ID, individually
+        // in lockstep with Y's own frames. TiledAnimationToAchjMapper.Map treats Y as "not a true
+        // anchor" purely because Y has *any* ParentId set (see trueAnchorTileIds), regardless of
+        // whether that ParentId resolves -- so T is never folded into a group with Y; it surfaces
+        // as its own independent chain. The validator's chained-ParentId check must mirror that
+        // exact rule (GetParentId(anchor) is non-null) rather than requiring the intermediate
+        // tile's own ParentId to additionally *resolve* to an animated tile -- the narrower
+        // "resolves" check misses this dangling-intermediate case and silently reports zero issues
+        // for T even though its ParentId grouping doesn't take effect either.
+        var tileset = TilesetWithColumns(4);
+
+        var y = new Tile { ID = 9, Width = 0, Height = 0 };
+        y.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        y.Properties.Add(new IntProperty { Name = "ParentId", Value = 999 });
+        tileset.Tiles.Add(y);
+
+        var t = new Tile { ID = 10, Width = 0, Height = 0 };
+        t.Animation.Add(new Frame { TileID = 10, Duration = 150 });
+        t.Properties.Add(new IntProperty { Name = "ParentId", Value = 9 });
+        tileset.Tiles.Add(t);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        Assert.Contains(issues, i => i.TileId == 10 && i.AnchorTileId == 9);
+    }
+
+    [Fact]
     public void Validate_SatellitesFormNonRectangularFootprint_ReturnsIssuePerSatellite()
     {
         // Anchor at tile 8. Two satellites, each individually valid on its own (forward offset,

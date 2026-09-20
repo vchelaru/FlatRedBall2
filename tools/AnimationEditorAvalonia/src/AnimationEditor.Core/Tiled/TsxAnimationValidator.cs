@@ -50,7 +50,7 @@ public static class TsxAnimationValidator
             anchorId = 0;
             if (TiledAnimationToAchjMapper.GetParentId(tile) is not { } candidateId) return false;
             if (!animatedTilesById.TryGetValue(candidateId, out var anchor)) return false;
-            if (TiledAnimationToAchjMapper.GetParentId(anchor) is { } grandParentId && animatedTilesById.ContainsKey(grandParentId)) return false;
+            if (TiledAnimationToAchjMapper.GetParentId(anchor) is not null) return false;
             if ((tile.ID % columns) < (candidateId % columns) || (tile.ID / columns) < (candidateId / columns)) return false;
             anchorId = candidateId;
             return true;
@@ -103,8 +103,13 @@ public static class TsxAnimationValidator
                 continue;
             }
 
-            if (TiledAnimationToAchjMapper.GetParentId(anchor) is { } anchorsOwnParentId
-                && animatedTilesById.ContainsKey(anchorsOwnParentId))
+            // A true anchor (mirroring TiledAnimationToAchjMapper.Map's trueAnchorTileIds) is a
+            // tile with *no* ParentId of its own -- checked here regardless of whether that
+            // ParentId resolves to anything. A narrower "only if it resolves to an animated tile"
+            // check would miss the case where the intermediate tile's own ParentId is itself
+            // dangling/unresolved: the mapper still refuses to fold the outer tile into a group
+            // with it either way, so this must too.
+            if (TiledAnimationToAchjMapper.GetParentId(anchor) is not null)
             {
                 issues.Add(new TsxGroupIssue(anchorId, tile.ID,
                     $"tile {tile.ID}: ParentId {anchorId} references tile {anchorId}, which is itself a satellite (chained/nested ParentId) rather than a true anchor."));
