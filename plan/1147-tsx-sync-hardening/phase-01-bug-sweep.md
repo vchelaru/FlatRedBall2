@@ -160,6 +160,12 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   and `AchjToTiledAnimationMapper` for other unchecked casts or unvalidated arithmetic on
   attacker/corruption-controlled input (frame rects producing negative or huge tile ids from
   malformed achx coordinates), similar in spirit to the `ParentId` fix above.
+- [ ] **`TilesetAnimationSync` ownership check keys off `Animation.Count > 0`, not `achjAnimationName`**
+  — a tile with `achjAnimationName` set but no `achjSourceFile` (e.g. a partially-written tile from
+  an older schema, or a crash mid-write) and an *empty* `Animation` list would currently be treated
+  as unowned and silently claimed/overwritten, since the new hand-authored check only looks at
+  `Animation.Count`. Decide whether `achjAnimationName` alone should also count as "already tracked,
+  needs matching achjSourceFile to overwrite" and pin it.
 - [ ] **Fresh-eyes pass #1**: once the above are done, do a dedicated pass (self or subagent)
   re-reading every file in scope end to end asking "what haven't we tried yet" — new categories to
   consider: concurrent edits (two `ProjectManager` instances / two AnimationEditor windows open on
