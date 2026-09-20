@@ -56,6 +56,19 @@ namespace AnimationEditor.Core
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsxTileset != null;
 
+        /// <summary>Guards every achx/achj-format save method (<see
+        /// cref="SaveAnimationChainList(string)"/>, its <see cref="Stream"/> overload, and <see
+        /// cref="SaveAnimationChainListAsync"/>) against being called on a native tsx project --
+        /// defense-in-depth alongside <c>AppCommands.SaveCurrentAnimationChainList</c>'s own branch
+        /// on <see cref="IsNativeTsxProject"/>, for any caller that reaches <see
+        /// cref="ProjectManager"/> directly instead.</summary>
+        private void ThrowIfNativeTsxProject()
+        {
+            if (IsNativeTsxProject)
+                throw new InvalidOperationException(
+                    "Cannot save a native tsx project via SaveAnimationChainList -- use SaveTsxProject instead.");
+        }
+
         /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
         /// project. A native tsx project's grid size is always this -- it is not user-configurable
         /// (see issue #1140).</summary>
@@ -182,8 +195,14 @@ namespace AnimationEditor.Core
         /// any texture size); when writing as Pixel, this method converts just for the
         /// on-disk write and then converts back so the in-memory model stays UV.
         /// </summary>
+        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
+        /// <see cref="AnimationChainListSave"/> is a view over Tiled tileset data for a native tsx
+        /// project, not a real achx/achj document, so writing it through this method would produce
+        /// malformed/misleading content. Use <see cref="SaveTsxProject"/> instead.</exception>
         public void SaveAnimationChainList(string targetPath)
         {
+            ThrowIfNativeTsxProject();
+
             var acls = AnimationChainListSave;
             if (acls == null) return;
 
@@ -222,8 +241,12 @@ namespace AnimationEditor.Core
         /// on this overload. A texture missing from that dictionary is left in UV coordinates,
         /// same as the path-based overload's behavior when a PNG can't be read.
         /// </summary>
+        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
+        /// see <see cref="SaveAnimationChainList(string)"/>'s matching exception doc.</exception>
         public void SaveAnimationChainList(Stream stream)
         {
+            ThrowIfNativeTsxProject();
+
             var acls = AnimationChainListSave;
             if (acls == null) return;
 
@@ -240,8 +263,12 @@ namespace AnimationEditor.Core
         /// <see cref="AnimationChainListSave.Save(Stream)"/> would otherwise trigger from inside
         /// <c>XmlWriter.Dispose()</c>. See <see cref="AnimationChainListSave.SaveAsync"/>.
         /// </summary>
+        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
+        /// see <see cref="SaveAnimationChainList(string)"/>'s matching exception doc.</exception>
         public async Task SaveAnimationChainListAsync(Stream stream)
         {
+            ThrowIfNativeTsxProject();
+
             var acls = AnimationChainListSave;
             if (acls == null) return;
 

@@ -298,6 +298,56 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Null(pm.TsxTileSize);
     }
 
+    // SaveAnimationChainList(string)/(Stream)/SaveAnimationChainListAsync(Stream) write
+    // achx/achj-format content -- calling any of them on a native tsx project (whose
+    // AnimationChainListSave is a *view* over Tiled tileset data, not a real achx) would
+    // silently write malformed/misleading content instead of the real .tsx file.
+    // AppCommands.SaveCurrentAnimationChainList already branches on IsNativeTsxProject to route
+    // to SaveTsxProject instead, but that's the only gate today -- ProjectManager itself should
+    // refuse directly too, so a caller that bypasses AppCommands (several UI-layer call sites do,
+    // e.g. the browser build's stream-based save) can't slip through unguarded.
+    [Fact]
+    public void SaveAnimationChainList_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent()
+    {
+        var pm = new ProjectManager();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(tsxPath));
+        // UV needs no texture-size resolution, so the only way this can throw is the guard under
+        // test -- not an incidental "missing PNG" failure from the Pixel-conversion path.
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
+
+        var achxPath = Path.Combine(_dir.Path, "WrongFormat.achx");
+        var ex = Assert.Throws<InvalidOperationException>(() => pm.SaveAnimationChainList(achxPath));
+        Assert.Contains("SaveTsxProject", ex.Message);
+        Assert.False(File.Exists(achxPath));
+    }
+
+    [Fact]
+    public void SaveAnimationChainList_StreamOverload_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent()
+    {
+        var pm = new ProjectManager();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(tsxPath));
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
+
+        using var stream = new MemoryStream();
+        var ex = Assert.Throws<InvalidOperationException>(() => pm.SaveAnimationChainList(stream));
+        Assert.Contains("SaveTsxProject", ex.Message);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SaveAnimationChainListAsync_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent()
+    {
+        var pm = new ProjectManager();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(tsxPath));
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
+
+        using var stream = new MemoryStream();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => pm.SaveAnimationChainListAsync(stream));
+        Assert.Contains("SaveTsxProject", ex.Message);
+    }
+
     private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
         tileset.Tiles
             .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))

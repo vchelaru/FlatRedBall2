@@ -335,6 +335,36 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
+- **UI layer (`AnimationEditor.App`/`.Views`/`.Browser`, out of this sweep's declared file scope)
+  has multiple direct `AnimationChainListSave =`/`FileName =` assignment sites that bypass
+  `AppCommands.NewFile`/`CloseProject` (both already call `RestoreTsxState(null)`, fixed in fresh-
+  eyes pass #7) -- the identical bug class, just reached through a different code path. Found
+  during fresh-eyes pass #8's audit of every `ProjectManager.AnimationChainListSave =`/`.FileName
+  =` call site repo-wide (task item 5). Confirmed sites, none of which call `RestoreTsxState(null)`
+  first:
+  - `MainWindow.axaml.cs`'s `ActivateUntitledTabContent` (~line 781, switching to an Untitled tab)
+    and its "all tabs closed -- start fresh" branch (~line 911).
+  - `MainWindow.axaml.cs`'s `OpenAsNewUnsavedDocument` (~line 2519, shared by File > New and the
+    crash-recovery-restore path) and `HandleStartupAsync`'s empty-state branches (~lines 984, 1008
+    -- these run before any project can ever have been loaded, so likely unreachable in practice,
+    unlike the other sites here).
+  - `AnimationEditor.Views\Controls\AnimationTreeControl.axaml.cs`'s `AddAnimationChainAndBeginInlineRename`
+    (~line 679) and its `AnimationEditor.App` sibling (~line 3372 in `MainWindow.axaml.cs`) -- both
+    only fire when `AnimationChainListSave` is already `null`, so can't affect an active tsx project
+    (which always has a non-null `AnimationChainListSave`); lower risk than the others above.
+  - `AnimationEditor.Browser\App.axaml.cs`'s `CloseTab` (~line 634, "last tab closed" branch) --
+    confirmed the browser build never calls `LoadTsxProject` anywhere (grepped the whole project,
+    zero matches), so `IsNativeTsxProject` can never be true there today; not currently reachable,
+    but the same latent gap if tsx support is ever extended to the browser build.
+  Not fixed here: these files are outside "Files in scope" above (`AnimationEditor.App`/`.Views`/
+  `.Browser`, not `.Core`), and fixing them well likely means giving `TabController`/`MainWindow`
+  a single shared "reset to a fresh document" helper that always calls `RestoreTsxState(null)`,
+  rather than patching each site individually -- a small design decision worth its own dedicated
+  pass rather than folding into this one. `ProjectManager.ThrowIfNativeTsxProject` (added this pass,
+  see DONE below) does not cover this class of bug: assigning `AnimationChainListSave` directly is
+  a plain property setter with no guard surface, unlike the `SaveAnimationChainList` methods it
+  does protect.
+
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1112,3 +1142,101 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     signal the file's coverage for "missing tsx branch" is now complete, not just quiet. The
     remaining risk in this bug class, if any, is more likely in the Avalonia `.App`/`.Views` UI
     layer (out of this sweep's declared scope) than in `AppCommands.cs` itself.
+
+- [x] **Fresh-eyes pass #8 -- full line-by-line read of `ProjectManager.cs` end to end** (as opposed
+  to the many prior passes' targeted re-traces of just its tsx-specific methods), per the exact
+  approach that worked for `AppCommands.cs` in pass #7. Read and evaluated every member in the file
+  against "does it correctly account for native-tsx state the way the already-fixed choke points
+  do." Found and fixed one new real gap (a defense-in-depth guard, not a currently-reachable bug),
+  and surfaced one new UI-layer TODO item (above) via a repo-wide grep this pass ran as part of the
+  task's item 5.
+  - **Method-by-method verdicts** (public/private members with any load-bearing logic; trivial
+    pass-throughs and pure-static helpers with no state omitted):
+    - `AnimationChainListSave`, `FileName`, `OnDiskCoordinateType` (properties) -- plain settable
+      state, already covered by `TabEditorCache`'s direct round-trip (fresh-eyes pass #5's field
+      audit); a direct external set on a tsx project is the UI-layer TODO above, not a
+      `ProjectManager`-internal gap.
+    - `TileMapInformationList` -- static, unrelated to tsx (traced pass #1).
+    - `ReferencedPngs` -- already fixed (pass #5/#6).
+    - `IsNativeTsxProject`, `TsxTileSize` -- pure computed properties over `_tsxTileset`, safe.
+    - `ProjectFolderPath` -- session-wide by design, not per-load state (traced pass #5).
+    - `LoadAnimationChain` -- already fixed (clears tsx state, `ReferencedPngs`); re-verified
+      correct this pass, including its `TryLoadProjectFile`/no-`ProjectFile`-branch split.
+    - `NormalizeCoordinatesToUv` -- static, no hidden state (task item 2); just seeds a cache from
+      the `knownTextureSizes` parameter and delegates to `ConvertCoordinates`.
+    - `SaveAnimationChainList(string)` / `(Stream)` / `SaveAnimationChainListAsync(Stream)` --
+      **gap found and fixed, see below** (task item 3).
+    - `IsJsonPath`, `RunWithDiskCoordinateConversion(Async)`, `BuildSeedCache`, `ConvertCoordinates`,
+      `TryResolveTextureSize`, `GetTextureSizeInPixels`, `TryReadPngSize`,
+      `NormalizeFrameTextureNames` -- all either static/stateless or read only `_knownTextureSizes`/
+      `FileName`, no tsx-specific state involved.
+    - `ResolveFilesPanelRoot`, `FindContentAncestor`, `TryLoadProjectFile` (task item 1),
+      `FindMissingTextures`, `LoadTileMapInformation` -- achx/project-file/Files-panel concerns with
+      no tsx interaction; a native tsx project never has an `AnimationChainListSave.ProjectFile`
+      value (`TiledAnimationToAchjMapper.Map` never sets one), so `ResolveFilesPanelRoot`'s
+      project-file branch is simply inert for a tsx project, not a gap.
+    - `LoadTsxProject`, `SaveTsxProject` -- already exhaustively audited across every prior pass;
+      re-read confirmed the all-or-nothing commit pattern still holds.
+    - `CaptureTsxState`/`RestoreTsxState`/`CaptureTextureSizeState`/`RestoreTextureSizeState` --
+      already fixed (pass #6-adjacent), re-verified correct.
+    - `GetChainNamesWithTsxIssues`, `BuildTsxTilesetInfo` -- already audited (pass #3, #5's
+      `ProjectManager`-layer agreement tests); re-read found no new gap.
+  - **Real gap found and fixed (task item 3) -- `SaveAnimationChainList(string)`, its `Stream`
+    overload, and `SaveAnimationChainListAsync(Stream)` had no guard against being called on a
+    native tsx project.** `AppCommands.SaveCurrentAnimationChainList` is the only production call
+    site that branches on `IsNativeTsxProject`, but it is not the only caller of these methods: a
+    repo-wide grep for `SaveAnimationChainList`/`SaveAnimationChainListAsync` found
+    `AnimationEditor.Browser\App.axaml.cs` calling the `Stream`/`Async` overloads directly, bypassing
+    `AppCommands` entirely (confirmed not currently reachable there specifically, since the browser
+    build never calls `LoadTsxProject` -- grepped, zero matches -- so `IsNativeTsxProject` can never
+    be true on that build today). Without a guard, calling any of these three methods on a tsx
+    project would silently write achx/achj-format content derived from the tsx's own
+    `AnimationChainListSave` view, either corrupting the target path/stream or (worse, if pointed at
+    the live `.tsx` file) replacing real Tiled tileset XML with achx XML. Same "defense-in-depth
+    guard for a latent, not-currently-reachable-via-current-flow gap" shape as the already-fixed
+    `Columns <= 0` guards in `TiledAnimationToAchjMapper`/`TsxAnimationValidator` (see the
+    "Corrupt/negative or out-of-range values elsewhere" DONE entry above) -- fixed rather than left
+    as a TODO, following that same precedent. Fixed with a new private
+    `ProjectManager.ThrowIfNativeTsxProject()` helper called at the top of all three methods,
+    throwing `InvalidOperationException` naming `SaveTsxProject` as the correct alternative.
+    Confirmed the first draft of this test passed for the wrong reason (a fresh `pm` defaults
+    `OnDiskCoordinateType` to `Pixel`, and the tsx fixture's texture PNG doesn't exist on disk, so
+    `ConvertCoordinates`'s existing "texture size could not be resolved" guard threw first,
+    masking the intended guard entirely) -- fixed by setting `OnDiskCoordinateType = UV` in each
+    test (no texture-size resolution needed) and asserting the exception message names
+    `SaveTsxProject`, so the tests fail for the intended reason. Tests:
+    `ProjectManagerTsxProjectTests.SaveAnimationChainList_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent`,
+    `SaveAnimationChainList_StreamOverload_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent`,
+    `SaveAnimationChainListAsync_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent`.
+  - **Task items 1, 2, 4 -- traced, no gap.** `TryLoadProjectFile` (item 1) is purely achx-side: it
+    only ever runs from `LoadAnimationChain`'s `acls.ProjectFile` branch, which a native tsx project
+    never populates, and it touches only `ReferencedPngs` (already covered). `NormalizeCoordinatesToUv`
+    (item 2) is a stateless static helper with no fields of its own. Every other private field/method
+    not yet named in a prior pass's DONE entry (`RunWithDiskCoordinateConversion(Async)`,
+    `BuildSeedCache`, `TryResolveTextureSize`, `NormalizeFrameTextureNames`, `FindContentAncestor`)
+    (item 4) only ever touches `_knownTextureSizes` (already tsx-independent by design -- texture
+    sizes apply to achx/achj projects, tsx projects have no equivalent concept) or is pure/static; no
+    tsx-awareness gap in any of them. No `WriteRecoveryFile`/`TryReadRecoveryFile`/`DeleteRecoveryFile`/
+    `ApplySettings`/`SaveCompanionFileFor` methods exist in this file at all (grepped -- those live in
+    `IoManager`/`AppSettings`, different files, out of this file's scope).
+  - **Task item 5 -- external-caller-desync risk: real finding, but in the UI layer, not
+    `ProjectManager.cs` itself (see new TODO item above).** Grepped the whole repo for every
+    `.AnimationChainListSave =` and `.FileName =` assignment. Confirmed both of `AppCommands.cs`'s
+    own two direct-assignment sites (`NewFile`, `CloseProject`) already call `RestoreTsxState(null)`
+    immediately after (fixed in pass #7) -- no gap in `AppCommands.cs`. But the same grep surfaced
+    several sites in `AnimationEditor.App`/`.Views`/`.Browser` (outside this sweep's declared file
+    scope) that assign `AnimationChainListSave`/`FileName` directly with no equivalent
+    `RestoreTsxState(null)` call -- the identical bug class pass #7 fixed twice in `AppCommands.cs`,
+    reached through a different, out-of-scope layer. Not fixed here; see the new TODO item above for
+    the specific sites and why a shared reset helper (not a per-site patch) is the right shape for
+    that follow-up.
+  - **Honest assessment: `ProjectManager.cs` reads exhausted for the "missing tsx-awareness branch"
+    bug class specifically.** This was a genuine full read, not a targeted re-trace, and (like pass
+    #7's equally thorough read of `AppCommands.cs`) it surfaced exactly one real gap before running
+    out -- a defense-in-depth guard, not a live bug, and smaller in severity than every prior pass's
+    findings. Every other member traced cleanly to either "already fixed by a prior pass" or "no
+    tsx-specific behavior applies here." The remaining risk this pass could find is concentrated
+    entirely in the Avalonia `.App`/`.Views`/`.Browser` UI layer (the TODO item above), matching pass
+    #7's own prediction exactly -- not somewhere in `.Core` that a ninth pass of the same files is
+    likely to find. A ninth `ProjectManager.cs`- or `AppCommands.cs`-focused pass is not recommended;
+    the UI-layer TODO item is the highest-value next target if this sweep continues.
