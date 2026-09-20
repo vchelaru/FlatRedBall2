@@ -361,20 +361,110 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **Fresh-eyes pass #5 needed**: pass #4 found two new real, confirmed bugs (fixed, see DONE) plus
-  the TODO above, so per the phase doc's stop condition ("finds nothing new to add, twice in a row")
-  this phase is not yet exhausted -- this was not a clean pass. Suggested starting points for pass
-  #5: the achx-push mapper's per-frame (not per-chain) skip semantics in `AchjToTiledAnimationMapper.
-  MapFrame` -- `ChainMappingResult.EntryTileId` is always the *first non-skipped* frame's tile id, so
-  a chain whose frame 0 is skipped (texture mismatch, size mismatch, etc.) but has other valid frames
-  writes its animation starting from frame 1's tile instead of frame 0's; traced this pass as
-  probably pre-existing/intentional single-cell achj-push behavior (not part of the native-tsx
-  identity-preservation bug class this sweep targets), but not chased to a firm conclusion -- worth
-  a deliberate look. Also worth another look: whether `TsxWriter`'s patch-mode `TopLevelEquals` should
-  compare `Tileset.Properties` order-sensitively or order-insensitively (currently order-sensitive
-  via `PropertiesEqual`'s `Zip` -- a hand-reordered-but-otherwise-identical tileset-level properties
-  list would be seen as "different," falling back to a full rewrite; likely harmless since a full
-  rewrite is always a safe fallback, but not explicitly traced this pass).
+- [ ] **`ProjectManager.ReferencedPngs` has the same "reused-instance state leaks across tab
+  switches" shape as `_tsxTileset`/`_knownTextureSizes`, but only for the `TabEditorCache` cache-hit
+  path (`TryActivateTabFromCache`), not for a fresh `LoadAnimationChain` call (that leak is now
+  fixed -- see fresh-eyes pass #5 below).** `IProjectManager.ReferencedPngs` is read-only (`{ get;
+  }`), so `TabEditorCache.CaptureFromProject`/`ApplyToProject` has no way to round-trip it the way
+  it now does for `CaptureTsxState`/`CaptureTextureSizeState`. Concretely: switch from a tab whose
+  achx has a `ProjectFile` (populates `ReferencedPngs`) to a tab with none, via the tab-switch cache
+  (not File > Open) -- `ReferencedPngs` keeps reporting the previous tab's textures. Severity traced
+  precisely: the only production consumer is `MainWindow.axaml.cs`'s `RefreshTextureCombo` (unions
+  frame textures with `ReferencedPngs` for the texture-picker dropdown), called after a texture
+  drag-drop or a texture resize -- never on tab activation itself. So the effect is a polluted
+  texture-picker dropdown showing extra, still-valid-but-wrong-project PNG paths after a tab-switch
+  + edit, not data loss, corruption, or a wrong save -- meaningfully lower severity than the
+  `_tsxTileset`/`_knownTextureSizes` leaks (which broke `SaveTsxProject` routing and pixel-conversion
+  correctness). Left as TODO rather than fixed in this pass: the fix shape is simple (add a setter to
+  `IProjectManager.ReferencedPngs`, or a `Capture`/`Restore` pair matching the existing two, then
+  update `TabEditorCache` + all 8 `IProjectManager` implementations), but it's a UI-cosmetic-only
+  gap in `AnimationEditor.App` (outside this sweep's `.Core`-focused file scope) and a deliberate
+  scope call, not an oversight.
+
+- [x] **Fresh-eyes pass #5.** Investigated both of pass #4's suggested targets to a firm conclusion,
+  re-read `TiledAnimationToAchjMapper.cs`'s anchor/satellite/footprint logic end to end for internal
+  consistency, and audited every private/near-private `ProjectManager` field against the
+  `TabEditorCache` round-trip pattern. Found and fixed one new real, confirmed bug (below, a third
+  instance of the exact leak class pass #4 fixed twice already), added one new TODO item (above, a
+  narrower/lower-severity sibling of that same bug class), and reached firm conclusions on both
+  suggested targets -- neither needed a source change:
+  - **Target 1 (`AchjToTiledAnimationMapper.MapFrame`'s per-frame skip semantics) -- firm
+    conclusion: intentional, not a gap.** `ChainMappingResult.EntryTileId` is documented as "the
+    first non-skipped frame's tile id," and that's correct given achx-push's actual design: unlike
+    native-tsx (which threads `knownEntryTileIds`/`knownSatelliteTileIds` hints through
+    `ProjectManager` specifically to preserve a tile's identity save over save), achx-push has no
+    identity-preservation concept at all -- `TilesetAnimationSync`'s own
+    `Apply_RenamedChainMovesToDifferentTile_ClearsOldTileAndPopulatesNewTile` test already
+    establishes that an achx-push chain simply follows wherever its geometry currently points to,
+    full stop. A chain whose frame 0 becomes newly skipped (e.g. a texture-reference typo) moving
+    its entry tile to frame 1's position is the exact same class of "geometry changed, entry moves"
+    as a chain being re-authored to start at a different tile -- and `TilesetAnimationSync.Apply`'s
+    source-scoped stale-tile-clearing (keyed by `achjSourceFile`) already self-heals the old tile in
+    both cases identically, with no special-casing needed. Pinned with a new test (no source
+    change): `AchjToTiledAnimationMapperTests.
+    Map_FirstFrameSkippedButLaterFrameValid_EntryTileIdIsFirstSurvivingFrameNotOriginalFrameZero`.
+  - **Target 2 (`TsxWriter.TopLevelEquals`'s order-sensitive `PropertiesEqual`) -- firm conclusion:
+    acceptable, matches existing precedent, not fixed.** Traced how tileset-level property order
+    could ever actually diverge between the freshly-reloaded `original` and the in-memory `tileset`
+    being saved: `NativeTsxAnimationSync.CloneForSave` shares `Tileset.Properties` by reference
+    (never touches it), and nothing else in this sync pipeline ever reorders or reassigns
+    `Tileset.Properties` -- so under this codebase's own normal operation, the two lists are always
+    identical (same reference even) at save time. The only way they'd differ in order is a
+    concurrent external edit to the file between load and save (a hand-edit or another tool) --
+    genuinely narrow, and when it happens the consequence is exactly the already-accepted
+    "TsxWriter tile ordering" tradeoff: patch mode's own `TopLevelEquals` gate falls back to a full
+    rewrite, which is always safe/correct, just not minimal-diff for that one save. Considered
+    fixing it anyway (sorting property signatures before comparing is a one-line, low-risk change)
+    but left it as documented, pinned behavior instead -- consistent with treating "full rewrite is
+    a safe fallback" as this file's established acceptable-limitation pattern rather than a bug
+    needing a source change every time it's reachable. Pinned with a new test, confirmed to have
+    teeth by temporarily making `PropertiesEqual` order-insensitive and observing it fail (patch
+    mode would then reuse the original property order instead of falling back), then reverting:
+    `TsxWriterTests.Write_TopLevelPropertiesReorderedButContentUnchanged_FallsBackButStaysCorrect`.
+  - **`TiledAnimationToAchjMapper.cs` coherence re-read -- no gap found.** Traced `IsAnchor` (backward/
+    chained/orphaned ParentId) -> `tentativeSatellitesByAnchor` -> the footprint-completeness pass ->
+    `incompleteAnchorIds` -> `IsEffectiveAnchor` -> `satellitesByAnchor` end to end: every stage
+    consistently builds on the previous one's exclusions (e.g. a backward-offset tile is already
+    excluded from `tentativeSatellitesByAnchor` via `IsAnchor`, so it can never participate in or
+    corrupt the footprint-completeness dx/dy math), and this exact chain was already exercised by
+    pass #4's composition test
+    (`Map_NonRectangularFootprintGapFilledByChainedParentIdTile_AllFourTilesSurfaceAsIndependentChains`).
+    Reads as one coherent piece of logic, not a patchwork -- no new test added.
+  - **Real bug, confirmed red first -- `ProjectManager.ReferencedPngs` leaked across a plain
+    `LoadAnimationChain` call the same way `_tsxTileset` did before its own fix.**
+    `LoadAnimationChain_SecondFileHasNoProjectFile_ClearsPreviouslyLoadedReferencedPngs` failed
+    against the old code (`ReferencedPngs` still held the first achx's PNGs after loading a second
+    achx with no `ProjectFile` at all). Root cause: `LoadAnimationChain` only ever calls
+    `TryLoadProjectFile` (which repopulates `ReferencedPngs`) when the newly loaded achx declares a
+    `ProjectFile` -- there was no `else` branch clearing it for an achx that doesn't. This is a plain
+    "File > Open a second file in the same window" repro, not even tab-switch-cache-specific
+    (reachable identically whether or not `TabEditorCache` exists), and a third confirmed instance
+    of the exact leak class fixed twice already for `_tsxTileset` and `_knownTextureSizes`. Fixed
+    with a one-line `else ReferencedPngs = new FilePath[0];` in `LoadAnimationChain`, mirroring the
+    tsx-fields reset immediately above it. The tab-switch-cache-specific extension of this same field
+    (bypassing `LoadAnimationChain` entirely) is a distinct, lower-severity gap -- see the new TODO
+    item above. Test:
+    `ProjectManagerReferencedPngTests.LoadAnimationChain_SecondFileHasNoProjectFile_ClearsPreviouslyLoadedReferencedPngs`.
+  - **Full `ProjectManager.cs` private-field audit against the `TabEditorCache` round-trip pattern --
+    one gap found (`ReferencedPngs`, above), everything else confirmed fine.** Listed every private
+    field (`_tsxTileset`, `_tsxEntryTileIdsByChain`, `_tsxSatelliteTileIdsByChain`,
+    `_knownTextureSizes`, static `mTileMapInformationList`) and every settable public property
+    (`AnimationChainListSave`, `FileName`, `OnDiskCoordinateType`, `ReferencedPngs`,
+    `ProjectFolderPath`). The four tsx/texture-size fields are already covered by
+    `CaptureTsxState`/`CaptureTextureSizeState`; `AnimationChainListSave`/`FileName`/
+    `OnDiskCoordinateType` are already directly round-tripped by `TabEditorCache`;
+    `mTileMapInformationList` was already traced (fresh-eyes pass #1) as static and unrelated to tsx
+    sync; `ProjectFolderPath`'s own doc comment explicitly establishes it as a session-wide setting,
+    not per-achx-load state ("stays set... even with zero tabs open") -- correctly excluded from any
+    per-tab round-trip. No more instances of this pattern beyond `ReferencedPngs`.
+  - **Honest assessment: not a clean pass.** One new real, confirmed bug was found and fixed (a third
+    instance of the reused-instance-state-leak class), plus one new TODO item describing a narrower,
+    lower-severity sibling of that same bug in the tab-switch-cache path. Per the stop condition, a
+    pass #6 is needed -- but note the bar has visibly narrowed: this pass's only real bug was a
+    single-line omission in code adjacent to (not part of) prior fixes, both suggested investigation
+    targets resolved to "already correct, pin and document" with no source change, and the dedicated
+    coherence re-read of the most-patched file in scope found nothing. If pass #6 is also this thin,
+    the phase is close to exhausted.
 
 ## DONE (continued)
 
