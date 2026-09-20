@@ -47,6 +47,25 @@ namespace AnimationEditor.Core
         IReadOnlyList<string> GetChainNamesWithTsxIssues();
 
         /// <summary>
+        /// Captures this project's native-tsx state (tileset + tile-id tracking dictionaries) as
+        /// an opaque snapshot, or <see langword="null"/> for an achx/achj project. <see
+        /// cref="AnimationEditor.Core.Models.TabEditorCache"/> uses this to round-trip a tab's tsx
+        /// identity across a cache-hit tab switch (<c>TryActivateTabFromCache</c>) -- that path
+        /// never calls <see cref="LoadTsxProject"/>/<see cref="LoadAnimationChain"/>, so without
+        /// this, <see cref="IsNativeTsxProject"/>/<see cref="TsxTileSize"/> keep reflecting
+        /// whichever tab was most recently loaded from disk instead of the tab being switched to.
+        /// </summary>
+        object? CaptureTsxState();
+
+        /// <summary>
+        /// Restores a snapshot previously returned by <see cref="CaptureTsxState"/> on this same
+        /// instance, or clears all native-tsx state when <paramref name="state"/> is <see
+        /// langword="null"/> (restoring an achx/achj tab). Passing a snapshot captured from a
+        /// different <see cref="IProjectManager"/> instance is undefined.
+        /// </summary>
+        void RestoreTsxState(object? state);
+
+        /// <summary>
         /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
         /// with no filesystem path to write (the browser-wasm build). Uses the
         /// <c>knownTextureSizes</c> from the most recent <see cref="LoadAnimationChain"/> call

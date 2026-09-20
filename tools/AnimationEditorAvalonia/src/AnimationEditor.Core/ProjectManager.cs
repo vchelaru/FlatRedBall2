@@ -747,6 +747,36 @@ namespace AnimationEditor.Core
         /// happens to have one -- reasonable, since one of its would-be satellites failing to attach
         /// is worth surfacing on the anchor as well.
         /// </remarks>
+        /// <summary>Opaque snapshot type returned by <see cref="CaptureTsxState"/> -- holds
+        /// direct references to this instance's tsx-specific fields at capture time, safe to
+        /// share without cloning because <see cref="LoadTsxProject"/>/<see cref="SaveTsxProject"/>
+        /// always replace these fields wholesale rather than mutating them in place.</summary>
+        private sealed record TsxState(
+            DotTiled.Tileset Tileset,
+            Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
+            Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain);
+
+        /// <inheritdoc/>
+        public object? CaptureTsxState() =>
+            _tsxTileset is null ? null : new TsxState(_tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain);
+
+        /// <inheritdoc/>
+        public void RestoreTsxState(object? state)
+        {
+            if (state is TsxState tsxState)
+            {
+                _tsxTileset = tsxState.Tileset;
+                _tsxEntryTileIdsByChain = tsxState.EntryTileIdsByChain;
+                _tsxSatelliteTileIdsByChain = tsxState.SatelliteTileIdsByChain;
+            }
+            else
+            {
+                _tsxTileset = null;
+                _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+                _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+            }
+        }
+
         public IReadOnlyList<string> GetChainNamesWithTsxIssues()
         {
             if (_tsxTileset == null || AnimationChainListSave == null)

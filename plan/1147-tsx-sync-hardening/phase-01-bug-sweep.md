@@ -35,6 +35,13 @@ Stop condition: a fresh-eyes pass finds nothing new to add, twice in a row.
 
 ## Files in scope
 
+Deliberately expanded once, for the `TabEditorCache` fix below: that item's root cause (a
+long-lived `ProjectManager` with private tsx state no cache layer could see) followed directly
+from the just-fixed `LoadAnimationChain` leak and was reachable via an everyday action (switching
+tabs), so it was fixed in-sweep rather than left open -- see its DONE entry for the touched files
+outside this original list (`IProjectManager.cs`, `Models/TabEditorCache.cs`, `Models/TabEntry.cs`,
+plus the `IProjectManager` test fakes that had to grow the two new interface members).
+
 - `tools/AnimationEditorAvalonia/src/AnimationEditor.Core/Tiled/TsxWriter.cs`
 - `tools/AnimationEditorAvalonia/src/AnimationEditor.Core/Tiled/TsxCompatibilityChecker.cs`
 - `tools/AnimationEditorAvalonia/src/AnimationEditor.Core/Tiled/TsxAnimationValidator.cs`
@@ -354,30 +361,25 @@ duplicate tile id) with no surrounding try/catch, but this is unreachable in pra
 tileset that was never successfully loaded in the first place, and nothing in this editor's UI can
 introduce a duplicate tile id or change `Columns` after a successful load.
 
-- [ ] **`TabEditorCache`'s tab-switch cache restore bypasses `LoadTsxProject`/`LoadAnimationChain`
-  entirely, so it can't apply the `LoadAnimationChain` fix from fresh-eyes pass #4 (see DONE) --
-  switching between a cached tsx tab and a cached achx tab can still leave stale native-tsx state.**
-  Confirmed by reading (not yet reduced to a failing test -- the fix touches files outside this
-  sweep's declared "Files in scope" list, so left as a TODO rather than expanding scope
-  mid-sweep). `ProjectManager` is a single instance reused across tabs (see `TabSwitchCacheTests.cs`);
-  `TabEditorCache.ApplyToProject`/`CaptureFromProject` (`AnimationEditor.Core/Models/TabEditorCache.cs`)
-  round-trip a tab's editor state through `IProjectManager`'s public surface only
-  (`AnimationChainListSave`, `OnDiskCoordinateType`, `FileName`) -- there is no public surface at all
-  for `_tsxTileset`/`_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`, so a tab switch that hits
-  the cache (`TryActivateTabFromCache`, when `TabEditorCache.HasFreshCache` is true -- i.e. every
-  switch back to a tab already visited once, since the file on disk hasn't changed) never touches
-  those fields at all, regardless of whether the tab being switched to/from is a tsx or achx project.
-  Concretely: open tsx tab A, open achx tab B (first visit to each goes through
-  `OpenProjectWorkflowAsync` -> `LoadTsxProject`/`LoadAnimationChain`, so `_tsxTileset` is set for A's
-  visit and -- after this pass's fix -- cleared for B's), switch back to tab A via
-  `TryActivateTabFromCache` (fresh cache, no reload) -- `_tsxTileset` is still whatever
-  `LoadAnimationChain` last left it (cleared, from loading B), not tab A's tileset, so
-  `IsNativeTsxProject` now wrongly reports `false` while tab A is active and its
-  `AnimationChainListSave` is actually tab A's tsx-derived chains. A full fix needs `IProjectManager`
-  to expose enough surface for `TabEditorCache` to capture/restore the tsx-specific state per tab
-  (or an explicit tsx/achx flag + cached tileset on `TabEntry`), which touches `IProjectManager.cs`,
-  `TabEditorCache.cs`, and possibly `TabEntry.cs`/`TabController.cs` -- none of which are in this
-  sweep's declared scope.
+- [ ] **`ProjectManager._knownTextureSizes` has the identical "private per-load state
+  `TabEditorCache` can't see" shape as the tsx fields just fixed, on the browser-wasm build
+  specifically.** Found while checking whether the `TabEditorCache` fix's root cause (a long-lived
+  `ProjectManager` with private state no cache layer can round-trip) generalizes past the tsx
+  fields. `LoadAnimationChain`'s `knownTextureSizes` parameter (texture pixel sizes supplied by the
+  caller instead of a disk read, needed because the browser-wasm build has no filesystem to read PNG
+  headers from) is stashed into the private field `_knownTextureSizes`, which
+  `SaveAnimationChainList(Stream)` and `GetTextureSizeInPixels` depend on to convert UV coordinates
+  back to Pixel on save. Like the tsx fields, it's plain per-load instance state with no public
+  surface, so `TabEditorCache.CaptureFromProject`/`ApplyToProject` never touch it -- a browser-wasm
+  cache-hit tab switch (tab A loaded with known texture sizes, tab B loaded, switch back to A via
+  `TryActivateTabFromCache`) would restore tab A's `AnimationChainListSave` correctly but leave
+  `_knownTextureSizes` at whatever tab B's load left it (or `null`), so a save on tab A would use
+  wrong/missing texture sizes converting back to Pixel coordinates. Traced by reading only, not
+  reduced to a failing test yet -- `SaveAnimationChainList(string)` (the desktop path, not affected,
+  since it re-reads PNG headers from disk instead of relying on this field) has no equivalent gap.
+  Confirm on a browser-wasm-specific test harness (or by adding a `Stream`-based
+  `IProjectManager.CaptureTsxState`-shaped snapshot for this field too) before deciding whether this
+  needs the same opaque-snapshot treatment.
 
 - [ ] **Fresh-eyes pass #5 needed**: pass #4 found two new real, confirmed bugs (fixed, see DONE) plus
   the TODO above, so per the phase doc's stop condition ("finds nothing new to add, twice in a row")
@@ -853,3 +855,38 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     one new TODO item describing a deeper (but out-of-declared-scope) manifestation of one of them.
     Per the stop condition, a pass #5 is needed; see the TODO items above for suggested starting
     points.
+
+- [x] **`TabEditorCache`'s tab-switch cache restore bypassed `LoadTsxProject`/`LoadAnimationChain`
+  entirely, leaking stale native-tsx state across tab switches (scope deliberately expanded for
+  this item -- see "Files in scope" note above).** Real bug, confirmed red first in both directions:
+  `TryActivateTabFromCache_TsxThenAchxThenBackToTsx_RestoresNativeTsxStateAndSaveWritesEdit` failed
+  with `IsNativeTsxProject` still `false` after cache-restoring the tsx tab (the exact repro from
+  this item's original writeup), and
+  `TryActivateTabFromCache_AchxThenTsxThenBackToAchx_ClearsNativeTsxStateThenRestoresTsxOnReturn`
+  failed with `IsNativeTsxProject` still `true` after cache-restoring the achx tab -- a second,
+  previously-undocumented direction of the same bug (the achx tab wrongly inherits the *live* tsx
+  tab's state, not just the reverse). Decision: **design option 1**, expose enough on
+  `IProjectManager` for `TabEditorCache` to capture/restore the tsx-specific state, via an opaque
+  snapshot rather than leaking `DotTiled.Tileset`/the tracking dictionaries' concrete types across
+  the interface boundary -- keeps `ProjectManager`'s tsx fields `private` exactly as before, and
+  `TabEditorCache`/`TabEntry` never need to know the snapshot's shape. Fixed:
+  - `IProjectManager` gained `object? CaptureTsxState()` (returns `null` for an achx/achj project)
+    and `void RestoreTsxState(object? state)` (clears all tsx state when `state` is `null`).
+  - `ProjectManager` implements both via a private `sealed record TsxState(Tileset, EntryTileIdsByChain,
+    SatelliteTileIdsByChain)` holding direct references to the existing fields at capture time --
+    safe to share without cloning because `LoadTsxProject`/`SaveTsxProject` always replace these
+    fields wholesale, never mutate them in place (same reasoning already documented on
+    `_tsxEntryTileIdsByChain`). `RestoreTsxState(null)` reuses the exact same three-field reset
+    `LoadAnimationChain` already does for its own state-leak fix earlier in this sweep.
+  - `TabEntry` gained `object? CachedTsxState`; `TabEditorCache.CaptureFromProject`/`ApplyToProject`
+    call `pm.CaptureTsxState()`/`pm.RestoreTsxState(tab.CachedTsxState)` alongside the existing
+    `AnimationChainListSave`/`OnDiskCoordinateType` round-trip.
+  - Eight `IProjectManager` implementations (7 test fakes across `AnimationEditor.Views.Tests` and
+    `AnimationEditor.Core.Tests`, plus `ProjectManager` itself) needed the two new members added to
+    compile; all are either a no-op stub (`CaptureTsxState() => null`, `RestoreTsxState` empty body)
+    or a passthrough to a wrapped `ProjectManager` (`TabSwitchCacheTests`' `CountingProjectManager`).
+  Tests (new file `TabSwitchCacheTsxTests.cs`):
+  `TryActivateTabFromCache_TsxThenAchxThenBackToTsx_RestoresNativeTsxStateAndSaveWritesEdit` (also
+  proves a save against the cache-restored tab writes a real edit to the correct tsx file, not a
+  no-op against cleared state) and
+  `TryActivateTabFromCache_AchxThenTsxThenBackToAchx_ClearsNativeTsxStateThenRestoresTsxOnReturn`.

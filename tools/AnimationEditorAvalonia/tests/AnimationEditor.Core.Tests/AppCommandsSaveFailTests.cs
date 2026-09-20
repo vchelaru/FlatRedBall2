@@ -74,6 +74,8 @@ public class AppCommandsSaveFailTests
         public void LoadTsxProject(FilePath fileName) { }
         public void SaveTsxProject(string? targetPath = null) { }
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
+        public object? CaptureTsxState() => null;
+        public void RestoreTsxState(object? state) { }
 
         public void LoadAnimationChain(
             FilePath fileName,

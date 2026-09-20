@@ -70,6 +70,14 @@ namespace AnimationEditor.Core.Models
         public DateTime? CachedDiskWriteTimeUtc { get; set; }
 
         /// <summary>
+        /// Snapshot of this tab's native-tsx state (see <see cref="IProjectManager.CaptureTsxState"/>),
+        /// captured alongside <see cref="CachedEditorModel"/> so a cache-hit tab switch restores
+        /// <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileSize"/>
+        /// for THIS tab instead of leaving whatever tab was loaded last. Null for an achx/achj tab.
+        /// </summary>
+        public object? CachedTsxState { get; set; }
+
+        /// <summary>
         /// Name of the selected animation chain when this tab was last deactivated.
         /// Session-only (not written to <c>.aeproperties</c>).
         /// </summary>
