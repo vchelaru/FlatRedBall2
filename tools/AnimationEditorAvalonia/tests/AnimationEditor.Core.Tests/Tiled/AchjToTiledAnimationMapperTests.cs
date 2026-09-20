@@ -86,6 +86,28 @@ public class AchjToTiledAnimationMapperTests
     }
 
     [Fact]
+    public void Map_FirstFrameSkippedButLaterFrameValid_EntryTileIdIsFirstSurvivingFrameNotOriginalFrameZero()
+    {
+        // EntryTileId is documented (see ChainMappingResult.EntryTileId) as "the first non-skipped
+        // frame's tile id," not "frame 0's tile id" -- and that's intentional here, not a gap:
+        // achx-push has no identity-preservation concept for entry tile ids the way native-tsx's
+        // knownEntryTileIds hint does (TilesetAnimationSync's own
+        // Apply_RenamedChainMovesToDifferentTile_ClearsOldTileAndPopulatesNewTile test already
+        // establishes that an achx-push chain simply follows wherever its geometry currently
+        // points, with the sync layer's source-scoped stale-clearing self-healing the old tile
+        // either way). This chain's frame 0 references a different texture (skipped); frame 1 is
+        // the first frame that actually survives, at tile 5.
+        var achj = AchjWithChain("Walk",
+            PixelFrame(0, 0, 16, 32, textureName: "OtherSheet.png"),
+            PixelFrame(16, 32, 32, 64));
+
+        var results = AchjToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Equal((uint)5, results[0].EntryTileId);
+        Assert.Equal([(uint)5], results[0].Frames.Select(f => f.TileId));
+    }
+
+    [Fact]
     public void Map_FlippedFrame_KeepsFrameButWarnsFlipDropped()
     {
         var achj = AchjWithChain("Flipped", PixelFrame(0, 0, 16, 32, flipHorizontal: true));
