@@ -319,6 +319,63 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_NonRectangularFootprintGapFilledByChainedParentIdTile_AllFourTilesSurfaceAsIndependentChains()
+    {
+        // Combines the two group-level fixes (non-rectangular footprint + chained ParentId) in one
+        // tileset, per the fresh-eyes-pass-#4 task: anchor A(0) intends a 2x2 footprint via two
+        // genuine satellites -- S_a(1) at offset (1,0) and S_b(4) at offset (0,1) -- but the (1,1)
+        // corner isn't a real ParentId=0 satellite: it's tile 5, whose ParentId is chained through
+        // S_a (id 1) instead of pointing at the true anchor A. Tile 5 must already be excluded from
+        // A's tentative-satellites set by the chained-ParentId check (IsAnchor) *before* the
+        // completeness check ever runs, so A's own footprint is computed from {S_a, S_b} only --
+        // finds the (1,1) gap and un-folds all three -- while tile 5 independently surfaces as its
+        // own chain via the pre-existing chained-ParentId handling. All four tiles must end up as
+        // four independent 1x1 chains, none silently dropped or mis-footprinted.
+        var tileset = EmptyTileset();
+
+        var anchorA = new Tile { ID = 0, Width = 0, Height = 0 };
+        anchorA.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        tileset.Tiles.Add(anchorA);
+
+        var satelliteA1 = new Tile { ID = 1, Width = 0, Height = 0 };
+        satelliteA1.Animation.Add(new Frame { TileID = 1, Duration = 100 });
+        satelliteA1.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
+        tileset.Tiles.Add(satelliteA1);
+
+        var satelliteA4 = new Tile { ID = 4, Width = 0, Height = 0 };
+        satelliteA4.Animation.Add(new Frame { TileID = 4, Duration = 100 });
+        satelliteA4.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
+        tileset.Tiles.Add(satelliteA4);
+
+        // Tile 5 sits at the (1,1) corner that would complete A's rectangle, but its ParentId
+        // chains through satellite 1 instead of pointing at anchor 0.
+        var chainedCorner = new Tile { ID = 5, Width = 0, Height = 0 };
+        chainedCorner.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        chainedCorner.Properties.Add(new IntProperty { Name = "ParentId", Value = 1 });
+        tileset.Tiles.Add(chainedCorner);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+
+        Assert.Equal(4, acls.AnimationChains.Count);
+        var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
+        Assert.Contains("ID:0", chainNames);
+        Assert.Contains("ID:1", chainNames);
+        Assert.Contains("ID:4", chainNames);
+        Assert.Contains("ID:5", chainNames);
+
+        foreach (var chain in acls.AnimationChains)
+        {
+            Assert.False(satelliteTileIdsByChain.ContainsKey(chain));
+            Assert.Single(chain.Frames);
+        }
+
+        var anchorChain = acls.AnimationChains.Single(c => c.Name == "ID:0");
+        Assert.Equal((uint)0, entryTileIdsByChain[anchorChain]);
+        var cornerChain = acls.AnimationChains.Single(c => c.Name == "ID:5");
+        Assert.Equal((uint)5, entryTileIdsByChain[cornerChain]);
+    }
+
+    [Fact]
     public void Map_ReturnsEntryTileIdForEachChainKeyedByChainReference()
     {
         var tileset = EmptyTileset();
