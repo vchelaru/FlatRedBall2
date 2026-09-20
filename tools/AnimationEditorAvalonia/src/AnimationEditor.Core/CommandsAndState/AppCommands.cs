@@ -584,13 +584,20 @@ namespace AnimationEditor.Core.CommandsAndState
                 : new FilePath(_pm.FileName).Extension;
             var defaultExtension = string.IsNullOrEmpty(currentExtension) ? "achj" : currentExtension;
 
-            var path = await FileDialogService.PickSaveFileAsync(
-                "Save Animation Chain", defaultExtension,
-                new[]
+            // A native tsx project's Save As must offer only its own format -- SaveTsxProject
+            // always writes Tiled tileset XML regardless of the target path's extension (see
+            // SaveCurrentAnimationChainList below), so letting the achj/achx choices through here
+            // would let the user save tsx content under a misleading .achx/.achj name.
+            var fileTypeChoices = _pm.IsNativeTsxProject
+                ? new[] { new FileTypeChoice("tsx", "Tiled Tileset (*.tsx)") }
+                : new[]
                 {
                     new FileTypeChoice("achj", "Animation Chain JSON (*.achj)"),
                     new FileTypeChoice("achx", "Animation Chain XML (*.achx)")
-                });
+                };
+
+            var path = await FileDialogService.PickSaveFileAsync(
+                "Save Animation Chain", defaultExtension, fileTypeChoices);
 
             if (string.IsNullOrEmpty(path)) return;
 

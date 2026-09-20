@@ -204,6 +204,49 @@ public class AppCommandsSaveAsTests : IDisposable
             dialog.RequestedFileTypeChoices!.Select(c => c.Extension).OrderBy(e => e));
     }
 
+    // ── Native tsx project (fresh-eyes pass #6): Save As must offer tsx, not achj/achx ──
+
+    private const string TsxFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+         <image source="Heroes.png" width="64" height="64"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="200"/>
+           <frame tileid="1" duration="200"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public async Task SaveCurrentAnimationChainListAsync_NativeTsxProject_RequestsTsxDefaultExtension()
+    {
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        File.WriteAllText(tsxPath, TsxFixtureXml);
+        ctx.ProjectManager.LoadTsxProject(new AnimationEditor.Core.Paths.FilePath(tsxPath));
+        var dialog = new CapturingFileDialogService(Path.Combine(_dir.Path, "out.tsx"));
+        ctx.AppCommands.FileDialogService = dialog;
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        Assert.Equal("tsx", dialog.RequestedDefaultExtension);
+    }
+
+    [Fact]
+    public async Task SaveCurrentAnimationChainListAsync_NativeTsxProject_OffersOnlyTsxChoice()
+    {
+        var tsxPath = Path.Combine(_dir.Path, "Heroes.tsx");
+        File.WriteAllText(tsxPath, TsxFixtureXml);
+        ctx.ProjectManager.LoadTsxProject(new AnimationEditor.Core.Paths.FilePath(tsxPath));
+        var dialog = new CapturingFileDialogService(Path.Combine(_dir.Path, "out.tsx"));
+        ctx.AppCommands.FileDialogService = dialog;
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        Assert.Equal(new[] { "tsx" }, dialog.RequestedFileTypeChoices!.Select(c => c.Extension));
+    }
+
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_SavedFile_ContainsChainData()
     {
