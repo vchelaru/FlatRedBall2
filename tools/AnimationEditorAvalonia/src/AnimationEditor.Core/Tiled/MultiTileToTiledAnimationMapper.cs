@@ -14,6 +14,10 @@ public sealed record TiledSatelliteMapping(uint TileId, IReadOnlyList<MappedFram
 /// tile cell per frame onto a tileset's tile grid.</summary>
 public sealed record MultiTileMappingResult
 {
+    /// <summary>The chain this result came from, by reference -- lets a caller (<see
+    /// cref="AnimationEditor.Core.ProjectManager"/>) record "this chain owns this tile id" keyed
+    /// on identity instead of on <see cref="ChainName"/>, which changes on a rename.</summary>
+    public required AnimationChainSave SourceChain { get; init; }
     public required string ChainName { get; init; }
     /// <summary>The entry/anchor tile's own per-frame tile id sequence (top-left cell of the footprint).</summary>
     public required IReadOnlyList<MappedFrame> AnchorFrames { get; init; }
@@ -44,20 +48,28 @@ public static class MultiTileToTiledAnimationMapper
 {
     private const float Epsilon = 0.001f;
 
+    /// <param name="knownEntryTileIds">Optional identity hint from a prior <see
+    /// cref="TiledAnimationToAchjMapper.Map"/> load (or a prior save -- see <see
+    /// cref="AnimationEditor.Core.ProjectManager"/>'s own tracking), keyed by chain object
+    /// reference. When a chain has an entry here, that tile id wins over the freshly-computed
+    /// first-frame id -- without this, every save relocates any chain whose owning tile isn't its
+    /// own first frame (an ordinary hand-authored Tiled pattern), orphaning the original tile.</param>
     public static IReadOnlyList<MultiTileMappingResult> Map(
-        AnimationChainListSave achj, TilesetAnimationInfo tilesetInfo)
+        AnimationChainListSave achj, TilesetAnimationInfo tilesetInfo,
+        IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds = null)
     {
         return achj.AnimationChains
-            .Select(chain => MapChain(chain, achj.CoordinateType, achj.TimeMeasurementUnit, tilesetInfo))
+            .Select(chain => MapChain(chain, achj.CoordinateType, achj.TimeMeasurementUnit, tilesetInfo, knownEntryTileIds))
             .ToList();
     }
 
     private static MultiTileMappingResult MapChain(
         AnimationChainSave chain, TextureCoordinateType coordinateType, TimeMeasurementUnit timeUnit,
-        TilesetAnimationInfo tilesetInfo)
+        TilesetAnimationInfo tilesetInfo, IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds)
     {
         MultiTileMappingResult Empty(string? warning = null) => new()
         {
+            SourceChain = chain,
             ChainName = chain.Name,
             AnchorFrames = [],
             EntryTileId = null,
@@ -120,11 +132,18 @@ public static class MultiTileToTiledAnimationMapper
             .Select(kv => new TiledSatelliteMapping(kv.Value[0].TileId, kv.Value))
             .ToList();
 
+        uint? entryTileId = null;
+        if (anchorFrames.Count > 0)
+            entryTileId = knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var known)
+                ? known
+                : anchorFrames[0].TileId;
+
         return new MultiTileMappingResult
         {
+            SourceChain = chain,
             ChainName = chain.Name,
             AnchorFrames = anchorFrames,
-            EntryTileId = anchorFrames.Count > 0 ? anchorFrames[0].TileId : null,
+            EntryTileId = entryTileId,
             Satellites = satellites,
             Warnings = [],
         };

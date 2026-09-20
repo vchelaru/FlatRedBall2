@@ -54,7 +54,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, FixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Contains(acls.AnimationChains, c => c.Name == "ID:0");
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
@@ -87,5 +87,73 @@ public class NativeTsxProjectRoundTripTests
         var reloadedSatellite = reloaded.Tiles.Single(t => t.ID == 9);
         Assert.Equal(8, reloadedSatellite.GetProperty<IntProperty>("ParentId").Value);
         Assert.Equal([((uint)9, 150), ((uint)13, 150)], reloadedSatellite.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // Tile 5 owns an animation whose frames are [6, 7] -- 5 itself never appears as a frame. This
+    // is an entirely ordinary hand-authored-in-Tiled pattern (the tile shown at rest is never one
+    // of the cycled frames), and is exactly the shape that shipped broken: recomputing the "owning"
+    // tile from frame[0] every save relocated this animation from 5 to 6, leaving 5 blank.
+    private const string OwnerNotFirstFrameFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="2">
+          <animation>
+           <frame tileid="2" duration="100"/>
+           <frame tileid="3" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="5">
+          <properties>
+           <property name="Name" value="RiseUp"/>
+          </properties>
+          <animation>
+           <frame tileid="6" duration="300"/>
+           <frame tileid="7" duration="300"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void LoadEditUnrelatedChainSave_OwnerTileNotItsOwnFirstFrame_StaysOnItsOriginalTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, OwnerNotFirstFrameFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+
+        // Simulate "I removed one animation": drop the unrelated ID:2 chain, leave RiseUp alone.
+        acls.AnimationChains.RemoveAll(c => c.Name == "ID:2");
+
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal("RiseUp", riseUp.GetProperty<StringProperty>("Name").Value);
+
+        // No new tile should have been invented at id 6 for the same content.
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 6 && t.Animation.Count > 0);
+
+        // The removed chain's tile is actually cleared, not left dangling.
+        var clearedTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 2);
+        Assert.True(clearedTile is null || clearedTile.Animation.Count == 0);
     }
 }

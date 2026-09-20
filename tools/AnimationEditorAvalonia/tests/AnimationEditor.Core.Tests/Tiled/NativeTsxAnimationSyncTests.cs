@@ -1,5 +1,7 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
+using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -19,6 +21,7 @@ public class NativeTsxAnimationSyncTests
     private static MultiTileMappingResult Result(
         string chainName, uint entryTileId, MappedFrame[] anchorFrames, params TiledSatelliteMapping[] satellites) => new()
     {
+        SourceChain = new AnimationChainSave { Name = chainName },
         ChainName = chainName,
         AnchorFrames = anchorFrames,
         EntryTileId = entryTileId,
@@ -98,5 +101,70 @@ public class NativeTsxAnimationSyncTests
         var syncResult = NativeTsxAnimationSync.Apply(tileset, results);
 
         Assert.False(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_TwoChainsClaimSameEntryTile_ThrowsInsteadOfSilentlyOverwriting()
+    {
+        var tileset = EmptyTileset();
+        var results = new[]
+        {
+            Result("Walk", 0, [new MappedFrame(0, 100)]),
+            Result("Idle", 0, [new MappedFrame(4, 100)]),
+        };
+
+        Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+    }
+
+    [Fact]
+    public void Apply_SatelliteCollidesWithAnotherChainsAnchor_ThrowsInsteadOfSilentlyOverwriting()
+    {
+        var tileset = EmptyTileset();
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)]);
+        var results = new[]
+        {
+            Result("Walk", 0, [new MappedFrame(0, 100)], satellite),
+            Result("Idle", 1, [new MappedFrame(1, 100)]),
+        };
+
+        Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+    }
+
+    [Fact]
+    public void Apply_ExistingNamePropertyHasWrongType_IsReplacedNotDuplicated()
+    {
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        // Simulate a hand-authored/corrupt file where "Name" was written as an int property.
+        tile.Properties.Add(new IntProperty { Name = "Name", Value = 42 });
+        tileset.Tiles.Add(tile);
+
+        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+        NativeTsxAnimationSync.Apply(tileset, results);
+
+        var nameProperties = tile.Properties.Where(p => p.Name == "Name").ToList();
+        var single = Assert.Single(nameProperties);
+        var stringProperty = Assert.IsType<StringProperty>(single);
+        Assert.Equal("Walk", stringProperty.Value);
+    }
+
+    [Fact]
+    public void Apply_ExistingParentIdPropertyHasWrongType_IsReplacedNotDuplicated()
+    {
+        var tileset = EmptyTileset();
+        var anchorTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tileset.Tiles.Add(anchorTile);
+        var satelliteTile = new Tile { ID = 1, Width = 0, Height = 0 };
+        satelliteTile.Properties.Add(new StringProperty { Name = "ParentId", Value = "not-a-number" });
+        tileset.Tiles.Add(satelliteTile);
+
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)]);
+        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)], satellite) };
+        NativeTsxAnimationSync.Apply(tileset, results);
+
+        var parentIdProperties = satelliteTile.Properties.Where(p => p.Name == "ParentId").ToList();
+        var single = Assert.Single(parentIdProperties);
+        var intProperty = Assert.IsType<IntProperty>(single);
+        Assert.Equal(0, intProperty.Value);
     }
 }

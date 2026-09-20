@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Tiled;
 using DotTiled;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -122,5 +123,53 @@ public class TilesetAnimationSyncTests
         var tile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.All(tile.Animation, f => Assert.Equal(250, f.Duration));
         Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_TwoChainsInSameSourceClaimSameEntryTile_ThrowsInsteadOfSilentlyOverwriting()
+    {
+        var tileset = EmptyTileset();
+        var results = new[]
+        {
+            Result("Walk", 0, new MappedFrame(0, 100)),
+            Result("Idle", 0, new MappedFrame(4, 100)),
+        };
+
+        Assert.Throws<InvalidOperationException>(() => TilesetAnimationSync.Apply(tileset, results, SourceLabel));
+    }
+
+    [Fact]
+    public void Apply_TileOwnedByDifferentSource_IsSkippedNotOverwritten()
+    {
+        var tileset = EmptyTileset();
+        var firstSourceResults = new[] { Result("Walk", 0, new MappedFrame(0, 999)) };
+        TilesetAnimationSync.Apply(tileset, firstSourceResults, "../Hero.achx");
+
+        // A different achx's geometry happens to compute the same entry tile id.
+        var secondSourceResults = new[] { Result("Idle", 0, new MappedFrame(4, 100)) };
+        var syncResult = TilesetAnimationSync.Apply(tileset, secondSourceResults, "../OtherChain.achx");
+
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Equal(999, tile.Animation.Single().Duration);
+        Assert.Equal("../Hero.achx", tile.GetProperty<StringProperty>("achjSourceFile").Value);
+        Assert.Equal(0, syncResult.AppliedCount);
+        Assert.Contains(syncResult.Warnings, w => w.Contains("already owned by"));
+    }
+
+    [Fact]
+    public void Apply_ExistingAnimationNamePropertyHasWrongType_IsReplacedNotDuplicated()
+    {
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tile.Properties.Add(new IntProperty { Name = "achjAnimationName", Value = 42 });
+        tileset.Tiles.Add(tile);
+
+        var results = new[] { Result("Walk", 0, new MappedFrame(0, 100)) };
+        TilesetAnimationSync.Apply(tileset, results, SourceLabel);
+
+        var matching = tile.Properties.Where(p => p.Name == "achjAnimationName").ToList();
+        var single = Assert.Single(matching);
+        var stringProperty = Assert.IsType<StringProperty>(single);
+        Assert.Equal("Walk", stringProperty.Value);
     }
 }

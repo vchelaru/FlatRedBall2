@@ -37,11 +37,18 @@ public static class TiledAnimationToAchjMapper
     /// so every consumer re-multiplied an already-in-pixels value by the texture size again (a
     /// 200ms duration rendered as "200 seconds"; a 864px coordinate rendered as 864*2048).
     /// </summary>
-    public static AnimationChainListSave Map(Tileset tileset)
+    /// <param name="entryTileIdsByChain">Every returned chain's own source tile id, keyed by
+    /// chain object reference. A native-tsx save (<see cref="MultiTileToTiledAnimationMapper"/>)
+    /// must feed this back in as its <c>knownEntryTileIds</c> so a chain whose owning tile id
+    /// doesn't match its own first frame -- a perfectly ordinary hand-authored Tiled pattern --
+    /// keeps writing to the same tile instead of relocating (and orphaning the original tile)
+    /// every save. Keyed by reference, not name, so a rename doesn't look like delete+create.</param>
+    public static AnimationChainListSave Map(Tileset tileset, out IReadOnlyDictionary<AnimationChainSave, uint> entryTileIdsByChain)
     {
         var imageFileName = tileset.Image.HasValue ? (tileset.Image.Value.Source.HasValue ? tileset.Image.Value.Source.Value : string.Empty) : string.Empty;
         var (textureWidth, textureHeight) = GetTextureSize(tileset);
         var acls = new AnimationChainListSave();
+        var entryTileIds = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
 
         var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
         var parentIdByTileId = animatedTiles.ToDictionary(t => t.ID, GetParentId);
@@ -85,8 +92,10 @@ public static class TiledAnimationToAchjMapper
             }
 
             acls.AnimationChains.Add(chain);
+            entryTileIds[chain] = anchor.ID;
         }
 
+        entryTileIdsByChain = entryTileIds;
         return acls;
     }
 
@@ -115,12 +124,15 @@ public static class TiledAnimationToAchjMapper
         return string.IsNullOrEmpty(name) ? $"ID:{tile.ID}" : name;
     }
 
+    /// <summary>A negative <c>ParentId</c> (hand-edited or corrupt file) is treated the same as a
+    /// missing one rather than unchecked-cast into a huge <see cref="uint"/> -- silently wrapping
+    /// -1 into 4294967295 would send lookups into nonsense territory instead of failing loudly.</summary>
     internal static uint? GetParentId(Tile tile)
     {
         var property = tile.Properties.FirstOrDefault(p => p.Name == ParentIdPropertyName);
         return property switch
         {
-            IntProperty intProperty => (uint)intProperty.Value,
+            IntProperty { Value: >= 0 } intProperty => (uint)intProperty.Value,
             _ => null,
         };
     }

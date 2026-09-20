@@ -35,6 +35,14 @@ namespace AnimationEditor.Core
         /// </summary>
         private DotTiled.Tileset? _tsxTileset;
 
+        /// <summary>Each native-tsx chain's own tile id, keyed by chain object reference (survives
+        /// a rename, unlike keying by name) -- populated on <see cref="LoadTsxProject"/> from what
+        /// the file already said, and kept current after every <see cref="SaveTsxProject"/> so a
+        /// brand-new chain's first-save id keeps being reused on every later save instead of being
+        /// recomputed (and potentially drifting) from geometry each time. See <see
+        /// cref="Tiled.MultiTileToTiledAnimationMapper"/>'s <c>knownEntryTileIds</c> parameter.</summary>
+        private Dictionary<AnimationChainSave, uint> _tsxEntryTileIdsByChain = new(ReferenceEqualityComparer.Instance);
+
         /// <summary>Whether the currently loaded project is a native <c>.tsx</c> project (see
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsxTileset != null;
@@ -640,7 +648,8 @@ namespace AnimationEditor.Core
                     $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
 
             _tsxTileset = tileset;
-            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset);
+            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+            _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
             FileName = fileName.FullPath;
         }
 
@@ -654,9 +663,19 @@ namespace AnimationEditor.Core
             if (_tsxTileset == null || AnimationChainListSave == null)
                 return;
 
-            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset));
+            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain);
             Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
             Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
+
+            // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
+            // id) so the *next* save reuses them instead of recomputing from geometry again -- see
+            // _tsxEntryTileIdsByChain's doc comment for why that matters. Rebuilt from scratch
+            // (rather than just adding to it) so a deleted chain's entry doesn't linger forever.
+            var updated = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+            foreach (var result in mapped)
+                if (result.EntryTileId is { } entryTileId)
+                    updated[result.SourceChain] = entryTileId;
+            _tsxEntryTileIdsByChain = updated;
         }
 
         /// <summary>
@@ -680,7 +699,7 @@ namespace AnimationEditor.Core
 
             var anchorTileIdsWithIssues = issues.Select(i => i.AnchorTileId).ToHashSet();
 
-            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset))
+            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain)
                 .Where(r => r.EntryTileId.HasValue && anchorTileIdsWithIssues.Contains(r.EntryTileId.Value))
                 .Select(r => r.ChainName)
                 .ToList();

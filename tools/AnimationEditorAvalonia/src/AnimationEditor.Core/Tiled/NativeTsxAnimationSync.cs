@@ -1,4 +1,5 @@
 using DotTiled;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -18,8 +19,42 @@ public sealed record NativeTsxAnimationSyncResult(bool Changed);
 /// </summary>
 public static class NativeTsxAnimationSync
 {
+    /// <summary>
+    /// Every tile id a save wants to write to must be claimed by exactly one chain (as its anchor
+    /// or one of its satellites) -- a Tiled tile can only carry one &lt;animation&gt;. Two chains
+    /// whose geometry happens to compute the same tile id, or a group whose own anchor and
+    /// satellite alias each other, would otherwise silently overwrite one another in whatever
+    /// order <paramref name="results"/> happens to iterate. Matches this codebase's "fail loudly
+    /// instead of corrupting" precedent (issue #1145) rather than picking a winner.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Two chains claim the same tile id.</exception>
+    private static void ValidateNoTileIdCollisions(IReadOnlyList<MultiTileMappingResult> results)
+    {
+        var claimedBy = new Dictionary<uint, string>();
+
+        void Claim(uint tileId, string chainName)
+        {
+            if (claimedBy.TryGetValue(tileId, out var existingChain))
+                throw new InvalidOperationException(
+                    $"Can't save: Tiled tile {tileId} would be claimed by both \"{existingChain}\" and " +
+                    $"\"{chainName}\". Two animations can't share one tile -- move one of them in the " +
+                    "spritesheet or rename it so they no longer compute the same tile id.");
+            claimedBy[tileId] = chainName;
+        }
+
+        foreach (var result in results)
+        {
+            if (result.EntryTileId is { } entryTileId)
+                Claim(entryTileId, result.ChainName);
+            foreach (var satellite in result.Satellites)
+                Claim(satellite.TileId, result.ChainName);
+        }
+    }
+
     public static NativeTsxAnimationSyncResult Apply(Tileset tileset, IReadOnlyList<MultiTileMappingResult> results)
     {
+        ValidateNoTileIdCollisions(results);
+
         var previouslyAnimatedTileIds = tileset.Tiles
             .Where(t => t.Animation.Count > 0)
             .Select(t => t.ID)
@@ -109,19 +144,33 @@ public static class NativeTsxAnimationSync
         return true;
     }
 
+    /// <summary>Finds a property by name regardless of its concrete type, and removes it if it
+    /// isn't a <typeparamref name="T"/> -- a hand-authored file can carry e.g. an int-typed "Name"
+    /// property. Matching only <c>OfType&lt;T&gt;()</c> would miss it entirely and add a *second*,
+    /// correctly-typed property with the same name alongside it: two <c>&lt;property name="Name"&gt;</c>
+    /// entries, which real Tiled never produces and won't round-trip cleanly.</summary>
+    private static T? FindByNameRemovingWrongType<T>(Tile tile, string name) where T : class, IProperty
+    {
+        var existingWrongType = tile.Properties.FirstOrDefault(p => p.Name == name && p is not T);
+        if (existingWrongType != null)
+            tile.Properties.Remove(existingWrongType);
+        return tile.Properties.OfType<T>().FirstOrDefault(p => p.Name == name);
+    }
+
     private static bool SetOrRemoveStringProperty(Tile tile, string name, string? value)
     {
-        var existing = tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == name);
+        var hadWrongType = tile.Properties.Any(p => p.Name == name && p is not StringProperty);
+        var existing = FindByNameRemovingWrongType<StringProperty>(tile, name);
         if (value is null)
         {
-            if (existing is null) return false;
+            if (existing is null) return hadWrongType;
             tile.Properties.Remove(existing);
             return true;
         }
 
         if (existing != null)
         {
-            if (existing.Value == value) return false;
+            if (existing.Value == value) return hadWrongType;
             existing.Value = value;
             return true;
         }
@@ -132,17 +181,18 @@ public static class NativeTsxAnimationSync
 
     private static bool SetOrRemoveIntProperty(Tile tile, string name, int? value)
     {
-        var existing = tile.Properties.OfType<IntProperty>().FirstOrDefault(p => p.Name == name);
+        var hadWrongType = tile.Properties.Any(p => p.Name == name && p is not IntProperty);
+        var existing = FindByNameRemovingWrongType<IntProperty>(tile, name);
         if (value is null)
         {
-            if (existing is null) return false;
+            if (existing is null) return hadWrongType;
             tile.Properties.Remove(existing);
             return true;
         }
 
         if (existing != null)
         {
-            if (existing.Value == value.Value) return false;
+            if (existing.Value == value.Value) return hadWrongType;
             existing.Value = value.Value;
             return true;
         }
