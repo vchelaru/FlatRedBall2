@@ -9,7 +9,7 @@ namespace AnimationEditor.Core
     {
         AnimationChainListSave? AnimationChainListSave { get; set; }
         TileMapInformationList TileMapInformationList { get; set; }
-        FilePath[] ReferencedPngs { get; }
+        FilePath[] ReferencedPngs { get; set; }
         string? FileName { get; set; }
 
         /// <summary>

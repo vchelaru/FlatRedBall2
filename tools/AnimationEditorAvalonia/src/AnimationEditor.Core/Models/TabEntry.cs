@@ -87,6 +87,14 @@ namespace AnimationEditor.Core.Models
         public object? CachedTextureSizeState { get; set; }
 
         /// <summary>
+        /// Snapshot of <see cref="IProjectManager.ReferencedPngs"/>, captured alongside
+        /// <see cref="CachedEditorModel"/> so a cache-hit tab switch restores THIS tab's
+        /// project-referenced PNGs (used by the texture-picker dropdown) instead of leaving
+        /// whatever tab was loaded last. Empty (not null) when this tab has no linked project.
+        /// </summary>
+        public FilePath[] CachedReferencedPngs { get; set; } = Array.Empty<FilePath>();
+
+        /// <summary>
         /// Name of the selected animation chain when this tab was last deactivated.
         /// Session-only (not written to <c>.aeproperties</c>).
         /// </summary>

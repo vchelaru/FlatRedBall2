@@ -146,7 +146,7 @@ public class TabSwitchCacheTests : IDisposable
             set => _inner.TileMapInformationList = value;
         }
 
-        public FilePath[] ReferencedPngs => _inner.ReferencedPngs;
+        public FilePath[] ReferencedPngs { get => _inner.ReferencedPngs; set => _inner.ReferencedPngs = value; }
         public string? FileName { get => _inner.FileName; set => _inner.FileName = value; }
         public string? ProjectFolderPath { get => _inner.ProjectFolderPath; set => _inner.ProjectFolderPath = value; }
         public TextureCoordinateType OnDiskCoordinateType

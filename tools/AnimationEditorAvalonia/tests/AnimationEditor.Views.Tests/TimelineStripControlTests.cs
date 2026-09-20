@@ -19,7 +19,7 @@ public class TimelineStripControlTests
     {
         public AnimationChainListSave? AnimationChainListSave { get; set; }
         public TileMapInformationList TileMapInformationList { get; set; } = new();
-        public FilePath[] ReferencedPngs => Array.Empty<FilePath>();
+        public FilePath[] ReferencedPngs { get; set; } = Array.Empty<FilePath>();
         public string? FileName { get; set; }
         public string? ProjectFolderPath { get; set; }
         public TextureCoordinateType OnDiskCoordinateType { get; set; }

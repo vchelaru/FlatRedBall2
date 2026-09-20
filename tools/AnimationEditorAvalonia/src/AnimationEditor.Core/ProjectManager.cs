@@ -23,7 +23,7 @@ namespace AnimationEditor.Core
             set => mTileMapInformationList = value;
         }
 
-        public FilePath[] ReferencedPngs { get; private set; } = new FilePath[0];
+        public FilePath[] ReferencedPngs { get; set; } = new FilePath[0];
 
         public string? FileName { get; set; }
 
