@@ -86,6 +86,21 @@ public class MultiTileToTiledAnimationMapperTests
     }
 
     [Fact]
+    public void Map_FrameFootprintExtendsPastTilesetRightEdge_SkipsChainAndWarnsInsteadOfWrappingIntoNextRow()
+    {
+        // Columns=4, footprint is 2 tiles wide, anchored at column 3 (the last column) -- the
+        // footprint's right-hand cell would need column 4, which doesn't exist in this row.
+        // originColumn(3) + dx(1) = 4 == ColumnCount computes a tileId that lands on a real tile
+        // (the first tile of the next row) instead of failing, silently misplacing the satellite.
+        var achj = AchjWithChain("BadEdge", PixelFrame(48, 0, 80, 16));
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].AnchorFrames);
+        Assert.Contains("column", results[0].Warnings[0]);
+    }
+
+    [Fact]
     public void Map_FrameSizeNotWholeMultipleOfTile_SkipsChainAndWarns()
     {
         var achj = AchjWithChain("Bad", PixelFrame(0, 0, 20, 16));

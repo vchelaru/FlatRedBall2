@@ -328,12 +328,67 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **Fresh-eyes pass #1**: once the above are done, do a dedicated pass (self or subagent)
-  re-reading every file in scope end to end asking "what haven't we tried yet" — new categories to
-  consider: concurrent edits (two `ProjectManager` instances / two AnimationEditor windows open on
-  the same tsx), very large tilesets (performance, not just correctness), non-Latin/unicode chain
-  names round-tripping through the `Name` property, and the achj (JSON) vs achx (XML) serialization
-  paths for anything this phase touches.
+- [ ] **Row/`TileCount` bottom-edge overflow — the row equivalent of the column-overflow bug fixed
+  in this same pass (see "Fresh-eyes pass #1" in DONE below).**
+  `AchjToTiledAnimationMapper.MapFrame` and `MultiTileToTiledAnimationMapper.MapChain`
+  now both reject a frame whose column (or footprint's right-hand column) is at or past the
+  tileset's `ColumnCount`, but neither checks the equivalent bound on `row` (or
+  `originRow + footprintRows - 1`) against the tileset's actual row count — equivalently, that the
+  computed tile id stays `< TileCount`. Unlike the column case, this can't be validated from
+  `ColumnCount` alone: `TilesetAnimationInfo` has no `TileCount` field today. Fixing this means
+  adding one and threading it through both call sites that build a `TilesetAnimationInfo`
+  (`ProjectManager.BuildTsxTilesetInfo`, `TiledTilesetSyncRunner.BuildTilesetInfo`). Symptom if
+  triggered: `NativeTsxAnimationSync.ApplyTile`'s `tileset.Tiles.FirstOrDefault(t => t.ID == tileId)`
+  finds nothing for an out-of-range id and *creates a brand-new `Tile`* with that id, so a corrupt/
+  malformed achx frame rect (or a multi-tile footprint anchored near the last row) would silently
+  fabricate a `<tile id="...">` entry beyond the tileset's declared `tilecount` instead of being
+  skipped with a warning.
+- [ ] **`TiledAnimationToAchjMapper`'s satellite offset math assumes every satellite sits at or
+  below/right of its anchor.** `dx`/`dy` in `Map` are computed as `uint` subtraction
+  (`satellite.ID % columns - anchorCol`, `satellite.ID / columns - anchorRow`); a hand-edited
+  `ParentId` that points a "satellite" at a tile id *smaller* than its anchor (physically above or
+  left of the anchor in the grid — never producible by AnimationEditor's own UI, which only ever
+  grows a footprint to the right/down from its anchor) underflows that subtraction. Casting the
+  wrapped value back to `int` for the `satelliteTileIdsForChain` dictionary key happens to recover
+  the correct negative offset (two's-complement reinterpretation), but `footprintColumns`/
+  `footprintRows` (also `uint`) then compute `dx + 1`/`dy + 1`, which wraps back to 0 instead of
+  actually expanding — so the anchor's own mapped frame rect (`RightCoordinate`/`BottomCoordinate`)
+  never grows to include that satellite's real position, silently excluding it from the loaded
+  model instead of surfacing a warning the way `TsxAnimationValidator` does for other broken-group
+  shapes. Needs a decision on the right response (treat as an invalid/orphaned `ParentId` like the
+  existing "doesn't resolve to a true anchor" cases? clamp to non-negative? flag via the
+  validator?) before writing the fix.
+- [ ] **`ProjectManager.SaveTsxProject`'s `targetPath` "Save As to a new file" branch has no test
+  at the `ProjectManager` layer.** `TsxWriter`'s full-rewrite code path itself is well covered
+  (`TsxWriterTests`' `Write_RoundTrip_*` tests write to a fresh `outputPath` that doesn't exist yet),
+  but every native-tsx `ProjectManager`-level test in this sweep saves back to the same `FileName` a
+  project was loaded from. No test calls `SaveTsxProject(targetPath: <new path>)` on an
+  already-loaded native-tsx project and confirms the file written to that new path is a complete,
+  correct tsx (as opposed to, say, a partial write reusing stale `_tsxEntryTileIdsByChain`/
+  `_tsxSatelliteTileIdsByChain` state from the original path in some unexpected way).
+- [ ] **O(n) tile lookups inside per-result loops could become O(n²) on a large tileset.**
+  `NativeTsxAnimationSync.Apply`/`ApplyTile` (`tileset.Tiles.Single(...)`/`.FirstOrDefault(...)`) and
+  `TilesetAnimationSync.Apply` (the same pattern) both scan `tileset.Tiles` — a `List<Tile>` — once
+  per stale tile cleared and once per anchor/satellite applied. Correctness is unaffected, but a
+  tileset with thousands of tiles and many animated chains (real Tiled tilesets can have 10,000+
+  tiles) turns every save into a quadratic scan. Not fixed here (this sweep is correctness-first
+  per the phase doc), but a `ToDictionary(t => t.ID)` lookup built once per `Apply` call would make
+  each lookup O(1) if this ever becomes a measured problem.
+
+Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
+same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
+`ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
+`_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`/`_tsxTileset` are plain instance fields),
+non-Latin/unicode chain names (plain string passthrough, no char-level manipulation anywhere in this
+subsystem), achj-vs-achx serialization interaction with the entry/satellite tracking dictionaries
+(confirmed these never touch disk in either format).
+
+- [ ] **Fresh-eyes pass #2 needed**: pass #1 (above) found new gaps, so per the phase doc's stop
+  condition ("finds nothing new to add, twice in a row") at least one more fresh-eyes pass is
+  required before this phase can be considered exhausted. Re-read every file in scope end to end
+  again once the TODO items above are resolved, looking for anything pass #1 didn't have time to
+  chase down (see its "honest assessment" note in the DONE entry below for what's likely still
+  under-explored).
 
 ## DONE (continued)
 
@@ -357,3 +412,44 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   `achjAnimationName = "OldChain"`, no `achjSourceFile`, empty `Animation` is claimed by a new achx
   chain, ending up with the new chain's name and `achjSourceFile` set. Test:
   `TilesetAnimationSyncTests.Apply_TileHasStaleAnimationNamePropertyButEmptyAnimationAndNoSourceProperty_IsClaimedNotPermanentlyBlocked`.
+
+- [x] **Fresh-eyes pass #1.** Re-read every file in "Files in scope" end to end (not just the
+  diffs from prior fixes), working through the phase doc's four suggested categories
+  (concurrency/static state, large tilesets, unicode names, achj-vs-achx serialization) plus
+  general tile-grid boundary math. Found and fixed one real bug (below), and added four new
+  plausible-gap TODO items above; the rest of the suggested categories were traced and confirmed
+  not to be gaps (see the "Traced, not added" note above the TODO list for the reasoning on each).
+  - **Real bug, confirmed red first — a multi-tile/single-tile frame whose column (or footprint's
+    right-hand column) is at or past the tileset's `ColumnCount` silently wraps into a real tile in
+    the *next* row instead of failing.** `AchjToTiledAnimationMapper.MapFrame` computes
+    `tileId = row * ColumnCount + column` and `MultiTileToTiledAnimationMapper.MapChain` computes
+    each footprint cell's id the same way; neither checked that `column`/`originColumn + dx` stays
+    below `ColumnCount` before that arithmetic — a column value one past the last valid index folds
+    into a legitimate-looking id belonging to the next row's leftmost tile(s), which then gets its
+    animation silently overwritten instead of the frame being rejected. Same failure shape as the
+    already-fixed negative-coordinate bugs (unchecked arithmetic on corruption-controlled input),
+    just on the other edge. Fixed with a new bounds check in both mappers, matching each one's
+    existing skip/abort pattern: `AchjToTiledAnimationMapper` gained a `SkipCounts.ColumnOutOfRange`
+    per-frame skip category; `MultiTileToTiledAnimationMapper` aborts the whole chain with a warning
+    (matching its existing per-chain-abort precedent for other geometry failures). Tests:
+    `AchjToTiledAnimationMapperTests.Map_ColumnBeyondTilesetWidth_SkipsFrameAndWarnsInsteadOfWrappingIntoNextRow`,
+    `MultiTileToTiledAnimationMapperTests.Map_FrameFootprintExtendsPastTilesetRightEdge_SkipsChainAndWarnsInsteadOfWrappingIntoNextRow`.
+  - **Traced (not a bug): can two satellites of the same chain ever compute the same `(Dx, Dy)`
+    key?** No — structurally impossible on both load and save. On load
+    (`TiledAnimationToAchjMapper.Map`), `(Dx, Dy)` is a deterministic function of a satellite's own
+    tile id relative to a fixed anchor position (`id % columns`, `id / columns`), and Tiled tile ids
+    within one tileset are unique, so two different satellite tiles always land on two different
+    `(Dx, Dy)` pairs. On save (`MultiTileToTiledAnimationMapper.MapChain`), `perOffset` is built by
+    iterating every `(dx, dy)` cell of an NxM grid exactly once, so collisions can't arise there
+    either. No pinning test added — this is a mathematical guarantee of the id-to-offset mapping,
+    not a subtle behavioral invariant of this codebase's logic.
+  - **Honest assessment: this pass was not exhaustive.** It covered the phase doc's four suggested
+    categories and general boundary-value tracing (tile id 0/last id, 1-column tilesets, empty
+    chain lists) reasonably thoroughly, and found one real, confirmed bug plus four plausible new
+    gaps. It did *not* deeply chase: error-path combinations across multiple simultaneous corruption
+    conditions in one file (e.g. a tileset that is both `Columns <= 0` *and* has duplicate tile ids),
+    the Avalonia UI layer's own handling of the warnings/exceptions this sweep's `.Core` layer
+    produces (out of scope per "Files in scope", but a second pass could double check nothing new
+    leaks through), or a line-by-line audit of `TsxWriter`'s XML-escaping behavior for property
+    values containing characters that are special in XML (`<`, `&`, `"`) — plausible but not
+    investigated this pass. A second fresh-eyes pass should pick up here.

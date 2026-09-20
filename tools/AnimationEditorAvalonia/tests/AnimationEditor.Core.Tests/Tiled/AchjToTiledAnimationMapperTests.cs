@@ -44,6 +44,21 @@ public class AchjToTiledAnimationMapperTests
     };
 
     [Fact]
+    public void Map_ColumnBeyondTilesetWidth_SkipsFrameAndWarnsInsteadOfWrappingIntoNextRow()
+    {
+        // Left=64 is column 4 -- one past the last valid column index (0-3) in a 4-column
+        // tileset. Column 4 passes both the grid-alignment and negative-column checks, but
+        // tileId = row*ColumnCount + column would land on tile 4 -- a real tile, just the first
+        // one of the *next* row, not "one past the last column of this row".
+        var achj = AchjWithChain("Corrupt", PixelFrame(64, 0, 80, 32));
+
+        var results = AchjToTiledAnimationMapper.Map(achj, TilesetInfo);
+
+        Assert.Empty(results[0].Frames);
+        Assert.Contains("column", results[0].Warnings[0]);
+    }
+
+    [Fact]
     public void Map_DifferentTexture_SkipsFrameAndWarns()
     {
         var achj = AchjWithChain("OtherTexture", PixelFrame(0, 0, 16, 32, textureName: "OtherSheet.png"));

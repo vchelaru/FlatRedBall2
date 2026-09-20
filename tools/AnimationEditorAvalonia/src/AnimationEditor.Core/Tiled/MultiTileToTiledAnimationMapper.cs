@@ -137,6 +137,13 @@ public static class MultiTileToTiledAnimationMapper
             if (originColumn < 0 || originRow < 0)
                 return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
 
+            // A footprint whose right-hand cell would need a column at or past the tileset's own
+            // column count still computes a "valid"-looking tileId for that cell -- it just lands
+            // on a real tile in the *next* row instead of failing, silently misplacing a satellite
+            // onto an unrelated tile every save.
+            if (originColumn + footprintColumns > tilesetInfo.ColumnCount)
+                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+
             for (var dy = 0; dy < footprintRows; dy++)
                 for (var dx = 0; dx < footprintColumns; dx++)
                 {

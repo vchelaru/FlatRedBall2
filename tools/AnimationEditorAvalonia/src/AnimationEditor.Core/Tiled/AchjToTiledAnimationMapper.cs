@@ -19,6 +19,7 @@ public sealed record SkipCounts
     public int NotGridAligned { get; init; }
     public int FlipDropped { get; init; }
     public int NegativeCoordinate { get; init; }
+    public int ColumnOutOfRange { get; init; }
 }
 
 /// <summary>Result of mapping one <see cref="AnimationChainSave"/> onto a tileset's tile grid.</summary>
@@ -66,7 +67,10 @@ public sealed record TilesetAnimationInfo
 /// origin isn't aligned to the tile grid (<see cref="SkipCounts.NotGridAligned"/>); its rect origin
 /// resolves to a negative column/row -- an exact negative multiple of the tile size passes the
 /// grid-alignment check but would otherwise unchecked-cast to a huge bogus tile id (<see
-/// cref="SkipCounts.NegativeCoordinate"/>); or it uses <see cref="TextureCoordinateType.UV"/>
+/// cref="SkipCounts.NegativeCoordinate"/>); its rect origin resolves to a column at or past the
+/// tileset's own column count, which would otherwise compute a tileId that lands on a real tile in
+/// the next row instead of failing (<see cref="SkipCounts.ColumnOutOfRange"/>); or it uses
+/// <see cref="TextureCoordinateType.UV"/>
 /// coordinates but the tileset's pixel size wasn't supplied (<see
 /// cref="SkipCounts.UvMissingPixelSize"/>). A flipped frame is not skipped -- Tiled tile animation
 /// frames can't flip per-frame, so the flip is dropped and tallied separately (<see
@@ -183,6 +187,14 @@ public static class AchjToTiledAnimationMapper
             return Skip(s => s.NegativeCoordinate++,
                 $"{label}: frame rect origin ({left}, {top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
 
+        // A column at or past the tileset's own column count would still compute a "valid"-
+        // looking tileId (row * ColumnCount + column) -- just one that lands on the first tile(s)
+        // of the *next* row instead of failing, silently misplacing this frame's animation onto
+        // an unrelated tile.
+        if (column >= tilesetInfo.ColumnCount)
+            return Skip(s => s.ColumnOutOfRange++,
+                $"{label}: frame rect origin ({left}, {top}) resolves to column {column}, which is past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+
         var tileId = (uint)((row * tilesetInfo.ColumnCount) + column);
 
         return new MappedFrame(tileId, FrameDurationMs(frame.FrameLength, timeUnit));
@@ -227,6 +239,7 @@ public static class AchjToTiledAnimationMapper
         public int NotGridAligned;
         public int FlipDropped;
         public int NegativeCoordinate;
+        public int ColumnOutOfRange;
 
         public SkipCounts Build() => new()
         {
@@ -236,6 +249,7 @@ public static class AchjToTiledAnimationMapper
             NotGridAligned = NotGridAligned,
             FlipDropped = FlipDropped,
             NegativeCoordinate = NegativeCoordinate,
+            ColumnOutOfRange = ColumnOutOfRange,
         };
     }
 }
