@@ -76,13 +76,22 @@ public static class TilesetAnimationSync
             // A tile another achx source already owns (tracked by a *different* achjSourceFile)
             // is off-limits -- the class doc's "never disturbs tiles owned by a different source"
             // promise only held for the stale-clear step above; the overwrite step here had no
-            // such check and would silently clobber it. Skip and warn instead of writing.
+            // such check and would silently clobber it. Skip and warn instead of writing. The same
+            // applies to a tile with an existing animation but *no* achjSourceFile at all -- a
+            // human hand-authored it directly in Tiled (or some older tool wrote it), and this
+            // sync has no way to know it's safe to claim, since its entry-tile-id is only ever a
+            // coincidence of the achx chain's sprite-sheet geometry.
             if (!isNewTile)
             {
                 var owningSource = GetStringProperty(tile!, SourceFilePropertyName);
                 if (owningSource != null && owningSource != sourceLabel)
                 {
                     warnings.Add($"chain \"{result.ChainName}\": tile {tileId} is already owned by \"{owningSource}\" - skipped.");
+                    continue;
+                }
+                if (owningSource == null && tile!.Animation.Count > 0)
+                {
+                    warnings.Add($"chain \"{result.ChainName}\": tile {tileId} already has a hand-authored animation with no achjSourceFile - skipped.");
                     continue;
                 }
             }

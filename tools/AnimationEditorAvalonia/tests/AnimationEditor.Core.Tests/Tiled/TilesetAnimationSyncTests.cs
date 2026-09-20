@@ -157,6 +157,27 @@ public class TilesetAnimationSyncTests
     }
 
     [Fact]
+    public void Apply_TileHasHandAuthoredAnimationNoSourceProperty_IsSkippedNotOverwritten()
+    {
+        var tileset = EmptyTileset();
+        var handAuthoredTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        handAuthoredTile.Animation.Add(new Frame { TileID = 0, Duration = 999 });
+        // No achjSourceFile/achjAnimationName property at all -- this tile was never touched by
+        // any achx sync; a human drew its keyframes directly in Tiled.
+        tileset.Tiles.Add(handAuthoredTile);
+
+        // This achx chain's frame geometry happens to compute the same entry tile id.
+        var results = new[] { Result("Walk", 0, new MappedFrame(4, 100)) };
+        var syncResult = TilesetAnimationSync.Apply(tileset, results, SourceLabel);
+
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Equal(999, tile.Animation.Single().Duration);
+        Assert.DoesNotContain(tile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+        Assert.Equal(0, syncResult.AppliedCount);
+        Assert.Contains(syncResult.Warnings, w => w.Contains("hand-authored") || w.Contains("already owned"));
+    }
+
+    [Fact]
     public void Apply_ExistingAnimationNamePropertyHasWrongType_IsReplacedNotDuplicated()
     {
         var tileset = EmptyTileset();

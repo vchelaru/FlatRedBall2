@@ -120,14 +120,17 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   and deciding insertion points for new ids — real restructuring, not a one-line fix — so left as a
   known limitation. Test:
   `TsxWriterTests.Write_OriginalFileTilesNotInAscendingIdOrder_SortBeforeWriteReusesSlicesReorderedNotCorrupted`.
+- [x] **`TilesetAnimationSync`/achx-push against a tile with a pre-existing hand-authored animation
+  and no prior achx association.** Real bug, confirmed red before the fix — the overwrite loop's
+  ownership check only fired when `achjSourceFile` was set to a *different* source; a tile with no
+  `achjSourceFile` at all (hand-authored, untracked) fell through and got its animation silently
+  clobbered whenever an achx chain's geometry happened to compute the same entry tile id. Fixed by
+  also skipping+warning when `achjSourceFile` is unset but the tile already has a non-empty
+  `Animation`. Test:
+  `TilesetAnimationSyncTests.Apply_TileHasHandAuthoredAnimationNoSourceProperty_IsSkippedNotOverwritten`.
 
 ## TODO
 
-- [ ] **`TilesetAnimationSync`/achx-push against a tsx with pre-existing hand-authored animations
-  and *no* prior `.tiledsync` association** (the very first sync ever run against a real file) —
-  same shape as the native-tsx root cause, but for the achx-push path specifically. Confirm whether
-  the "recompute vs. what's on disk" mismatch can also silently clobber hand-authored content here,
-  not just cross-source content.
 - [ ] **`TiledTilesetSyncRunner.SyncAll` partial-batch failure ordering**: if tsx #2 in the
   association list throws, are any writes already made to tsx #1 in the same batch left in a
   correct, self-consistent state (not half-applied)? Should already be fine (each tsx is
