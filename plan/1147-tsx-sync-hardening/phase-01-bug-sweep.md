@@ -185,6 +185,18 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   as unowned and silently claimed/overwritten, since the new hand-authored check only looks at
   `Animation.Count`. Decide whether `achjAnimationName` alone should also count as "already tracked,
   needs matching achjSourceFile to overwrite" and pin it.
+- [ ] **Chained/nested `ParentId` (satellite-of-a-satellite) silently drops the innermost tile** —
+  found while fixing the orphaned-`ParentId` gap above. `TiledAnimationToAchjMapper.Map`'s
+  `IsAnchor`/`satellitesByAnchor` only look one level deep: if tile C's `ParentId` points at tile B,
+  and B's `ParentId` points at real anchor A (so B is itself a satellite, not a top-level anchor),
+  then C is correctly excluded from the anchor loop (its `ParentId` *does* resolve to an animated
+  tile, so the orphan fix above doesn't catch it) but is never folded into any anchor's satellites
+  either, since `satellitesByAnchor[A.ID]` only contains tiles whose `ParentId` is literally `A.ID`
+  (i.e. just B), not tiles transitively chained through B. C's animation data silently vanishes from
+  the returned model exactly like the orphan case, just one level removed. Needs a test proving the
+  gap, then a decision on the fix shape (walk `ParentId` to its root anchor when computing
+  `satellitesByAnchor`? reject/flag chained `ParentId` as invalid since AnimationEditor's own UI
+  never produces it?).
 - [ ] **Fresh-eyes pass #1**: once the above are done, do a dedicated pass (self or subagent)
   re-reading every file in scope end to end asking "what haven't we tried yet" — new categories to
   consider: concurrent edits (two `ProjectManager` instances / two AnimationEditor windows open on
