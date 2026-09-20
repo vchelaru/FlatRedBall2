@@ -335,17 +335,7 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **Fresh-eyes pass #9 was interrupted mid-pass (agent stalled/crashed) and needs finishing.**
-  It was doing a full line-by-line read of `MainWindow.axaml.cs` (the same "full read, not a
-  targeted re-trace" approach that found real bugs in `AppCommands.cs`/`ProjectManager.cs` in
-  passes #7/#8). Before stalling it found and fixed one real bug (see DONE: drag-and-drop silently
-  ignoring `.tsx` files) and confirmed category 6 (direct `TabEntry` construction bypassing
-  `TabEditorCache`) is a non-issue in this file. It had just started reading `HandleStartupAsync`
-  (lines ~976-1060) and the crash-recovery restore flow when it stopped — categories 2-5 and 7 from
-  the original pass #9 brief (recent-files/MRU menu, window/tab title staleness, menu-item
-  enable/disable gating on project type, crash-recovery restore tsx-awareness, keyboard-shortcut/
-  command-palette dispatch bypassing `AppCommands`) were never reached. Re-run this pass rather than
-  treating it as a completed clean pass — it isn't one, it's an incomplete one.
+(none open)
 
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
@@ -1312,13 +1302,13 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     985, +3 new), `AnimationEditor.Browser` builds clean (0 warnings/0 errors; no test project to
     run).
 
-- [x] **Drag-and-drop silently ignored `.tsx` files (found mid-pass by the interrupted fresh-eyes
-  pass #9 -- see the TODO entry above for why pass #9 itself isn't done).** `AchxDropProcessor.
-  SelectAchxFiles` (the "OS file dropped onto the window" classifier) only recognized `.achx`/
-  `.achj`, so dropping a native `.tsx` project onto the AnimationEditor window did nothing --
-  `OnWindowDrop` filtered it out before `LoadAnimationFileAsync` (which already dispatches
-  correctly by extension via `OpenProjectWorkflowAsync`, same as `File > Open`) ever saw it. Real
-  bug, confirmed red first (`ContainsAchx_TsxOnly_ReturnsTrue`/
+- [x] **Drag-and-drop silently ignored `.tsx` files (found mid-pass by fresh-eyes pass #9, which
+  stalled before finishing -- see the completed pass #9 entry below for the rest of that pass).**
+  `AchxDropProcessor.SelectAchxFiles` (the "OS file dropped onto the window" classifier) only
+  recognized `.achx`/`.achj`, so dropping a native `.tsx` project onto the AnimationEditor window
+  did nothing -- `OnWindowDrop` filtered it out before `LoadAnimationFileAsync` (which already
+  dispatches correctly by extension via `OpenProjectWorkflowAsync`, same as `File > Open`) ever saw
+  it. Real bug, confirmed red first (`ContainsAchx_TsxOnly_ReturnsTrue`/
   `SelectAchxFiles_TsxFile_IsIncludedAlongsideAchx` both failed against the original filter, then
   passed after adding the `tsx` extension check). Fixed in
   `tools/AnimationEditorAvalonia/src/AnimationEditor.Core/DragDrop/AchxDropProcessor.cs`;
@@ -1327,3 +1317,94 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   `LoadAnimationFileAsync`. Tests: `AchxDropProcessorTests.ContainsAchx_TsxOnly_ReturnsTrue`,
   `SelectAchxFiles_TsxFile_IsIncludedAlongsideAchx`. Full suite after this fix:
   `AnimationEditor.Core.Tests` 2178/2178, `AnimationEditor.App` builds clean.
+
+- [x] **Fresh-eyes pass #9 (completed) -- finished the full line-by-line read of
+  `MainWindow.axaml.cs` after the interrupted attempt above.** The interrupted attempt had already
+  found/fixed the drag-and-drop bug (see previous entry) and confirmed direct `TabEntry`
+  construction (category 6) was a non-issue; this continuation covered the five categories it never
+  reached, plus a full re-read of everything in between (not just the interrupted agent's partial
+  notes) since those notes weren't trusted as complete on their own:
+  1. **Recent-files/MRU menu -- safe, no gap.** `RefreshRecentFiles`/`CreateNativeMenuActions`
+     (macOS `NativeMenu`) and the `CurrentFileChanged`-driven `_appSettings.AddFile` both route
+     through `LoadAnimationFileAsync` -> `AppCommands.OpenProjectWorkflowAsync`, already confirmed
+     tsx-aware by prior passes; `AppSettingsModel.AddFile`/`RecentFiles` are plain path strings with
+     no extension filtering, format-agnostic by construction.
+  2. **Window/tab title staleness -- one real bug, confirmed red first, fixed.**
+     `TitleBarHelper.BuildWindowTitle` itself is a pure `FileName`-string mapper with no tsx logic
+     (safe), and every reachable transition already called `UpdateTitle()` explicitly
+     (`ActivateUntitledTabContent`, the "all tabs closed" branch, `CloseProjectAsync`) or via the
+     `CurrentFileChanged` event (`TryActivateTabFromCache`, `OpenProjectWorkflowAsync`,
+     `SaveCurrentAnimationChainListAsync`'s successful-save path) -- except
+     `OpenAsNewUnsavedDocument` (shared by `OnNewClick` and the crash-recovery restore branch),
+     which reset `ProjectManager` state via `ResetToBlankDocument()` (a plain field reset, no event)
+     and never called `UpdateTitle()` itself. `OnNewClick`'s own follow-up
+     (`SaveCurrentAnimationChainListAsync`) only updates the title on a *successful* Save As --
+     cancelling the dialog (the default behavior of `NullFileDialogService`, used by every test in
+     this file's test class) returns early with no title update. Net effect: File > New from a
+     named tsx (or achx) tab, with the Save As dialog cancelled, left the title bar showing the
+     just-closed file's name even though `FileName`/`IsNativeTsxProject` had already reset
+     underneath it -- not fixable-as-cheap by patching `OnNewClick` alone, since the same gap is
+     reachable via the crash-recovery restore call site too. Fixed with one `UpdateTitle()` call
+     inside `OpenAsNewUnsavedDocument` itself, right after its own reset, matching the pattern every
+     other reset site already uses. Test:
+     `NewAndLoadResetTests.New_AfterOpeningTsxTabAndCancelingSaveAs_TitleNoLongerShowsOldFileName`
+     (failed with the title still containing `"Heroes.tsx"` before the fix).
+  3. **Menu-item enable/disable gating on project type -- safe, no gap.** No menu item in this file
+     is enabled/disabled based on `IsNativeTsxProject`; the only `IsNativeTsxProject`-gated UI is
+     the property-inspector panel visibility toggles (`PropRectPanel`/`PropCirclePanel`/
+     `PropTransformSection`/`PropColorSection`), all already correct. `MenuAssociateTiledTileset`
+     (Associate Tiled Tileset) stays enabled for a tsx project and does nothing useful when clicked
+     (already traced as a harmless no-op in pass #6, since `SaveCurrentAnimationChainList` skips
+     `SyncAssociatedTiledTilesets` whenever `IsNativeTsxProject` is true) -- confirmed still the
+     case, not re-litigated. `DoResizeTextureAsync` (Resize Texture) operates on a frame's texture
+     PNG file directly, independent of achx/tsx schema, so it has no tsx-specific behavior to gate.
+  4. **Crash-recovery restore -- safe, no gap; confirmed tsx projects structurally never
+     participate in recovery, and that's correct, not a scope gap.** Traced `WriteRecoveryFile`'s
+     one call site (`AppCommands.SaveCurrentAnimationChainList`'s `else` branch, which only fires
+     when `_pm.FileName` is empty/null) against the fact that a native tsx project can only exist by
+     opening a real `.tsx` file from disk -- there is no "blank tsx" concept reachable via File >
+     New, so `IsNativeTsxProject` and "`FileName` is null" are mutually exclusive states in this
+     codebase. Every edit to a *named* file (tsx or achx) autosaves immediately via the same method's
+     `if` branch instead, so there is no unsaved-data window a crash could lose for a tsx project in
+     the first place -- recovery exists specifically for the untitled-document case, which a tsx
+     project can never be in. `TakeRecoveryFileContent`/`OpenAsNewUnsavedDocument`/
+     `RecoveredDocumentBanner`'s dismiss handler have no format-specific logic of their own to get
+     wrong.
+  5. **Keyboard shortcut / command-palette dispatch -- safe, no gap.** No command palette exists in
+     this file (grepped, zero matches). Every entry in `BuildHotkeyDefinitions`' hotkey registry
+     delegates straight to an already-audited handler (`OnNewClick`, `LoadAsync`, `OnSaveClick`,
+     `HandleCopyAsync`/`HandleCutAsync`/`HandlePasteAsync`/`HandleDuplicate`/`HandleDelete`,
+     `_undoManager.Undo`/`Redo`, tree reorder/rename, panel zoom) -- none of the `Action` delegates
+     implement inline project-state-touching logic that bypasses `AppCommands`. The `KeyDown`/`KeyUp`
+     tunnel handlers in `WireKeyboard` are pure gesture-matching-and-dispatch with no tsx-adjacent
+     logic of their own.
+  - **Traced, not a bug: `SyncGridControlsToProject`'s tsx-forced grid lock has no `else` branch to
+    revert when switching away from a tsx project.** While a native tsx tab is active, this method
+    forces `SnapToGridCheck`/`GridSizeInput` to the tsx's own tile size (issue #1140, by design --
+    see its own doc comment). Switching to an achx with no companion settings file yet (so
+    `ApplyCompanionSettings` never fires) leaves those controls showing the previous tsx's
+    tile-size/on values rather than resetting to any achx-specific default. Not fixed: this
+    "sticky UI setting persists until an explicit companion-file override arrives" behavior already
+    applies identically to achx-to-achx transitions with no companion file and predates the tsx
+    feature entirely -- the tsx feature only changed how the value gets forced *while active*, not
+    whether anything resets it on the way out. Since a plain achx-to-achx transition has the exact
+    same "no reset without a companion file" shape, this isn't a tsx-awareness branch that's missing;
+    it's pre-existing general UI behavior the tsx feature never needed to (and didn't) change. Purely
+    cosmetic/UI (affects the wireframe's snap-to-grid increment only, never anything that reaches
+    disk) -- no test added.
+  - **Full re-read confirmed clean beyond the two items above:** `ActivateUntitledTabContent`, the
+    "all tabs closed" branch, `OpenAsNewUnsavedDocument`'s tsx-state reset (aside from the missing
+    `UpdateTitle()` call, now fixed), `HandleStartupAsync`'s crash-recovery/CLI-arg/saved-tabs
+    branches, drag-and-drop via `AchxDropProcessor`, and every direct `TabEntry`/
+    `AnimationChainListSave =`/`FileName =` assignment site in this file (five sites total, all
+    previously audited: `ActivateUntitledTabContent`'s post-reset content assignment,
+    `HandleStartupAsync`'s two deliberately-narrow memory-probe/no-recovery branches,
+    `OpenAsNewUnsavedDocument`'s post-reset content assignment, and
+    `AddAnimationChainAndBeginInlineRename`'s null-guard, which is structurally unreachable while a
+    tsx project is active) all hold up against a fresh read, not just the interrupted agent's notes.
+  - **Verdict: this is now a genuinely clean-for-this-bug-class pass.** One real, confirmed bug was
+    found (title staleness) and fixed; every other category traced to "safe, no gap" with a concrete
+    reason, not a shrug. Combined with the drag-and-drop fix the interrupted attempt already landed,
+    fresh-eyes pass #9 is complete. Full suite: `AnimationEditor.Core.Tests` 2178/2178 (unchanged),
+    `AnimationEditor.App.Tests` 989/989 (was 988, +1 new), `AnimationEditor.Views.Tests` builds
+    clean.
