@@ -356,4 +356,84 @@ public class NativeTsxProjectRoundTripTests
         Assert.Equal(0, newSatellite.GetProperty<IntProperty>("ParentId").Value);
         Assert.Equal("Bar", newSatellite.GetProperty<StringProperty>("Foo").Value);
     }
+
+    // Tile 8 is the anchor of a 2-tile-wide group with an explicit hand-authored Name ("Walk"),
+    // whose satellite (tile 9) carries ParentId=8.
+    private const string NamedGroupFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="8">
+          <properties>
+           <property name="Name" value="Walk"/>
+          </properties>
+          <animation>
+           <frame tileid="8" duration="150"/>
+           <frame tileid="12" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="9">
+          <properties>
+           <property name="ParentId" type="int" value="8"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="150"/>
+           <frame tileid="13" duration="150"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    // Renaming a chain (mutating AnimationChainSave.Name in place -- same object reference, not
+    // remove+re-add) must update only the anchor tile's Name property, leaving the anchor's own
+    // tile id and the satellite's ParentId untouched -- satellite ids are derived purely from
+    // spritesheet geometry, never from the chain's name, and the reference-keyed
+    // knownEntryTileIds hint (see MultiTileToTiledAnimationMapper.Map) exists precisely so a
+    // rename isn't mistaken for delete-old-chain + create-new-chain.
+    [Fact]
+    public void LoadRenameChainWithMultiTileSatelliteSave_AnchorNameUpdatedInPlace_SatelliteParentIdStaysOnSameAnchor()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, NamedGroupFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var chain = acls.AnimationChains.Single(c => c.Name == "Walk");
+
+        // Rename in place -- mutate the existing chain object, don't remove+re-add.
+        chain.Name = "Run";
+
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
+        // The rename must not be mistaken for a new chain -- the anchor tile id stays 8.
+        Assert.Equal((uint)8, mapped.Single().EntryTileId);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        // Anchor stayed on tile 8, with its Name property updated to the new name (not left
+        // stale, not duplicated).
+        var anchor = reloaded.Tiles.Single(t => t.ID == 8);
+        Assert.Equal("Run", anchor.GetProperty<StringProperty>("Name").Value);
+        Assert.Single(anchor.Properties, p => p.Name == "Name");
+        Assert.Equal([((uint)8, 150), ((uint)12, 150)], anchor.Animation.Select(f => (f.TileID, f.Duration)));
+
+        // Satellite still points at the same anchor id and keeps its own animation -- no
+        // spurious clear/recreate as a side effect of the rename.
+        var satellite = reloaded.Tiles.Single(t => t.ID == 9);
+        Assert.Equal(8, satellite.GetProperty<IntProperty>("ParentId").Value);
+        Assert.Equal([((uint)9, 150), ((uint)13, 150)], satellite.Animation.Select(f => (f.TileID, f.Duration)));
+    }
 }

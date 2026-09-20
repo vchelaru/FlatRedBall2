@@ -214,7 +214,35 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   tile-4 id), then reverting. No source change. Test:
   `ProjectManagerTsxProjectTests.SaveTsxProject_AllFramesDeletedFromChain_ClearsPreviouslyOwnedTileAndDoesNotStickOnResave`.
 
+- [x] **Rename a chain that has multi-tile satellites.** Already correct -- a satellite's tile id
+  and `ParentId` are derived purely from frame geometry (never from the chain's `Name`), and a
+  rename touches no frame geometry, so both the anchor's tile id and the satellite's `ParentId`
+  are trivially stable across a rename; the only real risk was the anchor's `Name` property
+  actually getting updated to the new value in place (not left stale, not duplicated) via the
+  reference-keyed `knownEntryTileIds` hint, which the test confirmed has teeth by temporarily
+  forcing `explicitName: null` in `NativeTsxAnimationSync.Apply` and observing the reload assert
+  fail (`KeyNotFoundException: Property 'Name' not found`), then reverting. No source change.
+  Test: `NativeTsxProjectRoundTripTests.LoadRenameChainWithMultiTileSatelliteSave_AnchorNameUpdatedInPlace_SatelliteParentIdStaysOnSameAnchor`.
+
 ## TODO
+
+- [ ] **Owner-not-own-first-frame anchor combined with a multi-tile satellite relocates the
+  satellite on save, unlike the anchor.** Found while testing the rename item above (not itself a
+  rename bug -- reproduces on the very first save, no rename needed). `MultiTileToTiledAnimationMapper`
+  preserves the *anchor's* tile id via the `knownEntryTileIds` hint when the anchor's own id isn't
+  its own frame-0 tile, but a satellite has no equivalent hint: its tile id is always freshly
+  computed as the anchor's frame-0 position plus the satellite's (dx, dy) offset within the
+  footprint. `TiledAnimationToAchjMapper.Map` (load side), however, infers that same (dx, dy)
+  offset from the anchor's and satellite's own *static* tile ids in the spritesheet -- a different
+  base position whenever the anchor's own id isn't its own frame-0 tile. The two bases then differ
+  by a fixed delta, so the freshly-computed satellite id drifts from its original id by that same
+  delta every save, silently orphaning the original satellite tile. Confirmed with a throwaway
+  probe: anchor id 5 (own frames [9, 13], i.e. one row below its own static position), satellite
+  id 6 (`ParentId=5`, one column right of the anchor's static position) -- after one save the
+  satellite's animation ends up written to tile 10 (one row below tile 6, matching the anchor's own
+  delta) while tile 6 is left cleared. Needs either a `knownEntryTileIds`-style hint per satellite,
+  or a design decision that this hand-authored pattern isn't supported for multi-tile groups (with
+  a validator warning) -- same tradeoff already made for the chained-`ParentId` case above.
 
 - [ ] **`TsxAnimationValidator`'s per-frame lockstep check only compares `TileID`, never
   `Duration`.** A satellite hand-edited with the correct tile-id sequence but a different duration
@@ -224,9 +252,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   necessarily a bug (the "ignore, don't corrupt" design still holds), but it's a real gap in the
   warning coverage versus what's silently discarded; decide whether the lockstep check should also
   compare `Duration` per frame.
-- [ ] **Rename a chain that has multi-tile satellites** — confirm the satellite's `ParentId` still
-  resolves correctly and no satellite gets orphaned/cleared as a side effect of the anchor's identity
-  being preserved-by-reference now.
 - [ ] **`GetChainNamesWithTsxIssues` and `SaveTsxProject` must agree on entry tile ids** — now that
   both pass `_tsxEntryTileIdsByChain`, confirm with a `ProjectManager`-level test (not just the
   mapper) that the validator-driven UI warning list never disagrees with what an actual save would
