@@ -84,3 +84,5 @@ tools/AnimationEditorAvalonia/tests/_out/
 
 # Glue writes per-user editor state next to the project; it is not part of the project.
 **/*.settings.user.json
+
+*.user
