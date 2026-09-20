@@ -76,13 +76,20 @@
              InfoBannerBg + AccentCool left stripe reuses MainWindow's existing "tier-2
              actionable info" styling (see DefaultHandlerBanner) instead of inventing a new
              color language, while staying distinct from ErrorBanner's red and
-             ItemDeletedToastPanel's plain #333. -->
+             ItemDeletedToastPanel's plain #333.
+
+             Top margin (44) clears MainWindow's 36px custom title bar (WindowDecorations="None"
+             means Minimize/Maximize/CloseBtn are ordinary in-tree controls at the top-right
+             corner, not native OS chrome the overlay can't reach). This overlay auto-hides on a
+             timer, so a user's click can land after the panel has vanished; if any part of it
+             sat over CloseBtn, that stray click would close the whole app instead of hitting
+             nothing. See ToastCloseButtonOverlapTests. -->
         <Border x:Name="ToastPanel" x:FieldModifier="Public"
                 IsVisible="False"
                 IsHitTestVisible="True"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                Margin="0,16,16,0"
+                Margin="0,44,16,0"
                 MaxWidth="420"
                 Background="{DynamicResource InfoBannerBg}"
                 BorderBrush="{DynamicResource LineBrush}"

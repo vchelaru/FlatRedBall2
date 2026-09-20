@@ -18,6 +18,11 @@ public partial class EditorNotificationOverlay : UserControl
     private Action? _toastRetryAction;
     private Action? _undoAction;
 
+    /// <summary>Internal seam so tests can drive hover state without synthesizing pointer events.</summary>
+    internal bool IsToastHovered { get; set; }
+    internal bool IsErrorBannerHovered { get; set; }
+    internal bool IsItemDeletedHovered { get; set; }
+
     public EditorNotificationOverlay()
     {
         InitializeComponent();
@@ -34,6 +39,17 @@ public partial class EditorNotificationOverlay : UserControl
             ItemDeletedToastPanel.IsVisible = false;
             _undoAction?.Invoke();
         };
+
+        // #1130 follow-up: an auto-hide timer races a deliberate click toward that panel's own
+        // dismiss/retry/undo button -- a slow click can land after the panel has vanished,
+        // hitting whatever is underneath instead. Hovering a panel suspends its auto-hide for as
+        // long as the pointer stays over it, so a click aimed at the panel can never miss it.
+        ToastPanel.PointerEntered += (_, _) => IsToastHovered = true;
+        ToastPanel.PointerExited += (_, _) => IsToastHovered = false;
+        ErrorBanner.PointerEntered += (_, _) => IsErrorBannerHovered = true;
+        ErrorBanner.PointerExited += (_, _) => IsErrorBannerHovered = false;
+        ItemDeletedToastPanel.PointerEntered += (_, _) => IsItemDeletedHovered = true;
+        ItemDeletedToastPanel.PointerExited += (_, _) => IsItemDeletedHovered = false;
     }
 
     public void WireUndo(Action undo) => _undoAction = undo;
@@ -59,7 +75,7 @@ public partial class EditorNotificationOverlay : UserControl
 
         _toastTimer?.Stop();
         _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _toastTimer.Tick += (_, _) => HideToast();
+        _toastTimer.Tick += (_, _) => HideToastIfNotHovered();
         _toastTimer.Start();
     }
 
@@ -70,7 +86,7 @@ public partial class EditorNotificationOverlay : UserControl
 
         _errorBannerTimer?.Stop();
         _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-        _errorBannerTimer.Tick += (_, _) => HideErrorBanner();
+        _errorBannerTimer.Tick += (_, _) => HideErrorBannerIfNotHovered();
         _errorBannerTimer.Start();
     }
 
@@ -78,10 +94,28 @@ public partial class EditorNotificationOverlay : UserControl
     {
         try
         {
-            await Task.Delay(4000, token);
+            do
+            {
+                await Task.Delay(4000, token);
+            } while (IsItemDeletedHovered);
+
             ItemDeletedToastPanel.IsVisible = false;
         }
         catch (TaskCanceledException) { }
+    }
+
+    /// <summary>Testable seam for the timer Tick: hovering keeps the toast up indefinitely.</summary>
+    internal void HideToastIfNotHovered()
+    {
+        if (!IsToastHovered)
+            HideToast();
+    }
+
+    /// <summary>Testable seam for the timer Tick: hovering keeps the banner up indefinitely.</summary>
+    internal void HideErrorBannerIfNotHovered()
+    {
+        if (!IsErrorBannerHovered)
+            HideErrorBanner();
     }
 
     private void HideToast()

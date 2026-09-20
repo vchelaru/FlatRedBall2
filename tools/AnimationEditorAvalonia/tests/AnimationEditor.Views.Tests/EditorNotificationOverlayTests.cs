@@ -51,4 +51,56 @@ public class EditorNotificationOverlayTests
 
         Assert.True(overlay.ToastRetryBtn.IsVisible);
     }
+
+    // #1130 follow-up: the auto-hide timer used to be able to fire while the user was moving the
+    // pointer toward the toast's own dismiss button, hiding it out from under the click. These
+    // drive the timer's Tick logic directly (HideToastIfNotHovered/HideErrorBannerIfNotHovered)
+    // rather than waiting on the real DispatcherTimer interval.
+    [AvaloniaFact]
+    public void HideToastIfNotHovered_StaysVisibleWhileHovered()
+    {
+        var overlay = new EditorNotificationOverlay();
+        overlay.ShowToast("Exported spritesheet.json");
+        overlay.IsToastHovered = true;
+
+        overlay.HideToastIfNotHovered();
+
+        Assert.True(overlay.ToastPanel.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void HideToastIfNotHovered_HidesWhenNotHovered()
+    {
+        var overlay = new EditorNotificationOverlay();
+        overlay.ShowToast("Exported spritesheet.json");
+        overlay.IsToastHovered = false;
+
+        overlay.HideToastIfNotHovered();
+
+        Assert.False(overlay.ToastPanel.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void HideErrorBannerIfNotHovered_StaysVisibleWhileHovered()
+    {
+        var overlay = new EditorNotificationOverlay();
+        overlay.ShowErrorBanner("Save failed");
+        overlay.IsErrorBannerHovered = true;
+
+        overlay.HideErrorBannerIfNotHovered();
+
+        Assert.True(overlay.ErrorBanner.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void HideErrorBannerIfNotHovered_HidesWhenNotHovered()
+    {
+        var overlay = new EditorNotificationOverlay();
+        overlay.ShowErrorBanner("Save failed");
+        overlay.IsErrorBannerHovered = false;
+
+        overlay.HideErrorBannerIfNotHovered();
+
+        Assert.False(overlay.ErrorBanner.IsVisible);
+    }
 }
