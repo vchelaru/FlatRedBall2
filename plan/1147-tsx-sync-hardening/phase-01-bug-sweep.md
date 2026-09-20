@@ -214,6 +214,40 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   tile-4 id), then reverting. No source change. Test:
   `ProjectManagerTsxProjectTests.SaveTsxProject_AllFramesDeletedFromChain_ClearsPreviouslyOwnedTileAndDoesNotStickOnResave`.
 
+- [x] **Owner-not-own-first-frame anchor combined with a multi-tile satellite relocates the
+  satellite on save, unlike the anchor.** Real bug, confirmed red first -- a load-save-with-zero-edits
+  test (`LoadSaveWithNoEdits_OwnerNotFirstFrameAnchorWithMultiTileSatellite_SatelliteStaysOnItsOriginalTile`)
+  failed against the old code with `KeyNotFoundException: Property 'ParentId' not found` on the
+  reloaded tile: the fix from the very first DONE item above only preserves the *anchor's* tile id
+  via `knownEntryTileIds` when the anchor's own id isn't its own frame-0 tile; a satellite had no
+  equivalent hint, so its tile id was always freshly computed as the anchor's frame-0 position plus
+  the satellite's (dx, dy) offset -- a different base than `TiledAnimationToAchjMapper.Map`'s load-side
+  offset (derived from the anchor's and satellite's *static* tile ids), so the two bases differed by
+  a fixed delta and the satellite silently drifted to a new tile id every save, orphaning the
+  original. Fixed with the same hint pattern as the anchor, extended to satellites:
+  - `TiledSatelliteMapping` gained an `Offset` field (`(int Dx, int Dy)`) alongside `TileId`/`Frames`,
+    so a satellite's position within the footprint is explicit data instead of only recoverable from
+    iteration order.
+  - `TiledAnimationToAchjMapper.Map` gained a second `out` parameter, `satelliteTileIdsByChain`
+    (`IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>`) -- each
+    chain's satellites' actual on-disk tile ids, keyed by chain reference then by (dx, dy) offset from
+    the anchor's *static* position (mirrors `entryTileIdsByChain`'s shape one level down, since a
+    chain can have more than one satellite in a 2xN/NxM footprint).
+  - `MultiTileToTiledAnimationMapper.Map`/`MapChain` gained a matching optional `knownSatelliteTileIds`
+    parameter; when a chain+offset pair has a hint, that tile id wins over the freshly-computed
+    anchor-frame-0-plus-offset id.
+  - `ProjectManager` gained `_tsxSatelliteTileIdsByChain`, populated on `LoadTsxProject` from the new
+    `out` parameter and threaded into `SaveTsxProject`'s and `GetChainNamesWithTsxIssues`'s
+    `MultiTileToTiledAnimationMapper.Map` calls exactly like `_tsxEntryTileIdsByChain` already was;
+    `SaveTsxProject`'s post-save commit-forward loop was extended to also rebuild
+    `_tsxSatelliteTileIdsByChain` from each result's `Satellites` (keyed by `Offset` -> `TileId`) so a
+    brand-new satellite's first-save id stays stable on later saves the same way a brand-new chain's
+    entry id already did.
+  Confirmed the achx-push path (`AchjToTiledAnimationMapper`/`TilesetAnimationSync`) can't have this
+  bug: it's single-cell-only by design (grepped both files for `Satellite`/`ParentId` -- zero matches),
+  so there's no satellite-offset computation for this class of drift to affect. Test:
+  `NativeTsxProjectRoundTripTests.LoadSaveWithNoEdits_OwnerNotFirstFrameAnchorWithMultiTileSatellite_SatelliteStaysOnItsOriginalTile`.
+
 - [x] **Rename a chain that has multi-tile satellites.** Already correct -- a satellite's tile id
   and `ParentId` are derived purely from frame geometry (never from the chain's `Name`), and a
   rename touches no frame geometry, so both the anchor's tile id and the satellite's `ParentId`
@@ -225,24 +259,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   Test: `NativeTsxProjectRoundTripTests.LoadRenameChainWithMultiTileSatelliteSave_AnchorNameUpdatedInPlace_SatelliteParentIdStaysOnSameAnchor`.
 
 ## TODO
-
-- [ ] **Owner-not-own-first-frame anchor combined with a multi-tile satellite relocates the
-  satellite on save, unlike the anchor.** Found while testing the rename item above (not itself a
-  rename bug -- reproduces on the very first save, no rename needed). `MultiTileToTiledAnimationMapper`
-  preserves the *anchor's* tile id via the `knownEntryTileIds` hint when the anchor's own id isn't
-  its own frame-0 tile, but a satellite has no equivalent hint: its tile id is always freshly
-  computed as the anchor's frame-0 position plus the satellite's (dx, dy) offset within the
-  footprint. `TiledAnimationToAchjMapper.Map` (load side), however, infers that same (dx, dy)
-  offset from the anchor's and satellite's own *static* tile ids in the spritesheet -- a different
-  base position whenever the anchor's own id isn't its own frame-0 tile. The two bases then differ
-  by a fixed delta, so the freshly-computed satellite id drifts from its original id by that same
-  delta every save, silently orphaning the original satellite tile. Confirmed with a throwaway
-  probe: anchor id 5 (own frames [9, 13], i.e. one row below its own static position), satellite
-  id 6 (`ParentId=5`, one column right of the anchor's static position) -- after one save the
-  satellite's animation ends up written to tile 10 (one row below tile 6, matching the anchor's own
-  delta) while tile 6 is left cleared. Needs either a `knownEntryTileIds`-style hint per satellite,
-  or a design decision that this hand-authored pattern isn't supported for multi-tile groups (with
-  a validator warning) -- same tradeoff already made for the chained-`ParentId` case above.
 
 - [ ] **`TsxAnimationValidator`'s per-frame lockstep check only compares `TileID`, never
   `Duration`.** A satellite hand-edited with the correct tile-id sequence but a different duration

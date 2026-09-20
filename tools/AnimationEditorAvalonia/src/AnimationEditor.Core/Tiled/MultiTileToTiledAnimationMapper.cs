@@ -6,9 +6,11 @@ using System.Linq;
 
 namespace AnimationEditor.Core.Tiled;
 
-/// <summary>One satellite tile of a multi-tile animation group: its own (fixed) tile id and the
-/// per-frame tile id sequence it should carry as its own Tiled animation.</summary>
-public sealed record TiledSatelliteMapping(uint TileId, IReadOnlyList<MappedFrame> Frames);
+/// <summary>One satellite tile of a multi-tile animation group: its own (fixed) tile id, the
+/// per-frame tile id sequence it should carry as its own Tiled animation, and its position within
+/// the footprint relative to the anchor (used to key <c>knownSatelliteTileIds</c> hints across
+/// saves -- see <see cref="MultiTileToTiledAnimationMapper.Map"/>).</summary>
+public sealed record TiledSatelliteMapping(uint TileId, IReadOnlyList<MappedFrame> Frames, (int Dx, int Dy) Offset);
 
 /// <summary>Result of mapping one <see cref="AnimationChainSave"/> that may span more than one
 /// tile cell per frame onto a tileset's tile grid.</summary>
@@ -54,18 +56,29 @@ public static class MultiTileToTiledAnimationMapper
     /// reference. When a chain has an entry here, that tile id wins over the freshly-computed
     /// first-frame id -- without this, every save relocates any chain whose owning tile isn't its
     /// own first frame (an ordinary hand-authored Tiled pattern), orphaning the original tile.</param>
+    /// <param name="knownSatelliteTileIds">The satellite equivalent of <paramref
+    /// name="knownEntryTileIds"/>: each chain's satellites' own on-disk tile ids, keyed by chain
+    /// reference then by the satellite's (Dx, Dy) offset within the footprint. A satellite's tile
+    /// id is otherwise always recomputed as the anchor's *frame-0* position plus its offset -- a
+    /// different base than the anchor's own (possibly hint-preserved) tile id whenever the anchor's
+    /// id isn't its own frame-0 tile, which silently drifts the satellite to a new tile every save
+    /// without this hint.</param>
     public static IReadOnlyList<MultiTileMappingResult> Map(
         AnimationChainListSave achj, TilesetAnimationInfo tilesetInfo,
-        IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds = null)
+        IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds = null,
+        IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>? knownSatelliteTileIds = null)
     {
         return achj.AnimationChains
-            .Select(chain => MapChain(chain, achj.CoordinateType, achj.TimeMeasurementUnit, tilesetInfo, knownEntryTileIds))
+            .Select(chain => MapChain(
+                chain, achj.CoordinateType, achj.TimeMeasurementUnit, tilesetInfo, knownEntryTileIds,
+                knownSatelliteTileIds != null && knownSatelliteTileIds.TryGetValue(chain, out var hints) ? hints : null))
             .ToList();
     }
 
     private static MultiTileMappingResult MapChain(
         AnimationChainSave chain, TextureCoordinateType coordinateType, TimeMeasurementUnit timeUnit,
-        TilesetAnimationInfo tilesetInfo, IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds)
+        TilesetAnimationInfo tilesetInfo, IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds,
+        IReadOnlyDictionary<(int Dx, int Dy), uint>? knownSatelliteTileIds)
     {
         MultiTileMappingResult Empty(string? warning = null) => new()
         {
@@ -129,7 +142,13 @@ public static class MultiTileToTiledAnimationMapper
         var anchorFrames = perOffset[(0, 0)];
         var satellites = perOffset
             .Where(kv => kv.Key != (0, 0))
-            .Select(kv => new TiledSatelliteMapping(kv.Value[0].TileId, kv.Value))
+            .Select(kv =>
+            {
+                var tileId = knownSatelliteTileIds != null && knownSatelliteTileIds.TryGetValue(kv.Key, out var known)
+                    ? known
+                    : kv.Value[0].TileId;
+                return new TiledSatelliteMapping(tileId, kv.Value, kv.Key);
+            })
             .ToList();
 
         uint? entryTileId = null;

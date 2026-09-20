@@ -43,6 +43,15 @@ namespace AnimationEditor.Core
         /// cref="Tiled.MultiTileToTiledAnimationMapper"/>'s <c>knownEntryTileIds</c> parameter.</summary>
         private Dictionary<AnimationChainSave, uint> _tsxEntryTileIdsByChain = new(ReferenceEqualityComparer.Instance);
 
+        /// <summary>The satellite equivalent of <see cref="_tsxEntryTileIdsByChain"/>: each
+        /// chain's satellites' own tile ids, keyed by chain reference then by the satellite's
+        /// (Dx, Dy) offset within the footprint. Without this, a satellite's tile id is always
+        /// recomputed relative to the anchor's *frame-0* position -- a different base than the
+        /// anchor's own (possibly hint-preserved) tile id whenever the anchor's id isn't its own
+        /// frame-0 tile, silently drifting the satellite to a new tile every save. See <see
+        /// cref="Tiled.MultiTileToTiledAnimationMapper"/>'s <c>knownSatelliteTileIds</c> parameter.</summary>
+        private Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> _tsxSatelliteTileIdsByChain = new(ReferenceEqualityComparer.Instance);
+
         /// <summary>Whether the currently loaded project is a native <c>.tsx</c> project (see
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsxTileset != null;
@@ -648,8 +657,9 @@ namespace AnimationEditor.Core
                     $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
 
             _tsxTileset = tileset;
-            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
+            _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
             FileName = fileName.FullPath;
         }
 
@@ -663,7 +673,8 @@ namespace AnimationEditor.Core
             if (_tsxTileset == null || AnimationChainListSave == null)
                 return;
 
-            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain);
+            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
+                AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain);
             Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
             Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
 
@@ -671,11 +682,17 @@ namespace AnimationEditor.Core
             // id) so the *next* save reuses them instead of recomputing from geometry again -- see
             // _tsxEntryTileIdsByChain's doc comment for why that matters. Rebuilt from scratch
             // (rather than just adding to it) so a deleted chain's entry doesn't linger forever.
-            var updated = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+            var updatedEntries = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+            var updatedSatellites = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
             foreach (var result in mapped)
+            {
                 if (result.EntryTileId is { } entryTileId)
-                    updated[result.SourceChain] = entryTileId;
-            _tsxEntryTileIdsByChain = updated;
+                    updatedEntries[result.SourceChain] = entryTileId;
+                if (result.Satellites.Count > 0)
+                    updatedSatellites[result.SourceChain] = result.Satellites.ToDictionary(s => s.Offset, s => s.TileId);
+            }
+            _tsxEntryTileIdsByChain = updatedEntries;
+            _tsxSatelliteTileIdsByChain = updatedSatellites;
         }
 
         /// <summary>
@@ -699,7 +716,8 @@ namespace AnimationEditor.Core
 
             var anchorTileIdsWithIssues = issues.Select(i => i.AnchorTileId).ToHashSet();
 
-            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain)
+            return Tiled.MultiTileToTiledAnimationMapper.Map(
+                    AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain)
                 .Where(r => r.EntryTileId.HasValue && anchorTileIdsWithIssues.Contains(r.EntryTileId.Value))
                 .Select(r => r.ChainName)
                 .ToList();

@@ -58,7 +58,7 @@ public class NativeTsxAnimationSyncTests
     public void Apply_MultiTileGroup_WritesParentIdOnSatelliteTile()
     {
         var tileset = EmptyTileset();
-        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100), new MappedFrame(2, 100)]);
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100), new MappedFrame(2, 100)], (1, 0));
         var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100), new MappedFrame(1, 100)], satellite) };
 
         NativeTsxAnimationSync.Apply(tileset, results);
@@ -120,7 +120,7 @@ public class NativeTsxAnimationSyncTests
     public void Apply_SatelliteCollidesWithAnotherChainsAnchor_ThrowsInsteadOfSilentlyOverwriting()
     {
         var tileset = EmptyTileset();
-        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)]);
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)], (1, 0));
         var results = new[]
         {
             Result("Walk", 0, [new MappedFrame(0, 100)], satellite),
@@ -137,8 +137,8 @@ public class NativeTsxAnimationSyncTests
         // overlap in the spritesheet such that only the *satellites* collide -- distinct from the
         // already-covered anchor-vs-anchor and satellite-vs-anchor cases.
         var tileset = EmptyTileset();
-        var walkSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)]);
-        var runSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)]);
+        var walkSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)], (1, 0));
+        var runSatellite = new TiledSatelliteMapping(5, [new MappedFrame(5, 100)], (1, 0));
         var results = new[]
         {
             Result("Walk", 0, [new MappedFrame(0, 100)], walkSatellite),
@@ -180,7 +180,7 @@ public class NativeTsxAnimationSyncTests
         satelliteTile.Properties.Add(new StringProperty { Name = "ParentId", Value = "not-a-number" });
         tileset.Tiles.Add(satelliteTile);
 
-        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)]);
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)], (1, 0));
         var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)], satellite) };
         NativeTsxAnimationSync.Apply(tileset, results);
 

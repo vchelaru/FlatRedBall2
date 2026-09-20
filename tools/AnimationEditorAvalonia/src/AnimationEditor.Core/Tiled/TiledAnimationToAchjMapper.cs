@@ -50,12 +50,25 @@ public static class TiledAnimationToAchjMapper
     /// doesn't match its own first frame -- a perfectly ordinary hand-authored Tiled pattern --
     /// keeps writing to the same tile instead of relocating (and orphaning the original tile)
     /// every save. Keyed by reference, not name, so a rename doesn't look like delete+create.</param>
-    public static AnimationChainListSave Map(Tileset tileset, out IReadOnlyDictionary<AnimationChainSave, uint> entryTileIdsByChain)
+    /// <param name="satelliteTileIdsByChain">The satellite equivalent of <paramref
+    /// name="entryTileIdsByChain"/>: each chain's satellites' own source tile ids, keyed by chain
+    /// reference then by the satellite's (Dx, Dy) offset from the anchor's *static* grid position.
+    /// A native-tsx save must feed this back in as <see
+    /// cref="MultiTileToTiledAnimationMapper"/>'s <c>knownSatelliteTileIds</c> for the same reason
+    /// as <paramref name="entryTileIdsByChain"/> -- a satellite's tile id is otherwise always
+    /// recomputed relative to the anchor's *frame-0* position, a different base whenever the
+    /// anchor's own id isn't its own frame-0 tile, which silently drifts the satellite to a new
+    /// tile every save.</param>
+    public static AnimationChainListSave Map(
+        Tileset tileset,
+        out IReadOnlyDictionary<AnimationChainSave, uint> entryTileIdsByChain,
+        out IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> satelliteTileIdsByChain)
     {
         var imageFileName = tileset.Image.HasValue ? (tileset.Image.Value.Source.HasValue ? tileset.Image.Value.Source.Value : string.Empty) : string.Empty;
         var (textureWidth, textureHeight) = GetTextureSize(tileset);
         var acls = new AnimationChainListSave();
         var entryTileIds = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+        var satelliteTileIds = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
 
         var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
         var parentIdByTileId = animatedTiles.ToDictionary(t => t.ID, GetParentId);
@@ -87,12 +100,14 @@ public static class TiledAnimationToAchjMapper
 
             var footprintColumns = 1u;
             var footprintRows = 1u;
+            var satelliteTileIdsForChain = new Dictionary<(int Dx, int Dy), uint>();
             foreach (var satellite in satellitesByAnchor[anchor.ID])
             {
                 var dx = (satellite.ID % columns) - anchorCol;
                 var dy = (satellite.ID / columns) - anchorRow;
                 footprintColumns = System.Math.Max(footprintColumns, dx + 1);
                 footprintRows = System.Math.Max(footprintRows, dy + 1);
+                satelliteTileIdsForChain[((int)dx, (int)dy)] = satellite.ID;
             }
 
             foreach (var frame in anchor.Animation)
@@ -113,9 +128,12 @@ public static class TiledAnimationToAchjMapper
 
             acls.AnimationChains.Add(chain);
             entryTileIds[chain] = anchor.ID;
+            if (satelliteTileIdsForChain.Count > 0)
+                satelliteTileIds[chain] = satelliteTileIdsForChain;
         }
 
         entryTileIdsByChain = entryTileIds;
+        satelliteTileIdsByChain = satelliteTileIds;
         return acls;
     }
 

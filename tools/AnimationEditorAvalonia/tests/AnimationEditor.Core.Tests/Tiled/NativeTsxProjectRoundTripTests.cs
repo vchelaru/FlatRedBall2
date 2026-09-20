@@ -54,7 +54,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, FixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Contains(acls.AnimationChains, c => c.Name == "ID:0");
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
@@ -123,7 +123,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, OwnerNotFirstFrameFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
         var tilesetInfo = new TilesetAnimationInfo
         {
             TileWidth = tileset.TileWidth,
@@ -191,7 +191,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, TwoWideGroupFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
 
         // Shrink the chain's frame rect from 2 tiles wide to 1 tile wide (drops the satellite).
@@ -267,7 +267,7 @@ public class NativeTsxProjectRoundTripTests
 
         // (a) The satellite's actual on-disk frames (1 frame, duration 999) never make it into the
         // editable model -- only the anchor's frames (2 frames, duration 150) do.
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(2, chain.Frames.Count);
         Assert.All(chain.Frames, f => Assert.Equal(0.15f, f.FrameLength, tolerance: 0.0001f));
@@ -323,7 +323,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, SingleTileWithNeighborFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
         var chain = acls.AnimationChains.Single(c => c.Name == "ID:0");
 
         // Grow the chain's frame rect from 1 tile wide to 2 tiles wide (gains a satellite).
@@ -355,6 +355,71 @@ public class NativeTsxProjectRoundTripTests
         Assert.Equal([((uint)1, 100), ((uint)2, 100)], newSatellite.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal(0, newSatellite.GetProperty<IntProperty>("ParentId").Value);
         Assert.Equal("Bar", newSatellite.GetProperty<StringProperty>("Foo").Value);
+    }
+
+    // Tile 5's own animation is [9, 13] -- one row below its own static position (row 1 -> rows
+    // 2/3), the same "owner isn't its own first frame" pattern as the anchor-only fixture above.
+    // Tile 6, one column right of tile 5's STATIC position (not its frame-0 position), carries
+    // ParentId=5 as the satellite. On-disk tile 6 already holds the correctly-derived sequence
+    // [10, 14] (as a prior correct save would have left it) -- a save with zero edits must not
+    // move it.
+    private const string OwnerNotFirstFrameWithSatelliteFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="5">
+          <animation>
+           <frame tileid="9" duration="150"/>
+           <frame tileid="13" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="6">
+          <properties>
+           <property name="ParentId" type="int" value="5"/>
+          </properties>
+          <animation>
+           <frame tileid="10" duration="150"/>
+           <frame tileid="14" duration="150"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void LoadSaveWithNoEdits_OwnerNotFirstFrameAnchorWithMultiTileSatellite_SatelliteStaysOnItsOriginalTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, OwnerNotFirstFrameWithSatelliteFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+
+        // Save with NO edits at all -- not even a rename.
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain, satelliteTileIdsByChain);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        var satellite = reloaded.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.NotNull(satellite);
+        Assert.Equal(5, satellite!.GetProperty<IntProperty>("ParentId").Value);
+        Assert.Equal([((uint)10, 150), ((uint)14, 150)], satellite.Animation.Select(f => (f.TileID, f.Duration)));
+
+        // Tile 10 -- where the bug used to relocate the satellite to (matching the anchor's own
+        // one-row-down delta) -- must not have been newly claimed as its own animated tile.
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 10 && t.Animation.Count > 0);
     }
 
     // Tile 8 is the anchor of a 2-tile-wide group with an explicit hand-authored Name ("Walk"),
@@ -398,7 +463,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, NamedGroupFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
         var chain = acls.AnimationChains.Single(c => c.Name == "Walk");
 
         // Rename in place -- mutate the existing chain object, don't remove+re-add.

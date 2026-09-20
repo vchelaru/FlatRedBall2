@@ -38,7 +38,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 5, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         Assert.Equal(TextureCoordinateType.UV, acls.CoordinateType);
         Assert.Equal(TimeMeasurementUnit.Second, acls.TimeMeasurementUnit);
@@ -70,7 +70,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 11958, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(864f / 2048f, chain.Frames[0].LeftCoordinate, tolerance: 0.00001f);
@@ -93,7 +93,7 @@ public class TiledAnimationToAchjMapperTests
         satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
         tileset.Tiles.Add(satellite);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(2, chain.Frames.Count);
@@ -118,7 +118,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new StringProperty { Name = "Name", Value = "Torch" });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         Assert.Equal("Torch", acls.AnimationChains.Single().Name);
     }
@@ -131,7 +131,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 5, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:5", chain.Name);
@@ -149,7 +149,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new IntProperty { Name = "ParentId", Value = -1 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:3", chain.Name);
@@ -170,7 +170,7 @@ public class TiledAnimationToAchjMapperTests
         orphan.Properties.Add(new IntProperty { Name = "ParentId", Value = 99 });
         tileset.Tiles.Add(orphan);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:5", chain.Name);
@@ -204,7 +204,7 @@ public class TiledAnimationToAchjMapperTests
         chainedC.Properties.Add(new IntProperty { Name = "ParentId", Value = 1 });
         tileset.Tiles.Add(chainedC);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
 
         Assert.Equal(2, acls.AnimationChains.Count);
         var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -225,7 +225,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal((uint)5, entryTileIdsByChain[chain]);
