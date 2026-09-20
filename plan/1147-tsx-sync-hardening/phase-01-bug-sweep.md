@@ -202,6 +202,17 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   the original (999ms, 1-frame) data instead of the derived one, then reverting. No source change.
   Test:
   `NativeTsxProjectRoundTripTests.LoadMapApplySave_SatelliteHandEditedFramesInconsistentWithAnchor_IgnoredOnLoadWarnedByValidatorOverwrittenOnSave`.
+- [x] **Zero-frame chain that used to have an entry tile.** Already correct --
+  `MultiTileToTiledAnimationMapper.MapChain`'s `Frames.Count == 0` early return sets `EntryTileId =
+  null` before `knownEntryTileIds` is ever consulted, so `NativeTsxAnimationSync.Apply` naturally
+  drops that tile into the `previouslyAnimatedTileIds.Except(newTileIds)` stale-clearing path, and
+  `ProjectManager.SaveTsxProject`'s post-save bookkeeping loop only re-adds a chain to
+  `_tsxEntryTileIdsByChain` when `EntryTileId` is non-null, so the stale hint is dropped rather than
+  lingering for a later re-populated save to wrongly reuse. Confirmed the test has teeth by
+  temporarily reverting that rebuild-from-scratch loop to an in-place mutate-without-removing
+  version and observing the assertion fail (stale tile-0 id reused instead of freshly computed
+  tile-4 id), then reverting. No source change. Test:
+  `ProjectManagerTsxProjectTests.SaveTsxProject_AllFramesDeletedFromChain_ClearsPreviouslyOwnedTileAndDoesNotStickOnResave`.
 
 ## TODO
 
@@ -213,9 +224,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   necessarily a bug (the "ignore, don't corrupt" design still holds), but it's a real gap in the
   warning coverage versus what's silently discarded; decide whether the lockstep check should also
   compare `Duration` per frame.
-- [ ] **Zero-frame chain that used to have an entry tile** (user deletes all frames from a chain but
-  doesn't delete the chain itself) — confirm this correctly clears the previously-owned tile on
-  save, same as deleting the chain outright.
 - [ ] **Rename a chain that has multi-tile satellites** — confirm the satellite's `ParentId` still
   resolves correctly and no satellite gets orphaned/cleared as a side effect of the anchor's identity
   being preserved-by-reference now.

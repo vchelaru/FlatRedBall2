@@ -131,6 +131,48 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Equal((uint)4, EntryTileIdNamed(afterSecondSave, "NewChain"));
     }
 
+    // A user can delete every frame from a chain via the UI without deleting the chain object
+    // itself, leaving an empty AnimationChainSave still present in AnimationChainListSave. That
+    // must clear the tile the chain used to own (same as deleting the chain outright would), and
+    // must NOT leave a stale _tsxEntryTileIdsByChain entry that a later re-populated save could
+    // wrongly reuse.
+    [Fact]
+    public void SaveTsxProject_AllFramesDeletedFromChain_ClearsPreviouslyOwnedTileAndDoesNotStickOnResave()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        Assert.Equal("ID:0", chain.Name);
+        chain.Frames.Clear();
+
+        pm.SaveTsxProject();
+
+        var afterClear = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var clearedTile = afterClear.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(clearedTile.Animation);
+        Assert.DoesNotContain(clearedTile.Properties, p => p.Name is "Name" or "ParentId");
+
+        // Re-populate the same chain object with frames that map to a different tile (row 1,
+        // column 0 -> tile id 4). If the stale tile-0 identity hint lingered, this would either
+        // misapply to tile 0 or throw; it must instead be computed fresh from the new geometry.
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png",
+            LeftCoordinate = 0f, RightCoordinate = 0.25f,
+            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            FrameLength = 0.1f,
+        });
+
+        pm.SaveTsxProject();
+
+        var afterResave = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal((uint)4, EntryTileIdNamed(afterResave, "ID:0"));
+        var tileZeroAfterResave = afterResave.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(tileZeroAfterResave.Animation);
+    }
+
     private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
         tileset.Tiles
             .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))
