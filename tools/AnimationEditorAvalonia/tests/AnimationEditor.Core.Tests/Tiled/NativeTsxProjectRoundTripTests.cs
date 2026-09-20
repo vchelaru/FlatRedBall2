@@ -156,4 +156,136 @@ public class NativeTsxProjectRoundTripTests
         var clearedTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 2);
         Assert.True(clearedTile is null || clearedTile.Animation.Count == 0);
     }
+
+    // Tile 8 is the anchor of a 2-tile-wide group whose satellite (tile 9) also carries an
+    // unrelated hand-authored property, to confirm shrinking doesn't wipe more than this sync
+    // owns.
+    private const string TwoWideGroupFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="8">
+          <animation>
+           <frame tileid="8" duration="150"/>
+           <frame tileid="12" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="9">
+          <properties>
+           <property name="ParentId" type="int" value="8"/>
+           <property name="Collidable" type="bool" value="true"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="150"/>
+           <frame tileid="13" duration="150"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void LoadShrinkGroupFootprintSave_UnusedSatelliteCleared_ButUnrelatedPropertyKept()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, TwoWideGroupFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
+
+        // Shrink the chain's frame rect from 2 tiles wide to 1 tile wide (drops the satellite).
+        foreach (var frame in groupChain.Frames)
+            frame.RightCoordinate = frame.LeftCoordinate + (16f / 64f);
+
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
+        Assert.Empty(mapped.Single().Satellites);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        var anchor = reloaded.Tiles.Single(t => t.ID == 8);
+        Assert.Equal([((uint)8, 150), ((uint)12, 150)], anchor.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var formerSatellite = reloaded.Tiles.SingleOrDefault(t => t.ID == 9);
+        Assert.NotNull(formerSatellite);
+        Assert.Empty(formerSatellite!.Animation);
+        Assert.DoesNotContain(formerSatellite.Properties, p => p.Name == "ParentId");
+        Assert.True(formerSatellite.GetProperty<BoolProperty>("Collidable").Value);
+    }
+
+    // Tile 0 is a plain single-tile animation. Tile 1 pre-exists with an unrelated hand-authored
+    // property but no animation -- it's exactly where the new satellite will need to land once
+    // the chain grows to a 2-tile-wide footprint.
+    private const string SingleTileWithNeighborFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="100"/>
+           <frame tileid="1" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="1">
+          <properties>
+           <property name="Foo" value="Bar"/>
+          </properties>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void LoadGrowChainFootprintSave_NewSatelliteCreated_ButUnrelatedPropertyOnExistingTileKept()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
+        File.WriteAllText(fixturePath, SingleTileWithNeighborFixtureXml);
+        var tileset = Loader.Default().LoadTileset(fixturePath);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain);
+        var chain = acls.AnimationChains.Single(c => c.Name == "ID:0");
+
+        // Grow the chain's frame rect from 1 tile wide to 2 tiles wide (gains a satellite).
+        foreach (var frame in chain.Frames)
+            frame.RightCoordinate = frame.LeftCoordinate + (32f / 64f);
+
+        var tilesetInfo = new TilesetAnimationInfo
+        {
+            TileWidth = tileset.TileWidth,
+            TileHeight = tileset.TileHeight,
+            ColumnCount = tileset.Columns,
+            ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
+        };
+
+        var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
+        Assert.Single(mapped.Single().Satellites);
+        NativeTsxAnimationSync.Apply(tileset, mapped);
+
+        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        TsxWriter.Write(tileset, outputPath);
+        var reloaded = Loader.Default().LoadTileset(outputPath);
+
+        var anchor = reloaded.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 100), ((uint)1, 100)], anchor.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var newSatellite = reloaded.Tiles.Single(t => t.ID == 1);
+        Assert.Equal([((uint)1, 100), ((uint)2, 100)], newSatellite.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal(0, newSatellite.GetProperty<IntProperty>("ParentId").Value);
+        Assert.Equal("Bar", newSatellite.GetProperty<StringProperty>("Foo").Value);
+    }
 }

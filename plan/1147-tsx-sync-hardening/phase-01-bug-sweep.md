@@ -90,12 +90,17 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
   first-save id feeds back in as the next save's `knownEntryTileIds` hint. No source change; test
   added to pin the behavior (confirmed red when the hint was stubbed out, green against real code):
   `ProjectManagerTsxProjectTests.SaveTsxProject_BrandNewChain_EntryTileIdStaysStableAcrossRepeatedSaves`.
+- [x] **Multi-tile group footprint shrinks or grows across a save.** Already correct --
+  `NativeTsxAnimationSync.Apply`'s stale-vs-new tile id set diff (computed fresh from
+  `results` every call) naturally drops a satellite no chain claims anymore and creates one a
+  chain newly needs, and `ApplyTile`/`ClearTile` only ever touch the `Animation`/`Name`/`ParentId`
+  properties this sync owns, leaving unrelated hand-authored properties on the affected tile
+  alone in both directions. No source change; tests added to pin the behavior:
+  `NativeTsxProjectRoundTripTests.LoadShrinkGroupFootprintSave_UnusedSatelliteCleared_ButUnrelatedPropertyKept`,
+  `LoadGrowChainFootprintSave_NewSatelliteCreated_ButUnrelatedPropertyOnExistingTileKept`.
 
 ## TODO
 
-- [ ] **Multi-tile group footprint shrinks or grows across a save** (e.g. 2×1 → 1×1): confirm the
-  now-unused satellite tile is actually cleared (not left with a stale animation) and the newly
-  needed satellite tile is actually created, in one native-tsx round trip.
 - [ ] **Two different multi-tile chains have overlapping satellite/anchor footprints in the
   spritesheet** (legitimate geometry collision, not an authoring mistake) — confirm this is caught
   by the same collision detection as the identical-entry-tile case, with a clear message identifying
