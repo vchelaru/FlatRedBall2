@@ -56,7 +56,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             }
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedNodes = _frames.Cast<object>().ToList();
             _selectedState.SelectedFrame = _frames[^1];
             return true;
@@ -68,7 +67,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 _chain.Frames.Remove(frame);
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedNodes = _preSelection;
             _selectedState.SelectedFrame = _preSelection.OfType<AnimationFrameSave>().LastOrDefault();
         }

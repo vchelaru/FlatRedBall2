@@ -32,7 +32,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedCircle = _circle;
             return true;
         }
@@ -43,7 +42,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedCircle = _preAddCircle;
         }
     }

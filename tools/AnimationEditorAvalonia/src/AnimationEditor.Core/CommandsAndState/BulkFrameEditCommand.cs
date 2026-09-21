@@ -143,7 +143,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events.RaiseAnimationChainsChanged();
             if (_refreshWireframe)
                 _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

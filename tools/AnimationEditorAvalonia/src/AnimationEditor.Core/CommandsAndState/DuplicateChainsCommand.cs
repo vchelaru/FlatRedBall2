@@ -69,6 +69,5 @@ internal sealed class DuplicateChainsCommand : IUndoableCommand
     {
         _commands.RefreshTreeView();
         _events.RaiseAnimationChainsChanged();
-        _commands.SaveCurrentAnimationChainList();
     }
 }

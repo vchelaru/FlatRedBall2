@@ -129,6 +129,5 @@ internal sealed class MoveFramesCommand : IUndoableCommand
             _commands.RefreshTreeNode(_targetChain);
         _commands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
-        _commands.SaveCurrentAnimationChainList();
     }
 }

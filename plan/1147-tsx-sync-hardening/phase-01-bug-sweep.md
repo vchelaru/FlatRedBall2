@@ -2296,3 +2296,28 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     `AppCommandsTsxAchxOnlyEditsTests` (4).
   - **Margin/spacing support -- needs a design decision, filed as #1165** (how a multi-tile frame
     spans the gap pixels).
+
+- [x] **Fresh-eyes pass #23 -- undo and redo through the tsx save path.** Every command autosaves
+  on Do, Undo and Redo; the save-time behavior added since #1155 (owner transfer, colliding-claim
+  yielding, lossy warnings, stale guard) had only ever been exercised on the Do side. Drove the
+  real commands (duplicate, move-onto-another-chain, delete chain, delete all frames, rename,
+  grow-left transfer) through Undo and Redo, reading the tsx back after every step. The tsx
+  logic held everywhere. One real, project-wide bug fell out of the instrumentation:
+  - **Every edit, undo and redo saved twice -- fixed.** Each `IUndoableCommand` raised
+    `AnimationChainsChanged` (which `AppCommands` reacts to by saving) *and* called
+    `SaveCurrentAnimationChainList()` itself right after: two disk writes, two Tiled-sync pushes,
+    two hot-reload own-save records and two "not every change applied" toasts per action, for
+    achx and tsx alike, since the autosave policy moved into `AppCommands` (278daac4). The 30
+    explicit calls are gone; `OnAnimationChainsChanged` is the one save, and now also writes the
+    crash-recovery snapshot for an untitled document (that was the only job the explicit call
+    still did that the event path skipped). Tests: `AppCommandsSaveOnChangeTests.
+    Command_DoUndoRedo_EachSavesExactlyOnce`, `RaiseAnimationChainsChanged_NoFileNameSet_WritesRecoveryFile`
+    (both red first); `AppCommandsTsxUndoRedoTests` (7) kept as regression guards.
+  - **Confirmed on the way:** undoing a move that had transferred an owner moves it back and
+    frees the tile; undoing a moved duplicate makes it yield again while its previously-saved
+    tile keeps that last good state until the copy is saveable or deleted; delete-chain and
+    delete-all-frames undo revive the original tile id; rename undo restores the `Name` property.
+  Full suite: `AnimationEditor.Core.Tests` 2372, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.
+  The tsx path itself came back clean; the find was outside it, so this counts as an empty pass
+  for the sweep's own stop condition (one of two).

@@ -43,7 +43,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _events.RaiseAnimationChainsChanged();
             _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

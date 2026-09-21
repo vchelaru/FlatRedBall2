@@ -39,7 +39,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedRectangle = null;
             return true;
         }
@@ -51,7 +50,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedRectangle = _rect;
         }
 
@@ -61,7 +59,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedRectangle = null;
         }
     }

@@ -26,7 +26,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Loop = _loop;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             return true;
         }
 
@@ -35,7 +34,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Loop = !_loop;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

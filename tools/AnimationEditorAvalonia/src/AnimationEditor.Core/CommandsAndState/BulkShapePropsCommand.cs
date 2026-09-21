@@ -134,7 +134,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshAnimationFrameDisplay();
             _commands.RefreshWireframe();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

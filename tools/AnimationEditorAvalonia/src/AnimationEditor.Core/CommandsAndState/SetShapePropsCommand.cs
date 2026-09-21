@@ -94,6 +94,5 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
         _commands.RefreshAnimationFrameDisplay();
         _commands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
-        _commands.SaveCurrentAnimationChainList();
     }
 }

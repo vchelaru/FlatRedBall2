@@ -77,7 +77,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             }
             _events.RaiseAnimationChainsChanged();
             _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
             return true;
         }
 
@@ -93,7 +92,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             }
             _events.RaiseAnimationChainsChanged();
             _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

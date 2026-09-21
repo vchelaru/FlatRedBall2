@@ -65,7 +65,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

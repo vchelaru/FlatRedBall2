@@ -28,7 +28,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Name = _newName;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             return true;
         }
 
@@ -37,7 +36,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Name = _oldName;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

@@ -41,7 +41,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 _acls.AnimationChains.Add(_chain);
             _commands.RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedChain = _chain;
             return true;
         }
@@ -51,7 +50,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _acls.AnimationChains.Remove(_chain);
             _commands.RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedChain = _preAddChain;
         }
     }

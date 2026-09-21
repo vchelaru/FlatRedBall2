@@ -65,7 +65,6 @@ internal sealed class PasteShapesCommand : IUndoableCommand
         _commands.RefreshTreeNode(_frame);
         _commands.RefreshAnimationFrameDisplay();
         _events.RaiseAnimationChainsChanged();
-        _commands.SaveCurrentAnimationChainList();
     }
 
     private void SelectPrimaryShape(object shape)

@@ -45,7 +45,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             }
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

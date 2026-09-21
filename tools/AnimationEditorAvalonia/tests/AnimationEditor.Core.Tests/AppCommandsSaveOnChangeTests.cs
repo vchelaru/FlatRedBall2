@@ -33,6 +33,50 @@ public class AppCommandsSaveOnChangeTests
         }
     }
 
+    // #1147 pass #23: every IUndoableCommand raised AnimationChainsChanged (which autosaves here)
+    // AND called SaveCurrentAnimationChainList itself, so each edit, undo and redo wrote the file
+    // twice -- two disk writes, two Tiled-sync pushes, two "not every change applied" toasts.
+    [Fact]
+    public void Command_DoUndoRedo_EachSavesExactlyOnce()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tmpPath = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N") + ".achx");
+        ctx.ProjectManager.FileName = tmpPath;
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var saves = 0;
+        ctx.AppCommands.EditorProjectModelChanged += _ => saves++;
+
+        try
+        {
+            ctx.AppCommands.RenameChain(chain, "Run");
+            Assert.Equal(1, saves);
+            ctx.UndoManager.Undo();
+            Assert.Equal(2, saves);
+            ctx.UndoManager.Redo();
+            Assert.Equal(3, saves);
+            ctx.AppCommands.DuplicateChains([chain]);
+            Assert.Equal(4, saves);
+        }
+        finally
+        {
+            if (File.Exists(tmpPath)) File.Delete(tmpPath);
+        }
+    }
+
+    // An untitled document has no file to autosave to; the crash-recovery snapshot is what
+    // stands in for it, and the event path must write it just like the commands used to.
+    [Fact]
+    public void RaiseAnimationChainsChanged_NoFileNameSet_WritesRecoveryFile()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.ProjectManager.FileName = null;
+        if (File.Exists(ctx.IoManager.RecoveryFilePath)) File.Delete(ctx.IoManager.RecoveryFilePath);
+
+        ctx.ApplicationEvents.RaiseAnimationChainsChanged();
+
+        Assert.True(File.Exists(ctx.IoManager.RecoveryFilePath));
+    }
+
     [Fact]
     public void RaiseAnimationChainsChanged_NoFileNameSet_DoesNotThrow()
     {

@@ -56,7 +56,7 @@ fix per item, until no more plausible gaps remain.
 
 | Phase | Document | Status |
 |---|---|---|
-| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (pass #22 closed every deferred residual; two empty passes still needed) |
+| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (pass #23 clean on the tsx path, found a project-wide double-save; one more empty pass closes it) |
 
 ### [AnimationEditorCommon: renderer-agnostic .achx runtime](934-animationeditorcommon/)
 

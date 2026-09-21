@@ -55,8 +55,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager = undoManager;
 
             // Autosave policy: every command that mutates the animation data raises
-            // AnimationChainsChanged (constructors/Do() of ~20 IUndoableCommand types, plus a
-            // couple of direct call sites in this class). This is the single place that reacts
+            // AnimationChainsChanged (constructors/Do() of ~30 IUndoableCommand types, plus a
+            // couple of direct call sites in this class). This is the ONLY place that reacts
             // to it by writing the change to disk -- it used to live in MainWindow (the Avalonia
             // app layer), which meant "does an edit actually get saved" had zero test coverage
             // and was twice misdiagnosed while investigating issue #839. Living here instead
@@ -69,11 +69,11 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.TiledSyncParseFailed += (achxFile, ex) => TiledSyncFailed?.Invoke(achxFile, ex);
         }
 
-        private void OnAnimationChainsChanged()
-        {
-            if (!string.IsNullOrEmpty(_pm.FileName))
-                SaveCurrentAnimationChainList();
-        }
+        // The one save per edit. SaveCurrentAnimationChainList itself writes the crash-recovery
+        // snapshot when there is no file yet, so an untitled document is covered too. Commands
+        // must NOT call SaveCurrentAnimationChainList on their own as well: every edit, undo and
+        // redo used to be written twice (two disk writes, two Tiled-sync pushes, two toasts).
+        private void OnAnimationChainsChanged() => SaveCurrentAnimationChainList();
 
         // ── Chain lock (#1032) ────────────────────────────────────────────────────
         // A locked chain's frame/shape *content* cannot be edited (add/delete/move/duplicate/

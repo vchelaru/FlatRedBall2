@@ -30,7 +30,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Frames.Add(_frame);
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedFrame = _frame;
             // Arm the wireframe to fit this frame into view on the reload the selection above triggers,
             // in case it's larger than the viewport (e.g. a whole-sheet default) — #616. Undo does not
@@ -44,7 +43,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Frames.Remove(_frame);
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedFrame = _preAddFrame;
         }
     }

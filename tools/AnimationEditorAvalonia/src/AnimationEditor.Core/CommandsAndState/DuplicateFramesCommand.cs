@@ -132,7 +132,6 @@ internal sealed class DuplicateFramesCommand : IUndoableCommand
         }).Where(c => c is not null).Distinct())
             _commands.RefreshTreeNode(chain!);
         _events.RaiseAnimationChainsChanged();
-        _commands.SaveCurrentAnimationChainList();
     }
 
     private void RestoreFrameSelection(List<object> nodes)

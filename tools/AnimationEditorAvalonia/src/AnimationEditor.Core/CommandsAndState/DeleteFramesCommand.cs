@@ -56,7 +56,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _commands.RefreshWireframe();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             return true;
         }
 
@@ -70,7 +69,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _commands.RefreshWireframe();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedFrame = _removed[0].Frame;
         }
 
@@ -82,7 +80,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _commands.RefreshWireframe();
             _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
         }
 
         /// <summary>
