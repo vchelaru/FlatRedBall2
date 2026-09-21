@@ -335,42 +335,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`SaveTsxProject` writes from a load-time snapshot with no re-read/merge against disk, so a
-  concurrent achx-push sync to the same `.tsx` (via a `.tiledsync` association) can be silently
-  clobbered or have its own new tiles dropped from the file entirely.** Found in fresh-eyes pass
-  #13 (see DONE below for the full trace). The narrower part of this gap -- a tile achx-push already
-  owned *at the moment the native-tsx project loaded* -- is fixed this pass (ownership-aware
-  exclusion + stale-clear protection + a loud throw on a fresh claim collision). What's **not**
-  fixed, and needs a decision rather than a unilateral change: `ProjectManager.SaveTsxProject`
-  operates entirely on `_tsxTileset`, an in-memory snapshot taken once at `LoadTsxProject` and never
-  refreshed from disk before a later save; `TsxWriter.Write` (both its patch and full-rewrite paths)
-  drives its output purely from the in-memory `Tileset.Tiles` list, with zero fallback to what's
-  currently on disk. So if achx-push adds a brand-new tile to the file (or edits one this project's
-  own stale snapshot doesn't have) *after* the native-tsx tab loaded but *before* it next saves, that
-  tile is invisible to every check this pass added (they all key off `tilesById`, which is built
-  from the same stale snapshot) and is silently omitted from the file the next time this project
-  saves -- true data loss, not just a stale warning. This is a classic lost-update/concurrent-writer
-  problem, just at the file level within one process (two independent, un-coordinated save pipelines
-  targeting one file) rather than across processes.
-  - Confirmed reachable via ordinary UI, not just hand-editing: `AddAssociatedTiledTilesetViaDialogAsync`
-    /`AddAssociatedTiledTileset` (`AppCommands.cs`) let a user point any achx/achj's `.tiledsync`
-    association at any `.tsx` path via a plain file-picker dialog, with **zero check** for whether
-    that path is currently open as a native-tsx tab (or vice versa -- `LoadTsxProject`/
-    `TsxCompatibilityChecker.CheckOpenCompatibility` have no awareness of `.tiledsync` associations
-    either). Two ordinary actions -- File > Open a `.tsx` directly, and in a different tab,
-    Associate Tiled Tileset pointing an achx at that same path -- are all it takes.
-  - Candidate responses, undecided: (a) `SaveTsxProject` re-reads the file immediately before
-    applying its own changes and merges in any tile it doesn't recognize as its own (the structurally
-    correct fix, but a real change to the save flow's design, not a small patch); (b) refuse to open
-    a `.tsx` natively if it already has a `.tiledsync` association pointing at it (and symmetrically,
-    refuse to associate a `.tiledsync` with a `.tsx` that's currently open natively), trading
-    coexistence for a hard error the user can react to; (c) leave both features working, document the
-    hazard, and accept it as a known limitation of running both features against the same file in one
-    session (lowest engineering cost, worst user-facing outcome if hit). Not decided in this pass --
-    genuinely needs a product/design call, same as this sweep's established precedent for
-    "structurally real but needs a decision beyond a bug-sweep pass" findings (e.g. the `TsxWriter`
-    tile-ordering limitation, `PropertiesEqual` order-sensitivity).
-
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1915,3 +1879,91 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     `AppCommands.AddAssociatedTiledTileset*`) had already been individually audited by earlier
     passes, but never against each other. Full suite: `AnimationEditor.Core.Tests` 2192/2192 (was
     2189, +3 new).
+
+- [x] **Resolved the pass #13 coexistence TODO: refuse native-tsx/achx-push coexistence outright
+  (candidate (b)), rather than the re-read-and-merge fix (candidate (a)) or documenting-and-accepting
+  (candidate (c)).** Product decision made explicitly (not a unilateral engineering call): a `.tsx`
+  can never be both a native-tsx project and an achx-push target at the same time. Blocked in both
+  directions:
+  - **Direction 1 -- opening a `.tsx` natively while it already has a `.tiledsync` association.**
+    New static `Tiled/TiledSyncAssociationScanner.FindAssociationsTargeting(tsxPath)` recursively
+    scans the tsx's own directory and subdirectories for every `.tiledsync` file, resolves each
+    one's relative `TiledTilesetPaths` against its own folder, and returns the absolute achx/achj
+    path (inferred from the `.tiledsync` file's own name; falls back to the `.tiledsync` path itself
+    if no sibling `.achx`/`.achj` is found on disk) for every match. `ProjectManager.LoadTsxProject`
+    calls it first and throws `InvalidOperationException` before touching `_tsxTileset` or any other
+    field if any match is found -- same all-or-nothing invariant the method's doc comment already
+    promised for its other two throw conditions (unsupported construct, corrupt tsx). Deliberately
+    NOT added to `IIoManager`/`IoManager` (unlike `GetAssociatedTiledTilesetPaths`, which is
+    achx-keyed and DOES belong there): `ProjectManager` has no `IIoManager` dependency today (its
+    constructor takes none, and ~50 call sites do `new ProjectManager()`), and it already does its
+    own direct `Directory.EnumerateFiles` scanning elsewhere (`FindMissingTextures`'s PNG fallback
+    scan) -- a static scanner class matches that existing precedent
+    (`Tiled/TsxCompatibilityChecker.cs` is the same "static class ProjectManager calls directly, no
+    DI" shape) without adding constructor-injection blast radius to every `new ProjectManager()`
+    call site for a single guard. **Known scope limit, stated in the class's own doc comment**: an
+    achx/achj living outside the tsx's own directory tree (a sibling or parent folder, reached via
+    the plain file-picker `AddAssociatedTiledTilesetViaDialogAsync` already uses) is not found by
+    this scan -- narrower than a perfect search, but consistent with how every other relative path in
+    this file format is already resolved from the achx's own folder, and matches the ordinary case of
+    an achx/achj and its tsx colocated in one content folder.
+  - **Direction 2 -- associating a `.tiledsync` with a `.tsx` that's currently open natively in
+    another tab.** `AppCommands`/`ProjectManager` have no visibility into other tabs (`ProjectManager`
+    only tracks its own current/active project; tab awareness lives in `TabManager`, which
+    `AppCommands` has no reference to, and threading it in would mean a constructor change touching
+    ~10 `new AppCommands(...)` call sites). Used the same host-supplied-delegate seam this class
+    already has for exactly this kind of "Core needs UI-owned state it doesn't have" gap (see
+    `CanvasDefaultTexturePath`): new `IAppCommands.IsTsxPathOpenAsNativeProject` (`Func<string,
+    bool>?`), null by default (permissive -- "not open anywhere" -- matching
+    `CanvasDefaultTexturePath`'s own null-means-no-info convention so a host that hasn't wired tab
+    awareness keeps associating exactly as before). `AppCommands.AddAssociatedTiledTileset` throws
+    `InvalidOperationException` when the delegate reports the target tsx open; the delegate itself is
+    wired in `MainWindow.axaml.cs`'s `WireAppCommands()`, checking both the active tab
+    (`_projectManager.IsNativeTsxProject` + `FileName` match) and every backgrounded tab
+    (`TabEntry.CachedTsxState != null` for a path match) since a native-tsx tab's own
+    identity-tracking state only lives in one of those two places depending on whether it's currently
+    active. `AddAssociatedTiledTilesetViaDialogAsync` (the fire-and-forget UI entry point invoked via
+    `_ = ...` with no caller-side try/catch) catches the exception and re-raises it through the
+    existing `TiledSyncFailed` event instead of letting it become a silently-swallowed unobserved
+    task exception -- reusing the event this class already fires for the sibling "corrupt
+    `.tiledsync`" failure mode, which `MainWindow` already displays via `UpdateTiledSyncStatus`, so no
+    new UI wiring was needed for display, only for supplying the tab-awareness delegate itself.
+  - Tests (`AnimationEditor.Core.Tests`): `ProjectManagerTsxProjectTests.
+    LoadTsxProject_TsxAlreadyAssociatedViaTiledSync_ThrowsInsteadOfSilentlyCoexisting`,
+    `LoadTsxProject_TsxAssociatedFromAchjInstead_ThrowsInsteadOfSilentlyCoexisting` (direction 1,
+    both confirmed red before the fix -- `Assert.Throws` saw no exception); happy-path guards
+    `LoadTsxProject_NoAssociationAnywhere_OpensNormallyAsBefore`,
+    `LoadTsxProject_TiledSyncAssociatesADifferentTsx_OpensNormally` (an unrelated or
+    differently-targeted `.tiledsync` must not false-positive). `AppCommandsTiledSyncTests.
+    AddAssociatedTiledTileset_TargetTsxOpenAsNativeProjectElsewhere_ThrowsInsteadOfSilentlyCoexisting`,
+    `AddAssociatedTiledTilesetViaDialogAsync_TargetTsxOpenAsNativeProjectElsewhere_
+    RaisesTiledSyncFailedInsteadOfAssociating` (direction 2, both confirmed red before the fix --
+    the interface member didn't exist yet, a compile-time red); happy-path guards
+    `AddAssociatedTiledTileset_DelegateNotWired_AssociatesNormally`,
+    `AddAssociatedTiledTileset_DelegateSaysNotOpenElsewhere_AssociatesNormally`.
+  - Files changed: new `Tiled/TiledSyncAssociationScanner.cs`; `ProjectManager.cs` (`LoadTsxProject`
+    guard + updated `<exception>` doc); `CommandsAndState/IAppCommands.cs`/`AppCommands.cs`
+    (`IsTsxPathOpenAsNativeProject` property, `AddAssociatedTiledTileset` guard,
+    `AddAssociatedTiledTilesetViaDialogAsync` try/catch); `AnimationEditor.App/MainWindow.axaml.cs`
+    (`WireAppCommands()` wires the delegate using `_projectManager`/`_tabManager`, both already
+    fields on this class). `IIoManager`/`IoManager`/`BrowserIoManager` untouched -- deliberately not
+    part of the abstraction for either direction, per the reasoning above.
+  - Full suite: `AnimationEditor.Core.Tests` 2200/2200 (was 2192, +8 new). `AnimationEditor.App`,
+    `AnimationEditor.Views`, and `AnimationEditor.Browser` all still build clean (full
+    `AnimationEditorAvalonia.slnx` build, 0 warnings/0 errors); `AnimationEditor.App.Tests`
+    989/989.
+  - **Honest assessment of residual scope -- this closes the two reachable-via-ordinary-UI paths
+    pass #13 identified, but not the full lost-update window.** A `.tiledsync` file created or
+    hand-edited on disk (bypassing `AddAssociatedTiledTilesetPath`/`AddAssociatedTiledTileset`
+    entirely -- e.g. by another tool, a teammate's commit, or manual editing) while a `.tsx` is
+    *already* open as a native-tsx tab is not caught until that tab's next `LoadTsxProject` call --
+    there is no live re-check while a tab sits open, only at open/associate time. This is narrower
+    than the two flows pass #13 confirmed reachable via ordinary UI (both of which this fix closes
+    completely), but it is a real, if awkward-to-hit, gap: the association is invisible to the
+    already-open tab for the rest of that session, and a save from that tab would still write over
+    ground achx-push might independently claim once its own association is eventually read. Not
+    fixed here -- doing so would mean either polling/watching `.tiledsync` files for every open
+    native-tsx tab (a new, always-on file-watch responsibility with its own cost/complexity) or
+    re-validating on every `SaveTsxProject` call (which starts to resemble candidate (a)'s
+    re-read-and-merge shape, the option this pass deliberately did not choose). Left as a known,
+    narrower residual rather than folded into this fix silently.
