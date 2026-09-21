@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Tiled;
 using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
@@ -451,6 +452,56 @@ public class WireframeControl : TextureViewport
         _objectFinder?.GetAnimationChainContaining(frame)?.IsLocked == true;
 
     /// <summary>
+    /// Records the undo command for a single frame's region change (Move Frame / Resize Frame).
+    /// The single-frame handle-drag and grid/region-resize commit sites all funnel through here
+    /// so the propagation below lives in one place instead of three near-identical copies.
+    /// <para>
+    /// When this is a resize (not just a move) of a frame belonging to a native .tsx project's
+    /// multi-frame chain, also propagates the new width/height onto every sibling frame in that
+    /// chain (each sibling keeps its own Left/Top) and records them in the same undo command. See
+    /// <see cref="FrameFootprintSync"/> for why: <c>MultiTileToTiledAnimationMapper</c> requires
+    /// every frame in a chain to share one whole-tile footprint, and silently drops the chain's
+    /// tile animation on save the moment one frame's size disagrees with the rest -- which is
+    /// exactly what stretching only one frame produces otherwise.
+    /// </para>
+    /// </summary>
+    private void RecordFrameRegionChange(
+        AnimationFrameSave frame,
+        float bL, float bT, float bR, float bB,
+        float aL, float aT, float aR, float aB)
+    {
+        bool sizeChanged = Math.Abs((bR - bL) - (aR - aL)) > 0.0001f || Math.Abs((bB - bT) - (aB - aT)) > 0.0001f;
+        var chain = sizeChanged && _projectManager?.IsNativeTsxProject == true
+            ? _objectFinder?.GetAnimationChainContaining(frame)
+            : null;
+
+        if (chain is null || chain.Frames.Count < 2)
+        {
+            _undoManager!.Record(new FrameRegionChangedCommand(
+                frame, bL, bT, bR, bB, aL, aT, aR, aB, _appCommands!, _events!));
+            return;
+        }
+
+        var siblingMatches = FrameFootprintSync.ComputeSiblingMatches(chain, frame, newWidth: aR - aL, newHeight: aB - aT);
+        var snapshots = new List<BulkFrameRegionChangedCommand.FrameSnapshot>
+        {
+            new(frame, bL, bT, bR, bB, aL, aT, aR, aB),
+        };
+        foreach (var m in siblingMatches)
+        {
+            m.Frame.RightCoordinate  = m.After.Right;
+            m.Frame.BottomCoordinate = m.After.Bottom;
+            snapshots.Add(new(m.Frame,
+                m.Before.Left, m.Before.Top, m.Before.Right, m.Before.Bottom,
+                m.After.Left,  m.After.Top,  m.After.Right,  m.After.Bottom));
+        }
+
+        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+        foreach (var m in siblingMatches)
+            FrameRegionChanged?.Invoke(m.Frame);
+    }
+
+    /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
@@ -897,11 +948,9 @@ public class WireframeControl : TextureViewport
         if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
         {
             FrameRegionChanged?.Invoke(sel.Frame);
-            _undoManager!.Record(new FrameRegionChangedCommand(
-                sel.Frame,
+            RecordFrameRegionChange(sel.Frame,
                 _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-                aL, aT, aR, aB,
-                _appCommands!, _events!));
+                aL, aT, aR, aB);
         }
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
@@ -1643,11 +1692,9 @@ public class WireframeControl : TextureViewport
                     RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
                 {
                     FrameRegionChanged?.Invoke(_draggingRect.Frame);
-                    _undoManager!.Record(new FrameRegionChangedCommand(
-                        _draggingRect.Frame,
+                    RecordFrameRegionChange(_draggingRect.Frame,
                         _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-                        aL, aT, aR, aB,
-                        _appCommands!, _events!));
+                        aL, aT, aR, aB);
                 }
             }
             _draggingRect = null;
@@ -1915,8 +1962,7 @@ public class WireframeControl : TextureViewport
 
         if (RegionChanged(bL, bT, bR, bB, aL, aT, aR, aB))
         {
-            _undoManager!.Record(new FrameRegionChangedCommand(
-                frame, bL, bT, bR, bB, aL, aT, aR, aB, _appCommands!, _events!));
+            RecordFrameRegionChange(frame, bL, bT, bR, bB, aL, aT, aR, aB);
         }
     }
 

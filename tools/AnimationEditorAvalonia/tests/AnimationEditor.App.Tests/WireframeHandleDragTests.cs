@@ -6,7 +6,9 @@ using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
+using System.Linq;
 using Xunit;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.App.Tests;
 
@@ -364,6 +366,138 @@ public class WireframeHandleDragTests
 
             Assert.False(ctx.UndoManager.CanUndo,
                 "Bulk handle click without dragging must not create an undo entry");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    // ── Native tsx: stretching one frame propagates its new size to siblings ─────────────────
+    // A multi-tile .tsx tile animation (MultiTileToTiledAnimationMapper) requires every frame in
+    // a chain to share the exact same whole-tile footprint. Stretching just one frame to span
+    // more tiles is the only way to author that in the wireframe, so the resize must propagate
+    // to every other frame in the chain -- but only for a native tsx project; an ordinary achx
+    // project's frames are independent.
+
+    private const string NativeTsxFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+         <image source="Heroes.png" width="64" height="64"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="200"/>
+           <frame tileid="1" duration="200"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    /// <summary>
+    /// Loads the fixture above as a native tsx project: one chain ("ID:0") with two 16px-tile
+    /// frames -- frame 0 at pixel (0,0)-(16,16), frame 1 at (16,0)-(32,16) -- against a real
+    /// 64x64 "Heroes.png" so <see cref="WireframeControl.SimulateHandleDrag"/>'s texture-space
+    /// math has a bitmap to work against.
+    /// </summary>
+    private static (WireframeControl ctrl, AnimationChainSave chain, string dir) BuildNativeTsxCtrl(TestServices ctx)
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var tsxPath = System.IO.Path.Combine(dir, "Heroes.tsx");
+        System.IO.File.WriteAllText(tsxPath, NativeTsxFixtureXml);
+        WriteSolidPng(dir, SKColors.DarkGray, size: 64, name: "Heroes.png");
+
+        ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
+
+        var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = chain.Frames[0];
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(System.IO.Path.Combine(dir, "Heroes.png"));
+        ctrl.SetCamera(0f, 0f, 1f);
+        ctrl.RefreshFrames();
+
+        return (ctrl, chain, dir);
+    }
+
+    [AvaloniaFact]
+    public void HandleDrag_StretchingFrameInNativeTsxProject_PropagatesNewSizeToSiblingFrames()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, chain, dir) = BuildNativeTsxCtrl(ctx);
+        try
+        {
+            var frame0 = chain.Frames[0];
+            var frame1 = chain.Frames[1];
+
+            // Stretch frame 0's right edge from pixel 16 to pixel 32, doubling its width to span
+            // two 16px tiles instead of one.
+            ctrl.SimulateHandleDrag(HandleKind.BotRight,
+                startScreenX: 16f, startScreenY: 16f,
+                endScreenX:   32f, endScreenY:   16f);
+
+            Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
+
+            // Frame 1 keeps its own Left/Top (its position in the sheet) but must now match
+            // frame 0's new 32px width -- otherwise MultiTileToTiledAnimationMapper drops the
+            // whole chain's tile animation on save (footprint mismatch).
+            Assert.Equal(0.25f, frame1.LeftCoordinate,   precision: 4);
+            Assert.Equal(0f,    frame1.TopCoordinate,    precision: 4);
+            Assert.Equal(0.75f, frame1.RightCoordinate,  precision: 4);
+            Assert.Equal(0.25f, frame1.BottomCoordinate, precision: 4);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
+    public void HandleDrag_StretchingFrameInNativeTsxProject_UndoRestoresSiblingFrameToo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, chain, dir) = BuildNativeTsxCtrl(ctx);
+        try
+        {
+            var frame1 = chain.Frames[1];
+            var beforeR = frame1.RightCoordinate;
+
+            ctrl.SimulateHandleDrag(HandleKind.BotRight,
+                startScreenX: 16f, startScreenY: 16f,
+                endScreenX:   32f, endScreenY:   16f);
+
+            Assert.NotEqual(beforeR, frame1.RightCoordinate);
+
+            ctx.UndoManager.Undo();
+
+            Assert.Equal(beforeR, frame1.RightCoordinate, precision: 4);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
+    public void HandleDrag_StretchingFrame_PlainAchxProject_DoesNotPropagateToSiblingFrames()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, dir) = BuildCtrlWithSelectedFrame(ctx);
+        try
+        {
+            var chain = ctx.SelectedState.SelectedChain!;
+            var frame0 = chain.Frames[0]; // full-UV (0,0,1,1) from the helper
+            var frame1 = new AnimationFrameSave
+            {
+                TextureName      = "sprite.png",
+                FrameLength      = 0.1f,
+                LeftCoordinate   = 0f, TopCoordinate    = 0f,
+                RightCoordinate  = 0.25f, BottomCoordinate = 0.25f,
+                ShapesSave = new ShapesSave(),
+            };
+            chain.Frames.Add(frame1);
+            ctrl.RefreshFrames();
+
+            var beforeR = frame1.RightCoordinate;
+
+            ctrl.SimulateHandleDrag(HandleKind.BotRight,
+                startScreenX: 64f, startScreenY: 64f,
+                endScreenX:   32f, endScreenY:   64f);
+
+            Assert.NotEqual(beforeR, frame0.RightCoordinate); // frame 0 really did resize
+            Assert.Equal(beforeR, frame1.RightCoordinate, precision: 4); // sibling untouched
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
