@@ -46,14 +46,21 @@
                  while unlocked, since hover reveals both add-frame and lock together). The lock
                  lane sits further from the edge than add-frame's, so clearing it clears both. The
                  ":not(.locked)" on the hover rule keeps a locked+hovered row on the locked margin
-                 rather than depending on style declaration order. -->
+                 rather than depending on style declaration order.
+                 The hover rule is also scoped to TextBlock.meta.chain (bound to IsChainNode):
+                 Avalonia's :pointerover bubbles up to ancestor TreeViewItems, so hovering a frame
+                 also marks its parent chain's TreeViewItem :pointerover, and every sibling frame
+                 under that chain is a visual descendant of it too. Only the chain's own meta text
+                 may ever grow a lane (frames never show add-frame/lock icons), so without the
+                 ".chain" class this rule widened every frame's meta text as a side effect of
+                 hovering just one of them. -->
             <Style Selector="TextBlock.meta">
                 <Setter Property="Margin" Value="8,0,8,0" />
             </Style>
             <Style Selector="TextBlock.meta.locked">
                 <Setter Property="Margin" Value="8,0,56,0" />
             </Style>
-            <Style Selector="TreeViewItem:pointerover TextBlock.meta:not(.locked)">
+            <Style Selector="TreeViewItem:pointerover TextBlock.meta.chain:not(.locked)">
                 <Setter Property="Margin" Value="8,0,56,0" />
             </Style>
         </TreeView.Styles>
@@ -81,6 +88,7 @@
                         <TextBlock Grid.Column="1"
                                    Classes="meta"
                                    Classes.locked="{Binding IsLocked}"
+                                   Classes.chain="{Binding IsChainNode}"
                                    Text="{Binding Meta}"
                                    Foreground="{DynamicResource AccentCool}"
                                    FontSize="11"

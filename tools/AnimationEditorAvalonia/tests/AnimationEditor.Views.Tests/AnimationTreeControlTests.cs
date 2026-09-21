@@ -408,6 +408,53 @@ public class AnimationTreeControlTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// Hovering a frame row bubbles <c>:pointerover</c> up to its parent chain's TreeViewItem
+    /// (Avalonia pointer-over propagates to ancestors), and the chain's own meta text is a
+    /// visual descendant of that same TreeViewItem -- so it's correct for the chain's meta to
+    /// widen and reveal its icons even when the pointer is over one of its frames, not the
+    /// chain header itself. But every frame row (the hovered one and its siblings) is *also* a
+    /// descendant of that same bubbled-pointerover chain TreeViewItem, and frames never show
+    /// add-frame/lock icons -- so their meta text must never widen from this.
+    /// </summary>
+    [AvaloniaFact]
+    public void HoveringFrameRow_DoesNotWidenAnyFrameMetaMargin()
+    {
+        var (control, _, acls) = Build();
+        var chain = acls.AnimationChains[0]; // "Walk", 2 frames
+        var frame1 = chain.Frames[0];
+        var frame2 = chain.Frames[1];
+
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        try
+        {
+            window.Show();
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var frame1Tvi = control.TreeView.GetVisualDescendants()
+                .OfType<TreeViewItem>()
+                .First(i => i.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, frame1));
+            var local = new Point(frame1Tvi.Bounds.Width / 2, frame1Tvi.Bounds.Height / 2);
+            var windowPoint = frame1Tvi.TranslatePoint(local, window)!.Value;
+            window.MouseMove(windowPoint);
+            Dispatcher.UIThread.RunJobs();
+
+            TextBlock MetaFor(object data) =>
+                control.TreeView.GetVisualDescendants()
+                    .OfType<TextBlock>()
+                    .First(t => t.Classes.Contains("meta") &&
+                                t.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                                ReferenceEquals(vm.Data, data));
+
+            Assert.Equal(8, MetaFor(frame1).Margin.Right); // the hovered frame itself: no icons ever appear on it
+            Assert.Equal(8, MetaFor(frame2).Margin.Right); // sibling frame: must not shift just because frame1 is hovered
+        }
+        finally { window.Close(); }
+    }
+
     // ── Multi-select (#757) ───────────────────────────────────────────────────
     // Browser's AnimationTreeControl was SelectionMode=Single; desktop's AnimTree is Multiple
     // and pushes SelectedItems into ISelectedState.SelectedNodes so SelectedChains/Frames work.
