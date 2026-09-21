@@ -56,7 +56,7 @@ fix per item, until no more plausible gaps remain.
 
 | Phase | Document | Status |
 |---|---|---|
-| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (pass #21 found a real loss in the Tiled-coexistence flow; the empty-pass count is back to zero) |
+| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (pass #22 closed every deferred residual; two empty passes still needed) |
 
 ### [AnimationEditorCommon: renderer-agnostic .achx runtime](934-animationeditorcommon/)
 

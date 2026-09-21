@@ -5402,6 +5402,9 @@ public partial class MainWindow : Window
             // clearing anything.
             PropTransformSection.IsVisible = !_projectManager.IsNativeTsxProject;
             PropColorSection.IsVisible     = !_projectManager.IsNativeTsxProject;
+            // A Tiled tile animation always loops: Loop (#1120) has no tsx representation.
+            PropChainLoop.IsEnabled = !_projectManager.IsNativeTsxProject;
+            LoopToggle.IsEnabled    = !_projectManager.IsNativeTsxProject;
 
             // Disable (not just visually leave typeable) whichever panel is showing when its
             // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled

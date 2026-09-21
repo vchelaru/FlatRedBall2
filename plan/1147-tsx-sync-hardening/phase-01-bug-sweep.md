@@ -2274,3 +2274,25 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     `.tiledsync`). Closing it means content-hashing on every save; not done here.
   Full suite: `AnimationEditor.Core.Tests` 2356, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.
+
+- [x] **Pass #22 -- closing every residual earlier passes left as "follow-up" instead of fixing.**
+  Three fixes, one issue for the item that needs a design call.
+  - **Own-save cooldown window (pass #21's residual) -- fixed, PR #1166.** The coalescer dropped
+    any change event within 500 ms of this editor's write; an external write in that window was
+    swallowed, leaving the model stale and unmarked. `RecordOwnSave` now runs after the write and
+    hashes the file; an event inside the cooldown is dropped only while the file still holds that
+    content. Tests: `FileChangeCoalescerTests` (+2), `HotReloadWatcherTests` (+1).
+  - **Duplicate chain always failed the save (pass #16's residual) -- fixed, PR #1167.** A chain
+    whose claim on a tile is freshly computed this save now yields to the chain that already owned
+    it: the save writes everything else, reports the yielding chain by name, leaves its old tiles
+    untouched, and picks it up on the first save after its frames move. Same treatment for a
+    resize/move that lands on another chain's tile (that case used to throw). Tests:
+    `AppCommandsSaveFailedTests.DuplicateChains_*`, `TsxFrameResizeRoundTripTests.Resize_GrowLeftOntoAnotherChainsOwnerTile_*`.
+  - **Achx-only edits still reachable in a tsx project (pass #17's residual) -- fixed, this PR.**
+    Every command that creates shapes, flips, sprite offsets, color, or a non-looping chain
+    no-ops in a native tsx project (`AppCommands.IsAchxOnlyEditBlocked`, the locked-chain guard
+    pattern), the shared tree-menu plan no longer offers them, and the inspector's Loop toggles
+    are disabled. `TsxLossyDataCheck` stays as the save-time backstop. Tests:
+    `AppCommandsTsxAchxOnlyEditsTests` (4).
+  - **Margin/spacing support -- needs a design decision, filed as #1165** (how a multi-tile frame
+    spans the gap pixels).

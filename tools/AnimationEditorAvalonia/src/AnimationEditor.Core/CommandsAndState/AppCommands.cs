@@ -108,8 +108,21 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetChainLocked(AnimationChainSave chain, bool locked) =>
             _undoManager.Execute(new SetChainLockedCommand(chain, locked, this, _events));
 
-        public void SetChainLoop(AnimationChainSave chain, bool loop) =>
+        public void SetChainLoop(AnimationChainSave chain, bool loop)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
             _undoManager.Execute(new SetChainLoopCommand(chain, loop, this, _events));
+        }
+
+        // -- Native tsx: achx-only data ------------------------------------------------------
+        // A Tiled tile animation holds rects and durations, nothing else (see
+        // Tiled.TsxLossyDataCheck, which warns on save about whatever slipped through). Every
+        // command that would create shapes, flips, sprite offsets, color, or a non-looping chain
+        // no-ops in a native tsx project, so no host (tree menu, inspector, keyboard, browser)
+        // can produce data the file can't keep. Same pattern as the locked-chain guards.
+
+        /// <summary>True when the current project is a native tsx, i.e. the edit must not happen.</summary>
+        private bool IsAchxOnlyEditBlocked() => _pm.IsNativeTsxProject;
         // Delegates wired up by the Avalonia app layer ----------------------------
 
         /// <summary>
@@ -752,7 +765,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
         {
-            if (IsFrameLocked(frame)) return;
+            if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
 
             var rectangleSave = new AARectSave
             {
@@ -768,7 +781,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddCircle(AnimationFrameSave frame)
         {
-            if (IsFrameLocked(frame)) return;
+            if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
 
             var circleSave = new CircleSave
             {
@@ -1422,6 +1435,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetFrameFlip(
             IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical, bool? flipDiagonal = null)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             // Absolute set, not toggle: only the frames whose flag actually differs from the target
             // get flipped (and their offset/shapes mirrored), so a frame already at the target state
             // is untouched. Reuses FlipCommand's toggle for exactly those frames, grouped into one
@@ -1454,7 +1468,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void FlipChainHorizontally(AnimationChainSave chain)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain) || IsAchxOnlyEditBlocked()) return;
             _undoManager.Execute(new FlipCommand(
                 chain.Frames.ToArray(), FlipAxis.Horizontal, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
@@ -1462,7 +1476,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void FlipChainVertically(AnimationChainSave chain)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain) || IsAchxOnlyEditBlocked()) return;
             _undoManager.Execute(new FlipCommand(
                 chain.Frames.ToArray(), FlipAxis.Vertical, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
@@ -1583,6 +1597,8 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null || sources.Count == 0) return Array.Empty<AnimationChainSave>();
+            if (IsAchxOnlyEditBlocked())
+                flipH = flipV = false;
 
             var ordered = sources
                 .OrderBy(c => acls.AnimationChains.IndexOf(c))
@@ -1970,6 +1986,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
             _undoManager.Execute(new BulkFrameEditCommand(
@@ -1986,6 +2003,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
@@ -1997,6 +2015,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
             // Mode drives how the preview + timeline/tree thumbnails tint; it doesn't touch the
@@ -2008,6 +2027,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
@@ -2162,6 +2182,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
             IReadOnlyList<CircleSave> circles)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var clones = BuildShapeClones(frame, rectangles, circles);
             if (clones.Count == 0) return;
             _undoManager.Execute(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
@@ -2253,6 +2274,7 @@ namespace AnimationEditor.Core.CommandsAndState
             IReadOnlyList<AARectSave> rectangles, IReadOnlyList<CircleSave> circles,
             IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame)
         {
+            if (IsAchxOnlyEditBlocked()) return;
             var clones = BuildShapeClones(targetFrame, rectangles, circles);
             if (clones.Count == 0) return;
 

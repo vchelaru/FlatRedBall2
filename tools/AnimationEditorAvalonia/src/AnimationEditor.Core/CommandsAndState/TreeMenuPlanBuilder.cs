@@ -18,6 +18,9 @@ public static class TreeMenuPlanBuilder
         TreeMenuActions actions)
     {
         var items = new List<TreeMenuItem>();
+        // A native tsx project can't store shapes, flips, or sprite offsets (see
+        // Tiled.TsxLossyDataCheck), so the items that would create them aren't offered.
+        var isNativeTsx = projectManager.IsNativeTsxProject;
 
         switch (nodeData)
         {
@@ -49,9 +52,12 @@ public static class TreeMenuPlanBuilder
                     AddFrameReorderItems(items, frame, chain, appCommands);
                     items.Add(TreeMenuItem.Separator());
                 }
-                items.Add(TreeMenuItem.Item("Add AxisAlignedRectangle", () => appCommands.AddAxisAlignedRectangle(frame)));
-                items.Add(TreeMenuItem.Item("Add Circle", () => appCommands.AddCircle(frame)));
-                items.Add(TreeMenuItem.Separator());
+                if (!isNativeTsx)
+                {
+                    items.Add(TreeMenuItem.Item("Add AxisAlignedRectangle", () => appCommands.AddAxisAlignedRectangle(frame)));
+                    items.Add(TreeMenuItem.Item("Add Circle", () => appCommands.AddCircle(frame)));
+                    items.Add(TreeMenuItem.Separator());
+                }
                 items.Add(TreeMenuItem.Item("Copy", actions.Copy));
                 items.Add(TreeMenuItem.Item("Cut", actions.Cut));
                 items.Add(TreeMenuItem.Item("Paste", actions.Paste));
@@ -73,8 +79,11 @@ public static class TreeMenuPlanBuilder
                     items.Add(TreeMenuItem.Separator());
                 }
                 items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustFrameTime));
-                items.Add(TreeMenuItem.Item("Flip Horizontally", () => appCommands.FlipChainHorizontally(chain2)));
-                items.Add(TreeMenuItem.Item("Flip Vertically", () => appCommands.FlipChainVertically(chain2)));
+                if (!isNativeTsx)
+                {
+                    items.Add(TreeMenuItem.Item("Flip Horizontally", () => appCommands.FlipChainHorizontally(chain2)));
+                    items.Add(TreeMenuItem.Item("Flip Vertically", () => appCommands.FlipChainVertically(chain2)));
+                }
                 items.Add(TreeMenuItem.Item("Invert Frame Order", () => appCommands.InvertFrameOrder(chain2)));
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!));
@@ -84,12 +93,16 @@ public static class TreeMenuPlanBuilder
                 items.Add(TreeMenuItem.Item("Copy", actions.Copy));
                 items.Add(TreeMenuItem.Item("Cut", actions.Cut));
                 items.Add(TreeMenuItem.Item("Paste", actions.Paste));
-                items.Add(TreeMenuItem.SubMenu("Duplicate",
-                    TreeMenuItem.Item("Original", actions.Duplicate),
-                    TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(true, false)),
-                    TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(false, true))));
+                if (isNativeTsx)
+                    items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate));
+                else
+                    items.Add(TreeMenuItem.SubMenu("Duplicate",
+                        TreeMenuItem.Item("Original", actions.Duplicate),
+                        TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(true, false)),
+                        TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(false, true))));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustOffsets));
+                if (!isNativeTsx)
+                    items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustOffsets));
                 items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Delete Animation", actions.Delete));
