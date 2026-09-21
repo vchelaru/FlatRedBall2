@@ -144,6 +144,77 @@ public class TsxEntryTileOwnershipTransferTests : IDisposable
         Assert.True(oldTile is null || oldTile.Animation.Count == 0);
     }
 
+    // Deleting the very frame the hint was derived from (and adding a new one elsewhere) changes
+    // what frame 0 maps to without any frame's own origin cell moving. That's an add/remove, not
+    // a resize -- the pinned tile stays put, exactly like a frame reorder.
+    [Fact]
+    public void RemovingEntryOriginFrame_OnAutoDerivedChain_PreservesEntryTile()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(SingleTileFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = new AnimationChainSave { Name = "NewChain" };
+        var frame0 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f };
+        var frame1 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f };
+        SetGridRect(frame0, colStart: 0, colEnd: 1, rowStart: 1, rowEnd: 2); // tile 4
+        SetGridRect(frame1, colStart: 1, colEnd: 2, rowStart: 1, rowEnd: 2); // tile 5
+        chain.Frames.Add(frame0);
+        chain.Frames.Add(frame1);
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // entry tile 4, derived from frame0
+
+        var frame2 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f };
+        SetGridRect(frame2, colStart: 2, colEnd: 3, rowStart: 1, rowEnd: 2); // tile 6
+        chain.Frames.Remove(frame0);
+        chain.Frames.Add(frame2);
+
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var ownerTile = reloaded.Tiles.Single(t => t.ID == 4);
+        Assert.Equal([((uint)5, 100), ((uint)6, 100)], ownerTile.Animation.Select(f => (f.TileID, f.Duration)));
+        var relocatedTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.True(relocatedTile is null || relocatedTile.Animation.Count == 0);
+    }
+
+    // A reorder alone must not transfer (see RemovingEntryOriginFrame... above and
+    // ProjectManagerTsxProjectTests.SaveTsxProject_BrandNewChain_EntryTileIdStaysStable...), but
+    // it must not disarm a later transfer either: the hint still tracks the frame it was derived
+    // from, wherever that frame now sits in the chain, so shrinking that frame's left edge
+    // afterward is still an origin move.
+    [Fact]
+    public void ReorderingThenShrinkingLeftward_OnAutoDerivedChain_TransfersEntryToNewOrigin()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(SingleTileFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = new AnimationChainSave { Name = "NewWide" };
+        var frame0 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f };
+        var frame1 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f };
+        SetGridRect(frame0, colStart: 0, colEnd: 2, rowStart: 2, rowEnd: 3); // origin tile 8
+        SetGridRect(frame1, colStart: 0, colEnd: 2, rowStart: 3, rowEnd: 4); // origin tile 12
+        chain.Frames.Add(frame0);
+        chain.Frames.Add(frame1);
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // entry tile 8, derived from frame0
+
+        chain.Frames.Reverse();
+        pm.SaveTsxProject(); // still tile 8
+
+        SetGridRect(frame0, colStart: 1, colEnd: 2, rowStart: 2, rowEnd: 3); // tile 9
+        SetGridRect(frame1, colStart: 1, colEnd: 2, rowStart: 3, rowEnd: 4); // tile 13
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var currentTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 13);
+        Assert.NotNull(currentTile);
+        Assert.Equal([((uint)13, 100), ((uint)9, 100)], currentTile!.Animation.Select(f => (f.TileID, f.Duration)));
+        var oldTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 8);
+        Assert.True(oldTile is null || oldTile.Animation.Count == 0);
+    }
+
     // Owner tile 20 is purely administrative: its own animation cycles tiles 0/1 and 4/5, none of
     // which is tile 20 itself -- an ordinary hand-authored Tiled pattern (same shape as
     // NativeTsxProjectRoundTripTests' OwnerNotFirstFrameFixtureXml), just with a 2-tile-wide
