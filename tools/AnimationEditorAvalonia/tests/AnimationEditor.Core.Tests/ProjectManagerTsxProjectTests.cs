@@ -473,6 +473,41 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.DoesNotContain(afterUndo.Tiles, t => t.ID == 10 && t.Animation.Count > 0);
     }
 
+    // Broader gap than any single command: a save whose mapping ABORTS with a warning (mismatched
+    // texture, misaligned rect, footprint overflow, non-zero margin/spacing -- any of MapChain's
+    // Empty() call sites) while the chain still has frames is neither the "live hint" case nor the
+    // "genuinely cleared to zero" case, so nothing preserved its entry/satellite hints -- the next
+    // successful save recomputed fresh from frame[0], relocating an "owner isn't its own first
+    // frame" chain. Reachable via ANY command whose Do()/Undo() can drive a chain in and out of an
+    // abort condition without touching Frames.Count or frame identity --
+    // SetFrameTextureNameCommand.Do()/Undo() (pointing a frame at the wrong texture, then back) is
+    // the simplest one.
+    [Fact]
+    public void SaveTsxProject_MappingAbortsThenRecoversViaTextureNameFix_RestoresOriginalTileInsteadOfRelocating()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        var frame0 = chain.Frames[0];
+        var originalTextureName = frame0.TextureName;
+
+        // SetFrameTextureNameCommand.Do(): point frame 0 at a texture that doesn't match the open
+        // tileset's own image -- MapChain aborts the whole chain with a warning.
+        frame0.TextureName = "Wrong.png";
+        pm.SaveTsxProject();
+
+        // SetFrameTextureNameCommand.Undo(): restore the original, matching texture name.
+        frame0.TextureName = originalTextureName;
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
     // Reordering a chain's frames (e.g. ReorderCommand<AnimationFrameSave> backing "Reverse Chain"
     // or drag-to-reorder) never adds/removes any AnimationFrameSave object and never empties the
     // chain, but it DOES change which frame is at index 0 -- the exact value
