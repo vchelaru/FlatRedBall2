@@ -127,6 +127,35 @@ public class FileChangeCoalescerTests
         Assert.Empty(afterCooldown);
     }
 
+    // 6d. #1147 pass #22: the cooldown is only a heuristic for "this event is our own write's
+    // echo". When the caller can tell whether the file still holds what we wrote, an external
+    // write inside the window must fire instead of being swallowed.
+    [Fact]
+    public void Cooldown_OwnSaveWindowButContentChanged_Fires()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        c.IsStillOwnContent = _ => false;
+        c.RecordOwnSave("a.achx", 0);
+        c.Record("a.achx", WatcherChangeType.Modified, 10);
+
+        var result = c.Flush(100);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void Cooldown_OwnSaveWindowContentUnchanged_DoesNotFire()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        c.IsStillOwnContent = _ => true;
+        c.RecordOwnSave("a.achx", 0);
+        c.Record("a.achx", WatcherChangeType.Modified, 10);
+
+        var result = c.Flush(100);
+
+        Assert.Empty(result);
+    }
+
     // 6c. Path separator mismatch (forward vs back slash) does not prevent own-save suppression.
     [Fact]
     public void Cooldown_PathSeparatorMismatch_StillDiscarded()

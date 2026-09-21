@@ -28,6 +28,16 @@ namespace AnimationEditor.Core.HotReload
         private readonly Dictionary<string, long> _ownSaves =
             new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Optional content check for an event inside the own-save cooldown: return true when the
+        /// file on disk still holds what this editor wrote (the event is our own echo, drop it),
+        /// false when something else has written it since (fire it). The cooldown alone is a
+        /// timing heuristic; an external write landing inside it -- Tiled saving the same tsx a
+        /// beat after this editor did -- would otherwise be swallowed, leaving the in-memory model
+        /// stale with no reload to mark it. Null keeps the pure timing rule.
+        /// </summary>
+        public Func<string, bool>? IsStillOwnContent { get; set; }
+
         public void Record(string path, WatcherChangeType type, long timestampMs)
         {
             path = path.Replace('\\', '/');
@@ -103,7 +113,8 @@ namespace AnimationEditor.Core.HotReload
                     // FSW fired within CooldownMs of our save it was caused by that save.
                     // Remove from pending so it never fires — even after the cooldown elapses.
                     if (_ownSaves.TryGetValue(kv.Key, out long saveTs) &&
-                        kv.Value.Ts - saveTs < CooldownMs)
+                        kv.Value.Ts - saveTs < CooldownMs &&
+                        (IsStillOwnContent?.Invoke(kv.Key) ?? true))
                     {
                         ready.Add(kv.Key);
                         continue;

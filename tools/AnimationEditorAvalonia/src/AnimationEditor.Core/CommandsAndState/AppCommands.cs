@@ -495,7 +495,6 @@ namespace AnimationEditor.Core.CommandsAndState
                     return;
                 }
 
-                HotReloadWatcher.RecordOwnSave(target);
                 try
                 {
                     if (_pm.IsNativeTsxProject)
@@ -506,6 +505,8 @@ namespace AnimationEditor.Core.CommandsAndState
                     }
                     else
                         _pm.SaveAnimationChainList(target);
+                    // After the write, so the watcher can hash what actually landed on disk.
+                    HotReloadWatcher.RecordOwnSave(target);
                     _undoManager.MarkSaved();
                     EditorProjectModelChanged?.Invoke(target);
                 }
