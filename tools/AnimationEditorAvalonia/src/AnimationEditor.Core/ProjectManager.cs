@@ -741,10 +741,32 @@ namespace AnimationEditor.Core
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
             // id) so the *next* save reuses them instead of recomputing from geometry again -- see
-            // _tsxEntryTileIdsByChain's doc comment for why that matters. Rebuilt from scratch
-            // (rather than just adding to it) so a deleted chain's entry doesn't linger forever.
+            // _tsxEntryTileIdsByChain's doc comment for why that matters. Rebuilt primarily from
+            // `mapped` (rather than just adding to it) so a chain that's still in the project but
+            // now has zero frames doesn't leave a stale hint a later re-populated save could wrongly
+            // reuse (see SaveTsxProject_AllFramesDeletedFromChain_... below).
+            //
+            // Hints for chains that are entirely ABSENT from AnimationChainListSave right now
+            // (never reached `mapped` at all) are carried forward unchanged rather than dropped.
+            // A Delete-chain command autosaves immediately after removing the chain, and its Undo
+            // re-inserts the exact same AnimationChainSave object and autosaves again -- carrying
+            // the hint forward is what lets that reinsertion land back on the chain's original
+            // tile instead of being recomputed from frame[0] as if it were brand new. This can't
+            // reintroduce the zero-frame-chain hazard above: that hazard is about a chain staying
+            // present while its EntryTileId goes null, which this branch never touches.
+            var currentChains = new HashSet<AnimationChainSave>(
+                AnimationChainListSave.AnimationChains, ReferenceEqualityComparer.Instance);
+
             var updatedEntries = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
+            foreach (var kvp in _tsxEntryTileIdsByChain)
+                if (!currentChains.Contains(kvp.Key))
+                    updatedEntries[kvp.Key] = kvp.Value;
+
             var updatedSatellites = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+            foreach (var kvp in _tsxSatelliteTileIdsByChain)
+                if (!currentChains.Contains(kvp.Key))
+                    updatedSatellites[kvp.Key] = kvp.Value;
+
             foreach (var result in mapped)
             {
                 if (result.EntryTileId is { } entryTileId)

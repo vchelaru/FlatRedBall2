@@ -44,6 +44,26 @@ public class ProjectManagerTsxProjectTests : IDisposable
         </tileset>
         """;
 
+    // Tile 5 owns an animation whose frames are [6, 7] -- 5 itself never appears as a frame, an
+    // ordinary hand-authored-in-Tiled pattern (same shape as NativeTsxProjectRoundTripTests'
+    // OwnerNotFirstFrameFixtureXml). Used to prove a delete-then-undo round trip restores the
+    // chain to tile 5, not tile 6.
+    private const string OwnerNotFirstFrameFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+         <image source="Heroes.png" width="64" height="64"/>
+         <tile id="5">
+          <properties>
+           <property name="Name" value="RiseUp"/>
+          </properties>
+          <animation>
+           <frame tileid="6" duration="300"/>
+           <frame tileid="7" duration="300"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
     private const string WangsetFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Terrain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
@@ -205,6 +225,46 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Equal((uint)4, EntryTileIdNamed(afterResave, "ID:0"));
         var tileZeroAfterResave = afterResave.Tiles.Single(t => t.ID == 0);
         Assert.Empty(tileZeroAfterResave.Animation);
+    }
+
+    // DeleteChainsCommand.Do() removes the chain from AnimationChainListSave.AnimationChains and
+    // immediately autosaves (AppCommands.SaveCurrentAnimationChainList runs after every mutating
+    // command); DeleteChainsCommand.Undo() re-inserts the exact same AnimationChainSave object
+    // and autosaves again. Between those two saves, the chain is entirely absent from `mapped`,
+    // and SaveTsxProject's post-save bookkeeping loop rebuilds _tsxEntryTileIdsByChain from
+    // `mapped` alone -- so the chain's original tile-identity hint is dropped, not just for the
+    // save where it's absent (correct) but permanently, even though the exact same object comes
+    // right back afterward. A subsequent save with that same object must restore it to its
+    // original tile (5), not relocate it to frame[0]'s tile (6).
+    [Fact]
+    public void SaveTsxProject_DeleteChainThenReinsertSameObjectAndSave_RestoresOriginalTileInsteadOfRelocating()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        Assert.Equal("RiseUp", chain.Name);
+
+        // DeleteChainsCommand.Do().
+        pm.AnimationChainListSave.AnimationChains.Remove(chain);
+        pm.SaveTsxProject();
+
+        var afterDelete = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var deletedTile = afterDelete.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.True(deletedTile is null || deletedTile.Animation.Count == 0);
+
+        // DeleteChainsCommand.Undo(): same object, original index.
+        pm.AnimationChainListSave.AnimationChains.Insert(0, chain);
+        pm.SaveTsxProject();
+
+        var afterUndo = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = afterUndo.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var tileSix = afterUndo.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.True(tileSix is null || tileSix.Animation.Count == 0);
     }
 
     // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at
