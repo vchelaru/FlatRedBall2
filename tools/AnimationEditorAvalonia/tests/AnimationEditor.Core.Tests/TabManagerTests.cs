@@ -909,6 +909,32 @@ public class TabManagerTests
         Assert.Equal(P(@"C:\hero.achx"), tm.ActiveTab!.Path);
     }
 
+    // Rename replaces the TabEntry with a brand-new instance (only path/kind change; everything
+    // else must be carried forward explicitly). CachedTsxState/CachedTextureSizeState/
+    // CachedReferencedPngs were added to TabEntry after Rename was written and never got added to
+    // its explicit copy list -- currently unreachable in production (Rename's only caller only
+    // promotes an Untitled tab, which can never carry native-tsx state), but a cheap,
+    // no-behavior-risk fix for the same "reused-tab-entry state leak" shape this sweep has fixed
+    // repeatedly elsewhere in ProjectManager/TabEditorCache.
+    [Fact]
+    public void Rename_CarriesForwardTsxAndTextureSizeAndReferencedPngsCache()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+        var tsxState = new object();
+        var textureSizeState = new object();
+        var referencedPngs = new[] { P(@"C:\Games\hero.png") };
+        tm.Tabs[0].CachedTsxState = tsxState;
+        tm.Tabs[0].CachedTextureSizeState = textureSizeState;
+        tm.Tabs[0].CachedReferencedPngs = referencedPngs;
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\hero.tsx"));
+
+        Assert.Same(tsxState, tm.Tabs[0].CachedTsxState);
+        Assert.Same(textureSizeState, tm.Tabs[0].CachedTextureSizeState);
+        Assert.Same(referencedPngs, tm.Tabs[0].CachedReferencedPngs);
+    }
+
     [Fact]
     public void Rename_UnknownPath_IsNoOp()
     {

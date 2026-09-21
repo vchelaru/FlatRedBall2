@@ -324,6 +324,9 @@ namespace AnimationEditor.Core.Models
                 CachedOnDiskCoordinateType = tab.CachedOnDiskCoordinateType,
                 CachedDiskWriteTimeUtc = tab.CachedDiskWriteTimeUtc,
                 UndoSnapshot = tab.UndoSnapshot,
+                CachedTsxState = tab.CachedTsxState,
+                CachedTextureSizeState = tab.CachedTextureSizeState,
+                CachedReferencedPngs = tab.CachedReferencedPngs,
             };
             _tabs[idx] = replacement;
             if (ActiveTab == tab)
