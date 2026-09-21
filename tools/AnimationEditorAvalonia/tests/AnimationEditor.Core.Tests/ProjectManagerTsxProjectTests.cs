@@ -1,4 +1,5 @@
 using AnimationEditor.Core;
+using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.IO;
@@ -59,6 +60,34 @@ public class ProjectManagerTsxProjectTests : IDisposable
           <animation>
            <frame tileid="6" duration="300"/>
            <frame tileid="7" duration="300"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    // Tile 5's own animation is [9, 13] -- one row below its own static position (row 1 -> rows
+    // 2/3), the same "owner isn't its own first frame" pattern as OwnerNotFirstFrameFixtureXml
+    // above. Tile 6, one column right of tile 5's STATIC position (not its frame-0 position),
+    // carries ParentId=5 as the satellite, with its own on-disk content [10, 14] -- also not its
+    // own frame-0 position (10), matching NativeTsxProjectRoundTripTests'
+    // OwnerNotFirstFrameWithSatelliteFixtureXml.
+    private const string OwnerNotFirstFrameWithSatelliteFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="5">
+          <animation>
+           <frame tileid="9" duration="150"/>
+           <frame tileid="13" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="6">
+          <properties>
+           <property name="ParentId" type="int" value="5"/>
+          </properties>
+          <animation>
+           <frame tileid="10" duration="150"/>
+           <frame tileid="14" duration="150"/>
           </animation>
          </tile>
         </tileset>
@@ -384,6 +413,64 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Equal((uint)4, EntryTileIdNamed(afterResave, "RiseUp"));
         var tileFive = afterResave.Tiles.SingleOrDefault(t => t.ID == 5);
         Assert.True(tileFive is null || tileFive.Animation.Count == 0);
+    }
+
+    // The satellite-level sibling of the two frame-count-based dormant-hint fixes above, but for a
+    // command that shrinks then restores a chain's FOOTPRINT rather than its frame count --
+    // e.g. BulkFrameRegionChangedCommand.Do()/Undo() dragging a resize handle across every frame
+    // of a 2-wide chain down to 1-wide and back. Unlike DeleteFramesCommand, the frame OBJECTS
+    // here never change (Do()/Undo() only mutate LeftCoordinate/RightCoordinate/etc. in place on
+    // the same AnimationFrameSave instances) and chain.Frames.Count never changes either -- only
+    // the computed footprint width does. A save while shrunk correctly clears the now-unused
+    // satellite (tile 6) per the already-established "footprint shrinks" behavior, but the
+    // now-satellite-less save also unconditionally replaced (not merged into) the whole
+    // per-chain satellite hint dictionary, discarding the (Dx,Dy)=(1,0) -> tile 6 hint outright.
+    // A subsequent save after Undo (footprint restored to its exact original 2-wide rect) must
+    // land the satellite back on tile 6, not recompute it fresh from geometry (which would land
+    // on tile 10 -- the satellite's own frame-0 content tile -- exactly the "owner isn't its own
+    // first frame" relocation bug this whole file is themed around, just for a satellite).
+    [Fact]
+    public void SaveTsxProject_ShrinkFootprintThenUndoWithSameFrameObjectsAndSave_RestoresSatelliteToOriginalTileInsteadOfRelocating()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameWithSatelliteFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        var originalRects = chain.Frames
+            .Select(f => (f.LeftCoordinate, f.TopCoordinate, f.RightCoordinate, f.BottomCoordinate))
+            .ToArray();
+
+        // BulkFrameRegionChangedCommand.Do(): shrink every frame from 2 tiles wide to 1 tile wide
+        // in place -- same AnimationFrameSave objects, only their coordinates change.
+        foreach (var frame in chain.Frames)
+            frame.RightCoordinate = frame.LeftCoordinate + (frame.RightCoordinate - frame.LeftCoordinate) / 2f;
+        pm.SaveTsxProject();
+
+        var afterShrink = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var clearedSatellite = afterShrink.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.True(clearedSatellite is null || clearedSatellite.Animation.Count == 0);
+
+        // BulkFrameRegionChangedCommand.Undo(): restore every frame's exact original rect.
+        for (var i = 0; i < chain.Frames.Count; i++)
+        {
+            var (l, t, r, b) = originalRects[i];
+            chain.Frames[i].LeftCoordinate = l;
+            chain.Frames[i].TopCoordinate = t;
+            chain.Frames[i].RightCoordinate = r;
+            chain.Frames[i].BottomCoordinate = b;
+        }
+        pm.SaveTsxProject();
+
+        var afterUndo = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var satellite = afterUndo.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.NotNull(satellite);
+        Assert.Equal(5, satellite!.GetProperty<IntProperty>("ParentId").Value);
+        Assert.Equal([((uint)10, 150), ((uint)14, 150)], satellite.Animation.Select(f => (f.TileID, f.Duration)));
+
+        // Tile 10 -- the satellite's own frame-0 content tile, where the bug would relocate it to
+        // -- must not have been newly claimed as its own animated tile.
+        Assert.DoesNotContain(afterUndo.Tiles, t => t.ID == 10 && t.Animation.Count > 0);
     }
 
     // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at

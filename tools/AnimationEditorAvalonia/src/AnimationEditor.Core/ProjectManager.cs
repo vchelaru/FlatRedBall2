@@ -879,7 +879,35 @@ namespace AnimationEditor.Core
                     }
                 }
                 if (result.Satellites.Count > 0)
-                    updatedSatellites[chain] = result.Satellites.ToDictionary(s => s.Offset, s => s.TileId);
+                {
+                    // Merged onto whatever this chain's satellite hints already were (rather than
+                    // replacing the whole per-chain dictionary), so an offset that isn't part of
+                    // *this* save's footprint keeps whatever hint it had -- see the branch below
+                    // for why that matters.
+                    var merged = _tsxSatelliteTileIdsByChain.TryGetValue(chain, out var existingSatellites)
+                        ? new Dictionary<(int Dx, int Dy), uint>(existingSatellites)
+                        : new Dictionary<(int Dx, int Dy), uint>();
+                    foreach (var satellite in result.Satellites)
+                        merged[satellite.Offset] = satellite.TileId;
+                    updatedSatellites[chain] = merged;
+                }
+                else if (result.EntryTileId is not null
+                    && _tsxSatelliteTileIdsByChain.TryGetValue(chain, out var stillHinted))
+                {
+                    // The chain still mapped successfully (a real anchor, not an aborted/warned
+                    // save) but this save's footprint has no satellites at all -- e.g. a resize
+                    // command shrank every frame down to a single tile. Unlike the fully-emptied-
+                    // chain case above, chain.Frames never went to zero and no AnimationFrameSave
+                    // object was added or removed (a resize only mutates existing frames'
+                    // Left/Top/Right/BottomCoordinate in place), so there's no frame-reference
+                    // signal available to gate a dormant-hint-style revival on. Keeping the old
+                    // per-offset hints alive unconditionally instead mirrors how
+                    // _tsxEntryTileIdsByChain already behaves for a chain that never empties: once
+                    // a (chain, offset) pair claims a tile, later saves keep reusing it for as long
+                    // as the chain has any frames at all, so a save right after Undo restores the
+                    // satellite to its original tile instead of recomputing it from geometry.
+                    updatedSatellites[chain] = stillHinted;
+                }
             }
             _tsxEntryTileIdsByChain = updatedEntries;
             _tsxSatelliteTileIdsByChain = updatedSatellites;
