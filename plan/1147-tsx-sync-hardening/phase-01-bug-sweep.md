@@ -335,7 +335,36 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-(none open)
+- [ ] **`DeleteFramesCommand`/`AddFramesCommand`-style Undo of "delete every frame in a chain" still
+  relocates the chain instead of restoring it, for the frame-level sibling of the just-fixed
+  whole-chain-delete bug.** Confirmed real with a throwaway probe test (not kept): starting from
+  the `OwnerNotFirstFrameFixtureXml` fixture (tile 5 owns frames [6, 7]), removing all of a chain's
+  frames and autosaving (as `DeleteFramesCommand.Do()` does) drops `_tsxEntryTileIdsByChain`'s hint
+  for that chain by design (`SaveTsxProject_AllFramesDeletedFromChain_...` pins exactly this,
+  intentionally, so a later *re-population with different frames* doesn't wrongly reuse a stale
+  tile). But `DeleteFramesCommand.Undo()` re-inserts the exact same `AnimationFrameSave` objects at
+  their original indices and autosaves again -- and because the chain object itself never left
+  `AnimationChainListSave.AnimationChains` (only its `Frames` list emptied and refilled), the fix
+  just landed for whole-chain delete (carry the hint forward when the *chain* is absent from the
+  ACLS) does not apply here: the chain is never absent, so `SaveTsxProject`'s bookkeeping loop
+  can't distinguish "same chain, frames temporarily cleared then undo-restored identically" from
+  "same chain, frames cleared then genuinely re-authored with different geometry" using only
+  chain-reference identity -- both look identical (chain present, `EntryTileId` was null on the
+  intervening save). The `AllFramesDeletedFromChain` test's own reasoning requires recomputing
+  fresh in the second case, so a correct fix needs a way to tell the two apart, e.g. fingerprinting
+  the frame *content* (or, since Undo never clones frames -- confirmed via the same "no `.Clone()`/
+  `new AnimationChainSave(`/`new AnimationFrameSave(` in `CommandsAndState`" grep that showed no
+  command ever replaces a chain object -- fingerprinting by frame *object reference sequence*
+  would work and is cheap to compute) alongside the dormant hint, and only reusing a dormant hint
+  when the current frame sequence's fingerprint matches the one recorded when that hint was last
+  valid. Not fixed in this pass: that requires widening `_tsxEntryTileIdsByChain`'s value type (and
+  `MultiTileToTiledAnimationMapper.Map`'s `knownEntryTileIds` parameter type, and every call site/
+  test that constructs one) from a bare `uint` to a `(uint TileId, IReadOnlyList<AnimationFrameSave>
+  Frames)`-shaped hint -- a materially larger, riskier change than the whole-chain fix, and better
+  scoped as its own dedicated TDD pass rather than folded into this one. Lower severity than the
+  whole-chain case: needs the narrower combination of "select every frame in a chain and delete
+  them, then immediately Undo" (rarer than plain chain deletion) *and* an owner-tile-not-its-own-
+  first-frame chain.
 
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
@@ -1408,3 +1437,132 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     fresh-eyes pass #9 is complete. Full suite: `AnimationEditor.Core.Tests` 2178/2178 (unchanged),
     `AnimationEditor.App.Tests` 989/989 (was 988, +1 new), `AnimationEditor.Views.Tests` builds
     clean.
+
+- [x] **Fresh-eyes pass #10 -- end-to-end scenario walkthroughs instead of re-reading already
+  well-trodden files, per the task's explicit instruction to try a genuinely different angle.**
+  Traced 3-4 concrete multi-step user workflows through the actual current code (not synthetic
+  edge cases), with a dedicated focus on Undo/Redo against the reference-keyed
+  `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain` tracking dictionaries -- an angle no
+  prior pass in this sweep had checked. Found and fixed two real, confirmed bugs (one fully fixed,
+  one confirmed-but-deferred to TODO with full reasoning), confirmed one scenario already safe with
+  a teeth-tested pinning test, and did a full read of `TabEditorCache.cs`/`TabEntry.cs`/
+  `TabController.cs`/`IProjectManager.cs` (the remaining files in/adjacent to "Files in scope" that
+  hadn't had a dedicated full read, only incremental touches):
+  - **Real bug, confirmed red first -- Undo of "Delete Animation" on a native-tsx chain relocates
+    it instead of restoring it, for an owner-tile-not-its-own-first-frame chain.**
+    `DeleteChainsCommand.Do()` removes the chain from `AnimationChainListSave.AnimationChains` and
+    autosaves immediately (`AppCommands.SaveCurrentAnimationChainList` runs after every mutating
+    command); `Undo()` re-inserts the *exact same* `AnimationChainSave` object at its original
+    index and autosaves again. Traced why this breaks the identity hint despite both saves acting
+    on the same object: `SaveTsxProject`'s post-save bookkeeping loop rebuilt
+    `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain` from scratch using only chains present
+    in that save's `mapped` results (added by an earlier pass specifically so a genuinely-deleted
+    chain's stale hint doesn't linger forever) -- so the chain's hint was purged during the
+    Do()-triggered save (it's entirely absent from `AnimationChainListSave` at that moment), and by
+    the time Undo() re-inserts the same object and saves again, no hint remains: the entry tile id
+    gets recomputed fresh from frame[0], relocating a hand-authored "owner ≠ own frame[0]" chain
+    away from its original tile and leaving that tile orphaned. Confirmed no command in
+    `CommandsAndState` ever clones or replaces a chain/frame object across Undo/Redo (grepped for
+    `.Clone()`/`DeepClone`/`new AnimationChainSave(`/`new AnimationFrameSave(` -- zero matches, and
+    every `Add*Command`/`Delete*Command`/`Duplicate*Command` reviewed re-adds/re-removes the exact
+    same reference), which is what makes a reference-keyed carry-forward fix sound. Fixed by having
+    `SaveTsxProject`'s bookkeeping loop carry forward -- rather than drop -- hints for chains
+    entirely absent from the current `AnimationChainListSave` (candidates for a later Undo/Redo
+    reinsertion), while still dropping hints for chains that stay present but come back with zero
+    frames (the pre-existing, still-tested zero-frame-chain guarantee is untouched, since that
+    case's chain is never absent from the ACLS). Test:
+    `ProjectManagerTsxProjectTests.SaveTsxProject_DeleteChainThenReinsertSameObjectAndSave_RestoresOriginalTileInsteadOfRelocating`.
+  - **Real bug, confirmed but deferred to TODO (above) -- the frame-level sibling of the bug just
+    fixed: Undo of "delete every frame in a chain" (`DeleteFramesCommand`) also relocates the
+    chain, and the whole-chain fix above does not cover it.** Unlike whole-chain delete, the chain
+    object here never leaves `AnimationChainListSave.AnimationChains` -- only its `Frames` list
+    empties and refills -- so there is no "chain absent from the ACLS" signal to key a
+    carry-forward decision on; the chain-present-with-null-`EntryTileId` state is indistinguishable
+    (via chain-reference identity alone) from the already-tested, deliberately-different
+    "clear frames then re-author with genuinely different geometry" case
+    (`SaveTsxProject_AllFramesDeletedFromChain_...`), which requires the fresh recompute this
+    scenario doesn't want. Confirmed real with a throwaway probe test (not kept, per this sweep's
+    established practice for confirming-then-discarding a test that only pins a known, deferred
+    gap) built on the same `OwnerNotFirstFrameFixtureXml` fixture. A correct fix needs a way to
+    tell "same content, Undo-restored" apart from "different content, re-authored" -- e.g.
+    fingerprinting the frame sequence by object reference (frames are never cloned across
+    Undo/Redo either, per the same grep) alongside the dormant hint -- which means widening
+    `_tsxEntryTileIdsByChain`'s value type and `MultiTileToTiledAnimationMapper.Map`'s
+    `knownEntryTileIds` parameter type, a materially larger and riskier change than the whole-chain
+    fix. Left as a TODO with full reasoning rather than folded into this pass; see the TODO item
+    above for the complete writeup.
+  - **Scenario: two DISTINCT tsx tabs switched back and forth repeatedly, editing and saving each
+    in turn -- already correct, confirmed with a teeth-tested pinning test, no source change.**
+    Every prior tab-switch-cache test in this sweep pairs one tsx tab with one achx tab; this was
+    the untested tsx-vs-tsx combination. Traced why it already works: `CaptureTsxState` wraps the
+    *current* `_tsxTileset`/tracking-dictionary instances in a fresh `TsxState` record at capture
+    time, and `LoadTsxProject`/`SaveTsxProject` always reassign (never mutate in place) those
+    fields, so two captures at different times necessarily hold independent object instances with
+    no way to cross-contaminate. Confirmed the test has teeth by temporarily stubbing
+    `CaptureTsxState` to always return `null` and observing it fail, then reverting. Test:
+    `TabSwitchCacheTsxTests.TryActivateTabFromCache_TwoDistinctTsxTabsSwitchedBackAndForthRepeatedly_EachSavesOnlyItsOwnFile`.
+  - **Scenario: drag-and-drop a tsx file while another (possibly-Untitled) tab is active -- safe,
+    no gap, and structurally identical to File > Open, not a discrepancy between the two.** Traced
+    precisely: `OnWindowDrop` and every File > Open path funnel through the same
+    `LoadAnimationFileAsync`, which (a) captures the leaving tab's full state (including its undo
+    history) via `_tabController.CaptureLeavingTab` before switching, and (b) registers any
+    not-yet-tracked current document (including an Untitled one with in-memory-only content) as a
+    background tab via `EnsureCurrentEditorContentHasTab` before opening the new file -- so nothing
+    is discarded either way. This app has no general "unsaved changes, save first?" prompt at all
+    for switching away from a tab (only for *closing* one) precisely because every named file
+    autosaves on every edit and every Untitled tab's content is captured, not discarded, on
+    switch-away -- confirmed this is consistent with fresh-eyes pass #9's own crash-recovery
+    finding ("every edit to a *named* file... autosaves immediately... there is no unsaved-data
+    window"). No gap to fix; no new test needed (this is the same mechanism `TabSwitchCacheTsxTests`
+    and pass #9's title-staleness fix already exercise).
+  - **`TabEditorCache.cs`/`TabEntry.cs`/`TabController.cs` -- full dedicated reads (all three had
+    only been touched incrementally by prior passes' field-by-field additions, never read fully in
+    one pass). `TabEditorCache.cs`/`TabEntry.cs`: no gap -- `Invalidate` only clears
+    `CachedEditorModel`/`CachedDiskWriteTimeUtc`, leaving `CachedTsxState`/`CachedTextureSizeState`/
+    `CachedReferencedPngs` stale, but confirmed harmless: `ApplyToProject` is only ever called after
+    `HasFreshCache` returns `true`, which requires `CachedEditorModel != null` -- an invalidated tab
+    always falls through to a full reload instead. `TabController.cs`: re-confirmed safe (already
+    read fully in pass #7); `CaptureLeavingTab` atomically snapshots the undo stack and
+    `CaptureTabEditorState` together in one method, so the two can never observe different
+    "moments" of the same tab's state.**
+  - **Real bug, confirmed red first, found while reading `TabManager.cs` (a neighbor of
+    `TabController.cs`, surfaced by tracing `TabEntry.UndoSnapshot`'s only non-`TabController`
+    write site) -- `TabManager.Rename` silently dropped `CachedTsxState`/`CachedTextureSizeState`/
+    `CachedReferencedPngs` when replacing a `TabEntry`.** `Rename` builds a brand-new `TabEntry` and
+    explicitly copies `CachedEditorModel`/`CachedOnDiskCoordinateType`/`CachedDiskWriteTimeUtc`/
+    `UndoSnapshot` from the old instance, but the three tsx/texture-size/referenced-pngs cache
+    fields (all added by *later* fixes in this same sweep) were never added to that copy list.
+    Traced reachability precisely rather than assuming: `Rename`'s only caller
+    (`MainWindow.axaml.cs`'s `CurrentFileChanged` handler) only invokes it to promote an Untitled
+    tab to a real file path after a successful Save/Save-As -- and an Untitled tab can never carry
+    native-tsx state (there is no "blank tsx" reachable via File > New, per pass #9's own finding),
+    so this is not reachable in production today. Fixed anyway, matching this sweep's established
+    "cheap, risk-free, defense-in-depth for a latent instance of an already-fixed leak class"
+    precedent (e.g. the Browser `CloseTab` fix in the UI-layer `ResetToBlankDocument` entry above):
+    a three-line copy-list addition with no behavior change on any currently-reachable path. Test:
+    `TabManagerTests.Rename_CarriesForwardTsxAndTextureSizeAndReferencedPngsCache`.
+  - **`IProjectManager.cs` -- full read, no gap.** Pure interface declaration with XML docs already
+    audited for accuracy by prior passes; no behavior to get wrong.
+  - **Honest assessment: not a clean pass, but the strongest signal yet that the "missing
+    tsx-awareness branch" and "reused-instance state leak" bug classes (the shapes every pass since
+    #5 has been finding) are giving way to a narrower, genuinely novel class: reference-keyed
+    bookkeeping dictionaries whose lifecycle is not itself part of the undo/redo history, so
+    replaying a command's own Do/Undo can desync them from the state the undo stack represents.**
+    This pass deliberately avoided re-reading the heavily-trodden mapper/sync files and instead
+    walked realistic multi-step scenarios end-to-end, and the two real bugs it found (both in the
+    Undo/Redo-vs-tsx-identity-tracking interaction, confirmed as the most promising *novel* angle
+    by the task itself) came from that shift in approach, not from finding new territory in
+    already-audited files -- `TabEditorCache.cs`/`TabEntry.cs`/`TabController.cs`/
+    `IProjectManager.cs` all read clean on a genuine first full pass. One of the two bugs found
+    (the frame-level Undo case) was deliberately deferred to TODO rather than fixed, since a safe
+    fix requires a materially larger change (widening a hint dictionary's value type across its
+    parameter signature and every call site) than this pass's risk budget should absorb in one
+    sitting -- a first for this sweep, which has fixed every previously-found bug in the same pass
+    it was discovered in. This is not a clean pass by the stop condition's letter, but the *shape*
+    of what it found (a deferred, larger design question rather than a quick localized fix) reads
+    as the sweep approaching genuine exhaustion of the cheap, obviously-reachable bug supply in
+    `AnimationEditor.Core`; a pass #11 aimed squarely at implementing the deferred TODO fix (rather
+    than another scenario-walkthrough sweep) is the highest-value next step if this continues. Full
+    suite: `AnimationEditor.Core.Tests` 2181/2181 (was 2178, +3 new: the whole-chain fix's test, the
+    two-tsx-tabs pin, and the `TabManager.Rename` fix's test), `AnimationEditor.App.Tests` 989/989
+    (unchanged), `AnimationEditor.Views.Tests` builds clean.
