@@ -893,6 +893,8 @@ namespace AnimationEditor.Core
                     AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), correctedEntryHints, correctedSatelliteHints);
             }
 
+            mapped = YieldCollidingFreshClaims(mapped, entryHintsForMap, satelliteHintsForMap);
+
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
             Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped);
             Tiled.TsxWriter.Write(workingTileset, targetPath ?? FileName!);
@@ -1059,6 +1061,72 @@ namespace AnimationEditor.Core
             return mapped.SelectMany(r => r.Warnings)
                 .Concat(Tiled.TsxLossyDataCheck.Warnings(AnimationChainListSave))
                 .ToList();
+        }
+
+        /// <summary>
+        /// A Tiled tile carries one animation, so two chains computing the same tile id can't both
+        /// be written. That happens routinely, not just by mistake: duplicating a chain gives the
+        /// copy the same cells as its source, and the user moves the copy's frames afterwards.
+        /// Rather than refusing the whole save (<see cref="Tiled.NativeTsxAnimationSync.Apply"/>
+        /// would throw), the chain whose claim on the tile is freshly computed this save yields to
+        /// the one that already owned it (a hinted claim), and is reported by name like any other
+        /// chain that couldn't be mapped -- keeping whatever tiles it owned before untouched, and
+        /// picked up on the first save after its frames stop overlapping. Two fresh claims on one
+        /// tile (two brand-new chains on the same cells) keep the first in chain order.
+        /// </summary>
+        private IReadOnlyList<Tiled.MultiTileMappingResult> YieldCollidingFreshClaims(
+            IReadOnlyList<Tiled.MultiTileMappingResult> mapped,
+            IReadOnlyDictionary<AnimationChainSave, uint> entryHints,
+            IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> satelliteHints)
+        {
+            // Every claim this save makes: (tile, owning chain, is it a hint or fresh?).
+            var claims = new List<(uint TileId, Tiled.MultiTileMappingResult Result, bool IsHinted)>();
+            foreach (var r in mapped)
+            {
+                if (r.Warnings.Count > 0) continue;
+                if (r.EntryTileId is { } entry)
+                    claims.Add((entry, r, !r.EntryTileIdIsFreshlyComputed));
+                foreach (var satellite in r.Satellites)
+                {
+                    var hinted = satelliteHints.TryGetValue(r.SourceChain, out var hints)
+                        && hints.TryGetValue(satellite.Offset, out var hintedId) && hintedId == satellite.TileId;
+                    claims.Add((satellite.TileId, r, hinted));
+                }
+            }
+
+            var yielding = new Dictionary<AnimationChainSave, string>(ReferenceEqualityComparer.Instance);
+            foreach (var group in claims.GroupBy(c => c.TileId))
+            {
+                var claimants = group.Select(c => c.Result).Distinct(ReferenceEqualityComparer.Instance).Cast<Tiled.MultiTileMappingResult>().ToList();
+                if (claimants.Count < 2) continue;
+                var winner = group.FirstOrDefault(c => c.IsHinted).Result ?? claimants[0];
+                foreach (var loser in claimants.Where(c => !ReferenceEquals(c, winner)))
+                    yielding.TryAdd(loser.SourceChain,
+                        $"chain \"{loser.ChainName}\": Tiled tile {group.Key} already carries \"{winner.ChainName}\" - not saved; move its frames to cells no other chain uses.");
+            }
+            if (yielding.Count == 0)
+                return mapped;
+
+            return mapped.Select(r =>
+            {
+                if (!yielding.TryGetValue(r.SourceChain, out var warning))
+                    return r;
+                // Same shape MultiTileToTiledAnimationMapper's own Empty(warning) produces: the
+                // chain's previously-owned tiles are still reported so the stale-clearing step
+                // leaves them alone, but nothing new is written.
+                uint? ownedEntry = entryHints.TryGetValue(r.SourceChain, out var e) ? e
+                    : _tsxEntryTileIdsByChain.TryGetValue(r.SourceChain, out var prior) ? prior : null;
+                var ownedSatellites = satelliteHints.TryGetValue(r.SourceChain, out var sh) ? sh
+                    : _tsxSatelliteTileIdsByChain.TryGetValue(r.SourceChain, out var priorSh) ? priorSh : null;
+                return r with
+                {
+                    AnchorFrames = [],
+                    EntryTileId = ownedEntry,
+                    EntryTileIdIsFreshlyComputed = false,
+                    Satellites = ownedSatellites?.Select(kv => new Tiled.TiledSatelliteMapping(kv.Value, [], kv.Key)).ToList() ?? [],
+                    Warnings = [warning],
+                };
+            }).ToList();
         }
 
         /// <summary>Whether <paramref name="a"/> and <paramref name="b"/> hold the exact same

@@ -378,10 +378,11 @@ public class TsxFrameResizeRoundTripTests : IDisposable
     }
 
     // The tile the origin moves onto can already be another chain's owner. Two animations can't
-    // share a tile, so the save refuses (same as any other geometry collision) and the file keeps
-    // its pre-edit content instead of one chain silently swallowing the other.
+    // share a tile, so the moved chain yields: the save still writes everything else, reports the
+    // moved chain by name, and leaves both chains' tiles exactly as they were (#1147 pass #22 --
+    // before that, the whole save threw).
     [Fact]
-    public void Resize_GrowLeftOntoAnotherChainsOwnerTile_ThrowsAndLeavesFileUntouched()
+    public void Resize_GrowLeftOntoAnotherChainsOwnerTile_WarnsAndLeavesBothChainsTilesUntouched()
     {
         var pm = new ProjectManager();
         var path = WriteFixture(EmptyFixtureXml);
@@ -398,9 +399,9 @@ public class TsxFrameResizeRoundTripTests : IDisposable
 
         Resize(hero, dLeft: -1, dTop: 0, dRight: 0, dBottom: 0); // Hero's origin now wants 4
 
-        var ex = Assert.Throws<InvalidOperationException>(() => pm.SaveTsxProject());
-        Assert.Contains("Hero", ex.Message);
-        Assert.Contains("Other", ex.Message);
+        var warning = Assert.Single(pm.SaveTsxProject());
+        Assert.Contains("\"Hero\"", warning);
+        Assert.Contains("\"Other\"", warning);
         var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
         Assert.Equal([((uint)5, 100), ((uint)17, 100)], tileset.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal([((uint)4, 100), ((uint)16, 100)], tileset.Tiles.Single(t => t.ID == 4).Animation.Select(f => (f.TileID, f.Duration)));
