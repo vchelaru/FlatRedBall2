@@ -2128,3 +2128,32 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     `catch` into `MarkSaveFailed`, so the user never sees which two chains collided.
   Full suite: `AnimationEditor.Core.Tests` 2323, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
+
+- [x] **Fresh-eyes pass #16 -- chain-level operations in a native-tsx project (duplicate, paste,
+  new chain over owned cells) and what the user sees when the save refuses.** One real gap,
+  fixed; the rest traced safe.
+  - **Duplicate chain always fails the save, silently -- real gap, fixed at the reporting
+    layer.** A copy animates the same cells as its source, so it claims the same tile and
+    `ValidateNoTileIdCollisions` refuses the whole save (correct: a Tiled tile carries one
+    animation). But `SaveCurrentAnimationChainList`'s bare `catch` turned that into a red "Auto
+    Save Failed" status with no reason, and every later autosave kept failing the same way until
+    the copy was moved -- with nothing telling the user that. New `IAppCommands.SaveFailed`
+    carries the exception message; desktop and browser show it as a toast ("Auto save failed --
+    Tiled tile 0 would be claimed by both ..."). Also covers disk/permissions failures on achx
+    saves, which were equally silent. Undoing the duplicate makes the next autosave succeed
+    again. Not changed: the duplicate itself. Auto-assigning the copy a free owner tile (the
+    hand-authored unrelated-owner pattern) would let two chains share cells, but the copy would
+    then stay pinned there forever once the user moves its frames; a deliberate feature, not a
+    sweep fix. Test: `AppCommandsSaveFailedTests` (2).
+  - **Paste chain / new chain over owned cells -- same class, same fix.** Both reach the same
+    collision throw and now the same toast.
+  - **Shrink-then-regrow satellite hint vs. a chain placed on the vacated tile -- safe.** The
+    kept `(1,0)` hint is a real physical-cell conflict once the chain regrows, so refusing (now
+    with a reason) is right.
+  - **Redo of a transferring resize -- safe.** `BulkFrameRegionChangedCommand.Redo` re-applies
+    the same rects as `Do`; the transfer is a pure function of the rects
+    (`TsxFrameResizeRoundTripTests.Resize_GrowLeftThenRevert_*` covers the reverse).
+  - **Hot-reload of a tsx with origin-tracked chains -- safe.** `LoadTsxProject` replaces every
+    chain object and re-seeds `_tsxEntryHintOriginFrames` from the file.
+  Full suite: `AnimationEditor.Core.Tests` 2325, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.

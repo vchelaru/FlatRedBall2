@@ -60,6 +60,16 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
 
         /// <summary>
+        /// Raised when <see cref="SaveCurrentAnimationChainList"/> could not write the file at all
+        /// (the exception's message): a disk/permissions error, or for a native tsx project a
+        /// tile claimed by two chains (e.g. a just-duplicated chain still animating the same
+        /// cells as its source). The file is left exactly as it was and <see
+        /// cref="IUndoManager.SaveState"/> goes to <see cref="Commands.SaveState.Failed"/>; the
+        /// app layer should surface the reason, since the status bar alone only says "failed".
+        /// </summary>
+        event Action<string>? SaveFailed;
+
+        /// <summary>
         /// Raised after a frame, shape, or animation chain is deleted, carrying a short
         /// label for the deleted item(s). The app layer shows an undo toast in response.
         /// </summary>

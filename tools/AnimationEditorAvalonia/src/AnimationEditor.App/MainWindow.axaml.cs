@@ -1260,6 +1260,8 @@ public partial class MainWindow : Window
         _appCommands.TsxSaveCompletedWithWarnings += warnings =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowToast($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+        _appCommands.SaveFailed += message =>
+            Dispatcher.UIThread.InvokeAsync(() => ShowToast($"Auto save failed — {message}"));
 
         Notifications.WireUndo(() => _undoManager.Undo());
 

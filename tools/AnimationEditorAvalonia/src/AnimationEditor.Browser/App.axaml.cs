@@ -177,6 +177,7 @@ public partial class App : Application
         var notifications = new EditorNotificationOverlay();
         notifications.WireUndo(() => undoManager.Undo());
         appCommands.ItemsDeleted += notifications.ShowItemDeleted;
+        appCommands.SaveFailed += message => notifications.ShowToast($"Auto save failed — {message}");
         var dialogs = new EditorDialogOverlay();
         appCommands.ConfirmAsync = (message, title) =>
             EditorDialogs.ConfirmAsync(dialogs, message, title);

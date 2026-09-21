@@ -189,6 +189,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.TsxSaveCompletedWithWarnings"/>
         public event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
 
+        /// <inheritdoc cref="IAppCommands.SaveFailed"/>
+        public event Action<string>? SaveFailed;
+
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
@@ -486,9 +489,10 @@ namespace AnimationEditor.Core.CommandsAndState
                     _undoManager.MarkSaved();
                     EditorProjectModelChanged?.Invoke(target);
                 }
-                catch
+                catch (Exception ex)
                 {
                     _undoManager.MarkSaveFailed();
+                    SaveFailed?.Invoke(ex.Message);
                     return;
                 }
 
