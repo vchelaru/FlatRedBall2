@@ -473,6 +473,46 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.DoesNotContain(afterUndo.Tiles, t => t.ID == 10 && t.Animation.Count > 0);
     }
 
+    // Reordering a chain's frames (e.g. ReorderCommand<AnimationFrameSave> backing "Reverse Chain"
+    // or drag-to-reorder) never adds/removes any AnimationFrameSave object and never empties the
+    // chain, but it DOES change which frame is at index 0 -- the exact value
+    // MultiTileToTiledAnimationMapper.MapChain falls back to when no entry/satellite hint exists.
+    // Both hints are looked up purely by chain (and, for satellites, offset) reference -- never by
+    // frame order -- so a reorder must leave the entry and satellite tiles exactly where they were
+    // before, only changing the per-frame Animation sequence each one plays.
+    [Fact]
+    public void SaveTsxProject_ReorderFramesWithinChainAndSave_EntryAndSatelliteTilesStayPutOnlyAnimationOrderChanges()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameWithSatelliteFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        Assert.Equal(2, chain.Frames.Count);
+
+        // ReorderCommand<AnimationFrameSave>'s "Reverse Chain" action: chain.Frames.Reverse().
+        // Frame[0] used to be tile 9/10 (anchor/satellite); after reversing, frame[0] is what used
+        // to be tile 13/14 -- if the hints weren't consulted, the fallback would relocate the
+        // anchor to 13 and the satellite to 14.
+        chain.Frames.Reverse();
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+
+        var anchor = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(anchor);
+        Assert.Equal([((uint)13, 150), ((uint)9, 150)], anchor!.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var satellite = reloaded.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.NotNull(satellite);
+        Assert.Equal(5, satellite!.GetProperty<IntProperty>("ParentId").Value);
+        Assert.Equal([((uint)14, 150), ((uint)10, 150)], satellite.Animation.Select(f => (f.TileID, f.Duration)));
+
+        // Neither tile 13 nor tile 9 (the reversed frame-0 position) should have been newly
+        // claimed as an independent animated tile.
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 13 && t.Animation.Count > 0);
+    }
+
     // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at
     // the new path -- via TsxWriter's full-rewrite branch, since a brand-new path never satisfies
     // TsxWriter.Write's `File.Exists(path)` patch-mode gate -- and must leave the file the project
