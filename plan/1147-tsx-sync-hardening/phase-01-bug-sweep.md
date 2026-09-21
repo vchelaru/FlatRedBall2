@@ -335,37 +335,6 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **`DeleteFramesCommand`/`AddFramesCommand`-style Undo of "delete every frame in a chain" still
-  relocates the chain instead of restoring it, for the frame-level sibling of the just-fixed
-  whole-chain-delete bug.** Confirmed real with a throwaway probe test (not kept): starting from
-  the `OwnerNotFirstFrameFixtureXml` fixture (tile 5 owns frames [6, 7]), removing all of a chain's
-  frames and autosaving (as `DeleteFramesCommand.Do()` does) drops `_tsxEntryTileIdsByChain`'s hint
-  for that chain by design (`SaveTsxProject_AllFramesDeletedFromChain_...` pins exactly this,
-  intentionally, so a later *re-population with different frames* doesn't wrongly reuse a stale
-  tile). But `DeleteFramesCommand.Undo()` re-inserts the exact same `AnimationFrameSave` objects at
-  their original indices and autosaves again -- and because the chain object itself never left
-  `AnimationChainListSave.AnimationChains` (only its `Frames` list emptied and refilled), the fix
-  just landed for whole-chain delete (carry the hint forward when the *chain* is absent from the
-  ACLS) does not apply here: the chain is never absent, so `SaveTsxProject`'s bookkeeping loop
-  can't distinguish "same chain, frames temporarily cleared then undo-restored identically" from
-  "same chain, frames cleared then genuinely re-authored with different geometry" using only
-  chain-reference identity -- both look identical (chain present, `EntryTileId` was null on the
-  intervening save). The `AllFramesDeletedFromChain` test's own reasoning requires recomputing
-  fresh in the second case, so a correct fix needs a way to tell the two apart, e.g. fingerprinting
-  the frame *content* (or, since Undo never clones frames -- confirmed via the same "no `.Clone()`/
-  `new AnimationChainSave(`/`new AnimationFrameSave(` in `CommandsAndState`" grep that showed no
-  command ever replaces a chain object -- fingerprinting by frame *object reference sequence*
-  would work and is cheap to compute) alongside the dormant hint, and only reusing a dormant hint
-  when the current frame sequence's fingerprint matches the one recorded when that hint was last
-  valid. Not fixed in this pass: that requires widening `_tsxEntryTileIdsByChain`'s value type (and
-  `MultiTileToTiledAnimationMapper.Map`'s `knownEntryTileIds` parameter type, and every call site/
-  test that constructs one) from a bare `uint` to a `(uint TileId, IReadOnlyList<AnimationFrameSave>
-  Frames)`-shaped hint -- a materially larger, riskier change than the whole-chain fix, and better
-  scoped as its own dedicated TDD pass rather than folded into this one. Lower severity than the
-  whole-chain case: needs the narrower combination of "select every frame in a chain and delete
-  them, then immediately Undo" (rarer than plain chain deletion) *and* an owner-tile-not-its-own-
-  first-frame chain.
-
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1566,3 +1535,85 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     suite: `AnimationEditor.Core.Tests` 2181/2181 (was 2178, +3 new: the whole-chain fix's test, the
     two-tsx-tabs pin, and the `TabManager.Rename` fix's test), `AnimationEditor.App.Tests` 989/989
     (unchanged), `AnimationEditor.Views.Tests` builds clean.
+
+- [x] **`DeleteFramesCommand` Undo of "delete every frame in a chain" relocated the chain instead of
+  restoring it -- the frame-level sibling of the whole-chain-delete fix, deferred by pass #10.**
+  Real bug, confirmed red first --
+  `SaveTsxProject_DeleteFramesThenUndoWithSameFrameObjectsAndSave_RestoresOriginalTileInsteadOfRelocating`
+  failed against the old code (tile 5 left empty, animation relocated onto tile 6) before the fix,
+  using the same `OwnerNotFirstFrameFixtureXml` fixture (tile 5 owns frames [6, 7]) as the
+  whole-chain-delete test.
+
+  **Design chosen: a dormant-hint side table keyed by frame-object-reference fingerprint, entirely
+  inside `ProjectManager` -- not the wider `MultiTileToTiledAnimationMapper.Map`/
+  `knownEntryTileIds` parameter-type change pass #10 sketched.** The simpler design worked: no
+  `MultiTileToTiledAnimationMapper`/`TiledAnimationToAchjMapper`/`ProjectManagerTsxValidationIssuesTests`
+  call site needed to change, because the fingerprint check only needs to decide, for one
+  `SaveTsxProject` call, *which* hint value to feed into the existing `knownEntryTileIds`/
+  `knownSatelliteTileIds` dictionaries -- it never needs those dictionaries' shape to carry the
+  fingerprint themselves. Added:
+  - `ProjectManager._tsxLastNonEmptyFramesByChain` (`Dictionary<AnimationChainSave,
+    IReadOnlyList<AnimationFrameSave>>`) -- each chain's `Frames` contents as of the most recent
+    save where it had a real entry tile id, i.e. the frame-object sequence that produced the
+    current `_tsxEntryTileIdsByChain` value. Seeded on `LoadTsxProject` (so a chain that already
+    has an on-disk hint can go dormant on the very first post-load save, not just the second),
+    reset alongside the other tsx fields on an achx load, and round-tripped through
+    `CaptureTsxState`/`RestoreTsxState` for the tab-switch cache.
+  - `ProjectManager._tsxDormantHintsByChain` (`Dictionary<AnimationChainSave, DormantTsxHint>`,
+    `DormantTsxHint` = `(uint EntryTileId, IReadOnlyDictionary<(int Dx, int Dy), uint> Satellites,
+    IReadOnlyList<AnimationFrameSave> Frames)`) -- populated in `SaveTsxProject`'s post-save
+    bookkeeping loop the moment a present chain's `EntryTileId` comes back null *and*
+    `chain.Frames.Count == 0` (as opposed to null for some other mapper-skip reason, e.g. a
+    texture-mismatch or misaligned-frame warning, which must not create a dormant hint). A chain
+    left empty across several consecutive saves keeps reusing the same dormant entry (checked
+    first) rather than losing it after the first "still empty" resave.
+  - `SaveTsxProject` now builds one-off merged copies of `_tsxEntryTileIdsByChain`/
+    `_tsxSatelliteTileIdsByChain` (only when at least one dormant hint actually matches -- no
+    allocation on the common path) before calling `MultiTileToTiledAnimationMapper.Map`: for every
+    chain with a dormant hint whose `Frames` list is reference-sequence-equal (same count, same
+    object at each index -- `FramesSequenceEqual`) to the chain's *current* `Frames`, the dormant
+    tile id (and satellite ids) win for that one save. A successfully revived hint flows back into
+    `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain` as an active hint via the same
+    `mapped`-result loop that already existed -- no separate "un-dormant" step needed.
+
+  **What distinguishes "reuse the dormant hint" from "genuinely cleared, don't reuse" (the
+  already-shipped, still-correct `SaveTsxProject_AllFramesDeletedFromChain_...` guarantee):**
+  frame-object *reference* identity, not value/content equality. `DeleteFramesCommand.Undo()`
+  re-inserts the exact same `AnimationFrameSave` instances it removed (confirmed by reading
+  `DeleteFramesCommand.cs`: `Undo()` re-inserts from `_removed`, the same array captured in
+  `Do()`, never a clone) -- `FramesSequenceEqual`'s `ReferenceEquals` check matches, so the dormant
+  hint revives. A user who clears a chain's frames and then re-authors it with brand-new
+  `AnimationFrameSave` objects -- even ones with identical-looking coordinates, and even mapping to
+  the same tile count -- produces a `Frames` list that fails the reference check, so the dormant
+  hint is left unused and a fresh id is computed from geometry, exactly as before. Pinned with a
+  new test built specifically to rule out a coincidental pass:
+  `SaveTsxProject_DeleteFramesThenReauthorWithDifferentFrameObjectsAndSave_ComputesFreshTileNotStaleDormantHint`
+  uses the *same* `OwnerNotFirstFrameFixtureXml` fixture as the fix's own positive test (tile 5,
+  not tile 0), so a naive "any non-empty `Frames` after a clear reuses the last hint" bug couldn't
+  slip through by accident the way it might have against the original `AllFramesDeletedFromChain`
+  test's `PlainFixtureXml` (where the owner tile happens to equal frame 0's tile).
+
+  **Redo symmetry, verified rather than assumed:** the task asked whether the same
+  frame-reference-stability property holds for Redo, not just Undo. Read
+  `DeleteFramesCommand.Redo()`: it re-removes frames via `_chain.Frames.Remove(frame)` over the
+  same `_removed` array `Do()`/`Undo()` already use -- no clone, same objects. Added
+  `SaveTsxProject_DeleteFramesUndoRedoUndoCycleWithSameFrameObjects_RestoresOriginalTileEveryTime`,
+  which drives a full Do -> Undo -> Redo -> Undo cycle (four `SaveTsxProject` calls) and asserts
+  tile 5 is correctly cleared after Redo and correctly restored after the second Undo. It passed
+  without any additional source change: `ReferenceEquals`-based fingerprinting has no notion of
+  "Undo" vs. "Redo" baked in, only "are these the same frame objects as when the hint went
+  dormant," so the same mechanism covers both directions of the undo stack for free.
+
+  Tests: `ProjectManagerTsxProjectTests.SaveTsxProject_DeleteFramesThenUndoWithSameFrameObjectsAndSave_RestoresOriginalTileInsteadOfRelocating`,
+  `SaveTsxProject_DeleteFramesThenReauthorWithDifferentFrameObjectsAndSave_ComputesFreshTileNotStaleDormantHint`,
+  `SaveTsxProject_DeleteFramesUndoRedoUndoCycleWithSameFrameObjects_RestoresOriginalTileEveryTime`.
+  Full suite: `AnimationEditor.Core.Tests` 2184/2184 (was 2181, +3 new).
+
+  **New plausible gap noticed, not yet added as a TODO item because it isn't yet confirmed real:**
+  `AddFramesCommand`'s own Undo (removing frames it just added) and any other command that clears
+  a chain to zero frames via a path other than `DeleteFramesCommand` would need the same
+  `chain.Frames.Count == 0` condition to fire for dormant-hint capture to kick in at all -- which
+  it does generically (the check is on the mapper result + live `Frames.Count`, not on which
+  command caused it), so this is very likely already covered, not a gap. Not filed as a TODO
+  item since no concrete repro was found or attempted -- flagging only as a "worth a quick
+  confirming test if this area gets touched again" note, not a known bug.
