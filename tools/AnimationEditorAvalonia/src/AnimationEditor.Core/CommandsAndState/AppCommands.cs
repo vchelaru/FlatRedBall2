@@ -494,9 +494,20 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc/>
         public event Action<string, int>? TiledSyncSucceeded;
 
+        /// <inheritdoc/>
+        public Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
+
         public void AddAssociatedTiledTileset(string tsxAbsolutePath)
         {
             if (string.IsNullOrEmpty(_pm.FileName)) return;
+
+            if (IsTsxPathOpenAsNativeProject?.Invoke(tsxAbsolutePath) == true)
+                throw new InvalidOperationException(
+                    $"Cannot associate \"{tsxAbsolutePath}\" -- it is currently open as a native " +
+                    "AnimationEditor project in another tab. Close that tab first, or choose a " +
+                    "different .tsx file. A .tsx cannot be both a native-tsx project and an " +
+                    "achx-push target at the same time.");
+
             _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
         }
 
@@ -508,7 +519,14 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Associate Tiled Tileset", "tsx", "Tiled Tileset (*.tsx)");
             if (string.IsNullOrEmpty(path)) return;
 
-            AddAssociatedTiledTileset(path);
+            try
+            {
+                AddAssociatedTiledTileset(path);
+            }
+            catch (Exception ex)
+            {
+                TiledSyncFailed?.Invoke(path, ex);
+            }
         }
 
         /// <summary>

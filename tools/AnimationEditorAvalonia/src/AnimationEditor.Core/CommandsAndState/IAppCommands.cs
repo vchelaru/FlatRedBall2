@@ -479,15 +479,34 @@ namespace AnimationEditor.Core.CommandsAndState
         /// project's animation chains into that Tiled tileset. No-op if the project has never been
         /// saved (<c>ProjectManager.FileName</c> is null) or the path is already associated.
         /// </summary>
+        /// <exception cref="InvalidOperationException"><paramref name="tsxAbsolutePath"/> is
+        /// currently open as a native-tsx project in another tab (see
+        /// <see cref="IsTsxPathOpenAsNativeProject"/>, issue #1147) -- a .tsx cannot be both a
+        /// native-tsx project and an achx-push target at the same time.</exception>
         void AddAssociatedTiledTileset(string tsxAbsolutePath);
 
         /// <summary>
         /// Shows an open-file dialog (via <see cref="FileDialogService"/>) for the user to pick a
         /// <c>.tsx</c> file, then associates it via <see cref="AddAssociatedTiledTileset"/>. The
         /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled or the
-        /// project has never been saved.
+        /// project has never been saved. Unlike <see cref="AddAssociatedTiledTileset"/>, a coexistence
+        /// conflict here is reported via <see cref="TiledSyncFailed"/> rather than thrown, since this
+        /// method is the fire-and-forget UI entry point.
         /// </summary>
         Task AddAssociatedTiledTilesetViaDialogAsync();
+
+        /// <summary>
+        /// Host-supplied check for whether <c>tsxPath</c> (an absolute path) is currently open as a
+        /// native-tsx project -- either the active tab (<see
+        /// cref="IProjectManager.IsNativeTsxProject"/>) or a backgrounded one. <see
+        /// langword="null"/> when the host hasn't wired tab awareness, which <see
+        /// cref="AddAssociatedTiledTileset"/> treats as "not open anywhere" (same permissive-default
+        /// pattern as <see cref="CanvasDefaultTexturePath"/>). Used to refuse pointing a
+        /// <c>.tiledsync</c> association at a <c>.tsx</c> while it's open natively (issue #1147) --
+        /// the symmetric block to <c>ProjectManager.LoadTsxProject</c> refusing to open a <c>.tsx</c>
+        /// that already has such an association.
+        /// </summary>
+        Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
 
         /// <summary>
         /// Raised when syncing to one associated .tsx tileset fails after a save (missing file, an

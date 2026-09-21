@@ -3,6 +3,7 @@ using AnimationEditor.Core.Tests;
 using DotTiled;
 using DotTiled.Serialization;
 using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,6 +45,80 @@ public class AppCommandsTiledSyncTests
         var ex = Record.Exception(() => ctx.AppCommands.AddAssociatedTiledTileset("C:/Some/Heroes.tsx"));
 
         Assert.Null(ex);
+    }
+
+    // ── Native-tsx / achx-push coexistence (issue #1147) ────────────────────────────
+    // Symmetric to ProjectManagerTsxProjectTests' LoadTsxProject guard: a .tsx currently open as a
+    // native-tsx project in some tab must not also be pointed at by a new achx-push association.
+
+    [Fact]
+    public void AddAssociatedTiledTileset_TargetTsxOpenAsNativeProjectElsewhere_ThrowsInsteadOfSilentlyCoexisting()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.IsTsxPathOpenAsNativeProject = path => new FilePath(path) == new FilePath(tsxPath);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ctx.AppCommands.AddAssociatedTiledTileset(tsxPath));
+
+        Assert.Contains(tsxPath, ex.Message);
+        Assert.Empty(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
+    }
+
+    [Fact]
+    public async Task AddAssociatedTiledTilesetViaDialogAsync_TargetTsxOpenAsNativeProjectElsewhere_RaisesTiledSyncFailedInsteadOfAssociating()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(tsxPath);
+        ctx.AppCommands.IsTsxPathOpenAsNativeProject = path => new FilePath(path) == new FilePath(tsxPath);
+
+        string? failedPath = null;
+        Exception? failedEx = null;
+        ctx.AppCommands.TiledSyncFailed += (path, ex) => { failedPath = path; failedEx = ex; };
+        await ctx.AppCommands.AddAssociatedTiledTilesetViaDialogAsync();
+
+        Assert.Equal(new FilePath(tsxPath), new FilePath(failedPath!));
+        Assert.IsType<InvalidOperationException>(failedEx);
+        Assert.Empty(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
+    }
+
+    [Fact]
+    public void AddAssociatedTiledTileset_DelegateNotWired_AssociatesNormally()
+    {
+        // Happy-path guard: a host that hasn't wired IsTsxPathOpenAsNativeProject (null delegate)
+        // must keep associating exactly as before -- permissive default, matching
+        // CanvasDefaultTexturePath's own null-means-"no info" convention.
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        ctx.ProjectManager.FileName = achxPath;
+
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+
+        Assert.Single(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
+    }
+
+    [Fact]
+    public void AddAssociatedTiledTileset_DelegateSaysNotOpenElsewhere_AssociatesNormally()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.IsTsxPathOpenAsNativeProject = _ => false;
+
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+
+        Assert.Single(ctx.IoManager.GetAssociatedTiledTilesetPaths(achxPath));
     }
 
     [Fact]

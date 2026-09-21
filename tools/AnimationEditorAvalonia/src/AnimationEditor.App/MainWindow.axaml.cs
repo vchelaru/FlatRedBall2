@@ -1164,6 +1164,19 @@ public partial class MainWindow : Window
         _appCommands.LoadFailed += (path, ex) =>
             Dispatcher.UIThread.InvokeAsync(() => ShowLoadFailedDialogAsync(path, ex));
 
+        // Tab-awareness for the native-tsx/achx-push coexistence guard (issue #1147):
+        // AddAssociatedTiledTileset needs to know whether the target .tsx is open as a native-tsx
+        // project in some OTHER tab, which AppCommands/ProjectManager alone can't see -- ProjectManager
+        // only knows its own current (active) project, not the full set of tabs _tabManager owns.
+        _appCommands.IsTsxPathOpenAsNativeProject = tsxPath =>
+        {
+            var target = new FilePath(tsxPath);
+            if (_projectManager.IsNativeTsxProject && _projectManager.FileName != null &&
+                new FilePath(_projectManager.FileName) == target)
+                return true;
+            return _tabManager.Tabs.Any(t => t.Path == target && t.CachedTsxState != null);
+        };
+
         _appCommands.HotReloadFailed += (path, reason) =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
