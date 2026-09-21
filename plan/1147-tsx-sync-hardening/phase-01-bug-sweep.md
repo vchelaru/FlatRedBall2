@@ -2212,3 +2212,27 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     object layers, wangsets, transformations were already refused up front.
   Full suite: `AnimationEditor.Core.Tests` 2347, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
+
+- [x] **Fresh-eyes pass #19 -- the load side, continued: tileset shapes Tiled can produce that
+  aren't a plain single-image atlas with full metadata.** One regression (mine, from #1157)
+  fixed, two misleading failures turned into clear refusals.
+  - **`<image>` without width/height -- opening threw, fixed.** The loader already fell back to
+    the grid's extent (columns*tilewidth by rows*tileheight), but `ProjectManager.
+    BuildTsxTilesetInfo` passed a null texture size to the save path, which dereferenced it on the
+    first UV->pixel conversion ("Nullable object must have a value"). Before #1157 that only broke
+    the save; #1157's open-time mapping (origin seeding) turned it into a file that wouldn't open
+    at all. The save path now uses the loader's own `GetTextureSize`, so the conversion inverts the
+    load exactly. Test: `EditAndSave_ImageWithoutWidthAndHeight_OpensAndSavesUsingTheGridSize`
+    (red first).
+  - **Image-collection tileset -- refused with the right reason.** A one-image-per-tile tileset
+    (`columns="0"`, no shared `<image>`) is a legitimate Tiled file with no tile grid for any of
+    this editor's math; the only error it hit was the mapper's "Columns=0 isn't a valid tile-grid
+    width", which called a valid file corrupt. `TsxCompatibilityChecker` now refuses it by name.
+    The columns=0-with-an-image corrupt case still takes the old path. Test:
+    `CheckOpenCompatibility_ImageCollectionTileset_ReturnsBlockingReason`.
+  - **Animated tile itself past the tile count -- validator gap, closed** (pass #18 covered only
+    the frames it references). Test: `Validate_AnimatedTileItselfBeyondTileCount_ReturnsIssue`.
+  - **Safe:** an `<image source="../art/x.png">` outside the tsx folder resolves through the same
+    relative-path join every achx uses; BOM/CRLF handling is already covered by `TsxWriterTests`.
+  Full suite: `AnimationEditor.Core.Tests` 2350, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.

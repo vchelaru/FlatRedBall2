@@ -259,6 +259,21 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_AnimatedTileItselfBeyondTileCount_ReturnsIssue()
+    {
+        var tileset = TilesetWithColumns(4); // 64 tiles
+        var anchor = new Tile { ID = 70, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)70, issue.TileId);
+        Assert.Contains("tile count", issue.Message);
+    }
+
+    [Fact]
     public void Validate_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException()
     {
         // Two animated <tile> elements sharing one id used to hit the internal id-keyed

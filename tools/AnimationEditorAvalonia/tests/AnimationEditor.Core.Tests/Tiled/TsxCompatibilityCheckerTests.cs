@@ -74,6 +74,34 @@ public class TsxCompatibilityCheckerTests
         Assert.Contains(expectedWord, blockingReason);
     }
 
+    // Fresh-eyes pass #19: an image-collection tileset (no shared <image>, one <image> per tile,
+    // columns="0") is a legitimate Tiled file, not a corrupt one -- but nothing in this editor's
+    // grid-based tile math applies to it, and the only error it hit was TiledAnimationToAchjMapper's
+    // "Columns=0 isn't a valid tile-grid width", which misdescribes the file.
+    private const string ImageCollectionFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Props" tilewidth="32" tileheight="48" tilecount="2" columns="0">
+         <grid orientation="orthogonal" width="1" height="1"/>
+         <tile id="0">
+          <image source="barrel.png" width="32" height="48"/>
+         </tile>
+         <tile id="1">
+          <image source="crate.png" width="32" height="32"/>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void CheckOpenCompatibility_ImageCollectionTileset_ReturnsBlockingReason()
+    {
+        var tileset = Loader.Default().LoadTileset(WriteFixture(ImageCollectionFixtureXml, "Props.tsx"));
+
+        var canOpen = TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason);
+
+        Assert.False(canOpen);
+        Assert.Contains("image collection", blockingReason);
+    }
+
     [Fact]
     public void CheckOpenCompatibility_TilesetWithWangsets_ReturnsBlockingReason()
     {

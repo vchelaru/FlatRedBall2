@@ -148,6 +148,35 @@ public class NativeTsxForeignContentRoundTripTests : IDisposable
         Assert.Empty(tile.Animation);
     }
 
+    // Tiled always writes width/height on <image>, but a hand-written or tool-generated tsx may
+    // not. The loader already falls back to columns*tilewidth by rows*tileheight; the save path
+    // built its TilesetAnimationInfo with a null texture size and threw on the first UV->pixel
+    // conversion ("Nullable object must have a value"), and since #1157 runs a mapping at open
+    // to seed origin tracking, the file wouldn't even open.
+    private const string ImageWithoutSizeXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+         <image source="Heroes.png"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="200"/>
+           <frame tileid="1" duration="200"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Fact]
+    public void EditAndSave_ImageWithoutWidthAndHeight_OpensAndSavesUsingTheGridSize()
+    {
+        var path = Write(ImageWithoutSizeXml);
+
+        EditFirstFrameDurationAndSave(path);
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)0, 300), ((uint)1, 200)], reloaded.Tiles.Single(t => t.ID == 0).Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
     // The same content with no line breaks: the patch writer can't slice it per tile, so this
     // exercises the full-rewrite fallback.
     [Fact]

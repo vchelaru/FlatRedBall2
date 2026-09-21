@@ -1189,6 +1189,10 @@ namespace AnimationEditor.Core
         private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
         {
             var image = tileset.Image;
+            // Same size the load side used to build the UV rects (falls back to the tile grid's
+            // extent when <image> carries no width/height), so UV -> pixel conversion on save
+            // inverts it exactly instead of dereferencing a missing size.
+            var (textureWidth, textureHeight) = Tiled.TiledAnimationToAchjMapper.GetTextureSize(tileset);
             return new Tiled.TilesetAnimationInfo
             {
                 TileWidth = tileset.TileWidth,
@@ -1196,8 +1200,8 @@ namespace AnimationEditor.Core
                 ColumnCount = tileset.Columns,
                 TileCount = tileset.TileCount,
                 ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
-                TextureWidth = image.HasValue && image.Value.Width.HasValue ? image.Value.Width.Value : null,
-                TextureHeight = image.HasValue && image.Value.Height.HasValue ? image.Value.Height.Value : null,
+                TextureWidth = textureWidth,
+                TextureHeight = textureHeight,
             };
         }
     }

@@ -165,13 +165,18 @@ public static class TsxAnimationValidator
             }
         }
 
-        // A frame id past the tileset's tile count (only reachable by hand-editing) maps to a
-        // rect outside the image and can never be saved; say so at open instead of leaving the
-        // user with an off-sheet frame and a per-save warning.
+        // An animated tile, or a frame it references, past the tileset's tile count (only
+        // reachable by hand-editing) maps to a rect outside the image and can never be saved; say
+        // so at open instead of leaving the user with an off-sheet frame and a per-save warning.
         foreach (var tile in animatedTilesById.Values)
+        {
+            if (tile.ID >= tileset.TileCount)
+                issues.Add(new TsxGroupIssue(tile.ID, tile.ID,
+                    $"Animated tile {tile.ID} is past the tileset's tile count of {tileset.TileCount}."));
             foreach (var frame in tile.Animation.Where(f => f.TileID >= tileset.TileCount).DistinctBy(f => f.TileID))
                 issues.Add(new TsxGroupIssue(tile.ID, tile.ID,
                     $"Tile {tile.ID}'s animation references tile {frame.TileID}, past the tileset's tile count of {tileset.TileCount}."));
+        }
 
         return issues;
     }
