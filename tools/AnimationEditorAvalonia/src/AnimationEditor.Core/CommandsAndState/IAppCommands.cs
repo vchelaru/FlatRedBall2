@@ -87,7 +87,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Fired when <see cref="ReloadAchxFromDisk"/> detects a mangled file (bad XML,
         /// Git conflict markers, etc.). The first argument is the file path; the second is
         /// a user-readable reason. Project state is left unchanged and the undo stack is
-        /// not cleared. Use this to surface a toast rather than a blocking error dialog.
+        /// not cleared -- but the in-memory model is now stale relative to disk, so <see
+        /// cref="SaveCurrentAnimationChainList"/> refuses to write that path (raising <see
+        /// cref="SaveFailed"/>) until a later reload of it succeeds; Save As to another path
+        /// still works. Use this to surface a toast rather than a blocking error dialog.
         /// </summary>
         event Action<string, string>? HotReloadFailed;
 

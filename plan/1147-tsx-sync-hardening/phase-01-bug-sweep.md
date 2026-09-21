@@ -2250,3 +2250,27 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   not a loss. Tests kept as regression guards: `AchxPushForeignContentRoundTripTests` (2).
   Full suite: `AnimationEditor.Core.Tests` 2352, all green. **First consecutive empty pass; one
   more is needed to close.**
+
+- [x] **Fresh-eyes pass #21 -- the pairing pass #14 asked for and nobody ran: hot reload vs. a
+  tab with a live model, i.e. Tiled and this editor editing one tsx at the same time.** One real
+  data loss, fixed; recovery files traced safe.
+  - **A failed hot reload left a stale model that the next autosave wrote back over the file --
+    real loss, fixed.** Tiled saves the tsx with something this editor can't load (a wangset, a
+    partial write caught mid-flight, a hand edit with bad XML); `ReloadAchxFromDisk` throws,
+    shows "Reload skipped", and keeps the old in-memory tileset. Every edit autosaves, so the very
+    next one wrote `_tsxTileset` (pre-Tiled-edit) back over Tiled's file, destroying whatever
+    Tiled had just added. Same hole for an achx edited outside the editor. `AppCommands` now
+    remembers every path whose reload failed (with the reason); `SaveCurrentAnimationChainList`
+    refuses to write such a path (`MarkSaveFailed` + `SaveFailed` naming the reason and the way
+    out) until a later reload of it succeeds or the file is freshly opened; Save As to another
+    path still works. Tests: `AppCommandsStaleOnDiskTests` (4; the refuse and the reopen cases
+    were red first).
+  - **Recovery files -- safe.** `WriteRecoveryFile` runs only for a document with no
+    `FileName`; a tsx project always has one, so no achx-format recovery snapshot of a tsx can
+    ever be offered on restart.
+  - **Residual, inherent to file watching:** `HotReloadWatcher.RecordOwnSave` suppresses the
+    change event for this editor's own write; an external write landing inside that window is
+    missed, leaving the model stale but unmarked (pass #13 named the same window for
+    `.tiledsync`). Closing it means content-hashing on every save; not done here.
+  Full suite: `AnimationEditor.Core.Tests` 2356, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.

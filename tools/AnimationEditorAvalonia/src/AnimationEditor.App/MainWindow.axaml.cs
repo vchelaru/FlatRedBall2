@@ -1185,7 +1185,7 @@ public partial class MainWindow : Window
 
         _appCommands.HotReloadFailed += (path, reason) =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
+                ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason} Saving to it is paused until it reloads.", isError: true));
 
         _appCommands.TiledSyncFailed += (tsxPath, ex) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(

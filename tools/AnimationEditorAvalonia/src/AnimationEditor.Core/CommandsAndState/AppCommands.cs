@@ -335,6 +335,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         private void FinishLoadIntoEditor(string fileName)
         {
+            // A fresh, successful load of this path is by definition in sync with disk again.
+            _staleOnDiskReasons.Remove(new AnimationEditor.Core.Paths.FilePath(fileName).FullPath);
             _undoManager.Clear();
             _undoManager.MarkSaved();
             _selectedState.Reset();
@@ -470,11 +472,29 @@ namespace AnimationEditor.Core.CommandsAndState
         public void RefreshTreeView() =>
             RefreshTreeViewRequested?.Invoke();
 
+        /// <summary>
+        /// Files whose on-disk content changed under an open tab and could not be reloaded
+        /// (<see cref="ReloadAchxFromDisk"/> threw), keyed by full path with the failure reason.
+        /// The in-memory model is stale relative to disk from that moment, so writing it back
+        /// would destroy whatever the other program (Tiled, a text editor) just saved. Cleared
+        /// when a later reload of that path succeeds.
+        /// </summary>
+        private readonly Dictionary<string, string> _staleOnDiskReasons = new(StringComparer.OrdinalIgnoreCase);
+
         public void SaveCurrentAnimationChainList(string? fileName = null)
         {
             var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
+                if (_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(target).FullPath, out var staleReason))
+                {
+                    _undoManager.MarkSaveFailed();
+                    SaveFailed?.Invoke(
+                        $"\"{System.IO.Path.GetFileName(target)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
+                        "Saving would overwrite that change. Fix the file so it reloads, or Save As a different file.");
+                    return;
+                }
+
                 HotReloadWatcher.RecordOwnSave(target);
                 try
                 {
@@ -2335,9 +2355,11 @@ namespace AnimationEditor.Core.CommandsAndState
             }
             catch (Exception ex)
             {
+                _staleOnDiskReasons[new AnimationEditor.Core.Paths.FilePath(path).FullPath] = ex.Message;
                 HotReloadFailed?.Invoke(path, ex.Message);
                 return;
             }
+            _staleOnDiskReasons.Remove(new AnimationEditor.Core.Paths.FilePath(path).FullPath);
 
             _undoManager.Clear();
             _undoManager.MarkSaved();
