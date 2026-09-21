@@ -1967,3 +1967,112 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     re-validating on every `SaveTsxProject` call (which starts to resemble candidate (a)'s
     re-read-and-merge shape, the option this pass deliberately did not choose). Left as a known,
     narrower residual rather than folded into this fix silently.
+
+- [x] **Fresh-eyes pass #14 -- extended the "cross-feature interaction" angle pass #13 opened to
+  other pairs of features/subsystems sharing a `.tsx` file, plus a broader "what haven't we tried"
+  scan.** One real gap found and pinned with a teeth-tested test (a degenerate case of the
+  coexistence guard itself, not a new bug class); every other angle traced to a concrete "safe, no
+  gap" verdict:
+  - **Hot-reload vs. a currently-open native-tsx tab -- safe, no gap.** `AppCommands.
+    ReloadAchxFromDisk` (fixed pass #6 to branch on extension) calls `_pm.LoadTsxProject(filePath)`
+    for a `.tsx` path -- the exact same method the coexistence guard lives in, not a parallel path
+    that could miss it -- so a hot-reload-triggered reload of an already-open native-tsx tab
+    inherits the guard for free. Traced why this can't spuriously false-positive on an ordinary
+    external edit (e.g. a teammate's commit, or hand-editing the tsx in Tiled itself): the guard
+    only checks for a `.tiledsync` file targeting the path, which is disk state independent of *why*
+    the tsx file itself changed. `LoadTsxProject`'s existing all-or-nothing commit pattern also means
+    a hot-reload that legitimately hits the guard (because a `.tiledsync` was concurrently created,
+    hand-edited, or restored via version control while the tab sat open -- the same residual gap
+    pass #13's fix already documented as known-and-accepted) fails cleanly via the existing
+    `HotReloadFailed` event, leaving the tab's in-memory state untouched rather than half-applied.
+    No new test added -- this is the residual gap pass #13 already named, observed from a different
+    trigger (hot-reload) rather than a new one.
+  - **Coexistence-guard stress tests (task's angle 2) -- three sub-cases traced, one real
+    (degenerate, not previously covered) case found and pinned:**
+    - **A `.tsx` associating itself while it is the CURRENTLY ACTIVE native-tsx tab -- real,
+      previously-uncovered case; already correctly blocked by existing code, confirmed with a new
+      teeth-tested test rather than assumed.** Every existing coexistence test for direction 2
+      (`AppCommandsTiledSyncTests`) stubs `IsTsxPathOpenAsNativeProject` by hand; none exercised the
+      *real* delegate `MainWindow.WireAppCommands()` wires (comparing `_projectManager.FileName`/
+      `_tabManager.Tabs` against the target path), and none tried the specific case of a tab
+      associating *itself*. Without this check, a self-referential `.tiledsync` would get written
+      next to the tsx's own file, permanently locking it out of ever being reopened natively again
+      (every future `LoadTsxProject` call would see its own association and refuse to open) --
+      reachable via ordinary UI (the "Associate Tiled Tileset" file picker has no filter excluding
+      the currently-open file). Added
+      `NativeTsxSelfAssociationTests.AddAssociatedTiledTileset_TargetIsTheCurrentlyOpenTsxItself_ThrowsInsteadOfWritingSelfReferentialTiledSync`
+      (`AnimationEditor.App.Tests`, exercising the real `MainWindow` wiring via `LoadAnimationFileAsync`
+      + `AddAssociatedTiledTileset`, not a stub). Confirmed the test has teeth: temporarily disabling
+      *both* of the delegate's branches (the active-tab check and the backgrounded-tabs check) made
+      it fail with "No exception was thrown"; disabling only the active-tab check left it passing,
+      because the backgrounded-tabs check (`_tabManager.Tabs.Any(t => t.Path == target && t.
+      CachedTsxState != null)`) independently also catches this case -- the just-opened tab is
+      already tab-tracked with a populated `CachedTsxState` by the time `AddAssociatedTiledTileset`
+      runs, so both branches redundantly guard the same scenario here (harmless belt-and-suspenders,
+      not a gap -- reverted both temporary edits after confirming).
+    - **A `.tiledsync` pointing at a tsx that gets renamed/moved on disk -- traced, safe, not a
+      guard evasion.** AnimationEditor has no in-app rename/move for `.tsx` files (grepped for
+      `RenameFile`/`MoveFile`/`File.Move(` -- the only hits are unrelated `IoManager`/`RecycleBin`
+      code); a rename can only happen externally. After an external rename, the `.tiledsync`'s
+      relative path still names the *old* filename, which no longer exists -- so `TiledTilesetSyncRunner
+      .SyncAll` fails with the already-covered "tsx missing from disk" failure mode
+      (`StatusBarTests.TiledSyncStatus_ShowsFailureDetail_AfterAssociatedTsxMissingFromDisk`), not a
+      coexistence conflict, and the *new*-named file opens natively without any (correctly absent)
+      association. The reverse -- a different, unrelated tsx later reusing the freed old filename --
+      is correctly (conservatively) treated as still-associated by path, matching every other
+      path-identity assumption already made throughout this file format. No test added: not a new
+      behavior, just confirms path-based identity fails safe in both directions.
+    - **Two different open native-tsx tabs whose paths could resolve to the same file via spelling
+      differences -- traced, safe by construction, not reachable.** `TabManager.OpenOrFocus`/
+      `FindTab` (the single path both `File > Open` and drag-drop funnel through) dedupe via the same
+      `FilePath` equality (case-insensitive, slash-normalized, relative-vs-absolute-resolved) the
+      coexistence guard itself uses -- so two tabs both pointing at the same file via different
+      ordinary spellings can't coexist as distinct `TabEntry` instances in the first place; opening
+      the "second" spelling just focuses the existing tab. `FilePath` does not resolve symlinks (no
+      filesystem-level canonicalization anywhere in this class), so two *symlinked* paths to one
+      underlying file would evade both this dedup and the coexistence guard identically -- a
+      pre-existing, engine-wide `FilePath` limitation (not introduced by, or unique to, this guard),
+      consistent with every other path-identity assumption in this codebase. Not filed as a new TODO:
+      fixing it would mean adding filesystem-level path canonicalization to `FilePath` itself, a
+      change with a far wider blast radius than this sweep's scope, for a scenario with no evidence
+      of being hit in practice.
+  - **Multiple Tiled tileset associations from one achx file (task's angle 3) -- safe, no gap.**
+    Grepped every call site of `IIoManager.AddAssociatedTiledTilesetPath`: the only production caller
+    is `AppCommands.AddAssociatedTiledTileset`, which runs the `IsTsxPathOpenAsNativeProject` guard
+    unconditionally before delegating -- there is no direct-to-`IoManager` bypass anywhere in
+    production code (only test fixtures call `IoManager.AddAssociatedTiledTilesetPath` directly, to
+    seed fixture state without exercising `AppCommands`). Confirmed the guard therefore fires once
+    per association, not once per achx: `AddAssociatedTiledTilesetViaDialogAsync`'s file picker
+    (`PickOpenFileAsync`, not a multi-select variant) only ever returns one path per invocation, and
+    associating a second or third tsx to the same achx means a second or third full user-initiated
+    "Associate Tiled Tileset" action, each independently running the guard.
+  - **Export path (task's angle 4) -- safe, no gap, matches an existing pass #7 finding.**
+    `AppCommands.ExportToPixiJsAsync` reads only `_pm.AnimationChainListSave` (the already-mapped
+    abstract model, identical in shape whether it came from a tsx or achx load) and `_pm.
+    GetTextureSizeInPixels`/`_pm.FileName`'s directory for texture resolution -- no tsx/achx-specific
+    branch exists or is needed, consistent with pass #7's "`ExportToPixiJsAsync`... operate[s] on the
+    already-mapped abstract `AnimationChainListSave` model and have no tsx/achx-specific behavior to
+    get wrong." Grepped for any other export feature (`Export` across `AnimationEditor.Core`) --
+    PixiJS is the only one.
+  - **Honest assessment: the cross-feature-interaction angle is now much thinner than pass #13's
+    haul, but not conclusively exhausted.** This pass found one real (if degenerate/redundant-fix)
+    gap and confirmed it with a from-scratch test using the *real* production wiring rather than a
+    stub -- itself a small process improvement, since every prior coexistence test in this file
+    stubbed the delegate and so could never have caught a wiring mistake in `MainWindow.axaml.cs`
+    itself. Every other angle traced to a concrete, reasoned "safe" verdict grounded in a specific
+    mechanism (shared `FilePath` equality, single guarded call site, single export path, pre-existing
+    missing-file failure mode) rather than a shrug. Confidence the cross-feature angle is *fully*
+    exhausted is moderate, not high: pass #13 found its bugs by asking "do these two features'
+    independent state machines fight over one file," and this pass's stress-tests of the *same* guard
+    pass #13 just added found only a redundant-coverage case, not a new hole -- suggesting the
+    specific achx-push/native-tsx pairing is genuinely settling, but the sweep has now only checked
+    that one pairing against itself twice in a row (passes #13 and #14) rather than trying a
+    genuinely different pairing (e.g. hot-reload vs. tab-cache, or the recovery-file system vs. tab
+    switching) with the same rigor. A pass #15 that picks a *different* pair of subsystems --
+    or, per the stop condition, a second consecutive "nothing new" pass on this exact pairing --
+    is the more informative next step than a third stress-test of the same guard.
+  Test: `AnimationEditor.App.Tests.NativeTsxSelfAssociationTests.
+  AddAssociatedTiledTileset_TargetIsTheCurrentlyOpenTsxItself_ThrowsInsteadOfWritingSelfReferentialTiledSync`.
+  Full suite: `AnimationEditor.Core.Tests` 2200/2200 (unchanged -- no `.Core` source change this
+  pass), `AnimationEditor.App.Tests` 990/990 (was 989, +1 new), full
+  `AnimationEditorAvalonia.slnx` build 0 warnings/0 errors.
