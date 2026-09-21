@@ -157,6 +157,77 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Null(pm.AnimationChainListSave);
     }
 
+    // ── Native-tsx / achx-push coexistence (issue #1147) ────────────────────────────
+    // A .tsx cannot be both an achx-push sync target (a .tiledsync association pointing at it)
+    // and a native-tsx project at the same time -- SaveTsxProject's load-time snapshot and
+    // achx-push's stateless-per-save sync would silently fight over the same file (see the
+    // "lost-update" TODO in plan/1147-tsx-sync-hardening/phase-01-bug-sweep.md). Refusing the
+    // combination outright, rather than trying to merge them, is the chosen fix.
+
+    [Fact]
+    public void LoadTsxProject_TsxAlreadyAssociatedViaTiledSync_ThrowsInsteadOfSilentlyCoexisting()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        var achxPath = Path.Combine(_dir.Path, "Hero.achx");
+        File.WriteAllText(achxPath, "<AnimationChainListSave/>");
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath)));
+
+        Assert.Contains("Hero.achx", ex.Message);
+        Assert.False(ctx.ProjectManager.IsNativeTsxProject);
+        // The load never got far enough to touch it -- still the fresh, empty ACLS TestServices set up.
+        Assert.Same(ctx.Acls, ctx.ProjectManager.AnimationChainListSave);
+    }
+
+    [Fact]
+    public void LoadTsxProject_TsxAssociatedFromAchjInstead_ThrowsInsteadOfSilentlyCoexisting()
+    {
+        // Same association mechanism regardless of whether the owning project is .achx or .achj --
+        // AddAssociatedTiledTilesetPath doesn't care, and neither should this guard.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        var achjPath = Path.Combine(_dir.Path, "Hero.achj");
+        File.WriteAllText(achjPath, "{}");
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achjPath, tsxPath);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath)));
+
+        Assert.Contains("Hero.achj", ex.Message);
+    }
+
+    [Fact]
+    public void LoadTsxProject_NoAssociationAnywhere_OpensNormallyAsBefore()
+    {
+        // Happy path guard: an unassociated .tsx must keep opening exactly as before -- the new
+        // scan must not false-positive on a plain tsx with no .tiledsync anywhere near it.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+
+        ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
+
+        Assert.True(ctx.ProjectManager.IsNativeTsxProject);
+    }
+
+    [Fact]
+    public void LoadTsxProject_TiledSyncAssociatesADifferentTsx_OpensNormally()
+    {
+        // A .tiledsync file existing nearby isn't itself a conflict -- only one whose paths
+        // actually resolve to THIS tsx should block the load.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        var otherTsxPath = WriteFixture(PlainFixtureXml, "Villains.tsx");
+        var achxPath = Path.Combine(_dir.Path, "Hero.achx");
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, otherTsxPath);
+
+        ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
+
+        Assert.True(ctx.ProjectManager.IsNativeTsxProject);
+    }
+
     [Fact]
     public void SaveTsxProject_AfterLoad_WritesAnimationBackToTsxFile()
     {
