@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
@@ -72,7 +73,7 @@ namespace AnimationEditor.Core.Models
         /// <summary>
         /// Snapshot of this tab's native-tsx state (see <see cref="IProjectManager.CaptureTsxState"/>),
         /// captured alongside <see cref="CachedEditorModel"/> so a cache-hit tab switch restores
-        /// <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileSize"/>
+        /// <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileGrid"/>
         /// for THIS tab instead of leaving whatever tab was loaded last. Null for an achx/achj tab.
         /// </summary>
         public object? CachedTsxState { get; set; }

@@ -38,4 +38,14 @@ public static class GridPlacementCalculator
         int gy = GridSnapper.Snap(worldY, gridSize);
         return (gx, gy, gx + gridSize, gy + gridSize);
     }
+
+    /// <summary>The <see cref="TileGrid"/> form: the cell containing the point (a click in the
+    /// spacing gap after a cell counts as that cell), sized to the cell alone -- never the gap.</summary>
+    public static (int minX, int minY, int maxX, int maxY) SnapToCell(
+        float worldX, float worldY, TileGrid grid)
+    {
+        int gx = grid.CellLeft(grid.ColumnContaining(worldX));
+        int gy = grid.CellTop(grid.RowContaining(worldY));
+        return (gx, gy, gx + grid.CellWidth, gy + grid.CellHeight);
+    }
 }

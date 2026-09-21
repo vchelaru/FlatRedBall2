@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using Avalonia.Controls;
@@ -85,7 +86,7 @@ public class ActivateUntitledTabTsxStateTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.False(ctx.ProjectManager.IsNativeTsxProject);
-            Assert.Null(ctx.ProjectManager.TsxTileSize);
+            Assert.Null(ctx.ProjectManager.TsxTileGrid);
         }
         finally
         {

@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core;
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
@@ -123,7 +124,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
 
         Assert.True(pm.IsNativeTsxProject);
         Assert.Equal("ID:0", pm.AnimationChainListSave!.AnimationChains.Single().Name);
-        Assert.Equal((16, 16), pm.TsxTileSize);
+        Assert.Equal(new TileGrid(16, 16), pm.TsxTileGrid);
     }
 
     // Duplication sweep: LoadAnimationChain resets ReferencedPngs/OnDiskCoordinateType because
@@ -849,7 +850,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
     // A ProjectManager instance is reused across File > Open calls (it's a single long-lived
     // instance per app window/tab-set, not recreated per file -- see TabSwitchCacheTests). Loading
     // a plain .achx after a native tsx project was open must clear every tsx-specific field, or
-    // IsNativeTsxProject/TsxTileSize keep reporting the *previous* tsx's state even though the
+    // IsNativeTsxProject/TsxTileGrid keep reporting the *previous* tsx's state even though the
     // currently-loaded project is no longer a tsx at all -- and worse, AppCommands.
     // SaveCurrentAnimationChainList branches on IsNativeTsxProject to decide whether to call
     // SaveTsxProject (writing Tiled tileset XML, sourced from the stale _tsxTileset) instead of
@@ -870,7 +871,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
         pm.LoadAnimationChain(new FilePath(achxPath));
 
         Assert.False(pm.IsNativeTsxProject);
-        Assert.Null(pm.TsxTileSize);
+        Assert.Null(pm.TsxTileGrid);
     }
 
     // SaveAnimationChainList(string)/(Stream)/SaveAnimationChainListAsync(Stream) write

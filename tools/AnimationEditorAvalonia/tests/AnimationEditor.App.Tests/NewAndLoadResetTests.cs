@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -171,7 +172,7 @@ public class NewAndLoadResetTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.False(ctx.ProjectManager.IsNativeTsxProject);
-            Assert.Null(ctx.ProjectManager.TsxTileSize);
+            Assert.Null(ctx.ProjectManager.TsxTileGrid);
         }
         finally
         {

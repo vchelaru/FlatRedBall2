@@ -27,4 +27,13 @@ public class GridPlacementCalculatorTests
         var region = GridPlacementCalculator.SnapToCell(33f, 5f, 8);
         Assert.Equal((32, 0, 40, 8), region);
     }
+
+    [Fact]
+    public void SnapToCell_SpacedGridClickInGapAfterCell_ReturnsThatCellWithoutTheGap()
+    {
+        // 16px cells, margin 2, spacing 1: cell 1 is 19..35 and x=35 is the gap after it.
+        var grid = new TileGrid(16, 16, Margin: 2, Spacing: 1);
+        var region = GridPlacementCalculator.SnapToCell(35.5f, 20f, grid);
+        Assert.Equal((19, 19, 35, 35), region);
+    }
 }

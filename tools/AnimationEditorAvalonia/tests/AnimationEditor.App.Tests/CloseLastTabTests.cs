@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
@@ -153,7 +154,7 @@ public class CloseLastTabTests
 
             Assert.Empty(tabManager.Tabs);
             Assert.False(ctx.ProjectManager.IsNativeTsxProject);
-            Assert.Null(ctx.ProjectManager.TsxTileSize);
+            Assert.Null(ctx.ProjectManager.TsxTileGrid);
         }
         finally
         {

@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -108,11 +109,11 @@ namespace AnimationEditor.Core
                     "Cannot save a native tsx project via SaveAnimationChainList -- use SaveTsxProject instead.");
         }
 
-        /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
-        /// project. A native tsx project's grid size is always this -- it is not user-configurable
-        /// (see issue #1140).</summary>
-        public (int Width, int Height)? TsxTileSize =>
-            _tsxTileset is null ? null : (_tsxTileset.TileWidth, _tsxTileset.TileHeight);
+        /// <summary>The tsx's own tile grid (tile size, margin, spacing), or <see langword="null"/>
+        /// for an achx/achj project. A native tsx project's wireframe grid is always this -- it is
+        /// not user-configurable (see issue #1140).</summary>
+        public TileGrid? TsxTileGrid =>
+            _tsxTileset is null ? null : new TileGrid(_tsxTileset.TileWidth, _tsxTileset.TileHeight, _tsxTileset.Margin, _tsxTileset.Spacing);
 
         /// <summary>
         /// The folder explicitly picked via File → Open Project Folder (or restored from

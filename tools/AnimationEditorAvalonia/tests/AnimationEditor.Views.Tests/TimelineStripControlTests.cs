@@ -1,6 +1,7 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
 using Avalonia.Headless.XUnit;
@@ -24,7 +25,7 @@ public class TimelineStripControlTests
         public string? ProjectFolderPath { get; set; }
         public TextureCoordinateType OnDiskCoordinateType { get; set; }
         public bool IsNativeTsxProject => false;
-        public (int Width, int Height)? TsxTileSize => null;
+        public TileGrid? TsxTileGrid => null;
         public void LoadTsxProject(FilePath fileName) { }
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();

@@ -60,6 +60,9 @@ public class WireframeControl : TextureViewport
         public List<(SKRect Bounds, bool IsSelected, float RevealProgress)> Frames = new();
         /// <summary>Mirrors <see cref="WireframeControl.FillFrames"/> (#976).</summary>
         public bool FillFrames = true;
+        /// <summary>Texture-space rect of each tile cell inside a frame on a grid with spacing
+        /// (#1165) -- the pixels Tiled actually draws, gaps excluded.</summary>
+        public List<(SKRect Bounds, bool IsSelected)> FrameCellBounds = new();
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
@@ -86,6 +89,7 @@ public class WireframeControl : TextureViewport
     }
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
+    private static readonly SKColor CellOutlineColor = new(90, 220, 160, 230);
 
     // ── Overlay rendering ─────────────────────────────────────────────────────
 
@@ -127,6 +131,15 @@ public class WireframeControl : TextureViewport
         {
             frameStroke.Color = isSelected ? new SKColor(80, 160, 255, 230) : new SKColor(80, 160, 255, 120);
             canvas.DrawRect(sr, frameStroke);
+        }
+
+        // Per-cell outlines inside spaced-grid frames (#1165): a second colour so the strip of
+        // gap pixels between cells reads as "inside the frame rect, but not part of any tile".
+        // Drawn after the frame strokes so a 1x1 frame's cell edge sits on top of its own outline.
+        foreach (var (bounds, isSelected) in s.FrameCellBounds)
+        {
+            frameStroke.Color = isSelected ? CellOutlineColor : CellOutlineColor.WithAlpha(120);
+            canvas.DrawRect(s.TextureRectToScreen(bounds), frameStroke);
         }
 
         // Hover label (#718): a small screen-space notch anchored at the top-left corner of
@@ -874,11 +887,10 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void SimulateGridSnapClick(float screenX, float screenY)
     {
-        if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
+        if (_bitmap is null || !_showGrid || !_grid.IsValid) return;
         var world = ScreenToTexture(screenX, screenY);
-        int gx = GridSnapper.Snap(world.X, _gridSize);
-        int gy = GridSnapper.Snap(world.Y, _gridSize);
-        FrameCreatedFromRegion?.Invoke(gx, gy, gx + _gridSize, gy + _gridSize);
+        var (gx, gy, gr, gb) = GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
+        FrameCreatedFromRegion?.Invoke(gx, gy, gr, gb);
     }
 
     /// <summary>
@@ -890,7 +902,7 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void SimulateGridSnapDoubleClick(float screenX, float screenY)
     {
-        if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
+        if (_bitmap is null || !_showGrid || !_grid.IsValid) return;
         var world = ScreenToTexture(screenX, screenY);
         SnapSelectedFrameToGridCell(world.X, world.Y);
     }
@@ -904,7 +916,7 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void SimulateGridPlainClick(float screenX, float screenY)
     {
-        if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
+        if (_bitmap is null || !_showGrid || !_grid.IsValid) return;
         var world = ScreenToTexture(screenX, screenY);
         TrySelectFrameAtPoint(world);
     }
@@ -1286,6 +1298,15 @@ public class WireframeControl : TextureViewport
         foreach (var fr in _frameRects)
             snap.Frames.Add((fr.Bounds, fr.IsSelected, GetSelectionRevealProgress(fr.Frame)));
 
+        // Cell outlines inside each frame (issue #1165): on a grid with spacing, a multi-cell
+        // frame's rect includes the gap pixels between its cells, which Tiled never draws.
+        // Outlining each cell shows exactly what will animate; the outer rect keeps its handles
+        // so editing is unchanged. Unaligned rects (mid-edit) get no outlines.
+        if (_showGrid && _grid.Spacing > 0)
+            foreach (var fr in _frameRects)
+                foreach (var cell in _grid.FrameCells(fr.Bounds.Left, fr.Bounds.Top, fr.Bounds.Width, fr.Bounds.Height))
+                    snap.FrameCellBounds.Add((new SKRect(cell.Left, cell.Top, cell.Right, cell.Bottom), fr.IsSelected));
+
         if (_hoverFrame != null)
         {
             snap.HoverFrameBounds = _hoverFrame.Bounds;
@@ -1344,7 +1365,7 @@ public class WireframeControl : TextureViewport
         // Grid mode double-click: bypass handle hit-testing so that a frame covering
         // the entire texture (which would otherwise always hit HandleKind.Move) can still
         // have a specific grid cell applied to it.
-        if (!isCtrl && !_isMagicWandMode && e.ClickCount == 2 && _showGrid && _gridSize > 0 && _bitmap != null)
+        if (!isCtrl && !_isMagicWandMode && e.ClickCount == 2 && _showGrid && _grid.IsValid && _bitmap != null)
         {
             var dblWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
             SnapSelectedFrameToGridCell(dblWorld.X, dblWorld.Y);
@@ -1446,13 +1467,12 @@ public class WireframeControl : TextureViewport
         //    select the frame under the cursor, same as plain mode. Resizing/repositioning
         //    the selected frame onto a grid cell is an explicit gesture (double-click,
         //    issue #363/#895) — a plain click must never silently move or resize it.
-        if (_showGrid && _gridSize > 0)
+        if (_showGrid && _grid.IsValid)
         {
             if (isCtrl)
             {
-                int gx = GridSnapper.Snap(world.X, _gridSize);
-                int gy = GridSnapper.Snap(world.Y, _gridSize);
-                FrameCreatedFromRegion?.Invoke(gx, gy, gx + _gridSize, gy + _gridSize);
+                var (gx, gy, gr, gb) = GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
+                FrameCreatedFromRegion?.Invoke(gx, gy, gr, gb);
             }
             else
                 TrySelectFrameAtPoint(world);
@@ -1776,9 +1796,9 @@ public class WireframeControl : TextureViewport
 
         var nb = DragHandleApplier.Apply(_draggingHandle, dx, dy, startBounds);
 
-        // Always snap to integer pixel; upgrade to grid-size snap when the grid is on.
-        int snapSize = (_showGrid && _gridSize > 0) ? _gridSize : 1;
-        nb = DragHandleApplier.SnapEdges(nb, _draggingHandle, snapSize);
+        // Always snap to integer pixel; upgrade to grid snap when the grid is on.
+        var snapGrid = (_showGrid && _grid.IsValid) ? _grid : TileGrid.Uniform(1);
+        nb = DragHandleApplier.SnapEdges(nb, _draggingHandle, snapGrid);
 
         _draggingRect.Bounds = new SKRect(nb.Left, nb.Top, nb.Right, nb.Bottom);
 
@@ -1799,7 +1819,7 @@ public class WireframeControl : TextureViewport
                 if (fr == _draggingRect) continue;
                 var sb = new BoundsRect(startB.Left, startB.Top, startB.Right, startB.Bottom);
                 var nb2 = DragHandleApplier.Apply(_draggingHandle, dx, dy, sb);
-                nb2 = DragHandleApplier.SnapEdges(nb2, _draggingHandle, snapSize);
+                nb2 = DragHandleApplier.SnapEdges(nb2, _draggingHandle, snapGrid);
                 fr.Bounds = new SKRect(nb2.Left, nb2.Top, nb2.Right, nb2.Bottom);
                 var (l2, t2, r2, b2) = DragHandleApplier.ToUvCoords(nb2, texW, texH);
                 fr.Frame.LeftCoordinate   = l2;
@@ -1822,10 +1842,11 @@ public class WireframeControl : TextureViewport
         float dx = world.X - _dragStartWorld.X;
         float dy = world.Y - _dragStartWorld.Y;
 
-        // Snap to integer pixel; upgrade to grid-size snap when the grid is on.
-        int snapSize = (_showGrid && _gridSize > 0) ? _gridSize : 1;
-        dx = MathF.Round(dx / snapSize) * snapSize;
-        dy = MathF.Round(dy / snapSize) * snapSize;
+        // Snap to integer pixel; upgrade to a whole-cell stride (cell + spacing) when the grid is
+        // on, so a grid-aligned chain stays grid-aligned.
+        var snapGrid = (_showGrid && _grid.IsValid) ? _grid : TileGrid.Uniform(1);
+        dx = MathF.Round(dx / snapGrid.StrideX) * snapGrid.StrideX;
+        dy = MathF.Round(dy / snapGrid.StrideY) * snapGrid.StrideY;
 
         float texW = _bitmap.Width;
         float texH = _bitmap.Height;
@@ -1998,7 +2019,7 @@ public class WireframeControl : TextureViewport
     private void SnapSelectedFrameToGridCell(float worldX, float worldY)
     {
         if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
-        var (minX, minY, maxX, maxY) = GridPlacementCalculator.SnapToCell(worldX, worldY, _gridSize);
+        var (minX, minY, maxX, maxY) = GridPlacementCalculator.SnapToCell(worldX, worldY, _grid);
         ApplyRegionToSelectedFrame(minX, minY, maxX, maxY);
     }
 

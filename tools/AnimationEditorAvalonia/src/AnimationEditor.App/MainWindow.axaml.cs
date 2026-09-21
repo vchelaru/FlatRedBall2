@@ -1366,51 +1366,52 @@ public partial class MainWindow : Window
             return;
         }
 
-        WireframeCtrl.SetGrid(
-            SnapToGridCheck.IsChecked == true,
-            GetGridSizeFromInput());
+        WireframeCtrl.SetGrid(SnapToGridCheck.IsChecked == true, CurrentGrid());
         SaveCompanionFile();
     }
 
     private int GetGridSizeFromInput() => (int)(GridSizeInput.Value ?? 16m);
 
+    /// <summary>The grid the wireframe should snap to: a native tsx project's own tile grid
+    /// (margin/spacing included), else the toolbar's plain square size.</summary>
+    private TileGrid CurrentGrid() => _projectManager.TsxTileGrid ?? TileGrid.Uniform(GetGridSizeFromInput());
+
     /// <summary>
-    /// A native tsx project's grid is fixed to the tsx's own tile size, not user-configurable
-    /// (issue #1140): sets the toolbar grid controls to match and turns snap-to-grid on. Any
-    /// further edit to the size is reverted by <see cref="ApplyGridSize"/>. Deliberately doesn't
-    /// touch <see cref="Avalonia.Controls.Control.IsEnabled"/> on either control -- GridSizeInput's
-    /// IsEnabled is XAML-bound to SnapToGridCheck.IsChecked, and setting it directly here would
-    /// permanently replace that binding with a local value (Avalonia clears an active binding when
-    /// its target property is set imperatively), breaking the enable/disable-by-checkbox behavior
-    /// for every achx/achj project opened afterward. <see
-    /// cref="AnimationEditor.Core.ProjectManager.TsxTileSize"/> only exposes one size because <see
-    /// cref="AnimationEditor.Views.Controls.WireframeControl.SetGrid"/> only takes one -- a
-    /// non-square tsx tile can't be represented by this grid today, same limitation as before this
-    /// feature.
+    /// A native tsx project's grid is fixed to the tsx's own tile grid (tile size, margin,
+    /// spacing), not user-configurable (issue #1140): sets the toolbar grid controls to match and
+    /// turns snap-to-grid on. Any further edit to the size is reverted by <see
+    /// cref="ApplyGridSize"/>. Deliberately doesn't touch <see
+    /// cref="Avalonia.Controls.Control.IsEnabled"/> on either control -- GridSizeInput's IsEnabled
+    /// is XAML-bound to SnapToGridCheck.IsChecked, and setting it directly here would permanently
+    /// replace that binding with a local value (Avalonia clears an active binding when its target
+    /// property is set imperatively), breaking the enable/disable-by-checkbox behavior for every
+    /// achx/achj project opened afterward. The toolbar's single size box shows the tile width; the
+    /// wireframe gets the full grid, so a non-square tile, margin, and spacing all snap correctly
+    /// even though the box can't display them.
     /// </summary>
     private void SyncGridControlsToProject()
     {
-        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileSize is { } tileSize)
+        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileGrid is { } tileGrid)
         {
-            GridSizeInput.Value = tileSize.Width;
+            GridSizeInput.Value = tileGrid.CellWidth;
             SnapToGridCheck.IsChecked = true;
-            WireframeCtrl.SetGrid(true, tileSize.Width);
+            WireframeCtrl.SetGrid(true, tileGrid);
         }
     }
 
     private void ApplyGridSize()
     {
-        // A native tsx project's grid size is fixed to the tsx's own tile size (issue #1140) --
-        // revert any edit rather than applying it.
-        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileSize is { } lockedSize
-            && GetGridSizeFromInput() != lockedSize.Width)
+        // A native tsx project's grid is fixed to the tsx's own tile grid (issue #1140) -- revert
+        // any edit rather than applying it.
+        if (_projectManager.IsNativeTsxProject && _projectManager.TsxTileGrid is { } lockedGrid
+            && GetGridSizeFromInput() != lockedGrid.CellWidth)
         {
-            GridSizeInput.Value = lockedSize.Width;
+            GridSizeInput.Value = lockedGrid.CellWidth;
             return;
         }
 
         if (SnapToGridCheck.IsChecked == true)
-            WireframeCtrl.SetGrid(true, GetGridSizeFromInput());
+            WireframeCtrl.SetGrid(true, CurrentGrid());
         SaveCompanionFile();
     }
 
@@ -1953,7 +1954,7 @@ public partial class MainWindow : Window
         {
             SnapToGridCheck.IsChecked = settings.SnapToGrid;
             GridSizeInput.Value       = settings.GridSize;
-            WireframeCtrl.SetGrid(settings.SnapToGrid, settings.GridSize);
+            WireframeCtrl.SetGrid(settings.SnapToGrid, CurrentGrid());
 
             WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
             PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);

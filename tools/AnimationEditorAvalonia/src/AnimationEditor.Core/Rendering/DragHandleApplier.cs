@@ -88,23 +88,33 @@ public static class DragHandleApplier
     /// when the fixed edge is off-grid, snapping the dragged edge could land it past
     /// the fixed edge and invert the frame.
     /// </remarks>
-    public static BoundsRect SnapEdges(BoundsRect bounds, HandleKind handle, int snapSize)
-    {
-        if (snapSize <= 0) return bounds;
+    public static BoundsRect SnapEdges(BoundsRect bounds, HandleKind handle, int snapSize) =>
+        snapSize <= 0 ? bounds : SnapEdges(bounds, handle, TileGrid.Uniform(snapSize));
 
-        float Snap(float v) => MathF.Round(v / snapSize) * snapSize;
+    /// <summary>
+    /// The <see cref="TileGrid"/> form of <see cref="SnapEdges(BoundsRect, HandleKind, int)"/>:
+    /// a left/top edge snaps to the nearest cell start and a right/bottom edge to the nearest
+    /// cell end, so on a grid with spacing a resize lands on the far side of a cell (the gap
+    /// stays outside the frame's edge, inside only between cells).
+    /// </summary>
+    public static BoundsRect SnapEdges(BoundsRect bounds, HandleKind handle, TileGrid grid)
+    {
+        if (!grid.IsValid) return bounds;
 
         float l = bounds.Left, t = bounds.Top, r = bounds.Right, b = bounds.Bottom;
 
         if (handle == HandleKind.Move)
+        {
             // Preserve size; snap top-left corner only.
-            return new BoundsRect(Snap(l), Snap(t), Snap(l) + (r - l), Snap(t) + (b - t));
+            float sl = grid.SnapStartX(l), st = grid.SnapStartY(t);
+            return new BoundsRect(sl, st, sl + (r - l), st + (b - t));
+        }
 
         var (dl, dr, dt, db) = DraggedEdges(handle);
-        if (dl) l = Snap(l);
-        if (dr) r = Snap(r);
-        if (dt) t = Snap(t);
-        if (db) b = Snap(b);
+        if (dl) l = grid.SnapStartX(l);
+        if (dr) r = grid.SnapEndX(r);
+        if (dt) t = grid.SnapStartY(t);
+        if (db) b = grid.SnapEndY(b);
 
         // A snap can land the dragged edge past the (possibly off-grid) fixed edge —
         // clamp it so the frame collapses to 1px instead of inverting.

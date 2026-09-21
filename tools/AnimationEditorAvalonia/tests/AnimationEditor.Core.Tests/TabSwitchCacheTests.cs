@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
@@ -156,7 +157,7 @@ public class TabSwitchCacheTests : IDisposable
         }
 
         public bool IsNativeTsxProject => _inner.IsNativeTsxProject;
-        public (int Width, int Height)? TsxTileSize => _inner.TsxTileSize;
+        public TileGrid? TsxTileGrid => _inner.TsxTileGrid;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();

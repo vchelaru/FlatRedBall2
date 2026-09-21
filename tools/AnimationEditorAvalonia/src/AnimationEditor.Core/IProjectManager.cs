@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -26,7 +27,7 @@ namespace AnimationEditor.Core
 
         /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
         /// project. Not user-configurable for a native tsx project (issue #1140).</summary>
-        (int Width, int Height)? TsxTileSize { get; }
+        TileGrid? TsxTileGrid { get; }
 
         void LoadAnimationChain(
             FilePath fileName,
@@ -55,7 +56,7 @@ namespace AnimationEditor.Core
         /// cref="AnimationEditor.Core.Models.TabEditorCache"/> uses this to round-trip a tab's tsx
         /// identity across a cache-hit tab switch (<c>TryActivateTabFromCache</c>) -- that path
         /// never calls <see cref="LoadTsxProject"/>/<see cref="LoadAnimationChain"/>, so without
-        /// this, <see cref="IsNativeTsxProject"/>/<see cref="TsxTileSize"/> keep reflecting
+        /// this, <see cref="IsNativeTsxProject"/>/<see cref="TsxTileGrid"/> keep reflecting
         /// whichever tab was most recently loaded from disk instead of the tab being switched to.
         /// </summary>
         object? CaptureTsxState();

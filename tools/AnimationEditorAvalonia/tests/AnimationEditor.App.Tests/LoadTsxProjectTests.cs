@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -106,7 +107,7 @@ public class LoadTsxProjectTests
     }
 
     [AvaloniaFact]
-    public void LoadAnimationFileAsync_TsxFile_ForcesGridSizeToTsxTileSizeAndLocksSnapToGrid()
+    public void LoadAnimationFileAsync_TsxFile_ForcesGridSizeToTsxTileGridAndLocksSnapToGrid()
     {
         var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -135,6 +136,39 @@ public class LoadTsxProjectTests
             snapToGridCheck.IsChecked = false;
             Dispatcher.UIThread.RunJobs();
             Assert.True(snapToGridCheck.IsChecked);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void LoadAnimationFileAsync_TsxFileWithMarginAndSpacing_WireframeGridCarriesBothAndSurvivesSnapToggle()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var path = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(path, TsxFixtureXml.Replace("tilecount=\"16\"", "margin=\"2\" spacing=\"1\" tilecount=\"16\""));
+
+            typeof(MainWindow)
+                .GetMethod("LoadAnimationFileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, [path, false]);
+            Dispatcher.UIThread.RunJobs();
+
+            var wireframe = window.FindControl<AnimationEditor.App.Controls.WireframeControl>("WireframeCtrl")!;
+            var expected = new TileGrid(16, 16, Margin: 2, Spacing: 1);
+            Assert.Equal(expected, wireframe.Grid);
+
+            // The snap-to-grid revert re-applies the grid; it must not collapse to a plain 16px one.
+            var snapToGridCheck = window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("SnapToGridCheck")!;
+            snapToGridCheck.IsChecked = false;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(expected, wireframe.Grid);
         }
         finally
         {

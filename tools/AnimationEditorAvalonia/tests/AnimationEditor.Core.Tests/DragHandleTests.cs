@@ -367,6 +367,27 @@ public class DragHandleApplierTests
     }
 
     [Fact]
+    public void SnapEdges_SpacedGridMidRight_SnapsRightEdgeToCellEndNotNextCellStart()
+    {
+        // 16px cells, margin 2, spacing 1: cell 1 is 19..35, cell 2 is 36..52. A right edge at
+        // 34 must land on 35 (cell 1's end), which is where the gap starts -- not on 36.
+        var grid = new TileGrid(16, 16, Margin: 2, Spacing: 1);
+        var input = new BoundsRect(19f, 2f, 34f, 18f);
+        var result = DragHandleApplier.SnapEdges(input, HandleKind.MidRight, grid);
+        Assert.Equal(35f, result.Right);
+        Assert.Equal(19f, result.Left);
+    }
+
+    [Fact]
+    public void SnapEdges_SpacedGridMove_SnapsTopLeftToCellStartAndPreservesSize()
+    {
+        var grid = new TileGrid(16, 16, Margin: 2, Spacing: 1);
+        var input = new BoundsRect(21f, 4f, 54f, 20f);
+        var result = DragHandleApplier.SnapEdges(input, HandleKind.Move, grid);
+        Assert.Equal(new BoundsRect(19f, 2f, 52f, 18f), result);
+    }
+
+    [Fact]
     public void SnapEdges_SnapSizeZeroOrNegative_ReturnsUnchanged()
     {
         var input = new BoundsRect(20.7f, 30.3f, 80.7f, 100.3f);

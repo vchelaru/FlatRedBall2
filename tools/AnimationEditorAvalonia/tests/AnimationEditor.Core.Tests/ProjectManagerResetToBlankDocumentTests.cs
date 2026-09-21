@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -45,7 +46,7 @@ public class ProjectManagerResetToBlankDocumentTests : IDisposable
         pm.ResetToBlankDocument();
 
         Assert.False(pm.IsNativeTsxProject);
-        Assert.Null(pm.TsxTileSize);
+        Assert.Null(pm.TsxTileGrid);
         Assert.NotNull(pm.AnimationChainListSave);
         Assert.Empty(pm.AnimationChainListSave!.AnimationChains);
         Assert.Null(pm.FileName);

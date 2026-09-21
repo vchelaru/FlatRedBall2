@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
@@ -16,7 +17,7 @@ namespace AnimationEditor.Core.Tests;
 /// plan/1147-tsx-sync-hardening/phase-01-bug-sweep.md's TODO: a cache-hit tab switch
 /// (<see cref="AnimationEditor.Core.CommandsAndState.AppCommands.TryActivateTabFromCache"/>)
 /// never went through <c>LoadTsxProject</c>/<c>LoadAnimationChain</c>, so it couldn't restore or
-/// clear <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileSize"/>
+/// clear <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileGrid"/>
 /// -- those kept reflecting whichever tab was *live-loaded* last, not the tab actually being
 /// switched to.
 /// </summary>
@@ -73,10 +74,10 @@ public class TabSwitchCacheTsxTests : IDisposable
         _ctx.AppCommands.CaptureTabEditorState(achxTab);
 
         // The reported bug: switching back to the tsx tab via the cache path must restore
-        // IsNativeTsxProject/TsxTileSize for THIS tab, not leave whatever the achx tab left behind.
+        // IsNativeTsxProject/TsxTileGrid for THIS tab, not leave whatever the achx tab left behind.
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tsxTab));
         Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
-        Assert.Equal((16, 16), _ctx.ProjectManager.TsxTileSize);
+        Assert.Equal(new TileGrid(16, 16), _ctx.ProjectManager.TsxTileGrid);
 
         // A save against the cache-restored tab must act on THIS tab's tileset, not no-op
         // against stale/cleared state -- prove it by making an edit and confirming it lands.
@@ -91,7 +92,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         // cache-restore just set -- not leak it forward either.
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(achxTab));
         Assert.False(_ctx.ProjectManager.IsNativeTsxProject);
-        Assert.Null(_ctx.ProjectManager.TsxTileSize);
+        Assert.Null(_ctx.ProjectManager.TsxTileGrid);
     }
 
     // Every prior tab-switch-cache test in this sweep pairs one tsx tab with one achx tab. This
@@ -163,11 +164,11 @@ public class TabSwitchCacheTsxTests : IDisposable
         // clear the tsx state the (live-loaded) tsx tab left behind, not report it as still native-tsx.
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(achxTab));
         Assert.False(_ctx.ProjectManager.IsNativeTsxProject);
-        Assert.Null(_ctx.ProjectManager.TsxTileSize);
+        Assert.Null(_ctx.ProjectManager.TsxTileGrid);
 
         // And switching back onward to the tsx tab must restore it correctly.
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tsxTab));
         Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
-        Assert.Equal((16, 16), _ctx.ProjectManager.TsxTileSize);
+        Assert.Equal(new TileGrid(16, 16), _ctx.ProjectManager.TsxTileGrid);
     }
 }
