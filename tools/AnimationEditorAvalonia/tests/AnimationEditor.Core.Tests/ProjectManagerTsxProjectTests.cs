@@ -267,6 +267,125 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.True(tileSix is null || tileSix.Animation.Count == 0);
     }
 
+    // The frame-level sibling of the DeleteChainsCommand case above. DeleteFramesCommand.Do()
+    // clears every frame from a chain but leaves the AnimationChainSave object itself in
+    // AnimationChainListSave -- unlike DeleteChainsCommand, the chain is never absent from the
+    // ACLS, so the "carry the hint forward for an absent chain" fix above doesn't apply here.
+    // DeleteFramesCommand.Undo() re-inserts the exact same AnimationFrameSave objects at their
+    // original indices. A subsequent save with those same objects must restore the chain to its
+    // original tile (5), not recompute from frame[0] (6).
+    [Fact]
+    public void SaveTsxProject_DeleteFramesThenUndoWithSameFrameObjectsAndSave_RestoresOriginalTileInsteadOfRelocating()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        Assert.Equal("RiseUp", chain.Name);
+        var originalFrames = chain.Frames.ToArray();
+
+        // DeleteFramesCommand.Do(): clear every frame; the chain object itself stays put.
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        var afterDelete = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var clearedTile = afterDelete.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.True(clearedTile is null || clearedTile.Animation.Count == 0);
+
+        // DeleteFramesCommand.Undo(): re-insert the EXACT SAME frame objects at their original indices.
+        foreach (var frame in originalFrames)
+            chain.Frames.Add(frame);
+        pm.SaveTsxProject();
+
+        var afterUndo = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = afterUndo.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var tileSix = afterUndo.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.True(tileSix is null || tileSix.Animation.Count == 0);
+    }
+
+    // DeleteFramesCommand.Redo() re-removes the exact same frame objects a subsequent Undo just
+    // restored -- same object-reference stability as Undo, so the whole Do/Undo/Redo/Undo cycle
+    // must keep landing back on tile 5, not just a single Do/Undo round trip.
+    [Fact]
+    public void SaveTsxProject_DeleteFramesUndoRedoUndoCycleWithSameFrameObjects_RestoresOriginalTileEveryTime()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        var originalFrames = chain.Frames.ToArray();
+
+        // Do().
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        // Undo().
+        foreach (var frame in originalFrames)
+            chain.Frames.Add(frame);
+        pm.SaveTsxProject();
+
+        // Redo(): same object references removed again.
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        var afterRedo = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var clearedAfterRedo = afterRedo.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.True(clearedAfterRedo is null || clearedAfterRedo.Animation.Count == 0);
+
+        // Undo() again: same object references restored again.
+        foreach (var frame in originalFrames)
+            chain.Frames.Add(frame);
+        pm.SaveTsxProject();
+
+        var afterSecondUndo = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = afterSecondUndo.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // The mirror-image guarantee: if the user clears every frame and then genuinely re-authors
+    // the chain with brand-new frame content (different AnimationFrameSave objects, different
+    // geometry) instead of undoing, the dormant tile-5 hint from the delete above must NOT be
+    // reused -- this must compute a fresh entry tile id from the new geometry, same as
+    // SaveTsxProject_AllFramesDeletedFromChain_ClearsPreviouslyOwnedTileAndDoesNotStickOnResave
+    // but against an owner-not-first-frame fixture, so a frame-sequence-based fix can't
+    // accidentally satisfy this case by coincidence (e.g. an owner tile id that happens to equal
+    // frame[0]'s id).
+    [Fact]
+    public void SaveTsxProject_DeleteFramesThenReauthorWithDifferentFrameObjectsAndSave_ComputesFreshTileNotStaleDormantHint()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+
+        // DeleteFramesCommand.Do().
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        // Re-author with brand-new frame content (row 1, column 0 -> tile id 4) instead of undoing.
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png",
+            LeftCoordinate = 0f, RightCoordinate = 0.25f,
+            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            FrameLength = 0.1f,
+        });
+
+        pm.SaveTsxProject();
+
+        var afterResave = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal((uint)4, EntryTileIdNamed(afterResave, "RiseUp"));
+        var tileFive = afterResave.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.True(tileFive is null || tileFive.Animation.Count == 0);
+    }
+
     // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at
     // the new path -- via TsxWriter's full-rewrite branch, since a brand-new path never satisfies
     // TsxWriter.Write's `File.Exists(path)` patch-mode gate -- and must leave the file the project
