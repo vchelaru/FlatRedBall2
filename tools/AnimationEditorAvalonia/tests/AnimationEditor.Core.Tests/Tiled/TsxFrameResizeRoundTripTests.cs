@@ -177,17 +177,52 @@ public class TsxFrameResizeRoundTripTests : IDisposable
         }
     }
 
+    /// <summary>Every way a user can drag the frame rect, as (dLeft, dTop, dRight, dBottom) in
+    /// whole tiles, and the owner tile an origin-following chain ends up on. Edges, corners
+    /// (two edges at once), and whole-rect moves (all four edges by the same amount). Only a
+    /// left/top change moves the origin cell; right/bottom-only changes leave the owner at 5.</summary>
+    public static TheoryData<string, int, int, int, int, uint> EdgeMoves => new()
+    {
+        { "grow left", -1, 0, 0, 0, 4u },
+        { "shrink left", 1, 0, 0, 0, 6u },
+        { "grow top", 0, -1, 0, 0, 1u },
+        { "shrink top", 0, 1, 0, 0, 9u },
+        { "grow right", 0, 0, 1, 0, 5u },
+        { "shrink right", 0, 0, -1, 0, 5u },
+        { "grow bottom", 0, 0, 0, 1, 5u },
+        { "shrink bottom", 0, 0, 0, -1, 5u },
+        { "grow top-left corner", -1, -1, 0, 0, 0u },
+        { "shrink top-left corner", 1, 1, 0, 0, 10u },
+        { "grow top-right corner", 0, -1, 1, 0, 1u },
+        { "shrink top-right corner", 0, 1, -1, 0, 9u },
+        { "grow bottom-left corner", -1, 0, 0, 1, 4u },
+        { "shrink bottom-left corner", 1, 0, 0, -1, 6u },
+        { "grow bottom-right corner", 0, 0, 1, 1, 5u },
+        { "shrink bottom-right corner", 0, 0, -1, -1, 5u },
+        { "move left", -1, 0, -1, 0, 4u },
+        { "move right", 1, 0, 1, 0, 6u },
+        { "move up", 0, -1, 0, -1, 1u },
+        { "move down", 0, 1, 0, 1, 9u },
+        { "move down-right", 1, 1, 1, 1, 10u },
+    };
+
+    /// <summary><see cref="EdgeMoves"/> without the owner column, for the chain whose owner
+    /// never moves.</summary>
+    public static TheoryData<string, int, int, int, int> EdgeMovesOnly
+    {
+        get
+        {
+            var data = new TheoryData<string, int, int, int, int>();
+            foreach (var row in EdgeMoves)
+                data.Add((string)row[0], (int)row[1], (int)row[2], (int)row[3], (int)row[4]);
+            return data;
+        }
+    }
+
     // Left/top moves relocate frame 0's origin cell, so the owner follows it; right/bottom never
     // move the origin, so the owner stays at 5.
     [Theory]
-    [InlineData("grow left", -1, 0, 0, 0, 4u)]
-    [InlineData("shrink left", 1, 0, 0, 0, 6u)]
-    [InlineData("grow top", 0, -1, 0, 0, 1u)]
-    [InlineData("shrink top", 0, 1, 0, 0, 9u)]
-    [InlineData("grow right", 0, 0, 1, 0, 5u)]
-    [InlineData("shrink right", 0, 0, -1, 0, 5u)]
-    [InlineData("grow bottom", 0, 0, 0, 1, 5u)]
-    [InlineData("shrink bottom", 0, 0, 0, -1, 5u)]
+    [MemberData(nameof(EdgeMoves))]
     public void Resize_AutoDerivedChain_RoundTripsWithOwnerAtFrameZeroOrigin(string _, int dLeft, int dTop, int dRight, int dBottom, uint expectedEntryTileId)
     {
         var pm = new ProjectManager();
@@ -207,14 +242,7 @@ public class TsxFrameResizeRoundTripTests : IDisposable
     // follows the origin exactly like an auto-derived chain -- even though the file, not us,
     // authored the hint.
     [Theory]
-    [InlineData("grow left", -1, 0, 0, 0, 4u)]
-    [InlineData("shrink left", 1, 0, 0, 0, 6u)]
-    [InlineData("grow top", 0, -1, 0, 0, 1u)]
-    [InlineData("shrink top", 0, 1, 0, 0, 9u)]
-    [InlineData("grow right", 0, 0, 1, 0, 5u)]
-    [InlineData("shrink right", 0, 0, -1, 0, 5u)]
-    [InlineData("grow bottom", 0, 0, 0, 1, 5u)]
-    [InlineData("shrink bottom", 0, 0, 0, -1, 5u)]
+    [MemberData(nameof(EdgeMoves))]
     public void Resize_LoadedChainWithOwnerAtOrigin_RoundTripsWithOwnerAtFrameZeroOrigin(string _, int dLeft, int dTop, int dRight, int dBottom, uint expectedEntryTileId)
     {
         var pm = new ProjectManager();
@@ -232,14 +260,7 @@ public class TsxFrameResizeRoundTripTests : IDisposable
     // moves it, and any satellite a grow adds must sit next to the OWNER (where the loader looks
     // for it), not at the frame's physical cell.
     [Theory]
-    [InlineData("grow left", -1, 0, 0, 0)]
-    [InlineData("shrink left", 1, 0, 0, 0)]
-    [InlineData("grow top", 0, -1, 0, 0)]
-    [InlineData("shrink top", 0, 1, 0, 0)]
-    [InlineData("grow right", 0, 0, 1, 0)]
-    [InlineData("shrink right", 0, 0, -1, 0)]
-    [InlineData("grow bottom", 0, 0, 0, 1)]
-    [InlineData("shrink bottom", 0, 0, 0, -1)]
+    [MemberData(nameof(EdgeMovesOnly))]
     public void Resize_LoadedChainWithUnrelatedOwner_RoundTripsWithOwnerUnchanged(string _, int dLeft, int dTop, int dRight, int dBottom)
     {
         var pm = new ProjectManager();
@@ -272,12 +293,17 @@ public class TsxFrameResizeRoundTripTests : IDisposable
                <property name="Cost" type="int" value="7"/>
               </properties>
              </tile>
+             <tile id="9">
+              <properties>
+               <property name="Cost" type="int" value="2"/>
+              </properties>
+             </tile>
             </tileset>
             """);
         pm.LoadTsxProject(new FilePath(path));
         var chain = NewBaseChain("Hero");
         pm.AnimationChainListSave!.AnimationChains.Add(chain);
-        pm.SaveTsxProject(); // owner tile 5
+        pm.SaveTsxProject(); // owner tile 5, satellites 6, 9, 10
 
         Resize(chain, dLeft: 1, dTop: 0, dRight: 0, dBottom: 0);
         pm.SaveTsxProject();
@@ -293,5 +319,185 @@ public class TsxFrameResizeRoundTripTests : IDisposable
         Assert.Equal([((uint)6, 100), ((uint)18, 100)], claimed.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal(7, claimed.GetProperty<IntProperty>("Cost").Value);
         Assert.Equal("Hero", claimed.GetProperty<StringProperty>("Name").Value);
+
+        // The vacated satellite loses its animation and ParentId, nothing else.
+        var vacatedSatellite = tileset.Tiles.Single(t => t.ID == 9);
+        Assert.Empty(vacatedSatellite.Animation);
+        Assert.Equal(["Cost"], vacatedSatellite.Properties.Select(p => p.Name));
+        Assert.Equal(2, vacatedSatellite.GetProperty<IntProperty>("Cost").Value);
+    }
+
+    // A transfer must be reversible: a resize followed by its Undo (the rect put back exactly)
+    // lands the owner and every satellite back on the tiles they started on.
+    [Fact]
+    public void Resize_GrowLeftThenRevert_OwnerReturnsToOriginalTile()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        Resize(chain, dLeft: -1, dTop: 0, dRight: 0, dBottom: 0);
+        pm.SaveTsxProject(); // owner tile 4
+        Resize(chain, 0, 0, 0, 0);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 5);
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 4);
+        Assert.Equal([5u, 6u, 9u, 10u], tileset.Tiles.Where(t => t.Animation.Count > 0).Select(t => t.ID));
+    }
+
+    // Half-way through a drag only frame 0 has the new rect (or a command resized one frame
+    // without its siblings). That save can't map the chain, so it must leave the file and the
+    // owner alone and report it; the transfer happens on the save where the siblings match.
+    [Fact]
+    public void Resize_OnlyFrameZeroGrownLeft_WarnsAndKeepsOwnerUntilSiblingsMatch()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        SetGridRect(chain.Frames[0], colStart: 0, colEnd: 3, rowStart: 1, rowEnd: 3);
+        var warnings = pm.SaveTsxProject();
+
+        Assert.Contains("Hero", Assert.Single(warnings));
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)5, 100), ((uint)17, 100)], tileset.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 4);
+
+        SetGridRect(chain.Frames[1], colStart: 0, colEnd: 3, rowStart: 4, rowEnd: 6);
+        Assert.Empty(pm.SaveTsxProject());
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 4);
+    }
+
+    // The tile the origin moves onto can already be another chain's owner. Two animations can't
+    // share a tile, so the save refuses (same as any other geometry collision) and the file keeps
+    // its pre-edit content instead of one chain silently swallowing the other.
+    [Fact]
+    public void Resize_GrowLeftOntoAnotherChainsOwnerTile_ThrowsAndLeavesFileUntouched()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var hero = NewBaseChain("Hero");
+        var other = new AnimationChainSave { Name = "Other" };
+        other.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f });
+        other.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f });
+        SetGridRect(other.Frames[0], colStart: 0, colEnd: 1, rowStart: 1, rowEnd: 2); // tile 4
+        SetGridRect(other.Frames[1], colStart: 0, colEnd: 1, rowStart: 4, rowEnd: 5); // tile 16
+        pm.AnimationChainListSave!.AnimationChains.Add(hero);
+        pm.AnimationChainListSave.AnimationChains.Add(other);
+        pm.SaveTsxProject(); // Hero owns 5, Other owns 4
+
+        Resize(hero, dLeft: -1, dTop: 0, dRight: 0, dBottom: 0); // Hero's origin now wants 4
+
+        var ex = Assert.Throws<InvalidOperationException>(() => pm.SaveTsxProject());
+        Assert.Contains("Hero", ex.Message);
+        Assert.Contains("Other", ex.Message);
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)5, 100), ((uint)17, 100)], tileset.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal([((uint)4, 100), ((uint)16, 100)], tileset.Tiles.Single(t => t.ID == 4).Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // Resizing one chain never touches another chain's tiles.
+    [Fact]
+    public void Resize_OneOfTwoChains_OtherChainKeepsItsTiles()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var hero = NewBaseChain("Hero");
+        var other = new AnimationChainSave { Name = "Other" };
+        other.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f });
+        SetGridRect(other.Frames[0], colStart: 0, colEnd: 2, rowStart: 8, rowEnd: 9); // tiles 32, 33
+        pm.AnimationChainListSave!.AnimationChains.Add(hero);
+        pm.AnimationChainListSave.AnimationChains.Add(other);
+        pm.SaveTsxProject();
+
+        Resize(hero, dLeft: 1, dTop: 0, dRight: 0, dBottom: 0);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, hero, expectedEntryTileId: 6);
+        AssertRoundTrip(path, other, expectedEntryTileId: 32);
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)33, 100)], tileset.Tiles.Single(t => t.ID == 33).Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // Moving a frame other than frame 0 changes what the tiles animate, not which tiles own it.
+    [Fact]
+    public void Resize_MoveOnlyFrameOne_OwnerStays()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        SetGridRect(chain.Frames[1], colStart: 0, colEnd: 2, rowStart: 7, rowEnd: 9); // origin 28
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 5);
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)5, 100), ((uint)28, 100)], tileset.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // Deleting every frame parks the owner as a dormant hint; Undo re-inserts the same frame
+    // objects and revives it. The revived owner is still frame 0's cell, so it must still follow
+    // that cell on a later resize instead of having forgotten where it came from.
+    [Fact]
+    public void Resize_AfterAllFramesDeletedAndRestored_OwnerStillFollowsOrigin()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        var frames = chain.Frames.ToArray();
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+        chain.Frames.AddRange(frames);
+        pm.SaveTsxProject(); // revived on tile 5
+
+        Resize(chain, dLeft: 1, dTop: 0, dRight: 0, dBottom: 0);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 6);
+    }
+
+    // Switching tabs parks the whole tsx state (TabEditorCache) and restores it later; the
+    // origin tracking must survive that round trip like every other hint does.
+    [Fact]
+    public void Resize_AfterTsxStateCapturedAndRestored_OwnerStillFollowsOrigin()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        var acls = pm.AnimationChainListSave!;
+        acls.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        var parked = pm.CaptureTsxState();
+        var otherPath = Path.Combine(_dir.Path, "Other.tsx");
+        File.WriteAllText(otherPath, EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(otherPath));
+        pm.AnimationChainListSave = acls;
+        pm.FileName = path;
+        pm.RestoreTsxState(parked);
+
+        Resize(chain, dLeft: 1, dTop: 0, dRight: 0, dBottom: 0);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 6);
     }
 }
