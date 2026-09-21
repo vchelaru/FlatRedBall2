@@ -2321,3 +2321,36 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.
   The tsx path itself came back clean; the find was outside it, so this counts as an empty pass
   for the sweep's own stop condition (one of two).
+
+- [x] **Fresh-eyes pass #24 -- the Browser (WASM) build against everything the sweep added.
+  Nothing new.** Traced rather than driven (the Playwright drive needs the app launched, which
+  this sweep doesn't do; `scripts/run-browser-ui-drive.ps1` is the smoke if wanted):
+  - The tsx-sync subsystem is absent from the Browser by design, not by accident:
+    `BrowserIoManager.GetAssociatedTiledTilesetPaths` always returns empty (the association is
+    stored in the `.tiledsync` companion so a later desktop open syncs it), so
+    `SyncAssociatedTiledTilesets` is a no-op; there is no tsx open path; `AppCommands.
+    HotReloadWatcher` stays `NullHotReloadWatcher` so the own-save hash and stale-on-disk guard
+    never engage; `WriteRecoveryFile` is a no-op, so pass #23's "event path also writes the
+    recovery snapshot" change is inert there.
+  - Of the events this sweep added, only `SaveFailed` applies and it is wired (toast, #1159).
+    `TsxSaveCompletedWithWarnings`/`HotReloadFailed` have nothing to fire for.
+  - Pre-existing oddity, outside this subsystem, noted not fixed: the Browser sets
+    `ProjectManager.FileName` to the achx's bare name as a logical identity, so the shared
+    autosave writes a phantom copy into the WASM virtual filesystem on every edit while the real
+    save goes through the File System Access API. Harmless (in-memory), but since #1159 a
+    failure of that phantom write would surface as an "Auto save failed" toast for a save the
+    user never asked for. Worth a separate issue if it ever shows up.
+  **Second consecutive pass with nothing new in the subsystem (#23 was clean on the tsx path;
+  its find was project-wide). Stop condition met.**
+
+## Outcome
+
+Sweep closed after 24 passes. Beyond the original identity fix (#1148), the sweep's later
+passes landed: sibling footprint propagation on every size-changing path (#1155, #1158);
+entry-tile ownership transfer with owner-relative satellites and load seeding (#1157); the
+autosave-failure reason (#1159); lossy-data warnings and command-level gating for achx-only data
+in a tsx (#1160, #1168); Tiled 1.9 tile classes and unmodelled root attributes surviving a save,
+margin/spacing and image-collection tilesets refused by name, validator range checks (#1161,
+#1162); the stale-on-disk guard and content-hashed own-save detection for Tiled coexistence
+(#1164, #1166); colliding fresh claims yielding instead of failing the save (#1167); and one save
+per edit instead of two (#1169). Open follow-up: #1165 (margin/spacing support).
