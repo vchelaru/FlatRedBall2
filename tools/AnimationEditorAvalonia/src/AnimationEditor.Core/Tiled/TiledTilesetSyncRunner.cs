@@ -46,7 +46,7 @@ public static class TiledTilesetSyncRunner
         {
             try
             {
-                var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(tsxPath);
+                var tileset = TsxLoader.LoadTileset(tsxPath);
                 var tilesetInfo = BuildTilesetInfo(tileset);
                 var sourceLabel = new FilePath(achxFilePath).RelativeTo(new FilePath(tsxPath).GetDirectoryContainingThis());
 

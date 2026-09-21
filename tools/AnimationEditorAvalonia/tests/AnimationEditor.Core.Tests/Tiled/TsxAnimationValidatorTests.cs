@@ -238,6 +238,26 @@ public class TsxAnimationValidatorTests
         Assert.Contains("does not reference an animated tile", issue.Message);
     }
 
+    // Fresh-eyes pass #18: a hand-edited frame past the tileset's tile count loads as a rect
+    // outside the image and can never be saved (MultiTileToTiledAnimationMapper skips the chain),
+    // with nothing at open time saying why.
+    [Fact]
+    public void Validate_FrameReferencesTileBeyondTileCount_ReturnsIssue()
+    {
+        var tileset = TilesetWithColumns(4); // 64 tiles
+        var anchor = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        anchor.Animation.Add(new Frame { TileID = 64, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)8, issue.AnchorTileId);
+        Assert.Contains("64", issue.Message);
+        Assert.Contains("tile count", issue.Message);
+    }
+
     [Fact]
     public void Validate_TilesetHasDuplicateAnimatedTileIds_ThrowsClearErrorInsteadOfRawDictionaryException()
     {

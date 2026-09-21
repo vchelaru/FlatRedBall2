@@ -55,6 +55,25 @@ public class TsxCompatibilityCheckerTests
         Assert.Null(blockingReason);
     }
 
+    // Fresh-eyes pass #18: TiledAnimationToAchjMapper places tile N at col*tilewidth, and the
+    // native-tsx save path never passes Margin/Spacing to the mapper either, so a tileset with
+    // either opened fine but showed every frame rect shifted off its real pixels (tile 1 of a
+    // 16px, margin 1, spacing 1 sheet starts at x=18, not 16). The achx-push path already refuses
+    // such a tileset per chain; opening natively must refuse up front for the same reason.
+    [Theory]
+    [InlineData("margin=\"1\"", "margin")]
+    [InlineData("spacing=\"1\"", "spacing")]
+    public void CheckOpenCompatibility_TilesetWithMarginOrSpacing_ReturnsBlockingReason(string attribute, string expectedWord)
+    {
+        var xml = PlainFixtureXml.Replace("tilecount=\"16\"", $"{attribute} tilecount=\"16\"");
+        var tileset = Loader.Default().LoadTileset(WriteFixture(xml, "Heroes.tsx"));
+
+        var canOpen = TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason);
+
+        Assert.False(canOpen);
+        Assert.Contains(expectedWord, blockingReason);
+    }
+
     [Fact]
     public void CheckOpenCompatibility_TilesetWithWangsets_ReturnsBlockingReason()
     {

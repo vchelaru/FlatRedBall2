@@ -56,7 +56,7 @@ fix per item, until no more plausible gaps remain.
 
 | Phase | Document | Status |
 |---|---|---|
-| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (passes #15-#17 each found one; still not two empty passes in a row) |
+| 1 | [Bug sweep](1147-tsx-sync-hardening/phase-01-bug-sweep.md) | In progress (passes #15-#18 all found something; #18 found two real losses on the load side) |
 
 ### [AnimationEditorCommon: renderer-agnostic .achx runtime](934-animationeditorcommon/)
 

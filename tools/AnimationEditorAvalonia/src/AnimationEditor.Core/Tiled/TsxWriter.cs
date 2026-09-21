@@ -41,11 +41,19 @@ public static class TsxWriter
         if (File.Exists(path) && TryWritePatched(tileset, path))
             return;
 
+        // The full rewrite regenerates the root element from the DotTiled model, which has no
+        // slot for every attribute Tiled can put there (backgroundcolor, for one). The patch path
+        // keeps the original root text verbatim, so this only matters when patching wasn't
+        // possible -- carry those attributes over from the file rather than drop them.
+        var extraRootAttributes = File.Exists(path) ? ReadUnmodelledRootAttributes(path) : [];
+
         using var stream = File.Create(path);
-        Write(tileset, stream);
+        Write(tileset, stream, extraRootAttributes);
     }
 
-    public static void Write(Tileset tileset, Stream stream)
+    public static void Write(Tileset tileset, Stream stream) => Write(tileset, stream, []);
+
+    private static void Write(Tileset tileset, Stream stream, IReadOnlyList<(string Name, string Value)> extraRootAttributes)
     {
         var settings = new XmlWriterSettings
         {
@@ -55,8 +63,36 @@ public static class TsxWriter
         };
         using var writer = XmlWriter.Create(stream, settings);
         writer.WriteStartDocument();
-        WriteTileset(writer, tileset);
+        WriteTileset(writer, tileset, extraRootAttributes);
         writer.WriteEndDocument();
+    }
+
+    /// <summary>Every attribute the writer itself emits on &lt;tileset&gt;; anything else found on
+    /// an existing file's root is unknown to the DotTiled model and must be copied through.</summary>
+    private static readonly HashSet<string> ModelledRootAttributes = new(StringComparer.Ordinal)
+    {
+        "version", "tiledversion", "name", "class", "tilewidth", "tileheight", "spacing", "margin",
+        "tilecount", "columns", "objectalignment", "tilerendersize", "fillmode",
+    };
+
+    private static IReadOnlyList<(string Name, string Value)> ReadUnmodelledRootAttributes(string path)
+    {
+        try
+        {
+            var root = XDocument.Load(path).Root;
+            if (root is null || root.Name.LocalName != "tileset")
+                return [];
+            return root.Attributes()
+                .Where(a => !a.IsNamespaceDeclaration && !ModelledRootAttributes.Contains(a.Name.LocalName))
+                .Select(a => (a.Name.LocalName, a.Value))
+                .ToList();
+        }
+        catch
+        {
+            // An unreadable original can't have anything worth carrying; the rewrite proceeds
+            // exactly as it always did.
+            return [];
+        }
     }
 
     /// <summary>
@@ -84,7 +120,7 @@ public static class TsxWriter
 
     private static bool TryWritePatchedCore(Tileset tileset, string path)
     {
-        var original = Loader.Default().LoadTileset(path);
+        var original = TsxLoader.LoadTileset(path);
         if (!TopLevelEquals(original, tileset))
             return false;
 
@@ -289,7 +325,7 @@ public static class TsxWriter
             $"TsxWriter does not yet support '{property.Type}' properties (property '{property.Name}')."),
     };
 
-    private static void WriteTileset(XmlWriter writer, Tileset tileset)
+    private static void WriteTileset(XmlWriter writer, Tileset tileset, IReadOnlyList<(string Name, string Value)> extraRootAttributes)
     {
         if (tileset.Wangsets.Count > 0)
             throw new NotSupportedException("TsxWriter does not yet support wangsets.");
@@ -319,6 +355,8 @@ public static class TsxWriter
             writer.WriteAttributeString("tilerendersize", ToAttributeString(tileset.RenderSize));
         if (tileset.FillMode != FillMode.Stretch)
             writer.WriteAttributeString("fillmode", ToAttributeString(tileset.FillMode));
+        foreach (var (name, value) in extraRootAttributes)
+            writer.WriteAttributeString(name, value);
 
         if (tileset.Image.HasValue)
             WriteImage(writer, tileset.Image.Value);

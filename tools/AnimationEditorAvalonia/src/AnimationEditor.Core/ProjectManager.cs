@@ -755,7 +755,7 @@ namespace AnimationEditor.Core
                     "(Associate Tiled Tileset). A .tsx cannot be both a native-tsx project and an " +
                     "achx-push target at the same time.");
 
-            var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(fileName.FullPath);
+            var tileset = Tiled.TsxLoader.LoadTileset(fileName.FullPath);
 
             if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason))
                 throw new NotSupportedException(

@@ -2178,3 +2178,37 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     check already guarantees nothing is lost without notice. Worth a small follow-up issue.
   Full suite: `AnimationEditor.Core.Tests` 2340, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
+
+- [x] **Fresh-eyes pass #18 -- the load side against what real Tiled writes: every root/image/
+  tile attribute and element a 1.9-1.12 tileset can carry, through an edit-and-save, in both the
+  patch-in-place path and the full-rewrite fallback.** Two real losses and one silent-wrongness,
+  all fixed; one validator gap closed.
+  - **Tiled 1.9 `class="..."` on tiles -- real loss, fixed.** Tiled 1.9 saved a tile's class as
+    `class` (1.10 went back to `type`, all DotTiled reads). An edited tile is regenerated from the
+    model, so the class vanished from any 1.9-era animated tile the moment its animation was
+    touched, and a class-only tile whose animation was removed was deleted as "empty". New
+    `TsxLoader.LoadTileset` (now the only tsx read path: `ProjectManager`, `TsxWriter`'s
+    original load, `TiledTilesetSyncRunner`) folds `class` into `Tile.Type`; a regenerated tile
+    writes `type`, exactly what Tiled itself does on resave. Tests:
+    `NativeTsxForeignContentRoundTripTests.*Tiled19Class*` (2, red first).
+  - **`backgroundcolor` on the root -- real loss in the fallback, fixed.** DotTiled has no slot
+    for it; the patch path reuses the original root text so it survived there, but the full
+    rewrite (taken for a file the writer can't slice per line, e.g. minified) dropped it.
+    `TsxWriter.Write(path)` now copies any root attribute it doesn't model from the original
+    file. Test: `EditAndSave_MinifiedSingleLineFile_KeepsEveryForeignAttributeAndElement` (red
+    first); its Tiled-formatted twin proves the patch path keeps a kitchen-sink of root/image/
+    grid/tileoffset/property-of-every-type/tile class+probability content byte-for-byte.
+  - **Margin/spacing tilesets -- silent wrong geometry, now refused at open.** Neither mapper
+    accounts for margin/spacing (`TiledAnimationToAchjMapper` places tile N at col*tilewidth;
+    the native save path never even passed them to `MultiTileToTiledAnimationMapper`), so such a
+    file opened with every frame rect shifted off its pixels and no way to save. Real support is a
+    feature (multi-tile frames would span the gap pixels); `TsxCompatibilityChecker` refuses with
+    a reason, like wangsets. Test: `CheckOpenCompatibility_TilesetWithMarginOrSpacing_*`.
+  - **Frame id past the tile count -- validator gap, closed.** A hand-edited frame beyond
+    `tilecount` loaded as an off-image rect and could never be saved, with nothing at open saying
+    why. `TsxAnimationValidator` now reports it. Test: `Validate_FrameReferencesTileBeyondTileCount_ReturnsIssue`.
+  - **Safe:** `trans` is rewritten as `#aarrggbb` (Tiled reads both), self-closing tags gain a
+    space, the fallback reorders `<image>` before `<tileoffset>` -- all cosmetic; per-tile
+    object layers, wangsets, transformations were already refused up front.
+  Full suite: `AnimationEditor.Core.Tests` 2347, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
