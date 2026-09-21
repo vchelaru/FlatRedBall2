@@ -408,4 +408,29 @@ public class TiledAnimationToAchjMapperTests
 
         Assert.Contains("5", exception.Message);
     }
+
+    [Fact]
+    public void Map_TileOwnedByAchxPushSource_ExcludedFromNativeTsxModelEntirely()
+    {
+        // A tile carrying "achjSourceFile" was written by the achx-push feature (issue #1133),
+        // not by this native-tsx project (issue #1140) -- a completely separate save pipeline
+        // (TilesetAnimationSync/TiledTilesetSyncRunner) that never touches Name/ParentId and
+        // re-syncs this tile independently of whatever native-tsx project has this same .tsx
+        // open. Before this fix, any animated tile became its own anchor chain regardless of who
+        // wrote it, so opening the tsx natively silently absorbed the achx-push tile into the
+        // editable model -- letting a user rename/delete/move an animation that isn't this
+        // project's to own, and orphaning the achjSourceFile/achjAnimationName tracking
+        // properties the next time this project saves. It must not surface as a chain at all.
+        var tileset = EmptyTileset();
+        var achxOwnedTile = new Tile { ID = 5, Width = 0, Height = 0 };
+        achxOwnedTile.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        achxOwnedTile.Properties.Add(new StringProperty { Name = "achjAnimationName", Value = "Fireball" });
+        achxOwnedTile.Properties.Add(new StringProperty { Name = "achjSourceFile", Value = "../Fireball.achx" });
+        tileset.Tiles.Add(achxOwnedTile);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+
+        Assert.Empty(acls.AnimationChains);
+        Assert.Empty(entryTileIdsByChain);
+    }
 }

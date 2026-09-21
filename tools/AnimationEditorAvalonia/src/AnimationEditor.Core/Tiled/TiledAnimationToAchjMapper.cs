@@ -86,7 +86,20 @@ public static class TiledAnimationToAchjMapper
         var entryTileIds = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
         var satelliteTileIds = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
 
-        var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
+        // A tile carrying TilesetAnimationSync.SourceFilePropertyName ("achjSourceFile") was
+        // written by the achx-push feature (issue #1133) -- a completely separate save pipeline
+        // that never touches Name/ParentId and independently re-syncs this tile from its own
+        // achx/achj, regardless of whether this same .tsx is also open as a native project.
+        // Folding it into this project's own editable model (as it used to be, since any animated
+        // tile qualified) would let a user rename/move/delete an animation this project doesn't
+        // own, and would leave its achjSourceFile/achjAnimationName tracking properties orphaned
+        // -- or fought over -- the next time either feature saves. Excluded entirely rather than
+        // surfaced as a chain, unlike every other "not a real anchor" case in this method: those
+        // are all broken references to a tile this project *does* own, whereas this tile belongs
+        // to a different owner outright.
+        var animatedTiles = tileset.Tiles
+            .Where(t => t.Animation.Count > 0 && !IsAchxPushOwned(t))
+            .ToList();
         var parentIdByTileId = new Dictionary<uint, uint?>();
         foreach (var tile in animatedTiles)
             if (!parentIdByTileId.TryAdd(tile.ID, GetParentId(tile)))
@@ -229,6 +242,11 @@ public static class TiledAnimationToAchjMapper
         var rows = (tileset.TileCount + tileset.Columns - 1) / tileset.Columns;
         return (tileset.Columns * tileset.TileWidth, rows * tileset.TileHeight);
     }
+
+    /// <summary>Whether the achx-push feature (issue #1133) -- not this native-tsx project --
+    /// currently owns this tile's animation, per <see cref="TilesetAnimationSync.SourceFilePropertyName"/>.</summary>
+    private static bool IsAchxPushOwned(Tile tile) =>
+        tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
 
     private static string ChainName(Tile tile)
     {

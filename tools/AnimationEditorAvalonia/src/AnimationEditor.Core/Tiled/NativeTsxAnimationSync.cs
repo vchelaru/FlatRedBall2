@@ -13,9 +13,12 @@ public sealed record NativeTsxAnimationSyncResult(bool Changed);
 /// Applies <see cref="MultiTileToTiledAnimationMapper.Map"/> results onto a <see cref="Tileset"/>
 /// for a native <c>.tsx</c> project (issue #1140) -- the save-side counterpart of <see
 /// cref="TiledAnimationToAchjMapper"/>. Unlike <see cref="TilesetAnimationSync"/> (achj-push, source-
-/// scoped so multiple achx files can share one tileset), a native project owns the whole file: any
-/// previously-animated tile not represented in <paramref name="results"/> is stale and gets cleared,
-/// full stop.
+/// scoped so multiple achx files can share one tileset), a native project owns every tile it maps:
+/// any previously-animated tile not represented in <paramref name="results"/> is stale and gets
+/// cleared -- except a tile the achx-push feature (issue #1133) owns (tracked via <see
+/// cref="TilesetAnimationSync.SourceFilePropertyName"/>), which is never absorbed into this
+/// project's model in the first place (see <see cref="TiledAnimationToAchjMapper"/>'s matching
+/// load-side exclusion) and so is left untouched here rather than misread as stale.
 /// </summary>
 public static class NativeTsxAnimationSync
 {
@@ -62,8 +65,16 @@ public static class NativeTsxAnimationSync
         // unique, so no lookup ever needs to see a tile created earlier in the same call.
         var tilesById = BuildTilesById(tileset);
 
+        ValidateNoAchxPushOwnedTileClaimed(tilesById, results);
+
+        // A tile owned by the achx-push feature (issue #1133 -- tracked via
+        // TilesetAnimationSync.SourceFilePropertyName) is never absorbed into this project's own
+        // model (see TiledAnimationToAchjMapper's matching load-side exclusion), so it never
+        // appears in `results`. Without this exclusion, the "any previously-animated tile absent
+        // from results is stale, full stop" rule below would wipe another feature's animation on
+        // this project's very next save, regardless of whether the user edited anything related.
         var previouslyAnimatedTileIds = tileset.Tiles
-            .Where(t => t.Animation.Count > 0)
+            .Where(t => t.Animation.Count > 0 && !IsAchxPushOwned(t))
             .Select(t => t.ID)
             .ToHashSet();
 
@@ -97,6 +108,45 @@ public static class NativeTsxAnimationSync
 
         tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
         return new NativeTsxAnimationSyncResult(changed);
+    }
+
+    /// <summary>Whether the achx-push feature (issue #1133) -- a save pipeline entirely
+    /// independent of this native-tsx project -- currently owns this tile's animation, per
+    /// <see cref="TilesetAnimationSync.SourceFilePropertyName"/>.</summary>
+    private static bool IsAchxPushOwned(Tile tile) =>
+        tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
+
+    /// <summary>
+    /// A native-tsx chain's own geometry computing the same tile id as a tile the achx-push
+    /// feature already owns is the same "two independent claimants, can't silently pick a winner"
+    /// situation <see cref="ValidateNoTileIdCollisions"/> already fails loudly for between two
+    /// native-tsx chains -- extended here to the achx-push feature's own tiles, since <see
+    /// cref="TiledAnimationToAchjMapper"/> never absorbs them into this project's model in the
+    /// first place, so this is the only remaining place that could silently overwrite one.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A result claims a tile achx-push already owns.</exception>
+    private static void ValidateNoAchxPushOwnedTileClaimed(Dictionary<uint, Tile> tilesById, IReadOnlyList<MultiTileMappingResult> results)
+    {
+        void CheckOwnership(uint tileId, string chainName)
+        {
+            if (!tilesById.TryGetValue(tileId, out var tile) || !IsAchxPushOwned(tile))
+                return;
+
+            var owningSource = tile.Properties.OfType<StringProperty>()
+                .First(p => p.Name == TilesetAnimationSync.SourceFilePropertyName).Value;
+            throw new InvalidOperationException(
+                $"Can't save: Tiled tile {tileId} is already owned by achx-push source \"{owningSource}\" " +
+                $"and can't also be claimed by native-tsx chain \"{chainName}\". Move \"{chainName}\" to a " +
+                "different tile, or remove the achx-push association for this tile.");
+        }
+
+        foreach (var result in results)
+        {
+            if (result.EntryTileId is { } entryTileId)
+                CheckOwnership(entryTileId, result.ChainName);
+            foreach (var satellite in result.Satellites)
+                CheckOwnership(satellite.TileId, result.ChainName);
+        }
     }
 
     /// <summary>Builds a tile-id-keyed dictionary of every tile, throwing a clear error instead of

@@ -238,4 +238,51 @@ public class NativeTsxAnimationSyncTests
 
         Assert.Contains("5", exception.Message);
     }
+
+    [Fact]
+    public void Apply_TileOwnedByAchxPushSource_StaleClearingLeavesItUntouched()
+    {
+        // A tile carrying "achjSourceFile" was written by the achx-push feature (issue #1133),
+        // a save pipeline entirely independent of this native-tsx project (issue #1140) -- see
+        // TiledAnimationToAchjMapper's matching load-side exclusion. Since that tile is now never
+        // absorbed into this project's own AnimationChainListSave, it never appears in `results`,
+        // and the "any previously-animated tile absent from results is stale, full stop" clearing
+        // rule (this class's own doc comment) would otherwise wipe another feature's animation the
+        // very next time this project saves, regardless of whether anything the user actually
+        // edited has anything to do with that tile.
+        var tileset = EmptyTileset();
+        var achxOwnedTile = new Tile { ID = 5, Width = 0, Height = 0 };
+        achxOwnedTile.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        achxOwnedTile.Properties.Add(new StringProperty { Name = "achjAnimationName", Value = "Fireball" });
+        achxOwnedTile.Properties.Add(new StringProperty { Name = "achjSourceFile", Value = "../Fireball.achx" });
+        tileset.Tiles.Add(achxOwnedTile);
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        var tile = tileset.Tiles.Single(t => t.ID == 5);
+        Assert.Single(tile.Animation);
+        Assert.Equal("Fireball", tile.GetProperty<StringProperty>("achjAnimationName").Value);
+        Assert.Equal("../Fireball.achx", tile.GetProperty<StringProperty>("achjSourceFile").Value);
+        Assert.False(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_ChainGeometryClaimsAchxPushOwnedTile_ThrowsInsteadOfSilentlyOverwriting()
+    {
+        // Symmetric to Apply_TwoChainsClaimSameEntryTile_ThrowsInsteadOfSilentlyOverwriting, but
+        // the other claimant is a tile owned by the achx-push feature rather than another
+        // native-tsx chain. Two independent, un-coordinated save pipelines (achx-push and
+        // native-tsx) computing the same tile id for two different animations is the same
+        // "can't silently pick a winner" situation this codebase already fails loudly for.
+        var tileset = EmptyTileset();
+        var achxOwnedTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        achxOwnedTile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        achxOwnedTile.Properties.Add(new StringProperty { Name = "achjSourceFile", Value = "../Fireball.achx" });
+        tileset.Tiles.Add(achxOwnedTile);
+
+        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+        Assert.Contains("../Fireball.achx", exception.Message);
+    }
 }
