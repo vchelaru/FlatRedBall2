@@ -73,18 +73,173 @@ public class NativeTsxAnimationSyncTests
     }
 
     [Fact]
-    public void Apply_RemovedChain_ClearsStaleTileAnimationAndProperties()
+    public void Apply_RemovedChain_TileHasNothingElse_RemovesTileEntirely()
     {
+        // The tile only ever existed to carry "Walk"'s animation -- once that's gone there's
+        // nothing left worth a <tile id="0"/> stub for. Leaving one behind accumulates one bare
+        // stub per animation ever removed (issue found via ChibiCthulhuTiles.tsx).
         var tileset = EmptyTileset();
         var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
         NativeTsxAnimationSync.Apply(tileset, firstSync);
 
         var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
 
-        var tile = tileset.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(tile.Animation);
-        Assert.DoesNotContain(tile.Properties, p => p.Name is "Name" or "ParentId");
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
         Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOtherProperty_KeepsTileButClearsAnimationAndTrackingProperties()
+    {
+        // A tile carrying a property the animation editor doesn't own (e.g. hand-authored
+        // gameplay data) must survive the animation being removed -- only the animation-editor-
+        // owned "Name"/"ParentId" tracking properties and the animation itself get cleared.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+        NativeTsxAnimationSync.Apply(tileset, firstSync);
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        tile.Properties.Add(new StringProperty { Name = "Solid", Value = "true" });
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(survivingTile.Animation);
+        Assert.DoesNotContain(survivingTile.Properties, p => p.Name is "Name" or "ParentId");
+        Assert.Equal("true", survivingTile.GetProperty<StringProperty>("Solid").Value);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasNonDefaultType_KeepsTileAfterClearing()
+    {
+        // Tiled attributes other than <properties> (e.g. a per-tile "type", matching real data
+        // seen in ChibiCthulhuTiles.tsx: <tile id="268" type="Chomper"/>) are just as much a
+        // reason to keep the <tile> element as a property is -- IsTileEmpty must check them too.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+        NativeTsxAnimationSync.Apply(tileset, firstSync);
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        tile.Type = "Chomper";
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(survivingTile.Animation);
+        Assert.Equal("Chomper", survivingTile.Type);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOnlyAWrongTypedTrackingProperty_IsRemoved()
+    {
+        // FindByNameRemovingWrongType strips a wrong-typed "Name"/"ParentId" during ClearTile;
+        // once that's gone the tile is exactly as empty as if it never had the property at all.
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        tile.Properties.Add(new IntProperty { Name = "Name", Value = 42 });
+        tileset.Tiles.Add(tile);
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOtherEmptyStringProperty_KeepsTile()
+    {
+        // IsTileEmpty must key off property *presence*, not value -- an empty string is still a
+        // real property a human or another tool wrote and this sync doesn't own.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+        NativeTsxAnimationSync.Apply(tileset, firstSync);
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        tile.Properties.Add(new StringProperty { Name = "Note", Value = "" });
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Contains(survivingTile.Properties, p => p.Name == "Note");
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedMultiTileGroup_RemovesBothAnchorAndSatelliteWhenBothEndUpEmpty()
+    {
+        var tileset = EmptyTileset();
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)], (1, 0));
+        var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100)], satellite) };
+        NativeTsxAnimationSync.Apply(tileset, firstSync);
+        Assert.Equal(2, tileset.Tiles.Count);
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        Assert.Empty(tileset.Tiles);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_TileHasTrackingPropertyButNoAnimation_IsClearedAndRemoved()
+    {
+        // A tile that lost its <animation> (crashed/partial prior save, or a hand-edit) but kept
+        // its "Name" property never gets surfaced into `results` by TiledAnimationToAchjMapper.Map
+        // (it only maps Animation.Count > 0 tiles) -- so unless stale-detection also looks at the
+        // tracking property directly, this tile is never visited at all and leaks forever.
+        var tileset = EmptyTileset();
+        var orphanedTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        orphanedTile.Properties.Add(new StringProperty { Name = "Name", Value = "Walk" });
+        tileset.Tiles.Add(orphanedTile);
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_TileHasTrackingPropertyButNoAnimationAndAnotherProperty_IsKeptWithTrackingPropertyCleared()
+    {
+        var tileset = EmptyTileset();
+        var orphanedTile = new Tile { ID = 0, Width = 0, Height = 0 };
+        orphanedTile.Properties.Add(new StringProperty { Name = "Name", Value = "Walk" });
+        orphanedTile.Properties.Add(new StringProperty { Name = "Solid", Value = "true" });
+        tileset.Tiles.Add(orphanedTile);
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.DoesNotContain(survivingTile.Properties, p => p.Name is "Name" or "ParentId");
+        Assert.Equal("true", survivingTile.GetProperty<StringProperty>("Solid").Value);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_ResultHasWarnings_DoesNotOverwriteOrClearTheHintedTile()
+    {
+        // A result carrying a warning is a mapping FAILURE -- its EntryTileId (populated from the
+        // save's identity hint, see MultiTileToTiledAnimationMapper) exists only to keep the tile
+        // out of stale-clearing, not because there's real geometry to write. Applying its (always
+        // empty) AnchorFrames would overwrite the tile's real, previously-working animation.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, [new MappedFrame(0, 100), new MappedFrame(1, 100)]) };
+        NativeTsxAnimationSync.Apply(tileset, firstSync);
+
+        var failedResult = new MultiTileMappingResult
+        {
+            SourceChain = new AnimationChainSave { Name = "Walk" },
+            ChainName = "Walk",
+            AnchorFrames = [],
+            EntryTileId = 0,
+            Satellites = [],
+            Warnings = ["chain \"Walk\": frame size doesn't match the chain's footprint - skipped."],
+        };
+
+        var syncResult = NativeTsxAnimationSync.Apply(tileset, [failedResult]);
+
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Equal([((uint)0, 100), ((uint)1, 100)], tile.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.False(syncResult.Changed);
     }
 
     [Fact]
@@ -192,9 +347,7 @@ public class NativeTsxAnimationSyncTests
         var updatedTile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], updatedTile.Animation.Select(f => (f.TileID, f.Duration)));
 
-        var staleTile = tileset.Tiles.Single(t => t.ID == 5);
-        Assert.Empty(staleTile.Animation);
-        Assert.DoesNotContain(staleTile.Properties, p => p.Name is "Name" or "ParentId");
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 5);
 
         var newTile = tileset.Tiles.Single(t => t.ID == 10);
         Assert.Equal([((uint)10, 100)], newTile.Animation.Select(f => (f.TileID, f.Duration)));

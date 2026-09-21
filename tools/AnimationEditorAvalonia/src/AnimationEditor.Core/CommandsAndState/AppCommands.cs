@@ -186,6 +186,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.PixiJsExportCompleted"/>
         public event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
 
+        /// <inheritdoc cref="IAppCommands.TsxSaveCompletedWithWarnings"/>
+        public event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
@@ -273,20 +276,21 @@ namespace AnimationEditor.Core.CommandsAndState
                 return Task.CompletedTask;
             }
 
-            _undoManager.Clear();
-            _undoManager.MarkSaved();
-            _selectedState.Reset();
-            _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
-            RebuildTreeViewRequested?.Invoke(Array.Empty<string>());
-            RefreshWireframeRequested?.Invoke();
-            RefreshAnimationFrameDisplayRequested?.Invoke();
+            // Was hand-duplicating FinishLoadIntoEditor's steps here instead of calling it, and
+            // had drifted out of sync with it: missing HotReloadWatcher.StartWatching (a tsx's
+            // external changes -- hand edits, another tab's "sync associated Tiled tilesets" --
+            // were never picked up, no matter how long you waited) and missing
+            // LoadAndApplyCompanionFileFor (saved grid/zoom/expanded-tree-state silently dropped
+            // on every tsx open). Calling the shared helper, same as the achx open path
+            // (OpenAchxWorkflowAsync -> LoadAnimationChainFromParsed -> FinishLoadIntoEditor)
+            // below, makes this impossible to drift out of sync with again.
+            FinishLoadIntoEditor(path);
 
             // Reuses the achx-named event -- both mean "a project file finished loading,"
             // and every current subscriber (recent files, window title, etc.) treats it generically.
             _events.CallAchxLoaded(path);
             _events.RaiseCurrentFileChanged(path);
             _events.RaiseAvailableTexturesChanged();
-            EditorProjectModelChanged?.Invoke(path);
             return Task.CompletedTask;
         }
 
@@ -332,6 +336,21 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.MarkSaved();
             _selectedState.Reset();
             _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
+            RefreshEditorSurfaceForActiveProject(fileName);
+        }
+
+        /// <summary>
+        /// Refreshes everything about the editor's UI/watcher state that depends only on "this is
+        /// now the active project" — not on how it got there. Shared by <see
+        /// cref="FinishLoadIntoEditor"/> (a fresh disk load) and <see
+        /// cref="TryActivateTabFromCache"/> (reactivating an already-loaded tab), which is why it
+        /// deliberately does NOT touch undo history or selection: those two callers disagree on
+        /// what to do with them (a fresh load resets both; reactivating a cached tab must preserve
+        /// undo history and restore the tab's own prior selection instead), so each decides that
+        /// for itself before calling this.
+        /// </summary>
+        private void RefreshEditorSurfaceForActiveProject(string fileName)
+        {
             // Rebuild (not refresh): a freshly-opened file should present a collapsed,
             // scannable overview rather than every chain's frames expanded — unless a
             // companion file already recorded which chains were expanded, in which case
@@ -343,10 +362,9 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
 
-            // Start watching the loaded file and its referenced PNGs.
-            var achxDir = System.IO.Path.GetDirectoryName(fileName) ?? string.Empty;
-            var pngPaths = GetReferencedAbsolutePngPaths(fileName, achxDir);
-            HotReloadWatcher.StartWatching(fileName, pngPaths);
+            // Start (or restart) watching the active file and its referenced PNGs. _pm.FileName is
+            // already fileName by the time either caller reaches this point.
+            SyncHotReloadWatcher();
 
             EditorProjectModelChanged?.Invoke(fileName);
         }
@@ -372,17 +390,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
             TabEditorCache.ApplyToProject(tab, _pm);
             RestoreTabSelection(tab);
-            // See the comment in FinishLoadIntoEditor: build already-expanded from the
-            // companion file so reactivating a tab doesn't flicker collapsed-then-expanded.
-            RebuildTreeViewRequested?.Invoke((IReadOnlyList<string>?)_ioManager.TryLoadCompanionSettings(tab.Path.FullPath)?.ExpandedNodes ?? Array.Empty<string>());
-            _ioManager.LoadAndApplyCompanionFileFor(tab.Path.FullPath);
-            RefreshWireframeRequested?.Invoke();
-            RefreshAnimationFrameDisplayRequested?.Invoke();
-            SyncHotReloadWatcher();
+            RefreshEditorSurfaceForActiveProject(tab.Path.FullPath);
 
             _events.RaiseCurrentFileChanged(tab.Path.FullPath);
             _events.RaiseAvailableTexturesChanged();
-            EditorProjectModelChanged?.Invoke(tab.Path.FullPath);
             return true;
         }
 
@@ -465,7 +476,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 try
                 {
                     if (_pm.IsNativeTsxProject)
-                        _pm.SaveTsxProject(target);
+                    {
+                        var warnings = _pm.SaveTsxProject(target);
+                        if (warnings.Count > 0)
+                            TsxSaveCompletedWithWarnings?.Invoke(warnings);
+                    }
                     else
                         _pm.SaveAnimationChainList(target);
                     _undoManager.MarkSaved();

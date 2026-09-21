@@ -73,8 +73,15 @@ public static class NativeTsxAnimationSync
         // appears in `results`. Without this exclusion, the "any previously-animated tile absent
         // from results is stale, full stop" rule below would wipe another feature's animation on
         // this project's very next save, regardless of whether the user edited anything related.
+        //
+        // Also catches a tile that carries Name/ParentId but has *no* animation left (a crashed/
+        // partial prior save, or a hand-edit that deleted the <animation> element but not the
+        // property) -- TiledAnimationToAchjMapper.Map only ever surfaces Animation.Count > 0 tiles
+        // into `results` in the first place, so a tile like that can never be "claimed" by a
+        // result and would otherwise never be visited by this method at all, leaking its stale
+        // tracking property (and the tile itself, once IsTileEmpty applies) forever.
         var previouslyAnimatedTileIds = tileset.Tiles
-            .Where(t => t.Animation.Count > 0 && !IsAchxPushOwned(t))
+            .Where(t => !IsAchxPushOwned(t) && (t.Animation.Count > 0 || HasTrackingProperty(t)))
             .Select(t => t.ID)
             .ToHashSet();
 
@@ -90,11 +97,27 @@ public static class NativeTsxAnimationSync
         var changed = false;
 
         foreach (var staleTileId in previouslyAnimatedTileIds.Except(newTileIds))
-            if (ClearTile(tilesById[staleTileId]))
+        {
+            var staleTile = tilesById[staleTileId];
+            if (ClearTile(staleTile))
                 changed = true;
+            if (IsTileEmpty(staleTile))
+            {
+                tileset.Tiles.Remove(staleTile);
+                tilesById.Remove(staleTileId);
+            }
+        }
 
         foreach (var result in results)
         {
+            // A result carrying a warning is a mapping FAILURE (see MultiTileToTiledAnimationMapper
+            // .MapChain's Empty() helper) -- its EntryTileId/Satellites, when present, are only the
+            // chain's last-known identity hints, kept so the stale-clearing loop above doesn't wipe
+            // them, not real geometry to write. Applying result.AnchorFrames (always empty here)
+            // would overwrite the tile's real, previously-working animation with nothing.
+            if (result.Warnings.Count > 0)
+                continue;
+
             if (result.EntryTileId is not { } entryTileId)
                 continue;
 
@@ -115,6 +138,14 @@ public static class NativeTsxAnimationSync
     /// <see cref="TilesetAnimationSync.SourceFilePropertyName"/>.</summary>
     private static bool IsAchxPushOwned(Tile tile) =>
         tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
+
+    /// <summary>Whether a tile carries either of this sync's own tracking properties, regardless
+    /// of whether it still has animation frames -- see the stale-detection comment in <see
+    /// cref="Apply"/> for why a property-only tile must still be treated as this sync's to
+    /// clean up.</summary>
+    private static bool HasTrackingProperty(Tile tile) =>
+        tile.Properties.Any(p =>
+            p.Name is TiledAnimationToAchjMapper.NamePropertyName or TiledAnimationToAchjMapper.ParentIdPropertyName);
 
     /// <summary>
     /// A native-tsx chain's own geometry computing the same tile id as a tile the achx-push
@@ -252,7 +283,9 @@ public static class NativeTsxAnimationSync
     }
 
     /// <summary>Clears a stale tile's animation and any AnimationEditor-owned tracking properties.
-    /// Returns whether it actually had anything to clear.</summary>
+    /// Returns whether it actually had anything to clear. Doesn't remove the tile itself -- callers
+    /// that want that call <see cref="IsTileEmpty"/> afterward, since a tile carrying other,
+    /// non-editor-owned properties must stay in the file.</summary>
     private static bool ClearTile(Tile tile)
     {
         var hadAnimation = tile.Animation.Count > 0;
@@ -265,6 +298,24 @@ public static class NativeTsxAnimationSync
 
         return hadAnimation || hadTrackingProperties;
     }
+
+    /// <summary>Whether a tile has nothing left worth keeping a &lt;tile&gt; element for -- no
+    /// animation, no properties, and none of Tiled's other per-tile data (type/probability/x/y/
+    /// width/height/image/object layer). A tile that only ever existed to carry an animation this
+    /// sync owns becomes exactly this once <see cref="ClearTile"/> strips it, and leaving it in
+    /// <see cref="Tileset.Tiles"/> as a bare <c>&lt;tile id="N"/&gt;</c> stub would accumulate one
+    /// such stub per animation ever removed.</summary>
+    private static bool IsTileEmpty(Tile tile) =>
+        string.IsNullOrEmpty(tile.Type) &&
+        tile.Probability == 0f &&
+        tile.X == 0 &&
+        tile.Y == 0 &&
+        tile.Width == 0 &&
+        tile.Height == 0 &&
+        !tile.Image.HasValue &&
+        !tile.ObjectLayer.HasValue &&
+        tile.Properties.Count == 0 &&
+        tile.Animation.Count == 0;
 
     private static bool AnimationEquals(List<Frame> a, List<Frame> b)
     {

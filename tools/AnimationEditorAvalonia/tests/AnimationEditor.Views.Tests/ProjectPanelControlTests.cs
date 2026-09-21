@@ -459,6 +459,28 @@ public class ProjectPanelControlTests
         Assert.True(control.TreeRoots[0].HasThumbnail);
     }
 
+    // A .tsx row shows the Tiled icon instead of the chain fallback/thumbnail, and never asks
+    // ProjectTreeThumbnailService for a thumbnail -- it has no animation frames to preview.
+    [AvaloniaFact]
+    public async Task SetEntries_TsxFile_ShowsTiledIconAndSkipsThumbnailLoad()
+    {
+        var root = new FakeFolder("Content");
+        var tsxFile = new FakeFile("Tileset.tsx", Encoding.UTF8.GetBytes("<tileset/>"));
+        var entry = new AchxFileEntry(tsxFile, root, "Tileset.tsx");
+
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        control.Initialize(new ProjectTreeThumbnailService(diskCacheDirectory: null));
+
+        control.SetEntries(new[] { entry });
+        await control.ThumbnailLoadTask;
+
+        var node = control.TreeRoots[0];
+        Assert.True(node.ShowTsxIcon);
+        Assert.False(node.ShowFallbackIcon);
+        Assert.False(node.HasThumbnail);
+        Assert.Equal(0, tsxFile.OpenReadCount);
+    }
+
     // Issue #1018: right-click a folder row -> "New Animation File", named inline in the tree.
     // Shown regardless of SupportsRevealInExplorer -- the browser build has real folder access
     // via NativeReadWriteFolder, it just can't reveal in an OS shell.
@@ -636,9 +658,14 @@ public class ProjectPanelControlTests
         public FakeFile(string name, byte[]? content = null) { Name = name; _content = content; }
         private readonly byte[]? _content;
         public string Name { get; }
-        public Task<Stream> OpenReadAsync() => _content is null
-            ? throw new NotSupportedException()
-            : Task.FromResult<Stream>(new MemoryStream(_content));
+        public int OpenReadCount { get; private set; }
+        public Task<Stream> OpenReadAsync()
+        {
+            OpenReadCount++;
+            return _content is null
+                ? throw new NotSupportedException()
+                : Task.FromResult<Stream>(new MemoryStream(_content));
+        }
         public Task<Stream> OpenWriteAsync() => throw new NotSupportedException();
         public Task<FolderEntrySnapshot> GetBasicPropertiesAsync() =>
             Task.FromResult(new FolderEntrySnapshot(null, null));

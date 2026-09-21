@@ -158,7 +158,7 @@ public class TabSwitchCacheTests : IDisposable
         public bool IsNativeTsxProject => _inner.IsNativeTsxProject;
         public (int Width, int Height)? TsxTileSize => _inner.TsxTileSize;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
-        public void SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
+        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();
         public object? CaptureTsxState() => _inner.CaptureTsxState();
         public void RestoreTsxState(object? state) => _inner.RestoreTsxState(state);

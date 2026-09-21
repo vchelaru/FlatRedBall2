@@ -373,13 +373,25 @@ public sealed class ThumbnailService : IDisposable
         int finalW = Math.Max(1, (int)(sw * scale));
         int finalH = Math.Max(1, (int)(sh * scale));
 
-        // Crop the frame's region into its own image first, then scale. Scaling a sub-rect of
+        // Crop the frame's region into its own bitmap first, then scale. Scaling a sub-rect of
         // the full sheet directly lets the sampler reach past the rect edges and pull in
         // neighbouring frames (visible bleed / thin seam lines). A standalone subset has no
         // neighbours to bleed from.
-        using var img    = SKImage.FromBitmap(source);
-        using var region = img.Subset(SKRectI.Create(sx, sy, sw, sh));
-        if (region is null) return null;   // sx/sy/sw/sh are clamped in-bounds, so defensive only
+        //
+        // ExtractSubset (bitmap-level) instead of SKImage.FromBitmap(source).Subset(...): the
+        // latter was a full-sheet pixel copy on every single call (issue #514's exact concern,
+        // here for the timeline/tree thumbnail path -- selecting many chains at once crops dozens
+        // of frames off the same sheet in one burst, each paying that full-sheet copy).
+        // ExtractSubset shares the source bitmap's existing pixel buffer instead of copying it, so
+        // the cost scales with the crop size, not the sheet size. It also sidesteps a genuine
+        // native crash: SKImage.Subset() called more than once against the SAME cached SKImage
+        // (e.g. two GetFrameThumbnail calls for the same region with different tints) corrupted
+        // Skia's native state -- ExtractSubset works on a fresh local SKBitmap every call, so
+        // there's nothing shared to corrupt.
+        using var croppedBitmap = new SKBitmap();
+        if (!source.ExtractSubset(croppedBitmap, SKRectI.Create(sx, sy, sw, sh)))
+            return null;   // sx/sy/sw/sh are clamped in-bounds, so defensive only
+        using var region = SKImage.FromBitmap(croppedBitmap);
 
         var thumb = new SKBitmap(finalW, finalH);
         using var canvas = new SKCanvas(thumb);

@@ -80,15 +80,40 @@ public static class MultiTileToTiledAnimationMapper
         TilesetAnimationInfo tilesetInfo, IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds,
         IReadOnlyDictionary<(int Dx, int Dy), uint>? knownSatelliteTileIds)
     {
-        MultiTileMappingResult Empty(string? warning = null) => new()
+        // A genuine mapping failure (non-null warning -- bad geometry, wrong texture, etc.) must
+        // not silently orphan a tile this chain already owns on disk: NativeTsxAnimationSync.Apply
+        // only protects a tile id from its "any previously-animated tile absent from this save's
+        // claims is stale" clearing rule when that id shows up somewhere in this call's results, so
+        // a failed chain has to keep reporting its last-known entry/satellite ids (from this save's
+        // identity hints) even though it computed nothing new -- otherwise the very act of an
+        // in-progress edit failing validation (e.g. resizing a frame to a size that doesn't land on
+        // a whole tile) deletes the chain's previously-working animation as a side effect. A chain
+        // that's simply empty (no warning -- e.g. every frame deleted) is NOT protected this way:
+        // that's the caller intentionally saying "this chain no longer owns a tile."
+        MultiTileMappingResult Empty(string? warning = null)
         {
-            SourceChain = chain,
-            ChainName = chain.Name,
-            AnchorFrames = [],
-            EntryTileId = null,
-            Satellites = [],
-            Warnings = warning is null ? [] : [warning],
-        };
+            uint? entryTileId = null;
+            IReadOnlyList<TiledSatelliteMapping> satellites = [];
+            if (warning != null)
+            {
+                if (knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var hintedEntry))
+                    entryTileId = hintedEntry;
+                if (knownSatelliteTileIds != null)
+                    satellites = knownSatelliteTileIds
+                        .Select(kv => new TiledSatelliteMapping(kv.Value, [], kv.Key))
+                        .ToList();
+            }
+
+            return new()
+            {
+                SourceChain = chain,
+                ChainName = chain.Name,
+                AnchorFrames = [],
+                EntryTileId = entryTileId,
+                Satellites = satellites,
+                Warnings = warning is null ? [] : [warning],
+            };
+        }
 
         if (chain.Frames.Count == 0)
             return Empty();

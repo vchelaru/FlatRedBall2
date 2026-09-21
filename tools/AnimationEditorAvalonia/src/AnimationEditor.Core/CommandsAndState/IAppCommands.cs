@@ -49,6 +49,17 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
 
         /// <summary>
+        /// Raised after <see cref="SaveCurrentAnimationChainList"/> saves a native tsx project
+        /// (<see cref="ProjectManager.IsNativeTsxProject"/>) with one or more chains whose mapping
+        /// failed this save (bad geometry, wrong texture, etc. -- see <see
+        /// cref="ProjectManager.SaveTsxProject"/>). The chain's previously-written tile is left
+        /// untouched rather than cleared, but the edit that caused the failure was NOT written; the
+        /// app layer should surface these as a toast so the user knows the save didn't fully apply.
+        /// Never raised for an achx/achj save or a tsx save with no warnings.
+        /// </summary>
+        event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+
+        /// <summary>
         /// Raised after a frame, shape, or animation chain is deleted, carrying a short
         /// label for the deleted item(s). The app layer shows an undo toast in response.
         /// </summary>

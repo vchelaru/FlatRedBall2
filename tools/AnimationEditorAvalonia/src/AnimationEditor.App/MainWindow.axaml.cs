@@ -61,10 +61,10 @@ public partial class MainWindow : Window
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
 
-    // Watches the Open Project Folder tree for .achx changes that never went through an open tab
-    // (#843) -- e.g. a git pull or another editor touching a file the user never clicked. The
-    // active tab's own .achx/PNGs are already covered by _appCommands.HotReloadWatcher.
-    private readonly FolderWatcher _projectFolderWatcher = new(AchxFolderScanner.IsAchxPath);
+    // Watches the Open Project Folder tree for .achx/.achj/.tsx changes that never went through an
+    // open tab (#843) -- e.g. a git pull or another editor touching a file the user never clicked.
+    // The active tab's own .achx/PNGs are already covered by _appCommands.HotReloadWatcher.
+    private readonly FolderWatcher _projectFolderWatcher = new(AchxFolderScanner.IsProjectTreePath);
 
     /// <summary>
     /// Completes once the most recent <see cref="IAppCommands.EditorProjectModelChanged"/>
@@ -187,6 +187,12 @@ public partial class MainWindow : Window
     private TreeNodeVm? _treeSelectionAnchor;
     private bool _isApplyingShiftRangeSelection;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
+
+    // Coalesces a multi-row tree-selection gesture (Shift/Ctrl+Click range, Shift+Arrow
+    // extension) that fires Avalonia's SelectionChanged once per row into a leading-edge
+    // (immediate) sync plus at most one trailing catch-up sync -- see OnTreeSelectionChanged.
+    private bool _treeSelectionBurstActive;
+    private TreeNodeVm? _pendingTreeSelectionVm;
 
     // The platform application-data root under which settings live. Injected (not read from
     // Environment here) so headless tests can redirect it to a temp dir and never touch the
@@ -1251,6 +1257,10 @@ public partial class MainWindow : Window
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
+        _appCommands.TsxSaveCompletedWithWarnings += warnings =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowToast($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+
         Notifications.WireUndo(() => _undoManager.Undo());
 
         // Wire hot reload watcher
@@ -1895,17 +1905,18 @@ public partial class MainWindow : Window
         // *every* commit (including each one a coalescing session is made of). Sealing there would
         // close the window right after each tick and defeat coalescing entirely.
         _appCommands.SealPendingEdits();
+        LogSelectionPerf($"HandleSelectionChanged fired: {_selectedState.SelectedChains.Count} chains selected");
         // Sync the texture combo to the texture of the currently selected frame/chain
-        Dispatcher.UIThread.InvokeAsync(SyncTextureCombo);
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTextureCombo", SyncTextureCombo));
         // Sync tree selection
-        Dispatcher.UIThread.InvokeAsync(SyncTreeSelection);
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTreeSelection", SyncTreeSelection));
         // Refresh property inspector
-        Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("RefreshPropertyPanel", RefreshPropertyPanel));
         // Refresh timeline strip
-        Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("RefreshTimelineStrip", RefreshTimelineStrip));
         // The status counts are selection-aware (they show "N chains selected" for a
         // multi-select), so re-run them when the selection changes (#623).
-        Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("UpdateStatusBar", UpdateStatusBar));
     }
 
     // ── Companion file (.aeproperties) ────────────────────────────────────────
@@ -4078,6 +4089,25 @@ public partial class MainWindow : Window
             await LoadAnimationFileAsync(path);
     }
 
+    // ---- TEMP diagnostic probe (multi-select freeze investigation) -- remove once done ----
+    private static readonly string _selectionPerfLogPath =
+        Path.Combine(Path.GetTempPath(), "ae-selection-perf.log");
+
+    private static void LogSelectionPerf(string message)
+    {
+        try { File.AppendAllText(_selectionPerfLogPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}"); }
+        catch { /* diagnostic-only, never let logging break the app */ }
+    }
+
+    private static void TimeSelectionPerf(string label, Action action)
+    {
+        var sw = Stopwatch.StartNew();
+        action();
+        sw.Stop();
+        LogSelectionPerf($"  {label}: {sw.ElapsedMilliseconds}ms");
+    }
+    // ---- end TEMP diagnostic probe ----
+
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_suppressTreeSelectionHandling) return;
@@ -4089,14 +4119,63 @@ public partial class MainWindow : Window
         if (!_isApplyingShiftRangeSelection)
             _treeSelectionAnchor = vm;
 
-        // Sync multi-select into SelectedState
-        _selectedState.SelectedNodes = AnimTree.SelectedItems
-            .OfType<TreeNodeVm>()
-            .Select(n => n.Data)
-            .OfType<object>()
-            .ToList();
+        if (!_treeSelectionBurstActive)
+        {
+            // Leading edge: the first event in a (possible) burst is handled immediately and
+            // synchronously, exactly like before this fix -- this is what every existing single-
+            // selection-change caller (including code that changes selection again synchronously
+            // right after, e.g. adding a shape right after a tree click) already depends on.
+            _treeSelectionBurstActive = true;
+            Dispatcher.UIThread.Post(EndTreeSelectionBurst);
+            SyncTreeSelectionFromAnimTree(vm);
+            return;
+        }
 
-        TreeBuilder.RouteNodeSelection(vm.Data, _selectedState, _projectManager.AnimationChainListSave);
+        // A rapid multi-row gesture (Shift/Ctrl+Click range, our own Shift+Arrow extension) can
+        // fire this event once PER ROW rather than once for the whole gesture -- syncing
+        // ISelectedState (which cascades into the timeline strip, property panel, preview, and
+        // status bar) on every one of those turns an O(1) selection into O(N) redundant rebuilds
+        // (measured: a 40-chain select fired this 80 times, ~8s of UI-thread work). Once the
+        // leading-edge event above has synced, every further event in the same burst is
+        // coalesced into one trailing catch-up sync instead of reacting to every intermediate
+        // step.
+        LogSelectionPerf($"---- OnTreeSelectionChanged burst event: {AnimTree.SelectedItems.Count} tree items currently selected ----");
+        _pendingTreeSelectionVm = vm;
+    }
+
+    private void EndTreeSelectionBurst()
+    {
+        _treeSelectionBurstActive = false;
+        var vm = _pendingTreeSelectionVm;
+        _pendingTreeSelectionVm = null;
+        // No further event arrived after the leading-edge sync -- nothing to catch up on. This
+        // is the common case (an ordinary single selection change), and skipping the trailing
+        // sync here is what keeps it from replaying a now-stale selection over something else
+        // that may have changed ISelectedState synchronously since (e.g. a command adding a
+        // shape and selecting it).
+        if (vm is null) return;
+
+        LogSelectionPerf($"==== EndTreeSelectionBurst trailing sync: {AnimTree.SelectedItems.Count} tree items selected ====");
+        SyncTreeSelectionFromAnimTree(vm);
+    }
+
+    private void SyncTreeSelectionFromAnimTree(TreeNodeVm vm)
+    {
+        LogSelectionPerf($"==== SyncTreeSelectionFromAnimTree: {AnimTree.SelectedItems.Count} tree items selected ====");
+        var overallSw = Stopwatch.StartNew();
+
+        // Sync multi-select into SelectedState
+        TimeSelectionPerf("SelectedNodes assignment (1st SelectionChanged dispatch)", () =>
+            _selectedState.SelectedNodes = AnimTree.SelectedItems
+                .OfType<TreeNodeVm>()
+                .Select(n => n.Data)
+                .OfType<object>()
+                .ToList());
+
+        TimeSelectionPerf("RouteNodeSelection (2nd SelectionChanged dispatch)", () =>
+            TreeBuilder.RouteNodeSelection(vm.Data, _selectedState, _projectManager.AnimationChainListSave));
+
+        LogSelectionPerf($"==== SyncTreeSelectionFromAnimTree done: {overallSw.ElapsedMilliseconds}ms ====");
     }
 
     // ── Files panel ───────────────────────────────────────────────────────────
@@ -4531,8 +4610,30 @@ public partial class MainWindow : Window
     /// <see cref="PreviewControl.GroupTracksChanged"/> — only when the group's chain membership
     /// actually changes, not on every render or unrelated selection change.
     /// </summary>
+    // Tracks what the group timeline's rows were last built from -- one TimelineStripSignature per
+    // row, same per-chain content signature the single-chain strip already uses (#452). This
+    // method's own doc comment says it should only run "when the group's chain membership actually
+    // changes," but RefreshTimelineStrip calls it on every refresh regardless (any selection
+    // change, not just a group-membership change) -- without this guard, selecting anything while
+    // a large group is active re-rebuilds every row's frame VMs and thumbnails for nothing
+    // (measured: 40 chains, ~20-35ms per redundant rebuild, several of these back to back after a
+    // large multi-select settles).
+    private IReadOnlyList<TimelineStripSignature>? _groupTimelineSignature;
+
     private void RefreshGroupTimelineTracks()
     {
+        var overallSw = Stopwatch.StartNew();
+        var groupTracks = PreviewCtrl.GroupTracks;
+
+        var newSignature = groupTracks.Select(t => TimelineStripSignature.From(t.Chain)).ToList();
+        if (_groupTimelineSignature != null && newSignature.SequenceEqual(_groupTimelineSignature))
+        {
+            RefreshGroupTimelineScrubbers();
+            LogSelectionPerf($"    RefreshGroupTimelineTracks: SKIPPED (signature unchanged), {overallSw.ElapsedMilliseconds}ms");
+            return;
+        }
+        _groupTimelineSignature = newSignature;
+
         _groupTimelineTracks.Clear();
 
         // Shared across every row (#1056) so a frame of equal duration renders at equal width in
@@ -4540,19 +4641,39 @@ public partial class MainWindow : Window
         double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
             PreviewCtrl.GroupTracks.Select(t => t.Chain));
 
-        foreach (var (chain, _) in PreviewCtrl.GroupTracks)
+        LogSelectionPerf($"    RefreshGroupTimelineTracks: {groupTracks.Count} tracks, sharedPps computed at {overallSw.ElapsedMilliseconds}ms");
+
+        long buildMs = 0, colorMs = 0, thumbMs = 0;
+        int frameCount = 0, thumbCount = 0;
+        var stepSw = new Stopwatch();
+        foreach (var (chain, _) in groupTracks)
         {
+            stepSw.Restart();
             var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain, sharedPps));
+            buildMs += stepSw.ElapsedMilliseconds;
+            frameCount += track.Frames.Count;
+
             if (chain.Frames.Count > 0)
             {
+                stepSw.Restart();
                 var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
+                colorMs += stepSw.ElapsedMilliseconds;
+
                 for (int i = 0; i < chain.Frames.Count && i < track.Frames.Count; i++)
+                {
+                    stepSw.Restart();
                     track.Frames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], colors[i], 22, 18);
+                    thumbMs += stepSw.ElapsedMilliseconds;
+                    thumbCount++;
+                }
             }
             _groupTimelineTracks.Add(track);
         }
+        LogSelectionPerf($"    RefreshGroupTimelineTracks loop: {frameCount} total frames, BuildFrameItems={buildMs}ms, ResolveAll(colors)={colorMs}ms, GetFrameThumbnail={thumbMs}ms across {thumbCount} calls");
 
+        stepSw.Restart();
         RefreshGroupTimelineScrubbers();
+        LogSelectionPerf($"    RefreshGroupTimelineTracks: RefreshGroupTimelineScrubbers={stepSw.ElapsedMilliseconds}ms, TOTAL={overallSw.ElapsedMilliseconds}ms");
     }
 
     /// <summary>

@@ -47,6 +47,29 @@ public class AppCommandsHotReloadTsxTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// Live bug: opening a .tsx never started the hot-reload watcher at all, so an external edit
+    /// to the file (hand-editing the raw XML, another tab's "sync associated Tiled tilesets"
+    /// writing to it) was never picked up no matter how long you waited or how many times you
+    /// saved -- AchxChangedOnDisk can only fire for a path the watcher was told to watch, and
+    /// OpenTsxWorkflowAsync never called HotReloadWatcher.StartWatching (it hand-duplicates
+    /// FinishLoadIntoEditor's steps instead of calling it, and dropped that one on the way).
+    /// </summary>
+    [Fact]
+    public async Task OpenTsxWorkflowAsync_StartsWatchingTheOpenedTsxPath()
+    {
+        var spy = new AppCommandsHotReloadTests.SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+
+        string tsxPath = WriteTsx("Heroes.tsx", TsxFixtureXml);
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(tsxPath);
+
+        // Compares against IProjectManager.FileName (the authoritative "what's open now"),
+        // not the raw tsxPath string -- the watcher is started via SyncHotReloadWatcher, which
+        // reads the normalized FileName rather than passing the caller's literal path through.
+        Assert.Equal(_ctx.ProjectManager.FileName, spy.LastStartAchxPath);
+    }
+
     [Fact]
     public async Task ReloadAchxFromDisk_NativeTsxPath_ReloadsAsTsxNotAsAnEmptyAchx()
     {

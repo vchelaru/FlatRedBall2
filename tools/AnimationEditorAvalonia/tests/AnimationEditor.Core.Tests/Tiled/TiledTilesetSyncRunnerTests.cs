@@ -67,8 +67,11 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
-    public void SyncAll_ChainRemovedSinceLastSync_ClearsStaleTileOnReSync()
+    public void SyncAll_ChainRemovedSinceLastSync_RemovesStaleTileOnReSyncRatherThanLeavingAnEmptyStub()
     {
+        // A tile with nothing left after clearing (issue found via ChibiCthulhuTiles.tsx: a
+        // removed animation left a bare <tile id="0"/> stub behind, one per animation ever
+        // removed) must disappear from the file entirely on re-sync, not just lose its animation.
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         var tsxPath = WriteFixtureTileset(tempDir);
         var achxPath = Path.Combine(tempDir, "Hero.achx");
@@ -78,8 +81,38 @@ public class TiledTilesetSyncRunnerTests
         TiledTilesetSyncRunner.SyncAll(emptyAchj, achxPath, [tsxPath]);
 
         var reloaded = Loader.Default().LoadTileset(tsxPath);
-        var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(tile0.Animation);
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 0);
+    }
+
+    [Fact]
+    public void SyncAll_ChainRemovedSinceLastSync_LeavesOtherAnimatedTilesUntouched()
+    {
+        // Removing one animation's stale tile must patch out only that tile's own line -- a
+        // sibling <tile> (e.g. tile 4 from a second chain) must survive with its animation intact,
+        // proving the removal doesn't disturb TsxWriter's in-place line patching for neighbors.
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+
+        var save = AchjWithWalkChain();
+        var idleChain = new AnimationChainSave { Name = "Idle" };
+        idleChain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Heroes.png", FrameLength = 0.1f,
+            LeftCoordinate = 0, TopCoordinate = 16, RightCoordinate = 16, BottomCoordinate = 32,
+        });
+        save.AnimationChains.Add(idleChain);
+        TiledTilesetSyncRunner.SyncAll(save, achxPath, [tsxPath]);
+
+        // "Walk" (tile 0) is gone from the achx; "Idle" (tile 4) still exists.
+        var onlyIdle = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        onlyIdle.AnimationChains.Add(idleChain);
+        TiledTilesetSyncRunner.SyncAll(onlyIdle, achxPath, [tsxPath]);
+
+        var reloaded = Loader.Default().LoadTileset(tsxPath);
+        Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 0);
+        var idleTile = reloaded.Tiles.Single(t => t.ID == 4);
+        Assert.Equal([((uint)4, 100)], idleTile.Animation.Select(f => (f.TileID, f.Duration)));
     }
 
     [Fact]

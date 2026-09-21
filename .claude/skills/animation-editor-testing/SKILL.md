@@ -78,7 +78,7 @@ Both the persistent startup banner and the About dialog's "Check for Updates"/"R
 
 `AnimationChainListSave`'s default `CoordinateType` is the legacy UV format. A fixture written with the default and then opened via `OpenFileAsTab`/`LoadAnimationFileAsync` (not just scanned into `ProjectPanel.TreeRoots`) routes through `AppCommands.OpenAchxWorkflowAsync`'s `UvLoadGate`, which calls `ConfirmAsync` to ask about converting to pixel coordinates. Unless the test stubbed `ConfirmAsync`, this hits the real Avalonia dialog and hangs forever — indistinguishable from a genuine deadlock. Always set `CoordinateType = TextureCoordinateType.Pixel` on fixtures that get opened through the real load path (a fixture only ever scanned into the Project tree doesn't need it).
 
-For an unexplained hang, `dotnet test ... --blame-hang-timeout 45s` kills and reports after 45s instead of waiting indefinitely — much cheaper than guessing.
+For an unexplained hang, `dotnet test ... --blame-hang-timeout 45s` kills and reports after 45s instead of waiting indefinitely — much cheaper than guessing. For a native crash (access violation) that takes down the whole test host mid-run, `--blame-crash` instead writes a `Sequence_*.xml` listing every test in run order with `Completed="False"` on whichever one was executing when it died — read that file to find the culprit instead of manually bisecting with `--filter`.
 
 ## Tests must never write the developer's real settings
 

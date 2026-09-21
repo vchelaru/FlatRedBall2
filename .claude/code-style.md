@@ -1,6 +1,6 @@
 # Code Style
 
-Naming conventions and formatting rules will be established as the architecture finalizes. See `ARCHITECTURE.md` for the current design direction.
+Naming conventions and formatting rules will be established as the architecture finalizes.
 
 ## Diagnostics / Logging
 
@@ -51,6 +51,10 @@ Every test must explicitly declare all values it will assert against in its Arra
 Helper methods are fine for common setup (file creation, object initialization), but should accept parameters for the specific values being tested. This makes tests self-contained and prevents hidden dependencies.
 
 **Pattern**: If you assert a specific value, that value must be explicitly declared in the test's Arrange section.
+
+## XML Documentation
+
+Add XML doc comments only on public-facing members where behavior isn't obvious from the name and signature alone. Document when: there's a non-obvious gotcha; a parameter's valid range/semantics needs clarification; the method has a side effect or ordering constraint the caller must know. Do not document when: the name/signature already tell the story; the member is `internal`/`private`; you'd just restate the name in prose.
 
 ## File Formats
 

@@ -75,6 +75,89 @@ public class GroupTimelineUiTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// Live bug found while investigating the multi-select freeze (issue: selecting many chains
+    /// stayed slow for ~1-2s even after the tree-selection burst itself was coalesced): this
+    /// method's own doc comment says it should only run when the group's chain membership
+    /// actually changes, but <c>RefreshTimelineStrip</c> calls it on EVERY refresh regardless --
+    /// any unrelated selection-changed dispatch while a large group is active re-rebuilds every
+    /// row's frame VMs and thumbnails for nothing (measured: 40 chains, several ~20-35ms redundant
+    /// rebuilds back to back).
+    /// </summary>
+    [AvaloniaFact]
+    public void RefreshTimelineStrip_CalledAgainWithUnchangedGroupMembership_DoesNotRebuildTrackRows()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 2);
+        var b = MakeChain("B", 3);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(a);
+        acls.AnimationChains.Add(b);
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            LoadProjectIntoWindow(ctx, window, acls);
+
+            ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+            Dispatcher.UIThread.RunJobs();
+
+            var tracks = window.FindControl<ItemsControl>("GroupTimelineTracks")!;
+            var items = Assert.IsType<ObservableCollection<ChainTimelineTrackVm>>(tracks.ItemsSource);
+            Assert.Equal(2, items.Count);
+            var firstBuildRowA = items[0];
+            var firstBuildRowB = items[1];
+
+            // Re-trigger the refresh path (mirrors an unrelated selection-changed dispatch, e.g.
+            // RouteNodeSelection's second SelectionChanged fire) without the group's chain
+            // membership actually changing.
+            typeof(MainWindow).GetMethod("RefreshTimelineStrip", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, null);
+
+            Assert.Equal(2, items.Count);
+            Assert.Same(firstBuildRowA, items[0]); // not rebuilt -- same row VM instance
+            Assert.Same(firstBuildRowB, items[1]);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>The skip-when-unchanged guard above must not suppress a REAL membership change --
+    /// growing the group from 2 to 3 chains must still rebuild with the new row.</summary>
+    [AvaloniaFact]
+    public void RefreshTimelineStrip_GroupMembershipGrows_StillRebuildsWithNewRow()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 2);
+        var b = MakeChain("B", 3);
+        var c = MakeChain("C", 1);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(a);
+        acls.AnimationChains.Add(b);
+        acls.AnimationChains.Add(c);
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            LoadProjectIntoWindow(ctx, window, acls);
+
+            ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+            Dispatcher.UIThread.RunJobs();
+
+            ctx.SelectedState.SelectedNodes = new List<object> { a, b, c };
+            Dispatcher.UIThread.RunJobs();
+
+            var tracks = window.FindControl<ItemsControl>("GroupTimelineTracks")!;
+            var items = Assert.IsType<ObservableCollection<ChainTimelineTrackVm>>(tracks.ItemsSource);
+            Assert.Equal(3, items.Count);
+            Assert.Equal("C", items[2].ChainName);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void RefreshTimelineStrip_DropBackToSingleSelection_RestoresSingleRowStrip()
     {

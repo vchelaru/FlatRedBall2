@@ -212,8 +212,10 @@ public partial class ProjectPanelControl : UserControl
     {
         foreach (var node in nodes)
         {
-            if (node.IsFile) results.Add(node);
-            else CollectFileNodes(node.Children, results);
+            // A .tsx has no animation frames to preview -- it always shows the Tiled icon
+            // (ShowTsxIcon), so there's nothing for ProjectTreeThumbnailService to generate.
+            if (node.IsFile && !node.IsTsx) results.Add(node);
+            else if (!node.IsFile) CollectFileNodes(node.Children, results);
         }
     }
 
@@ -242,7 +244,7 @@ public partial class ProjectPanelControl : UserControl
     /// </summary>
     public async Task InvalidateThumbnail(AchxFileEntry entry)
     {
-        if (_thumbnailService is null) return;
+        if (_thumbnailService is null || entry.IsTsx) return;
 
         var node = FindNode(TreeRoots, entry);
         if (node is null) return;
@@ -583,7 +585,13 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
     }
 
     public bool HasThumbnail => _thumbnail is not null;
-    public bool ShowFallbackIcon => IsFile && _thumbnail is null;
+
+    /// <summary>True for a <c>.tsx</c> row -- shown with the Tiled icon instead of the
+    /// chain icon/thumbnail, since a tileset has no animation frames to preview.</summary>
+    public bool IsTsx => Entry?.IsTsx == true;
+
+    public bool ShowFallbackIcon => IsFile && !IsTsx && _thumbnail is null;
+    public bool ShowTsxIcon => IsTsx;
 
     public bool IsExpanded
     {

@@ -24,7 +24,7 @@ Do not ask about:
 - Specific mechanics before you understand the feel
 - Anything that sounds like an engineering question
 
-The coder agent handles those concerns later. Your only job is to understand the desired experience.
+Implementation handles those concerns later. Your only job is to understand the desired experience.
 
 # Conversation Flow
 

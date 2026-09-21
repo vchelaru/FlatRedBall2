@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: "Minigame orchestrator for FlatRedBall2. Designs a small retro game (user-provided or random), delegates implementation to a coder sub-agent, builds it, and reports friction. Use when the user says 'make a random game', 'use the orchestrator', or similar."
+description: "Minigame orchestrator for FlatRedBall2. Designs a small retro game (user-provided or random), delegates implementation to a fresh sub-agent, builds it, and reports friction. Use when the user says 'make a random game', 'use the orchestrator', or similar."
 ---
 
 # Minigame Orchestrator
@@ -9,7 +9,7 @@ description: "Minigame orchestrator for FlatRedBall2. Designs a small retro game
 
 Test the FlatRedBall2 engine's AI-usability by designing and implementing a small retro game, then reporting friction.
 
-**Critical constraint:** Do NOT read existing samples (`samples/`), unit tests (`tests/`), or any game code outside `src/` and the current project being built. The only resources available are: engine source code (`src/`), XML docs, skill files (`frb-skills/` for game-dev skills, `.claude/skills/` for engine-contributor skills), and templates (`.claude/templates/`). This applies to you AND to the coder agent you delegate to. The whole point of this evaluation is to test whether the engine's docs and skills are sufficient — looking at other samples defeats the purpose.
+**Critical constraint:** Do NOT read existing samples (`samples/`), unit tests (`tests/`), or any game code outside `src/` and the current project being built. The only resources available are: engine source code (`src/`), XML docs, skill files (`frb-skills/` for game-dev skills, `.claude/skills/` for engine-contributor skills), and templates (`.claude/templates/`). This applies to you AND to the sub-agent you delegate to. The whole point of this evaluation is to test whether the engine's docs and skills are sufficient — looking at other samples defeats the purpose.
 
 # Pipeline
 
@@ -92,9 +92,9 @@ The GDD should follow this structure (keep it concise — this is micro scope):
 <what is explicitly OUT of scope for this micro evaluation>
 ```
 
-## Step 4: Delegate to Coder Agent
+## Step 4: Delegate to a Fresh Sub-Agent
 
-**Do not implement the game yourself.** Use the Agent tool to spawn a `coder` sub-agent with the following prompt (fill in the blanks from your design):
+**Do not implement the game yourself.** Use the Agent tool to spawn a fresh `general-purpose` sub-agent (no prior context — the whole point is to test how an agent with only engine source, XML docs, and skill files performs) with the following prompt (fill in the blanks from your design):
 
 ```
 Implement the game described in samples/auto/<ProjectName>/design.md as a new FlatRedBall2 sample project.
@@ -115,7 +115,7 @@ Content mode decisions (do not ask — use these):
 **Scaffolding rule (non-negotiable):** Follow the `content-boundary` skill's one-of-each rule. Place exactly one tile of each collision class the code references and exactly one marker of each entity type the code spawns — no more. Do not author a designed level, do not procedurally generate tile CSV, do not call out to Python or shell scripts to produce content. If you catch yourself writing a loop to fill tile data, stop — you have crossed from scaffolding into authoring. The human opens the TMX in Tiled and designs the real level.
 ```
 
-Wait for the coder agent to complete before proceeding.
+Wait for the sub-agent to complete before proceeding.
 
 ## Step 5: Build
 
@@ -137,11 +137,11 @@ Smoke-run guidance:
 
 Before writing the result file, honestly answer these questions:
 
-1. **Did you spawn a `coder` agent in Step 4?** (Yes/No)
-2. **Did the `coder` agent write all the game code?** (Yes/No)
+1. **Did you spawn a fresh sub-agent in Step 4?** (Yes/No)
+2. **Did that sub-agent write all the game code?** (Yes/No)
 3. **Did you write or edit any game source files yourself** (outside of build fixes in Step 5)? (Yes/No — if Yes, list which files)
 
-If the answer to #1 or #2 is No, or #3 is Yes, you violated the pipeline. This is a **critical process failure** — the entire point of the orchestrator is to test how the *coder agent* performs with the engine's skills and docs. If you implemented the game yourself, the friction feedback is about *your* experience, not the coder's, which defeats the purpose of the evaluation.
+If the answer to #1 or #2 is No, or #3 is Yes, you violated the pipeline. This is a **critical process failure** — the entire point of the orchestrator is to test how a *fresh agent* performs with the engine's skills and docs. If you implemented the game yourself, the friction feedback is about *your* experience, not the sub-agent's, which defeats the purpose of the evaluation.
 
 Record your answers — they go in the result file.
 
@@ -162,10 +162,10 @@ Create a result file at `samples/auto/eval-results/<game-name>.md` with this exa
 <1-2 sentences: what keys to press, what the goal is>
 
 ## Delegation Audit
-- Spawned coder agent: <Yes/No>
-- Coder agent wrote all game code: <Yes/No>
+- Spawned fresh sub-agent: <Yes/No>
+- Sub-agent wrote all game code: <Yes/No>
 - Orchestrator edited game source files (outside build fixes): <Yes/No — list files if Yes>
-- **Verdict:** <PASS or FAIL — FAIL if coder was not used or orchestrator wrote game code>
+- **Verdict:** <PASS or FAIL — FAIL if a fresh sub-agent was not used or orchestrator wrote game code>
 
 ## Feedback
 <Friction points from implementation — things that were confusing, required excessive context, had unclear APIs, missing/misleading docs, or missing skill coverage. If everything went smoothly, just write "No concerns.">

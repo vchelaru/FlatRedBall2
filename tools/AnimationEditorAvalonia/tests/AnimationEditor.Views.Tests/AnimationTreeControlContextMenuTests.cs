@@ -62,7 +62,7 @@ public class AnimationTreeControlContextMenuTests
         public bool IsNativeTsxProject => false;
         public (int Width, int Height)? TsxTileSize => null;
         public void LoadTsxProject(FilePath fileName) { }
-        public void SaveTsxProject(string? targetPath = null) { }
+        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
         public object? CaptureTsxState() => null;
         public void RestoreTsxState(object? state) { }

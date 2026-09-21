@@ -13,7 +13,7 @@ tools/AnimationEditorAvalonia/
 
 > The legacy WinForms version (`FlatRedBall.AnimationEditorForms`) lives in the separate `FlatRedBall` (FRB1) repo at `FRBDK/FlatRedBall.AnimationEditorForms/`. Do **not** edit it for FRB2 issues — that codebase is being replaced. Issues filed in `vchelaru/FlatRedBall2` always refer to the Avalonia version.
 
-For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. For generating headless documentation screenshots of the UI, see the **`animation-editor-screenshots`** skill. For WASM/`?demo=` visual proof in the browser host, see **`animation-editor-browser-verify`**.
+For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. For generating headless documentation screenshots of the UI, see the **`animation-editor-screenshots`** skill. For WASM/`?demo=` visual proof in the browser host, see **`animation-editor-browser-verify`**. For SkiaSharp rendering internals and performance debugging, see **`animation-editor-rendering`**.
 
 ## `.achx` is a general-purpose format — the editor authors, runtimes interpret
 
@@ -71,16 +71,6 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 **Landmine — the zoom hosts share no base class.** `IZoomTarget` exists only because `TextureViewport` (wireframe + PNG viewer) and `PreviewControl` are unrelated types. To share any *other* viewport behavior across both, extend `IZoomTarget` (or add a sibling interface); there is no common base to hang it on.
 
 **Scan for an existing control before adding one to a second surface; extract on the second copy.** `ZoomControl` exists because the widget was first duplicated as raw XAML plus per-host event wiring across three toolbars. When a control *and its wiring* would be copied a second time, factor it into a reusable `UserControl` — duplicated markup and its feedback-loop plumbing drift apart otherwise. (Testing an extracted `UserControl` has a namescope gotcha — see `animation-editor-testing`.)
-
-## Rendering & performance
-
-Both panels render through a SkiaSharp `ICustomDrawOperation` on Avalonia's render thread (top: `WireframeControl.DrawOp.Render`; bottom: `PreviewControl.DrawFrameCore`). `lease.GrContext != null` means the GPU (ANGLE) path; null means CPU (software) — the two behave differently, so always know which you're on before reasoning about cost.
-
-**A "used to be smooth, now it's slow" report is a git signal, not an architecture signal.** Before theorizing about the pipeline, `git log` the render files — a recent commit that changed *how an image is drawn* is far more often the cause than a long-standing pattern suddenly biting. Chasing the architecture first wastes rounds.
-
-**Measure before guessing.** An on-canvas draw-time overlay (rolling ms/frame + a GPU/CPU tag) toggles with **F3** (`DiagnosticsEnabled` on each control, rendered by `DrawTimeOverlay`). Turn it on first: the ms reading plus the GPU/CPU tag localize the cost and rule out whole categories of hypothesis immediately.
-
-**Landmine — a raster `SKImage` re-uploads to the GPU every frame.** An `SKImage` from `SKImage.FromBitmap` is CPU-resident; on the GPU path Skia re-uploads the *visible source region* on each draw, so cost scales inversely with zoom — **zoomed out is slower**, which misdirects toward mipmaps/filtering. Fix: let Skia keep the texture cached by raising the GPU resource-cache budget once per lease (`GRContext.SetResourceCacheLimit`), sized to hold the image. Do **not** hand-manage a GPU copy via `SKImage.ToTextureImage` held across frames — opening a menu/popup purges the `GRContext`, leaving that cached texture dangling so it draws nothing (blank/flicker of *only* the image, while vector draws in the same pass survive). Skia's own cache re-uploads correctly after a purge; a hand-held texture does not.
 
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 

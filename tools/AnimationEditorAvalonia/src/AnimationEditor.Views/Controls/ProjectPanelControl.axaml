@@ -8,8 +8,9 @@
         <x:Double x:Key="ProjectTreeThumbSize">28</x:Double>
     </UserControl.Resources>
     <!--
-        Open Project Folder (#770): recursively-discovered .achx tree for a picked folder.
-        Click a file row to open it, click a folder row to expand/collapse. First-frame
+        Open Project Folder (#770): recursively-discovered .achx/.achj/.tsx tree for a picked
+        folder (.tsx surfaced later; OpenProjectWorkflowAsync already opens one as a native
+        tsx project). Click a file row to open it, click a folder row to expand/collapse. First-frame
         thumbnails (#839) load lazily via ProjectTreeThumbnailService and need no Window,
         so this control stays shareable, unmodified, between desktop and the browser build.
         Deliberately still no drag support (unlike desktop's FilesPanelControl), which does
@@ -80,6 +81,13 @@
                                  Width="16" Height="16"
                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
                                  CurrentColor="{DynamicResource IconInkMuted}" />
+                        <!-- .tsx row: the same Tiled logo used elsewhere in the app
+                             (status bar's tileset-sync indicator) rather than the chain icon,
+                             since a tileset has no animation frames to preview. -->
+                        <Image IsVisible="{Binding ShowTsxIcon}"
+                               Width="16" Height="16"
+                               Source="avares://AnimationEditor.Views/Assets/icons/png/tiled-icon-128.png"
+                               Stretch="Uniform" />
                         <Image IsVisible="{Binding HasThumbnail}"
                                Width="{StaticResource ProjectTreeThumbSize}"
                                Height="{StaticResource ProjectTreeThumbSize}"

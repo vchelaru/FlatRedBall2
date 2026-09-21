@@ -231,7 +231,9 @@ public class AppCommandsHotReloadTests : IDisposable
         Assert.Contains(expectedAbs, spy.LastStartPngPaths!, StringComparer.OrdinalIgnoreCase);
     }
 
-    private sealed class SpyHotReloadWatcher : IHotReloadWatcher
+    /// <summary>Also reused by <c>AppCommandsHotReloadTsxTests</c> to verify the tsx open path
+    /// wires the watcher the same way the achx open path does.</summary>
+    internal sealed class SpyHotReloadWatcher : IHotReloadWatcher
     {
         public string? LastStartAchxPath;
         public List<string>? LastStartPngPaths;

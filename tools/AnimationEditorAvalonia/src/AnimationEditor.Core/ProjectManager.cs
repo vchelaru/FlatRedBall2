@@ -765,12 +765,24 @@ namespace AnimationEditor.Core
                 if (chain.Frames.Count > 0)
                     _tsxLastNonEmptyFramesByChain[chain] = chain.Frames.ToArray();
             _tsxDormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance);
+
+            // Same reused-instance hazard LoadAnimationChain resets its own achx-side fields for:
+            // this ProjectManager instance is reused across File > Open calls, so a prior achx's
+            // ReferencedPngs/OnDiskCoordinateType must not leak into a now-open tsx project. A tsx
+            // has no ProjectFile/CoordinateType concept of its own, so these just go back to their
+            // no-project defaults rather than being recomputed from the tsx.
+            ReferencedPngs = new FilePath[0];
+            OnDiskCoordinateType = TextureCoordinateType.Pixel;
         }
 
         /// <summary>
         /// Saves the current <see cref="AnimationChainListSave"/> back to the tsx opened by <see
         /// cref="LoadTsxProject"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and <see
-        /// cref="Tiled.NativeTsxAnimationSync"/>. No-op if no tsx project is loaded.
+        /// cref="Tiled.NativeTsxAnimationSync"/>. No-op (returns an empty list) if no tsx project is
+        /// loaded. Returns every chain's mapping warning from this save -- a chain that couldn't be
+        /// mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
+        /// untouched rather than being cleared, so a caller should surface these to the user instead
+        /// of assuming the save fully captured every edit.
         /// </summary>
         /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
         /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
@@ -778,10 +790,10 @@ namespace AnimationEditor.Core
         /// after <see cref="Tiled.TsxWriter.Write(DotTiled.Tileset, string)"/> has actually
         /// succeeded -- so a write failure (an unsupported construct, a disk/permissions error)
         /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
-        public void SaveTsxProject(string? targetPath = null)
+        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null)
         {
             if (_tsxTileset == null || AnimationChainListSave == null)
-                return;
+                return [];
 
             // Revives a dormant hint for this save's Map() call, but only for a chain whose
             // current Frames are reference-sequence-identical to the ones captured when that hint
@@ -959,6 +971,8 @@ namespace AnimationEditor.Core
             _tsxSatelliteTileIdsByChain = updatedSatellites;
             _tsxLastNonEmptyFramesByChain = updatedLastFrames;
             _tsxDormantHintsByChain = updatedDormant;
+
+            return mapped.SelectMany(r => r.Warnings).ToList();
         }
 
         /// <summary>Whether <paramref name="a"/> and <paramref name="b"/> hold the exact same

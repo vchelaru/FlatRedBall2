@@ -126,6 +126,27 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Equal((16, 16), pm.TsxTileSize);
     }
 
+    // Duplication sweep: LoadAnimationChain resets ReferencedPngs/OnDiskCoordinateType because
+    // one ProjectManager instance is reused across File > Open calls (see LoadAnimationChain's own
+    // "must not leak into a now-plain achx project" comment for the tsx-side fields it resets).
+    // LoadTsxProject never got the symmetric reset, so opening an achx (populating these two
+    // fields) and then a tsx in the same tab leaked the achx's stale PNGs into the tsx project --
+    // concretely, MainWindow's texture combo unions in ReferencedPngs, so it offered textures from
+    // a project that was no longer open.
+    [Fact]
+    public void LoadTsxProject_PriorAchxLeftReferencedPngsAndCoordinateType_ClearsThemForTheTsxProject()
+    {
+        var pm = new ProjectManager();
+        pm.ReferencedPngs = new[] { new FilePath(Path.Combine(_dir.Path, "StaleFromAchx.png")) };
+        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+
+        pm.LoadTsxProject(new FilePath(path));
+
+        Assert.Empty(pm.ReferencedPngs);
+        Assert.Equal(TextureCoordinateType.Pixel, pm.OnDiskCoordinateType);
+    }
+
     [Fact]
     public void LoadTsxProject_UnsupportedConstruct_ThrowsAndLeavesProjectUnchanged()
     {
@@ -304,9 +325,9 @@ public class ProjectManagerTsxProjectTests : IDisposable
         pm.SaveTsxProject();
 
         var afterClear = DotTiled.Serialization.Loader.Default().LoadTileset(path);
-        var clearedTile = afterClear.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(clearedTile.Animation);
-        Assert.DoesNotContain(clearedTile.Properties, p => p.Name is "Name" or "ParentId");
+        // Tile 0 only ever existed to carry this chain's animation -- with nothing left after
+        // clearing, it must be removed entirely rather than left as a bare <tile id="0"/> stub.
+        Assert.DoesNotContain(afterClear.Tiles, t => t.ID == 0);
 
         // Re-populate the same chain object with frames that map to a different tile (row 1,
         // column 0 -> tile id 4). If the stale tile-0 identity hint lingered, this would either
@@ -323,8 +344,9 @@ public class ProjectManagerTsxProjectTests : IDisposable
 
         var afterResave = DotTiled.Serialization.Loader.Default().LoadTileset(path);
         Assert.Equal((uint)4, EntryTileIdNamed(afterResave, "ID:0"));
-        var tileZeroAfterResave = afterResave.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(tileZeroAfterResave.Animation);
+        // Tile 0 stays gone -- the re-populated chain now maps to tile 4, and nothing recreates
+        // a tile-0 stub along the way.
+        Assert.DoesNotContain(afterResave.Tiles, t => t.ID == 0);
     }
 
     // DeleteChainsCommand.Do() removes the chain from AnimationChainListSave.AnimationChains and
@@ -577,6 +599,55 @@ public class ProjectManagerTsxProjectTests : IDisposable
         var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
         Assert.NotNull(riseUp);
         Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // The abort test above only checks the FINAL state after the chain is fixed and re-saved -- it
+    // never confirmed what the file looks like right after the aborting save itself. In practice
+    // (issue found live: resizing a chain's frame to a size Tiled can't represent as a tile
+    // animation) a user can abort a save and not immediately un-abort it -- the previously-working
+    // animation must still be sitting on disk in the meantime, not wiped the moment the edit that
+    // broke it gets saved.
+    [Fact]
+    public void SaveTsxProject_MappingAborts_LeavesPreviouslyOwnedTileAnimationUntouchedRatherThanWipingIt()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        chain.Frames[0].TextureName = "Wrong.png";
+
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
+    // The exact live-bug shape: growing one frame of a single-cell chain to try to turn it into a
+    // multi-tile group, without growing every other frame to match, doesn't create satellites --
+    // it fails MultiTileToTiledAnimationMapper's "every frame must share the chain's footprint"
+    // check, and (before this fix) silently deleted the chain's original, working single-cell
+    // animation as a side effect of the failed resize.
+    [Fact]
+    public void SaveTsxProject_GrowOnlyOneFrameToSpanMultipleCells_FailsValidationButPreservesOriginalAnimation()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        // Grow frame 0 from one 16px tile (UV 0.25) to two tiles (UV 0.5) wide; frame 1 stays a
+        // single 16px cell -- the two frames now disagree on footprint size.
+        chain.Frames[0].RightCoordinate = 0.5f;
+
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var tile0 = reloaded.Tiles.SingleOrDefault(t => t.ID == 0);
+        Assert.NotNull(tile0);
+        Assert.Equal([((uint)0, 200), ((uint)1, 200)], tile0!.Animation.Select(f => (f.TileID, f.Duration)));
     }
 
     // A dormant chain (frames cleared to zero, hint parked in _tsxDormantHintsByChain) whose

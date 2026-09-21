@@ -70,8 +70,16 @@ public static class TilesetAnimationSync
         var changed = false;
 
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
-            if (ClearTile(tilesById[staleTileId]))
+        {
+            var staleTile = tilesById[staleTileId];
+            if (ClearTile(staleTile))
                 changed = true;
+            if (IsTileEmpty(staleTile))
+            {
+                tileset.Tiles.Remove(staleTile);
+                tilesById.Remove(staleTileId);
+            }
+        }
 
         var appliedCount = 0;
         var warnings = new List<string>();
@@ -131,7 +139,10 @@ public static class TilesetAnimationSync
     /// <summary>Clears a stale tile's animation/tracking properties. Returns whether it actually
     /// had anything to clear -- a tile only ever enters this path because it's currently tracked
     /// (i.e. it has <see cref="SourceFilePropertyName"/> set), so in practice this is always
-    /// <c>true</c>, but the check keeps the method honest rather than assuming that invariant.</summary>
+    /// <c>true</c>, but the check keeps the method honest rather than assuming that invariant.
+    /// Doesn't remove the tile itself -- callers that want that call <see cref="IsTileEmpty"/>
+    /// afterward, since a tile carrying other, non-sync-owned properties must stay in the
+    /// file.</summary>
     private static bool ClearTile(Tile tile)
     {
         var hadAnimation = tile.Animation.Count > 0;
@@ -140,6 +151,24 @@ public static class TilesetAnimationSync
         tile.Properties.RemoveAll(p => p.Name is AnimationNamePropertyName or SourceFilePropertyName);
         return hadAnimation || hadTrackingProperties;
     }
+
+    /// <summary>Whether a tile has nothing left worth keeping a &lt;tile&gt; element for -- no
+    /// animation, no properties, and none of Tiled's other per-tile data (type/probability/x/y/
+    /// width/height/image/object layer). A tile that only ever existed to carry an animation this
+    /// sync owns becomes exactly this once <see cref="ClearTile"/> strips it, and leaving it in
+    /// <see cref="Tileset.Tiles"/> as a bare <c>&lt;tile id="N"/&gt;</c> stub would accumulate one
+    /// such stub per animation ever removed.</summary>
+    private static bool IsTileEmpty(Tile tile) =>
+        string.IsNullOrEmpty(tile.Type) &&
+        tile.Probability == 0f &&
+        tile.X == 0 &&
+        tile.Y == 0 &&
+        tile.Width == 0 &&
+        tile.Height == 0 &&
+        !tile.Image.HasValue &&
+        !tile.ObjectLayer.HasValue &&
+        tile.Properties.Count == 0 &&
+        tile.Animation.Count == 0;
 
     private static bool AnimationEquals(List<Frame> a, List<Frame> b)
     {

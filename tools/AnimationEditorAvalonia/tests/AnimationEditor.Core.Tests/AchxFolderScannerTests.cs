@@ -44,6 +44,29 @@ public class AchxFolderScannerTests
     }
 
     [Fact]
+    public async Task ScanAsync_TsxFile_IsIncludedAndFlaggedAsTsx()
+    {
+        var root = new FakeEditorFolder("Content");
+        root.Files.Add(new FakeEditorFile("hero.achx"));
+        root.Files.Add(new FakeEditorFile("Tileset.tsx"));
+        root.Files.Add(new FakeEditorFile("notes.txt"));
+
+        var entries = await AchxFolderScanner.ScanAsync(root);
+
+        Assert.Equal(["hero.achx", "Tileset.tsx"], entries.Select(e => e.FileName).OrderBy(n => n).ToArray());
+        Assert.True(entries.Single(e => e.FileName == "Tileset.tsx").IsTsx);
+        Assert.False(entries.Single(e => e.FileName == "hero.achx").IsTsx);
+    }
+
+    [Theory]
+    [InlineData("Tileset.tsx", true)]
+    [InlineData("Tileset.TSX", true)]
+    [InlineData("hero.achx", false)]
+    [InlineData("hero.achj", false)]
+    public void IsTsxPath_MatchesTsxExtensionCaseInsensitively(string path, bool expected) =>
+        Assert.Equal(expected, AchxFolderScanner.IsTsxPath(path));
+
+    [Fact]
     public async Task ScanAsync_NestedSubfolders_ReturnsRelativePathsAndParentFolder()
     {
         var root = new FakeEditorFolder("Content");

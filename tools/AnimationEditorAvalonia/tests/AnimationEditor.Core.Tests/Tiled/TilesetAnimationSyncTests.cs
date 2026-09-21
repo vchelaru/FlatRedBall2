@@ -76,8 +76,11 @@ public class TilesetAnimationSyncTests
     }
 
     [Fact]
-    public void Apply_RemovedChain_ClearsStaleTileAnimationAndTrackingProperties()
+    public void Apply_RemovedChain_TileHasNothingElse_RemovesTileEntirely()
     {
+        // The tile only ever existed to carry "Walk"'s animation -- once that's gone there's
+        // nothing left worth a <tile id="0"/> stub for. Leaving one behind accumulates one bare
+        // stub per animation ever removed (issue found via ChibiCthulhuTiles.tsx).
         var tileset = EmptyTileset();
         var firstSync = new[] { Result("Walk", 0, new MappedFrame(0, 100)) };
         TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
@@ -85,9 +88,81 @@ public class TilesetAnimationSyncTests
         // The "Walk" chain no longer exists in the source (deleted or renamed away from tile 0).
         var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
 
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOtherProperty_KeepsTileButClearsAnimationAndTrackingProperties()
+    {
+        // A tile carrying a property this sync doesn't own (e.g. hand-authored gameplay data)
+        // must survive the animation being removed -- only the achjAnimationName/achjSourceFile
+        // tracking properties and the animation itself get cleared.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, new MappedFrame(0, 100)) };
+        TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
         var tile = tileset.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(tile.Animation);
-        Assert.DoesNotContain(tile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+        tile.Properties.Add(new StringProperty { Name = "Solid", Value = "true" });
+
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(survivingTile.Animation);
+        Assert.DoesNotContain(survivingTile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+        Assert.Equal("true", survivingTile.GetProperty<StringProperty>("Solid").Value);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasNonDefaultType_KeepsTileAfterClearing()
+    {
+        // Tiled attributes other than <properties> (e.g. a per-tile "type") are just as much a
+        // reason to keep the <tile> element as a property is -- IsTileEmpty must check them too.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, new MappedFrame(0, 100)) };
+        TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        tile.Type = "Chomper";
+
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Empty(survivingTile.Animation);
+        Assert.Equal("Chomper", survivingTile.Type);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOnlyAWrongTypedTrackingProperty_IsRemoved()
+    {
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
+        tile.Properties.Add(new IntProperty { Name = "achjAnimationName", Value = 42 });
+        tile.Properties.Add(new StringProperty { Name = "achjSourceFile", Value = SourceLabel });
+        tileset.Tiles.Add(tile);
+
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_RemovedChain_TileHasOtherEmptyStringProperty_KeepsTile()
+    {
+        // IsTileEmpty must key off property *presence*, not value -- an empty string is still a
+        // real property a human or another tool wrote and this sync doesn't own.
+        var tileset = EmptyTileset();
+        var firstSync = new[] { Result("Walk", 0, new MappedFrame(0, 100)) };
+        TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
+        var tile = tileset.Tiles.Single(t => t.ID == 0);
+        tile.Properties.Add(new StringProperty { Name = "Note", Value = "" });
+
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+
+        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
+        Assert.Contains(survivingTile.Properties, p => p.Name == "Note");
         Assert.True(syncResult.Changed);
     }
 
@@ -102,8 +177,7 @@ public class TilesetAnimationSyncTests
         var secondSync = new[] { Result("Walk", 5, new MappedFrame(5, 100)) };
         TilesetAnimationSync.Apply(tileset, secondSync, SourceLabel);
 
-        var oldTile = tileset.Tiles.Single(t => t.ID == 0);
-        Assert.Empty(oldTile.Animation);
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
 
         var newTile = tileset.Tiles.Single(t => t.ID == 5);
         Assert.Equal((uint)5, newTile.Animation.Single().TileID);
@@ -136,9 +210,7 @@ public class TilesetAnimationSyncTests
         var updatedTile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], updatedTile.Animation.Select(f => (f.TileID, f.Duration)));
 
-        var staleTile = tileset.Tiles.Single(t => t.ID == 5);
-        Assert.Empty(staleTile.Animation);
-        Assert.DoesNotContain(staleTile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 5);
 
         var newTile = tileset.Tiles.Single(t => t.ID == 10);
         Assert.Equal([((uint)10, 100)], newTile.Animation.Select(f => (f.TileID, f.Duration)));

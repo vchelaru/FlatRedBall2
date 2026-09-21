@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Tiled;
 using FlatRedBall2.AnimationEditorCommon;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
@@ -125,5 +126,59 @@ public class MultiTileToTiledAnimationMapperTests
 
         Assert.Empty(results[0].AnchorFrames);
         Assert.Contains("whole number of tiles", results[0].Warnings[0]);
+    }
+
+    [Fact]
+    public void Map_MappingFailsButHasKnownEntryHint_StillReportsHintedEntryTileIdSoItIsNotOrphaned()
+    {
+        // NativeTsxAnimationSync.Apply only protects a tile id from stale-clearing when it shows
+        // up in this save's results -- a failed chain (e.g. a resize that lands on a size that
+        // isn't a whole number of tiles) must keep reporting its last-known entry tile id from the
+        // save's identity hint, or the previously-working animation on that tile gets deleted as a
+        // side effect of the failed edit.
+        var achj = AchjWithChain("Bad", PixelFrame(0, 0, 20, 16));
+        var chain = achj.AnimationChains[0];
+        var hints = new Dictionary<AnimationChainSave, uint> { [chain] = 5 };
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo, hints);
+
+        var result = Assert.Single(results);
+        Assert.Empty(result.AnchorFrames);
+        Assert.NotEmpty(result.Warnings);
+        Assert.Equal((uint)5, result.EntryTileId);
+    }
+
+    [Fact]
+    public void Map_MappingFailsButHasKnownSatelliteHints_StillReportsHintedSatelliteTileIds()
+    {
+        var achj = AchjWithChain("Bad", PixelFrame(0, 0, 20, 16));
+        var chain = achj.AnimationChains[0];
+        var entryHints = new Dictionary<AnimationChainSave, uint> { [chain] = 0 };
+        var satelliteHints = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>
+        {
+            [chain] = new Dictionary<(int, int), uint> { [(1, 0)] = 1 },
+        };
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo, entryHints, satelliteHints);
+
+        var result = Assert.Single(results);
+        var satellite = Assert.Single(result.Satellites);
+        Assert.Equal((uint)1, satellite.TileId);
+    }
+
+    [Fact]
+    public void Map_ChainGenuinelyEmpty_NoWarningAndNoHintedEntryTileId()
+    {
+        // Distinguishes "mapping failed, protect the old tile" (above) from "the chain
+        // intentionally has no frames anymore, the old tile really is stale now."
+        var achj = AchjWithChain("Empty");
+        var chain = achj.AnimationChains[0];
+        var hints = new Dictionary<AnimationChainSave, uint> { [chain] = 5 };
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo, hints);
+
+        var result = Assert.Single(results);
+        Assert.Empty(result.Warnings);
+        Assert.Null(result.EntryTileId);
     }
 }

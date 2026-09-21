@@ -148,6 +148,7 @@ The description is loaded into every session's skill listing — it pays for its
 - Game-specific logic — FRB2 is an engine; score systems, wave spawning, and other consumer-game concerns don't belong here.
 - **In-flight migration / refactor state** — what's done *now*, what blocks what, what's left. This inverts to false the moment the work lands. Skills hold *timeless* structure only; transient progress belongs in conversation or a task tracker, not the skill.
 - **War stories — "Issue #N: X happened" framing, even for a landmine that never expires.** State the rule in pure present-tense, timeless form. The test: could this sentence be true independent of which issue surfaced it? If so, cut the issue reference.
+- **File:line citations.** A line number is stale the moment the file changes above or below it. Point at a symbol, method, or section name instead (`RenderFrameThumbnail` in `ThumbnailService.cs`, not `ThumbnailService.cs:270`). Applies to every guidance file, not just skills.
 - Anything derivable from a quick grep or general C# / .NET knowledge.
 - Stale every commit (TODOs, in-flight migrations).
 

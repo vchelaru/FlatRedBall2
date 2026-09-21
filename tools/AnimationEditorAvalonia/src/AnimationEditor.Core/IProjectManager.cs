@@ -38,9 +38,12 @@ namespace AnimationEditor.Core
         /// <see cref="ProjectManager.LoadTsxProject"/>.</summary>
         void LoadTsxProject(FilePath fileName);
 
-        /// <summary>Saves back to the tsx opened by <see cref="LoadTsxProject"/>; no-op if none is
-        /// loaded. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
-        void SaveTsxProject(string? targetPath = null);
+        /// <summary>Saves back to the tsx opened by <see cref="LoadTsxProject"/>; no-op (returns
+        /// empty) if none is loaded. Returns every mapping warning from this save (e.g. a chain
+        /// whose frame geometry couldn't be written this time) so a caller can surface them --
+        /// the chain's previously-written tile is left untouched, not cleared, when this is
+        /// non-empty. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
+        IReadOnlyList<string> SaveTsxProject(string? targetPath = null);
 
         /// <summary>Names of chains with a tsx validation issue; empty when no tsx project is
         /// loaded or nothing is wrong. See <see cref="ProjectManager.GetChainNamesWithTsxIssues"/>.</summary>

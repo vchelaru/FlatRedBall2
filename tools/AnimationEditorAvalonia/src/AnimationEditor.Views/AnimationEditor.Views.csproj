@@ -39,6 +39,10 @@
     <AvaloniaResource Include="Theming\ThemeStyles.axaml" />
     <AvaloniaResource Include="Theming\ThemeIconResources.axaml" />
     <AvaloniaResource Include="Assets\icons\svg\**" />
+    <!-- Tiled logo, reused for a .tsx row in ProjectPanelControl's tree; copied from
+         AnimationEditor.App's own Assets\icons\tiled-icon-128.png since App is desktop-only and
+         this control is also loaded by the browser build. -->
+    <AvaloniaResource Include="Assets\icons\png\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -754,9 +754,24 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     // -- State reset -----------------------------------------------------------
 
+    // ---- TEMP diagnostic probe (multi-select freeze investigation) -- remove once done;
+    // shares a log file with MainWindow's own probe so both interleave chronologically. ----
+    private static void LogSelectionPerf(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "ae-selection-perf.log");
+            File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch { /* diagnostic-only, never let logging break the app */ }
+    }
+    // ---- end TEMP diagnostic probe ----
+
     private void OnSelectionChanged()
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         SyncGroupPlayback();
+        LogSelectionPerf($"      PreviewControl.SyncGroupPlayback: {sw.ElapsedMilliseconds}ms");
 
         var chain = _selectedState!.SelectedChain;
         var frame = _selectedState!.SelectedFrame;

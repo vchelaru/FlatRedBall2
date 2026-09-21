@@ -114,6 +114,24 @@ When (b) applies, the explanation must be in the PR/commit body and must say:
 
 If you cannot honestly write (1)-(3), the answer is: write the test.
 
+Run tests yourself via Bash — don't reason about whether a test would pass/fail instead of actually running it.
+
+## Reuse Before You Duplicate (Repo-Wide)
+
+Before writing a new method that parallels an existing workflow (a new file-type's open/save/load path, a new variant of an existing command), check whether the existing path already funnels its completion/bookkeeping through a shared helper — call that helper instead of hand-copying its steps. A hand-copied duplicate has no way to know when the helper gains a step, so it silently drifts (e.g. `OpenTsxWorkflowAsync` hand-duplicated `FinishLoadIntoEditor` and missed `HotReloadWatcher.StartWatching`).
+
+## Researching Third-Party APIs
+
+For a third-party API's shape (MonoGame, Gum, MonoGame.Extended, etc.): official docs or a link the user gave first, then WebSearch for official docs, then the package's own public XML docs. Never decompile a DLL or dig through `~/.nuget/packages/` to reverse-engineer an API — it burns time for little benefit. If none of the above answers it, stop and ask the user instead.
+
+## Manual-Test Scratch Projects
+
+A change that needs a human to see or hear it (audio, rendering, input feel) needs a runnable harness, built without being asked. Put it under `diagnostics/manual-test/<Name>/` (gitignored as a whole — never commit/push it; this differs from a feasibility spike like `diagnostics/MusicPitchSpike`, which documents a finding and *is* committed). Give it a classic `.sln` (`dotnet new sln --format sln`) and open it yourself. Never launch the app process yourself (`dotnet run`, starting the exe) — even for an existing tool — open the project/solution and let the human run it their own way.
+
+## Don't Infer Conventions from `samples/`
+
+Do not use `samples/` to infer coding patterns or conventions unless explicitly told to. This project evaluates how AI works with the engine as if no samples exist (e.g. a NuGet-only consumer) — treat `samples/` as unavailable for that purpose.
+
 ## AI-Usability Goals
 
 This project serves dual purposes: building a game engine AND evaluating how well AI assistants can work with it. **Game samples are not just games — they are AI usability tests for FlatRedBall2.**
@@ -167,7 +185,7 @@ Skill files are loaded into a limited context window — every line costs budget
 ## Agent Workflow
 
 **Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:
-- **Game creation** (random or specific vision) → invoke the `orchestrator` skill. It handles both random game selection and user-provided designs, then delegates implementation to a coder sub-agent. Only skip the orchestrator if the user explicitly asks to (e.g., wants to use the game-designer agent for a longer design conversation instead).
+- **Game creation** (random or specific vision) → invoke the `orchestrator` skill. It handles both random game selection and user-provided designs, then delegates implementation to a fresh sub-agent. Only skip the orchestrator if the user explicitly asks to (e.g., wants to use the game-designer agent for a longer design conversation instead).
 - **Engine feature or bug** → identify which subsystem (collision, rendering, input, etc.) to know which skill files are relevant
 - **Docs or refactor** → docs-writer or refactoring-specialist agent
 
@@ -177,8 +195,8 @@ This scoping step keeps context lean — only load the skills and files that are
 
 For every task, one of the following must happen before you proceed:
 
-1. **Spawn the matching agent from `.claude/agents/`** and transfer the relevant context in the prompt. Preferred when the agent would need to explore files you haven't already loaded, or when the task is self-contained enough to brief in a short prompt. Announce the spawn: "Invoking coder agent for this task..."
-2. **Or, do it inline yourself — but first read the agent's `.md` file** (e.g. `.claude/agents/coder.md`) at the start of the task and follow its rules. Preferred when you already have the relevant context loaded and the transfer cost to a sub-agent would be high.
+1. **Spawn the matching agent from `.claude/agents/`** and transfer the relevant context in the prompt. Preferred when the agent would need to explore files you haven't already loaded, or when the task is self-contained enough to brief in a short prompt. Announce the spawn: "Invoking qa agent for this task..."
+2. **Or, do it inline yourself — but first read the agent's `.md` file** (e.g. `.claude/agents/qa.md`) at the start of the task and follow its rules. Preferred when you already have the relevant context loaded and the transfer cost to a sub-agent would be high.
 
 This keeps the agent files as the single source of truth for how each kind of work is done (TDD discipline, file-reading order, code-style enforcement, etc.) — CLAUDE.md does not duplicate those rules, so they can't drift.
 
@@ -186,7 +204,6 @@ Re-read the agent file at the **start of each new coding task**, not just once p
 
 Available agents:
 - **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.
-- **coder** — Writing or modifying code and unit tests for new features or bugs
 - **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
 - **refactoring-specialist** — Refactoring and improving code structure
 - **docs-writer** — Writing or updating documentation
