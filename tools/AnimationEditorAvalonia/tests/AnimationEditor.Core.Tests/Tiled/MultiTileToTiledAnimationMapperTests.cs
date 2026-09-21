@@ -181,4 +181,45 @@ public class MultiTileToTiledAnimationMapperTests
         Assert.Empty(result.Warnings);
         Assert.Null(result.EntryTileId);
     }
+
+    // ── EntryTileIdIsFreshlyComputed (tile-ownership-transfer signal) ────────────────────────
+    // ProjectManager uses this to tell "the hint was actually used as-is" (possibly a
+    // hand-authored owner tile that's intentionally unrelated to frame 0's own geometry, must
+    // never be silently discarded) apart from "no hint existed, so this is exactly frame 0's own
+    // computed top-left tile" (safe to treat as ours to relocate later if geometry moves).
+
+    [Fact]
+    public void Map_NoEntryHint_EntryTileIdIsFreshlyComputedIsTrue()
+    {
+        var achj = AchjWithChain("Idle", PixelFrame(0, 0, 16, 16));
+
+        var result = Assert.Single(MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo));
+
+        Assert.True(result.EntryTileIdIsFreshlyComputed);
+    }
+
+    [Fact]
+    public void Map_EntryHintProvided_EntryTileIdIsFreshlyComputedIsFalse()
+    {
+        var achj = AchjWithChain("Idle", PixelFrame(0, 0, 16, 16));
+        var chain = achj.AnimationChains[0];
+        var hints = new Dictionary<AnimationChainSave, uint> { [chain] = 7 };
+
+        var result = Assert.Single(MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo, hints));
+
+        Assert.Equal((uint)7, result.EntryTileId);
+        Assert.False(result.EntryTileIdIsFreshlyComputed);
+    }
+
+    [Fact]
+    public void Map_MappingFailsButHasKnownEntryHint_EntryTileIdIsFreshlyComputedIsFalse()
+    {
+        var achj = AchjWithChain("Bad", PixelFrame(0, 0, 20, 16));
+        var chain = achj.AnimationChains[0];
+        var hints = new Dictionary<AnimationChainSave, uint> { [chain] = 5 };
+
+        var result = Assert.Single(MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo, hints));
+
+        Assert.False(result.EntryTileIdIsFreshlyComputed);
+    }
 }

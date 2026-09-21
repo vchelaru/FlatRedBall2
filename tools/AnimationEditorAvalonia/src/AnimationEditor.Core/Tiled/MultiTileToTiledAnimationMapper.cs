@@ -24,6 +24,16 @@ public sealed record MultiTileMappingResult
     /// <summary>The entry/anchor tile's own per-frame tile id sequence (top-left cell of the footprint).</summary>
     public required IReadOnlyList<MappedFrame> AnchorFrames { get; init; }
     public uint? EntryTileId { get; init; }
+    /// <summary>
+    /// True when <see cref="EntryTileId"/> was computed fresh from frame 0's own top-left cell
+    /// (no <c>knownEntryTileIds</c> hint existed for this chain), false when an existing hint was
+    /// reused as-is instead. <see cref="AnimationEditor.Core.ProjectManager"/> uses this to tell
+    /// apart a hint that is safely "ours" (came from our own geometry, safe to relocate later if
+    /// the frame moves) from
+    /// one that might be a hand-authored owner tile deliberately unrelated to frame 0's position,
+    /// which must never be silently discarded.
+    /// </summary>
+    public bool EntryTileIdIsFreshlyComputed { get; init; }
     /// <summary>Empty for a single-cell (1x1) chain -- see <see cref="AchjToTiledAnimationMapper"/>
     /// remarks for why that case needs no group at all.</summary>
     public required IReadOnlyList<TiledSatelliteMapping> Satellites { get; init; }
@@ -198,10 +208,17 @@ public static class MultiTileToTiledAnimationMapper
             .ToList();
 
         uint? entryTileId = null;
+        bool entryTileIdIsFreshlyComputed = false;
         if (anchorFrames.Count > 0)
-            entryTileId = knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var known)
-                ? known
-                : anchorFrames[0].TileId;
+        {
+            if (knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var known))
+                entryTileId = known;
+            else
+            {
+                entryTileId = anchorFrames[0].TileId;
+                entryTileIdIsFreshlyComputed = true;
+            }
+        }
 
         return new MultiTileMappingResult
         {
@@ -209,6 +226,7 @@ public static class MultiTileToTiledAnimationMapper
             ChainName = chain.Name,
             AnchorFrames = anchorFrames,
             EntryTileId = entryTileId,
+            EntryTileIdIsFreshlyComputed = entryTileIdIsFreshlyComputed,
             Satellites = satellites,
             Warnings = [],
         };
