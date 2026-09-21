@@ -94,6 +94,57 @@ public class TabSwitchCacheTsxTests : IDisposable
         Assert.Null(_ctx.ProjectManager.TsxTileSize);
     }
 
+    // Every prior tab-switch-cache test in this sweep pairs one tsx tab with one achx tab. This
+    // covers the untested combination -- two DISTINCT tsx tabs -- switching back and forth
+    // repeatedly, editing and saving each in turn, to prove CaptureTsxState/RestoreTsxState keep
+    // each tab's own tileset/entry-tile-id tracking fully isolated rather than one tab's saves
+    // leaking into the other's file or tile-identity hints.
+    [Fact]
+    public async Task TryActivateTabFromCache_TwoDistinctTsxTabsSwitchedBackAndForthRepeatedly_EachSavesOnlyItsOwnFile()
+    {
+        string pathA = WriteTsx("HeroesA.tsx");
+        string pathB = WriteTsx("HeroesB.tsx");
+        var tabA = new TabEntry(new FilePath(pathA));
+        var tabB = new TabEntry(new FilePath(pathB));
+
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(pathA);
+        _ctx.AppCommands.CaptureTabEditorState(tabA);
+
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(pathB);
+        _ctx.AppCommands.CaptureTabEditorState(tabB);
+
+        // Switch back to A, edit, save -- must land in HeroesA.tsx only.
+        Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabA));
+        Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
+        _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "RenamedA";
+        _ctx.ProjectManager.SaveTsxProject();
+        _ctx.AppCommands.CaptureTabEditorState(tabA);
+
+        // Switch to B, edit, save -- must land in HeroesB.tsx only, and must not carry forward
+        // A's edit or A's tileset.
+        Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabB));
+        Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
+        _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "RenamedB";
+        _ctx.ProjectManager.SaveTsxProject();
+        _ctx.AppCommands.CaptureTabEditorState(tabB);
+
+        // Switch back to A again -- must still reflect A's own edit, not B's.
+        Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabA));
+        Assert.Equal("RenamedA", _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name);
+
+        var reloadedA = DotTiled.Serialization.Loader.Default().LoadTileset(pathA);
+        Assert.Contains(reloadedA.Tiles,
+            t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "RenamedA"));
+        Assert.DoesNotContain(reloadedA.Tiles,
+            t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "RenamedB"));
+
+        var reloadedB = DotTiled.Serialization.Loader.Default().LoadTileset(pathB);
+        Assert.Contains(reloadedB.Tiles,
+            t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "RenamedB"));
+        Assert.DoesNotContain(reloadedB.Tiles,
+            t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == "RenamedA"));
+    }
+
     [Fact]
     public async Task TryActivateTabFromCache_AchxThenTsxThenBackToAchx_ClearsNativeTsxStateThenRestoresTsxOnReturn()
     {
