@@ -457,8 +457,9 @@ public class WireframeControl : TextureViewport
     /// so the propagation below lives in one place instead of three near-identical copies.
     /// <para>
     /// When this is a resize (not just a move) of a frame belonging to a native .tsx project's
-    /// multi-frame chain, also propagates the new width/height onto every sibling frame in that
-    /// chain (each sibling keeps its own Left/Top) and records them in the same undo command. See
+    /// multi-frame chain, also propagates the same per-edge movement onto every sibling frame in
+    /// that chain (matching whichever edge was actually dragged, so growing left/up moves
+    /// siblings left/up too, not just right/down) and records them in the same undo command. See
     /// <see cref="FrameFootprintSync"/> for why: <c>MultiTileToTiledAnimationMapper</c> requires
     /// every frame in a chain to share one whole-tile footprint, and silently drops the chain's
     /// tile animation on save the moment one frame's size disagrees with the rest -- which is
@@ -482,13 +483,17 @@ public class WireframeControl : TextureViewport
             return;
         }
 
-        var siblingMatches = FrameFootprintSync.ComputeSiblingMatches(chain, frame, newWidth: aR - aL, newHeight: aB - aT);
+        var siblingMatches = FrameFootprintSync.ComputeSiblingMatches(chain, frame,
+            new FrameFootprintSync.FrameRect(bL, bT, bR, bB),
+            new FrameFootprintSync.FrameRect(aL, aT, aR, aB));
         var snapshots = new List<BulkFrameRegionChangedCommand.FrameSnapshot>
         {
             new(frame, bL, bT, bR, bB, aL, aT, aR, aB),
         };
         foreach (var m in siblingMatches)
         {
+            m.Frame.LeftCoordinate   = m.After.Left;
+            m.Frame.TopCoordinate    = m.After.Top;
             m.Frame.RightCoordinate  = m.After.Right;
             m.Frame.BottomCoordinate = m.After.Bottom;
             snapshots.Add(new(m.Frame,
