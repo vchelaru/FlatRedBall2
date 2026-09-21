@@ -2236,3 +2236,17 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     relative-path join every achx uses; BOM/CRLF handling is already covered by `TsxWriterTests`.
   Full suite: `AnimationEditor.Core.Tests` 2350, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
+
+- [x] **Fresh-eyes pass #20 -- the achx-push path (`TiledTilesetSyncRunner` / `TilesetAnimationSync`)
+  against the same fully-decorated Tiled file pass #18 used, plus hand-authored and Tiled 1.9
+  class-only tiles it must not disturb, through push, removal, and the minified full-rewrite
+  fallback. Nothing new.** The only red was a test assertion reloading through the raw DotTiled
+  loader (which doesn't read `class`) instead of `TsxLoader`; the file was intact. Confirmed on
+  the way: a hand-authored animation on a tile a chain would claim is skipped with a warning (not
+  overwritten); a class-only tile claimed by a push and later released keeps its class (pass
+  #18's `TsxLoader` fixup protects this path too, since the runner loads through it); an
+  image-collection tsx associated for push skips every chain with a "past the tileset's 0
+  column(s)" warning rather than dividing by zero -- an odd message for a nonsensical association,
+  not a loss. Tests kept as regression guards: `AchxPushForeignContentRoundTripTests` (2).
+  Full suite: `AnimationEditor.Core.Tests` 2352, all green. **First consecutive empty pass; one
+  more is needed to close.**
