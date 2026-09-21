@@ -335,29 +335,7 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-- [ ] **A chain that is dormant (frames cleared to zero, then refilled with genuinely different,
-  non-reference-matching content) whose refill ALSO triggers a mapping abort loses its dormant hint
-  outright, instead of staying dormant for a later save to possibly still revive.** Surfaced while
-  fixing the "mapping aborts drop hints" bug in fresh-eyes pass #11 (see DONE below): that fix's new
-  `else if (_tsxEntryTileIdsByChain.TryGetValue(chain, out var stillActiveEntry))` branch only fires
-  when the chain has an *active* (non-dormant) hint; a chain currently sitting in
-  `_tsxDormantHintsByChain` has no entry in `_tsxEntryTileIdsByChain` (dormant and active are
-  mutually exclusive by construction), so the new branch's condition is false and does nothing for
-  it. Meanwhile `updatedDormant` is seeded at the top of `SaveTsxProject` only for chains *absent*
-  from the current `AnimationChainListSave` -- a present chain's existing dormant hint is never
-  copied forward into `updatedDormant` on its own, so if this save's abort means neither the revival
-  check (frames don't reference-match the dormant snapshot) nor the "genuinely empty" branch (frames
-  count isn't zero) fires, the dormant hint for this chain is silently dropped rather than staying
-  dormant for a still-later save to attempt reviving. Reachable via: delete all of a chain's frames
-  (dormant hint created) -> refill with brand-new, unrelated frame content that also happens to
-  reference a mismatched texture or an otherwise-invalid rect (mapping aborts) -> fix the texture ->
-  save again -- the fix-the-texture save recomputes fresh from geometry instead of ever having had a
-  chance to revive the now-lost dormant hint. Narrow (requires stacking two separately-unusual
-  states -- dormant AND an abort -- in succession) and not yet confirmed with a red test; the fix
-  shape is likely a third pre-seed loop mirroring the existing "carry forward absent chains'" dormant
-  hints, extended to also carry forward a *present* chain's dormant hint when this save doesn't
-  either revive or genuinely re-empty it, but this needs its own dedicated red-first test before
-  landing to confirm the scenario is real and to avoid papering over a related-but-different case.
+(empty -- see fresh-eyes pass #12 in DONE below, which resolved the one item that was here.)
 
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
@@ -1754,3 +1732,74 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   pass #12 aimed at the TODO item above, or at a from-scratch re-derivation of that state machine's
   full transition table (live -> dormant -> revived -> aborted, and every pairwise combination), is
   more likely to find the next gap than another command-by-command command audit.
+
+- [x] **Fresh-eyes pass #12 -- from-scratch derivation of `SaveTsxProject`'s full per-chain state
+  transition table (Live / Dormant / Aborted / Absent / Never-had-a-hint), as recommended by pass
+  #11.** Found and fixed one real, confirmed bug (the TODO item this pass resolves), and reduced the
+  nominal "25 pairwise combinations" to a much smaller set of genuinely distinct cases by tracing a
+  structural fact first: **"Aborted" and "Absent" are not separate stored buckets.** A chain's
+  identity-tracking state, at rest between saves, only ever lives in one of three places --
+  `_tsxEntryTileIdsByChain` (Live), `_tsxDormantHintsByChain` (Dormant), or neither (Never) -- and:
+  - An **Aborted** outcome (mapping fails with a warning while `chain.Frames.Count > 0`) does not
+    create a fourth bucket; the existing branches simply re-file the chain back into whichever
+    bucket it already occupied (Live stays Live via the `stillActiveEntry` branch; Dormant now stays
+    Dormant via this pass's fix, below). So "X -> Aborted -> Y" collapses to "X -> Y" for bucket
+    purposes -- Aborted only matters as a same-save output label, never as next-save input state.
+  - An **Absent** chain (missing from `AnimationChainListSave.AnimationChains` this save) doesn't go
+    through the bucket-transition branches at all -- it's carried forward verbatim by the two
+    unconditional pre-loops (one over `_tsxEntryTileIdsByChain`, one over `_tsxDormantHintsByChain`,
+    both keyed on `!currentChains.Contains`), so whichever bucket it was in when it disappeared is
+    exactly the bucket it's still in when/if it reappears. "X -> Absent -> Y" therefore also
+    collapses to "X -> Y" once the carry-forward itself is confirmed unconditional and
+    non-discriminating (confirmed by reading both loops -- neither branches on bucket identity).
+
+  This leaves a genuine 3x3 core table over {Live, Dormant, Never} (Absent/Aborted are transparent
+  wrappers around this core, verified separately below), all 9 cells traced against the actual
+  branch logic in `SaveTsxProject`'s post-`mapped` loop:
+
+  | Prev \ This save | -> Live (maps OK) | -> Dormant (Frames.Count==0) | -> Aborted (has frames, maps fail) |
+  |---|---|---|---|
+  | **Live** | OK (fresh recompute or hint reuse; pre-existing) | OK (`updatedEntries` not repopulated for this chain, so Live entry correctly drops as the chain demotes; pre-existing, `..._AllFramesDeletedFromChain_...`) | OK (`stillActiveEntry` branch keeps the hint; pass #11) |
+  | **Dormant** | OK -- two sub-cases: reference-match revival via the pre-map injection (pre-existing, `..._DeleteFramesThenUndo...`), or no-match fresh recompute (pre-existing, `..._DeleteFramesThenReauthor...`) | OK (`stillDormant` re-used, not replaced with a new fingerprint; pre-existing) | **BUG, fixed this pass** -- neither the Live branch (`_tsxEntryTileIdsByChain` has no entry) nor the Dormant branch (`Frames.Count` isn't 0) fired, so the dormant hint was silently dropped. Fixed with a new `else if (_tsxDormantHintsByChain.TryGetValue(...))` branch that re-parks the same `DormantTsxHint` unchanged, mirroring the Live branch immediately above it in the same `if`/`else if` chain. Test: `SaveTsxProject_DormantChainRefillAlsoAbortsMapping_DormantHintSurvivesForLaterRevival` (confirmed red before the fix -- tile 5's animation came back empty instead of restored). |
+  | **Never** | OK (fresh compute, brand-new chain; pre-existing, `AddChainCommand`) | OK (neither branch's `TryGetValue` succeeds -- correctly stays Never, no phantom dormant hint for a chain with nothing to preserve; pre-existing, matches the explicit doc-comment reasoning in the Dormant branch) | OK (no-op -- nothing to preserve, nothing preserved; pre-existing, e.g. a brand-new chain immediately given a bad texture name) |
+
+  **Wrapper transitions verified separately** (Absent and Aborted layered on top of the 3x3 core, all
+  confirmed either already-tested or newly pinned this pass):
+  - `Live -> Absent -> Live` (delete then undo, still has frames): already tested,
+    `SaveTsxProject_DeleteChainThenReinsertSameObjectAndSave_...` (pass #10).
+  - `Dormant -> Absent -> Dormant -> Live` (delete a dormant chain, undo it back in still empty,
+    then restore its original frames): **not previously tested** -- confirmed correct via the
+    unconditional dormant carry-forward loop, and pinned with a teeth-tested test (temporarily
+    disabled that loop's carry-forward with `if (false && ...)`, observed it fail, then reverted).
+    Test: `SaveTsxProject_DormantChainDeletedThenReinsertedStillEmptyThenRevived_DormantHintSurvivesAbsence`.
+  - `Live -> Aborted -> Absent` / `Dormant -> Aborted -> Absent`: not given dedicated tests -- both
+    reduce structurally to `Live -> Absent` / `Dormant -> Absent` per the "Aborted re-files into its
+    existing bucket" fact above, and the carry-forward loops don't discriminate on *how* a chain
+    arrived in its bucket, only *which* bucket it's in -- no incremental discriminating power over
+    the tests already listed.
+  - `Absent -> Dormant` starting from a *Live* bucket (i.e. a chain reappears with zero frames after
+    having been deleted while it still had a real tile): traced as structurally unreachable, not
+    just untested -- no command in this codebase mutates `Frames` on a chain that isn't currently in
+    `AnimationChainListSave.AnimationChains` (Undo/Redo only re-insert/remove the chain reference
+    itself; nothing can clear its frames while it's absent), so a chain can never change bucket
+    *during* its absence. No test added for an unreachable input.
+
+  **Net result:** one real, confirmed bug (Dormant -> Aborted losing its hint, the exact TODO item
+  pass #11 left behind) fixed with a three-line branch addition mirroring the existing Live-abort
+  branch; one additional non-obvious-but-already-correct transition
+  (Dormant -> Absent -> Dormant -> revival) pinned with a teeth-tested test that didn't exist before.
+  Source change: `ProjectManager.cs`'s `SaveTsxProject` gained one `else if` branch (see diff/PR).
+  Tests: `SaveTsxProject_DormantChainRefillAlsoAbortsMapping_DormantHintSurvivesForLaterRevival`,
+  `SaveTsxProject_DormantChainDeletedThenReinsertedStillEmptyThenRevived_DormantHintSurvivesAbsence`.
+  Full suite: `AnimationEditor.Core.Tests` 2189/2189 (was 2187, +2 new).
+
+  **Honest assessment: the three-way state machine is now provably complete, not just "no new bugs
+  found this pass."** Unlike passes #10-#11 (which each fixed one case and surfaced a new, unproven
+  adjacent one), this pass didn't stop at finding gaps command-by-command -- it enumerated the full
+  state space structurally, showed two of the nominal five "states" are not independent stored
+  buckets at all (collapsing the real search space from 25 cells to 9 core cells + a small, fully
+  reasoned set of wrapper cases), and traced every one of the resulting cells to a concrete verdict
+  (7 pre-existing/correct, 1 real bug now fixed, 1 structurally unreachable). No cell was left as "not
+  yet confirmed" or deferred. This is a stronger completeness claim than any prior pass in this sweep
+  could make, precisely because it was derived from the state space itself rather than from guessing
+  at plausible commands.
