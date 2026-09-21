@@ -804,8 +804,10 @@ namespace AnimationEditor.Core
         /// cref="Tiled.NativeTsxAnimationSync"/>. No-op (returns an empty list) if no tsx project is
         /// loaded. Returns every chain's mapping warning from this save -- a chain that couldn't be
         /// mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
-        /// untouched rather than being cleared, so a caller should surface these to the user instead
-        /// of assuming the save fully captured every edit.
+        /// untouched rather than being cleared -- plus one per chain carrying data the format
+        /// can't hold (<see cref="Tiled.TsxLossyDataCheck"/>; that chain IS written, minus that
+        /// data). A caller should surface these to the user instead of assuming the save fully
+        /// captured every edit.
         /// </summary>
         /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
         /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
@@ -1054,7 +1056,9 @@ namespace AnimationEditor.Core
             _tsxLastNonEmptyFramesByChain = updatedLastFrames;
             _tsxDormantHintsByChain = updatedDormant;
 
-            return mapped.SelectMany(r => r.Warnings).ToList();
+            return mapped.SelectMany(r => r.Warnings)
+                .Concat(Tiled.TsxLossyDataCheck.Warnings(AnimationChainListSave))
+                .ToList();
         }
 
         /// <summary>Whether <paramref name="a"/> and <paramref name="b"/> hold the exact same

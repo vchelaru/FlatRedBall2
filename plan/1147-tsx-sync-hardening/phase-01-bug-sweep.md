@@ -2121,11 +2121,12 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   - **Mid-drag autosave -- safe.** Frame coordinates mutate live during a drag but
     `FrameRegionChanged` (the autosave trigger) fires only on commit, after propagation. A
     partial state reaching a save is covered by `Resize_OnlyFrameZeroGrownLeft_WarnsAndKeepsOwnerUntilSiblingsMatch`.
-  - **Two UX residuals, not data loss, not fixed here (file as standalone issues if wanted):**
-    the wireframe snaps a native-tsx drag to pixels or the optional display grid, not to the
-    tileset's tile size, so an off-grid drop saves with a warning instead of snapping; and a tile
-    collision thrown by `SaveTsxProject` is swallowed by `SaveCurrentAnimationChainList`'s bare
-    `catch` into `MarkSaveFailed`, so the user never sees which two chains collided.
+  - **Off-grid drops -- safe (correcting an earlier note).** `MainWindow.SyncGridControlsToProject`
+    forces the wireframe grid on at the tsx's own tile size for a native-tsx project and refuses
+    to let it be turned off or resized, so a handle drag always lands on tile boundaries.
+  - **One UX residual, not data loss, not fixed here:** a tile collision thrown by
+    `SaveTsxProject` is swallowed by `SaveCurrentAnimationChainList`'s bare `catch` into
+    `MarkSaveFailed`, so the user never sees which two chains collided (fixed in pass #16).
   Full suite: `AnimationEditor.Core.Tests` 2323, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.
 
@@ -2157,3 +2158,23 @@ introduce a duplicate tile id or change `Columns` after a successful load.
     chain object and re-seeds `_tsxEntryHintOriginFrames` from the file.
   Full suite: `AnimationEditor.Core.Tests` 2325, `AnimationEditor.App.Tests` 999,
   `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green; Browser builds clean.
+
+- [x] **Fresh-eyes pass #17 -- achx-model data the tsx format can't hold (flips, sprite offset,
+  color, collision shapes, non-looping chains), and every way a user can still create it in a
+  native-tsx project.** One real gap, fixed; the earlier snapping note corrected (see pass #15).
+  - **Silently dropped on save -- real gap, fixed at the save boundary.** The inspector hides the
+    transform/color/shape panels for a tsx project (#1140), but the frame context menu still
+    offers "Add Rectangle"/"Add Circle" (`TreeMenuPlanBuilder`), the chain menu "Duplicate
+    flipped" (`HandleDuplicateChainsFlip`), the Loop toggle (#1120), and paste from an achx tab
+    all still produce that data. `MultiTileToTiledAnimationMapper` reads only rects and durations,
+    so it vanished on save and on the next reload -- a shape sat in the tree until then. Rather
+    than gate each entry point (and miss the next one), `SaveTsxProject` now appends one
+    `TsxLossyDataCheck` warning per chain naming the kinds it dropped ("chain "Walk": collision
+    shape, flip can't be stored in a .tsx and was not saved."), through the existing
+    "Saved, but not every change applied" toast. The chain itself is still written. Tests:
+    `TsxLossyDataCheckTests` (14), `ProjectManagerTsxProjectTests.SaveTsxProject_FrameCarriesCollisionShape_*`.
+  - **Not done: gating those entry points.** Hiding "Add Rectangle" etc. for a tsx project would
+    be friendlier than a warning after the fact, but it is per-entry-point work and the boundary
+    check already guarantees nothing is lost without notice. Worth a small follow-up issue.
+  Full suite: `AnimationEditor.Core.Tests` 2340, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.

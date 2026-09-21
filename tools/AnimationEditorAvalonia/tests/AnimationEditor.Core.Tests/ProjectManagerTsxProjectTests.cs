@@ -923,6 +923,28 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Contains("SaveTsxProject", ex.Message);
     }
 
+    // A collision shape (or a flip, offset, color, non-looping chain) has no home in a .tsx. The
+    // save still writes everything the format can hold, but must say what it dropped -- see
+    // TsxLossyDataCheckTests for the full list.
+    [Fact]
+    public void SaveTsxProject_FrameCarriesCollisionShape_WritesAnimationAndWarnsAboutTheShape()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        chain.Frames[0].ShapesSave = new ShapesSave { Shapes = { new AARectSave { Name = "Hit" } } };
+        chain.Frames[1].FrameLength = 0.3f;
+
+        var warnings = pm.SaveTsxProject();
+
+        var warning = Assert.Single(warnings);
+        Assert.Contains("\"ID:0\"", warning);
+        Assert.Contains("shape", warning);
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        Assert.Equal([((uint)0, 200), ((uint)1, 300)], reloaded.Tiles.Single(t => t.ID == 0).Animation.Select(f => (f.TileID, f.Duration)));
+    }
+
     private static uint EntryTileIdNamed(DotTiled.Tileset tileset, string chainName) =>
         tileset.Tiles
             .Single(t => t.Properties.OfType<DotTiled.StringProperty>().Any(p => p.Name == "Name" && p.Value == chainName))
