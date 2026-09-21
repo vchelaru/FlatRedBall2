@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Paths;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -50,6 +51,8 @@ public sealed record TilesetAnimationInfo
     public required int TileCount { get; init; }
     public int Margin { get; init; }
     public int TileSpacing { get; init; }
+    /// <summary>The same geometry as a <see cref="TileGrid"/>, for the shared cell math.</summary>
+    public TileGrid Grid => new(TileWidth, TileHeight, Margin, TileSpacing);
     public required string ImageFileName { get; init; }
     /// <summary>Required only when the source uses <see cref="TextureCoordinateType.UV"/> frames,
     /// to convert normalized (0-1) coordinates to pixels.</summary>
@@ -107,19 +110,6 @@ public static class AchjToTiledAnimationMapper
 
         foreach (var chain in achj.AnimationChains)
         {
-            if (tilesetInfo.Margin != 0 || tilesetInfo.TileSpacing != 0)
-            {
-                results.Add(new ChainMappingResult
-                {
-                    ChainName = chain.Name,
-                    Frames = [],
-                    EntryTileId = null,
-                    Warnings = [$"chain \"{chain.Name}\": tileset has non-zero margin or spacing, which this importer can't account for when computing tile ids - skipped."],
-                    SkipCounts = new SkipCounts(),
-                });
-                continue;
-            }
-
             var warnings = new List<string>();
             var skipCounts = new SkipCountsBuilder();
             var frames = new List<MappedFrame>();
@@ -175,7 +165,10 @@ public static class AchjToTiledAnimationMapper
             return Skip(s => s.SizeMismatch++,
                 $"{label}: frame rect {width}x{height} doesn't match tile size {tilesetInfo.TileWidth}x{tilesetInfo.TileHeight} - skipped.");
 
-        if (Math.Abs(left % tilesetInfo.TileWidth) > Epsilon || Math.Abs(top % tilesetInfo.TileHeight) > Epsilon)
+        // Size already matched one cell, so a null here can only mean the origin is off-grid
+        // (margin and spacing included -- column 1 of a 16px, margin-2, spacing-1 sheet starts at
+        // x=19, not 16).
+        if (tilesetInfo.Grid.TryLocate(left, top, width, height, Epsilon) is not { } footprint)
             return Skip(s => s.NotGridAligned++,
                 $"{label}: frame rect origin ({left}, {top}) is not aligned to the tile grid - skipped.");
 
@@ -186,13 +179,12 @@ public static class AchjToTiledAnimationMapper
                 warnings.Add($"{label}: uses a flip flag; Tiled tile animation frames can't flip per-frame, so the flip is dropped.");
         }
 
-        var column = (int)Math.Round(left / tilesetInfo.TileWidth);
-        var row = (int)Math.Round(top / tilesetInfo.TileHeight);
+        var (column, row, _, _) = footprint;
 
-        // A left/top that's an exact negative multiple of the tile size (e.g. -16 with a 16px
-        // tile) passes the grid-alignment check above (remainder is 0 -- "%" keeps the dividend's
-        // sign for negative operands) yet resolves to a negative column/row. Casting that straight
-        // to uint would wrap to a huge bogus tile id instead of failing gracefully.
+        // A left/top that's an exact negative multiple of the cell stride (e.g. -16 with a 16px
+        // tile) passes the grid-alignment check above yet resolves to a negative column/row.
+        // Casting that straight to uint would wrap to a huge bogus tile id instead of failing
+        // gracefully.
         if (column < 0 || row < 0)
             return Skip(s => s.NegativeCoordinate++,
                 $"{label}: frame rect origin ({left}, {top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");

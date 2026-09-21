@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -108,6 +109,7 @@ public static class TiledAnimationToAchjMapper
         var trueAnchorTileIds = animatedTiles.Where(t => !parentIdByTileId[t.ID].HasValue).Select(t => t.ID).ToHashSet();
 
         var columns = (uint)tileset.Columns;
+        var grid = new TileGrid(tileset.TileWidth, tileset.TileHeight, tileset.Margin, tileset.Spacing);
 
         // A ParentId pointing "backward" -- to an anchor with a larger column or row than the
         // satellite's own -- has no corresponding multi-tile-group shape AnimationEditor's own UI
@@ -199,16 +201,20 @@ public static class TiledAnimationToAchjMapper
 
             foreach (var frame in anchor.Animation)
             {
-                var col = frame.TileID % columns;
-                var row = frame.TileID / columns;
+                var col = (int)(frame.TileID % columns);
+                var row = (int)(frame.TileID / columns);
 
+                // One contiguous rect per frame: a multi-cell footprint includes the spacing gaps
+                // between its cells (see TileGrid's remarks) -- the editor doesn't model N pieces.
+                var left = grid.CellLeft(col);
+                var top = grid.CellTop(row);
                 chain.Frames.Add(new AnimationFrameSave
                 {
                     TextureName = imageFileName,
-                    LeftCoordinate = (col * tileset.TileWidth) / (float)textureWidth,
-                    TopCoordinate = (row * tileset.TileHeight) / (float)textureHeight,
-                    RightCoordinate = ((col + footprintColumns) * tileset.TileWidth) / (float)textureWidth,
-                    BottomCoordinate = ((row + footprintRows) * tileset.TileHeight) / (float)textureHeight,
+                    LeftCoordinate = left / (float)textureWidth,
+                    TopCoordinate = top / (float)textureHeight,
+                    RightCoordinate = (left + grid.SpanWidth((int)footprintColumns)) / (float)textureWidth,
+                    BottomCoordinate = (top + grid.SpanHeight((int)footprintRows)) / (float)textureHeight,
                     FrameLength = frame.Duration / 1000f,
                 });
             }

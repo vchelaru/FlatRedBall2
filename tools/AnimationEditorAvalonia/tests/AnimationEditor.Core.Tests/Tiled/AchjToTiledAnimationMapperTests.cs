@@ -134,16 +134,29 @@ public class AchjToTiledAnimationMapperTests
     }
 
     [Fact]
-    public void Map_MarginOrSpacing_SkipsWholeChainAndWarns()
+    public void Map_MarginAndSpacing_LocatesTileFromItsRealPixels()
     {
-        var achj = AchjWithChain("Walk", PixelFrame(0, 0, 16, 32));
-        var marginedTilesetInfo = TilesetInfo with { Margin = 2 };
+        // 16x32 tiles, margin 2, spacing 1: column 1 starts at x = 2 + 17 = 19, row 1 at y = 2 + 33 = 35.
+        var achj = AchjWithChain("Walk", PixelFrame(19, 35, 35, 67));
+        var spacedTilesetInfo = TilesetInfo with { Margin = 2, TileSpacing = 1 };
 
-        var results = AchjToTiledAnimationMapper.Map(achj, marginedTilesetInfo);
+        var results = AchjToTiledAnimationMapper.Map(achj, spacedTilesetInfo);
+
+        Assert.Equal((uint)5, Assert.Single(results[0].Frames).TileId);
+        Assert.Empty(results[0].Warnings);
+    }
+
+    [Fact]
+    public void Map_MarginAndSpacing_FrameOnUnspacedPixels_SkipsAsNotGridAligned()
+    {
+        // Left=16 is where column 1 would be WITHOUT the margin/spacing; on this sheet it is 19.
+        var achj = AchjWithChain("Walk", PixelFrame(16, 0, 32, 32));
+        var spacedTilesetInfo = TilesetInfo with { Margin = 2, TileSpacing = 1 };
+
+        var results = AchjToTiledAnimationMapper.Map(achj, spacedTilesetInfo);
 
         Assert.Empty(results[0].Frames);
-        Assert.Null(results[0].EntryTileId);
-        Assert.Contains("margin or spacing", results[0].Warnings[0]);
+        Assert.Contains("not aligned", results[0].Warnings[0]);
     }
 
     [Fact]

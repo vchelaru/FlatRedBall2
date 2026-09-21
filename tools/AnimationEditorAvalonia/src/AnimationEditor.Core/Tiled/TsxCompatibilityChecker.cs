@@ -18,21 +18,11 @@ public static class TsxCompatibilityChecker
     /// <paramref name="blockingReason"/> is <see cref="TsxWriter"/>'s own explanation in that case.</returns>
     public static bool CheckOpenCompatibility(Tileset tileset, out string? blockingReason)
     {
-        // Neither mapper accounts for margin/spacing when placing tiles (TiledAnimationToAchjMapper
-        // puts tile N at col*tilewidth; MultiTileToTiledAnimationMapper refuses per chain), so such
-        // a tileset would open with every frame rect shifted off its real pixels and no way to
-        // save. Refuse up front instead.
         // An image-collection tileset (one image per tile, no shared sheet) has no tile grid for
         // any of this editor's tile-id math to work against.
         if (!tileset.Image.HasValue || tileset.Tiles.Any(t => t.Image.HasValue))
         {
             blockingReason = "the tileset is an image collection (one image per tile), which AnimationEditor doesn't support yet -- only a single-image tileset can be opened.";
-            return false;
-        }
-
-        if (tileset.Margin != 0 || tileset.Spacing != 0)
-        {
-            blockingReason = $"the tileset uses margin ({tileset.Margin}) or spacing ({tileset.Spacing}), which AnimationEditor doesn't support yet.";
             return false;
         }
 

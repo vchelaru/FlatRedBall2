@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Paths;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -59,6 +60,12 @@ public sealed record MultiTileMappingResult
 public static class MultiTileToTiledAnimationMapper
 {
     private const float Epsilon = 0.001f;
+
+    /// <summary>How many cells a rect of this size spans, gaps included; the caller validates the
+    /// exact size, this only picks the nearest candidate.</summary>
+    private static (int Columns, int Rows) FootprintSize(TileGrid grid, float width, float height) => (
+        (int)Math.Round((width + grid.Spacing) / grid.StrideX),
+        (int)Math.Round((height + grid.Spacing) / grid.StrideY));
 
     /// <param name="knownEntryTileIds">Optional identity hint from a prior <see
     /// cref="TiledAnimationToAchjMapper.Map"/> load (or a prior save -- see <see
@@ -128,16 +135,16 @@ public static class MultiTileToTiledAnimationMapper
         if (chain.Frames.Count == 0)
             return Empty();
 
-        if (tilesetInfo.Margin != 0 || tilesetInfo.TileSpacing != 0)
-            return Empty($"chain \"{chain.Name}\": tileset has non-zero margin or spacing, which this importer can't account for when computing tile ids - skipped.");
-
+        // A multi-cell frame is one contiguous rect that includes the spacing gaps between its
+        // cells (TileGrid.SpanWidth), so on a spaced sheet a 2x1 footprint is 2*tw + spacing wide,
+        // never 2*tw.
+        var grid = tilesetInfo.Grid;
         var firstRect = AchjToTiledAnimationMapper.FrameRectPixels(chain.Frames[0], coordinateType, tilesetInfo);
-        var footprintColumns = (int)Math.Round(firstRect.Width / tilesetInfo.TileWidth);
-        var footprintRows = (int)Math.Round(firstRect.Height / tilesetInfo.TileHeight);
+        var (footprintColumns, footprintRows) = FootprintSize(grid, firstRect.Width, firstRect.Height);
 
         if (footprintColumns < 1 || footprintRows < 1
-            || Math.Abs(firstRect.Width - (footprintColumns * tilesetInfo.TileWidth)) > Epsilon
-            || Math.Abs(firstRect.Height - (footprintRows * tilesetInfo.TileHeight)) > Epsilon)
+            || Math.Abs(firstRect.Width - grid.SpanWidth(footprintColumns)) > Epsilon
+            || Math.Abs(firstRect.Height - grid.SpanHeight(footprintRows)) > Epsilon)
             return Empty($"chain \"{chain.Name}\": frame size {firstRect.Width}x{firstRect.Height} isn't a whole number of tiles - skipped.");
 
         var perOffset = new Dictionary<(int Dx, int Dy), List<MappedFrame>>();
@@ -155,20 +162,20 @@ public static class MultiTileToTiledAnimationMapper
 
             var rect = AchjToTiledAnimationMapper.FrameRectPixels(frame, coordinateType, tilesetInfo);
 
-            if (Math.Abs(rect.Width - (footprintColumns * tilesetInfo.TileWidth)) > Epsilon
-                || Math.Abs(rect.Height - (footprintRows * tilesetInfo.TileHeight)) > Epsilon)
+            if (Math.Abs(rect.Width - grid.SpanWidth(footprintColumns)) > Epsilon
+                || Math.Abs(rect.Height - grid.SpanHeight(footprintRows)) > Epsilon)
                 return Empty($"chain \"{chain.Name}\": frame size {rect.Width}x{rect.Height} doesn't match the chain's {footprintColumns}x{footprintRows}-tile footprint - skipped.");
 
-            if (Math.Abs(rect.Left % tilesetInfo.TileWidth) > Epsilon || Math.Abs(rect.Top % tilesetInfo.TileHeight) > Epsilon)
+            // Size already matched the footprint, so a null here can only mean the origin is off-grid.
+            if (grid.TryLocate(rect.Left, rect.Top, rect.Width, rect.Height, Epsilon) is not { } footprint)
                 return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) is not aligned to the tile grid - skipped.");
 
             var duration = AchjToTiledAnimationMapper.FrameDurationMs(frame.FrameLength, timeUnit);
-            var originColumn = (int)Math.Round(rect.Left / tilesetInfo.TileWidth);
-            var originRow = (int)Math.Round(rect.Top / tilesetInfo.TileHeight);
+            var (originColumn, originRow, _, _) = footprint;
 
-            // An exact negative multiple of the tile size (e.g. -16 with a 16px tile) passes the
-            // grid-alignment check above (remainder is 0) yet resolves to a negative
-            // column/row -- an unchecked cast to uint below would wrap to a huge bogus tile id.
+            // An exact negative multiple of the cell stride (e.g. -16 with a 16px tile) passes the
+            // grid-alignment check above yet resolves to a negative column/row -- an unchecked
+            // cast to uint below would wrap to a huge bogus tile id.
             if (originColumn < 0 || originRow < 0)
                 return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
 

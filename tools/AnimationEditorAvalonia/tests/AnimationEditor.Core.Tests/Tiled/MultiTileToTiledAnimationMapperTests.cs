@@ -74,6 +74,34 @@ public class MultiTileToTiledAnimationMapperTests
     }
 
     [Fact]
+    public void Map_MarginAndSpacing_TwoTileWideFrameIncludingTheGap_ProducesAnchorAndSatellite()
+    {
+        // Margin 2, spacing 1: column 0 at x=2..18, column 1 at x=19..35. A 2x1 frame is one
+        // contiguous rect from 2 to 35 (33px) that includes the 1px gap at x=18.
+        var achj = AchjWithChain("Walk", PixelFrame(2, 2, 35, 18));
+        var spacedTilesetInfo = TilesetInfo with { Margin = 2, TileSpacing = 1 };
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, spacedTilesetInfo);
+
+        var result = Assert.Single(results);
+        Assert.Empty(result.Warnings);
+        Assert.Equal((uint)0, result.EntryTileId);
+        Assert.Equal((uint)1, Assert.Single(result.Satellites).TileId);
+    }
+
+    [Fact]
+    public void Map_MarginAndSpacing_TwoTileWideFrameWithoutTheGap_SkipsAsNotWholeTiles()
+    {
+        // 32px wide = two 16px cells butted together, which no spaced footprint ever is (2 cells = 33px).
+        var achj = AchjWithChain("Walk", PixelFrame(2, 2, 34, 18));
+        var spacedTilesetInfo = TilesetInfo with { Margin = 2, TileSpacing = 1 };
+
+        var results = MultiTileToTiledAnimationMapper.Map(achj, spacedTilesetInfo);
+
+        Assert.Contains("whole number of tiles", Assert.Single(results).Warnings[0]);
+    }
+
+    [Fact]
     public void Map_NegativeAlignedFrameOrigin_SkipsChainAndWarnsInsteadOfUncheckedCastToHugeTileId()
     {
         // Left=-16 is an exact multiple of tile width 16 (remainder 0), so it isn't caught by the

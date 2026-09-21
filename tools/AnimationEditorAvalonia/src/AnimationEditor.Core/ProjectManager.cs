@@ -1267,6 +1267,8 @@ namespace AnimationEditor.Core
                 TileHeight = tileset.TileHeight,
                 ColumnCount = tileset.Columns,
                 TileCount = tileset.TileCount,
+                Margin = tileset.Margin,
+                TileSpacing = tileset.Spacing,
                 ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
                 TextureWidth = textureWidth,
                 TextureHeight = textureHeight,

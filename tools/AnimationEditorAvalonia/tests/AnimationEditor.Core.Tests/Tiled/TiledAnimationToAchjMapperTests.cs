@@ -51,6 +51,32 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
+    public void Map_MarginAndSpacing_PlacesTileAndSatelliteAtTheirRealPixelsGapIncluded()
+    {
+        // Margin 2, spacing 1, 16px tiles, 71px texture: column 1 starts at x = 2 + 17 = 19, and a
+        // 2x1 footprint (anchor 5 + satellite 6) spans 19..52 -- the gap at x=35 is inside the rect.
+        var tileset = EmptyTileset();
+        tileset.Margin = 2;
+        tileset.Spacing = 1;
+        tileset.Image = new Image { Source = "Heroes.png", Width = 71, Height = 71 };
+        var anchor = new Tile { ID = 5, Width = 0, Height = 0 };
+        anchor.Animation.Add(new Frame { TileID = 5, Duration = 100 });
+        var satellite = new Tile { ID = 6, Width = 0, Height = 0 };
+        satellite.Animation.Add(new Frame { TileID = 6, Duration = 100 });
+        satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 5 });
+        tileset.Tiles.Add(anchor);
+        tileset.Tiles.Add(satellite);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+
+        var frame = Assert.Single(Assert.Single(acls.AnimationChains).Frames);
+        Assert.Equal(19f / 71f, frame.LeftCoordinate, tolerance: 0.0001f);
+        Assert.Equal(19f / 71f, frame.TopCoordinate, tolerance: 0.0001f);
+        Assert.Equal(52f / 71f, frame.RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(35f / 71f, frame.BottomCoordinate, tolerance: 0.0001f);
+    }
+
+    [Fact]
     public void Map_RealWorldColumnAndLargeTexture_MatchesReportedGarbageValueRootCause()
     {
         // Regression for the exact numbers reported against a real file: 128 columns, 16px
