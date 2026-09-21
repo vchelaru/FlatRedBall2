@@ -335,6 +335,30 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
+- [ ] **A chain that is dormant (frames cleared to zero, then refilled with genuinely different,
+  non-reference-matching content) whose refill ALSO triggers a mapping abort loses its dormant hint
+  outright, instead of staying dormant for a later save to possibly still revive.** Surfaced while
+  fixing the "mapping aborts drop hints" bug in fresh-eyes pass #11 (see DONE below): that fix's new
+  `else if (_tsxEntryTileIdsByChain.TryGetValue(chain, out var stillActiveEntry))` branch only fires
+  when the chain has an *active* (non-dormant) hint; a chain currently sitting in
+  `_tsxDormantHintsByChain` has no entry in `_tsxEntryTileIdsByChain` (dormant and active are
+  mutually exclusive by construction), so the new branch's condition is false and does nothing for
+  it. Meanwhile `updatedDormant` is seeded at the top of `SaveTsxProject` only for chains *absent*
+  from the current `AnimationChainListSave` -- a present chain's existing dormant hint is never
+  copied forward into `updatedDormant` on its own, so if this save's abort means neither the revival
+  check (frames don't reference-match the dormant snapshot) nor the "genuinely empty" branch (frames
+  count isn't zero) fires, the dormant hint for this chain is silently dropped rather than staying
+  dormant for a still-later save to attempt reviving. Reachable via: delete all of a chain's frames
+  (dormant hint created) -> refill with brand-new, unrelated frame content that also happens to
+  reference a mismatched texture or an otherwise-invalid rect (mapping aborts) -> fix the texture ->
+  save again -- the fix-the-texture save recomputes fresh from geometry instead of ever having had a
+  chance to revive the now-lost dormant hint. Narrow (requires stacking two separately-unusual
+  states -- dormant AND an abort -- in succession) and not yet confirmed with a red test; the fix
+  shape is likely a third pre-seed loop mirroring the existing "carry forward absent chains'" dormant
+  hints, extended to also carry forward a *present* chain's dormant hint when this save doesn't
+  either revive or genuinely re-empty it, but this needs its own dedicated red-first test before
+  landing to confirm the scenario is real and to avoid papering over a related-but-different case.
+
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
 `ProjectManager` instances / static state (only `TileMapInformationList`, unrelated to tsx sync;
@@ -1617,3 +1641,116 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   command caused it), so this is very likely already covered, not a gap. Not filed as a TODO
   item since no concrete repro was found or attempted -- flagging only as a "worth a quick
   confirming test if this area gets touched again" note, not a known bug.
+
+- [x] **Fresh-eyes pass #11 -- audited every `IUndoableCommand` implementation in the codebase (not
+  just `DeleteChainsCommand`/`DeleteFramesCommand`, the two that seeded this bug class) for the same
+  "Undo/Redo desyncs tsx identity-tracking dictionaries" shape.** Found and fixed two new real,
+  confirmed bugs (below) -- one a direct hit on the task's own item 5 (footprint-resize commands),
+  the other a broader generalization discovered while investigating item 1 (rename) that turned out
+  to have nothing to do with rename at all -- and traced every other command to a concrete "safe, no
+  gap" verdict. Full command inventory (grepped `CommandsAndState/` for every `IUndoableCommand`
+  implementation -- 33 files, no commands exist outside this directory):
+
+  | Command | Verdict | Reasoning |
+  |---|---|---|
+  | `AddChainCommand` | Safe | Brand-new chain object; a first save always computes its entry tile fresh (no hint exists yet), so hint == natural value by construction -- an Add-Undo-Redo cycle has no discriminating outcome to test against. Undo (chain absent) is covered by the same reference-keyed absent-chain carry-forward already fixed for `DeleteChainsCommand`, which has zero command-specific branching. |
+  | `RenameChainCommand` | Safe | `Name` is never a dictionary key anywhere in this subsystem (`MultiTileToTiledAnimationMapper`/`ProjectManager`'s hints are keyed by chain *object reference*); `NativeTsxAnimationSync.ApplyTile`'s `explicitName` is a one-way property write, never read back as an identity key. Already covered by an existing DONE entry (multi-tile-satellite rename); Undo just re-sets `Name` in place on the same object, trivially unaffected. |
+  | `ReorderCommand<T>` (chains, frames, shapes) | Safe -- fixed one real gap it exposed indirectly (see below) | Rebuilds the list in place via `Clear()`+`Add()`, same objects, no membership change -- hints are keyed by reference/offset, never by list position. Frame-reorder specifically pinned with a teeth-tested test (`SaveTsxProject_ReorderFramesWithinChainAndSave_...`, confirmed red when hints are disabled). |
+  | `DuplicateChainsCommand` | Safe | `AppCommands.CloneChainWithFlip` builds a brand-new `AnimationChainSave` + brand-new `AnimationCloneHelper.CloneFrame`-cloned frames (verified by reading it, not assumed) -- no shared references with the source, so Undo (removing the copy) can't touch the source's hint, and the copy's own first save computes fresh like `AddChainCommand`. |
+  | `AddFrameCommand`, `AddFramesCommand`, `DuplicateFrameCommand`, `DuplicateFramesCommand` | Safe | Undo only removes the exact brand-new objects Do() just added -- these can never reference-match a `DormantTsxHint.Frames` snapshot (which only ever captures frames that existed *before* an add), so they can't spuriously revive or corrupt a dormant hint. The only way these reach `Frames.Count == 0` is undoing an add to an already-empty chain, which had no hint to begin with. |
+  | `MoveFramesCommand` | Safe (traced, no test added) | A cross-chain move that empties the source chain then an Undo that restores the same frame objects in the same order exercises the exact same dormant-hint capture/revival code path already pinned by `DeleteFramesCommand`'s tests (the mechanism has no command-specific branching) -- would have no incremental discriminating power. |
+  | `FrameRegionChangedCommand`, `BulkFrameRegionChangedCommand` | Real bug, fixed | See below -- the footprint-resize-then-undo satellite relocation (task item 5). |
+  | `MoveFrameOffsetCommand`, `MoveFrameOffsetBulkCommand` | Safe | Only mutate `RelativeX`/`RelativeY`, which `AchjToTiledAnimationMapper.FrameRectPixels` (verified by reading it) never reads -- these fields are a rendering offset, unrelated to which physical tile a frame's rect maps to. |
+  | `FlipCommand` | Safe | Mutates `FlipHorizontal`/`FlipVertical`/`FlipDiagonal`/`RelativeX`/`RelativeY`/shape offsets only; grepped the whole `Tiled/` folder for these flip flags -- the one hit (`AchjToTiledAnimationMapper.MapFrame`) is the achx-push path, which has no per-chain identity-hint dictionaries at all (already-established DONE entry: achx-push "simply follows wherever its geometry currently points to"), so there's no identity state for this command to desync. |
+  | `SetFrameTextureNameCommand` | Real bug exposed (not this command's fault) | See below -- the mapping-abort generalization. |
+  | `PasteChainsCommand` (incl. the `PasteChainsCut` composite) | Safe | `chains` always come from `ClipboardPayload.TryDeserialize` (fresh, deserialized objects) and `sourcesToRemove` are the original in-document references -- verified by reading the one call site (`MainWindow.axaml.cs`) -- so paste and the cut-delete never share a reference; behaves as two already-individually-safe operations (`AddChainCommand`-shaped add, `DeleteChainsCommand`-shaped remove) glued by `CompositeCommand`. |
+  | `SetChainLockedCommand`, `SetChainLoopCommand` | Safe | `IsLocked`/`Loop` are never read anywhere in `Tiled/` (grepped, zero matches) -- no interaction with tsx sync at all. |
+  | `AddAxisAlignedRectangleCommand`, `DeleteAxisAlignedRectangleCommand`, `AddCircleCommand`, `DeleteCircleCommand`, `DuplicateShapesCommand`, `PasteShapesCommand`, `MoveShapeCommand`, `ResizeShapeCommand`, `SetShapePropsCommand`, `BulkShapePropsCommand` | Safe | None of these touch `chain.Frames`/`AnimationChainListSave.AnimationChains`/frame rect coordinates at all (grepped `CommandsAndState/` for `.Frames.`/`AnimationChains.` -- none of these 10 files matched); they only mutate `frame.ShapesSave.Shapes`, which the Tiled sync pipeline never reads (grepped `Tiled/` for `Shape`/`Circle`/`Rectangle` -- one hit, an unrelated doc-comment word). |
+  | `CompositeCommand` | Safe | Pure delegation to already-individually-audited children in order; introduces no bookkeeping of its own. |
+  | `BulkFrameEditCommand` | Safe | Mutates `FrameLength`/`RelativeX`/`RelativeY`/UV coordinates/color fields via snapshot restore -- the UV-coordinate case is the same class as `FrameRegionChangedCommand` (already covered by the general footprint-resize fix below, since the fix lives in `ProjectManager`/the mapper, not in any specific command), and the rest are unrelated to tile identity. |
+
+  **Real bug #1, confirmed red first (task item 5) -- a footprint-resize-then-undo relocates a
+  multi-tile chain's satellite instead of restoring it.** `BulkFrameRegionChangedCommand.Do()`/
+  `Undo()` (and `FrameRegionChangedCommand` for a 1-frame chain) mutate an existing frame's
+  `Left`/`Top`/`Right`/`BottomCoordinate` in place -- no `AnimationFrameSave` object is added or
+  removed and `chain.Frames.Count` never changes, unlike every previously-fixed case in this bug
+  class. Shrinking a 2-wide footprint to 1-wide (dropping a satellite), then undoing back to the
+  exact original rect, hit a version of the "owner isn't its own first frame" relocation bug -- but
+  for the satellite: `SaveTsxProject`'s post-save bookkeeping unconditionally *replaced* (rather than
+  merged into) a present chain's whole satellite-hint dictionary every save, so an offset absent from
+  one save's footprint lost its hint outright instead of surviving for a later save where the
+  footprint widens again. Fixed by merging each save's satellite results onto the existing hint
+  dictionary, and by keeping the whole per-chain dictionary when a chain has frames but zero
+  satellites this save -- mirroring how `_tsxEntryTileIdsByChain` already persists unconditionally
+  for the life of a non-empty chain. No reference-fingerprint mechanism needed here (unlike the
+  frame-count-zero case): a resize never touches frame-object identity or count, so there's no
+  zero/dormant transition to gate revival on -- unconditional persistence is the correct, minimal
+  fix. Test:
+  `ProjectManagerTsxProjectTests.SaveTsxProject_ShrinkFootprintThenUndoWithSameFrameObjectsAndSave_RestoresSatelliteToOriginalTileInsteadOfRelocating`.
+
+  **Real bug #2, confirmed red first -- a broader generalization found while investigating item 1
+  (rename), unrelated to rename itself: ANY save whose mapping ABORTS with a warning while the chain
+  still has frames silently dropped the chain's entry/satellite hints.** Tracing
+  `SaveTsxProject`'s bookkeeping loop precisely (per this pass's "trace concretely, don't guess"
+  instruction) surfaced a third, unhandled outcome alongside the two it already handled ("live hint"
+  and "genuinely emptied to zero frames"): a chain that still has frames but whose
+  `MultiTileToTiledAnimationMapper.MapChain` call hit any of its `Empty()`-with-warning call sites
+  this save (mismatched texture name, misaligned/negative rect origin, footprint overflow, non-zero
+  margin/spacing) fell through both branches, so nothing preserved its hints. The very next
+  successful save then recomputed the entry tile fresh from frame[0], relocating an "owner isn't its
+  own first frame" chain exactly like the bug class this whole sweep is themed around -- reachable by
+  *any* command whose Do()/Undo() can drive a chain in and out of an abort condition without
+  changing `Frames.Count` or frame identity, not one specific command. `SetFrameTextureNameCommand`
+  (point a frame at the wrong texture, then back) is the simplest repro, but
+  `FrameRegionChangedCommand`/`BulkFrameRegionChangedCommand` (drag a rect to a misaligned/
+  non-tile-multiple size mid-gesture) and `MoveFramesCommand`/`AddFramesCommand`/
+  `DuplicateFrameCommand` (moving or adding a frame with a mismatched texture into an existing chain)
+  reach the identical code path. Fixed the general condition, not the one repro: a present chain with
+  frames whose mapping aborted now keeps its existing entry/satellite hints and last-known-frames
+  untouched, the same "transient, recoverable state" treatment already given to a chain absent from
+  the ACLS. Test:
+  `ProjectManagerTsxProjectTests.SaveTsxProject_MappingAbortsThenRecoversViaTextureNameFix_RestoresOriginalTileInsteadOfRelocating`.
+
+  **Traced, pinned with a teeth-tested test, no source change -- frame reorder within a chain (task
+  item 4).** `ReorderCommand<AnimationFrameSave>` (Reverse Chain, drag-to-reorder) changes which
+  frame sits at index 0 -- the exact fallback `MapChain` uses when no hint exists -- but both
+  `_tsxEntryTileIdsByChain` and `_tsxSatelliteTileIdsByChain` are keyed purely by chain/offset
+  reference, never by list position, so an existing hint keeps winning regardless of reorder.
+  Confirmed the test has teeth by temporarily forcing `SaveTsxProject` to pass `null` hints into
+  `Map` and observing the anchor relocate, then reverting. Test:
+  `SaveTsxProject_ReorderFramesWithinChainAndSave_EntryAndSatelliteTilesStayPutOnlyAnimationOrderChanges`.
+
+  **Task item 2 (reorder chains at the ACLS level) -- traced, safe, no test added.** Same reasoning
+  as the frame-reorder case one level up: `ReorderCommand<AnimationChainSave>` only rebuilds
+  `AnimationChainListSave.AnimationChains`' order via `Clear()`+`Add()` on the same objects --
+  nothing in this subsystem's identity tracking is position-keyed, confirmed by reading every
+  dictionary's key type (`AnimationChainSave` object references throughout). No discriminating test
+  possible beyond what the frame-level pin above already demonstrates for the identical mechanism.
+
+  **New TODO item surfaced while implementing the mapping-abort fix (see TODO list above): a chain
+  that is dormant AND whose refill also triggers a mapping abort loses its dormant hint outright**
+  instead of staying dormant for a still-later save to revive. Narrow (requires stacking two
+  separately-unusual states in succession) and not yet confirmed with a red test -- left as TODO
+  rather than folded into this pass's fix, to avoid guessing at a fix shape for an unconfirmed
+  scenario.
+
+  Full suite: `AnimationEditor.Core.Tests` 2187/2187 (was 2184, +3 new: the satellite-footprint fix's
+  test, the reorder-frames pin, and the mapping-abort fix's test).
+
+  **Honest assessment: not a clean pass, and the strongest evidence yet that this bug class was not
+  actually exhausted by pass #10's two fixes.** Two new real, confirmed bugs were found -- one a
+  direct hit on a specifically-suggested target (footprint resize), the other a genuine
+  generalization discovered by tracing code rather than guessing from a command's name, matching
+  exactly the "fix the class, not the repro" principle: the mapping-abort bug has nothing to do with
+  rename (what this pass was originally investigating when it was found) and instead applies
+  uniformly across at least five different commands. Every other command in the 33-file inventory
+  traced to a concrete, reasoned "safe" verdict -- no hand-waving "seems fine" verdicts. The bug class
+  does **not** yet look exhausted: the mapping-abort fix's own TODO offshoot (dormant hint lost on an
+  abort-while-refilling save) is a third, related-but-distinct gap in the same dormant/active hint
+  bookkeeping this pass touched twice, and the fact that two passes in a row (#10 and #11) each found
+  a "fix the obvious case, defer/discover a deeper related case" pattern suggests the
+  `_tsxEntryTileIdsByChain`/`_tsxSatelliteTileIdsByChain`/`_tsxDormantHintsByChain` three-way state
+  machine itself -- not any individual command -- is the part that keeps growing new edge cases. A
+  pass #12 aimed at the TODO item above, or at a from-scratch re-derivation of that state machine's
+  full transition table (live -> dormant -> revived -> aborted, and every pairwise combination), is
+  more likely to find the next gap than another command-by-command command audit.
