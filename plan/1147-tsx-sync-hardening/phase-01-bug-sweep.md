@@ -2076,3 +2076,55 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   Full suite: `AnimationEditor.Core.Tests` 2200/2200 (unchanged -- no `.Core` source change this
   pass), `AnimationEditor.App.Tests` 990/990 (was 989, +1 new), full
   `AnimationEditorAvalonia.slnx` build 0 warnings/0 errors.
+
+- [x] **Frame resize in a native-tsx chain (#1155, PR #1155).** A handle drag on one frame left its
+  siblings at the old size, so the chain failed the mapper's footprint check and its tile animation
+  was skipped on save. `FrameFootprintSync.ComputeSiblingMatches` now applies the dragged frame's
+  per-edge delta to every sibling (any of the 8 grow/shrink directions), recorded in the same undo
+  command. Tests: `FrameFootprintSyncTests`, `WireframeHandleDragTests.HandleDrag_StretchingFrameInNativeTsxProject_*`.
+
+- [x] **Entry-tile ownership transfer on a left/top frame-0 resize (#1156, PR #1157).** Resizing
+  frame 0's left or top edge moves its top-left cell; the pinned entry-tile hint then pointed at a
+  cell that was now a satellite (collision, `ValidateNoTileIdCollisions` threw) or outside the
+  footprint. `ProjectManager._tsxEntryHintOriginFrames` tracks the frame each hint was derived
+  from; the hint transfers only when that frame is still in the chain with its cell on a different
+  tile, so a reorder or add/remove keeps the pin. A save-then-reload matrix (21 drags x 3 owner
+  provenances) found three more: satellite hints keyed by the old origin survived a transfer and
+  collided; a fresh satellite sat at the frame's physical cell instead of next to the owner tile,
+  which the loader reads it back from, so growing a hand-authored chain wrote an unattachable
+  satellite; a loaded owner already at frame 0's cell was pinned like a hand-authored one. Tests:
+  `TsxFrameResizeRoundTripTests` (71), `TsxEntryTileOwnershipTransferTests`,
+  `MultiTileToTiledAnimationMapperTests`.
+
+- [x] **Fresh-eyes pass #15 -- the resize/drag edit path as a whole: every code path that changes
+  a frame's size, through autosave, into `SaveTsxProject`.** Pass #14 asked for a different
+  subsystem pairing; #1155 had just added footprint propagation to exactly one of the three
+  size-changing paths, so the question was whether the other two had the same hole. They did.
+  - **Inspector Width/Height (`AppCommands.SetFramePixelRegion`) -- real gap, fixed.** Typing a
+    width for one frame of a native-tsx chain left its siblings unchanged; the autosave that runs
+    on every edit then skipped the chain with a footprint warning. Siblings now take the same
+    width/height (keeping their own X/Y) inside the same `BulkFrameEditCommand`; an X/Y-only edit
+    propagates nothing, and an achx project is untouched. Test:
+    `AppCommandsSetFramePixelRegionTsxTests` (4; two red before the fix).
+  - **Bulk handle drag (`WireframeControl` commit for `_bulkHandleDragStarts`) -- real gap,
+    fixed.** Reachable only with a selection mixing chain nodes and individual frames (two chain
+    nodes alone drag every frame of both, which stays consistent), but the commit site had no
+    propagation at all. Both bulk commit sites now funnel through `CommitBulkHandleDrag`, which
+    uses a new many-frames `FrameFootprintSync.ComputeSiblingMatches` overload (per chain, first
+    size-changed dragged frame sets the delta; dragged frames are never siblings). Tests:
+    `FrameFootprintSyncTests.ComputeSiblingMatches_ManyResized*`,
+    `WireframeHandleDragTests.BulkHandleDrag_StretchingOneFrameOfEachChainInNativeTsxProject_*`
+    (red before the fix).
+  - **Chain drag, single-frame move, inspector X/Y -- safe.** A move changes no footprint; the
+    owner tile follows frame 0's cell via #1157's transfer (`TsxFrameResizeRoundTripTests`
+    "move" rows and `Resize_MoveOnlyFrameOne_OwnerStays`).
+  - **Mid-drag autosave -- safe.** Frame coordinates mutate live during a drag but
+    `FrameRegionChanged` (the autosave trigger) fires only on commit, after propagation. A
+    partial state reaching a save is covered by `Resize_OnlyFrameZeroGrownLeft_WarnsAndKeepsOwnerUntilSiblingsMatch`.
+  - **Two UX residuals, not data loss, not fixed here (file as standalone issues if wanted):**
+    the wireframe snaps a native-tsx drag to pixels or the optional display grid, not to the
+    tileset's tile size, so an off-grid drop saves with a warning instead of snapping; and a tile
+    collision thrown by `SaveTsxProject` is swallowed by `SaveCurrentAnimationChainList`'s bare
+    `catch` into `MarkSaveFailed`, so the user never sees which two chains collided.
+  Full suite: `AnimationEditor.Core.Tests` 2323, `AnimationEditor.App.Tests` 999,
+  `AnimationEditor.Views.Tests` 146, `DocScreenshots` 6, all green.

@@ -1998,8 +1998,26 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
+
+            // A native tsx chain's frames must all share one whole-tile footprint (see
+            // FrameFootprintSync), so a width/height typed for one frame is the whole chain's new
+            // size: every sibling takes it too, keeping its own X/Y. Same rule the wireframe's
+            // handle drag applies; a move (X/Y only) changes no footprint and propagates nothing.
+            var siblings = new List<AnimationFrameSave>();
+            if (_pm.IsNativeTsxProject && (pixelW.HasValue || pixelH.HasValue))
+            {
+                var edited = new HashSet<AnimationFrameSave>(unlockedFrames, ReferenceEqualityComparer.Instance);
+                siblings = unlockedFrames
+                    .Select(_objectFinder.GetAnimationChainContaining)
+                    .OfType<AnimationChainSave>()
+                    .Distinct<AnimationChainSave>(ReferenceEqualityComparer.Instance)
+                    .SelectMany(c => c.Frames)
+                    .Where(f => !edited.Contains(f))
+                    .ToList();
+            }
+
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () =>
+                unlockedFrames.Concat(siblings).ToList(), () =>
                 {
                     foreach (var f in unlockedFrames)
                     {
@@ -2008,6 +2026,11 @@ namespace AnimationEditor.Core.CommandsAndState
                         // (possibly just-moved) Left/Top.
                         if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
                         if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                    }
+                    foreach (var f in siblings)
+                    {
                         if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
                         if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
                     }

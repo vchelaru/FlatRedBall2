@@ -1,5 +1,7 @@
 using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Tiled;
 
@@ -31,23 +33,48 @@ public static class FrameFootprintSync
     /// other frames.
     /// </summary>
     public static IReadOnlyList<SiblingMatch> ComputeSiblingMatches(
-        AnimationChainSave chain, AnimationFrameSave resizedFrame, FrameRect resizedBefore, FrameRect resizedAfter)
-    {
-        float dLeft   = resizedAfter.Left   - resizedBefore.Left;
-        float dTop    = resizedAfter.Top    - resizedBefore.Top;
-        float dRight  = resizedAfter.Right  - resizedBefore.Right;
-        float dBottom = resizedAfter.Bottom - resizedBefore.Bottom;
+        AnimationChainSave chain, AnimationFrameSave resizedFrame, FrameRect resizedBefore, FrameRect resizedAfter) =>
+        ComputeSiblingMatches([(resizedFrame, resizedBefore, resizedAfter)], _ => chain);
 
+    /// <summary>
+    /// The many-frames form of <see cref="ComputeSiblingMatches(AnimationChainSave, AnimationFrameSave, FrameRect, FrameRect)"/>
+    /// for a bulk drag: every chain touched by <paramref name="resized"/> gets its un-dragged
+    /// frames matched to that chain's first dragged frame whose size actually changed. A dragged
+    /// frame is never also a sibling, and a chain whose dragged frames only moved needs nothing.
+    /// </summary>
+    public static IReadOnlyList<SiblingMatch> ComputeSiblingMatches(
+        IReadOnlyList<(AnimationFrameSave Frame, FrameRect Before, FrameRect After)> resized,
+        Func<AnimationFrameSave, AnimationChainSave?> chainOf)
+    {
+        var resizedFrames = new HashSet<AnimationFrameSave>(resized.Select(r => r.Frame), ReferenceEqualityComparer.Instance);
+        var handledChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
         var result = new List<SiblingMatch>();
-        foreach (var frame in chain.Frames)
+        foreach (var (resizedFrame, before, after) in resized)
         {
-            if (ReferenceEquals(frame, resizedFrame)) continue;
-            var before = new FrameRect(frame.LeftCoordinate, frame.TopCoordinate, frame.RightCoordinate, frame.BottomCoordinate);
-            var after = new FrameRect(
-                before.Left + dLeft, before.Top + dTop,
-                before.Right + dRight, before.Bottom + dBottom);
-            result.Add(new SiblingMatch(frame, before, after));
+            if (!SizeChanged(before, after)) continue;
+            var chain = chainOf(resizedFrame);
+            if (chain is null || !handledChains.Add(chain)) continue;
+
+            float dLeft   = after.Left   - before.Left;
+            float dTop    = after.Top    - before.Top;
+            float dRight  = after.Right  - before.Right;
+            float dBottom = after.Bottom - before.Bottom;
+            foreach (var frame in chain.Frames)
+            {
+                if (resizedFrames.Contains(frame)) continue;
+                var siblingBefore = new FrameRect(frame.LeftCoordinate, frame.TopCoordinate, frame.RightCoordinate, frame.BottomCoordinate);
+                var siblingAfter = new FrameRect(
+                    siblingBefore.Left + dLeft, siblingBefore.Top + dTop,
+                    siblingBefore.Right + dRight, siblingBefore.Bottom + dBottom);
+                result.Add(new SiblingMatch(frame, siblingBefore, siblingAfter));
+            }
         }
         return result;
     }
+
+    /// <summary>Whether a rect change altered the frame's size at all (a pure move keeps every
+    /// sibling's footprint valid and so propagates nothing).</summary>
+    public static bool SizeChanged(FrameRect before, FrameRect after) =>
+        Math.Abs((before.Right - before.Left) - (after.Right - after.Left)) > 0.0001f
+        || Math.Abs((before.Bottom - before.Top) - (after.Bottom - after.Top)) > 0.0001f;
 }

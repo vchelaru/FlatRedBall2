@@ -471,7 +471,8 @@ public class WireframeControl : TextureViewport
         float bL, float bT, float bR, float bB,
         float aL, float aT, float aR, float aB)
     {
-        bool sizeChanged = Math.Abs((bR - bL) - (aR - aL)) > 0.0001f || Math.Abs((bB - bT) - (aB - aT)) > 0.0001f;
+        bool sizeChanged = FrameFootprintSync.SizeChanged(
+            new FrameFootprintSync.FrameRect(bL, bT, bR, bB), new FrameFootprintSync.FrameRect(aL, aT, aR, aB));
         var chain = sizeChanged && _projectManager?.IsNativeTsxProject == true
             ? _objectFinder?.GetAnimationChainContaining(frame)
             : null;
@@ -998,21 +999,7 @@ public class WireframeControl : TextureViewport
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
-        var snapshots = _bulkHandleDragStarts
-            .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
-                s.Rect.Frame,
-                s.BL, s.BT, s.BR, s.BB,
-                s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
-                s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
-            .ToList();
-        if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
-        {
-            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-            foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-                FrameRegionChanged?.Invoke(fr.Frame);
-        }
-
-        _bulkHandleDragStarts.Clear();
+        CommitBulkHandleDrag();
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1658,6 +1645,51 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
+    /// Commits a bulk handle drag: one atomic undo command covering every dragged frame, then a
+    /// region-changed event per frame. In a native .tsx project, any chain whose dragged frames
+    /// changed size also gets its un-dragged frames matched to the new footprint, recorded in the
+    /// same command -- the bulk sibling of <see cref="RecordFrameRegionChange"/>'s propagation,
+    /// for a selection that mixes chain nodes with individual frames. Clears
+    /// <see cref="_bulkHandleDragStarts"/>.
+    /// </summary>
+    private void CommitBulkHandleDrag()
+    {
+        var snapshots = _bulkHandleDragStarts
+            .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                s.Rect.Frame,
+                s.BL, s.BT, s.BR, s.BB,
+                s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+            .ToList();
+        if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+        {
+            if (_projectManager?.IsNativeTsxProject == true && _objectFinder != null)
+            {
+                var siblingMatches = FrameFootprintSync.ComputeSiblingMatches(
+                    snapshots.Select(s => (s.Frame,
+                        new FrameFootprintSync.FrameRect(s.BL, s.BT, s.BR, s.BB),
+                        new FrameFootprintSync.FrameRect(s.AL, s.AT, s.AR, s.AB))).ToList(),
+                    _objectFinder.GetAnimationChainContaining);
+                foreach (var m in siblingMatches)
+                {
+                    m.Frame.LeftCoordinate   = m.After.Left;
+                    m.Frame.TopCoordinate    = m.After.Top;
+                    m.Frame.RightCoordinate  = m.After.Right;
+                    m.Frame.BottomCoordinate = m.After.Bottom;
+                    snapshots.Add(new(m.Frame,
+                        m.Before.Left, m.Before.Top, m.Before.Right, m.Before.Bottom,
+                        m.After.Left,  m.After.Top,  m.After.Right,  m.After.Bottom));
+                }
+            }
+
+            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            foreach (var s in snapshots)
+                FrameRegionChanged?.Invoke(s.Frame);
+        }
+        _bulkHandleDragStarts.Clear();
+    }
+
+    /// <summary>
     /// Commits the in-progress handle or chain drag (undo + region-changed events) and clears
     /// drag state. Shared by <see cref="OnEditPointerReleased"/> and
     /// <see cref="OnPointerCaptureLost"/> so both paths leave the control idle.
@@ -1667,24 +1699,7 @@ public class WireframeControl : TextureViewport
         if (_draggingRect != null)
         {
             if (_bulkHandleDragStarts.Count > 0)
-            {
-                // Bulk drag: record one atomic undo command covering all affected frames,
-                // then notify listeners for each changed frame.
-                var snapshots = _bulkHandleDragStarts
-                    .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
-                        s.Rect.Frame,
-                        s.BL, s.BT, s.BR, s.BB,
-                        s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
-                        s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
-                    .ToList();
-                if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
-                {
-                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-                    foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-                        FrameRegionChanged?.Invoke(fr.Frame);
-                }
-                _bulkHandleDragStarts.Clear();
-            }
+                CommitBulkHandleDrag();
             else
             {
                 float aL = _draggingRect.Frame.LeftCoordinate;

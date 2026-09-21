@@ -176,4 +176,48 @@ public class FrameFootprintSyncTests
 
         Assert.Empty(matches);
     }
+
+    // A bulk drag resizes one frame from each of several chains at once. Each chain's
+    // un-dragged frames follow their own chain's dragged frame; a dragged frame is never also a
+    // sibling; a chain whose dragged frame only moved (same size) needs nothing.
+    [Fact]
+    public void ComputeSiblingMatches_ManyResizedAcrossChains_PropagatesPerChainSkippingResizedFrames()
+    {
+        var walk = TwoFrameChain(new FrameRect(0f, 0f, 0.5f, 0.25f), new FrameRect(0.25f, 0f, 0.5f, 0.25f));
+        var run = TwoFrameChain(new FrameRect(0f, 0.5f, 0.5f, 0.75f), new FrameRect(0.25f, 0.5f, 0.5f, 0.75f));
+        var idle = TwoFrameChain(new FrameRect(0.25f, 0.25f, 0.5f, 0.5f), new FrameRect(0.5f, 0.25f, 0.75f, 0.5f));
+        var resized = new (AnimationFrameSave, FrameRect, FrameRect)[]
+        {
+            (walk.Frames[0], new FrameRect(0f, 0f, 0.25f, 0.25f), new FrameRect(0f, 0f, 0.5f, 0.25f)),
+            (run.Frames[0], new FrameRect(0f, 0.5f, 0.25f, 0.75f), new FrameRect(0f, 0.5f, 0.5f, 0.75f)),
+            (idle.Frames[0], new FrameRect(0f, 0.25f, 0.25f, 0.5f), new FrameRect(0.25f, 0.25f, 0.5f, 0.5f)), // moved, same size
+        };
+        AnimationChainSave? ChainOf(AnimationFrameSave f) =>
+            walk.Frames.Contains(f) ? walk : run.Frames.Contains(f) ? run : idle.Frames.Contains(f) ? idle : null;
+
+        var matches = FrameFootprintSync.ComputeSiblingMatches(resized, ChainOf);
+
+        Assert.Equal(2, matches.Count);
+        var walkMatch = Assert.Single(matches, m => ReferenceEquals(m.Frame, walk.Frames[1]));
+        Assert.Equal(new FrameRect(0.25f, 0f, 0.75f, 0.25f), walkMatch.After);
+        var runMatch = Assert.Single(matches, m => ReferenceEquals(m.Frame, run.Frames[1]));
+        Assert.Equal(new FrameRect(0.25f, 0.5f, 0.75f, 0.75f), runMatch.After);
+        Assert.DoesNotContain(matches, m => idle.Frames.Contains(m.Frame));
+    }
+
+    // Both frames of a chain dragged together already agree; nothing is left to propagate to.
+    [Fact]
+    public void ComputeSiblingMatches_ManyResized_WholeChainDragged_ReturnsEmpty()
+    {
+        var walk = TwoFrameChain(new FrameRect(0f, 0f, 0.5f, 0.25f), new FrameRect(0.25f, 0f, 0.75f, 0.25f));
+        var resized = new (AnimationFrameSave, FrameRect, FrameRect)[]
+        {
+            (walk.Frames[0], new FrameRect(0f, 0f, 0.25f, 0.25f), new FrameRect(0f, 0f, 0.5f, 0.25f)),
+            (walk.Frames[1], new FrameRect(0.25f, 0f, 0.5f, 0.25f), new FrameRect(0.25f, 0f, 0.75f, 0.25f)),
+        };
+
+        var matches = FrameFootprintSync.ComputeSiblingMatches(resized, _ => walk);
+
+        Assert.Empty(matches);
+    }
 }

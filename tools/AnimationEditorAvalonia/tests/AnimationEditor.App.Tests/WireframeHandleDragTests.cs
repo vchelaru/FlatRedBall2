@@ -470,6 +470,70 @@ public class WireframeHandleDragTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    // Two chains at rows 0 and 2, frame 0 of each selected as individual frame nodes. A bulk
+    // handle drag resizes only those two visible frames; each chain's other frame must follow
+    // its own chain's new footprint, in the same undo command.
+    private const string TwoChainNativeTsxFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+         <image source="Heroes.png" width="64" height="64"/>
+         <tile id="0">
+          <animation>
+           <frame tileid="0" duration="200"/>
+           <frame tileid="1" duration="200"/>
+          </animation>
+         </tile>
+         <tile id="8">
+          <animation>
+           <frame tileid="8" duration="200"/>
+           <frame tileid="9" duration="200"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [AvaloniaFact]
+    public void BulkHandleDrag_StretchingOneFrameOfEachChainInNativeTsxProject_PropagatesToEachChainsSiblings()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var tsxPath = System.IO.Path.Combine(dir, "Heroes.tsx");
+            System.IO.File.WriteAllText(tsxPath, TwoChainNativeTsxFixtureXml);
+            WriteSolidPng(dir, SKColors.DarkGray, size: 64, name: "Heroes.png");
+            ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
+            var chains = ctx.ProjectManager.AnimationChainListSave!.AnimationChains;
+            var walk0 = chains[0].Frames[0];
+            var walk1 = chains[0].Frames[1];
+            var run0 = chains[1].Frames[0];
+            var run1 = chains[1].Frames[1];
+            ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object> { walk0, run0 };
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(System.IO.Path.Combine(dir, "Heroes.png"));
+            ctrl.SetCamera(0f, 0f, 1f);
+            ctrl.RefreshFrames();
+
+            // Drag walk0's right edge from pixel 16 to 32 (one tile wider); run0 gets the same delta.
+            ctrl.SimulateBulkHandleDrag(walk0, HandleKind.BotRight,
+                startScreenX: 16f, startScreenY: 16f,
+                endScreenX:   32f, endScreenY:   16f);
+
+            Assert.Equal(0.5f, walk0.RightCoordinate, precision: 4);
+            Assert.Equal(0.5f, run0.RightCoordinate, precision: 4);
+            Assert.Equal(0.75f, walk1.RightCoordinate, precision: 4); // tile 1: left 0.25 + 0.5
+            Assert.Equal(0.75f, run1.RightCoordinate, precision: 4);  // tile 9: left 0.25 + 0.5
+
+            ctx.UndoManager.Undo();
+
+            Assert.Equal(0.5f, walk1.RightCoordinate, precision: 4);
+            Assert.Equal(0.5f, run1.RightCoordinate, precision: 4);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     [AvaloniaFact]
     public void HandleDrag_StretchingFrame_PlainAchxProject_DoesNotPropagateToSiblingFrames()
     {
