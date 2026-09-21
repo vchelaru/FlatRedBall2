@@ -335,7 +335,41 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/Anima
 
 ## TODO
 
-(empty -- see fresh-eyes pass #12 in DONE below, which resolved the one item that was here.)
+- [ ] **`SaveTsxProject` writes from a load-time snapshot with no re-read/merge against disk, so a
+  concurrent achx-push sync to the same `.tsx` (via a `.tiledsync` association) can be silently
+  clobbered or have its own new tiles dropped from the file entirely.** Found in fresh-eyes pass
+  #13 (see DONE below for the full trace). The narrower part of this gap -- a tile achx-push already
+  owned *at the moment the native-tsx project loaded* -- is fixed this pass (ownership-aware
+  exclusion + stale-clear protection + a loud throw on a fresh claim collision). What's **not**
+  fixed, and needs a decision rather than a unilateral change: `ProjectManager.SaveTsxProject`
+  operates entirely on `_tsxTileset`, an in-memory snapshot taken once at `LoadTsxProject` and never
+  refreshed from disk before a later save; `TsxWriter.Write` (both its patch and full-rewrite paths)
+  drives its output purely from the in-memory `Tileset.Tiles` list, with zero fallback to what's
+  currently on disk. So if achx-push adds a brand-new tile to the file (or edits one this project's
+  own stale snapshot doesn't have) *after* the native-tsx tab loaded but *before* it next saves, that
+  tile is invisible to every check this pass added (they all key off `tilesById`, which is built
+  from the same stale snapshot) and is silently omitted from the file the next time this project
+  saves -- true data loss, not just a stale warning. This is a classic lost-update/concurrent-writer
+  problem, just at the file level within one process (two independent, un-coordinated save pipelines
+  targeting one file) rather than across processes.
+  - Confirmed reachable via ordinary UI, not just hand-editing: `AddAssociatedTiledTilesetViaDialogAsync`
+    /`AddAssociatedTiledTileset` (`AppCommands.cs`) let a user point any achx/achj's `.tiledsync`
+    association at any `.tsx` path via a plain file-picker dialog, with **zero check** for whether
+    that path is currently open as a native-tsx tab (or vice versa -- `LoadTsxProject`/
+    `TsxCompatibilityChecker.CheckOpenCompatibility` have no awareness of `.tiledsync` associations
+    either). Two ordinary actions -- File > Open a `.tsx` directly, and in a different tab,
+    Associate Tiled Tileset pointing an achx at that same path -- are all it takes.
+  - Candidate responses, undecided: (a) `SaveTsxProject` re-reads the file immediately before
+    applying its own changes and merges in any tile it doesn't recognize as its own (the structurally
+    correct fix, but a real change to the save flow's design, not a small patch); (b) refuse to open
+    a `.tsx` natively if it already has a `.tiledsync` association pointing at it (and symmetrically,
+    refuse to associate a `.tiledsync` with a `.tsx` that's currently open natively), trading
+    coexistence for a hard error the user can react to; (c) leave both features working, document the
+    hazard, and accept it as a known limitation of running both features against the same file in one
+    session (lowest engineering cost, worst user-facing outcome if hit). Not decided in this pass --
+    genuinely needs a product/design call, same as this sweep's established precedent for
+    "structurally real but needs a decision beyond a bug-sweep pass" findings (e.g. the `TsxWriter`
+    tile-ordering limitation, `PropertiesEqual` order-sensitivity).
 
 Traced, not added as new TODO items (fresh-eyes pass #1, see DONE below for the full reasoning):
 same-chain satellites colliding on `(Dx, Dy)` (structurally impossible — traced), concurrent
@@ -1803,3 +1837,81 @@ introduce a duplicate tile id or change `Columns` after a successful load.
   yet confirmed" or deferred. This is a stronger completeness claim than any prior pass in this sweep
   could make, precisely because it was derived from the state space itself rather than from guessing
   at plausible commands.
+
+- [x] **Fresh-eyes pass #13 -- can achx-push and native-tsx collide when both target the same
+  `.tsx` file?** A genuinely new angle: every prior pass audited each feature's own state machine in
+  isolation; this one asked whether the two features' independent write paths interfere with each
+  other. Traced concretely rather than assumed, and found two real, confirmed bugs (fixed) plus one
+  larger structural gap that needs a design decision (moved to TODO above, not fixed here).
+  - **Real bug, confirmed red first -- `TiledAnimationToAchjMapper.Map` (native-tsx's load side) had
+    zero awareness of `achjSourceFile`, so opening a `.tsx` natively absorbed any achx-push-owned
+    tile into the native project's own editable model as an independent "ID:{tileId}" chain** (every
+    animated tile qualified as a chain candidate, regardless of who wrote it).
+    `Map_TileOwnedByAchxPushSource_ExcludedFromNativeTsxModelEntirely` failed against the old code
+    (`Assert.Empty` on `acls.AnimationChains` saw the achx-push tile's animation surfaced as its own
+    chain). Consequence traced, not assumed: once absorbed, a user could rename/move/delete an
+    animation that isn't this project's to own, and the next native-tsx save would either leave
+    achx-push's `achjAnimationName`/`achjSourceFile` properties orphaned on a tile whose `Animation`
+    native-tsx had since overwritten, or fight achx-push's own next sync over the same tile. Fixed by
+    excluding any tile carrying `TilesetAnimationSync.SourceFilePropertyName` from
+    `animatedTiles` entirely -- unlike every other "not a real anchor" case in this method (broken/
+    orphaned/chained/backward `ParentId`, all *this project's own* broken references), an
+    achx-push-owned tile belongs to a different owner outright, so it's excluded rather than
+    surfaced as its own chain. Test:
+    `TiledAnimationToAchjMapperTests.Map_TileOwnedByAchxPushSource_ExcludedFromNativeTsxModelEntirely`.
+  - **Real bug, confirmed red first -- fixing the load-side absorption above would have made
+    `NativeTsxAnimationSync.Apply`'s stale-tile-clearing strictly worse without a matching save-side
+    fix.** Once an achx-push-owned tile is never absorbed into the model, it never appears in a native
+    -tsx save's `results` -- and this class's own doc comment ("any previously-animated tile not
+    represented in results is stale and gets cleared, full stop") means every native-tsx save would
+    now unconditionally wipe that tile's animation, turning a race-condition-shaped bug into a
+    guaranteed-every-save one. `Apply_TileOwnedByAchxPushSource_StaleClearingLeavesItUntouched`
+    confirmed this red (before the fix, the achx-owned tile's `Animation` and tracking properties
+    were cleared by a save with empty `results`). Fixed by excluding
+    `IsAchxPushOwned` tiles from `previouslyAnimatedTileIds`, mirroring the load-side exclusion.
+    Also added a symmetric loud-failure guard, `ValidateNoAchxPushOwnedTileClaimed`, for the case a
+    native-tsx chain's own geometry newly computes the same tile id as an already achx-push-owned
+    tile -- consistent with this codebase's established "two independent claimants, don't silently
+    pick a winner" precedent (the existing `ValidateNoTileIdCollisions` between two native-tsx
+    chains). Test:
+    `Apply_ChainGeometryClaimsAchxPushOwnedTile_ThrowsInsteadOfSilentlyOverwriting`. Both tests
+    confirmed red before the fix, green after.
+  - **Traced but deliberately not fixed this pass -- `SaveTsxProject`'s load-time snapshot has no
+    re-read/merge against disk, so a concurrent achx-push write (new tile, or an edit to a tile the
+    snapshot doesn't know about) can still be silently dropped from the file the next time the
+    native-tsx tab saves.** The two fixes above close the gap for a tile achx-push already owned *at
+    the moment the native-tsx project loaded* (the common, easily-reachable case: associate then
+    open, or open then associate then switch tabs and save without ever touching the associated
+    tsx's tab again). They do **not** close the gap for a tile achx-push writes *while* the native-tsx
+    tab is already open and loaded -- `ProjectManager.SaveTsxProject` never re-reads the file, and
+    `TsxWriter.Write`'s output (patch or full-rewrite) is driven entirely by the in-memory
+    `Tileset.Tiles` list with no fallback to what's on disk, so a tile invisible to that stale
+    snapshot is invisible to every check this pass added and gets silently omitted from the written
+    file -- true data loss, not just a stale warning or a thrown exception. This is a materially
+    larger fix (re-reading and merging on every save, or refusing the two features' coexistence
+    outright) with real product tradeoffs, not a small patch -- added as a TODO item above with three
+    candidate responses laid out, rather than guessed at unilaterally.
+  - **Confirmed reachable via the app's own UI, not just hand-editing.** Re-checked
+    `AddAssociatedTiledTilesetViaDialogAsync`/`AddAssociatedTiledTileset` (`AppCommands.cs`,
+    previously traced in pass #6 for a *different* question -- whether associating from within an
+    already-native-tsx project's own tab does anything, concluded "harmless no-op" because
+    `SaveCurrentAnimationChainList` skips `SyncAssociatedTiledTilesets` for a native-tsx project).
+    That conclusion still holds for *that* question, but is orthogonal to this one: nothing in either
+    method, nor in `LoadTsxProject`/`TsxCompatibilityChecker`, checks whether the `.tsx` path being
+    associated (from an *achx* tab) is currently open natively in a *different* tab, or vice versa.
+    The dialog is a plain file picker with no such awareness either direction -- confirming the
+    scenario is reachable through two entirely ordinary actions (open a `.tsx` directly in one tab;
+    in a different tab, associate a `.tiledsync` pointing an achx at that same path), not a
+    contrived/hand-edited-XML edge case like most of this sweep's other findings.
+  - **Honest assessment: a fixed pass with a real deferred-design-question residue, not a clean
+    pass.** Two real, confirmed bugs found and fixed (both TDD, both had to be fixed together --
+    fixing only the load side would have actively regressed the save side), plus one larger
+    structural gap identified, traced to a concrete root cause (a long-lived in-memory session vs. a
+    stateless-per-call sync competing for one file with no coordination), and left as a TODO with
+    named candidate responses rather than guessed at. This is the first pass in the sweep to find a
+    bug class at the *intersection* of the two major features rather than within either one's own
+    state machine -- everything analyzed to reach it (`TilesetAnimationSync`, `NativeTsxAnimationSync`,
+    `TiledAnimationToAchjMapper`, `TsxWriter`, `ProjectManager.SaveTsxProject`,
+    `AppCommands.AddAssociatedTiledTileset*`) had already been individually audited by earlier
+    passes, but never against each other. Full suite: `AnimationEditor.Core.Tests` 2192/2192 (was
+    2189, +3 new).
