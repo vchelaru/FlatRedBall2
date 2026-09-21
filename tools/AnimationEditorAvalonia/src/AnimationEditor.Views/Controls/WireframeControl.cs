@@ -60,9 +60,9 @@ public class WireframeControl : TextureViewport
         public List<(SKRect Bounds, bool IsSelected, float RevealProgress)> Frames = new();
         /// <summary>Mirrors <see cref="WireframeControl.FillFrames"/> (#976).</summary>
         public bool FillFrames = true;
-        /// <summary>Texture-space rect of each tile cell inside a frame on a grid with spacing
-        /// (#1165) -- the pixels Tiled actually draws, gaps excluded.</summary>
-        public List<(SKRect Bounds, bool IsSelected)> FrameCellBounds = new();
+        /// <summary>Texture-space rect of each tile cell inside a selected frame on a grid with
+        /// spacing (#1165) -- the pixels Tiled actually draws, gaps excluded.</summary>
+        public List<SKRect> FrameCellBounds = new();
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
@@ -133,14 +133,12 @@ public class WireframeControl : TextureViewport
             canvas.DrawRect(sr, frameStroke);
         }
 
-        // Per-cell outlines inside spaced-grid frames (#1165): a second colour so the strip of
-        // gap pixels between cells reads as "inside the frame rect, but not part of any tile".
-        // Drawn after the frame strokes so a 1x1 frame's cell edge sits on top of its own outline.
-        foreach (var (bounds, isSelected) in s.FrameCellBounds)
-        {
-            frameStroke.Color = isSelected ? CellOutlineColor : CellOutlineColor.WithAlpha(120);
+        // Per-cell outlines inside selected spaced-grid frames (#1165): a second colour so the
+        // strip of gap pixels between cells reads as "inside the frame rect, but not part of any
+        // tile". Drawn after the frame strokes so a 1x1 frame's cell edge sits on top of its own outline.
+        frameStroke.Color = CellOutlineColor;
+        foreach (var bounds in s.FrameCellBounds)
             canvas.DrawRect(s.TextureRectToScreen(bounds), frameStroke);
-        }
 
         // Hover label (#718): a small screen-space notch anchored at the top-left corner of
         // the hovered frame. Fixed pixel font size (never multiplied by s.Zoom) so it reads the
@@ -1298,14 +1296,16 @@ public class WireframeControl : TextureViewport
         foreach (var fr in _frameRects)
             snap.Frames.Add((fr.Bounds, fr.IsSelected, GetSelectionRevealProgress(fr.Frame)));
 
-        // Cell outlines inside each frame (issue #1165): on a grid with spacing, a multi-cell
-        // frame's rect includes the gap pixels between its cells, which Tiled never draws.
-        // Outlining each cell shows exactly what will animate; the outer rect keeps its handles
-        // so editing is unchanged. Unaligned rects (mid-edit) get no outlines.
+        // Cell outlines inside each SELECTED frame (issue #1165): on a grid with spacing, a
+        // multi-cell frame's rect includes the gap pixels between its cells, which Tiled never
+        // draws. Outlining each cell shows exactly what will animate; the outer rect keeps its
+        // handles so editing is unchanged. Selected only -- on every frame of a big sheet it's
+        // noise. Unaligned rects (mid-edit) get no outlines.
         if (_showGrid && _grid.Spacing > 0)
             foreach (var fr in _frameRects)
-                foreach (var cell in _grid.FrameCells(fr.Bounds.Left, fr.Bounds.Top, fr.Bounds.Width, fr.Bounds.Height))
-                    snap.FrameCellBounds.Add((new SKRect(cell.Left, cell.Top, cell.Right, cell.Bottom), fr.IsSelected));
+                if (fr.IsSelected)
+                    foreach (var cell in _grid.FrameCells(fr.Bounds.Left, fr.Bounds.Top, fr.Bounds.Width, fr.Bounds.Height))
+                        snap.FrameCellBounds.Add(new SKRect(cell.Left, cell.Top, cell.Right, cell.Bottom));
 
         if (_hoverFrame != null)
         {

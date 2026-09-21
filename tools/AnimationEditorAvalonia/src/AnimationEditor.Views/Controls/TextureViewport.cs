@@ -192,14 +192,10 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
                 StrokeWidth  = 1f,
                 IsAntialias  = true
             };
-            // One line per cell start; with spacing, a second (always minor) line at each cell's
-            // far edge so the gap between cells reads as a thin band. Margin only shifts the
-            // origin -- the lines stay locked to the texture origin (PanX/PanY) either way.
+            // One line per cell start (cell + spacing apart); margin only shifts the origin. The
+            // lines stay locked to the texture origin (PanX/PanY) either way.
             float stepX = MathF.Max(1f, s.Grid.StrideX * s.Zoom);
             float stepY = MathF.Max(1f, s.Grid.StrideY * s.Zoom);
-            float cellW = s.Grid.CellWidth * s.Zoom;
-            float cellH = s.Grid.CellHeight * s.Zoom;
-            bool spaced = s.Grid.Spacing > 0;
 
             // Full viewport (not just textureDest) so empty canvas around the sheet still shows
             // the grid.
@@ -230,8 +226,6 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
                 if (major && !IsMajorVisible(xIndex)) continue;
                 if (major || minorAlpha > 0)
                     canvas.DrawLine(x, viewT, x, viewB, major ? majorPaint : minorPaint);
-                if (spaced && minorAlpha > 0)
-                    canvas.DrawLine(x + cellW, viewT, x + cellW, viewB, minorPaint);
             }
 
             var (yStart, yIndex) = FirstLine(originY, viewT, stepY);
@@ -241,8 +235,6 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
                 if (major && !IsMajorVisible(yIndex)) continue;
                 if (major || minorAlpha > 0)
                     canvas.DrawLine(viewL, y, viewR, y, major ? majorPaint : minorPaint);
-                if (spaced && minorAlpha > 0)
-                    canvas.DrawLine(viewL, y + cellH, viewR, y + cellH, minorPaint);
             }
 
             // Keep textureDest referenced so callers/tests that pass it stay valid; the full-
