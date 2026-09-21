@@ -929,6 +929,19 @@ namespace AnimationEditor.Core
                     if (_tsxSatelliteTileIdsByChain.TryGetValue(chain, out var stillActiveSatellites))
                         updatedSatellites[chain] = stillActiveSatellites;
                 }
+                else if (_tsxDormantHintsByChain.TryGetValue(chain, out var stillDormantThroughAbort))
+                {
+                    // The dormant sibling of the branch above: this chain was DORMANT (not live)
+                    // before this save, and its refill this save was neither a reference-match
+                    // revival (handled by the pre-map injection above) nor a genuine re-emptying
+                    // (Frames.Count > 0 here) -- it was refilled with new content that itself hit
+                    // a mapping abort (mismatched texture, misaligned rect, etc.). Without this
+                    // branch the dormant hint is simply dropped, even though a later save could
+                    // still legitimately revive it (e.g. the abort gets fixed, or the refill is
+                    // undone back to the exact original frame objects). Keep it parked exactly as
+                    // it was, same "transient, recoverable save state" treatment as the live case.
+                    updatedDormant[chain] = stillDormantThroughAbort;
+                }
             }
             _tsxEntryTileIdsByChain = updatedEntries;
             _tsxSatelliteTileIdsByChain = updatedSatellites;

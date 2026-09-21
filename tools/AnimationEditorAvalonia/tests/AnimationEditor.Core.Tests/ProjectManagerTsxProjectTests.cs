@@ -508,6 +508,98 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
     }
 
+    // A dormant chain (frames cleared to zero, hint parked in _tsxDormantHintsByChain) whose
+    // refill uses genuinely NEW frame content (not the original objects -- so the pre-map
+    // revival check correctly does not fire) that ALSO happens to trigger a mapping abort (wrong
+    // texture name) must not lose its dormant hint outright. A LATER save that puts the ORIGINAL
+    // frame objects back must still revive the dormant hint and land on tile 5, not recompute
+    // fresh from frame[0] (tile 6) as if the chain had never had a hint at all.
+    [Fact]
+    public void SaveTsxProject_DormantChainRefillAlsoAbortsMapping_DormantHintSurvivesForLaterRevival()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        Assert.Equal("RiseUp", chain.Name);
+        var originalFrames = chain.Frames.ToArray();
+
+        // DeleteFramesCommand.Do(): clear every frame -- creates the dormant hint for tile 5.
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        // Refill with brand-new, unrelated frame content that ALSO points at a texture that
+        // doesn't match the open tileset's own image -- MapChain aborts the whole chain with a
+        // warning. This is NOT the same frame objects as the dormant snapshot, so the pre-map
+        // revival check correctly does not fire for this save.
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "Wrong.png",
+            LeftCoordinate = 0f, RightCoordinate = 0.25f,
+            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            FrameLength = 0.1f,
+        });
+        pm.SaveTsxProject();
+
+        // Fix it: clear the aborted refill and put the ORIGINAL frame objects back. If the
+        // dormant hint survived the abort save above, this must revive it and land on tile 5.
+        chain.Frames.Clear();
+        foreach (var frame in originalFrames)
+            chain.Frames.Add(frame);
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var tileSix = reloaded.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.True(tileSix is null || tileSix.Animation.Count == 0);
+    }
+
+    // The dormant sibling of SaveTsxProject_DeleteChainThenReinsertSameObjectAndSave_...: a chain
+    // that is already DORMANT (frames cleared) when DeleteChainsCommand removes it from the ACLS
+    // entirely, then Undo() re-inserts the exact same (still-empty) object. The dormant hint must
+    // survive the round trip through absence, and a later save with the ORIGINAL frame objects
+    // put back must still revive it onto tile 5.
+    [Fact]
+    public void SaveTsxProject_DormantChainDeletedThenReinsertedStillEmptyThenRevived_DormantHintSurvivesAbsence()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerNotFirstFrameFixtureXml, "Heroes.tsx");
+        pm.LoadTsxProject(new FilePath(path));
+
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+        var originalFrames = chain.Frames.ToArray();
+
+        // DeleteFramesCommand.Do(): clear every frame -- creates the dormant hint for tile 5.
+        chain.Frames.Clear();
+        pm.SaveTsxProject();
+
+        // DeleteChainsCommand.Do(): remove the (still-empty) chain from the ACLS entirely.
+        pm.AnimationChainListSave.AnimationChains.Remove(chain);
+        pm.SaveTsxProject();
+
+        // DeleteChainsCommand.Undo(): re-insert the exact same object, still empty.
+        pm.AnimationChainListSave.AnimationChains.Insert(0, chain);
+        pm.SaveTsxProject();
+
+        // Now restore the ORIGINAL frame objects -- must revive the dormant hint onto tile 5, not
+        // recompute fresh from frame[0] (tile 6).
+        foreach (var frame in originalFrames)
+            chain.Frames.Add(frame);
+        pm.SaveTsxProject();
+
+        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
+        Assert.NotNull(riseUp);
+        Assert.Equal([((uint)6, 300), ((uint)7, 300)], riseUp!.Animation.Select(f => (f.TileID, f.Duration)));
+
+        var tileSix = reloaded.Tiles.SingleOrDefault(t => t.ID == 6);
+        Assert.True(tileSix is null || tileSix.Animation.Count == 0);
+    }
+
     // Reordering a chain's frames (e.g. ReorderCommand<AnimationFrameSave> backing "Reverse Chain"
     // or drag-to-reorder) never adds/removes any AnimationFrameSave object and never empties the
     // chain, but it DOES change which frame is at index 0 -- the exact value
