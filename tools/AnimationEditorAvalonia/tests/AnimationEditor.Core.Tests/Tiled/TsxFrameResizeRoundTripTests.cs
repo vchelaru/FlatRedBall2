@@ -1,0 +1,297 @@
+using AnimationEditor.Core;
+using AnimationEditor.Core.Tests;
+using AnimationEditor.Core.Tiled;
+using DotTiled;
+using FlatRedBall2.AnimationEditorCommon;
+using System;
+using System.IO;
+using System.Linq;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
+using Xunit;
+
+namespace AnimationEditor.Core.Tests.Tiled;
+
+/// <summary>
+/// Every edge a user can grab on a native-tsx chain's frames (left/top/right/bottom), grown and
+/// shrunk, across the three ways a chain's entry tile can relate to its frame-0 geometry: derived
+/// by our own save, loaded from a file whose owner tile is frame 0's own top-left cell, and loaded
+/// from a file whose owner tile is deliberately unrelated to the frames. Each case saves, then
+/// reloads the written file through <see cref="ProjectManager.LoadTsxProject"/> and checks the
+/// chain comes back with exactly the edited rects and the expected owner tile -- a round trip is
+/// the only assertion that catches an anchor/satellite/ParentId set that is internally
+/// inconsistent (e.g. a satellite the loader can't attach to its anchor).
+/// </summary>
+public class TsxFrameResizeRoundTripTests : IDisposable
+{
+    private readonly TestHelpers.TempDir _dir = new();
+
+    public void Dispose() => _dir.Dispose();
+
+    // 4 columns, 16x16 tiles, 12 rows (tilecount=48, image 64x192). Every chain below starts as a
+    // 2x2 footprint: frame 0 at cols 1..3 rows 1..3 (origin tile 5), frame 1 at cols 1..3 rows
+    // 4..6 (origin tile 17) -- one free tile of room on every side for the grow cases.
+    private const string TilesetHeader = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="48" columns="4">
+         <image source="Heroes.png" width="64" height="192"/>
+        """;
+
+    private const string EmptyFixtureXml = TilesetHeader + """
+
+        </tileset>
+        """;
+
+    // Owner tile 5 is frame 0's own top-left cell; satellites sit at their physical cells.
+    private const string OwnerIsOriginFixtureXml = TilesetHeader + """
+
+         <tile id="5">
+          <animation>
+           <frame tileid="5" duration="100"/>
+           <frame tileid="17" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="6">
+          <properties>
+           <property name="ParentId" type="int" value="5"/>
+          </properties>
+          <animation>
+           <frame tileid="6" duration="100"/>
+           <frame tileid="18" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="9">
+          <properties>
+           <property name="ParentId" type="int" value="5"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="100"/>
+           <frame tileid="21" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="10">
+          <properties>
+           <property name="ParentId" type="int" value="5"/>
+          </properties>
+          <animation>
+           <frame tileid="10" duration="100"/>
+           <frame tileid="22" duration="100"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    // Owner tile 36 (row 9, col 0) has nothing to do with the frames it animates (rows 1..6);
+    // its satellites sit next to the OWNER (37, 40, 41), not next to the frames -- the
+    // hand-authored pattern TiledAnimationToAchjMapper reads satellites by.
+    private const string OwnerUnrelatedFixtureXml = TilesetHeader + """
+
+         <tile id="36">
+          <animation>
+           <frame tileid="5" duration="100"/>
+           <frame tileid="17" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="37">
+          <properties>
+           <property name="ParentId" type="int" value="36"/>
+          </properties>
+          <animation>
+           <frame tileid="6" duration="100"/>
+           <frame tileid="18" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="40">
+          <properties>
+           <property name="ParentId" type="int" value="36"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="100"/>
+           <frame tileid="21" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="41">
+          <properties>
+           <property name="ParentId" type="int" value="36"/>
+          </properties>
+          <animation>
+           <frame tileid="10" duration="100"/>
+           <frame tileid="22" duration="100"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    private string WriteFixture(string xml)
+    {
+        var path = Path.Combine(_dir.Path, "Heroes.tsx");
+        File.WriteAllText(path, xml);
+        return path;
+    }
+
+    private static void SetGridRect(AnimationFrameSave frame, int colStart, int colEnd, int rowStart, int rowEnd)
+    {
+        const float tileX = 16f / 64f;
+        const float tileY = 16f / 192f;
+        frame.LeftCoordinate = colStart * tileX;
+        frame.RightCoordinate = colEnd * tileX;
+        frame.TopCoordinate = rowStart * tileY;
+        frame.BottomCoordinate = rowEnd * tileY;
+    }
+
+    /// <summary>Applies one edge move (in whole tiles) to both frames of the 2x2 base geometry.</summary>
+    private static void Resize(AnimationChainSave chain, int dLeft, int dTop, int dRight, int dBottom)
+    {
+        SetGridRect(chain.Frames[0], 1 + dLeft, 3 + dRight, 1 + dTop, 3 + dBottom);
+        SetGridRect(chain.Frames[1], 1 + dLeft, 3 + dRight, 4 + dTop, 6 + dBottom);
+    }
+
+    private static AnimationChainSave NewBaseChain(string name)
+    {
+        var chain = new AnimationChainSave { Name = name };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f });
+        Resize(chain, 0, 0, 0, 0);
+        return chain;
+    }
+
+    private static void AssertRoundTrip(string path, AnimationChainSave edited, uint expectedEntryTileId)
+    {
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var anchors = tileset.Tiles
+            .Where(t => t.Animation.Count > 0
+                && !t.Properties.Any(p => p.Name == "ParentId")
+                && (t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == "Name")?.Value ?? $"ID:{t.ID}") == edited.Name)
+            .ToList();
+        Assert.Equal([expectedEntryTileId], anchors.Select(t => t.ID));
+
+        var pm = new ProjectManager();
+        pm.LoadTsxProject(new FilePath(path));
+        var reloaded = pm.AnimationChainListSave!.AnimationChains.Single(c => c.Name == edited.Name);
+        Assert.Equal(edited.Frames.Count, reloaded.Frames.Count);
+        for (var i = 0; i < edited.Frames.Count; i++)
+        {
+            Assert.Equal(edited.Frames[i].LeftCoordinate, reloaded.Frames[i].LeftCoordinate, 4);
+            Assert.Equal(edited.Frames[i].TopCoordinate, reloaded.Frames[i].TopCoordinate, 4);
+            Assert.Equal(edited.Frames[i].RightCoordinate, reloaded.Frames[i].RightCoordinate, 4);
+            Assert.Equal(edited.Frames[i].BottomCoordinate, reloaded.Frames[i].BottomCoordinate, 4);
+        }
+    }
+
+    // Left/top moves relocate frame 0's origin cell, so the owner follows it; right/bottom never
+    // move the origin, so the owner stays at 5.
+    [Theory]
+    [InlineData("grow left", -1, 0, 0, 0, 4u)]
+    [InlineData("shrink left", 1, 0, 0, 0, 6u)]
+    [InlineData("grow top", 0, -1, 0, 0, 1u)]
+    [InlineData("shrink top", 0, 1, 0, 0, 9u)]
+    [InlineData("grow right", 0, 0, 1, 0, 5u)]
+    [InlineData("shrink right", 0, 0, -1, 0, 5u)]
+    [InlineData("grow bottom", 0, 0, 0, 1, 5u)]
+    [InlineData("shrink bottom", 0, 0, 0, -1, 5u)]
+    public void Resize_AutoDerivedChain_RoundTripsWithOwnerAtFrameZeroOrigin(string _, int dLeft, int dTop, int dRight, int dBottom, uint expectedEntryTileId)
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(EmptyFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5 derived from frame 0
+
+        Resize(chain, dLeft, dTop, dRight, dBottom);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId);
+    }
+
+    // A file whose owner tile is frame 0's own origin cell is the shape our own saves write, so it
+    // follows the origin exactly like an auto-derived chain -- even though the file, not us,
+    // authored the hint.
+    [Theory]
+    [InlineData("grow left", -1, 0, 0, 0, 4u)]
+    [InlineData("shrink left", 1, 0, 0, 0, 6u)]
+    [InlineData("grow top", 0, -1, 0, 0, 1u)]
+    [InlineData("shrink top", 0, 1, 0, 0, 9u)]
+    [InlineData("grow right", 0, 0, 1, 0, 5u)]
+    [InlineData("shrink right", 0, 0, -1, 0, 5u)]
+    [InlineData("grow bottom", 0, 0, 0, 1, 5u)]
+    [InlineData("shrink bottom", 0, 0, 0, -1, 5u)]
+    public void Resize_LoadedChainWithOwnerAtOrigin_RoundTripsWithOwnerAtFrameZeroOrigin(string _, int dLeft, int dTop, int dRight, int dBottom, uint expectedEntryTileId)
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerIsOriginFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+
+        Resize(chain, dLeft, dTop, dRight, dBottom);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId);
+    }
+
+    // An owner tile unrelated to the frames is a deliberate hand-authored choice: no resize ever
+    // moves it, and any satellite a grow adds must sit next to the OWNER (where the loader looks
+    // for it), not at the frame's physical cell.
+    [Theory]
+    [InlineData("grow left", -1, 0, 0, 0)]
+    [InlineData("shrink left", 1, 0, 0, 0)]
+    [InlineData("grow top", 0, -1, 0, 0)]
+    [InlineData("shrink top", 0, 1, 0, 0)]
+    [InlineData("grow right", 0, 0, 1, 0)]
+    [InlineData("shrink right", 0, 0, -1, 0)]
+    [InlineData("grow bottom", 0, 0, 0, 1)]
+    [InlineData("shrink bottom", 0, 0, 0, -1)]
+    public void Resize_LoadedChainWithUnrelatedOwner_RoundTripsWithOwnerUnchanged(string _, int dLeft, int dTop, int dRight, int dBottom)
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(OwnerUnrelatedFixtureXml);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = pm.AnimationChainListSave!.AnimationChains.Single();
+
+        Resize(chain, dLeft, dTop, dRight, dBottom);
+        pm.SaveTsxProject();
+
+        AssertRoundTrip(path, chain, expectedEntryTileId: 36);
+    }
+
+    // Tiles carry the user's own Tiled data too (custom properties, a class, collision shapes).
+    // The tile an owner vacates keeps all of it (only the animation and our tracking properties
+    // go), and the tile it lands on keeps its own alongside the new animation.
+    [Fact]
+    public void Resize_ShrinkLeftTransfersOwner_VacatedAndClaimedTilesKeepTheirOwnProperties()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(TilesetHeader + """
+
+             <tile id="5" type="Grass">
+              <properties>
+               <property name="Cost" type="int" value="3"/>
+              </properties>
+             </tile>
+             <tile id="6">
+              <properties>
+               <property name="Cost" type="int" value="7"/>
+              </properties>
+             </tile>
+            </tileset>
+            """);
+        pm.LoadTsxProject(new FilePath(path));
+        var chain = NewBaseChain("Hero");
+        pm.AnimationChainListSave!.AnimationChains.Add(chain);
+        pm.SaveTsxProject(); // owner tile 5
+
+        Resize(chain, dLeft: 1, dTop: 0, dRight: 0, dBottom: 0);
+        pm.SaveTsxProject();
+
+        var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var vacated = tileset.Tiles.Single(t => t.ID == 5);
+        Assert.Empty(vacated.Animation);
+        Assert.Equal("Grass", vacated.Type);
+        Assert.Equal(["Cost"], vacated.Properties.Select(p => p.Name));
+        Assert.Equal(3, vacated.GetProperty<IntProperty>("Cost").Value);
+
+        var claimed = tileset.Tiles.Single(t => t.ID == 6);
+        Assert.Equal([((uint)6, 100), ((uint)18, 100)], claimed.Animation.Select(f => (f.TileID, f.Duration)));
+        Assert.Equal(7, claimed.GetProperty<IntProperty>("Cost").Value);
+        Assert.Equal("Hero", claimed.GetProperty<StringProperty>("Name").Value);
+    }
+}

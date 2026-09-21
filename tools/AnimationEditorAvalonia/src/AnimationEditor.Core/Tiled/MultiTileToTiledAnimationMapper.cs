@@ -68,11 +68,11 @@ public static class MultiTileToTiledAnimationMapper
     /// own first frame (an ordinary hand-authored Tiled pattern), orphaning the original tile.</param>
     /// <param name="knownSatelliteTileIds">The satellite equivalent of <paramref
     /// name="knownEntryTileIds"/>: each chain's satellites' own on-disk tile ids, keyed by chain
-    /// reference then by the satellite's (Dx, Dy) offset within the footprint. A satellite's tile
-    /// id is otherwise always recomputed as the anchor's *frame-0* position plus its offset -- a
-    /// different base than the anchor's own (possibly hint-preserved) tile id whenever the anchor's
-    /// id isn't its own frame-0 tile, which silently drifts the satellite to a new tile every save
-    /// without this hint.</param>
+    /// reference then by the satellite's (Dx, Dy) offset within the footprint. A satellite
+    /// without a hint is placed at its offset from the entry tile's static grid position, which
+    /// is also where <see cref="TiledAnimationToAchjMapper"/> reads it back from -- so for any
+    /// file this editor can load, hint and fresh value agree, and the hint's remaining job is
+    /// letting a failed mapping keep reporting the tiles it owns (see <c>Empty</c> below).</param>
     public static IReadOnlyList<MultiTileMappingResult> Map(
         AnimationChainListSave achj, TilesetAnimationInfo tilesetInfo,
         IReadOnlyDictionary<AnimationChainSave, uint>? knownEntryTileIds = null,
@@ -196,28 +196,45 @@ public static class MultiTileToTiledAnimationMapper
         }
 
         var anchorFrames = perOffset[(0, 0)];
-        var satellites = perOffset
-            .Where(kv => kv.Key != (0, 0))
-            .Select(kv =>
-            {
-                var tileId = knownSatelliteTileIds != null && knownSatelliteTileIds.TryGetValue(kv.Key, out var known)
-                    ? known
-                    : kv.Value[0].TileId;
-                return new TiledSatelliteMapping(tileId, kv.Value, kv.Key);
-            })
-            .ToList();
 
-        uint? entryTileId = null;
-        bool entryTileIdIsFreshlyComputed = false;
-        if (anchorFrames.Count > 0)
+        uint entryTileId;
+        bool entryTileIdIsFreshlyComputed;
+        if (knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var known))
         {
-            if (knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var known))
-                entryTileId = known;
+            entryTileId = known;
+            entryTileIdIsFreshlyComputed = false;
+        }
+        else
+        {
+            entryTileId = anchorFrames[0].TileId;
+            entryTileIdIsFreshlyComputed = true;
+        }
+
+        // A fresh satellite sits at its offset from the ENTRY tile's static grid position, not
+        // from frame 0's -- the two only differ for a hand-authored owner tile unrelated to its
+        // frames, and TiledAnimationToAchjMapper reads a satellite's offset from the anchor's
+        // static position, so a satellite placed next to the frames instead would come back as
+        // an unattached anchor of its own (a backward offset) on the next load.
+        var entryColumn = (int)(entryTileId % tilesetInfo.ColumnCount);
+        var entryRow = (int)(entryTileId / tilesetInfo.ColumnCount);
+        var satellites = new List<TiledSatelliteMapping>();
+        foreach (var (offset, frames) in perOffset)
+        {
+            if (offset == (0, 0))
+                continue;
+
+            uint tileId;
+            if (knownSatelliteTileIds != null && knownSatelliteTileIds.TryGetValue(offset, out var knownSatellite))
+                tileId = knownSatellite;
             else
             {
-                entryTileId = anchorFrames[0].TileId;
-                entryTileIdIsFreshlyComputed = true;
+                if (entryColumn + offset.Dx >= tilesetInfo.ColumnCount)
+                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+                tileId = (uint)(((entryRow + offset.Dy) * tilesetInfo.ColumnCount) + (entryColumn + offset.Dx));
+                if (tileId >= tilesetInfo.TileCount)
+                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
             }
+            satellites.Add(new TiledSatelliteMapping(tileId, frames, offset));
         }
 
         return new MultiTileMappingResult

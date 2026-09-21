@@ -18,13 +18,11 @@ namespace AnimationEditor.Core.Tests.Tiled;
 /// <para>
 /// Resizing frame 0 so its own top-left cell moves (growing or shrinking its left or top edge)
 /// invalidates that pin: the physical tile the hint points to is no longer frame 0's own
-/// top-left cell. Growing produces an unconditional, provable collision (the stale hint's tile id
-/// becomes identical to a freshly-computed satellite's own tile id -- two different
-/// <c>&lt;animation&gt;</c> sequences would be written onto the same tile). Shrinking just
-/// orphans the hint (its tile id no longer appears anywhere in the chain's own footprint at all),
-/// which is indistinguishable from a legitimate hand-authored owner tile without knowing whether
-/// the hint was ever *auto-derived* by a prior save (safe to relocate) as opposed to loaded
-/// as-is from the file (must never be silently discarded).
+/// top-left cell. That is indistinguishable from a legitimate hand-authored owner tile unless the
+/// owner is known to be frame 0's own cell -- derived by a prior save, or loaded from a file
+/// where it already sat there (safe to relocate) -- as opposed to an owner somewhere unrelated
+/// (must never be silently discarded). The full edge/direction matrix lives in <see
+/// cref="TsxFrameResizeRoundTripTests"/>; this file pins the ownership rules themselves.
 /// </para>
 /// </summary>
 public class TsxEntryTileOwnershipTransferTests : IDisposable
@@ -67,7 +65,7 @@ public class TsxEntryTileOwnershipTransferTests : IDisposable
     }
 
     [Fact]
-    public void GrowingFrameZeroLeftward_CausesEntrySatelliteCollision_TransfersEntryToNewOrigin()
+    public void GrowingFrameZeroLeftward_OnLoadedChainWithOwnerAtOrigin_TransfersEntryToNewOrigin()
     {
         var pm = new ProjectManager();
         var path = WriteFixture(SingleTileFixtureXml, "Heroes.tsx");
@@ -77,8 +75,8 @@ public class TsxEntryTileOwnershipTransferTests : IDisposable
 
         // Grow frame 0's left edge out one tile (was tile 1 alone, cols 1..2 -- now cols 0..2,
         // two tiles wide). Frame 1 must match the new footprint too (chain[1] was tile 5, cols
-        // 1..2, row 1 -- now cols 0..2, row 1). The OLD anchor (tile 1) is now frame 0's own
-        // (1,0)-offset cell -- exactly where a freshly-computed satellite would also land.
+        // 1..2, row 1 -- now cols 0..2, row 1). The OLD owner (tile 1) is now frame 0's own
+        // (1,0)-offset cell.
         SetGridRect(chain.Frames[0], colStart: 0, colEnd: 2, rowStart: 0, rowEnd: 1);
         SetGridRect(chain.Frames[1], colStart: 0, colEnd: 2, rowStart: 1, rowEnd: 2);
 
@@ -86,15 +84,13 @@ public class TsxEntryTileOwnershipTransferTests : IDisposable
 
         var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
 
-        // The new origin (tile 0) must carry the anchor sequence -- in the un-fixed collision
-        // bug, tile 0 gets no <animation> at all (the stale hint keeps entryTileId pinned to
-        // tile 1, and the satellite also resolves to tile 1, so nothing ever targets tile 0).
+        // The new origin (tile 0) carries the anchor sequence; a pinned owner would instead keep
+        // tile 1 animating [0,4] with the satellite pushed out to tile 2.
         var anchorTile = reloaded.Tiles.SingleOrDefault(t => t.ID == 0);
         Assert.NotNull(anchorTile);
         Assert.Equal([((uint)0, 100), ((uint)4, 100)], anchorTile!.Animation.Select(f => (f.TileID, f.Duration)));
 
-        // The old anchor tile (1) now correctly holds the satellite's own sequence, not a
-        // second (colliding) copy of the anchor's.
+        // The old owner tile (1) now holds its own physical cell's sequence as the satellite.
         var satelliteTile = reloaded.Tiles.Single(t => t.ID == 1);
         Assert.Equal([((uint)1, 100), ((uint)5, 100)], satelliteTile.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal(0, satelliteTile.GetProperty<IntProperty>("ParentId").Value);
