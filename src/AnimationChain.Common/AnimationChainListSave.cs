@@ -248,8 +248,7 @@ public class AnimationChainListSave
     /// </remarks>
     public void Save(string path)
     {
-        using var stream = File.Create(path);
-        Save(stream);
+        AtomicFile.Write(path, Save);
     }
 
     /// <summary>
@@ -311,8 +310,7 @@ public class AnimationChainListSave
     /// </summary>
     public void SaveJson(string path)
     {
-        using var stream = File.Create(path);
-        SaveJson(stream);
+        AtomicFile.Write(path, SaveJson);
     }
 
     /// <summary>

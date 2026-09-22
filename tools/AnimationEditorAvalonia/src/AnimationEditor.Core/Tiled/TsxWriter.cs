@@ -1,5 +1,6 @@
 using DotTiled;
 using DotTiled.Serialization;
+using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -47,8 +48,7 @@ public static class TsxWriter
         // possible -- carry those attributes over from the file rather than drop them.
         var extraRootAttributes = File.Exists(path) ? ReadUnmodelledRootAttributes(path) : [];
 
-        using var stream = File.Create(path);
-        Write(tileset, stream, extraRootAttributes);
+        AtomicFile.Write(path, stream => Write(tileset, stream, extraRootAttributes));
     }
 
     public static void Write(Tileset tileset, Stream stream) => Write(tileset, stream, []);
@@ -179,7 +179,13 @@ public static class TsxWriter
         }
         sb.Append(rawText[closingTagOffset..]);
 
-        File.WriteAllText(path, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var patchedText = sb.ToString();
+        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        AtomicFile.Write(path, stream =>
+        {
+            using var writer = new StreamWriter(stream, encoding);
+            writer.Write(patchedText);
+        });
         return true;
     }
 

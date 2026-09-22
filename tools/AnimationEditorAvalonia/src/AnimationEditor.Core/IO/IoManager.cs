@@ -124,7 +124,11 @@ namespace AnimationEditor.Core.IO
                 try
                 {
                     var json = JsonSerializer.Serialize(settings, AETiledSyncJsonContext.Default.AETiledSyncSave);
-                    File.WriteAllText(location.FullPath, json);
+                    AtomicFile.Write(location.FullPath, stream =>
+                    {
+                        using var writer = new StreamWriter(stream);
+                        writer.Write(json);
+                    });
                 }
                 catch (Exception e)
                 {

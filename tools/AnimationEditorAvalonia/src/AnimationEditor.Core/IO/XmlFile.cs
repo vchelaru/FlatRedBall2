@@ -1,3 +1,4 @@
+using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
 using System.Text;
 using System.Xml.Serialization;
@@ -12,8 +13,7 @@ internal static class XmlFile
     public static void Serialize<T>(T obj, string path)
     {
         var serializer = new XmlSerializer(typeof(T));
-        using var stream = File.Create(path);
-        serializer.Serialize(stream, obj);
+        AtomicFile.Write(path, stream => serializer.Serialize(stream, obj));
     }
 
     public static void SerializeToString<T>(T obj, out string xml)
