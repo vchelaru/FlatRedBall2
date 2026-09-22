@@ -410,16 +410,17 @@ public class AnimationTreeControlTests
     }
 
     /// <summary>
-    /// Hovering a frame row bubbles <c>:pointerover</c> up to its parent chain's TreeViewItem
-    /// (Avalonia pointer-over propagates to ancestors), and the chain's own meta text is a
-    /// visual descendant of that same TreeViewItem -- so it's correct for the chain's meta to
-    /// widen and reveal its icons even when the pointer is over one of its frames, not the
-    /// chain header itself. But every frame row (the hovered one and its siblings) is *also* a
-    /// descendant of that same bubbled-pointerover chain TreeViewItem, and frames never show
-    /// add-frame/lock icons -- so their meta text must never widen from this.
+    /// #1173: hover-reveal must be scoped to the row the pointer is actually over. Previously
+    /// this was anchored on <c>TreeViewItem:pointerover</c>, which Avalonia propagates to every
+    /// visual ancestor under the pointer -- so hovering a frame row (nested inside its expanded
+    /// parent chain's TreeViewItem) also bubbled up and matched the *parent chain's* own hover
+    /// styles, revealing its add-frame/lock buttons and widening its meta text even though the
+    /// pointer was never over the chain header. The fix anchors hover-reveal on the per-row
+    /// content Grid instead (which does not visually contain nested child rows), so hovering a
+    /// frame can never react on its ancestor chain's row, nor on any sibling frame.
     /// </summary>
     [AvaloniaFact]
-    public void HoveringFrameRow_DoesNotWidenAnyFrameMetaMargin()
+    public void HoveringFrameRow_DoesNotAffectChainRowOrSiblingFrames()
     {
         var (control, _, acls) = Build();
         var chain = acls.AnimationChains[0]; // "Walk", 2 frames
@@ -452,6 +453,21 @@ public class AnimationTreeControlTests
 
             Assert.Equal(8, MetaFor(frame1).Margin.Right); // the hovered frame itself: no icons ever appear on it
             Assert.Equal(8, MetaFor(frame2).Margin.Right); // sibling frame: must not shift just because frame1 is hovered
+            Assert.Equal(8, MetaFor(chain).Margin.Right); // chain header: pointer is not over it, must not shift either
+
+            var chainAddBtn = control.TreeView.GetVisualDescendants()
+                .OfType<Button>()
+                .First(b => b.Classes.Contains("add-frame-btn") &&
+                            b.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, chain));
+            Assert.Equal(0, chainAddBtn.Opacity); // chain's own add-frame button must stay hidden
+
+            var chainLockBtn = control.TreeView.GetVisualDescendants()
+                .OfType<Button>()
+                .First(b => b.Classes.Contains("lock-btn") &&
+                            b.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, chain));
+            Assert.Equal(0, chainLockBtn.Opacity); // chain's own lock button must stay hidden
         }
         finally { window.Close(); }
     }

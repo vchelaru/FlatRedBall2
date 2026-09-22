@@ -10,13 +10,24 @@
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
             </Style>
-            <!-- Phase 15: hover-reveal add-frame button on chain rows, matching desktop. -->
+            <!-- Phase 15: hover-reveal add-frame button on chain rows, matching desktop.
+                 #1173: anchored on Grid.tree-row:pointerover, NOT TreeViewItem:pointerover.
+                 Avalonia's :pointerover pseudo-class propagates to every visual ancestor under
+                 the pointer, so hovering a frame row (nested inside its expanded parent chain's
+                 TreeViewItem) also marked the *parent chain's* TreeViewItem :pointerover, which
+                 then matched every descendant Button/TextBlock under it, including the chain's
+                 own, revealing its buttons and widening its meta text even though the pointer
+                 was never over the chain header. Grid.tree-row is the DataTemplate's own root
+                 element, i.e. just that row's header content: it does not visually contain any
+                 nested child TreeViewItems (those render in the TreeViewItem's own separate
+                 ItemsPresenter), so its :pointerover can only ever reflect the pointer being
+                 over that specific row. -->
             <Style Selector="Button.add-frame-btn">
                 <Setter Property="Opacity" Value="0" />
                 <Setter Property="IsHitTestVisible" Value="False" />
                 <Setter Property="Focusable" Value="False" />
             </Style>
-            <Style Selector="TreeViewItem:pointerover Button.add-frame-btn">
+            <Style Selector="Grid.tree-row:pointerover Button.add-frame-btn">
                 <Setter Property="Opacity" Value="1" />
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
@@ -29,7 +40,7 @@
                 <Setter Property="IsHitTestVisible" Value="False" />
                 <Setter Property="Focusable" Value="False" />
             </Style>
-            <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+            <Style Selector="Grid.tree-row:pointerover Button.lock-btn">
                 <Setter Property="Opacity" Value="1" />
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
@@ -48,25 +59,26 @@
                  ":not(.locked)" on the hover rule keeps a locked+hovered row on the locked margin
                  rather than depending on style declaration order.
                  The hover rule is also scoped to TextBlock.meta.chain (bound to IsChainNode):
-                 Avalonia's :pointerover bubbles up to ancestor TreeViewItems, so hovering a frame
-                 also marks its parent chain's TreeViewItem :pointerover, and every sibling frame
-                 under that chain is a visual descendant of it too. Only the chain's own meta text
-                 may ever grow a lane (frames never show add-frame/lock icons), so without the
-                 ".chain" class this rule widened every frame's meta text as a side effect of
-                 hovering just one of them. -->
+                 only the chain's own meta text may ever grow a lane (frames never show
+                 add-frame/lock icons), so without the ".chain" class this rule would widen a
+                 frame's own meta text on hover of that same frame, for no reason (see #1173). -->
             <Style Selector="TextBlock.meta">
                 <Setter Property="Margin" Value="8,0,8,0" />
             </Style>
             <Style Selector="TextBlock.meta.locked">
                 <Setter Property="Margin" Value="8,0,56,0" />
             </Style>
-            <Style Selector="TreeViewItem:pointerover TextBlock.meta.chain:not(.locked)">
+            <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
                 <Setter Property="Margin" Value="8,0,56,0" />
             </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="models:TreeNodeVm" ItemsSource="{Binding Children}">
-                <Grid HorizontalAlignment="Stretch">
+                <!-- Background="Transparent" (not left null) so the whole row is hit-test-visible,
+                     not just its child controls, since otherwise hovering empty space between the
+                     header text and the meta text would fail to trigger Grid.tree-row:pointerover
+                     above. -->
+                <Grid Classes="tree-row" Background="Transparent" HorizontalAlignment="Stretch">
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
                         <Panel Grid.Column="0">
                             <TextBlock Text="{Binding Header}"

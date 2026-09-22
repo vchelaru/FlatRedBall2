@@ -76,13 +76,59 @@ public class ChainLockTests
                         b.DataContext is TreeNodeVm vm && ReferenceEquals(vm.Data, chain));
     }
 
-    private static TextBlock GetMetaTextForChainRow(MainWindow window, AnimationChainSave chain)
+    private static TextBlock GetMetaTextForChainRow(MainWindow window, AnimationChainSave chain) =>
+        GetMetaTextForNode(window, chain);
+
+    private static TextBlock GetMetaTextForNode(MainWindow window, object data)
     {
         var tree = GetTree(window);
         return tree.GetVisualDescendants()
             .OfType<TextBlock>()
             .First(t => t.Classes.Contains("meta") &&
-                        t.DataContext is TreeNodeVm vm && ReferenceEquals(vm.Data, chain));
+                        t.DataContext is TreeNodeVm vm && ReferenceEquals(vm.Data, data));
+    }
+
+    private static (MainWindow Window, TestServices Ctx, AnimationChainSave Chain, AnimationFrameSave Frame)
+        CreateWindowWithChainAndFrame()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.FileName = null;
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+
+        var frame = new AnimationFrameSave { TextureName = "a.png" };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(frame);
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chain);
+
+        typeof(MainWindow)
+            .GetMethod("RefreshTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(window, null);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Measure(new Avalonia.Size(1600, 900));
+        window.Arrange(new Avalonia.Rect(0, 0, 1600, 900));
+        Dispatcher.UIThread.RunJobs();
+
+        return (window, ctx, chain, frame);
+    }
+
+    private static void HoverFrameRow(MainWindow window, AnimationFrameSave frame)
+    {
+        var tree = GetTree(window);
+        var tvi = tree.GetVisualDescendants()
+            .OfType<TreeViewItem>()
+            .First(i => i.DataContext is TreeNodeVm vm && ReferenceEquals(vm.Data, frame));
+        var local = new Point(tvi.Bounds.Width / 2, tvi.Bounds.Height / 2);
+        var windowPoint = tvi.TranslatePoint(local, window)!.Value;
+        window.MouseMove(windowPoint);
+        Dispatcher.UIThread.RunJobs();
     }
 
     /// <summary>Hovers the pointer over the chain row's TreeViewItem so its <c>:pointerover</c>
@@ -337,6 +383,58 @@ public class ChainLockTests
 
             var meta = GetMetaTextForChainRow(window, chain);
             Assert.Equal(56, meta.Margin.Right);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── Hover reveal must be scoped to the hovered row only (#1173) ──────────
+    // Avalonia's :pointerover pseudo-class propagates to every visual ancestor under the
+    // pointer, so hovering a frame row (nested inside its expanded parent chain's TreeViewItem)
+    // used to also mark the *parent chain's* TreeViewItem as :pointerover -- revealing the
+    // chain's add-frame/lock buttons and widening its meta text even though the pointer was
+    // never over the chain header.
+
+    [AvaloniaFact]
+    public void HoveringFrameRow_DoesNotRevealChainButtons()
+    {
+        var (window, _, chain, frame) = CreateWindowWithChainAndFrame();
+        try
+        {
+            HoverFrameRow(window, frame);
+
+            var addFrameBtn = GetAddFrameButtonForChainRow(window, chain);
+            Assert.Equal(0, addFrameBtn.Opacity);
+
+            var lockBtn = GetLockButtonForChainRow(window, chain);
+            Assert.Equal(0, lockBtn.Opacity);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void HoveringFrameRow_DoesNotWidenChainMetaMargin()
+    {
+        var (window, _, chain, frame) = CreateWindowWithChainAndFrame();
+        try
+        {
+            HoverFrameRow(window, frame);
+
+            var chainMeta = GetMetaTextForChainRow(window, chain);
+            Assert.Equal(8, chainMeta.Margin.Right);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void HoveringFrameRow_DoesNotWidenItsOwnMetaMargin()
+    {
+        var (window, _, _, frame) = CreateWindowWithChainAndFrame();
+        try
+        {
+            HoverFrameRow(window, frame);
+
+            var frameMeta = GetMetaTextForNode(window, frame);
+            Assert.Equal(8, frameMeta.Margin.Right); // no icon ever shows on a frame row -- no reason to widen
         }
         finally { window.Close(); }
     }

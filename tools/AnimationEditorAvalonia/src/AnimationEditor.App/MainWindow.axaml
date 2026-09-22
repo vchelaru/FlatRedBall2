@@ -635,13 +635,26 @@
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:checked /template/ Path#ChevronPath">
                             <Setter Property="Data" Value="{StaticResource TreeViewItemExpandedChevronPathData}" />
                         </Style>
-                        <!-- Inline "Add Frame" button: hidden by default, revealed on row hover -->
+                        <!-- Inline "Add Frame" button: hidden by default, revealed on row hover.
+                             #1173: anchored on Grid.tree-row:pointerover, NOT
+                             TreeViewItem:pointerover. Avalonia's :pointerover pseudo-class
+                             propagates to every visual ancestor under the pointer, so hovering a
+                             frame row (nested inside its expanded parent chain's TreeViewItem)
+                             also marked the *parent chain's* TreeViewItem :pointerover, which
+                             then matched every descendant Button/TextBlock under it, including
+                             the chain's own, revealing its buttons and widening every row's meta
+                             text under that chain even though the pointer was never over the
+                             chain header. Grid.tree-row is the DataTemplate's own root element,
+                             i.e. just that row's header content: it does not visually contain any
+                             nested child TreeViewItems (those render in the TreeViewItem's own
+                             separate ItemsPresenter), so its :pointerover can only ever reflect
+                             the pointer being over that specific row. -->
                         <Style Selector="Button.add-frame-btn">
                             <Setter Property="Opacity" Value="0" />
                             <Setter Property="IsHitTestVisible" Value="False" />
                             <Setter Property="Focusable" Value="False" />
                         </Style>
-                        <Style Selector="TreeViewItem:pointerover Button.add-frame-btn">
+                        <Style Selector="Grid.tree-row:pointerover Button.add-frame-btn">
                             <Setter Property="Opacity" Value="1" />
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
@@ -655,7 +668,7 @@
                             <Setter Property="IsHitTestVisible" Value="False" />
                             <Setter Property="Focusable" Value="False" />
                         </Style>
-                        <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+                        <Style Selector="Grid.tree-row:pointerover Button.lock-btn">
                             <Setter Property="Opacity" Value="1" />
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
@@ -673,14 +686,19 @@
                              reveals both add-frame and lock together). The lock lane sits further
                              from the edge than add-frame's, so clearing it clears both. The
                              ":not(.locked)" on the hover rule keeps a locked+hovered row on the
-                             locked margin rather than depending on style declaration order. -->
+                             locked margin rather than depending on style declaration order.
+                             The hover rule is also scoped to TextBlock.meta.chain (bound to
+                             IsChainNode, #1173): only the chain's own meta text may ever grow a
+                             lane (frames never show add-frame/lock icons), so without the
+                             ".chain" class this rule would widen a frame's own meta text on
+                             hover of that same frame, for no reason. -->
                         <Style Selector="TextBlock.meta">
                             <Setter Property="Margin" Value="8,0,8,0" />
                         </Style>
                         <Style Selector="TextBlock.meta.locked">
                             <Setter Property="Margin" Value="8,0,56,0" />
                         </Style>
-                        <Style Selector="TreeViewItem:pointerover TextBlock.meta:not(.locked)">
+                        <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
                             <Setter Property="Margin" Value="8,0,56,0" />
                         </Style>
                         <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
@@ -699,8 +717,13 @@
                                  hover-only Add-Frame button floated on top at the right. Floating the
                                  button (instead of giving it its own grid column) keeps every row's Meta
                                  on the same right edge — chain rows are no longer inset by the button while
-                                 frame rows hug the edge (the jagged offset in #623). -->
-                            <Grid HorizontalAlignment="Stretch">
+                                 frame rows hug the edge (the jagged offset in #623). Classes="tree-row"
+                                 scopes the hover-reveal styles above to just this row (#1173).
+                                 Background="Transparent" (not left null) makes the whole row
+                                 hit-test-visible, not just its child controls, since otherwise
+                                 hovering empty space between the header text and the meta text
+                                 would fail to trigger Grid.tree-row:pointerover. -->
+                            <Grid Classes="tree-row" Background="Transparent" HorizontalAlignment="Stretch">
                             <Grid ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch">
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Node kind icons: SVG files are the single source of truth for path data. -->
@@ -780,6 +803,7 @@
                                 <TextBlock Grid.Column="2"
                                            Classes="meta"
                                            Classes.locked="{Binding IsLocked}"
+                                           Classes.chain="{Binding IsChainNode}"
                                            Text="{Binding Meta}"
                                            Foreground="{DynamicResource AccentCool}"
                                            FontSize="11"
