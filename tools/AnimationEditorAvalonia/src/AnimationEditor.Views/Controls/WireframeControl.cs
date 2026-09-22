@@ -492,6 +492,7 @@ public class WireframeControl : TextureViewport
         {
             _undoManager!.Record(new FrameRegionChangedCommand(
                 frame, bL, bT, bR, bB, aL, aT, aR, aB, _appCommands!, _events!));
+            FrameRegionChanged?.Invoke(frame);
             return;
         }
 
@@ -514,6 +515,12 @@ public class WireframeControl : TextureViewport
         }
 
         _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+        // Fire for the dragged frame only after every sibling above has already been resized to
+        // match -- this is the one event that triggers autosave (see MainWindow.OnFrameRegionChanged),
+        // and firing it any earlier lets a save observe the dragged frame's new size while its
+        // siblings still have the old one, tripping MultiTileToTiledAnimationMapper's
+        // footprint-mismatch check on a resize that is actually being applied correctly.
+        FrameRegionChanged?.Invoke(frame);
         foreach (var m in siblingMatches)
             FrameRegionChanged?.Invoke(m.Frame);
     }
@@ -963,7 +970,8 @@ public class WireframeControl : TextureViewport
         float aR = sel.Frame.RightCoordinate, aB = sel.Frame.BottomCoordinate;
         if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
         {
-            FrameRegionChanged?.Invoke(sel.Frame);
+            // RecordFrameRegionChange raises FrameRegionChanged itself, once sibling frames (if
+            // any) are already synced -- see its remarks.
             RecordFrameRegionChange(sel.Frame,
                 _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
                 aL, aT, aR, aB);
@@ -1731,7 +1739,8 @@ public class WireframeControl : TextureViewport
                 if (!IsFrameLocked(_draggingRect.Frame) &&
                     RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
                 {
-                    FrameRegionChanged?.Invoke(_draggingRect.Frame);
+                    // RecordFrameRegionChange raises FrameRegionChanged itself, once sibling
+                    // frames (if any) are already synced -- see its remarks.
                     RecordFrameRegionChange(_draggingRect.Frame,
                         _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
                         aL, aT, aR, aB);
@@ -1999,11 +2008,17 @@ public class WireframeControl : TextureViewport
         frame.TopCoordinate    = aT;
         frame.BottomCoordinate = aB;
         RefreshFramesInternal();
-        FrameRegionChanged?.Invoke(frame);
 
+        // RecordFrameRegionChange raises FrameRegionChanged itself, once sibling frames (if any)
+        // are already synced -- see its remarks. Raising it here first would let the autosave it
+        // triggers observe this frame's new size before its siblings have caught up.
         if (RegionChanged(bL, bT, bR, bB, aL, aT, aR, aB))
         {
             RecordFrameRegionChange(frame, bL, bT, bR, bB, aL, aT, aR, aB);
+        }
+        else
+        {
+            FrameRegionChanged?.Invoke(frame);
         }
     }
 

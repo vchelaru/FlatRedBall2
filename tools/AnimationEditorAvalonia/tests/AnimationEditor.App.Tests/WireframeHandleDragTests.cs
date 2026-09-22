@@ -470,6 +470,43 @@ public class WireframeHandleDragTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    /// <summary>
+    /// MainWindow wires <c>WireframeControl.FrameRegionChanged</c> to autosave
+    /// (<c>OnFrameRegionChanged</c> -&gt; <c>RaiseAnimationChainsChanged</c> -&gt; one synchronous
+    /// save per edit). <see cref="WireframeControl.SimulateHandleDrag"/> mirrors the real
+    /// pointer-released commit path, which used to fire that event for the dragged frame
+    /// BEFORE calling <c>RecordFrameRegionChange</c> (the method that propagates the resize to
+    /// sibling frames) -- so the autosave triggered by the dragged frame's own event observed
+    /// a chain with one frame resized and its siblings still at the old size, and
+    /// <c>MultiTileToTiledAnimationMapper</c> skipped the whole chain with a footprint-mismatch
+    /// warning even though the drag itself was applied correctly moments later.
+    /// </summary>
+    [AvaloniaFact]
+    public void HandleDrag_StretchingFrameInNativeTsxProject_NeverAutosavesAMismatchedFootprint()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, chain, dir) = BuildNativeTsxCtrl(ctx);
+        try
+        {
+            // Mirrors MainWindow.OnFrameRegionChanged's wiring exactly, since this headless
+            // control isn't hosted inside a MainWindow that would wire it for us.
+            ctrl.FrameRegionChanged += frame =>
+            {
+                ctx.AppCommands.RefreshTreeNode(frame);
+                ctx.ApplicationEvents.RaiseAnimationChainsChanged();
+            };
+            var warnings = new System.Collections.Generic.List<string>();
+            ctx.AppCommands.TsxSaveCompletedWithWarnings += w => warnings.AddRange(w);
+
+            ctrl.SimulateHandleDrag(HandleKind.BotRight,
+                startScreenX: 16f, startScreenY: 16f,
+                endScreenX:   32f, endScreenY:   16f);
+
+            Assert.Empty(warnings);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // Two chains at rows 0 and 2, frame 0 of each selected as individual frame nodes. A bulk
     // handle drag resizes only those two visible frames; each chain's other frame must follow
     // its own chain's new footprint, in the same undo command.
