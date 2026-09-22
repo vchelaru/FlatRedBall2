@@ -869,6 +869,10 @@ public class FlatRedBallService
     {
         StartupTiming.BeginPhase("Screen load");
 
+        // A button/key held across this transition belongs to whichever screen was active when
+        // it was pressed — its eventual release must not be misread as input for the new screen.
+        Input.SuppressHeldReleases();
+
         foreach (var factory in _factories.Values)
             factory.DestroyAll();
         _factories.Clear();

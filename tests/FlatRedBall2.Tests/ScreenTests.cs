@@ -459,6 +459,29 @@ public class ScreenTests
         ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(5);
     }
 
+    private class OtherTestScreen : Screen { }
+
+    [Fact]
+    public void MoveToScreen_MouseHeldAcrossTransition_ReleaseOnNewScreenDoesNotRegisterAsClick()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        // Press begins while TestScreen is active.
+        engine.Input.InjectCursor(0, 0, primary: true, secondary: false);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.CurrentScreen.MoveToScreen<OtherTestScreen>();
+
+        // Release lands on the frame the new screen becomes active.
+        engine.Input.InjectCursor(0, 0, primary: false, secondary: false);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.CurrentScreen.ShouldBeOfType<OtherTestScreen>();
+        engine.Input.Cursor.PrimaryClick.ShouldBeFalse();
+    }
+
     // Closure-staleness probes: these PIN current behavior so we notice if it changes.
     // A configure callback is an Action<T> that closes over its enclosing scope.
     // C# closures capture variables by reference, so values read inside the callback

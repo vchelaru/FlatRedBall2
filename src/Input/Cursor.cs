@@ -120,7 +120,48 @@ public class Cursor : ICursor
             UpdateTouch();
 
         UpdateActiveCamera();
+        UpdateClickSuppression();
         UpdateDoubleClicks(realTimeSinceStart);
+    }
+
+    // A button/touch held at the moment SuppressHeldReleases() was called (e.g. a screen
+    // transition) must not have its eventual release reported as a click — that press belongs
+    // to whichever screen was active when it started, not whatever's active when it ends.
+    private bool _primaryClickSuppressed;
+    private bool _secondaryClickSuppressed;
+    private bool _primaryClickComputed;
+    private bool _secondaryClickComputed;
+
+    /// <summary>
+    /// Marks any button (or touch) currently held so its next release is not reported through
+    /// <see cref="PrimaryClick"/>/<see cref="SecondaryClick"/>. Called by the engine on every
+    /// screen transition; a button that was already up is unaffected, and the very next fresh
+    /// press/release cycle after the suppressed release behaves normally again.
+    /// </summary>
+    internal void SuppressHeldReleases()
+    {
+        if (PrimaryDown) _primaryClickSuppressed = true;
+        if (SecondaryDown) _secondaryClickSuppressed = true;
+    }
+
+    // Computes this frame's raw click edges once (so PrimaryClick/SecondaryClick are pure reads
+    // with no risk of a getter-order dependency) and consumes a pending suppression exactly when
+    // the release it was guarding actually fires.
+    private void UpdateClickSuppression()
+    {
+        bool primaryRaw = _touchActive
+            ? false
+            : _touchActivePrev
+                ? true
+                : _currentMouse.LeftButton == ButtonState.Released &&
+                  _previousMouse.LeftButton == ButtonState.Pressed;
+        _primaryClickComputed = primaryRaw && !_primaryClickSuppressed;
+        if (primaryRaw) _primaryClickSuppressed = false;
+
+        bool secondaryRaw = _currentMouse.RightButton == ButtonState.Released &&
+            _previousMouse.RightButton == ButtonState.Pressed;
+        _secondaryClickComputed = secondaryRaw && !_secondaryClickSuppressed;
+        if (secondaryRaw) _secondaryClickSuppressed = false;
     }
 
     // Sticky pick: keep the previously-chosen camera when the cursor leaves all viewports
@@ -257,12 +298,7 @@ public class Cursor : ICursor
     /// True on the frame a touch ends, or the frame the left mouse button transitions from down
     /// to up. Mirrors <see cref="PrimaryPressed"/> on the release edge.
     /// </remarks>
-    public bool PrimaryClick => _touchActive
-        ? false
-        : _touchActivePrev
-            ? true
-            : _currentMouse.LeftButton == ButtonState.Released &&
-              _previousMouse.LeftButton == ButtonState.Pressed;
+    public bool PrimaryClick => _primaryClickComputed;
 
     /// <inheritdoc/>
     public bool PrimaryDoublePressed => _primaryDoublePressed;
@@ -279,9 +315,7 @@ public class Cursor : ICursor
         _previousMouse.RightButton == ButtonState.Released;
 
     /// <inheritdoc/>
-    public bool SecondaryClick =>
-        _currentMouse.RightButton == ButtonState.Released &&
-        _previousMouse.RightButton == ButtonState.Pressed;
+    public bool SecondaryClick => _secondaryClickComputed;
 
     /// <inheritdoc/>
     public bool SecondaryDoublePressed => _secondaryDoublePressed;

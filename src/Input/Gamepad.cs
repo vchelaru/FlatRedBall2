@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
@@ -22,7 +23,37 @@ public class Gamepad : IGamepad
     private Buttons _injectedButtons;
     private float _leftStickX, _leftStickY, _rightStickX, _rightStickY, _leftTrigger, _rightTrigger;
 
+    // The standard digital buttons — triggers/thumbstick axes are read via GetAxis, not queried
+    // for press/release, so they're intentionally excluded here.
+    private static readonly Buttons[] DigitalButtons =
+    {
+        Buttons.A, Buttons.B, Buttons.X, Buttons.Y,
+        Buttons.LeftShoulder, Buttons.RightShoulder,
+        Buttons.Back, Buttons.Start, Buttons.BigButton,
+        Buttons.LeftStick, Buttons.RightStick,
+        Buttons.DPadUp, Buttons.DPadDown, Buttons.DPadLeft, Buttons.DPadRight,
+    };
+
+    // Buttons held at the moment SuppressHeldReleases() was called (e.g. a screen transition) —
+    // each one's next release must not be reported, since that press belongs to whichever screen
+    // was active when it started. Removed from this set the frame its release actually happens.
+    private readonly HashSet<Buttons> _heldAtSuppression = new();
+    private readonly HashSet<Buttons> _releaseSuppressedThisFrame = new();
+
     internal Gamepad(int index) => _index = index;
+
+    /// <summary>
+    /// Marks every digital button currently down so its next release is not reported through
+    /// <see cref="WasButtonJustReleased"/>. Called by the engine on every screen transition; a
+    /// button that was already up is unaffected, and the very next fresh press/release cycle
+    /// after the suppressed release behaves normally again.
+    /// </summary>
+    internal void SuppressHeldReleases()
+    {
+        foreach (var button in DigitalButtons)
+            if (_current.IsButtonDown(button))
+                _heldAtSuppression.Add(button);
+    }
 
     internal void InjectButton(Buttons button, bool down)
     {
@@ -54,6 +85,19 @@ public class Gamepad : IGamepad
                 new GamePadDPad());
         else
             _current = GamePad.GetState(_index);
+
+        _releaseSuppressedThisFrame.Clear();
+        if (_heldAtSuppression.Count > 0)
+        {
+            foreach (var button in DigitalButtons)
+            {
+                if (_heldAtSuppression.Contains(button) && _previous.IsButtonDown(button) && !_current.IsButtonDown(button))
+                {
+                    _releaseSuppressedThisFrame.Add(button);
+                    _heldAtSuppression.Remove(button);
+                }
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -63,7 +107,8 @@ public class Gamepad : IGamepad
     public bool WasButtonJustPressed(Buttons button) => !_previous.IsButtonDown(button) && _current.IsButtonDown(button);
 
     /// <inheritdoc/>
-    public bool WasButtonJustReleased(Buttons button) => _previous.IsButtonDown(button) && !_current.IsButtonDown(button);
+    public bool WasButtonJustReleased(Buttons button) =>
+        _previous.IsButtonDown(button) && !_current.IsButtonDown(button) && !_releaseSuppressedThisFrame.Contains(button);
 
     /// <inheritdoc/>
     public float GetAxis(GamepadAxis axis) => axis switch

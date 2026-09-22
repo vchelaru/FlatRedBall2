@@ -44,6 +44,22 @@ public class InputManager
 
     internal void SetCameras(IReadOnlyList<Camera> cameras) => _cursor.SetCameras(cameras);
 
+    /// <summary>
+    /// Marks every currently-held button/key across the cursor, keyboard, and all gamepads so
+    /// their next release is not reported as a fresh press-release. Called by the engine on every
+    /// screen transition — a button held down at the moment a screen activates belongs to whatever
+    /// was on screen when it was pressed, not the new screen, so its eventual release must not be
+    /// misread as input intended for the new screen (e.g. a "click to continue" prompt firing
+    /// immediately from a leftover mouse-up).
+    /// </summary>
+    internal void SuppressHeldReleases()
+    {
+        _cursor.SuppressHeldReleases();
+        _keyboard.SuppressHeldReleases();
+        foreach (var gp in _gamepads)
+            gp.SuppressHeldReleases();
+    }
+
     internal void InjectKey(Keys key, bool down) => _keyboard.InjectKey(key, down);
     internal void InjectGamepadButton(int playerIndex, Buttons button, bool down) => _gamepads[playerIndex].InjectButton(button, down);
     internal void InjectGamepadAxis(int playerIndex, GamepadAxis axis, float value) => _gamepads[playerIndex].InjectAxis(axis, value);

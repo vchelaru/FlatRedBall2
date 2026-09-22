@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework.Input;
 using Shouldly;
 using Xunit;
 
+using FrbKeyboard = FlatRedBall2.Input.Keyboard;
+
 namespace FlatRedBall2.Tests.Input;
 
 // --- fakes ---
@@ -145,6 +147,183 @@ public class CursorTests
         cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0.01));
 
         cursor.SecondaryPressed.ShouldBeTrue();
+    }
+
+    // --- SuppressHeldReleases (screen-transition carryover) ---
+
+    [Fact]
+    public void PrimaryClick_ReleaseAfterSuppressHeldReleases_ReturnsFalse()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(left: ButtonState.Pressed), Sec(0));
+
+        // Simulates a screen transition while the button is still held: the eventual release
+        // must not register as a click belonging to whatever screen is active when it happens.
+        cursor.SuppressHeldReleases();
+
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.01));
+
+        cursor.PrimaryClick.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void PrimaryClick_FreshPressAfterSuppressedRelease_StillFiresNormally()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(left: ButtonState.Pressed), Sec(0));
+        cursor.SuppressHeldReleases();
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.01)); // suppressed, and consumed
+
+        cursor.Update(Mouse(left: ButtonState.Pressed), Sec(0.02));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.03));
+
+        cursor.PrimaryClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void PrimaryClick_PressAfterSuppressHeldReleases_StillFiresNormally()
+    {
+        // Nothing was held at the moment of the transition, so suppression should be a no-op.
+        var cursor = new Cursor();
+        cursor.Update(Mouse(), Sec(0));
+
+        cursor.SuppressHeldReleases();
+
+        cursor.Update(Mouse(left: ButtonState.Pressed), Sec(0.01));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.02));
+
+        cursor.PrimaryClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SecondaryClick_ReleaseAfterSuppressHeldReleases_ReturnsFalse()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0));
+
+        cursor.SuppressHeldReleases();
+
+        cursor.Update(Mouse(right: ButtonState.Released), Sec(0.01));
+
+        cursor.SecondaryClick.ShouldBeFalse();
+    }
+}
+
+// --- Keyboard ---
+
+public class KeyboardReleaseSuppressionTests
+{
+    [Fact]
+    public void WasKeyJustReleased_ReleaseAfterSuppressHeldReleases_ReturnsFalse()
+    {
+        var keyboard = new FrbKeyboard();
+        keyboard.InjectKey(Keys.Space, down: true);
+        keyboard.Update();
+
+        keyboard.SuppressHeldReleases();
+
+        keyboard.InjectKey(Keys.Space, down: false);
+        keyboard.Update();
+
+        keyboard.WasKeyJustReleased(Keys.Space).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WasKeyJustReleased_FreshPressReleaseAfterSuppression_StillFiresNormally()
+    {
+        var keyboard = new FrbKeyboard();
+        keyboard.InjectKey(Keys.Space, down: true);
+        keyboard.Update();
+        keyboard.SuppressHeldReleases();
+        keyboard.InjectKey(Keys.Space, down: false);
+        keyboard.Update(); // suppressed, and consumed
+
+        keyboard.InjectKey(Keys.Space, down: true);
+        keyboard.Update();
+        keyboard.InjectKey(Keys.Space, down: false);
+        keyboard.Update();
+
+        keyboard.WasKeyJustReleased(Keys.Space).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void WasKeyJustReleased_KeyNotHeldAtSuppression_StillFiresNormally()
+    {
+        var keyboard = new FrbKeyboard();
+        keyboard.Update(); // nothing held
+
+        keyboard.SuppressHeldReleases();
+
+        keyboard.InjectKey(Keys.Enter, down: true);
+        keyboard.Update();
+        keyboard.InjectKey(Keys.Enter, down: false);
+        keyboard.Update();
+
+        keyboard.WasKeyJustReleased(Keys.Enter).ShouldBeTrue();
+    }
+}
+
+// --- Gamepad ---
+
+public class GamepadReleaseSuppressionTests
+{
+    [Fact]
+    public void WasButtonJustReleased_ReleaseAfterSuppressHeldReleases_ReturnsFalse()
+    {
+        var gamepad = new Gamepad(0);
+        gamepad.InjectButton(Buttons.A, down: true);
+        gamepad.Update();
+
+        gamepad.SuppressHeldReleases();
+
+        gamepad.InjectButton(Buttons.A, down: false);
+        gamepad.Update();
+
+        gamepad.WasButtonJustReleased(Buttons.A).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WasButtonJustReleased_FreshPressReleaseAfterSuppression_StillFiresNormally()
+    {
+        var gamepad = new Gamepad(0);
+        gamepad.InjectButton(Buttons.A, down: true);
+        gamepad.Update();
+        gamepad.SuppressHeldReleases();
+        gamepad.InjectButton(Buttons.A, down: false);
+        gamepad.Update(); // suppressed, and consumed
+
+        gamepad.InjectButton(Buttons.A, down: true);
+        gamepad.Update();
+        gamepad.InjectButton(Buttons.A, down: false);
+        gamepad.Update();
+
+        gamepad.WasButtonJustReleased(Buttons.A).ShouldBeTrue();
+    }
+}
+
+// --- InputManager.SuppressHeldReleases forwarding ---
+
+public class InputManagerSuppressHeldReleasesTests
+{
+    [Fact]
+    public void SuppressHeldReleases_ForwardsToKeyboardCursorAndGamepads()
+    {
+        var manager = new InputManager();
+        manager.InjectKey(Keys.Space, down: true);
+        manager.InjectCursor(0, 0, primary: true, secondary: false);
+        manager.InjectGamepadButton(0, Buttons.A, down: true);
+        manager.Update(TimeSpan.Zero);
+
+        manager.SuppressHeldReleases();
+
+        manager.InjectKey(Keys.Space, down: false);
+        manager.InjectCursor(0, 0, primary: false, secondary: false);
+        manager.InjectGamepadButton(0, Buttons.A, down: false);
+        manager.Update(TimeSpan.FromSeconds(0.01));
+
+        manager.Keyboard.WasKeyJustReleased(Keys.Space).ShouldBeFalse();
+        manager.Cursor.PrimaryClick.ShouldBeFalse();
+        manager.GetGamepad(0).WasButtonJustReleased(Buttons.A).ShouldBeFalse();
     }
 }
 
