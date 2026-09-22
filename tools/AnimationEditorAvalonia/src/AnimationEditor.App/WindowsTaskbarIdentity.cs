@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Velopack.Locators;
 
 namespace AnimationEditor.App;
 
@@ -19,6 +20,14 @@ namespace AnimationEditor.App;
 /// so the taskbar identity and the <c>.achx</c> file-association identity stay consistent.
 /// It must be stable across launches and contain no spaces.</para>
 ///
+/// <para><b>Managed (Velopack) installs are exempt</b> — <c>VelopackApp.Run()</c> (called
+/// earlier in <c>Main</c>) already assigns the process an AppUserModelID derived from the
+/// pack id, matching what <c>vpk pack</c> baked into the Start Menu/Desktop shortcut it
+/// created. Overriding that here with this class's own fixed id would desync the running
+/// process from the pinned shortcut's identity and split the taskbar pin into two icons
+/// (#1179) instead of one. Only a launch Velopack didn't assign an id for — a local/dev
+/// build with no pack id to derive from — needs this fallback.</para>
+///
 /// <para>Call once at the very start of <c>Main()</c>, before Avalonia creates any window.
 /// Safe to call on non-Windows platforms (returns immediately).</para>
 /// </summary>
@@ -33,9 +42,18 @@ internal static class WindowsTaskbarIdentity
         [MarshalAs(UnmanagedType.LPWStr)] string appId);
 
     /// <summary>
-    /// Assigns the stable AppUserModelID to the current process. No-op off Windows, and any
-    /// failure is swallowed — a missing shell identity only affects the taskbar icon, never
-    /// the app's ability to run.
+    /// True when this class's own AppUserModelID should be applied: Velopack has not already
+    /// assigned the process one. Pure decision logic, split out so it's testable without a
+    /// real Velopack locator or Windows shell interop.
+    /// </summary>
+    internal static bool ShouldSetExplicitId(string? velopackAssignedAppUserModelId) =>
+        velopackAssignedAppUserModelId is null;
+
+    /// <summary>
+    /// Assigns the stable AppUserModelID to the current process, unless Velopack already
+    /// assigned one for a managed install. No-op off Windows, and any failure is swallowed —
+    /// a missing/mismatched shell identity only affects the taskbar icon, never the app's
+    /// ability to run.
     /// </summary>
     public static void Set()
     {
@@ -50,6 +68,10 @@ internal static class WindowsTaskbarIdentity
     {
         try
         {
+            string? velopackAssignedId = VelopackLocator.CreateDefaultForPlatform().AppUserModelId;
+            if (!ShouldSetExplicitId(velopackAssignedId))
+                return;
+
             SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
         }
         catch (Exception e)
