@@ -233,6 +233,30 @@ public static class AchjToTiledAnimationMapper
             frame.BottomCoordinate - frame.TopCoordinate);
     }
 
+    /// <summary>Resolves a frame's pixel rect to the single Tiled tile id it lands on, or <see
+    /// langword="null"/> if it doesn't cleanly map (off-grid, wrong size, out of range) -- the same
+    /// checks <see cref="MapFrame"/> makes, without its warning/skip-tally bookkeeping. Display-only
+    /// (Inspector "Tile: N" readout, issue #1182); unrelated to which tile OWNS a chain's animation
+    /// (see <see cref="MultiTileToTiledAnimationMapper"/>'s entry-tile-id hint tracking).</summary>
+    internal static uint? TryGetTileId(AnimationFrameSave frame, TextureCoordinateType coordinateType, TilesetAnimationInfo tilesetInfo)
+    {
+        if (coordinateType == TextureCoordinateType.UV && (tilesetInfo.TextureWidth is null or <= 0 || tilesetInfo.TextureHeight is null or <= 0))
+            return null;
+
+        var (left, top, width, height) = FrameRectPixels(frame, coordinateType, tilesetInfo);
+        if (Math.Abs(width - tilesetInfo.TileWidth) > Epsilon || Math.Abs(height - tilesetInfo.TileHeight) > Epsilon)
+            return null;
+        if (tilesetInfo.Grid.TryLocate(left, top, width, height, Epsilon) is not { } footprint)
+            return null;
+
+        var (column, row, _, _) = footprint;
+        if (column < 0 || row < 0 || column >= tilesetInfo.ColumnCount)
+            return null;
+
+        var tileId = (uint)((row * tilesetInfo.ColumnCount) + column);
+        return tileId < tilesetInfo.TileCount ? tileId : null;
+    }
+
     /// <summary>Converts a frame's display length to milliseconds -- "Second" and "Undefined" both
     /// mean seconds (matching how the runtime treats "Undefined"), "Millisecond" passes through.
     /// Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse it.</summary>

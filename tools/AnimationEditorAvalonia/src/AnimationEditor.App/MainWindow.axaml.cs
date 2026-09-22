@@ -5065,6 +5065,8 @@ public partial class MainWindow : Window
     {
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
+        PropChainTsxOwnerInput.ValueChanged += (_, _) => ApplyChainTsxOwnerTileId();
+        PropChainTsxOwnerSyncButton.Click += (_, _) => SyncChainTsxOwnerTileIdToFirstFrame();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -5406,6 +5408,17 @@ public partial class MainWindow : Window
                 PropChainLocked.IsChecked = selectedChain!.IsLocked;
                 PropChainLoop.IsChecked = selectedChain.Loop;
             }
+            // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
+            // tile to own. Re-reads on every refresh (not just selection change) so an edit made
+            // through the field itself picks up the committed value, including a value the
+            // ownership-transfer/stale-reuse machinery in ProjectManager might have adjusted.
+            PropChainTsxOwnerSection.IsVisible = chainOnly && _projectManager.IsNativeTsxProject;
+            if (chainOnly && _projectManager.IsNativeTsxProject)
+            {
+                var ownerTileId = _projectManager.GetTsxOwnerTileId(selectedChain!);
+                PropChainTsxOwnerInput.Value = ownerTileId.HasValue ? ownerTileId.Value : null;
+                PropChainTsxOwnerError.IsVisible = false;
+            }
             // LoopToggle mirrors the selected chain's Loop regardless of whether a frame/shape
             // within it is also selected (#1120) -- it reflects "the chain currently playing",
             // not just the chain-only inspector view PropChainLoop above is scoped to.
@@ -5513,6 +5526,17 @@ public partial class MainWindow : Window
                     SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f, bmpW)).ToList());
                     SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f, bmpH)).ToList());
                 }
+
+                // Read-only tile id readout (#1182), native-tsx projects only -- independent of
+                // which tile OWNS the chain's animation (PropChainTsxOwnerInput above). Lets a
+                // user visually spot "the owner tile doesn't match any current frame" by eye.
+                PropFrameTsxTileText.IsVisible = _projectManager.IsNativeTsxProject;
+                if (_projectManager.IsNativeTsxProject)
+                {
+                    PropFrameTsxTileText.Text = _projectManager.ComputeFrameTileId(frame) is { } tileId
+                        ? $"Tile: {tileId}"
+                        : "Tile: (doesn't map to a whole tile)";
+                }
             }
 
             if (rect is not null)
@@ -5566,6 +5590,35 @@ public partial class MainWindow : Window
         var chain = _selectedState.SelectedChain;
         if (chain is null || PropChainLoop.IsChecked is not { } loop) return;
         _appCommands.SetChainLoop(chain, loop);
+    }
+
+    /// <summary>Commits <see cref="PropChainTsxOwnerInput"/>'s value via <see
+    /// cref="IAppCommands.SetChainTsxOwnerTileId"/> (issue #1182), showing the returned validation
+    /// error (if any) in <see cref="PropChainTsxOwnerError"/> instead of silently reverting -- the
+    /// field is left as the user typed it so they can see and fix what's wrong, rather than having
+    /// it snap back with no explanation.</summary>
+    private void ApplyChainTsxOwnerTileId()
+    {
+        if (_suppressPropRefresh) return;
+        var chain = _selectedState.SelectedChain;
+        if (chain is null || PropChainTsxOwnerInput.Value is not { } value || value < 0) return;
+
+        var error = _appCommands.SetChainTsxOwnerTileId(chain, (uint)value);
+        PropChainTsxOwnerError.Text = error;
+        PropChainTsxOwnerError.IsVisible = error is not null;
+    }
+
+    private void SyncChainTsxOwnerTileIdToFirstFrame()
+    {
+        var chain = _selectedState.SelectedChain;
+        if (chain is null || chain.Frames.Count == 0) return;
+        if (_projectManager.ComputeFrameTileId(chain.Frames[0]) is not { } tileId) return;
+
+        var error = _appCommands.SetChainTsxOwnerTileId(chain, tileId);
+        PropChainTsxOwnerError.Text = error;
+        PropChainTsxOwnerError.IsVisible = error is not null;
+        if (error is null)
+            PropChainTsxOwnerInput.Value = tileId;
     }
 
     private void ApplyFrameFlip()

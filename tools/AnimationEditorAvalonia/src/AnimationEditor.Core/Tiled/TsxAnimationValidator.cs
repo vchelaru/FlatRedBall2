@@ -165,6 +165,25 @@ public static class TsxAnimationValidator
             }
         }
 
+        // Two true anchors (independent chains, no ParentId relationship) sharing a Name is issue
+        // #1182: each is its own independently-tracked owner tile, so nothing before this caught
+        // two chains silently diverging under one shared name with no way to reconcile them from
+        // the UI. A satellite's own Name (never read/written by this codebase, but a hand-authored
+        // file could still set one) must never trip this -- it isn't an independent chain.
+        var trueAnchors = tileset.Tiles.Where(t => TiledAnimationToAchjMapper.GetParentId(t) is null);
+        var anchorsByName = trueAnchors
+            .Select(t => (Tile: t, Name: t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == TiledAnimationToAchjMapper.NamePropertyName)?.Value))
+            .Where(t => !string.IsNullOrEmpty(t.Name))
+            .GroupBy(t => t.Name);
+        foreach (var group in anchorsByName)
+        {
+            var tiles = group.Select(t => t.Tile).OrderBy(t => t.ID).ToList();
+            if (tiles.Count < 2) continue;
+            for (var i = 1; i < tiles.Count; i++)
+                issues.Add(new TsxGroupIssue(tiles[0].ID, tiles[i].ID,
+                    $"tile {tiles[i].ID}: shares Name \"{group.Key}\" with tile {tiles[0].ID}, but each is its own independently-tracked animation -- rename one or give them the same owner tile."));
+        }
+
         // An animated tile, or a frame it references, past the tileset's tile count (only
         // reachable by hand-editing) maps to a rect outside the image and can never be saved; say
         // so at open instead of leaving the user with an off-sheet frame and a per-save warning.

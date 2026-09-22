@@ -978,6 +978,46 @@
                                                           AutomationProperties.AutomationId="prop-chain-loop" />
                                             </StackPanel>
                                         </Border>
+
+                                        <!-- ── Owner tile (#1182) ── native-tsx projects only:
+                                             which physical Tiled tile carries this chain's
+                                             <animation> block. Previously hidden save-time
+                                             bookkeeping; now explicit and user-settable. -->
+                                        <Border x:Name="PropChainTsxOwnerSection"
+                                                BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10"
+                                                IsVisible="False">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="TILED"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="Auto,*">
+                                                    <TextBlock Text="Placed Tile"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,8,0"
+                                                               Foreground="{DynamicResource InkMid}"
+                                                               FontSize="11" />
+                                                    <NumericUpDown x:Name="PropChainTsxOwnerInput"
+                                                                   Grid.Column="1"
+                                                                   MinWidth="80"
+                                                                   Minimum="0"
+                                                                   Increment="1"
+                                                                   FormatString="0"
+                                                                   AutomationProperties.AutomationId="prop-chain-tsx-owner" />
+                                                </Grid>
+                                                <Button x:Name="PropChainTsxOwnerSyncButton"
+                                                        Content="Sync to First Frame"
+                                                        HorizontalAlignment="Left"
+                                                        AutomationProperties.AutomationId="prop-chain-tsx-owner-sync" />
+                                                <TextBlock x:Name="PropChainTsxOwnerError"
+                                                           Foreground="{DynamicResource Danger}"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"
+                                                           IsVisible="False" />
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
 
                                     <!-- ── Frame properties ── -->
@@ -1026,6 +1066,15 @@
                                                         </Grid>
                                                     </WrapPanel>
                                                 </StackPanel>
+                                                <!-- Read-only (#1182): the Tiled tile id this
+                                                     frame's own rect resolves to, independent of
+                                                     which tile OWNS the chain's animation (see
+                                                     PropChainTsxOwnerInput above). Native-tsx
+                                                     projects only. -->
+                                                <TextBlock x:Name="PropFrameTsxTileText"
+                                                           Foreground="{DynamicResource InkMid}"
+                                                           FontSize="11"
+                                                           IsVisible="False" />
 
                                             </StackPanel>
                                         </Border>

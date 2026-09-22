@@ -191,6 +191,18 @@ namespace AnimationEditor.Core.CommandsAndState
         /// as <see cref="SetChainLocked"/>.
         /// </summary>
         void SetChainLoop(AnimationChainSave chain, bool loop);
+
+        /// <summary>
+        /// Explicitly overrides which Tiled tile id <paramref name="chain"/>'s <c>&lt;animation&gt;</c>
+        /// is written to on the next save (issue #1182) -- e.g. an Inspector field the user typed
+        /// into, or a "Sync to First Frame" action passing <see
+        /// cref="IProjectManager.GetTsxOwnerTileId"/>'s current frame-0-computed value back in.
+        /// Validated before committing (tileset bounds, no collision with another chain's owner
+        /// tile); returns the validation error and makes no change on failure, or <see
+        /// langword="null"/> on success. Undoable, same as any other mutating command.
+        /// </summary>
+        string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId);
+
         void AddFrame(AnimationChainSave chain, string? textureName = null);
 
         /// <summary>

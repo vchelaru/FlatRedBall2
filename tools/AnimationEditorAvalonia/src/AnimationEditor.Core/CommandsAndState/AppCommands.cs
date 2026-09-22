@@ -114,6 +114,13 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetChainLoopCommand(chain, loop, this, _events));
         }
 
+        public string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId)
+        {
+            var command = new SetChainTsxOwnerTileIdCommand(chain, tileId, _pm, this, _events);
+            _undoManager.Execute(command);
+            return command.Error;
+        }
+
         // -- Native tsx: achx-only data ------------------------------------------------------
         // A Tiled tile animation holds rects and durations, nothing else (see
         // Tiled.TsxLossyDataCheck, which warns on save about whatever slipped through). Every

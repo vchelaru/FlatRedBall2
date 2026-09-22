@@ -87,6 +87,55 @@ public class TsxAnimationValidatorTests
     }
 
     [Fact]
+    public void Validate_TwoAnchorsShareName_ReturnsIssue()
+    {
+        // Two independently-tracked anchors (no ParentId relationship between them) both carry
+        // Name="RiseUp" -- issue #1182: nothing previously caught this, so two chains silently
+        // diverge under one shared name with no way to reconcile them from the UI.
+        var tileset = TilesetWithColumns(4);
+        var first = new Tile { ID = 8, Width = 0, Height = 0 };
+        first.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
+        first.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(first);
+
+        var second = new Tile { ID = 12, Width = 0, Height = 0 };
+        second.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
+        second.Animation.Add(new Frame { TileID = 12, Duration = 150 });
+        tileset.Tiles.Add(second);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal((uint)8, issue.AnchorTileId);
+        Assert.Equal((uint)12, issue.TileId);
+        Assert.Contains("RiseUp", issue.Message);
+        Assert.Contains("Name", issue.Message);
+    }
+
+    [Fact]
+    public void Validate_SatelliteSharesAnchorsName_ReturnsNoNameIssue()
+    {
+        // A satellite's Name is never read/written by this codebase (only the anchor's is), but
+        // guard against a hand-authored file where one happens to be set anyway -- a satellite is
+        // not an independent chain, so it must never trip the same-Name check against its own anchor.
+        var tileset = TilesetWithColumns(4);
+        var anchor = new Tile { ID = 8, Width = 0, Height = 0 };
+        anchor.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
+        anchor.Animation.Add(new Frame { TileID = 8, Duration = 150 });
+        tileset.Tiles.Add(anchor);
+
+        var satellite = new Tile { ID = 9, Width = 0, Height = 0 };
+        satellite.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
+        satellite.Animation.Add(new Frame { TileID = 9, Duration = 150 });
+        satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 8 });
+        tileset.Tiles.Add(satellite);
+
+        var issues = TsxAnimationValidator.Validate(tileset);
+
+        Assert.Empty(issues);
+    }
+
+    [Fact]
     public void Validate_BackwardParentId_ReferencesAnchorAtLargerColumnOrRow_ReturnsIssue()
     {
         // Anchor at tile 9 (column 1, row 2, 4 columns/tileset). Tile 8 (column 0, same row)

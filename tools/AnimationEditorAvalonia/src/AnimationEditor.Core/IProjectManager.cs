@@ -50,6 +50,18 @@ namespace AnimationEditor.Core
         /// loaded or nothing is wrong. See <see cref="ProjectManager.GetChainNamesWithTsxIssues"/>.</summary>
         IReadOnlyList<string> GetChainNamesWithTsxIssues();
 
+        /// <summary>The tile id a native-tsx chain's animation would be written to on the next
+        /// save. See <see cref="ProjectManager.GetTsxOwnerTileId"/>.</summary>
+        uint? GetTsxOwnerTileId(AnimationChainSave chain);
+
+        /// <summary>Explicitly overrides which tile id a native-tsx chain's animation is written
+        /// to. See <see cref="ProjectManager.TrySetTsxOwnerTileId"/>.</summary>
+        string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId);
+
+        /// <summary>The Tiled tile id a frame's own pixel rect resolves to. See <see
+        /// cref="ProjectManager.ComputeFrameTileId"/>.</summary>
+        uint? ComputeFrameTileId(AnimationFrameSave frame);
+
         /// <summary>
         /// Captures this project's native-tsx state (tileset + tile-id tracking dictionaries) as
         /// an opaque snapshot, or <see langword="null"/> for an achx/achj project. <see

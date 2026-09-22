@@ -1203,6 +1203,94 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
+        /// The tile id a native-tsx chain's Tiled <c>&lt;animation&gt;</c> block would be written to
+        /// on the next save -- an explicit hint set via <see cref="TrySetTsxOwnerTileId"/>, one
+        /// loaded from disk, or (when neither exists yet) freshly computed from frame 0's own
+        /// top-left cell. Issue #1182: makes what was previously hidden save-time bookkeeping
+        /// (<see cref="_tsxEntryTileIdsByChain"/>) explicit and readable, e.g. for an Inspector
+        /// "Placed Tile: N" readout. <see langword="null"/> for an achx/achj project, a chain not in
+        /// this project, or a chain whose current frames can't be mapped (empty, or bad geometry).
+        /// </summary>
+        public uint? GetTsxOwnerTileId(AnimationChainSave chain)
+        {
+            if (_tsxTileset == null || AnimationChainListSave == null)
+                return null;
+
+            return Tiled.MultiTileToTiledAnimationMapper.Map(
+                    AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain)
+                .FirstOrDefault(r => ReferenceEquals(r.SourceChain, chain))
+                ?.EntryTileId;
+        }
+
+        /// <summary>
+        /// Explicitly sets which tile id a native-tsx chain's Tiled <c>&lt;animation&gt;</c> is
+        /// written to on the next save, overriding whatever <see cref="GetTsxOwnerTileId"/> would
+        /// otherwise report -- issue #1182's explicit ownership, e.g. from an Inspector field the
+        /// user types into, or a "Sync to First Frame" action that passes <see
+        /// cref="GetTsxOwnerTileId"/>'s own frame-0-computed value back in. Validated against the
+        /// tileset's own tile count and every other chain's current owner tile before committing;
+        /// returns a human-readable error and makes no change on failure, or <see langword="null"/>
+        /// on success. Drops this chain's tracked "origin frame" (<see
+        /// cref="_tsxEntryHintOriginFrames"/>) and any satellite-offset hints (<see
+        /// cref="_tsxSatelliteTileIdsByChain"/>): an explicit pin isn't derived from any particular
+        /// frame's cell, so a later resize of that cell must never auto-transfer it back, and a
+        /// multi-tile chain's satellites must recompute relative to the new owner position instead
+        /// of reusing offsets captured at the old one.
+        /// </summary>
+        public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId)
+        {
+            if (_tsxTileset == null || AnimationChainListSave == null)
+                return "Can't set an owner tile: this isn't a native Tiled (.tsx) project.";
+            if (!AnimationChainListSave.AnimationChains.Contains(chain))
+                return "Can't set an owner tile: this chain isn't part of the current project.";
+            if (tileId >= (uint)_tsxTileset.TileCount)
+                return $"Tile {tileId} is past this tileset's {_tsxTileset.TileCount} tile(s).";
+
+            foreach (var other in AnimationChainListSave.AnimationChains)
+            {
+                if (ReferenceEquals(other, chain)) continue;
+                if (GetTsxOwnerTileId(other) == tileId)
+                    return $"Tile {tileId} is already the owner tile for \"{other.Name}\".";
+            }
+
+            var updatedEntries = new Dictionary<AnimationChainSave, uint>(_tsxEntryTileIdsByChain, ReferenceEqualityComparer.Instance)
+            {
+                [chain] = tileId
+            };
+            _tsxEntryTileIdsByChain = updatedEntries;
+
+            if (_tsxEntryHintOriginFrames.ContainsKey(chain))
+            {
+                var updatedOrigins = new Dictionary<AnimationChainSave, AnimationFrameSave>(_tsxEntryHintOriginFrames, ReferenceEqualityComparer.Instance);
+                updatedOrigins.Remove(chain);
+                _tsxEntryHintOriginFrames = updatedOrigins;
+            }
+
+            if (_tsxSatelliteTileIdsByChain.ContainsKey(chain))
+            {
+                var updatedSatellites = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(_tsxSatelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
+                updatedSatellites.Remove(chain);
+                _tsxSatelliteTileIdsByChain = updatedSatellites;
+            }
+
+            return null;
+        }
+
+        /// <summary>The Tiled tile id a frame's own pixel rect resolves to against this project's
+        /// tileset, or <see langword="null"/> for an achx/achj project or a frame whose rect doesn't
+        /// cleanly map to a single whole tile cell. Display-only (Inspector "Tile: N" readout, issue
+        /// #1182) -- unrelated to which tile OWNS the chain's animation; see <see
+        /// cref="GetTsxOwnerTileId"/> for that.</summary>
+        public uint? ComputeFrameTileId(AnimationFrameSave frame)
+        {
+            if (_tsxTileset == null || AnimationChainListSave == null)
+                return null;
+
+            return Tiled.AchjToTiledAnimationMapper.TryGetTileId(
+                frame, AnimationChainListSave.CoordinateType, BuildTsxTilesetInfo(_tsxTileset));
+        }
+
+        /// <summary>
         /// Names of chains that have a <see cref="Tiled.TsxAnimationValidator"/> issue -- a
         /// multi-tile group whose satellite tile has drifted out of lockstep with its anchor, or a
         /// dangling/chained/backward/incomplete-footprint <c>ParentId</c> (issue #1140). Empty when
