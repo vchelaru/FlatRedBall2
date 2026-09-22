@@ -1,12 +1,12 @@
 namespace AnimationEditor.Core.Layout;
 
 /// <summary>
-/// Resolves the persisted preview-pane row height (issue #904) against sane bounds so a
-/// missing, corrupt, or otherwise nonsensical stored value can never produce a broken window
-/// layout — a valid-JSON-but-bad-number case the whole-file settings load's try/catch doesn't
-/// catch on its own.
+/// Resolves a persisted layout dimension (e.g. the preview pane's row height, #904, or the
+/// sidebar's column width, #1178) against sane bounds so a missing, corrupt, or otherwise
+/// nonsensical stored value can never produce a broken window layout — a valid-JSON-but-bad-number
+/// case the whole-file settings load's try/catch doesn't catch on its own.
 /// </summary>
-public static class PreviewPaneHeightValidator
+public static class PersistedDimensionValidator
 {
     public static double Resolve(double? stored, double min, double max, double fallback)
     {

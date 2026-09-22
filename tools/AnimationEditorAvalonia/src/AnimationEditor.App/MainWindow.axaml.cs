@@ -254,6 +254,7 @@ public partial class MainWindow : Window
         ApplyPersistedTheme();
         ApplyPersistedCanvasColors();
         ApplyPersistedPreviewPaneHeight();
+        ApplyPersistedSidebarWidth();
         ApplyPersistedWindowState();
         WireMenuEvents();
         WireWireframeToolbar();
@@ -331,6 +332,7 @@ public partial class MainWindow : Window
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
             _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value;
+            _appSettings.SidebarWidth = MainContentGrid.ColumnDefinitions[0].Width.Value;
             _appSettings.WindowMaximized = WindowState == WindowState.Maximized;
             SaveTabsToSettings();
             // A normal close is not a crash -- clear any stray recovery file so the next
@@ -6026,7 +6028,7 @@ public partial class MainWindow : Window
 
     // ── Preview pane height ──────────────────────────────────────────────────
     // The AchxEditorPane's row 3 (bottom preview panel) is resized by dragging the
-    // GridSplitter at row 2. See PreviewPaneHeightValidator for the bounds a stored value
+    // GridSplitter at row 2. See PersistedDimensionValidator for the bounds a stored value
     // is checked against (#904).
     private const double MinPreviewPaneHeight = 80;
     private const double MaxPreviewPaneHeight = 2000;
@@ -6035,7 +6037,7 @@ public partial class MainWindow : Window
     /// <summary>Applies the persisted (or default, if missing/invalid) preview-pane row height.</summary>
     private void ApplyPersistedPreviewPaneHeight()
     {
-        var resolved = PreviewPaneHeightValidator.Resolve(
+        var resolved = PersistedDimensionValidator.Resolve(
             _appSettings.PreviewPaneHeight, MinPreviewPaneHeight, MaxPreviewPaneHeight, DefaultPreviewPaneHeight);
         AchxEditorPane.RowDefinitions[3].Height = new GridLength(resolved, GridUnitType.Pixel);
     }
@@ -6045,6 +6047,22 @@ public partial class MainWindow : Window
     {
         if (_appSettings.WindowMaximized)
             WindowState = WindowState.Maximized;
+    }
+
+    // ── Sidebar width ─────────────────────────────────────────────────────────
+    // The MainContentGrid's column 0 (left sidebar) is resized by dragging the GridSplitter
+    // at column 1. See PersistedDimensionValidator for the bounds a stored value is checked
+    // against (#1178).
+    private const double MinSidebarWidth = 150;
+    private const double MaxSidebarWidth = 1200;
+    private const double DefaultSidebarWidth = 300;
+
+    /// <summary>Applies the persisted (or default, if missing/invalid) sidebar column width.</summary>
+    private void ApplyPersistedSidebarWidth()
+    {
+        var resolved = PersistedDimensionValidator.Resolve(
+            _appSettings.SidebarWidth, MinSidebarWidth, MaxSidebarWidth, DefaultSidebarWidth);
+        MainContentGrid.ColumnDefinitions[0].Width = new GridLength(resolved, GridUnitType.Pixel);
     }
 
     private static uint ToArgb(SKColor color) =>

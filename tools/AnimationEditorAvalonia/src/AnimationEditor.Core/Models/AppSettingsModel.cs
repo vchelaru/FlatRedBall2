@@ -66,7 +66,7 @@ namespace AnimationEditor.Core.Models
         /// <summary>
         /// The bottom preview panel's row height in pixels, as last dragged via the horizontal
         /// GridSplitter (#904). <c>null</c> falls back to the editor's default height —
-        /// see <see cref="Layout.PreviewPaneHeightValidator"/> for the bounds a stored value
+        /// see <see cref="Layout.PersistedDimensionValidator"/> for the bounds a stored value
         /// is checked against before use.
         /// </summary>
         public double? PreviewPaneHeight { get; set; }
@@ -76,6 +76,14 @@ namespace AnimationEditor.Core.Models
         /// next launch so the window reopens in the same maximized/restored state it was left in.
         /// </summary>
         public bool WindowMaximized { get; set; }
+
+        /// <summary>
+        /// The left sidebar's column width in pixels, as last dragged via the vertical
+        /// GridSplitter (#1178). <c>null</c> falls back to the editor's default width —
+        /// see <see cref="Layout.PersistedDimensionValidator"/> for the bounds a stored value
+        /// is checked against before use.
+        /// </summary>
+        public double? SidebarWidth { get; set; }
 
         public void AddFile(FilePath filePath)
         {
