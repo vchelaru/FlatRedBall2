@@ -4162,6 +4162,23 @@ public partial class MainWindow : Window
         SyncTreeSelectionFromAnimTree(vm);
     }
 
+    /// <summary>
+    /// Resolves a still-in-flight tree-selection burst immediately instead of waiting for its
+    /// posted trailing sync. A rapid multi-row Ctrl+click fires <see cref="OnTreeSelectionChanged"/>
+    /// once per row; only the first row is synced into <see cref="ISelectedState"/> right away, and
+    /// the rest are buffered for a <c>Dispatcher.UIThread.Post</c> callback. Call this before any
+    /// command consumes <c>SelectedNodes</c>/<c>SelectedChains</c>/<c>SelectedFrames</c> to delete
+    /// or otherwise act on the current selection -- without it, the command could act on a stale,
+    /// partial selection, and the still-pending callback would then run afterward and resync
+    /// <c>SelectedNodes</c> from the tree's full (unchanged) selection, resurrecting rows the
+    /// command may have just deleted. See issue #1172 (<see cref="HandleDelete"/>).
+    /// </summary>
+    private void FlushPendingTreeSelectionBurst()
+    {
+        if (_treeSelectionBurstActive)
+            EndTreeSelectionBurst();
+    }
+
     private void SyncTreeSelectionFromAnimTree(TreeNodeVm vm)
     {
         LogSelectionPerf($"==== SyncTreeSelectionFromAnimTree: {AnimTree.SelectedItems.Count} tree items selected ====");
@@ -6848,6 +6865,15 @@ public partial class MainWindow : Window
 
     private void HandleDelete()
     {
+        // A rapid multi-row tree selection (Ctrl+click several chains/frames) can still have its
+        // trailing catch-up sync pending (see FlushPendingTreeSelectionBurst's doc comment) when
+        // Delete fires. Reading SelectedChains/SelectedFrames below without flushing first would
+        // delete only the partial, stale selection the leading-edge sync captured -- and the
+        // pending sync would then still run afterward and resync SelectedNodes from the tree's
+        // full (unchanged) selection, resurrecting the rows just deleted back into the selection
+        // so the wireframe draws their frames again. See issue #1172.
+        FlushPendingTreeSelectionBurst();
+
         // Delete the whole multi-selection of the focused node's kind, not just the
         // focused node — the delete commands batch them into a single undo step.
         // All kinds are fully undoable, so they delete immediately and surface an
