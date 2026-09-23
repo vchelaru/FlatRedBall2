@@ -89,6 +89,23 @@ Rules that keep scenarios honest:
 4. Fix, run the scenario, then run this folder and the whole assembly to catch leaked state.
 5. Commit the scenario and the fix together.
 
+## First-pass triage (September 2026)
+
+The first 56 scenarios failed 11 times on their first run. Only two were editor bugs; the rest
+were the harness or the author's expectations, and every scenario survived, corrected. Kept here
+so the next pass knows which "failures" to expect from the editor's real behaviour.
+
+| Scenario that failed | Cause | Outcome |
+|---|---|---|
+| Enable Hot Reload menu toggle | **Editor bug**: the MenuItem had no `ToggleType`, a click never unchecked it | Fixed (`ToggleType="CheckBox"`); scenario is the guard |
+| Save As on a file-backed tab | **Editor bug**: the tab kept the old path while the document moved | Fixed (`SaveAsCompleted` renames the tab); scenario is the guard |
+| Close dirty tab, Don't Save / Cancel | Expectation: file-backed documents auto-save, so no prompt | Rewritten around auto-save, plus three Untitled-tab prompt scenarios |
+| Click a frame box with the chain selected | Expectation: that press grabs the chain for a drag (#719) | Rewritten; double-click and no-undo scenarios added |
+| Ctrl+wheel zoom, play button, loop off | Harness: `DispatcherTimer`s tick only while the test awaits | `WaitAsync` / `WaitUntilAsync` added |
+| Search box filter | Expectation: filtered rows are hidden (`PinnedVisible`), not removed | `VisibleChainHeaders` added |
+| History rows after inspector edits | Author error: the History tab hides the inspector | Reordered; `TypeFlanker` now fails loudly on a hidden field |
+| Double-click a chain label to rename | Harness limit: text is not hit-testable headlessly | Replaced by the row double-click (fit to view) scenario |
+
 ## Gotchas
 
 - **Hit-testing is a render-time thing.** Pointer input is hit-tested against the composition
