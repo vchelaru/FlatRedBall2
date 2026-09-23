@@ -6,6 +6,7 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using Xunit;
 
@@ -27,7 +28,7 @@ public class AppCommandsSaveFailTests
         var events     = new ApplicationEvents();
         var selected   = new SelectedState(throwingPm);
         var appState   = new AppState(events, selected);
-        var io         = new IoManager(appState);
+        var io         = new IoManager(appState, Path.Combine(Path.GetTempPath(), "AnimationEditorCoreTests", $"recovery_{Guid.NewGuid():N}.achx"));
         var finder     = new ObjectFinder(throwingPm);
         var undo       = new UndoManager();
         var commands   = new AppCommands(throwingPm, selected, events, io, finder, undo);

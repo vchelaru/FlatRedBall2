@@ -165,7 +165,8 @@ public partial class App : Application
         var applicationEvents = new ApplicationEvents();
         var selectedState     = new SelectedState(projectManager);
         var appState          = new AppState(applicationEvents, selectedState);
-        var ioManager         = new IoManager(appState);
+        var ioManager         = new IoManager(appState,
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx"));
         var objectFinder      = new ObjectFinder(projectManager);
         var undoManager       = new UndoManager();
         var pendingCutState   = new PendingCutState();

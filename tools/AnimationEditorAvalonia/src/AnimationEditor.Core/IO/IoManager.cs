@@ -14,9 +14,16 @@ namespace AnimationEditor.Core.IO
     {
         private readonly IAppState _appState;
 
-        public IoManager(IAppState appState)
+        /// <param name="recoveryFilePath">
+        /// Where the crash-recovery copy of an unsaved document is written. Deliberately has no
+        /// default: a default pointing at the real per-user temp file let every test that built
+        /// its own <see cref="IoManager"/> write there, and the editor then offered that test
+        /// data as a recovered document on its next launch.
+        /// </param>
+        public IoManager(IAppState appState, string recoveryFilePath)
         {
             _appState = appState;
+            RecoveryFilePath = recoveryFilePath;
         }
         /// <summary>Raised when saving the companion file fails. The app layer should display the error.</summary>
         public event Action<string, Exception>? SaveFailed;
@@ -24,8 +31,7 @@ namespace AnimationEditor.Core.IO
         /// <inheritdoc/>
         public event Action<string, Exception>? TiledSyncParseFailed;
 
-        public string RecoveryFilePath { get; set; } =
-            Path.Combine(Path.GetTempPath(), "AnimationEditor_Recovery.achx");
+        public string RecoveryFilePath { get; set; }
 
         private FilePath GetCompanionFileFor(FilePath fileName)
         {

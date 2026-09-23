@@ -242,7 +242,7 @@ public class AnimationTreeControlTests
         var selectedState = new SelectedState(pm);
         var events = new ApplicationEvents();
         var appState = new AppState(events, selectedState);
-        var ioManager = new IoManager(appState);
+        var ioManager = new IoManager(appState, TestRecoveryPath.New());
         var objectFinder = new ObjectFinder(pm);
         var undoManager = new UndoManager();
         var appCommands = new AppCommands(pm, selectedState, events, ioManager, objectFinder, undoManager);

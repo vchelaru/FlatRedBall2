@@ -75,12 +75,11 @@ internal sealed class TestServices
         ApplicationEvents = new ApplicationEvents();
         SelectedState     = new SelectedState(ProjectManager);
         AppState          = new AppState(ApplicationEvents, SelectedState);
-        IoManager         = new IoManager(AppState);
-        // Each instance gets its own recovery path so concurrent test classes never race on
-        // the shared default temp file (see issue #703) — critical now that MainWindow's
-        // startup path (OnOpened) calls RecoveryFileExists() on every window it creates.
-        IoManager.RecoveryFilePath = System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(), "AnimationEditorAppTests", $"recovery_{System.Guid.NewGuid():N}.achx");
+        // Each instance gets its own recovery path so concurrent test classes never race on one
+        // file (see issue #703) — critical now that MainWindow's startup path (OnOpened) calls
+        // RecoveryFileExists() on every window it creates.
+        IoManager         = new IoManager(AppState, System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "AnimationEditorAppTests", $"recovery_{System.Guid.NewGuid():N}.achx"));
         ObjectFinder      = new ObjectFinder(ProjectManager);
         UndoManager       = new UndoManager();
         PendingCutState   = new PendingCutState();

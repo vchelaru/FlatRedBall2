@@ -241,7 +241,8 @@ public partial class App : Application
         sc.AddSingleton<IAppState>(sp => sp.GetRequiredService<AppState>());
 
         sc.AddSingleton<IoManager>(sp =>
-            new IoManager(sp.GetRequiredService<IAppState>()));
+            new IoManager(sp.GetRequiredService<IAppState>(),
+                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx")));
         sc.AddSingleton<IIoManager>(sp => sp.GetRequiredService<IoManager>());
 
         sc.AddSingleton<ObjectFinder>(sp =>

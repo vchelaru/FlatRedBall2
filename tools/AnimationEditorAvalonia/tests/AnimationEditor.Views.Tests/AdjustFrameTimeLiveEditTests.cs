@@ -84,7 +84,7 @@ public class AdjustFrameTimeLiveEditTests
         var pm = new FakeProjectManager { AnimationChainListSave = acls };
         var selectedState = new SelectedState(pm);
         var events = new ApplicationEvents();
-        var ioManager = new IoManager(new AppState(events, selectedState));
+        var ioManager = new IoManager(new AppState(events, selectedState), TestRecoveryPath.New());
         var objectFinder = new ObjectFinder(pm);
         var undoManager = new UndoManager();
         var appCommands = new AppCommands(pm, selectedState, events, ioManager, objectFinder, undoManager);

@@ -37,7 +37,8 @@ internal sealed class TestServices
         ApplicationEvents = new ApplicationEvents();
         SelectedState     = new SelectedState(ProjectManager);
         AppState          = new AppState(ApplicationEvents, SelectedState);
-        IoManager         = new IoManager(AppState);
+        IoManager         = new IoManager(AppState, System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "AnimationEditorDocScreenshots", $"recovery_{System.Guid.NewGuid():N}.achx"));
         ObjectFinder      = new ObjectFinder(ProjectManager);
         UndoManager       = new UndoManager();
         PendingCutState   = new PendingCutState();

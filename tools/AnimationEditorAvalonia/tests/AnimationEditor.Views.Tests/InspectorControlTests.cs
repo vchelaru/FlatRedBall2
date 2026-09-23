@@ -215,7 +215,7 @@ public class InspectorControlTests
         var state = new SelectedState(pm);
         var events = new ApplicationEvents();
         var appState = new AppState(events, state);
-        var ioManager = new IoManager(appState);
+        var ioManager = new IoManager(appState, TestRecoveryPath.New());
         var objectFinder = new ObjectFinder(pm);
         var undoManager = new UndoManager();
         var appCommands = new AppCommands(pm, state, events, ioManager, objectFinder, undoManager);
@@ -254,7 +254,7 @@ public class InspectorControlTests
         var state = new SelectedState(pm);
         var events = new ApplicationEvents();
         var appState = new AppState(events, state);
-        var ioManager = new IoManager(appState);
+        var ioManager = new IoManager(appState, TestRecoveryPath.New());
         var objectFinder = new ObjectFinder(pm);
         var undoManager = new UndoManager();
         var appCommands = new AppCommands(pm, state, events, ioManager, objectFinder, undoManager);
@@ -467,7 +467,7 @@ public class InspectorControlTests
         var state = new SelectedState(pm);
         var events = new ApplicationEvents();
         var appState = new AppState(events, state);
-        var ioManager = new IoManager(appState);
+        var ioManager = new IoManager(appState, TestRecoveryPath.New());
         var objectFinder = new ObjectFinder(pm);
         var undoManager = new UndoManager();
         var appCommands = new AppCommands(pm, state, events, ioManager, objectFinder, undoManager);
