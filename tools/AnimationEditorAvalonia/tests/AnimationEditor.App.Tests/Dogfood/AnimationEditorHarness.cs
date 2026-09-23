@@ -381,12 +381,14 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// Clicks a main-menu item by its x:Name ("MenuSave"): opens the menus above it and clicks
     /// the item where the popup laid it out, so toggling and enabling behave as for a user.
     /// </summary>
-    public void ClickMenu(string name)
+    public void ClickMenu(string name) => ClickMenu(Control<MenuItem>(name));
+
+    /// <summary>Clicks <paramref name="item"/> the same way, for menu items built in code (recent files).</summary>
+    public void ClickMenu(MenuItem item)
     {
-        MenuItem item = Control<MenuItem>(name);
         if (!item.IsEnabled)
         {
-            throw new InvalidOperationException($"{name} is disabled.");
+            throw new InvalidOperationException($"{item.Header} is disabled.");
         }
         List<MenuItem> ancestors = new List<MenuItem>();
         for (MenuItem? parent = item.Parent as MenuItem; parent != null; parent = parent.Parent as MenuItem)

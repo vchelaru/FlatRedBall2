@@ -809,9 +809,27 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
             if (IsFrameLocked(animationFrame)) return;
-            _undoManager.Execute(new MoveShapeCommand(
-                animationFrame, rectangle, rectangle.X, rectangle.Y,
-                animationFrame.RelativeX, animationFrame.RelativeY, this, _events));
+            _undoManager.Execute(MatchRectangleToFrameCommand(rectangle, animationFrame));
+        }
+
+        /// <summary>
+        /// Centres <paramref name="rectangle"/> on <paramref name="animationFrame"/>'s offset and
+        /// sizes it to the frame (scale is the half-size in pixels). The size is left alone when
+        /// the frame's texture cannot be read, since the pixel size is unknown then.
+        /// </summary>
+        private IUndoableCommand MatchRectangleToFrameCommand(AARectSave rectangle, AnimationFrameSave animationFrame)
+        {
+            var size = _pm.GetTextureSizeInPixels(animationFrame.TextureName);
+            float scaleX = size is { } sizeX
+                ? Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate) * sizeX.Width / 2f
+                : rectangle.ScaleX;
+            float scaleY = size is { } sizeY
+                ? Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate) * sizeY.Height / 2f
+                : rectangle.ScaleY;
+            return SetShapePropsCommand.ForRect(
+                animationFrame, rectangle, rectangle.Name ?? "",
+                animationFrame.RelativeX, animationFrame.RelativeY, scaleX, scaleY,
+                this, _events, $"Match {ShapeUndoLabel.Format(rectangle)} to Frame");
         }
 
         /// <summary>
@@ -839,9 +857,7 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
                 if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
-                commands.Add(new MoveShapeCommand(
-                    ownerFrame, rect, rect.X, rect.Y,
-                    ownerFrame.RelativeX, ownerFrame.RelativeY, this, _events));
+                commands.Add(MatchRectangleToFrameCommand(rect, ownerFrame));
             }
             if (commands.Count == 0) return;
 

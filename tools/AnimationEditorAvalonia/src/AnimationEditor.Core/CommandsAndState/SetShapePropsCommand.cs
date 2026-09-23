@@ -26,11 +26,11 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
     public static SetShapePropsCommand ForRect(
         AnimationFrameSave? frame, AARectSave rect,
         string newName, float newX, float newY, float newScaleX, float newScaleY,
-        IAppCommands commands, IApplicationEvents events) =>
+        IAppCommands commands, IApplicationEvents events, string? description = null) =>
         new(frame, rect, rect.Name ?? "", newName,
             rect.X, rect.Y, rect.ScaleX, rect.ScaleY,
             newX, newY, newScaleX, newScaleY,
-            commands, events, ShapeLabel("Rect", rect.Name ?? ""));
+            commands, events, description ?? ShapeLabel("Rect", rect.Name ?? ""));
 
     public static SetShapePropsCommand ForCircle(
         AnimationFrameSave? frame, CircleSave circ,

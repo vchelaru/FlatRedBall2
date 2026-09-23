@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 65 scenarios, roughly 25 seconds.
+About 85 scenarios, roughly 30 seconds.
 
 ## The pieces
 
@@ -25,7 +25,7 @@ About 65 scenarios, roughly 25 seconds.
 |---|---|
 | `AnimationEditorHarness.cs` | Hosts a real `MainWindow` on a fresh `TestServices` graph over a temp project folder. Fixtures, gestures, lookups (tree rows, tabs, wireframe geometry, inspector fields), undo labels, notifications. |
 | `ScriptedDialogs.cs` | Answers the dialogs the editor opens through its seams (confirm, string prompt, Save / Don't Save / Cancel, open and save file pickers). An unanswered dialog fails the scenario at the next `Layout()`. |
-| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents. |
+| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases. |
 
 ## Write a scenario
 
@@ -105,6 +105,28 @@ so the next pass knows which "failures" to expect from the editor's real behavio
 | Search box filter | Expectation: filtered rows are hidden (`PinnedVisible`), not removed | `VisibleChainHeaders` added |
 | History rows after inspector edits | Author error: the History tab hides the inspector | Reordered; `TypeFlanker` now fails loudly on a hidden field |
 | Double-click a chain label to rename | Harness limit: text is not hit-testable headlessly | Replaced by the row double-click (fit to view) scenario |
+
+## Third-pass findings (bug hunt, September 2026)
+
+Twenty scenarios written to ask "what should it do" and "what should it not do" rather than to
+cover code. Three failed; one was fixed, two are recorded here as open questions because the
+editor is consistent about them and changing them is a design call.
+
+| Finding | Kind | Outcome |
+|---|---|---|
+| "Match Frame Size" on a rectangle moved it to the frame's offset but never sized it | **Should, but didn't** | Fixed: it now also sets the scale to half the frame's pixel size (Core tests in `AppCommandsShapeTests`); the size is left alone when the texture cannot be read |
+| Typing a pixel X of 500 on a 64 px texture puts the frame entirely off the texture (UV 8.06); the inspector allows up to 16384 and the handle drag does not clamp either | Does, arguably shouldn't | Open: both paths agree, so clamping is a design decision, not a one-line fix. Scenario removed |
+| Renaming a chain to another chain's name in a different case ("run" beside "Run") is accepted | Does, arguably shouldn't | Open: the runtime lookup is ordinal, so the names are distinct today; a case-insensitive file or lookup would collide. Scenario removed |
+
+Behaviours the same pass confirmed as correct: negative frame lengths are refused, a zero
+frame length neither hangs playback nor errors, a zero pixel width keeps one pixel, a
+whitespace-only name is refused with a banner, a name with spaces and non-ASCII characters
+round-trips through save, deleting the open file on disk shows a toast and the next edit
+recreates it, cut/paste moves a frame between chains, copy/paste moves a chain between tabs,
+Ctrl+Y and Ctrl+Shift+Z both redo, Delete Frame acts on the right-clicked row, Ctrl+D on a
+rectangle duplicates it with its own name, Flip Vertically and Invert Frame Order undo one at a
+time, the preview toggles follow the toolbar, and the recent-files menu focuses an open tab
+instead of opening it twice.
 
 ## Gotchas
 
