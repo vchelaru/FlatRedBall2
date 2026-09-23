@@ -10,7 +10,6 @@ using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
-using Avalonia.Interactivity;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
 using Xunit;
@@ -20,7 +19,7 @@ namespace AnimationEditor.App.Tests;
 /// <summary>
 /// Covers the crash-recovery restore-on-launch path wired through <c>MainWindow.OnOpened</c>.
 /// A recovery file written by <see cref="IIoManager.WriteRecoveryFile"/> after an unclean
-/// shutdown is restored into a tab automatically and announced with a dismissable banner
+/// shutdown is restored into a tab automatically and announced with a banner
 /// (issue #1020) — it used to be a blocking Restore/Delete modal that forced the user to
 /// decide from memory, with no way to see the content first.
 /// </summary>
@@ -51,29 +50,6 @@ public class StartupRecoveryTests
             Assert.False(window.FindControl<Border>("RecoveredDocumentBanner")!.IsVisible);
             Assert.NotNull(ctx.ProjectManager.AnimationChainListSave);
             Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void RecoveryFilePresent_BannerDismissed_HidesBanner()
-    {
-        var ctx = TestHelpers.BuildServices();
-        SeedRecoveryFile(ctx, "Recovered");
-
-        var window = ctx.CreateMainWindow();
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
-        try
-        {
-            var banner = window.FindControl<Border>("RecoveredDocumentBanner")!;
-            Assert.True(banner.IsVisible);
-
-            window.FindControl<Button>("DismissRecoveredDocumentBtn")!
-                  .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.False(banner.IsVisible);
         }
         finally { window.Close(); }
     }

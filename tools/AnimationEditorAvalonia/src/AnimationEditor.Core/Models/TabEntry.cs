@@ -38,6 +38,13 @@ namespace AnimationEditor.Core.Models
         public TabKind Kind { get; }
 
         /// <summary>
+        /// True for the untitled tab restored from a crash-recovery file at startup; the
+        /// recovered-document banner shows while this tab is active. Not carried over by
+        /// <see cref="TabManager.Rename"/>, so saving the document to a path ends it.
+        /// </summary>
+        public bool IsRecoveredDocument { get; set; }
+
+        /// <summary>
         /// Determines the <see cref="TabKind"/> for <paramref name="path"/> by extension.
         /// A <c>.png</c> (any case) is <see cref="TabKind.Png"/>; everything else — including
         /// untitled sentinels and empty paths — is <see cref="TabKind.Achx"/>.

@@ -861,6 +861,20 @@ public class TabManagerTests
     // ── Rename ────────────────────────────────────────────────────────────────
 
     [Fact]
+    public void Rename_RecoveredDocument_ClearsIsRecoveredDocument()
+    {
+        // Saving a recovered document to a path renames its tab; from then on it is an ordinary
+        // file, so the recovered-document banner must not follow it.
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+        tm.ActiveTab!.IsRecoveredDocument = true;
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\projects\hero.achx"));
+
+        Assert.False(tm.ActiveTab!.IsRecoveredDocument);
+    }
+
+    [Fact]
     public void Rename_UpdatesTabPath()
     {
         var tm = new TabManager();

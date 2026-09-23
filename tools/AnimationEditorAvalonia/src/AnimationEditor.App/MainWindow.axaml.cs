@@ -1054,7 +1054,8 @@ public partial class MainWindow : Window
         {
             // Awaited above, so nothing is still in flight to clobber the restored document.
             OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-            RecoveredDocumentBanner.IsVisible = true;
+            _tabManager.ActiveTab!.IsRecoveredDocument = true;
+            UpdateRecoveredDocumentBanner();
         }
 
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
@@ -1104,12 +1105,16 @@ public partial class MainWindow : Window
     // ── Recovered-document banner ─────────────────────────────────────────────
 
     /// <summary>
-    /// The banner is informational only, so dismissing it just hides it (#1020). It carries no
-    /// "don't show again" setting: it appears exactly when a document was recovered, which is
-    /// never routine noise the user would want suppressed permanently.
+    /// The banner describes the recovered tab, so it follows that tab instead of having its own
+    /// dismiss button: shown while it is active, gone once it is closed or saved to a path
+    /// (<see cref="TabEntry.IsRecoveredDocument"/>). <see cref="TabManager.TabsChanged"/> covers
+    /// every one of those, including the Save As rename, which raises no ActiveChanged.
     /// </summary>
     private void WireRecoveredDocumentBanner() =>
-        DismissRecoveredDocumentBtn.Click += (_, _) => RecoveredDocumentBanner.IsVisible = false;
+        _tabManager.TabsChanged += UpdateRecoveredDocumentBanner;
+
+    private void UpdateRecoveredDocumentBanner() =>
+        RecoveredDocumentBanner.IsVisible = _tabManager.ActiveTab?.IsRecoveredDocument == true;
 
     // ── Default-handler prompt banner ─────────────────────────────────────────
 

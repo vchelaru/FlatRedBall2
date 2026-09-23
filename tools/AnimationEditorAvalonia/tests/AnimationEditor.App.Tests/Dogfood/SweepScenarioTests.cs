@@ -49,7 +49,7 @@ public class SweepScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CrashRecovery_UnsavedUntitledEdits_ComeBackOnTheNextStart_AndDismissHidesTheBanner()
+    public async Task CrashRecovery_UnsavedUntitledEdits_ComeBackOnTheNextStart_WithTheBanner()
     {
         string settingsRoot = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
         string recoveryCopy = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N") + ".achx");
@@ -74,8 +74,6 @@ public class SweepScenarioTests
         restarted.Control<Control>("RecoveredDocumentBanner").IsVisible.ShouldBeTrue("the user is told a document was recovered");
         restarted.Project.AnimationChains.Select(chain => chain.Name).ShouldContain("Recovered");
         restarted.TabLabels.ShouldContain(label => label.StartsWith("Untitled"), "the recovered document is an untitled tab");
-        restarted.Click(restarted.Control<Button>("DismissRecoveredDocumentBtn"));
-        restarted.Control<Control>("RecoveredDocumentBanner").IsVisible.ShouldBeFalse();
         File.Exists(recoveryCopy).ShouldBeFalse("the recovery file is consumed once restored");
     }
 
