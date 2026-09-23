@@ -214,6 +214,34 @@ JSON and later edits go there. The timeline strip's playhead follows a scrub at 
 With this pass every headless-reachable surface of the editor has at least one scenario. What
 remains is on the real-window list below.
 
+## Running the next pass (start here in a fresh session)
+
+This is the whole method; nothing else is needed to pick the work up.
+
+1. Read this file top to bottom, then skim `AnimationEditorHarness.cs` for the gesture and
+   lookup names. Build once: `dotnet build tools/AnimationEditorAvalonia/AnimationEditorAvalonia.slnx`.
+2. Pick a lens, not a feature list. The passes so far used: tutorial workflows, a menu-by-menu
+   sweep, "what should it do / what should it not do", tester-style abuse (odd orders, focus in
+   the wrong place, junk input, hammered keys, edits during playback or a hot reload), panels and
+   document kinds. Good next lenses: two things at once (playback plus hot reload plus a rename),
+   long sessions (hundreds of edits then undo all the way back), unusual projects (many chains,
+   huge textures, deep folders, non-ASCII paths), and every open note in the tables above.
+3. Write each scenario with the user's expectation stated up front, in the test name and the
+   assertion messages. Let the editor disagree. Ten to twenty scenarios per pass is the right size.
+4. Run them: `dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~<ClassName>"`.
+5. Triage every failure before touching anything, by reading the handler behind it: harness gap,
+   your expectation, or the editor. Expect most failures to be the first two; five editor bugs
+   came out of about 150 scenarios. Fix a harness gap in the harness, fix an expectation in the
+   scenario (keeping it, so the real behaviour stays pinned), and for an editor bug write the red
+   test at the layer that owns the logic before fixing.
+6. Never add a `*ForTest` method or a `Simulate*` hook to production for this; drive real input,
+   the existing seams, or add an injectable seam that production fills in by default (the
+   `IEditorDialogHost` parameter is the precedent).
+7. Record the pass as a table in this file (finding, kind, outcome), add anything the harness had
+   to route around to the real-window list below, update the scenario count under "Run it", and
+   commit the scenarios, any fix and this file together. Run the whole App assembly before
+   committing; the Core and Views assemblies too when `src/AnimationEditor.Core` changed.
+
 ## Needs real input: the non-headless list
 
 Things this harness cannot exercise, or can only approximate, kept here so a real-window pass
