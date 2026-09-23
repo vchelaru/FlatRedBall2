@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -199,5 +200,46 @@ public class OpenAchxWorkflowTests : IDisposable
 
         Assert.False(currentFileFired);
         Assert.False(texturesFired);
+    }
+
+    // ── Return value: did a document end up loaded? ──────────────────────────
+    // The window registers a tab before it runs the workflow, so it needs to know when the
+    // workflow refused (declined conversion, missing textures, unreadable file) to take that
+    // tab back; a tab labelled with a file that was never loaded otherwise stays behind.
+
+    [Fact]
+    public async Task OpenAchxWorkflow_WithValidFile_ReturnsTrue()
+    {
+        var path = WriteMinimalAchx();
+
+        bool opened = await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+
+        opened.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task OpenAchxWorkflow_UvFileAndUserDeclinesConversion_ReturnsFalse()
+    {
+        var path = Path.Combine(_dir.Path, "legacy.achx");
+        var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Idle" });
+        acls.Save(path);
+        _ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(false);
+
+        bool opened = await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+
+        opened.ShouldBeFalse();
+        _ctx.ProjectManager.FileName.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task OpenAchxWorkflow_UnreadableFile_ReturnsFalse()
+    {
+        var path = Path.Combine(_dir.Path, "broken.achx");
+        File.WriteAllText(path, "<AnimationChainArrayS");
+
+        bool opened = await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+
+        opened.ShouldBeFalse();
     }
 }

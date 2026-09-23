@@ -213,15 +213,15 @@ internal sealed class AnimationEditorHarness : IDisposable
     public TreeViewItem RowFor(object data)
     {
         Layout();
-        TreeNodeVm? node = Nodes.FirstOrDefault(candidate => ReferenceEquals(candidate.Data, data));
-        if (node != null)
-        {
-            AnimTree.ScrollIntoView(node);
-            Layout();
-        }
-        return AnimTree.GetVisualDescendants().OfType<TreeViewItem>()
-            .FirstOrDefault(row => row.DataContext is TreeNodeVm node && ReferenceEquals(node.Data, data))
+        TreeViewItem row = AnimTree.GetVisualDescendants().OfType<TreeViewItem>()
+            .FirstOrDefault(candidate => candidate.DataContext is TreeNodeVm node && ReferenceEquals(node.Data, data))
             ?? throw new InvalidOperationException($"No tree row is realized for {Describe(data)}; expand its parent first. The tree shows [{string.Join(", ", Nodes.Select(node => node.Header))}] and {(Nodes.Any(node => ReferenceEquals(node.Data, data)) ? "has" : "has no")} node for it.");
+        // TreeView.ScrollIntoView only knows its top-level items: a frame row a hundred rows down
+        // a long chain stayed off screen and the click landed on nothing (the chain kept the
+        // selection, so Delete removed the chain). Ask the row itself to scroll into the viewport.
+        row.BringIntoView();
+        Layout();
+        return row;
     }
 
     /// <summary>
@@ -234,7 +234,13 @@ internal sealed class AnimationEditorHarness : IDisposable
         TextBlock label = row.GetVisualDescendants().OfType<TextBlock>()
             .FirstOrDefault(block => block.Name == "RowHeaderLabel" && ReferenceEquals(block.DataContext, row.DataContext))
             ?? throw new InvalidOperationException($"The row for {Describe(data)} has no header label.");
-        return CenterOf(label);
+        Point point = CenterOf(label);
+        Rect viewport = new Rect(PointIn(AnimTree, 0, 0), AnimTree.Bounds.Size);
+        if (!viewport.Contains(point))
+        {
+            throw new InvalidOperationException($"The row for {Describe(data)} is at {point}, outside the tree's viewport {viewport}; a click there would land on nothing.");
+        }
+        return point;
     }
 
     public void ClickRow(object data, RawInputModifiers modifiers = RawInputModifiers.None) => ClickAt(RowHeaderPoint(data), modifiers);
@@ -628,7 +634,8 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     /// <summary>
     /// Types a value into the inspector's <see cref="NumericUpDown"/> named <paramref name="name"/>
-    /// ("PropPixelX"), commits with Enter, and moves focus back to the tree so the edit seals.
+    /// ("PropPixelX") and commits with Enter, which also seals the coalesced undo entry so the next
+    /// value typed is its own step. Focus stays in the box, as it does for a user.
     /// </summary>
     public void TypeNumber(string name, string text)
     {
@@ -639,16 +646,12 @@ internal sealed class AnimationEditorHarness : IDisposable
         }
         TextBox box = input.GetVisualDescendants().OfType<TextBox>().First();
         TypeAndEnter(box, text);
-        AnimTree.Focus();
-        Layout();
     }
 
     /// <summary>Types into the text box named <paramref name="name"/> ("PropTextureName") and presses Enter.</summary>
     public void TypeText(string name, string text)
     {
         TypeAndEnter(Control<TextBox>(name), text);
-        AnimTree.Focus();
-        Layout();
     }
 
     /// <summary>Types into the flanker numeric field named <paramref name="name"/> ("PropFrameLen", "SpeedInput") and presses Enter.</summary>
@@ -661,8 +664,6 @@ internal sealed class AnimationEditorHarness : IDisposable
         }
         TextBox box = field.GetVisualDescendants().OfType<TextBox>().First();
         TypeAndEnter(box, text);
-        AnimTree.Focus();
-        Layout();
     }
 
     #endregion

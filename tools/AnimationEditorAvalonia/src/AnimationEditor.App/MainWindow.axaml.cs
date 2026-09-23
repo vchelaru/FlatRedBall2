@@ -5130,16 +5130,25 @@ public partial class MainWindow : Window
         // #897: every field above commits on ValueChanged so the wireframe/preview updates live as
         // the user types or scrolls the wheel; each commit coalesces with the previous one for the
         // same field group into a single undo entry (see IUndoableCommand.CoalesceGroup). LostFocus
-        // seals that entry so the next edit — even to the same field — starts a fresh one.
-        SealOnLostFocus(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
+        // and Enter seal that entry so the next edit — even to the same field — starts a fresh one.
+        SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
             PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
             PropCircleX, PropCircleY, PropCircleRadius);
     }
 
-    private void SealOnLostFocus(params InputElement[] inputs)
+    private void SealOnCommit(params InputElement[] inputs)
     {
         foreach (var input in inputs)
+        {
             input.LostFocus += (_, _) => _appCommands.SealPendingEdits();
+            // Enter commits a NumericUpDown's text and the control marks the key handled, so listen
+            // after it: without this, "10 Enter, 20 Enter, Ctrl+Z" jumps back past both values
+            // because focus never left the box and nothing sealed the entry in between.
+            input.AddHandler(KeyDownEvent, (_, e) =>
+            {
+                if (e.Key == Key.Enter) _appCommands.SealPendingEdits();
+            }, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
     }
 
     private void ApplyTextureName()
@@ -5919,7 +5928,16 @@ public partial class MainWindow : Window
                 return;
             }
 
-            await _appCommands.OpenProjectWorkflowAsync(fileName);
+            bool opened = await _appCommands.OpenProjectWorkflowAsync(fileName);
+            if (!opened)
+            {
+                // The workflow refused (conversion declined, texture missing, unreadable file) and
+                // left the editor's document as it was, so the tab registered above would sit in
+                // the strip labelled with a file that never opened; closing it silently would then
+                // drop whatever the user typed under that label.
+                DropUnloadedTab(filePath);
+                return;
+            }
             // Restore this tab's prior history if it was previously open (snapshot normally
             // null on first open; non-null if the tab was closed and re-opened mid-session).
             if (arrivedTab?.UndoSnapshot != null)
@@ -5929,6 +5947,24 @@ public partial class MainWindow : Window
         {
             _suppressPreviewPromotion = false;
         }
+    }
+
+    /// <summary>
+    /// Takes back a tab that <see cref="LoadAnimationFileAsync"/> registered for a file the open
+    /// workflow then refused. Nothing was loaded, so the previous tab's content is still what the
+    /// editor shows; only the strip and the Project panel selection need to follow.
+    /// </summary>
+    private void DropUnloadedTab(FilePath path)
+    {
+        _tabManager.Close(path);
+        var next = _tabManager.ActiveTab;
+        if (next != null)
+        {
+            if (next.Kind == TabKind.Png)
+                ShowPngPane(next);
+            SyncProjectPanelSelectionTo(next);
+        }
+        RebuildTabStrip();
     }
 
     /// <summary>
@@ -7069,7 +7105,7 @@ public partial class MainWindow : Window
 
         // Read current dimensions
         int oldW, oldH;
-        using (var bmp = SKBitmap.Decode(absTexPath))
+        using (var bmp = AnimationEditor.Views.Services.SkiaFileDecoder.DecodeFile(absTexPath))
         {
             if (bmp is null)
             {
@@ -7143,11 +7179,11 @@ public partial class MainWindow : Window
         string baseName   = Path.GetFileNameWithoutExtension(absTexPath);
         string newAbsPath = Path.Combine(dir, baseName + "Resize.png");
 
-        using (var src = SKBitmap.Decode(absTexPath))
+        using (var src = AnimationEditor.Views.Services.SkiaFileDecoder.DecodeFile(absTexPath))
         {
             // The file decoded fine at the top of this method, but the user has since been in a
             // modal dialog — it could have been deleted, truncated, or locked in the meantime.
-            // SKBitmap.Decode returns null (it does not throw); guard before DrawBitmap so a
+            // The decode returns null (it does not throw); guard before DrawBitmap so a
             // race doesn't crash the app on the dispatcher (issue #479).
             if (src is null)
             {

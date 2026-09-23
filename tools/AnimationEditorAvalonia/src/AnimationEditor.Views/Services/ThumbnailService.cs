@@ -144,7 +144,7 @@ public sealed class ThumbnailService : IDisposable
         if (BitmapCache.TryGetValue(key, out var cached)) return cached;
         try
         {
-            var bm = SKBitmap.Decode(path);
+            var bm = AnimationEditor.Views.Services.SkiaFileDecoder.DecodeFile(path);
             BitmapCache[key] = bm;
             return bm;
         }

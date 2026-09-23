@@ -89,4 +89,26 @@ public class AppCommandsOpenTsxWorkflowTests : IDisposable
         var tile = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], tile.Animation.Select(f => (f.TileID, f.Duration)));
     }
+
+    [Fact]
+    public async Task OpenTsxWorkflowAsync_UnsupportedConstruct_ReturnsFalse()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var path = WriteFixture(WangsetFixtureXml, "Terrain.tsx");
+
+        bool opened = await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+
+        Assert.False(opened);
+    }
+
+    [Fact]
+    public async Task OpenTsxWorkflowAsync_ValidTsx_ReturnsTrue()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+
+        bool opened = await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+
+        Assert.True(opened);
+    }
 }

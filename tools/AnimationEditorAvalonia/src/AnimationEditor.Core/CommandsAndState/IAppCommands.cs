@@ -103,8 +103,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// UV-format files require all referenced textures to be resolvable; missing
         /// textures fire <see cref="LoadFailed"/> and abort the load. UV files with all
         /// textures present prompt via <see cref="AppCommands.ConfirmAsync"/> before converting.
+        /// Returns true when the file ended up loaded; false when it was refused (missing
+        /// textures, conversion declined, unreadable file) and the editor's document is unchanged,
+        /// so a caller that registered a tab for the path first can take it back.
         /// </summary>
-        Task OpenAchxWorkflowAsync(string path);
+        Task<bool> OpenAchxWorkflowAsync(string path);
         void LoadAnimationChain(string fileName);
 
         /// <summary>
@@ -112,16 +115,18 @@ namespace AnimationEditor.Core.CommandsAndState
         /// #1140) -- see <see cref="ProjectManager.LoadTsxProject"/>. Unlike <see
         /// cref="OpenAchxWorkflowAsync"/>, there is no conversion prompt: an incompatible tsx
         /// (wangsets/transformations/etc.) fires <see cref="LoadFailed"/> and aborts immediately.
+        /// Returns true when the tileset ended up loaded, false when it was refused.
         /// </summary>
-        Task OpenTsxWorkflowAsync(string path);
+        Task<bool> OpenTsxWorkflowAsync(string path);
 
         /// <summary>
         /// Dispatches to <see cref="OpenTsxWorkflowAsync"/> for a <c>.tsx</c> path, otherwise <see
         /// cref="OpenAchxWorkflowAsync"/> -- the single entry point every tab-open call site should
         /// use, so a native tsx project needs no changes to <c>TabKind</c>/<c>TabManager</c>
         /// (<c>TabEntry.InferKind</c> already treats a non-png extension as a full-editor tab).
+        /// Returns whichever result the workflow it dispatched to returned.
         /// </summary>
-        Task OpenProjectWorkflowAsync(string path);
+        Task<bool> OpenProjectWorkflowAsync(string path);
 
         /// <summary>
         /// Stores the current project model and chain/frame selection on <paramref name="tab"/>

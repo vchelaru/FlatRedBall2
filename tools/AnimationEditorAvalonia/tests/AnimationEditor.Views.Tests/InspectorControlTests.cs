@@ -498,6 +498,18 @@ public class InspectorControlTests
     }
 
     [AvaloniaFact]
+    public void RectXInput_EnterBetweenEdits_SealsPendingEditIntoSeparateUndoEntries()
+    {
+        var (control, _, undo) = BuildWithEditableRectAndUndoManager();
+
+        control.RectXInput.Value = 3m;
+        control.RectXInput.RaiseEvent(new KeyEventArgs { Key = Key.Return, RoutedEvent = InputElement.KeyDownEvent });
+        control.RectXInput.Value = 32m;
+
+        Assert.Equal(2, undo.UndoHistory.Count);
+    }
+
+    [AvaloniaFact]
     public void RectXInput_LostFocusBetweenEdits_SealsPendingEditIntoSeparateUndoEntries()
     {
         var (control, _, undo) = BuildWithEditableRectAndUndoManager();

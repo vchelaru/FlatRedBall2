@@ -224,7 +224,7 @@ namespace AnimationEditor.Core.CommandsAndState
         // ── Open workflow ─────────────────────────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.OpenAchxWorkflowAsync"/>
-        public async Task OpenAchxWorkflowAsync(string path)
+        public async Task<bool> OpenAchxWorkflowAsync(string path)
         {
             // Quick-parse to read CoordinateType without committing to a full load. Must dispatch
             // on extension the same way ProjectManager.LoadAnimationChain does (#878) -- a .achj
@@ -236,7 +236,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     ? AnimationChainListSave.FromJsonFile(path)
                     : AnimationChainListSave.FromFile(path);
             }
-            catch (Exception ex) { LoadFailed?.Invoke(path, ex); return; }
+            catch (Exception ex) { LoadFailed?.Invoke(path, ex); return false; }
 
             string achxDir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
             var missing = _pm.FindMissingTextures(preview, achxDir);
@@ -253,7 +253,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     new InvalidOperationException(
                         $"Cannot open '{System.IO.Path.GetFileName(path)}' — the following texture(s) could not be found or decoded: {names}. " +
                         "All textures must be present to convert UV coordinates to pixel coordinates."));
-                return;
+                return false;
             }
 
             if (outcome == IO.UvLoadOutcome.ConvertAndLoad || outcome == IO.UvLoadOutcome.RefuseUserDeclined)
@@ -268,7 +268,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 outcome = IO.UvLoadGate.DecideOutcome(preview.CoordinateType, allTexturesResolvable: true, userConfirmed: confirmed);
             }
 
-            if (outcome == IO.UvLoadOutcome.RefuseUserDeclined) return;
+            if (outcome == IO.UvLoadOutcome.RefuseUserDeclined) return false;
 
             bool failed = false;
             void OnFail(string _, Exception __) => failed = true;
@@ -276,7 +276,7 @@ namespace AnimationEditor.Core.CommandsAndState
             try { LoadAnimationChainFromParsed(path, preview); }
             finally { LoadFailed -= OnFail; }
 
-            if (failed) return;
+            if (failed) return false;
 
             if (outcome == IO.UvLoadOutcome.ConvertAndLoad)
                 _pm.OnDiskCoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel;
@@ -284,10 +284,11 @@ namespace AnimationEditor.Core.CommandsAndState
             _events.CallAchxLoaded(path);
             _events.RaiseCurrentFileChanged(path);
             _events.RaiseAvailableTexturesChanged();
+            return true;
         }
 
         /// <inheritdoc cref="IAppCommands.OpenTsxWorkflowAsync"/>
-        public Task OpenTsxWorkflowAsync(string path)
+        public Task<bool> OpenTsxWorkflowAsync(string path)
         {
             try
             {
@@ -296,7 +297,7 @@ namespace AnimationEditor.Core.CommandsAndState
             catch (Exception ex)
             {
                 LoadFailed?.Invoke(path, ex);
-                return Task.CompletedTask;
+                return Task.FromResult(false);
             }
 
             // Was hand-duplicating FinishLoadIntoEditor's steps here instead of calling it, and
@@ -314,11 +315,11 @@ namespace AnimationEditor.Core.CommandsAndState
             _events.CallAchxLoaded(path);
             _events.RaiseCurrentFileChanged(path);
             _events.RaiseAvailableTexturesChanged();
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         /// <inheritdoc cref="IAppCommands.OpenProjectWorkflowAsync"/>
-        public Task OpenProjectWorkflowAsync(string path) =>
+        public Task<bool> OpenProjectWorkflowAsync(string path) =>
             new FilePath(path).Extension == "tsx" ? OpenTsxWorkflowAsync(path) : OpenAchxWorkflowAsync(path);
 
         // -------------------------------------------------------------------------

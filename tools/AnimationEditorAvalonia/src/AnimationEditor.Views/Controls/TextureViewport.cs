@@ -9,6 +9,7 @@ using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using AnimationEditor.Views.Services;
 using SkiaSharp;
 using System;
 using System.Globalization;
@@ -593,7 +594,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
         }
 
         if (casePreserved != null && File.Exists(casePreserved))
-            return InstallDecodedTexture(SKBitmap.Decode(casePreserved), norm!);
+            return InstallDecodedTexture(SkiaFileDecoder.DecodeFile(casePreserved), norm!);
 
         // casePreserved == null means filePath was empty: an intentional clear (success).
         // A non-empty path that isn't on disk is a load failure.
@@ -629,10 +630,9 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
         if (casePreserved == null || !File.Exists(casePreserved))
             return casePreserved == null;   // empty path = intentional clear (success); missing = failure
 
-        // Read + decode off the UI thread. Byte-based decode (vs SKBitmap.Decode(path)) is what the
-        // rest of the app decodes with, and the file read for a large sheet is itself worth moving off
-        // the UI thread.
-        var decoded = await Task.Run(() => DecodeFileBytes(casePreserved));
+        // Read + decode off the UI thread: the file read for a large sheet is itself worth moving
+        // off the UI thread.
+        var decoded = await Task.Run(() => SkiaFileDecoder.DecodeFile(casePreserved));
 
         if (loadId != _textureLoadId)
         {
@@ -642,13 +642,6 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
         }
 
         return InstallDecodedTexture(decoded, norm!);
-    }
-
-    private static SKBitmap? DecodeFileBytes(string path)
-    {
-        try { return SKBitmap.Decode(File.ReadAllBytes(path)); }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
     }
 
     // Saves the leaving texture's camera, sets the new identity, and blanks the current image so the

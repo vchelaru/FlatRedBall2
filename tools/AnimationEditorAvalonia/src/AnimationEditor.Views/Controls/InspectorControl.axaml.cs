@@ -53,8 +53,8 @@ public partial class InspectorControl : UserControl
     /// lose focus), so the visual updates live as the user types or scrolls the wheel. Each
     /// underlying <c>IAppCommands.Set*</c> call coalesces with the previous one for the same field
     /// group (see <see cref="IUndoableCommand.CoalesceGroup"/>), so a whole typed value collapses
-    /// into a single undo entry; <c>LostFocus</c> calls <see cref="IAppCommands.SealPendingEdits"/>
-    /// to close that entry once editing moves elsewhere (#897).
+    /// into a single undo entry; <c>LostFocus</c> and Enter call <see cref="IAppCommands.SealPendingEdits"/>
+    /// to close that entry once editing moves elsewhere or a value is committed (#897).
     /// </summary>
     public void EnableEditing(
         IAppCommands appCommands,
@@ -69,14 +69,14 @@ public partial class InspectorControl : UserControl
         RectScaleXInput.ValueChanged += (_, _) => CommitRectProps();
         RectScaleYInput.ValueChanged += (_, _) => CommitRectProps();
         RectNameBox.KeyDown += CommitOnEnter(CommitRectProps);
-        SealOnLostFocus(RectXInput, RectYInput, RectScaleXInput, RectScaleYInput);
+        SealOnCommit(RectXInput, RectYInput, RectScaleXInput, RectScaleYInput);
 
         CircleNameBox.LostFocus += (_, _) => CommitCircleProps();
         CircleXInput.ValueChanged += (_, _) => CommitCircleProps();
         CircleYInput.ValueChanged += (_, _) => CommitCircleProps();
         CircleRadiusInput.ValueChanged += (_, _) => CommitCircleProps();
         CircleNameBox.KeyDown += CommitOnEnter(CommitCircleProps);
-        SealOnLostFocus(CircleXInput, CircleYInput, CircleRadiusInput);
+        SealOnCommit(CircleXInput, CircleYInput, CircleRadiusInput);
 
         FramePixelXInput.ValueChanged += (_, _) => CommitFramePixelRegion();
         FramePixelYInput.ValueChanged += (_, _) => CommitFramePixelRegion();
@@ -88,7 +88,7 @@ public partial class InspectorControl : UserControl
         FrameFlipHToggle.IsCheckedChanged += (_, _) => CommitFrameFlip();
         FrameFlipVToggle.IsCheckedChanged += (_, _) => CommitFrameFlip();
         FrameFlipDToggle.IsCheckedChanged += (_, _) => CommitFrameFlip();
-        SealOnLostFocus(FramePixelXInput, FramePixelYInput, FramePixelWInput, FramePixelHInput,
+        SealOnCommit(FramePixelXInput, FramePixelYInput, FramePixelWInput, FramePixelHInput,
             FrameLengthInput, FrameRelXInput, FrameRelYInput);
 
         FrameRedInput.ValueChanged += (_, _) => CommitFrameColor();
@@ -96,18 +96,26 @@ public partial class InspectorControl : UserControl
         FrameBlueInput.ValueChanged += (_, _) => CommitFrameColor();
         FrameAlphaInput.ValueChanged += (_, _) => CommitFrameAlpha();
         FrameColorModeCombo.SelectionChanged += (_, _) => CommitFrameColorOperation();
-        SealOnLostFocus(FrameRedInput, FrameGreenInput, FrameBlueInput, FrameAlphaInput);
+        SealOnCommit(FrameRedInput, FrameGreenInput, FrameBlueInput, FrameAlphaInput);
     }
 
     /// <summary>
     /// Ends the undo-coalescing window (see <see cref="IAppCommands.SealPendingEdits"/>) when any
-    /// of <paramref name="inputs"/> loses focus, so the next edit to that field starts a fresh
-    /// undo entry instead of merging into the one just closed (#897).
+    /// of <paramref name="inputs"/> loses focus or commits with Enter, so the next edit to that
+    /// field starts a fresh undo entry instead of merging into the one just closed (#897). The
+    /// Enter handler listens after the NumericUpDown's own (which commits the text and marks the
+    /// key handled), so the value that just landed is what gets sealed.
     /// </summary>
-    private void SealOnLostFocus(params InputElement[] inputs)
+    private void SealOnCommit(params InputElement[] inputs)
     {
         foreach (var input in inputs)
+        {
             input.LostFocus += (_, _) => _appCommands?.SealPendingEdits();
+            input.AddHandler(KeyDownEvent, (_, e) =>
+            {
+                if (e.Key == Key.Return) _appCommands?.SealPendingEdits();
+            }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
+        }
     }
 
     private static EventHandler<KeyEventArgs> CommitOnEnter(Action commit) => (_, e) =>

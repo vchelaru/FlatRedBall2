@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 145 scenarios, roughly 55 seconds.
+About 165 scenarios, roughly 60 seconds.
 
 ## The pieces
 
@@ -25,7 +25,7 @@ About 145 scenarios, roughly 55 seconds.
 |---|---|
 | `AnimationEditorHarness.cs` | Hosts a real `MainWindow` on a fresh `TestServices` graph over a temp project folder. Fixtures, gestures, lookups (tree rows, tabs, wireframe geometry, inspector fields), undo labels, notifications. |
 | `ScriptedDialogs.cs` | Answers the dialogs the editor opens through its seams (confirm, string prompt, Save / Don't Save / Cancel, open and save file pickers). An unanswered dialog fails the scenario at the next `Layout()`. |
-| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases, exploratory QA. |
+| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases, exploratory QA, dialogs, tsx and achj, unusual projects. |
 
 ## Write a scenario
 
@@ -214,6 +214,36 @@ JSON and later edits go there. The timeline strip's playhead follows a scrub at 
 With this pass every headless-reachable surface of the editor has at least one scenario. What
 remains is on the real-window list below.
 
+## Eighth-pass findings (unusual projects, September 2026)
+
+Eighteen scenarios on projects that do not look like the fixtures: a texture in a subfolder, two
+folders up through `../`, and written with backslashes; a folder named in Latin, Japanese and an
+emoji; a file 300 characters deep; a legacy UV file accepted, declined, and missing its texture;
+two chains with one name; an empty file; 200 chains; a 200-frame chain; a 4096 px atlas; a 1 px
+texture; a 1000×7 strip; a chain across two textures; a read-only file; and a hundred inspector
+edits undone and redone all the way. Five failed on the first run: three were the editor, one the
+harness, one a harness comment that was never true.
+
+| Finding | Kind | Outcome |
+|---|---|---|
+| Declining the UV conversion, or opening an unreadable file or a UV file whose texture is missing, left a tab labelled with the file that never opened; with nothing else open the editor sat under that label as an untitled document, and closing the tab dropped anything typed there without a prompt | **Should not, but did** | Fixed: the open workflows now say whether a document loaded (`IAppCommands.OpenAchxWorkflowAsync`, `OpenTsxWorkflowAsync` and `OpenProjectWorkflowAsync` return `Task<bool>`; red Core tests in `OpenAchxWorkflowTests` and `AppCommandsOpenTsxWorkflowTests`) and `MainWindow` takes the tab back when they did not, so the previous document stays showing |
+| A texture beside an `.achx` 300 characters deep never loaded: the wireframe stayed empty although the file's own PNG size check passed, because `SKBitmap.Decode(string)` opens the path natively and gives up past 260 characters, while the async load already decoded bytes | **Should, but didn't** | Fixed: `SkiaFileDecoder.DecodeFile` (Views; red test at a 300-character path) is now the one file decode for the wireframe, the PNG pane, thumbnails and Resize Texture. It also returns null for a zero-byte or non-image file, where the byte decode used to throw |
+| Typing 1 Enter, 2 Enter, 3 Enter into Pixel X and pressing Ctrl+Z went back to 0: Enter commits the value, but only focus loss sealed the coalesced undo entry, and focus never leaves the box | Does, arguably shouldn't | Fixed: Enter seals the entry the way focus loss does, in `MainWindow` and the Views `InspectorControl` (red Views test in `InspectorControlTests`); keystrokes within one value still collapse into one entry |
+| Delete after clicking frame 100 of a 200-frame chain removed the whole chain | Harness | `TreeView.ScrollIntoView` only knows top-level items, so the row stayed off screen and the click landed on nothing while the chain kept the selection; `RowFor` now calls `BringIntoView` on the row, and `RowHeaderPoint` refuses a point outside the tree's viewport |
+| `TypeNumber` said it moved focus back to the tree so the edit seals | Harness comment | The tree is not focusable, so focus stayed in the box; with Enter sealing, the comment now says what happens |
+
+Confirmed correct: a texture in a subfolder, two folders up, or written with backslashes loads and
+saves as a forward-slash relative path; a folder and file named in three scripts round-trip; an
+accepted UV conversion opens the same rectangles and writes pixels from then on; a UV file with a
+missing texture is refused with the texture named and no conversion question; two chains named
+"Walk" are edited and deleted individually and both survive the save; an empty file opens and
+takes a chain; 200 chains filter, sort, arrow-key and delete; a frame in the far corner of a
+4096 px atlas fits to view and saves exact pixels; a 1 px texture fits, zooms finitely and takes
+a frame; odd rectangles on a 1000×7 strip round-trip without drift; each frame of a chain on two
+textures shows its own texture and converts with its own size; a read-only file keeps the edit,
+reports the failed auto-save and saves again once writable; a hundred edits undo and redo all the
+way with the file following.
+
 ## Running the next pass (start here in a fresh session)
 
 This is the whole method; nothing else is needed to pick the work up.
@@ -223,17 +253,22 @@ This is the whole method; nothing else is needed to pick the work up.
 2. Pick a lens, not a feature list. The passes so far used: tutorial workflows, a menu-by-menu
    sweep, "what should it do / what should it not do", tester-style abuse (odd orders, focus in
    the wrong place, junk input, hammered keys, edits during playback or a hot reload), panels and
-   document kinds. Good next lenses: two things at once (playback plus hot reload plus a rename),
-   long sessions (hundreds of edits then undo all the way back), unusual projects (many chains,
-   huge textures, deep folders, non-ASCII paths), and every open note in the tables above.
+   document kinds, unusual projects (many chains, huge and tiny textures, deep folders, non-ASCII
+   paths, legacy files, duplicate names, a read-only file). Good next lenses: two things at once
+   (playback plus hot reload plus a rename), long sessions (hundreds of mixed edits across tabs,
+   then undo all the way back), the keyboard alone (arrow keys, Home/End, Tab order), and every
+   open note in the tables above.
 3. Write each scenario with the user's expectation stated up front, in the test name and the
    assertion messages. Let the editor disagree. Ten to twenty scenarios per pass is the right size.
 4. Run them: `dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~<ClassName>"`.
 5. Triage every failure before touching anything, by reading the handler behind it: harness gap,
    your expectation, or the editor. Expect most failures to be the first two; five editor bugs
-   came out of about 150 scenarios. Fix a harness gap in the harness, fix an expectation in the
-   scenario (keeping it, so the real behaviour stays pinned), and for an editor bug write the red
-   test at the layer that owns the logic before fixing.
+   came out of about 150 scenarios, then three more from the eighteen unusual-project ones. Fix a
+   harness gap in the harness, fix an expectation in the scenario (keeping it, so the real
+   behaviour stays pinned), and for an editor bug write the red test at the layer that owns the
+   logic before fixing. When a failure is not obvious from the assertion, a throwaway probe test
+   that logs focus, selection, undo labels and tab labels at each step and throws the log at the
+   end settles it in one run; delete it before committing.
 6. Never add a `*ForTest` method or a `Simulate*` hook to production for this; drive real input,
    the existing seams, or add an injectable seam that production fills in by default (the
    `IEditorDialogHost` parameter is the precedent).
@@ -294,9 +329,18 @@ knows where to look. Add to it whenever a scenario has to route around something
 - **The window's constructor wires the production dialogs**, replacing anything assigned to
   `AppCommands.ConfirmAsync` / `PromptStringAsync` / `FileDialogService` beforehand. The harness
   installs `ScriptedDialogs` after `Show()`; do the same for any extra seam.
-- **Dialogs opened straight through `EditorDialogs`** (Adjust Frame Time, Add Multiple Frames,
-  Adjust Offsets, About, Settings) do not go through a seam and would open a real headless window
-  that nothing closes. There is no scripted path for them yet; a scenario that needs one should
-  add a seam first.
+- **About and Settings build their own `Window` and `ShowDialog` it**, bypassing
+  `IEditorDialogHost`, so a scenario that reaches them opens a real headless window that nothing
+  closes. Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are
+  answered with `AnswerNextEditorDialog`; a scenario that needs About or Settings should route
+  them through the host first.
+- **`TreeView.ScrollIntoView` only knows top-level items.** A frame row far down a long chain is
+  realized (the tree does not virtualize) but sits outside the viewport, and a click at its
+  label's coordinates lands on nothing. `RowFor` calls `BringIntoView` on the row and
+  `RowHeaderPoint` throws when the point is still outside the tree, so a scenario never silently
+  clicks past a row.
+- **Focus does not leave an inspector box on Enter.** Enter commits the value (and seals its
+  undo entry); the `NumericUpDown` keeps the keyboard, and the tree itself is not focusable, so
+  `AnimTree.Focus()` changes nothing. Click a row or press Tab to move focus for real.
 - Keep per-user state out of the developer's profile: the harness passes its own temp
   `SettingsRoot`; give a second harness the same root to simulate a restart.
