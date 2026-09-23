@@ -6762,7 +6762,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 _appCommands.PasteChains(chains);
-                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+                RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
                 _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
@@ -6779,7 +6779,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 _appCommands.PasteFrames(targetChain, frames, insertIndex);
-                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+                RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
                 _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
@@ -6804,7 +6804,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 _appCommands.PasteShapes(targetFrames, rectangles ?? [], circles ?? []);
-                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+                RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
             {
@@ -6832,6 +6832,23 @@ public partial class MainWindow : Window
             _pendingCutState.Clear();
             SyncPendingCutHighlights();
         }
+    }
+
+    /// <summary>
+    /// Completes a cross-document cut: takes the cut items out of the document they came from and
+    /// writes that document to its file. The source is a background tab's cached model, which no
+    /// auto-save covers; left unsaved, the chain would come back from disk when that tab is closed,
+    /// reopened or hot-reloaded, leaving the project with it twice.
+    /// </summary>
+    private void RemoveCutSourcesAndSaveTheirDocument()
+    {
+        var source = _pendingCutState.SourceDocument;
+        if (source is null) return;
+        _pendingCutState.RemoveSourcesFrom(source);
+
+        var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
+        if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
+        _appCommands.SaveDocument(source, sourceTab.Path.FullPath, sourceTab.CachedOnDiskCoordinateType);
     }
 
     private void SyncPendingCutHighlights()

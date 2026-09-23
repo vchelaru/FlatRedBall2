@@ -248,10 +248,14 @@ namespace AnimationEditor.Core
 
             var acls = AnimationChainListSave;
             if (acls == null) return;
+            SaveAnimationChainList(acls, targetPath, OnDiskCoordinateType);
+        }
 
+        /// <inheritdoc cref="IProjectManager.SaveAnimationChainList(AnimationChainListSave, string, TextureCoordinateType)"/>
+        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat)
+        {
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
             NormalizeFrameTextureNames(acls, achxDirectory);
-            var diskFormat = OnDiskCoordinateType;
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
             // No conversion needed when on-disk format matches the in-memory format (UV).

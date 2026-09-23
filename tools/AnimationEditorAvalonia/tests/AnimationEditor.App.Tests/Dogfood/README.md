@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 110 scenarios, roughly 40 seconds.
+About 130 scenarios, roughly 50 seconds.
 
 ## The pieces
 
@@ -155,6 +155,52 @@ undo in one tab never touches another, 20 wheel notches each way stay finite, Al
 records nothing, an empty chain plays/scrubs/takes a frame, a locked chain refuses inspector
 edits and pasted frames, a corrupt file is reported and the editor stays usable, Save As keeps
 the undo history, Tab moves between inspector fields, and a 400x300 window still takes edits.
+
+## Fifth-pass findings (panels, group preview, races, September 2026)
+
+Nineteen scenarios on surfaces nobody had driven: the Project folder panel and its preview
+tabs, the group preview, the PNG tab, the Shortcuts tab, the theme across a restart, Close
+Project, bulk inspector edits, the colour fields, edits racing a hot reload, the search filter
+against selection and rename, deep copies, sixty frames, very long names, Space on a focused
+toggle.
+
+| Finding | Kind | Outcome |
+|---|---|---|
+| A cross-tab cut/paste removed the chain from the source document in memory but never wrote the source file; closing, reopening or hot-reloading that tab brought the chain back, so the project ended up with it twice | **Should, but didn't** | Fixed: the paste that completes a cross-document cut now saves the source document to its own file in its own disk format (`IProjectManager.SaveAnimationChainList(document, path, format)`, `IAppCommands.SaveDocument`); red Core tests in `ProjectManagerSaveTests` and `AppCommandsSaveDocumentTests`, scenario covers the paste path |
+| Adding frames with the row's + button auto-scrolls the tree to the new frame, so after a dozen frames the + button has scrolled out from under the pointer | Does, arguably shouldn't | Open UX note; the harness scrolls a row into view before clicking it, as a user would |
+| A rename does not re-apply the search filter; the renamed row keeps its old visibility until the box changes | Does, arguably shouldn't | Open, harmless: the renamed row is selected and a selected row is always shown anyway |
+| Cut looked like it did nothing | Expectation | Cut is a pending move, as in a file manager: the source stays until the paste lands |
+| Delete after typing a filter looked like it deleted a hidden row | Expectation | A selected row stays visible under any filter (by design), and with focus still in the search box Delete edits the text; the scenario now clicks the row first |
+| The Shortcuts list looked short | Expectation | It is grouped by category; 5 groups holding all the hotkeys |
+
+Confirmed correct: the Project panel opens a single-clicked file as a preview tab, replaces
+that preview on the next click, keeps it on double-click and promotes it on the first edit;
+Ctrl+click on two chains shows the group preview and a plain click leaves it; the PNG tab and
+the editor pane swap cleanly; the theme menu applies at once and survives a restart; Close
+Project clears tabs and the panel; a bulk frame-length edit sets every selected frame in one undo
+step and mixed values show "(mixed)"; colour mode and red reach the file; an inline rename racing
+a hot reload ends consistent with disk; undo across a reload leaves the tree matching the model;
+a duplicated chain owns its shapes; sixty Add Frame clicks all land; a 300-character name
+round-trips; Space on a focused toggle button toggles the button, not playback.
+
+## Needs real input: the non-headless list
+
+Things this harness cannot exercise, or can only approximate, kept here so a real-window pass
+knows where to look. Add to it whenever a scenario has to route around something.
+
+| Area | Why headless cannot see it | What a real-window pass should do |
+|---|---|---|
+| Double-tap on a row's text label (inline rename) | Text is not hit-testable headlessly; the press lands on the row | Double-click chain labels, frame labels (must centre, not rename), shape labels |
+| Focus after a popup or menu closes | The closed popup's item kept the keyboard; `ClickMenu` hands focus back by hand | Pick any menu item, press Ctrl+Z / Delete / Space immediately |
+| Double-click timing, drag threshold, pointer capture lost mid-drag | Headless raises events with no OS timing; capture-lost never happens | Slow double-clicks, tiny drags below the threshold, alt-tab mid-drag |
+| Smooth zoom, selection reveal, toast auto-hide, playback cadence | Timers tick only while the test awaits; no 60 fps loop | Wheel-zoom feel, reveal animation, toast racing a click on its button |
+| Anything drawn | `UseHeadlessDrawing = true`: no pixels; nothing here asserts on rendering | Handles, overlapping-frame highlight, onion skin, guides, grid, PNG diff view, timeline thumbnails, theme colours |
+| Tree drag-and-drop reorder (chains, frames), tab reorder by drag | Avalonia `DragDrop` needs a platform drag source | Drag rows above/below/into, drag tabs, drop a PNG from Explorer onto the wireframe and onto the tree |
+| Native dialogs: File > Load, the `EditorDialogs` windows (Adjust Frame Time, Add Multiple Frames, Adjust Offsets, About, Settings, Resize Texture) | Load calls `StorageProvider` directly; the others open real windows nothing closes | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
+| Clipboard with other apps, file association, single-instance handoff, Velopack update, crash recovery on next launch | Stubbed or process-level | Paste from another editor instance, double-click an `.achx` in Explorer with the editor open, kill and relaunch |
+| DPI scaling, multi-monitor, window restore position, macOS Dock/menu | Platform | Move between monitors with different scaling, restart |
+| Cursor changes (add-frame cursor on Ctrl-hover, handle cursors, hand over tabs) | Cursor is set but never observed | Hover every handle and the tabs with and without Ctrl |
+| Keyboard navigation feel: arrow keys in the tree with collapsed nodes, Home/End, typing to select | Only Down is covered | Walk the tree with the keyboard only |
 
 ## Gotchas
 

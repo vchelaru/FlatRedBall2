@@ -163,6 +163,13 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshTreeView();
         void SaveCurrentAnimationChainList(string? fileName = null);
         Task SaveCurrentAnimationChainListAsync();
+        /// <summary>
+        /// Writes a document other than the current one to its own file, in that file's disk
+        /// format: a cross-document cut removes chains from a background tab's model, and unless
+        /// that model reaches disk the chain comes back from the file on the next load or reload.
+        /// A failure is reported through <see cref="SaveFailed"/>.
+        /// </summary>
+        void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
         Task ExportToPixiJsAsync();
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);

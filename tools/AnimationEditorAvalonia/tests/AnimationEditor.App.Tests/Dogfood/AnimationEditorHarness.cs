@@ -98,9 +98,14 @@ internal sealed class AnimationEditorHarness : IDisposable
     public TabManager Tabs =>
         (TabManager)typeof(MainWindow).GetField("_tabManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(Window)!;
 
-    /// <summary>Chain headers the tree shows after the search filter; a filtered-out row is hidden, not removed.</summary>
+    /// <summary>
+    /// Chain headers the tree shows after the search filter. A filtered-out row is hidden, not
+    /// removed, and a selected row stays visible whatever the filter says (the row binds
+    /// IsVisible to PinnedVisible || IsSelected), so Delete never acts on something unseen.
+    /// </summary>
     public List<string> VisibleChainHeaders =>
-        Nodes.Where(node => node.IsChainNode && node.PinnedVisible).Select(node => node.Header).ToList();
+        Nodes.Where(node => node.IsChainNode && (node.PinnedVisible || AnimTree.SelectedItems.Contains(node)))
+            .Select(node => node.Header).ToList();
 
     /// <summary>Every node in the tree, depth first.</summary>
     public IEnumerable<TreeNodeVm> Nodes => Flatten(AnimTree.ItemsSource?.OfType<TreeNodeVm>() ?? Enumerable.Empty<TreeNodeVm>());
@@ -200,10 +205,19 @@ internal sealed class AnimationEditorHarness : IDisposable
         Nodes.FirstOrDefault(node => ReferenceEquals(node.Data, data))
         ?? throw new InvalidOperationException($"The tree has no node for {Describe(data)}; it shows [{string.Join(", ", Nodes.Select(node => node.Header))}].");
 
-    /// <summary>The realized row showing <paramref name="data"/>; its parents must be expanded.</summary>
+    /// <summary>
+    /// The realized row showing <paramref name="data"/>, scrolled into view first the way a user
+    /// would scroll to it; its parents must be expanded.
+    /// </summary>
     public TreeViewItem RowFor(object data)
     {
         Layout();
+        TreeNodeVm? node = Nodes.FirstOrDefault(candidate => ReferenceEquals(candidate.Data, data));
+        if (node != null)
+        {
+            AnimTree.ScrollIntoView(node);
+            Layout();
+        }
         return AnimTree.GetVisualDescendants().OfType<TreeViewItem>()
             .FirstOrDefault(row => row.DataContext is TreeNodeVm node && ReferenceEquals(node.Data, data))
             ?? throw new InvalidOperationException($"No tree row is realized for {Describe(data)}; expand its parent first. The tree shows [{string.Join(", ", Nodes.Select(node => node.Header))}] and {(Nodes.Any(node => ReferenceEquals(node.Data, data)) ? "has" : "has no")} node for it.");

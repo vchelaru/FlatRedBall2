@@ -130,7 +130,10 @@ public class RenameAndSearchScenarioTests
         box.IsEffectivelyVisible.ShouldBeTrue();
         editor.TypeAndEnter(box, "ru");
 
-        editor.VisibleChainHeaders.ShouldBe(new[] { "Run" });
+        // Opening a file selects its first chain, and a selected row stays visible under any filter.
+        editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run" });
+        editor.Nodes.First(node => node.Header == "Run").PinnedVisible.ShouldBeTrue();
+        editor.Nodes.First(node => node.Header == "Jump").PinnedVisible.ShouldBeFalse();
 
         editor.Click(editor.Control<Button>("SearchClearBtn"));
 

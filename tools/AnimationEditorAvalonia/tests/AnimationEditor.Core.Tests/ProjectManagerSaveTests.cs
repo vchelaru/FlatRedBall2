@@ -19,6 +19,32 @@ namespace AnimationEditor.Core.Tests;
 // reuse the knownTextureSizes captured at LoadAnimationChain time.
 public class ProjectManagerSaveTests
 {
+    [Fact]
+    public void SaveAnimationChainList_Document_WritesThatDocumentInTheGivenFormat_NotTheCurrentOne()
+    {
+        var pm = new ProjectManager();
+        var current = new AnimationChainListSave();
+        current.AnimationChains.Add(new AnimationChainSave { Name = "Current" });
+        pm.AnimationChainListSave = current;
+        pm.OnDiskCoordinateType = TextureCoordinateType.Pixel;
+        var other = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var otherChain = new AnimationChainSave { Name = "Other" };
+        otherChain.Frames.Add(new AnimationFrameSave { TextureName = "sprite.png", LeftCoordinate = 0.25f, RightCoordinate = 0.5f });
+        other.AnimationChains.Add(otherChain);
+        string dir = Path.Combine(Path.GetTempPath(), "AnimationEditorCoreTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        string path = Path.Combine(dir, "other.achx");
+
+        pm.SaveAnimationChainList(other, path, TextureCoordinateType.UV);
+
+        var saved = AnimationChainListSave.FromFile(path);
+        Assert.Equal("Other", Assert.Single(saved.AnimationChains).Name);
+        Assert.Equal(TextureCoordinateType.UV, saved.CoordinateType);
+        Assert.Equal(0.25f, saved.AnimationChains[0].Frames[0].LeftCoordinate);
+        Assert.Same(current, pm.AnimationChainListSave);
+        Assert.Equal(0.25f, otherChain.Frames[0].LeftCoordinate);
+    }
+
     private static (ProjectManager pm, AnimationFrameSave frame) LoadPixelChainWithKnownSizes()
     {
         var pm = new ProjectManager();

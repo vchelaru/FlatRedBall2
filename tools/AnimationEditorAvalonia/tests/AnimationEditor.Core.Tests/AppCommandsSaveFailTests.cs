@@ -91,6 +91,7 @@ public class AppCommandsSaveFailTests
 
         public string? ResolveFilesPanelRoot() => null;
 
+        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath)
             => throw new InvalidOperationException("Simulated save failure");
 

@@ -54,6 +54,7 @@ public class AnimationTreeControlTests
             AnimationChainListSave? preParsed = null,
             IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null) { }
 
+        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath) { }
         public void SaveAnimationChainList(System.IO.Stream stream) { }
         public string? ResolveFilesPanelRoot() => null;

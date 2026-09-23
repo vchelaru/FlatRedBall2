@@ -35,6 +35,14 @@ namespace AnimationEditor.Core
             IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null);
         void SaveAnimationChainList(string targetPath);
 
+        /// <summary>
+        /// Writes <paramref name="document"/>, which need not be the current one (a background
+        /// tab's model after a cross-document cut), to <paramref name="targetPath"/> in
+        /// <paramref name="diskFormat"/>. The in-memory document stays in UV afterwards, as the
+        /// current-model save leaves it.
+        /// </summary>
+        void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
+
         /// <summary>Opens <paramref name="fileName"/> as a native AnimationEditor project -- see
         /// <see cref="ProjectManager.LoadTsxProject"/>.</summary>
         void LoadTsxProject(FilePath fileName);

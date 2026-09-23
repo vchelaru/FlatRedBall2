@@ -179,6 +179,7 @@ public class TabSwitchCacheTests : IDisposable
             _inner.LoadAnimationChain(fileName, preParsed, knownTextureSizes);
         }
 
+        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath) =>
             _inner.SaveAnimationChainList(targetPath);
 
