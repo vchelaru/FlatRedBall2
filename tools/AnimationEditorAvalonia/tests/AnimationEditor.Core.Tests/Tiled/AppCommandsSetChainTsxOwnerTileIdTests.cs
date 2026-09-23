@@ -163,4 +163,37 @@ public class AppCommandsSetChainTsxOwnerTileIdTests : IDisposable
         _ctx.UndoManager.Undo();
         Assert.Equal("Walk", walk.Name);
     }
+
+    // False-match guard at the full command stack: a manual rename to text that happens to LOOK
+    // synthetic ("ID:999") must still mark the chain explicit -- whether a name is "real" is
+    // decided by the rename actually happening, never by re-inspecting the string's shape -- so a
+    // later Sync must never touch it again.
+    [Fact]
+    public void ManualRename_ToTextThatLooksSynthetic_StopsFutureAutoRename()
+    {
+        var chain = OpenTsx("ID:12");
+
+        Assert.True(_ctx.AppCommands.RenameChain(chain, "ID:999"));
+        Assert.Equal("ID:999", chain.Name);
+
+        var error = _ctx.AppCommands.SetChainTsxOwnerTileId(chain, 5);
+        Assert.Null(error);
+        Assert.Equal("ID:999", chain.Name); // untouched, even though it looks like a stale placeholder
+    }
+
+    // Undo of a manual rename must restore the chain's synthetic-tracking too, not just its Name
+    // text -- otherwise a chain that goes back to looking unnamed after Undo would stay "stuck"
+    // (explicit-but-wrong) instead of resuming auto-follow.
+    [Fact]
+    public void UndoOfManualRename_RestoresSyntheticTracking_SyncFollowsAgain()
+    {
+        var chain = OpenTsx("ID:12");
+
+        Assert.True(_ctx.AppCommands.RenameChain(chain, "Hero"));
+        _ctx.UndoManager.Undo(); // back to "ID:12", and (if restored correctly) synthetic again
+
+        var error = _ctx.AppCommands.SetChainTsxOwnerTileId(chain, 5);
+        Assert.Null(error);
+        Assert.Equal("ID:5", chain.Name); // resumed following -- proves synthetic tracking came back
+    }
 }

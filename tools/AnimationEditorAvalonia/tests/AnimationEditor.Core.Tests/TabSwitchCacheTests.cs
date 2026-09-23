@@ -164,6 +164,7 @@ public class TabSwitchCacheTests : IDisposable
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => _inner.GetTsxOwnerTileId(chain);
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId) => _inner.TrySetTsxOwnerTileId(chain, tileId);
         public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) => _inner.IsTsxOwnerTileIdAlreadySet(chain, tileId);
+        public bool MarkChainNameExplicit(AnimationChainSave chain) => _inner.MarkChainNameExplicit(chain);
         public uint? ComputeFrameTileId(AnimationFrameSave frame) => _inner.ComputeFrameTileId(frame);
         public object? CaptureTsxState() => _inner.CaptureTsxState();
         public void RestoreTsxState(object? state) => _inner.RestoreTsxState(state);

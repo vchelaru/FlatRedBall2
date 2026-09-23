@@ -39,7 +39,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 5, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         Assert.Equal(TextureCoordinateType.UV, acls.CoordinateType);
         Assert.Equal(TimeMeasurementUnit.Second, acls.TimeMeasurementUnit);
@@ -67,7 +67,7 @@ public class TiledAnimationToAchjMapperTests
         tileset.Tiles.Add(anchor);
         tileset.Tiles.Add(satellite);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var frame = Assert.Single(Assert.Single(acls.AnimationChains).Frames);
         Assert.Equal(19f / 71f, frame.LeftCoordinate, tolerance: 0.0001f);
@@ -97,7 +97,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 11958, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(864f / 2048f, chain.Frames[0].LeftCoordinate, tolerance: 0.00001f);
@@ -120,7 +120,7 @@ public class TiledAnimationToAchjMapperTests
         satellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
         tileset.Tiles.Add(satellite);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(2, chain.Frames.Count);
@@ -137,7 +137,7 @@ public class TiledAnimationToAchjMapperTests
     }
 
     [Fact]
-    public void Map_TileWithNameProperty_UsesNameAsChainName()
+    public void Map_TileWithNameProperty_UsesNameAsChainNameAndIsNotSynthetic()
     {
         var tileset = EmptyTileset();
         var tile = new Tile { ID = 2, Width = 0, Height = 0 };
@@ -145,23 +145,48 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new StringProperty { Name = "Name", Value = "Torch" });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out var syntheticChains);
 
         Assert.Equal("Torch", acls.AnimationChains.Single().Name);
+        Assert.Empty(syntheticChains);
     }
 
     [Fact]
-    public void Map_TileWithoutNameProperty_UsesIdLabel()
+    public void Map_TileWithoutNameProperty_UsesIdLabelAndIsSynthetic()
     {
         var tileset = EmptyTileset();
         var tile = new Tile { ID = 5, Width = 0, Height = 0 };
         tile.Animation.Add(new Frame { TileID = 5, Duration = 200 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out var syntheticChains);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:5", chain.Name);
+        Assert.Contains(chain, syntheticChains);
+    }
+
+    // False-match guard: whether a chain is "synthetic" is decided by provenance (was a Name
+    // property present on disk at all?), never by whether the resulting text happens to look like
+    // the "ID:{tileId}" placeholder format -- so an explicit name that coincidentally has that
+    // shape, matching its own tile id or not, is still correctly reported as a real name.
+    [Theory]
+    [InlineData("ID:5")]  // happens to match its own tile id
+    [InlineData("ID:999")] // happens to look like a stale placeholder from some other tile
+    [InlineData("ID:abc")] // not even a valid tile-id shape
+    public void Map_TileWithNamePropertyLookingLikeSynthetic_IsStillNotSynthetic(string explicitName)
+    {
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 5, Width = 0, Height = 0 };
+        tile.Animation.Add(new Frame { TileID = 5, Duration = 200 });
+        tile.Properties.Add(new StringProperty { Name = "Name", Value = explicitName });
+        tileset.Tiles.Add(tile);
+
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out var syntheticChains);
+
+        var chain = Assert.Single(acls.AnimationChains);
+        Assert.Equal(explicitName, chain.Name);
+        Assert.DoesNotContain(chain, syntheticChains);
     }
 
     [Fact]
@@ -184,7 +209,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
         tileset.Tiles.Add(tile);
 
-        Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _));
+        Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _));
     }
 
     [Fact]
@@ -199,7 +224,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new IntProperty { Name = "ParentId", Value = -1 });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:3", chain.Name);
@@ -220,7 +245,7 @@ public class TiledAnimationToAchjMapperTests
         orphan.Properties.Add(new IntProperty { Name = "ParentId", Value = 99 });
         tileset.Tiles.Add(orphan);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal("ID:5", chain.Name);
@@ -249,7 +274,7 @@ public class TiledAnimationToAchjMapperTests
         backwardSatellite.Properties.Add(new IntProperty { Name = "ParentId", Value = 5 });
         tileset.Tiles.Add(backwardSatellite);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
 
         Assert.Equal(2, acls.AnimationChains.Count);
         var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -287,7 +312,7 @@ public class TiledAnimationToAchjMapperTests
         chainedC.Properties.Add(new IntProperty { Name = "ParentId", Value = 1 });
         tileset.Tiles.Add(chainedC);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
 
         Assert.Equal(2, acls.AnimationChains.Count);
         var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -329,7 +354,7 @@ public class TiledAnimationToAchjMapperTests
         satelliteBelow.Properties.Add(new IntProperty { Name = "ParentId", Value = 0 });
         tileset.Tiles.Add(satelliteBelow);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out _);
 
         Assert.Equal(3, acls.AnimationChains.Count);
         var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -380,7 +405,7 @@ public class TiledAnimationToAchjMapperTests
         chainedCorner.Properties.Add(new IntProperty { Name = "ParentId", Value = 1 });
         tileset.Tiles.Add(chainedCorner);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out _);
 
         Assert.Equal(4, acls.AnimationChains.Count);
         var chainNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -410,7 +435,7 @@ public class TiledAnimationToAchjMapperTests
         tile.Properties.Add(new StringProperty { Name = "Name", Value = "RiseUp" });
         tileset.Tiles.Add(tile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal((uint)5, entryTileIdsByChain[chain]);
@@ -430,7 +455,7 @@ public class TiledAnimationToAchjMapperTests
         second.Animation.Add(new Frame { TileID = 5, Duration = 100 });
         tileset.Tiles.Add(second);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _));
+        var exception = Assert.Throws<InvalidOperationException>(() => TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _));
 
         Assert.Contains("5", exception.Message);
     }
@@ -454,7 +479,7 @@ public class TiledAnimationToAchjMapperTests
         achxOwnedTile.Properties.Add(new StringProperty { Name = "achjSourceFile", Value = "../Fireball.achx" });
         tileset.Tiles.Add(achxOwnedTile);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
 
         Assert.Empty(acls.AnimationChains);
         Assert.Empty(entryTileIdsByChain);

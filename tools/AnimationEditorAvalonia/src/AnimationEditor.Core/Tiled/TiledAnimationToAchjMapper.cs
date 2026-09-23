@@ -68,10 +68,18 @@ public static class TiledAnimationToAchjMapper
     /// recomputed relative to the anchor's *frame-0* position, a different base whenever the
     /// anchor's own id isn't its own frame-0 tile, which silently drifts the satellite to a new
     /// tile every save.</param>
+    /// <param name="chainsWithSyntheticName">Every returned chain whose name is the synthetic
+    /// <c>"ID:{tileId}"</c> placeholder because its anchor tile carried no explicit <see
+    /// cref="NamePropertyName"/> property -- real provenance (was the property present on disk?),
+    /// never inferred from whether the resulting text happens to *look* like the placeholder
+    /// format, so an explicit name a user (or a past bug) actually wrote to disk -- even one that
+    /// coincidentally has the same "ID:N" shape -- is never in this set and is never treated as
+    /// safe to silently overwrite. See <see cref="ProjectManager.TrySetTsxOwnerTileId"/>.</param>
     public static AnimationChainListSave Map(
         Tileset tileset,
         out IReadOnlyDictionary<AnimationChainSave, uint> entryTileIdsByChain,
-        out IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> satelliteTileIdsByChain)
+        out IReadOnlyDictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> satelliteTileIdsByChain,
+        out IReadOnlyCollection<AnimationChainSave> chainsWithSyntheticName)
     {
         // Every tile-position computation below is "% columns" / "/ columns" -- a corrupt/hand-
         // edited tsx with Columns <= 0 would either divide by zero (Columns == 0) or unchecked-cast
@@ -86,6 +94,7 @@ public static class TiledAnimationToAchjMapper
         var acls = new AnimationChainListSave();
         var entryTileIds = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
         var satelliteTileIds = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+        var syntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
 
         // A tile carrying TilesetAnimationSync.SourceFilePropertyName ("achjSourceFile") was
         // written by the achx-push feature (issue #1133) -- a completely separate save pipeline
@@ -182,7 +191,10 @@ public static class TiledAnimationToAchjMapper
 
         foreach (var anchor in animatedTiles.Where(IsEffectiveAnchor))
         {
-            var chain = new AnimationChainSave { Name = ChainName(anchor) };
+            var (name, isSynthetic) = ChainNameInfo(anchor);
+            var chain = new AnimationChainSave { Name = name };
+            if (isSynthetic)
+                syntheticNamedChains.Add(chain);
 
             var anchorCol = anchor.ID % columns;
             var anchorRow = anchor.ID / columns;
@@ -227,6 +239,7 @@ public static class TiledAnimationToAchjMapper
 
         entryTileIdsByChain = entryTileIds;
         satelliteTileIdsByChain = satelliteTileIds;
+        chainsWithSyntheticName = syntheticNamedChains;
         return acls;
     }
 
@@ -254,10 +267,15 @@ public static class TiledAnimationToAchjMapper
     private static bool IsAchxPushOwned(Tile tile) =>
         tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
 
-    private static string ChainName(Tile tile)
+    /// <summary>A tile's chain name plus whether that name is the synthetic <c>"ID:{tileId}"</c>
+    /// placeholder (no explicit <see cref="NamePropertyName"/> property present) or a real one read
+    /// from disk. The synthetic flag is provenance -- was the property present, at all -- never a
+    /// guess from the resulting string's shape, so a real explicit name that happens to look like
+    /// <c>"ID:N"</c> is still correctly reported as not synthetic.</summary>
+    private static (string Name, bool IsSynthetic) ChainNameInfo(Tile tile)
     {
         var name = tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == NamePropertyName)?.Value;
-        return string.IsNullOrEmpty(name) ? SyntheticChainName(tile.ID) : name;
+        return string.IsNullOrEmpty(name) ? (SyntheticChainName(tile.ID), true) : (name, false);
     }
 
     /// <summary>The placeholder chain name used when a native-tsx tile carries no explicit <see

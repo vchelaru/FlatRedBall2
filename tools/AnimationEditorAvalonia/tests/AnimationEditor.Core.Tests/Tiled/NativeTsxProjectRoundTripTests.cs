@@ -55,7 +55,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, FixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Contains(acls.AnimationChains, c => c.Name == "ID:0");
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
@@ -172,7 +172,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, OwnerNotFirstFrameFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var tilesetInfo = new TilesetAnimationInfo
         {
             TileWidth = tileset.TileWidth,
@@ -241,7 +241,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, TwoWideGroupFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
 
         // Shrink the chain's frame rect from 2 tiles wide to 1 tile wide (drops the satellite).
@@ -318,7 +318,7 @@ public class NativeTsxProjectRoundTripTests
 
         // (a) The satellite's actual on-disk frames (1 frame, duration 999) never make it into the
         // editable model -- only the anchor's frames (2 frames, duration 150) do.
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var chain = Assert.Single(acls.AnimationChains);
         Assert.Equal(2, chain.Frames.Count);
         Assert.All(chain.Frames, f => Assert.Equal(0.15f, f.FrameLength, tolerance: 0.0001f));
@@ -375,7 +375,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, SingleTileWithNeighborFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var chain = acls.AnimationChains.Single(c => c.Name == "ID:0");
 
         // Grow the chain's frame rect from 1 tile wide to 2 tiles wide (gains a satellite).
@@ -446,7 +446,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, OwnerNotFirstFrameWithSatelliteFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out _);
         var tilesetInfo = new TilesetAnimationInfo
         {
             TileWidth = tileset.TileWidth,
@@ -517,7 +517,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, NamedGroupFixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var chain = acls.AnimationChains.Single(c => c.Name == "Walk");
 
         // Rename in place -- mutate the existing chain object, don't remove+re-add.
@@ -571,7 +571,7 @@ public class NativeTsxProjectRoundTripTests
         File.WriteAllText(fixturePath, FixtureXml);
         var tileset = Loader.Default().LoadTileset(fixturePath);
 
-        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _);
+        var acls = TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out _, out _);
         var chain = acls.AnimationChains.Single(c => c.Name == "ID:0");
         const string specialName = "Fire & Ice <Test> \"Quotes\"";
         chain.Name = specialName;

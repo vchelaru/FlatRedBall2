@@ -1050,7 +1050,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
                 return false;
 
-            _undoManager.Execute(new RenameChainCommand(chain, chain.Name, newName, this, _events));
+            _undoManager.Execute(new RenameChainCommand(chain, chain.Name, newName, _pm, this, _events));
             return true;
         }
 

@@ -53,6 +53,17 @@ namespace AnimationEditor.Core
         /// <c>knownSatelliteTileIds</c> parameter.</summary>
         private Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> _tsxSatelliteTileIdsByChain = new(ReferenceEqualityComparer.Instance);
 
+        /// <summary>Chains whose <see cref="AnimationChainSave.Name"/> is still the synthetic
+        /// <c>"ID:{tileId}"</c> placeholder (<see cref="Tiled.TiledAnimationToAchjMapper.SyntheticChainName"/>)
+        /// rather than a real, explicitly-given one -- set from real provenance at load time (<see
+        /// cref="Tiled.TiledAnimationToAchjMapper.Map"/>'s <c>chainsWithSyntheticName</c> out param:
+        /// did the tile carry a <c>Name</c> property at all?), never guessed from whether the current
+        /// text happens to *look* like the placeholder format. <see cref="TrySetTsxOwnerTileId"/>
+        /// reads this to decide whether to keep a chain's placeholder following its owner tile;
+        /// <see cref="MarkChainNameExplicit"/> (called on a real rename) removes a chain once it has
+        /// a real name, so it's never auto-renamed again.</summary>
+        private HashSet<AnimationChainSave> _tsxSyntheticNamedChains = new(ReferenceEqualityComparer.Instance);
+
         /// <summary>Each chain's own <see cref="AnimationChainSave.Frames"/> contents as of the
         /// most recent save where it had a real (non-null) entry tile id -- i.e. the frame-object
         /// sequence that produced <see cref="_tsxEntryTileIdsByChain"/>'s current value for that
@@ -181,6 +192,7 @@ namespace AnimationEditor.Core
             _tsxTileset = null;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+            _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
             _tsxLastNonEmptyFramesByChain = new Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>>(ReferenceEqualityComparer.Instance);
             _tsxDormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance);
 
@@ -753,12 +765,14 @@ namespace AnimationEditor.Core
                 throw new NotSupportedException(
                     $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
 
-            var acls = Tiled.TiledAnimationToAchjMapper.Map(tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain);
+            var acls = Tiled.TiledAnimationToAchjMapper.Map(
+                tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out var syntheticNamedChains);
 
             _tsxTileset = tileset;
             AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
+            _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(syntheticNamedChains, ReferenceEqualityComparer.Instance);
             FileName = fileName.FullPath;
 
             // Seeds _tsxLastNonEmptyFramesByChain from what was just loaded, so a chain whose
@@ -1079,13 +1093,14 @@ namespace AnimationEditor.Core
             DotTiled.Tileset Tileset,
             Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
             Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain,
+            HashSet<AnimationChainSave> SyntheticNamedChains,
             Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>> LastNonEmptyFramesByChain,
             Dictionary<AnimationChainSave, DormantTsxHint> DormantHintsByChain);
 
         /// <inheritdoc/>
         public object? CaptureTsxState() =>
             _tsxTileset is null ? null : new TsxState(
-                _tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain,
+                _tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxSyntheticNamedChains,
                 _tsxLastNonEmptyFramesByChain, _tsxDormantHintsByChain);
 
         /// <inheritdoc/>
@@ -1096,6 +1111,7 @@ namespace AnimationEditor.Core
                 _tsxTileset = tsxState.Tileset;
                 _tsxEntryTileIdsByChain = tsxState.EntryTileIdsByChain;
                 _tsxSatelliteTileIdsByChain = tsxState.SatelliteTileIdsByChain;
+                _tsxSyntheticNamedChains = tsxState.SyntheticNamedChains;
                 _tsxLastNonEmptyFramesByChain = tsxState.LastNonEmptyFramesByChain;
                 _tsxDormantHintsByChain = tsxState.DormantHintsByChain;
             }
@@ -1104,6 +1120,7 @@ namespace AnimationEditor.Core
                 _tsxTileset = null;
                 _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
                 _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
+                _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
                 _tsxLastNonEmptyFramesByChain = new Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>>(ReferenceEqualityComparer.Instance);
                 _tsxDormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance);
             }
@@ -1160,9 +1177,9 @@ namespace AnimationEditor.Core
         /// of reusing offsets captured at the old one. There is no auto-follow -- once set (loaded,
         /// computed once, or set here), a chain's owner tile never moves again on its own; only
         /// another call here (e.g. the "Sync to First Frame" button) changes it. If <paramref
-        /// name="chain"/> has no real name yet -- its <see cref="AnimationChainSave.Name"/> is still
-        /// just the synthetic <c>"ID:{oldTileId}"</c> placeholder <see
-        /// cref="Tiled.TiledAnimationToAchjMapper"/> assigns an unnamed tile -- the name is re-derived
+        /// name="chain"/> is still tracked in <see cref="_tsxSyntheticNamedChains"/> -- its name has
+        /// never been anything but the synthetic <c>"ID:{tileId}"</c> placeholder, per real
+        /// provenance from load time, not a guess from the string's shape -- the name is re-derived
         /// for the new tile too, so an unnamed chain's tree label follows its owner instead of going
         /// stale (and, worse, getting baked in as a permanent explicit name on the next save: <see
         /// cref="Tiled.NativeTsxAnimationSync"/> only omits the <c>Name</c> property when the chain's
@@ -1190,8 +1207,6 @@ namespace AnimationEditor.Core
             if (IsTsxOwnerTileIdAlreadySet(chain, tileId))
                 return null;
 
-            var oldTileId = GetTsxOwnerTileId(chain);
-
             var updatedEntries = new Dictionary<AnimationChainSave, uint>(_tsxEntryTileIdsByChain, ReferenceEqualityComparer.Instance)
             {
                 [chain] = tileId
@@ -1205,10 +1220,33 @@ namespace AnimationEditor.Core
                 _tsxSatelliteTileIdsByChain = updatedSatellites;
             }
 
-            if (oldTileId.HasValue && chain.Name == Tiled.TiledAnimationToAchjMapper.SyntheticChainName(oldTileId.Value))
+            if (_tsxSyntheticNamedChains.Contains(chain))
                 chain.Name = Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId);
 
             return null;
+        }
+
+        /// <summary>
+        /// Marks a chain's name as a real, user-given one from now on -- called on an actual rename
+        /// (<see cref="AppCommands.RenameChain"/>) so <see cref="TrySetTsxOwnerTileId"/> never
+        /// overwrites it again. No-op outside a native-tsx project or for a chain that was already
+        /// marked. Returns whether the chain *was* still tracked as synthetic. Replaces the whole
+        /// set rather than calling <see cref="HashSet{T}.Remove"/> on the existing instance in
+        /// place: <see cref="CaptureTsxState"/> hands out this exact set by reference on the promise
+        /// (see its own doc comment) that it's only ever replaced wholesale, never mutated -- an
+        /// in-place <c>Remove</c> would silently corrupt an already-taken "before" snapshot (e.g.
+        /// <see cref="CommandsAndState.Commands.RenameChainCommand"/>'s own <c>_before</c>, captured
+        /// one line earlier in the same <c>Do()</c>), erasing the chain from it too and making Undo
+        /// unable to restore synthetic tracking.
+        /// </summary>
+        public bool MarkChainNameExplicit(AnimationChainSave chain)
+        {
+            if (!_tsxSyntheticNamedChains.Contains(chain))
+                return false;
+            var updated = new HashSet<AnimationChainSave>(_tsxSyntheticNamedChains, ReferenceEqualityComparer.Instance);
+            updated.Remove(chain);
+            _tsxSyntheticNamedChains = updated;
+            return true;
         }
 
         /// <summary>

@@ -119,7 +119,7 @@ public class HistoryPanelTests
     {
         var chain = new AnimationChainSave { Name = "Walk" };
         var ctx = TestHelpers.SetupFreshAcls();
-        var cmd = new RenameChainCommand(chain, "Walk", "Run", ctx.AppCommands, ctx.ApplicationEvents);
+        var cmd = new RenameChainCommand(chain, "Walk", "Run", ctx.ProjectManager, ctx.AppCommands, ctx.ApplicationEvents);
 
         Assert.Contains("Walk", cmd.Description);
         Assert.Contains("Run", cmd.Description);

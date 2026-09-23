@@ -230,6 +230,36 @@ public class ChainTsxOwnerTileTests : IDisposable
         finally { window.Close(); }
     }
 
+    // False-match guard, driven through the real UI: a manual rename to text that happens to LOOK
+    // like the synthetic placeholder ("ID:999") must still count as a real name -- Sync must never
+    // silently overwrite it, in the tree label or the underlying chain.
+    [AvaloniaFact]
+    public void ManualRename_ToTextThatLooksSynthetic_ThenClickingSyncButton_LeavesItUntouched()
+    {
+        var (window, ctx) = OpenTsx();
+        try
+        {
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == "ID:5");
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(ctx.AppCommands.RenameChain(chain, "ID:999"));
+            Dispatcher.UIThread.RunJobs();
+
+            var syncButton = window.FindControl<Button>("PropChainTsxOwnerSyncButton")!;
+            syncButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("ID:999", chain.Name);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
+            var node = roots.Single(r => ReferenceEquals(r.Data, chain));
+            Assert.Equal("ID:999", node.Header);
+        }
+        finally { window.Close(); }
+    }
+
     // Regression for the sync button's two reported problems: (1) no indication of already-synced
     // state, (2) repeated clicks pushing a spurious undo entry each time.
     [AvaloniaFact]
