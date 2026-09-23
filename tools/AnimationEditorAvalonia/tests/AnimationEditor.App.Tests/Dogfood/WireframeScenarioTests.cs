@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using AnimationEditor.Core.ViewModels;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 
@@ -71,6 +72,54 @@ public class WireframeScenarioTests
 
         editor.Services.SelectedState.SelectedFrame.ShouldBeSameAs(walk.Frames[1]);
         editor.UndoManager.CanUndo.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickingAFrameBox_WhileSeveralChainsAreSelected_SelectsThatFrame()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", Sheet, Sheet);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 32, 32), (64, 0, 32, 32)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 64, 32, 32), (64, 64, 32, 32)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        AnimationChainSave run = editor.ChainNamed("Run");
+        editor.ClickRow(walk);
+        editor.ClickRow(run, RawInputModifiers.Control);
+
+        editor.DoubleClickAt(editor.WireframeRectOf(run.Frames[1]).Center);
+
+        editor.Services.SelectedState.SelectedFrame.ShouldBeSameAs(run.Frames[1]);
+        editor.Services.SelectedState.SelectedChain.ShouldBeSameAs(run);
+        // The multi-chain bag must be replaced, or the tree keeps every chain highlighted.
+        editor.Services.SelectedState.SelectedChains.ShouldBeEmpty();
+        editor.AnimTree.SelectedItems.OfType<TreeNodeVm>().Select(n => n.Data).ShouldBe(new object[] { run.Frames[1] });
+        editor.UndoManager.CanUndo.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickingAFrameBox_AfterShiftSelectingEveryChain_SelectsThatFrame()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", Sheet, Sheet);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 32, 32), (64, 0, 32, 32)),
+            AnimationEditorHarness.Chain("Idle", "sheet.png", (0, 128, 32, 32)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 64, 32, 32), (64, 64, 32, 32)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        AnimationChainSave run = editor.ChainNamed("Run");
+        editor.ClickRow(walk);
+        editor.ClickRow(run, RawInputModifiers.Shift);
+
+        editor.DoubleClickAt(editor.WireframeRectOf(run.Frames[1]).Center);
+
+        editor.Services.SelectedState.SelectedFrame.ShouldBeSameAs(run.Frames[1]);
+        editor.Services.SelectedState.SelectedChain.ShouldBeSameAs(run);
+        // The multi-chain bag must be replaced, or the tree keeps every chain highlighted.
+        editor.Services.SelectedState.SelectedChains.ShouldBeEmpty();
+        editor.AnimTree.SelectedItems.OfType<TreeNodeVm>().Select(n => n.Data).ShouldBe(new object[] { run.Frames[1] });
     }
 
     [AvaloniaFact]

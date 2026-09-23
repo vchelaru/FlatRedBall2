@@ -56,6 +56,12 @@ namespace AnimationEditor.Core
                 {
                     // Automatically set the parent chain
                     _selectedChain = FindChainForFrame(value);
+                    // A frame picked outside the tree (e.g. double-clicking its wireframe box
+                    // while several chains are selected) replaces the multi-select bag; otherwise
+                    // SelectedChains stays stale and the tree keeps every chain highlighted. Tree
+                    // routing always puts the frame in the bag first, so it keeps its bag.
+                    if (!_selectedNodes.Contains(value))
+                        _selectedNodes = new List<object>();
                 }
                 _selectedRectangle = null;
                 _selectedCircle = null;
