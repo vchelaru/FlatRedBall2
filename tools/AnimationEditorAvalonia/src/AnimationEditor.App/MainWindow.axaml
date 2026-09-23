@@ -531,6 +531,14 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           ScrollViewer.AllowAutoHide="False">
                     <TreeView.Styles>
+                        <Style Selector="TextBlock#RowHeaderLabel">
+                            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+                        </Style>
+                        <Style Selector="TextBlock#RowHeaderLabel.auto-name">
+                            <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+                            <Setter Property="FontStyle" Value="Italic" />
+                            <Setter Property="ToolTip.Tip" Value="Auto name from the tile id -- no Name in the .tsx. Rename to give it one." />
+                        </Style>
                         <Style Selector="TreeViewItem">
                             <Setter Property="IsExpanded"
                                     Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
@@ -770,9 +778,11 @@
                                 <!-- Header lives in the star column so it ellipsizes when the panel is
                                      narrowed instead of forcing a horizontal scrollbar (#623). -->
                                 <Panel Grid.Column="1" VerticalAlignment="Center">
+                                        <!-- Auto-named tsx chain ("ID:{tileId}", no Name property
+                                             in the tsx): dimmed italic so it reads as a placeholder. -->
                                         <TextBlock x:Name="RowHeaderLabel"
                                                    Text="{Binding Header}"
-                                                   Foreground="{DynamicResource Ink}"
+                                                   Classes.auto-name="{Binding IsAutoName}"
                                                    Padding="2,1"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
@@ -965,6 +975,19 @@
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="Auto,*">
+                                                    <TextBlock Text="Name"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,8,0"
+                                                               Foreground="{DynamicResource InkMid}"
+                                                               FontSize="11" />
+                                                    <!-- Tsx: empty = auto "ID:{tileId}" name (no Name
+                                                         property written), shown as the placeholder. -->
+                                                    <TextBox x:Name="PropChainName"
+                                                             Grid.Column="1"
+                                                             FontSize="11"
+                                                             AutomationProperties.AutomationId="prop-chain-name" />
+                                                </Grid>
                                                 <CheckBox x:Name="PropChainLocked"
                                                           Content="Locked"
                                                           AutomationProperties.AutomationId="prop-chain-locked" />

@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using DotTiled;
@@ -304,6 +305,88 @@ public class ChainTsxOwnerTileTests : IDisposable
             var tileText = window.FindControl<TextBlock>("PropFrameTsxTileText")!;
             Assert.True(tileText.IsVisible);
             Assert.Contains("8", tileText.Text); // frame 0 is tile 8, distinct from the chain's owner tile (9)
+        }
+        finally { window.Close(); }
+    }
+
+    private static AnimationEditor.Core.ViewModels.TreeNodeVm TreeNode(MainWindow window, AnimationChainSave chain)
+    {
+        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
+        return roots.Single(r => ReferenceEquals(r.Data, chain));
+    }
+
+    private static void CommitNameBox(TextBox nameBox, string text)
+    {
+        nameBox.Text = text;
+        nameBox.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void NameBox_AutoNamedChain_ShowsEmptyTextWithAutoPlaceholder_AndTreeMarksItAuto()
+    {
+        var (window, ctx) = OpenTsx();
+        try
+        {
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == "ID:5");
+            var named = ctx.ProjectManager.AnimationChainListSave.AnimationChains.Single(c => c.Name == "RiseUp");
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            var nameBox = window.FindControl<TextBox>("PropChainName")!;
+            Assert.True(string.IsNullOrEmpty(nameBox.Text));
+            Assert.Equal("Auto name: ID 5", nameBox.PlaceholderText);
+            Assert.True(TreeNode(window, chain).IsAutoName);
+            Assert.False(TreeNode(window, named).IsAutoName);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void NameBox_ClearingExplicitName_RemovesNameFromTsx_AndRevertsToAutoName()
+    {
+        var (window, ctx) = OpenTsx();
+        try
+        {
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == "RiseUp");
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            var nameBox = window.FindControl<TextBox>("PropChainName")!;
+            Assert.Equal("RiseUp", nameBox.Text);
+
+            CommitNameBox(nameBox, "");
+
+            Assert.Equal("ID:9", chain.Name); // owner tile 9
+            Assert.True(TreeNode(window, chain).IsAutoName);
+            Assert.Equal("Auto name: ID 9", nameBox.PlaceholderText);
+            Assert.DoesNotContain(Disk(_tsxPath).Tiles.Single(t => t.ID == 9).Properties, p => p.Name == "Name");
+
+            ctx.UndoManager.Undo();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("RiseUp", chain.Name);
+            Assert.False(TreeNode(window, chain).IsAutoName);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void NameBox_TypingNameOnAutoNamedChain_WritesNameToTsx()
+    {
+        var (window, ctx) = OpenTsx();
+        try
+        {
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == "ID:5");
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            CommitNameBox(window.FindControl<TextBox>("PropChainName")!, "Spin");
+
+            Assert.Equal("Spin", chain.Name);
+            Assert.False(TreeNode(window, chain).IsAutoName);
+            var nameProp = Disk(_tsxPath).Tiles.Single(t => t.ID == 5).Properties.OfType<StringProperty>().Single(p => p.Name == "Name");
+            Assert.Equal("Spin", nameProp.Value);
         }
         finally { window.Close(); }
     }

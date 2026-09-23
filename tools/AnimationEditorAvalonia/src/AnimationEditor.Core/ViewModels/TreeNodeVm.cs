@@ -108,6 +108,18 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>Discriminator for the icon shown in the tree item template.</summary>
     public NodeKind Kind { get; set; } = NodeKind.Frame;
 
+    private bool _isAutoName;
+    /// <summary>
+    /// True when this chain node's <see cref="Header"/> is a native tsx chain's synthetic
+    /// "ID:{tileId}" name rather than a <c>Name</c> property in the tsx -- drives the dimmed/italic
+    /// header style. Always <c>false</c> for an achx/achj project or a non-chain node.
+    /// </summary>
+    public bool IsAutoName
+    {
+        get => _isAutoName;
+        set { if (_isAutoName != value) { _isAutoName = value; Notify(); } }
+    }
+
     private bool _hasValidationIssue;
     /// <summary>
     /// True when this chain node has a <see cref="Tiled.TsxAnimationValidator"/> issue for a

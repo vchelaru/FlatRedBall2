@@ -1039,10 +1039,20 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Rename a chain.  Returns <c>false</c> (no-op) when another chain in the same ACLS
-        /// already uses <paramref name="newName"/>; returns <c>true</c> on success.
+        /// already uses <paramref name="newName"/>; returns <c>true</c> on success. An empty name
+        /// reverts a native-tsx chain to its auto "ID:{tileId}" name (removing <c>Name</c> from the
+        /// tsx); outside a native-tsx project it's rejected.
         /// </summary>
         public bool RenameChain(AnimationChainSave chain, string newName)
         {
+            newName = newName.Trim();
+            if (newName.Length == 0)
+            {
+                if (_pm.IsChainNameAuto(chain)) return true;
+                if (_pm.GetTsxOwnerTileId(chain) is null) return false;
+                _undoManager.Execute(new RenameChainCommand(chain, chain.Name, null, _pm, this, _events));
+                return true;
+            }
             if (chain.Name == newName) return true;
 
             var acls = _pm.AnimationChainListSave;

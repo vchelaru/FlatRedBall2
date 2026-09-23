@@ -1239,6 +1239,23 @@ namespace AnimationEditor.Core
         /// one line earlier in the same <c>Do()</c>), erasing the chain from it too and making Undo
         /// unable to restore synthetic tracking.
         /// </summary>
+        public bool IsChainNameAuto(AnimationChainSave chain) => _tsxSyntheticNamedChains.Contains(chain);
+
+        /// <summary>
+        /// Reverts a native-tsx chain to its synthetic <c>"ID:{ownerTileId}"</c> name, so the next
+        /// save omits the tile's <c>Name</c> property. Returns <see langword="false"/> (no change)
+        /// outside a native-tsx project or when the chain has no owner tile to name it after.
+        /// Replaces the set wholesale for the same reason as <see cref="MarkChainNameExplicit"/>.
+        /// </summary>
+        public bool MakeChainNameAuto(AnimationChainSave chain)
+        {
+            if (GetTsxOwnerTileId(chain) is not { } ownerTileId)
+                return false;
+            chain.Name = Tiled.TiledAnimationToAchjMapper.SyntheticChainName(ownerTileId);
+            _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(_tsxSyntheticNamedChains, ReferenceEqualityComparer.Instance) { chain };
+            return true;
+        }
+
         public bool MarkChainNameExplicit(AnimationChainSave chain)
         {
             if (!_tsxSyntheticNamedChains.Contains(chain))

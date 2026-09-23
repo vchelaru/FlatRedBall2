@@ -4319,7 +4319,7 @@ public partial class MainWindow : Window
                     node.PinnedVisible = visible.Contains(c);
 
             RefreshTreeThumbnails();
-            SyncTsxValidationIssuesIntoTree();
+            SyncTsxDecorationsIntoTree();
 
             // Re-select to keep visual state
             SyncTreeSelection();
@@ -4331,12 +4331,15 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Refreshes the exclamation-icon decoration on every chain node from <see
-    /// cref="IProjectManager.GetChainNamesWithTsxIssues"/> (issue #1140). A no-op for an achx/achj
-    /// project, which always returns an empty set.
+    /// Refreshes the tsx-only chain decorations: the exclamation icon from <see
+    /// cref="IProjectManager.GetChainNamesWithTsxIssues"/> (issue #1140) and the auto-name header
+    /// style from <see cref="IProjectManager.IsChainNameAuto"/>. A no-op for an achx/achj project.
     /// </summary>
-    private void SyncTsxValidationIssuesIntoTree() =>
+    private void SyncTsxDecorationsIntoTree()
+    {
         TreeBuilder.ApplyValidationIssues(_treeRoots, _projectManager.GetChainNamesWithTsxIssues());
+        TreeBuilder.ApplyAutoNames(_treeRoots, _projectManager.IsChainNameAuto);
+    }
 
     /// <summary>
     /// Fully rebuilds the tree from scratch, expanding only the chains named in
@@ -4383,7 +4386,7 @@ public partial class MainWindow : Window
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
-            SyncTsxValidationIssuesIntoTree();
+            SyncTsxDecorationsIntoTree();
             SyncTreeSelection();
         }
         finally
@@ -4408,6 +4411,7 @@ public partial class MainWindow : Window
                 node.Header = chain.Name;
                 node.Meta   = TreeBuilder.BuildChainMeta(chain);
                 node.IsLocked = chain.IsLocked;
+                node.IsAutoName = _projectManager.IsChainNameAuto(chain);
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
                 // Grow-only: keep it visible if it already was, or if it now matches.
                 node.PinnedVisible = node.PinnedVisible
@@ -5125,6 +5129,8 @@ public partial class MainWindow : Window
 
     private void WirePropertyPanel()
     {
+        PropChainName.LostFocus  += (_, _) => ApplyChainName();
+        PropChainName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyChainName(); };
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
         PropChainTsxOwnerInput.ValueChanged += (_, _) => ApplyChainTsxOwnerTileId();
@@ -5477,6 +5483,7 @@ public partial class MainWindow : Window
             if (chainOnly)
             {
                 PropChainLocked.IsChecked = selectedChain!.IsLocked;
+                RefreshChainNameBox(selectedChain);
                 PropChainLoop.IsChecked = selectedChain.Loop;
             }
             // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
@@ -5664,6 +5671,32 @@ public partial class MainWindow : Window
     }
 
     // ── Property apply methods ────────────────────────────────────────────────
+
+    /// <summary>An auto-named tsx chain shows an empty box with its synthetic name as the
+    /// placeholder, so clearing the box and seeing the placeholder mean the same thing.</summary>
+    private void RefreshChainNameBox(AnimationChainSave chain)
+    {
+        var isAuto = _projectManager.IsChainNameAuto(chain);
+        PropChainName.Text = isAuto ? string.Empty : chain.Name;
+        PropChainName.PlaceholderText = _projectManager.GetTsxOwnerTileId(chain) is { } tileId
+            ? $"Auto name: ID {tileId}"
+            : null;
+    }
+
+    /// <summary>Commits <see cref="PropChainName"/>. Empty reverts a tsx chain to its auto name
+    /// (see <see cref="IAppCommands.RenameChain"/>); a rejected rename (duplicate, or empty in an
+    /// achx project) snaps the box back to the current name.</summary>
+    private void ApplyChainName()
+    {
+        if (_suppressPropRefresh) return;
+        var chain = _selectedState.SelectedChain;
+        if (chain is null) return;
+
+        var text = PropChainName.Text ?? string.Empty;
+        if (!_appCommands.RenameChain(chain, text))
+            ShowStatusMessage(text.Trim().Length == 0 ? "Chain name cannot be empty." : $"Another chain is already named \"{text.Trim()}\".", isError: true);
+        RefreshChainNameBox(chain);
+    }
 
     private void ApplyChainLocked()
     {
@@ -7547,11 +7580,13 @@ public partial class MainWindow : Window
 
         if (vm.Data is AnimationChainSave chain)
         {
-            if (string.IsNullOrEmpty(newName))
+            // Empty reverts a tsx chain to its auto "ID:{tileId}" name; RenameChain rejects it
+            // outside a tsx project.
+            if (string.IsNullOrEmpty(newName) && !_appCommands.RenameChain(chain, newName))
             {
                 ShowStatusMessage("Chain name cannot be empty.", isError: true);
             }
-            else if (newName != chain.Name)
+            else if (newName.Length > 0 && newName != chain.Name)
             {
                 _appCommands.RenameChain(chain, newName);
             }

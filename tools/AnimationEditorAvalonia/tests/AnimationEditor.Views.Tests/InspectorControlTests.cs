@@ -40,6 +40,8 @@ public class InspectorControlTests
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId) => "not a tsx project";
         public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) => false;
         public bool MarkChainNameExplicit(AnimationChainSave chain) => false;
+        public bool IsChainNameAuto(AnimationChainSave chain) => false;
+        public bool MakeChainNameAuto(AnimationChainSave chain) => false;
         public uint? ComputeFrameTileId(AnimationFrameSave frame) => null;
         public object? CaptureTsxState() => null;
         public void RestoreTsxState(object? state) { }

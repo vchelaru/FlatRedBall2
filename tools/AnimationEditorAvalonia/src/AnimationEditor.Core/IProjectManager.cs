@@ -76,6 +76,14 @@ namespace AnimationEditor.Core
         /// placeholder). See <see cref="ProjectManager.MarkChainNameExplicit"/>.</summary>
         bool MarkChainNameExplicit(AnimationChainSave chain);
 
+        /// <summary>True when a native-tsx chain's name is the synthetic "ID:{tileId}" placeholder
+        /// (no <c>Name</c> property in the tsx). Always false for an achx/achj project.</summary>
+        bool IsChainNameAuto(AnimationChainSave chain);
+
+        /// <summary>Reverts a native-tsx chain to its synthetic name. See <see
+        /// cref="ProjectManager.MakeChainNameAuto"/>.</summary>
+        bool MakeChainNameAuto(AnimationChainSave chain);
+
         /// <summary>The Tiled tile id a frame's own pixel rect resolves to. See <see
         /// cref="ProjectManager.ComputeFrameTileId"/>.</summary>
         uint? ComputeFrameTileId(AnimationFrameSave frame);

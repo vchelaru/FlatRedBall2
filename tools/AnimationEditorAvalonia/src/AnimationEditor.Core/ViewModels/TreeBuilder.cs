@@ -56,6 +56,15 @@ public static class TreeBuilder
                 node.HasValidationIssue = chainNamesWithIssues.Contains(chain.Name);
     }
 
+    /// <summary>Sets <see cref="TreeNodeVm.IsAutoName"/> on each chain (root) node from <paramref
+    /// name="isChainNameAuto"/> (<see cref="IProjectManager.IsChainNameAuto"/>).</summary>
+    public static void ApplyAutoNames(IEnumerable<TreeNodeVm> roots, Func<AnimationChainSave, bool> isChainNameAuto)
+    {
+        foreach (var node in roots)
+            if (node.Data is AnimationChainSave chain)
+                node.IsAutoName = isChainNameAuto(chain);
+    }
+
     // ── Zebra striping ────────────────────────────────────────────────────────
 
     /// <summary>
