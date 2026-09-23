@@ -10,6 +10,19 @@ dotnet test
 
 ---
 
+## Dogfooding the editor without launching it
+
+`tests/AnimationEditor.App.Tests/Dogfood/` drives the real `MainWindow` headlessly with simulated
+clicks, drags, keys and scripted dialogs, so a change can be exercised end to end while the
+machine is in use and without starting the app. Its README covers the harness, the scenario shape,
+the find-pin-fix loop and the headless gotchas.
+
+```
+dotnet test tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
+```
+
+---
+
 ## Running on macOS — Dock name and icon
 
 On macOS, `dotnet run` launches the bare executable and the Dock shows

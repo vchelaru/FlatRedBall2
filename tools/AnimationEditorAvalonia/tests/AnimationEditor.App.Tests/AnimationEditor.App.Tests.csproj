@@ -22,6 +22,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Avalonia.Headless.XUnit" />
+    <PackageReference Include="Shouldly" />
   </ItemGroup>
 
   <ItemGroup>

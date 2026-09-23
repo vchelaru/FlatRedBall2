@@ -60,7 +60,7 @@ internal sealed class TestServices
     /// so its settings file resolves under here instead of the developer's real %APPDATA%
     /// (issue #438). A fresh Guid also isolates tests from one another.
     /// </summary>
-    public string SettingsRoot { get; } =
+    public string SettingsRoot { get; init; } =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditorTests", System.Guid.NewGuid().ToString("N"));
 
     public TestServices()

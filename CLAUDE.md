@@ -51,6 +51,8 @@ dotnet build src/FlatRedBall2.csproj
 dotnet test tests/FlatRedBall2.Tests/
 ```
 
+**Animation editor work: dogfood it headlessly.** `tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/Dogfood/README.md` describes the harness that drives the real editor window with simulated input (clicks, drags, keys, scripted dialogs, tab strip, wireframe geometry) and the find-a-bug, pin-it, fix-it loop built on it. Read it before changing the animation editor. It never touches the desktop, so it is safe to run while the machine is in use; never launch the editor itself to check a change.
+
 ## Available Skills
 
 Skills live in two locations, by audience:

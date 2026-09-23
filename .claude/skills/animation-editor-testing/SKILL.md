@@ -26,6 +26,24 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 
 Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI. Reach for Browser Playwright only when Headless/desktop cannot catch it — a small smoke set, not a 1:1 port.
 
+## Dogfooding the whole editor headlessly
+
+Full guide: `tests/AnimationEditor.App.Tests/Dogfood/README.md`. `AnimationEditorHarness` hosts a
+real `MainWindow` on a fresh `TestServices` graph over a temp project and drives it the way a user
+does: `ClickRow`/`RightClickRow`+`PickTreeMenuItem`/`Expand`/`RowButton` on the tree, `ClickAt`,
+`DoubleClickAt`, `Drag`, `Wheel` with `WireframeRectOf`/`WireframePointAt` on the texture panel,
+`Press`/`Type`/`TypeNumber`/`TypeFlanker` for keys and inspector fields, `ClickMenu` (a real click
+through the opened menus, so toggles behave), `ClickTab`/`CloseTab` on the strip. `ScriptedDialogs`
+answers the confirm, prompt, Save/Don't Save/Cancel and file-picker seams; an unanswered dialog
+fails the scenario. Read results from `Project`, `Services.SelectedState`, `Nodes`,
+`VisibleChainHeaders`, `UndoLabels`, `HistoryRows`, `ErrorBannerText`/`ToastText`, `TabLabels` and
+`ReadSaved`. Add a new gesture there first, then fix what it finds. Landmines the harness already
+encodes, so do not rediscover them: hit-testing needs a render tick after layout
+(`AvaloniaHeadlessPlatform.ForceRenderTimerTick`), `DispatcherTimer`s tick only while the test
+awaits (`WaitAsync`, never `Thread.Sleep`+`RunJobs`), text labels are not hit-testable so a
+label-only double-tap is unreachable, file-backed documents auto-save so only Untitled tabs prompt
+on close, and File > Load bypasses `IFileDialogService` so it cannot be scripted.
+
 ## `[AvaloniaFact]` is a last resort
 
 `[AvaloniaFact]` (from `Avalonia.Headless.XUnit`) runs the test on a headless Avalonia UI thread. It is slow and **deadlocks** on anything that blocks the UI thread waiting for the UI — a code path reaching `Window.ShowDialog` hangs forever with nothing to close the dialog. The `MainWindow` constructor also overwrites injected delegates (`AppCommands.ConfirmAsync`, `PromptStringAsync`, `FileDialogService`), so a stub installed *before* construction is silently lost.

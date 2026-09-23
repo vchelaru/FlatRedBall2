@@ -114,7 +114,7 @@
                         <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate" />
                         <Separator />
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
-                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />
+                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
                         <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                         <Separator />

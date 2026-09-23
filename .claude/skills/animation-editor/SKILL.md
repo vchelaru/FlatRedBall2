@@ -13,7 +13,7 @@ tools/AnimationEditorAvalonia/
 
 > The legacy WinForms version (`FlatRedBall.AnimationEditorForms`) lives in the separate `FlatRedBall` (FRB1) repo at `FRBDK/FlatRedBall.AnimationEditorForms/`. Do **not** edit it for FRB2 issues — that codebase is being replaced. Issues filed in `vchelaru/FlatRedBall2` always refer to the Avalonia version.
 
-For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. For generating headless documentation screenshots of the UI, see the **`animation-editor-screenshots`** skill. For WASM/`?demo=` visual proof in the browser host, see **`animation-editor-browser-verify`**. For SkiaSharp rendering internals and performance debugging, see **`animation-editor-rendering`**.
+For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. Before changing editor behaviour, dogfood it headlessly through the harness in `tests/AnimationEditor.App.Tests/Dogfood/` (README there); it drives the real window with simulated input and never touches the desktop. For generating headless documentation screenshots of the UI, see the **`animation-editor-screenshots`** skill. For WASM/`?demo=` visual proof in the browser host, see **`animation-editor-browser-verify`**. For SkiaSharp rendering internals and performance debugging, see **`animation-editor-rendering`**.
 
 ## `.achx` is a general-purpose format — the editor authors, runtimes interpret
 

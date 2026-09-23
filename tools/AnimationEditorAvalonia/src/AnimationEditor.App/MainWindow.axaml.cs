@@ -1241,6 +1241,24 @@ public partial class MainWindow : Window
                 }
             });
         };
+        // Save As on a file-backed tab: the document now lives at the new path (auto-save writes
+        // there), so the tab follows it; otherwise the strip keeps naming the old file and a later
+        // open of that file focuses this tab's foreign content. An Untitled tab is promoted by the
+        // CurrentFileChanged handler above instead, and a path another tab holds is left alone.
+        _appCommands.SaveAsCompleted += path =>
+        {
+            var savedFrom = _tabManager.ActiveTab;
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var newPath = new FilePath(path);
+                if (savedFrom is { Kind: TabKind.Achx } && !IsUntitledTab(savedFrom) && savedFrom.Path != newPath
+                    && !_tabManager.Tabs.Any(tab => tab.Path == newPath))
+                {
+                    _tabManager.Rename(savedFrom.Path, newPath);
+                    RebuildTabStrip();
+                }
+            });
+        };
         _events.AvailableTexturesChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshTextureCombo);
 
         _undoManager.StackChanged         += () => Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
