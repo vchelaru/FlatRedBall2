@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 55 scenarios, roughly 25 seconds.
+About 65 scenarios, roughly 25 seconds.
 
 ## The pieces
 
@@ -25,7 +25,7 @@ About 55 scenarios, roughly 25 seconds.
 |---|---|
 | `AnimationEditorHarness.cs` | Hosts a real `MainWindow` on a fresh `TestServices` graph over a temp project folder. Fixtures, gestures, lookups (tree rows, tabs, wireframe geometry, inspector fields), undo labels, notifications. |
 | `ScriptedDialogs.cs` | Answers the dialogs the editor opens through its seams (confirm, string prompt, Save / Don't Save / Cancel, open and save file pickers). An unanswered dialog fails the scenario at the next `Layout()`. |
-| `*ScenarioTests.cs` | One file per area: chain list, frames, wireframe, shapes, tabs, playback, rename and search, external changes, history, untitled documents. |
+| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents. |
 
 ## Write a scenario
 

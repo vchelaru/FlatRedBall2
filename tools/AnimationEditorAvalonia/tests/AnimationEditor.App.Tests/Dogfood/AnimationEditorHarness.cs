@@ -121,6 +121,22 @@ internal sealed class AnimationEditorHarness : IDisposable
         return path;
     }
 
+    /// <summary>Writes a transparent PNG with one opaque rectangle (x, y, width, height), for the magic wand.</summary>
+    public string WritePngWithBlob(string name, int width, int height, (int X, int Y, int Width, int Height) blob)
+    {
+        string path = Path.Combine(ProjectFolder, name);
+        using SKBitmap bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        bitmap.Erase(SKColors.Transparent);
+        using (SKCanvas canvas = new SKCanvas(bitmap))
+        using (SKPaint paint = new SKPaint { Color = SKColors.OrangeRed })
+        {
+            canvas.DrawRect(new SKRect(blob.X, blob.Y, blob.X + blob.Width, blob.Y + blob.Height), paint);
+        }
+        using SKData data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
     /// <summary>
     /// Writes a pixel-coordinate <c>.achx</c> into <see cref="ProjectFolder"/> and returns its path.
     /// Pixel coordinates keep the real open path from asking about a UV conversion.
