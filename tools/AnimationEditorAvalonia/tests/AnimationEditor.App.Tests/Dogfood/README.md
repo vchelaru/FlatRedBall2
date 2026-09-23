@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 130 scenarios, roughly 50 seconds.
+About 140 scenarios, roughly 50 seconds.
 
 ## The pieces
 
@@ -183,6 +183,22 @@ a hot reload ends consistent with disk; undo across a reload leaves the tree mat
 a duplicated chain owns its shapes; sixty Add Frame clicks all land; a 300-character name
 round-trips; Space on a focused toggle button toggles the button, not playback.
 
+## Sixth-pass findings (dialogs, September 2026)
+
+The dialogs that open through `EditorDialogs` got a scripting seam: `MainWindow` takes an
+optional `IEditorDialogHost` (production passes nothing and keeps its window host), and
+`ScriptedDialogs` implements it by mounting the dialog's content in a headless window, handing
+it to the scenario's `AnswerNextEditorDialog` callback, then pressing OK or Cancel. Eight
+scenarios: Adjust Frame Time (Keep Proportional, Set All Frames Same, and cancelled after live
+edits), Add Multiple Frames (three with Increment UV, and cancelled), Adjust Offsets (Justify
+Bottom, Adjust All absolute then relative), and the Files tab. All eight passed on the first run:
+live edits preview and roll back on Cancel with no undo entry, a confirmed dialog collapses to
+one undo step, the batch add lands as one step, and the offsets land on every frame.
+
+The seam is the only test-motivated change to production code on this branch, and it follows
+the window's existing injection of its settings root and updater; no `*ForTest` methods or
+`Simulate*` hooks were added.
+
 ## Needs real input: the non-headless list
 
 Things this harness cannot exercise, or can only approximate, kept here so a real-window pass
@@ -196,7 +212,7 @@ knows where to look. Add to it whenever a scenario has to route around something
 | Smooth zoom, selection reveal, toast auto-hide, playback cadence | Timers tick only while the test awaits; no 60 fps loop | Wheel-zoom feel, reveal animation, toast racing a click on its button |
 | Anything drawn | `UseHeadlessDrawing = true`: no pixels; nothing here asserts on rendering | Handles, overlapping-frame highlight, onion skin, guides, grid, PNG diff view, timeline thumbnails, theme colours |
 | Tree drag-and-drop reorder (chains, frames), tab reorder by drag | Avalonia `DragDrop` needs a platform drag source | Drag rows above/below/into, drag tabs, drop a PNG from Explorer onto the wireframe and onto the tree |
-| Native dialogs: File > Load, the `EditorDialogs` windows (Adjust Frame Time, Add Multiple Frames, Adjust Offsets, About, Settings, Resize Texture) | Load calls `StorageProvider` directly; the others open real windows nothing closes | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
+| Native dialogs: File > Load, Resize Texture, About, Settings | Load calls `StorageProvider` directly; the others build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed; Resize Texture rewrites the PNG, so check the UVs afterwards |
 | Clipboard with other apps, file association, single-instance handoff, Velopack update, crash recovery on next launch | Stubbed or process-level | Paste from another editor instance, double-click an `.achx` in Explorer with the editor open, kill and relaunch |
 | DPI scaling, multi-monitor, window restore position, macOS Dock/menu | Platform | Move between monitors with different scaling, restart |
 | Cursor changes (add-frame cursor on Ctrl-hover, handle cursors, hand over tabs) | Cursor is set but never observed | Hover every handle and the tabs with and without Ctrl |

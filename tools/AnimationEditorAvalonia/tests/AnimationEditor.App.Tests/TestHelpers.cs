@@ -56,6 +56,12 @@ internal sealed class TestServices
     public IApplicationUpdater ApplicationUpdater { get; set; } = new FakeApplicationUpdater();
 
     /// <summary>
+    /// Host for the dialogs that open straight through <c>EditorDialogs</c>; null keeps the
+    /// production window host, which parks a headless test until someone closes the dialog.
+    /// </summary>
+    public AnimationEditor.Views.Dialogs.IEditorDialogHost? EditorDialogHost { get; set; }
+
+    /// <summary>
     /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
     /// so its settings file resolves under here instead of the developer's real %APPDATA%
     /// (issue #438). A fresh Guid also isolates tests from one another.
@@ -88,7 +94,7 @@ internal sealed class TestServices
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
             ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot,
-            ApplicationUpdater);
+            ApplicationUpdater, EditorDialogHost);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

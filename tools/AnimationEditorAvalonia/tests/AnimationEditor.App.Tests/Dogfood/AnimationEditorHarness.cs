@@ -41,6 +41,8 @@ internal sealed class AnimationEditorHarness : IDisposable
         ProjectFolder = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(ProjectFolder);
 
+        Dialogs = new ScriptedDialogs();
+        Services.EditorDialogHost = Dialogs;
         Window = Services.CreateMainWindow();
         Window.Width = 1280;
         Window.Height = 800;
@@ -49,7 +51,6 @@ internal sealed class AnimationEditorHarness : IDisposable
 
         // The window's constructor wires the production dialogs onto these seams, so the script
         // has to go on after construction or it is silently replaced.
-        Dialogs = new ScriptedDialogs();
         Services.AppCommands.ConfirmAsync = Dialogs.ConfirmAsync;
         Services.AppCommands.PromptStringAsync = Dialogs.PromptStringAsync;
         Services.AppCommands.FileDialogService = Dialogs;

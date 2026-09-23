@@ -219,7 +219,8 @@ public partial class MainWindow : Window
         ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
         string applicationDataRoot,
-        IApplicationUpdater? applicationUpdater = null)
+        IApplicationUpdater? applicationUpdater = null,
+        IEditorDialogHost? dialogHost = null)
     {
         _applicationDataRoot = applicationDataRoot;
 
@@ -236,7 +237,10 @@ public partial class MainWindow : Window
         _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
-        _dialogHost = new WindowEditorDialogHost(this);
+        // The dialogs that open straight through EditorDialogs (Adjust Frame Time, Add Multiple
+        // Frames, Adjust Offsets, ...) go through this host; a test passes a scripted one, since a
+        // real dialog window parks until a person closes it.
+        _dialogHost = dialogHost ?? new WindowEditorDialogHost(this);
         // Desktop renders the tree with its own _treeRoots collection, so the controller
         // reads expand state from there (browser reads its AnimationTreeControl instead).
         _tabController = new TabController(_undoManager, _appCommands,
