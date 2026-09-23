@@ -87,8 +87,13 @@ public static class TreeMenuPlanBuilder
                 items.Add(TreeMenuItem.Item("Invert Frame Order", () => appCommands.InvertFrameOrder(chain2)));
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!));
-                items.Add(TreeMenuItem.Item("Add Frame", () => appCommands.AddFrame(chain2)));
-                items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AddMultipleFrames));
+                // A locked chain refuses new frames (AddFrame and AddMultipleFrames are no-ops on
+                // it) and the row hides its + button; the menu must not offer inert items either.
+                if (!chain2.IsLocked)
+                {
+                    items.Add(TreeMenuItem.Item("Add Frame", () => appCommands.AddFrame(chain2)));
+                    items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AddMultipleFrames));
+                }
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Copy", actions.Copy));
                 items.Add(TreeMenuItem.Item("Cut", actions.Cut));

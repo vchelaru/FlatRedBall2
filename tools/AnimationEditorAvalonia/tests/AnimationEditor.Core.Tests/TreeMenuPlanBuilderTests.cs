@@ -16,6 +16,20 @@ public class TreeMenuPlanBuilderTests
         items.ToList().FindIndex(i => i.Header == header);
 
     [Fact]
+    public void Build_LockedChainNode_OffersNoWayToAddFrames()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        chain.IsLocked = true;
+
+        var items = TreeMenuPlanBuilder.Build(
+            chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.DoesNotContain(items, i => i.Header == "Add Frame");
+        Assert.DoesNotContain(items, i => i.HostSlot == TreeMenuHostSlot.AddMultipleFrames);
+    }
+
+    [Fact]
     public void Build_ChainNode_DuplicateIsSubmenuWithThreeChildren()
     {
         var ctx = TestHelpers.SetupFreshAcls();

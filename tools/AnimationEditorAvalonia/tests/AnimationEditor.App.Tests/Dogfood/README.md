@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 85 scenarios, roughly 30 seconds.
+About 110 scenarios, roughly 40 seconds.
 
 ## The pieces
 
@@ -25,7 +25,7 @@ About 85 scenarios, roughly 30 seconds.
 |---|---|
 | `AnimationEditorHarness.cs` | Hosts a real `MainWindow` on a fresh `TestServices` graph over a temp project folder. Fixtures, gestures, lookups (tree rows, tabs, wireframe geometry, inspector fields), undo labels, notifications. |
 | `ScriptedDialogs.cs` | Answers the dialogs the editor opens through its seams (confirm, string prompt, Save / Don't Save / Cancel, open and save file pickers). An unanswered dialog fails the scenario at the next `Layout()`. |
-| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases. |
+| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases, exploratory QA. |
 
 ## Write a scenario
 
@@ -127,6 +127,34 @@ Ctrl+Y and Ctrl+Shift+Z both redo, Delete Frame acts on the right-clicked row, C
 rectangle duplicates it with its own name, Flip Vertically and Invert Frame Order undo one at a
 time, the preview toggles follow the toolbar, and the recent-files menu focuses an open tab
 instead of opening it twice.
+
+## Fourth-pass findings (exploratory QA, September 2026)
+
+Twenty-seven scenarios in the "what would a real tester try" spirit: actions in odd orders,
+hotkeys with focus in the wrong place, junk typed into fields, keys hammered, edits during
+playback, a drag cancelled with Escape, a corrupt file, a missing texture, a locked chain, a
+tiny window, Tab-key traversal, ten tab switches in a row.
+
+| Finding | Kind | Outcome |
+|---|---|---|
+| A locked chain's context menu still offered "Add Frame" and "Add Multiple Frames…", both silently inert (the row's + button is hidden, and `AddFrame` refuses) | Does, but shouldn't | Fixed in `TreeMenuPlanBuilder` (red Core test first): a locked chain's menu offers neither |
+| An `.achx` whose PNG is missing takes edits but never saves them; the toast and status say "Auto Save Failed" and why | Looked like a bug, is by design | A pixel-coordinate file cannot be written without the texture size; scenario now asserts the refusal is explained and the file is untouched |
+| The first frame added to an empty chain has no texture, even when the project has one the wireframe is already showing | Should, arguably | Open: `AddFrame` inherits from a sibling frame or the canvas; on an empty chain with the canvas borrowing a texture it still lands empty. Small UX win if the canvas texture were used |
+| Ctrl+Z right after a menu action (Save As) did nothing headlessly | Harness | Focus stayed on the closed popup's item, whose key events go to the popup's own top level; `ClickMenu` now hands focus back to a tree row. Worth one manual check on the desktop that Ctrl+Z works immediately after a menu action |
+
+Confirmed correct: two Ctrl+N give distinct untitled names, undo/redo with nothing to do is
+silent, Delete inside an inspector box edits text not the frame, Delete twice deletes two chains
+and two undos restore both, deleting the playing chain stops the preview, three duplicates get
+three names, Escape during a handle drag leaves either the original or an undoable edit, junk in
+the frame-length box changes nothing and records no undo, a grid size of 0 does not break the
+wireframe, re-opening the open file focuses its tab and keeps the edit and its undo history, an
+empty clipboard pastes nothing quietly, a name with a trailing space is not a rename, renaming
+during playback keeps playing, the row's + button on an unselected chain targets that chain,
+Space in the search box types a space, tab switching keeps per-tab selection and undo stacks,
+undo in one tab never touches another, 20 wheel notches each way stay finite, Alt+Up at the top
+records nothing, an empty chain plays/scrubs/takes a frame, a locked chain refuses inspector
+edits and pasted frames, a corrupt file is reported and the editor stays usable, Save As keeps
+the undo history, Tab moves between inspector fields, and a 400x300 window still takes edits.
 
 ## Gotchas
 

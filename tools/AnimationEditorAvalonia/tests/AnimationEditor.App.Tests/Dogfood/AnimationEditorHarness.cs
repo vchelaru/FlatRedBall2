@@ -419,7 +419,21 @@ internal sealed class AnimationEditorHarness : IDisposable
         {
             ancestor.IsSubMenuOpen = false;
         }
+        // Leave menu mode the way a click does on the desktop: while the root Menu stays open
+        // it keeps the keyboard, so the next hotkey (Ctrl+Z after Save As) would be swallowed.
+        (ancestors.FirstOrDefault()?.Parent as Menu)?.Close();
         Layout();
+        // The tree itself is not focusable, its rows are: give the keyboard back to the selected
+        // row (or the window) so the next hotkey is not swallowed by the closed popup's item.
+        Control target = AnimTree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(row => row.IsSelected)
+            ?? AnimTree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault()
+            ?? (Control)Window;
+        target.Focus();
+        Layout();
+        if (Window.FocusManager?.GetFocusedElement() is MenuItem stuck)
+        {
+            throw new InvalidOperationException($"Focus is still on the menu item '{stuck.Header}' after the click; hotkeys would be swallowed.");
+        }
     }
 
     /// <summary>
