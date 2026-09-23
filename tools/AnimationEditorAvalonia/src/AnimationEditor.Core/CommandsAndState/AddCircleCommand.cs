@@ -4,6 +4,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     internal sealed class AddCircleCommand : IUndoableCommand
     {
+        private bool _createdShapesSave;
         private readonly CircleSave _circle;
         private readonly AnimationFrameSave _frame;
         private readonly IAppCommands _commands;
@@ -27,6 +28,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
+            _createdShapesSave = _frame.ShapesSave is null;
             _frame.ShapesSave ??= new ShapesSave();
             _frame.ShapesSave.Shapes.Add(_circle);
             _commands.RefreshTreeNode(_frame);
@@ -39,6 +41,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public void Undo()
         {
             _frame.ShapesSave!.Shapes.Remove(_circle);
+            if (_createdShapesSave)
+                _frame.ShapesSave = null; // see AddAxisAlignedRectangleCommand.Undo
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

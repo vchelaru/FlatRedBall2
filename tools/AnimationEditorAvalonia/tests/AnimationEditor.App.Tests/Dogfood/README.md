@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 165 scenarios, roughly 60 seconds.
+About 205 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
 
 ## The pieces
 
@@ -25,7 +25,7 @@ About 165 scenarios, roughly 60 seconds.
 |---|---|
 | `AnimationEditorHarness.cs` | Hosts a real `MainWindow` on a fresh `TestServices` graph over a temp project folder. Fixtures, gestures, lookups (tree rows, tabs, wireframe geometry, inspector fields), undo labels, notifications. |
 | `ScriptedDialogs.cs` | Answers the dialogs the editor opens through its seams (confirm, string prompt, Save / Don't Save / Cancel, open and save file pickers). An unanswered dialog fails the scenario at the next `Layout()`. |
-| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases, exploratory QA, dialogs, tsx and achj, unusual projects. |
+| `*ScenarioTests.cs` | One file per area: chain list, chain menu and multi-select, frames, wireframe, grid and magic wand, shapes, tabs, playback, rename and search, external changes, history, untitled documents, everyday editing, edge cases, exploratory QA, dialogs, tsx and achj, unusual projects, keyboard only, two things at once, long sessions, and a sweep of every remaining control. |
 
 ## Write a scenario
 
@@ -244,6 +244,58 @@ textures shows its own texture and converts with its own size; a read-only file 
 reports the failed auto-save and saves again once writable; a hundred edits undo and redo all the
 way with the file following.
 
+## Ninth-pass findings (full-breadth review, September 2026)
+
+Forty-three scenarios chosen from an inventory of every menu item, toolbar button, context-menu
+entry, hotkey and inspector field, crossed against what the first 164 scenarios already drove,
+and spread over four lenses at once: the keyboard alone, two things at once, long sessions, and
+a sweep of every control nobody had clicked (`KeyboardOnlyScenarioTests`,
+`TwoThingsAtOnceScenarioTests`, `LongSessionScenarioTests`, `SweepScenarioTests`). This pass
+also ran the folder on Linux for the first time, because the GitHub build runs the App tests on
+Ubuntu, and that found two more. Eleven failed on Windows and thirteen on Linux at first; three
+were the editor.
+
+| Finding | Kind | Outcome |
+|---|---|---|
+| Home and End did nothing in the animation tree, so a keyboard-only user at the bottom of a long tree could only hold Up | **Should, but didn't** | Fixed: a Tunnel-phase handler in `MainWindow` selects the first or last visible row and moves focus there (the scenario is the guard; the logic is `FlattenVisible` plus a selection, nothing to test below the window) |
+| Undoing Add Rectangle or Add Circle on a frame that had no shapes left an empty shape collection, which serialises as a `<ShapeCollectionSave>` block, so "undo everything" changed the file | **Should not, but did** | Fixed in the two add commands (red Core tests in `AppCommandsShapeTests`); the two-tab undo-everything scenario proves both files come back byte for byte |
+| On Linux a PNG replaced on disk never reloaded and the wireframe went blank: `ForceReloadTexture` re-read the lowercased identity path, which only resolves on a case-insensitive filesystem | **Should, but didn't** (Linux only) | Fixed in `TextureViewport` (red test in `WireframeTextureTests`, red on Windows too since the reload also lowercased the case-preserved path) |
+| On Linux a read-only `.achx` still saved: the atomic write renames a temp file over the target, and rename ignores the target's mode | Expectation (platform) | The scenario now makes the folder unwritable on Unix and the file read-only on Windows; either way the editor reports the failed auto-save and saves again once writable |
+| Playback looked as if it stopped on a frame delete, a lock and a hot reload | Expectation | The preview auto-plays once a chain is selected, so the scenario's first click on Play had paused it; with that handled, playback survives all three. Undo of a delete re-selects the restored frame, and a selected frame pins the preview |
+| The search filter looked ignored by a hot reload, and a paste under a filter looked unselected | Expectation | Model changes are grow-only by design (they never hide a row, only typing does), and the paste does select what it added; the scenario had indexed the wrong chain |
+| Flip V, Flip D and the preview toggles looked unclickable; the guides toggle did nothing | Expectation | They are `ToggleButton`s, and the guides toggle is not in the toolbar until a guide exists |
+| Ctrl+D right after Enter in an inspector box edited the box | Expectation (documented gotcha) | Focus stays in the box after Enter; the scenario clicks the row first |
+
+Seen and left alone:
+
+- `TextureCombo` and its "Texture:" label are hidden in the toolbar (`IsVisible="False"`); the
+  handler still retargets selected frames. A vestigial control, worth deleting or restoring.
+- `MainWindow.OpenProjectFolderForTestAsync` (and `HandleDeleteForTest`, plus a few `*ForTest`
+  internals in Views) predate this branch and are on `main`. Open Project Folder calls the OS
+  folder picker directly, so the Project-panel scenarios go through that hook. A `PickFolderAsync`
+  on `IFileDialogService` would let it go; 31 test call sites use it today.
+- The fourth-pass note about an empty chain's first frame is closed: beside a textured chain the
+  new frame takes the texture the canvas is showing.
+
+Confirmed correct: Down and Up walk an expanded chain's frames and on into the next chain, Right
+expands then steps into the first frame, Left goes up to the chain then collapses it, Enter on a
+row toggles expansion and never renames, Shift+Down range-selects and Delete removes the range
+as one step, F2 then Left moves the caret without collapsing the chain, F3 toggles render
+diagnostics on both canvases with the menu check mark following, Escape in the search box clears
+and collapses it; twenty edits then Reload From Disk at once show the last edit, a frame drag
+interrupted by a hot reload leaves the tree and the model agreeing, a tab switch during playback
+shows the other document; fifty chains named by keyboard reload identically, a hundred edits over
+25 tab switches keep both files and both undo stacks, twenty undo/redo ping-pongs and twenty
+open/close cycles leave everything consistent; Edit > Undo/Redo enable with the stack, Copy,
+Paste and Duplicate work from the menu, Export to PixiJS writes the JSON beside a copy of the
+texture and toasts, Associate Tiled Tileset records the association through the scripted picker,
+Expand All and Collapse All, the bounding-box toggle, the PNG usage overlay finds the chain and
+its two regions, Move and Magic Wand are one or the other and Move cannot be turned off, Green,
+Blue, Alpha, Relative Y, Pixel H, rectangle Y and Scale Y, circle X and Y and both shape name
+fields reach the file, File > New and File > Save through the menu, Follow System theme survives
+a restart, View > Show History and all four zoom items, and a crash leaves an untitled document
+that comes back on the next start behind a banner Dismiss hides.
+
 ## Running the next pass (start here in a fresh session)
 
 This is the whole method; nothing else is needed to pick the work up.
@@ -254,10 +306,11 @@ This is the whole method; nothing else is needed to pick the work up.
    sweep, "what should it do / what should it not do", tester-style abuse (odd orders, focus in
    the wrong place, junk input, hammered keys, edits during playback or a hot reload), panels and
    document kinds, unusual projects (many chains, huge and tiny textures, deep folders, non-ASCII
-   paths, legacy files, duplicate names, a read-only file). Good next lenses: two things at once
-   (playback plus hot reload plus a rename), long sessions (hundreds of mixed edits across tabs,
-   then undo all the way back), the keyboard alone (arrow keys, Home/End, Tab order), and every
-   open note in the tables above.
+   paths, legacy files, duplicate names, a read-only file), the keyboard alone, two things at
+   once, long sessions, and a sweep of every control against an inventory of the window. Good
+   next lenses: the Project panel and Files tab in depth (many folders, renames and deletes on
+   disk while open), the group preview with three or more chains, Linux-only behaviour (case,
+   permissions, watchers), and every note left open in the tables above.
 3. Write each scenario with the user's expectation stated up front, in the test name and the
    assertion messages. Let the editor disagree. Ten to twenty scenarios per pass is the right size.
 4. Run them: `dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~<ClassName>"`.
@@ -275,7 +328,10 @@ This is the whole method; nothing else is needed to pick the work up.
 7. Record the pass as a table in this file (finding, kind, outcome), add anything the harness had
    to route around to the real-window list below, update the scenario count under "Run it", and
    commit the scenarios, any fix and this file together. Run the whole App assembly before
-   committing; the Core and Views assemblies too when `src/AnimationEditor.Core` changed.
+   committing; the Core and Views assemblies too when `src/AnimationEditor.Core` changed. Run
+   the App assembly on Linux as well (WSL, from a clone in the Linux filesystem so Windows build
+   outputs stay untouched): the GitHub build uses Ubuntu, and the ninth pass found two Linux-only
+   differences that Windows could not show.
 
 ## Needs real input: the non-headless list
 
@@ -290,7 +346,7 @@ knows where to look. Add to it whenever a scenario has to route around something
 | Smooth zoom, selection reveal, toast auto-hide, playback cadence | Timers tick only while the test awaits; no 60 fps loop | Wheel-zoom feel, reveal animation, toast racing a click on its button |
 | Anything drawn | `UseHeadlessDrawing = true`: no pixels; nothing here asserts on rendering | Handles, overlapping-frame highlight, onion skin, guides, grid, PNG diff view, timeline thumbnails, theme colours |
 | Tree drag-and-drop reorder (chains, frames), tab reorder by drag | Avalonia `DragDrop` needs a platform drag source | Drag rows above/below/into, drag tabs, drop a PNG from Explorer onto the wireframe and onto the tree |
-| Native dialogs: File > Load, Resize Texture, About, Settings | Load calls `StorageProvider` directly; the others build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed; Resize Texture rewrites the PNG, so check the UVs afterwards |
+| Native dialogs: File > Load, Open Project Folder, the inspector's Browse… for a texture, Resize Texture, About, Settings | Load, the folder picker and Browse… call `StorageProvider` directly (the Project-panel scenarios use the pre-existing `OpenProjectFolderForTestAsync` hook instead); the others build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`; Export to PixiJS and Associate Tiled Tileset go through `IFileDialogService` and are scripted too) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed; Resize Texture rewrites the PNG, so check the UVs afterwards |
 | Clipboard with other apps, file association, single-instance handoff, Velopack update, crash recovery on next launch | Stubbed or process-level | Paste from another editor instance, double-click an `.achx` in Explorer with the editor open, kill and relaunch |
 | DPI scaling, multi-monitor, window restore position, macOS Dock/menu | Platform | Move between monitors with different scaling, restart |
 | Cursor changes (add-frame cursor on Ctrl-hover, handle cursors, hand over tabs) | Cursor is set but never observed | Hover every handle and the tabs with and without Ctrl |
@@ -339,6 +395,14 @@ knows where to look. Add to it whenever a scenario has to route around something
   label's coordinates lands on nothing. `RowFor` calls `BringIntoView` on the row and
   `RowHeaderPoint` throws when the point is still outside the tree, so a scenario never silently
   clicks past a row.
+- **The preview auto-plays once a chain is selected**, and the Play button toggles. A scenario
+  that wants playback running checks `Preview.IsPlaying` first and only clicks when stopped;
+  clicking blindly pauses it and every later assertion reads as "playback stopped".
+- **Linux differs in three places the harness has met.** Paths: the viewport's identity path is
+  lowercased, so anything that re-reads a file must use the case-preserved path (that was the
+  PNG reload bug). Permissions: a read-only file is replaced by the atomic save's rename, so an
+  unwritable folder is how to refuse a save. Shell: pass `|` in a `dotnet test` filter through
+  `wsl.exe` with a placeholder, since the WSL shell re-parses the argument line.
 - **Focus does not leave an inspector box on Enter.** Enter commits the value (and seals its
   undo entry); the `NumericUpDown` keeps the keyboard, and the tree itself is not focusable, so
   `AnimTree.Focus()` changes nothing. Click a row or press Tab to move focus for real.

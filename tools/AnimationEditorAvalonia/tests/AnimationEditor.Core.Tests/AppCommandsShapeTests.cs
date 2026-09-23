@@ -28,6 +28,39 @@ public class AppCommandsShapeTests
     }
 
     [Fact]
+    public void AddAxisAlignedRectangle_ThenUndo_OnAFrameWithNoShapes_LeavesShapesSaveNull()
+    {
+        // An empty ShapesSave still serializes as a <ShapeCollectionSave> block, so a frame that
+        // never had shapes must go back to having none, or "undo everything" changes the file.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        frame.ShapesSave = null;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
+
+        ctx.UndoManager.Undo();
+
+        frame.ShapesSave.ShouldBeNull();
+    }
+
+    [Fact]
+    public void AddAxisAlignedRectangle_ThenUndo_OnAFrameThatHadShapes_KeepsTheOthers()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.AppCommands.AddCircle(frame);
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
+
+        ctx.UndoManager.Undo();
+
+        frame.ShapesSave!.Shapes.Count.ShouldBe(1);
+        frame.ShapesSave.CircleSaves.Count().ShouldBe(1);
+    }
+
+    [Fact]
     public void AddAxisAlignedRectangle_SetsDefaultScale8()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -108,6 +141,21 @@ public class AppCommandsShapeTests
         ctx.AppCommands.AddCircle(frame);
 
         Assert.Single(frame.ShapesSave!.CircleSaves);
+    }
+
+    [Fact]
+    public void AddCircle_ThenUndo_OnAFrameWithNoShapes_LeavesShapesSaveNull()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        frame.ShapesSave = null;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.AppCommands.AddCircle(frame);
+
+        ctx.UndoManager.Undo();
+
+        frame.ShapesSave.ShouldBeNull();
     }
 
     [Fact]

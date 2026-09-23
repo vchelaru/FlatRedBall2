@@ -33,9 +33,18 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// Where the editor's per-user settings go for this run; a second harness given the same
     /// root starts the way a restarted editor would. Defaults to a fresh temp folder.
     /// </param>
-    public AnimationEditorHarness(string? settingsRoot = null)
+    /// <param name="recoveryFilePath">
+    /// Where the crash-recovery file for an unsaved document lives; give a second harness the
+    /// file a first one left behind to start the way the editor does after a crash. Defaults to
+    /// a fresh temp file.
+    /// </param>
+    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null)
     {
         Services = settingsRoot is null ? new TestServices() : new TestServices { SettingsRoot = settingsRoot };
+        if (recoveryFilePath != null)
+        {
+            Services.IoManager.RecoveryFilePath = recoveryFilePath;
+        }
         Services.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
         Services.ProjectManager.FileName = null;
         ProjectFolder = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));

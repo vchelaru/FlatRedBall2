@@ -739,7 +739,9 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     public void ForceReloadTexture()
     {
-        var path = _loadedTexturePath;
+        // Reload by the case-preserved path: the lowercased identity only resolves on a
+        // case-insensitive filesystem, and on Linux a hot reload found no file and went blank.
+        var path = _loadedTexturePathCasePreserved ?? _loadedTexturePath;
         if (path == null) return;
         // LoadTexture only restores a saved camera when _cameraByTexture has an entry for this
         // path, which is populated on cross-texture switches, not on the very first load of a

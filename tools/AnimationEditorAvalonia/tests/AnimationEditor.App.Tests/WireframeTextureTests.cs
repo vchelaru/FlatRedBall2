@@ -92,6 +92,33 @@ public class WireframeTextureTests
     /// <c>true</c> for a valid image and for an empty/clear path, <c>false</c> for an undecodable
     /// file or a path that isn't on disk.
     /// </summary>
+    /// <summary>
+    /// A hot reload re-reads the texture by its case-preserved path. The lowercased identity the
+    /// viewport keys its cache on only resolves on a case-insensitive filesystem; on Linux the
+    /// reload found no file and the wireframe went blank (the Dogfood PNG-replaced scenario on CI).
+    /// </summary>
+    [AvaloniaFact]
+    public void Wireframe_ForceReloadTexture_KeepsThePathsCase_AndReadsTheNewImage()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"), "Sheets");
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteSolidPng(dir, "Hero.png", SKColors.Red, size: 32);
+            var ctrl = ctx.CreateWireframeControl();
+            Assert.True(ctrl.LoadTexture(png));
+            Assert.Equal((32, 32), ctrl.BitmapSize);
+
+            WriteSolidPng(dir, "Hero.png", SKColors.Blue, size: 48);
+            ctrl.ForceReloadTexture();
+
+            Assert.Equal((48, 48), ctrl.BitmapSize);
+            Assert.Equal(png.Replace(System.IO.Path.DirectorySeparatorChar, '/'), ctrl.LoadedTexturePathCasePreserved);
+        }
+        finally { System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(dir)!, true); }
+    }
+
     [AvaloniaFact]
     public void Wireframe_LoadTexture_ReturnsLoadOutcome()
     {

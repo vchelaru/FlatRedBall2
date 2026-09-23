@@ -368,7 +368,7 @@ public class UnusualProjectScenarioTests
         AnimationChainSave walk = editor.ChainNamed("Walk");
         editor.Expand(walk);
         editor.ClickRow(walk.Frames[0]);
-        File.SetAttributes(path, FileAttributes.ReadOnly);
+        MakeUnwritable(path);
         try
         {
             editor.TypeNumber("PropPixelX", "8");
@@ -380,7 +380,7 @@ public class UnusualProjectScenarioTests
         }
         finally
         {
-            File.SetAttributes(path, FileAttributes.Normal);
+            MakeWritable(path);
         }
 
         editor.TypeNumber("PropPixelX", "16");
@@ -457,6 +457,38 @@ public class UnusualProjectScenarioTests
         editor.Project.AnimationChains.Count.ShouldBe(199);
         editor.Project.AnimationChains.Any(chain => chain.Name == "Chain001").ShouldBeFalse();
         AnimationEditorHarness.ReadSaved(path).AnimationChains.Count.ShouldBe(199);
+    }
+
+    /// <summary>
+    /// Makes the file impossible to save over. The editor saves by writing a temp file beside the
+    /// target and renaming it into place, so on Windows the target's read-only attribute is what
+    /// refuses the rename, while on Unix a read-only file is replaced happily and only a folder
+    /// without write permission refuses the temp file.
+    /// </summary>
+    private static void MakeUnwritable(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+        }
+        else
+        {
+            File.SetUnixFileMode(Path.GetDirectoryName(path)!,
+                UnixFileMode.UserRead | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+        }
+    }
+
+    private static void MakeWritable(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+        else
+        {
+            File.SetUnixFileMode(Path.GetDirectoryName(path)!,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+        }
     }
 
     /// <summary>A legacy UV-coordinate file, which the editor converts on open after asking.</summary>

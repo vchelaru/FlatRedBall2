@@ -3319,6 +3319,14 @@ public partial class MainWindow : Window
             OnAnimTreeShiftArrowKeyDown,
             RoutingStrategies.Tunnel);
 
+        // Tunnel-phase Home/End: Avalonia's TreeView has no first/last-row navigation of its own,
+        // so a keyboard-only user at the bottom of a long tree could only hold Up. Registered
+        // after OnInlineRenameKeyDown for the same reason as the Shift+arrow handler.
+        AnimTree.AddHandler(
+            InputElement.KeyDownEvent,
+            OnAnimTreeHomeEndKeyDown,
+            RoutingStrategies.Tunnel);
+
         // Bubble-phase LostFocus from the inline TextBox: commit
         AnimTree.AddHandler(
             InputElement.LostFocusEvent,
@@ -7326,13 +7334,13 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             CommitInlineRename(vm, tb.Text ?? string.Empty);
-            FocusTreeAfterRename(vm);
+            FocusTreeRow(vm);
         }
         else if (e.Key == Key.Escape)
         {
             e.Handled = true;
             vm.CancelEdit();
-            FocusTreeAfterRename(vm);
+            FocusTreeRow(vm);
         }
         else if (e.Key is Key.Left or Key.Right)
         {
@@ -7413,6 +7421,28 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Home selects the first visible row and End the last, as in a file manager. Visible means
+    /// after the search filter and collapsed chains, so End lands on the last row the user can
+    /// see, not on a frame hidden inside a collapsed chain. Focus follows the row so the arrow
+    /// keys carry on from there.
+    /// </summary>
+    private void OnAnimTreeHomeEndKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Home or Key.End)) return;
+        if (e.Source is TextBox) return; // inline rename owns the caret keys
+
+        var visible = TreeBuilder.FlattenVisible(_treeRoots);
+        if (visible.Count == 0) return;
+
+        var target = e.Key == Key.Home ? visible[0] : visible[^1];
+        AnimTree.SelectedItems!.Clear();
+        AnimTree.SelectedItems.Add(target);
+        _treeSelectionAnchor = target;
+        FocusTreeRow(target);
+        e.Handled = true;
+    }
+
     // AnimTree (the TreeView itself) has Focusable=false — only its TreeViewItem containers
     // are focusable — so AnimTree.Focus() is always a no-op. Committing/cancelling a rename
     // also flips the TextBox's IsVisible binding off, and Avalonia's own focus-fallback (moving
@@ -7420,7 +7450,7 @@ public partial class MainWindow : Window
     // Without an explicit refocus posted after that fallback, keyboard focus ends up on
     // whatever window chrome is next in tab order (e.g. the minimize button) instead of back
     // on the row that was being renamed.
-    private void FocusTreeAfterRename(TreeNodeVm vm)
+    private void FocusTreeRow(TreeNodeVm vm)
         => Dispatcher.UIThread.Post(() =>
         {
             AnimTree.GetVisualDescendants()

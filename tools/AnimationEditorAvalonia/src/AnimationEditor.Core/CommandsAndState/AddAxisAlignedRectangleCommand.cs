@@ -10,6 +10,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
         private readonly AARectSave? _preAddRect;
+        private bool _createdShapesSave;
 
         public string Description { get; }
 
@@ -27,6 +28,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
+            _createdShapesSave = _frame.ShapesSave is null;
             _frame.ShapesSave ??= new ShapesSave();
             _frame.ShapesSave.Shapes.Add(_rect);
             _commands.RefreshTreeNode(_frame);
@@ -39,6 +41,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public void Undo()
         {
             _frame.ShapesSave!.Shapes.Remove(_rect);
+            // A frame that had no shapes before goes back to none: an empty collection still
+            // serializes as a <ShapeCollectionSave> block, which would make the undo change the file.
+            if (_createdShapesSave)
+                _frame.ShapesSave = null;
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
