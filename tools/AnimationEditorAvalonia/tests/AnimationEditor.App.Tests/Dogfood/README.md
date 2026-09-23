@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 140 scenarios, roughly 50 seconds.
+About 145 scenarios, roughly 55 seconds.
 
 ## The pieces
 
@@ -198,6 +198,21 @@ one undo step, the batch add lands as one step, and the offsets land on every fr
 The seam is the only test-motivated change to production code on this branch, and it follows
 the window's existing injection of its settings root and updater; no `*ForTest` methods or
 `Simulate*` hooks were added.
+
+## Seventh-pass findings (tsx, achj, timeline strip, September 2026)
+
+The last document kinds and the last panel nobody had driven. Nine scenarios, all passed on the
+first run: a Tiled `.tsx` opens natively with its two-frame animation on the tileset image, its
+grid cannot be turned off, the inspector hides the transform and colour sections and disables
+Loop, the context menus offer no flips, shapes or offsets, a frame-length edit writes
+`duration="250"` back into the tileset, resizing one frame gives every frame of the chain the same
+footprint (and one undo restores them all), deleting the chain and undoing round-trips through
+the tileset, and typing a free owner tile moves the animation to that tile. An `.achj` opens,
+takes a rectangle and a colour, and auto-saves as JSON; Save As from `.achx` to `.achj` writes
+JSON and later edits go there. The timeline strip's playhead follows a scrub at either end.
+
+With this pass every headless-reachable surface of the editor has at least one scenario. What
+remains is on the real-window list below.
 
 ## Needs real input: the non-headless list
 
