@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// cref="IProjectManager.TrySetTsxOwnerTileId"/>, as one undo step. Undo/Redo round-trip the
     /// whole tsx tracking snapshot (<see cref="IProjectManager.CaptureTsxState"/>/<see
     /// cref="IProjectManager.RestoreTsxState"/>) rather than just the one dictionary entry: the
-    /// "before" state might have had a tracked origin frame or satellite hints that <see
+    /// "before" state might have had tracked satellite hints that <see
     /// cref="IProjectManager.TrySetTsxOwnerTileId"/> deliberately drops on an explicit set, and
     /// only the full-state capture/restore already used elsewhere for tab-switching knows how to
     /// put those back.

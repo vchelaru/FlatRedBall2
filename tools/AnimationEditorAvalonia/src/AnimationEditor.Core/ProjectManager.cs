@@ -53,18 +53,6 @@ namespace AnimationEditor.Core
         /// <c>knownSatelliteTileIds</c> parameter.</summary>
         private Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> _tsxSatelliteTileIdsByChain = new(ReferenceEqualityComparer.Instance);
 
-        /// <summary>For each chain whose <see cref="_tsxEntryTileIdsByChain"/> hint is frame 0's
-        /// own top-left cell -- computed by a prior <see cref="SaveTsxProject"/> (<see
-        /// cref="Tiled.MultiTileToTiledAnimationMapper.MultiTileMappingResult.EntryTileIdIsFreshlyComputed"/>),
-        /// or loaded from a file where the owner tile already sat there -- the frame object that
-        /// cell belongs to. A chain absent here has a hand-authored owner tile deliberately
-        /// unrelated to its frames, which a resize must never relocate. A tracked hint goes stale
-        /// exactly when its frame is still in the chain but its top-left cell now resolves to a
-        /// different tile (a left/top-edge resize, or a move) -- not when the frame is merely
-        /// reordered, removed, or joined by new frames, none of which move any cell. See the
-        /// "ownership transfer" block in <see cref="SaveTsxProject"/>.</summary>
-        private Dictionary<AnimationChainSave, AnimationFrameSave> _tsxEntryHintOriginFrames = new(ReferenceEqualityComparer.Instance);
-
         /// <summary>Each chain's own <see cref="AnimationChainSave.Frames"/> contents as of the
         /// most recent save where it had a real (non-null) entry tile id -- i.e. the frame-object
         /// sequence that produced <see cref="_tsxEntryTileIdsByChain"/>'s current value for that
@@ -193,7 +181,6 @@ namespace AnimationEditor.Core
             _tsxTileset = null;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
-            _tsxEntryHintOriginFrames = new Dictionary<AnimationChainSave, AnimationFrameSave>(ReferenceEqualityComparer.Instance);
             _tsxLastNonEmptyFramesByChain = new Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>>(ReferenceEqualityComparer.Instance);
             _tsxDormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance);
 
@@ -772,16 +759,6 @@ namespace AnimationEditor.Core
             AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
-            // A loaded owner tile that is frame 0's own top-left cell is the shape our own saves
-            // write, so it follows that cell on a resize exactly as if we had derived it (see
-            // _tsxEntryHintOriginFrames). Only an owner tile somewhere else is a hand-authored
-            // choice this editor must never relocate.
-            _tsxEntryHintOriginFrames = new Dictionary<AnimationChainSave, AnimationFrameSave>(ReferenceEqualityComparer.Instance);
-            foreach (var result in Tiled.MultiTileToTiledAnimationMapper.Map(acls, BuildTsxTilesetInfo(tileset)))
-                if (result.AnchorFrames.Count > 0
-                    && entryTileIdsByChain.TryGetValue(result.SourceChain, out var loadedEntryTileId)
-                    && loadedEntryTileId == result.AnchorFrames[0].TileId)
-                    _tsxEntryHintOriginFrames[result.SourceChain] = result.SourceChain.Frames[0];
             FileName = fileName.FullPath;
 
             // Seeds _tsxLastNonEmptyFramesByChain from what was just loaded, so a chain whose
@@ -856,48 +833,11 @@ namespace AnimationEditor.Core
             var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
                 AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), entryHintsForMap, satelliteHintsForMap);
 
-            // Ownership transfer: moving a frame's top-left cell (growing or shrinking its left or
-            // top edge, or dragging it) leaves entryHintsForMap's pinned tile id geometrically
-            // stale -- it no longer sits at the cell it was derived from -- and every satellite
-            // hint with it, since those are keyed by offset from that same origin (after a
-            // grow-left, the old (1,0) tile is the new (2,0) cell). A stale hint is
-            // indistinguishable from a legitimate hand-authored owner tile deliberately unrelated
-            // to frame 0's position (see MultiTileToTiledAnimationMapper's knownEntryTileIds doc
-            // comment), so the transfer only fires for a chain _tsxEntryHintOriginFrames tracks,
-            // and only when the frame the hint was derived from is still in the chain with its
-            // top-left cell now on a different tile. Merely comparing the hint against frame 0's
-            // current tile would also fire on a reorder or an add/remove, which move no cell at
-            // all and must keep the pin (SaveTsxProject_BrandNewChain_EntryTileIdStaysStable...).
-            // "Transfer" means dropping the chain's entry AND satellite hints from the map so the
-            // whole group recomputes fresh from frame 0's own current cells.
-            bool OriginFrameMoved(Tiled.MultiTileMappingResult r, uint hint)
-            {
-                if (!_tsxEntryHintOriginFrames.TryGetValue(r.SourceChain, out var originFrame))
-                    return false;
-                // AnchorFrames is one entry per chain.Frames, in order, whenever mapping succeeded.
-                var index = r.SourceChain.Frames.IndexOf(originFrame);
-                return index >= 0 && index < r.AnchorFrames.Count && r.AnchorFrames[index].TileId != hint;
-            }
-            var chainsToTransfer = mapped
-                .Where(r => r.EntryTileId is { } id
-                    && !r.EntryTileIdIsFreshlyComputed
-                    && r.AnchorFrames.Count > 0
-                    && OriginFrameMoved(r, id))
-                .Select(r => r.SourceChain)
-                .ToHashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
-            if (chainsToTransfer.Count > 0)
-            {
-                var correctedEntryHints = new Dictionary<AnimationChainSave, uint>(entryHintsForMap, ReferenceEqualityComparer.Instance);
-                var correctedSatelliteHints = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteHintsForMap, ReferenceEqualityComparer.Instance);
-                foreach (var chain in chainsToTransfer)
-                {
-                    correctedEntryHints.Remove(chain);
-                    correctedSatelliteHints.Remove(chain);
-                }
-                mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
-                    AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), correctedEntryHints, correctedSatelliteHints);
-            }
-
+            // No "ownership transfer" here: a chain's owner tile is a storage-slot choice (loaded,
+            // computed once, or explicitly set), never re-derived from frame geometry after the
+            // fact. Resizing/moving frame 0's rect never relocates it -- only an explicit
+            // TrySetTsxOwnerTileId call (or the Sync-to-First-Frame button, which just calls that
+            // with frame 0's current tile) changes which tile a chain owns.
             mapped = YieldCollidingFreshClaims(mapped, entryHintsForMap, satelliteHintsForMap);
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
@@ -933,13 +873,6 @@ namespace AnimationEditor.Core
                 if (!currentChains.Contains(kvp.Key))
                     updatedSatellites[kvp.Key] = kvp.Value;
 
-            // Origin frames are carried forward for every chain (present, absent, dormant, or
-            // mid-abort) and only ever overwritten by a fresh computation below: an entry here can
-            // never wrongly *add* a hint -- it only ever lets the transfer block drop one, and only
-            // while that frame is still in the chain -- so unlike the entry/satellite hints there
-            // is no stale-reuse hazard to rebuild against.
-            var updatedOriginFrames = new Dictionary<AnimationChainSave, AnimationFrameSave>(_tsxEntryHintOriginFrames, ReferenceEqualityComparer.Instance);
-
             var updatedLastFrames = new Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>>(ReferenceEqualityComparer.Instance);
             foreach (var kvp in _tsxLastNonEmptyFramesByChain)
                 if (!currentChains.Contains(kvp.Key))
@@ -965,28 +898,20 @@ namespace AnimationEditor.Core
                     updatedEntries[chain] = entryTileId;
                     updatedLastFrames[chain] = chain.Frames.ToArray();
 
-                    // Freshly computed (no hint used, or the ownership-transfer block above just
-                    // dropped a stale one) means this entry tile id is frame 0's own top-left
-                    // cell, so frame 0 is the frame a later save checks for an origin move.
-                    if (result.EntryTileIdIsFreshlyComputed)
-                        updatedOriginFrames[chain] = chain.Frames[0];
-
                     if (result.Satellites.Count > 0)
                     {
                         // Merged onto whatever this chain's satellite hints already were (rather
                         // than replacing the whole per-chain dictionary), so an offset that isn't
                         // part of *this* save's footprint keeps whatever hint it had -- see the
-                        // branch below for why that matters. A chain the ownership transfer
-                        // above just recomputed is the exception: its old per-offset hints are
-                        // exactly what went stale, so nothing of them may survive.
-                        var merged = !chainsToTransfer.Contains(chain) && _tsxSatelliteTileIdsByChain.TryGetValue(chain, out var existingSatellites)
+                        // branch below for why that matters.
+                        var merged = _tsxSatelliteTileIdsByChain.TryGetValue(chain, out var existingSatellites)
                             ? new Dictionary<(int Dx, int Dy), uint>(existingSatellites)
                             : new Dictionary<(int Dx, int Dy), uint>();
                         foreach (var satellite in result.Satellites)
                             merged[satellite.Offset] = satellite.TileId;
                         updatedSatellites[chain] = merged;
                     }
-                    else if (!chainsToTransfer.Contains(chain) && _tsxSatelliteTileIdsByChain.TryGetValue(chain, out var stillHinted))
+                    else if (_tsxSatelliteTileIdsByChain.TryGetValue(chain, out var stillHinted))
                     {
                         // This save's footprint has no satellites at all -- e.g. a resize command
                         // shrank every frame down to a single tile. chain.Frames never went to zero
@@ -1059,7 +984,6 @@ namespace AnimationEditor.Core
             }
             _tsxEntryTileIdsByChain = updatedEntries;
             _tsxSatelliteTileIdsByChain = updatedSatellites;
-            _tsxEntryHintOriginFrames = updatedOriginFrames;
             _tsxLastNonEmptyFramesByChain = updatedLastFrames;
             _tsxDormantHintsByChain = updatedDormant;
 
@@ -1155,14 +1079,13 @@ namespace AnimationEditor.Core
             DotTiled.Tileset Tileset,
             Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
             Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain,
-            Dictionary<AnimationChainSave, AnimationFrameSave> EntryHintOriginFrames,
             Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>> LastNonEmptyFramesByChain,
             Dictionary<AnimationChainSave, DormantTsxHint> DormantHintsByChain);
 
         /// <inheritdoc/>
         public object? CaptureTsxState() =>
             _tsxTileset is null ? null : new TsxState(
-                _tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxEntryHintOriginFrames,
+                _tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain,
                 _tsxLastNonEmptyFramesByChain, _tsxDormantHintsByChain);
 
         /// <inheritdoc/>
@@ -1173,7 +1096,6 @@ namespace AnimationEditor.Core
                 _tsxTileset = tsxState.Tileset;
                 _tsxEntryTileIdsByChain = tsxState.EntryTileIdsByChain;
                 _tsxSatelliteTileIdsByChain = tsxState.SatelliteTileIdsByChain;
-                _tsxEntryHintOriginFrames = tsxState.EntryHintOriginFrames;
                 _tsxLastNonEmptyFramesByChain = tsxState.LastNonEmptyFramesByChain;
                 _tsxDormantHintsByChain = tsxState.DormantHintsByChain;
             }
@@ -1182,7 +1104,6 @@ namespace AnimationEditor.Core
                 _tsxTileset = null;
                 _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
                 _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
-                _tsxEntryHintOriginFrames = new Dictionary<AnimationChainSave, AnimationFrameSave>(ReferenceEqualityComparer.Instance);
                 _tsxLastNonEmptyFramesByChain = new Dictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>>(ReferenceEqualityComparer.Instance);
                 _tsxDormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance);
             }
@@ -1234,12 +1155,11 @@ namespace AnimationEditor.Core
         /// cref="GetTsxOwnerTileId"/>'s own frame-0-computed value back in. Validated against the
         /// tileset's own tile count and every other chain's current owner tile before committing;
         /// returns a human-readable error and makes no change on failure, or <see langword="null"/>
-        /// on success. Drops this chain's tracked "origin frame" (<see
-        /// cref="_tsxEntryHintOriginFrames"/>) and any satellite-offset hints (<see
-        /// cref="_tsxSatelliteTileIdsByChain"/>): an explicit pin isn't derived from any particular
-        /// frame's cell, so a later resize of that cell must never auto-transfer it back, and a
-        /// multi-tile chain's satellites must recompute relative to the new owner position instead
-        /// of reusing offsets captured at the old one.
+        /// on success. Drops any satellite-offset hints (<see cref="_tsxSatelliteTileIdsByChain"/>):
+        /// a multi-tile chain's satellites must recompute relative to the new owner position instead
+        /// of reusing offsets captured at the old one. There is no auto-follow -- once set (loaded,
+        /// computed once, or set here), a chain's owner tile never moves again on its own; only
+        /// another call here (e.g. the "Sync to First Frame" button) changes it.
         /// </summary>
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId)
         {
@@ -1269,13 +1189,6 @@ namespace AnimationEditor.Core
             };
             _tsxEntryTileIdsByChain = updatedEntries;
 
-            if (_tsxEntryHintOriginFrames.ContainsKey(chain))
-            {
-                var updatedOrigins = new Dictionary<AnimationChainSave, AnimationFrameSave>(_tsxEntryHintOriginFrames, ReferenceEqualityComparer.Instance);
-                updatedOrigins.Remove(chain);
-                _tsxEntryHintOriginFrames = updatedOrigins;
-            }
-
             if (_tsxSatelliteTileIdsByChain.ContainsKey(chain))
             {
                 var updatedSatellites = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(_tsxSatelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
@@ -1287,15 +1200,12 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
-        /// True when a chain is already pinned to <paramref name="tileId"/> as an explicit owner
-        /// tile with nothing left for <see cref="TrySetTsxOwnerTileId"/> to change -- no origin-
-        /// frame or satellite hints still tracked for it. A chain whose owner tile only matches
-        /// <paramref name="tileId"/> because it was *computed* (never pinned) is NOT already set:
-        /// pinning it explicitly still drops those hints, which is a real state change.
+        /// True when a chain is already pinned to <paramref name="tileId"/> as its owner tile with
+        /// nothing left for <see cref="TrySetTsxOwnerTileId"/> to change -- no satellite hints
+        /// still tracked for it.
         /// </summary>
         public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) =>
             _tsxEntryTileIdsByChain.TryGetValue(chain, out var existing) && existing == tileId
-            && !_tsxEntryHintOriginFrames.ContainsKey(chain)
             && !_tsxSatelliteTileIdsByChain.ContainsKey(chain);
 
         /// <summary>The Tiled tile id a frame's own pixel rect resolves to against this project's

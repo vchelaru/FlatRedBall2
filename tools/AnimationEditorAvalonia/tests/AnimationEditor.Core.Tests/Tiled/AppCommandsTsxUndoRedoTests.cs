@@ -15,10 +15,13 @@ namespace AnimationEditor.Core.Tests.Tiled;
 /// <summary>
 /// Fresh-eyes pass #23 (plan/1147-tsx-sync-hardening/phase-01-bug-sweep.md): every command in a
 /// native tsx project autosaves on Do, Undo and Redo, so each of those must leave the file in
-/// the state the model shows. The passes since #1155 added save-time behavior (owner transfer,
-/// colliding-claim yielding, lossy-data warnings, the stale-on-disk guard) that was only ever
-/// exercised on the Do side. This drives the real commands through Undo and Redo and reads the
-/// tsx back after every step.
+/// the state the model shows. The passes since #1155 added save-time behavior (colliding-claim
+/// yielding, lossy-data warnings, the stale-on-disk guard) that was only ever exercised on the Do
+/// side. This drives the real commands through Undo and Redo and reads the tsx back after every
+/// step. Note: a chain's owner tile is a storage-slot choice, pinned once and never re-derived
+/// from frame geometry afterward -- a resize/move never migrates it, so a collision between two
+/// already-saved chains' owner tiles can't happen from moving frames around; only a chain's very
+/// first successful save (freshly computed) can collide with another chain's existing owner.
 /// </summary>
 [Collection("SequentialSingletons")]
 public class AppCommandsTsxUndoRedoTests : IDisposable
@@ -97,18 +100,24 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         Assert.Equal(3, _ctx.ProjectManager.AnimationChainListSave.AnimationChains.Count);
     }
 
+    // The copy's owner tile (4, from its first successful save) is pinned from then on -- moving
+    // its frames back onto Walk's own cells (Undo) doesn't migrate the owner back to 0, so it
+    // doesn't collide with Walk either: same frame *content* as Walk, but a different physical
+    // tile carries it, so no yield.
     [Fact]
-    public void MoveDuplicateThenUndo_CopyYieldsAgainAndItsMovedTileIsReleased_RedoRestoresIt()
+    public void MoveDuplicateThenUndo_CopyStaysOnItsPinnedTile_RedoMovesContentBack()
     {
         var walk = OpenTsx();
-        var copy = _ctx.AppCommands.DuplicateChains([walk]).Single();
+        var copy = _ctx.AppCommands.DuplicateChains([walk]).Single(); // yields Walk's tile 0 at first
         _ctx.AppCommands.SetFramePixelRegion(copy.Frames, pixelX: null, pixelY: 16, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], Anim(Disk(), 4));
         _warnings.Clear();
 
-        _ctx.UndoManager.Undo(); // copy back on Walk's cells
+        _ctx.UndoManager.Undo(); // copy's frames back on Walk's cells; its owner stays tile 4
         AssertSaved();
-        Assert.Single(_warnings);
+        Assert.Empty(_warnings);
+        Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 4));
+        Assert.Equal("WalkCopy", NameOf(Disk(), 4));
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 0));
         Assert.Equal("Walk", NameOf(Disk(), 0));
 
@@ -116,29 +125,6 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         AssertSaved();
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], Anim(Disk(), 4));
         Assert.Equal("WalkCopy", NameOf(Disk(), 4));
-    }
-
-    [Fact]
-    public void MoveChainOntoAnotherChainsTile_UndoRestoresBoth_RedoYieldsAgain()
-    {
-        var walk = OpenTsx();
-
-        // Walk moves down two rows onto Idle's tiles (8, 9): it yields, Idle keeps them.
-        _ctx.AppCommands.SetFramePixelRegion(walk.Frames, pixelX: null, pixelY: 32, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
-        Assert.Single(_warnings);
-        Assert.Equal("Idle", NameOf(Disk(), 8));
-        Assert.Equal("Walk", NameOf(Disk(), 0)); // its last good state stays
-        _warnings.Clear();
-
-        _ctx.UndoManager.Undo();
-        AssertSaved();
-        Assert.Empty(_warnings);
-        Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 0));
-        Assert.Equal("Idle", NameOf(Disk(), 8));
-
-        _ctx.UndoManager.Redo();
-        Assert.Single(_warnings);
-        Assert.Equal("Idle", NameOf(Disk(), 8));
     }
 
     [Fact]
@@ -191,26 +177,4 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         Assert.Equal("Run", NameOf(Disk(), 0));
     }
 
-    [Fact]
-    public void ResizeGrowLeft_UndoMovesOwnerBack_RedoMovesItAgain()
-    {
-        var idle = OpenTsx("Idle"); // tile 8 (col 0) can't grow left, so move it right first
-        // Frame 0 to tile 9 and frame 1 to tile 10 (X is absolute per frame), then grow frame 0's
-        // left edge back over tile 8 so its owner transfers there.
-        _ctx.AppCommands.SetFramePixelRegion([idle.Frames[0]], pixelX: 16, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
-        _ctx.AppCommands.SetFramePixelRegion([idle.Frames[1]], pixelX: 32, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
-        Assert.Equal("Idle", NameOf(Disk(), 9));
-        _ctx.AppCommands.SetFramePixelRegion([idle.Frames[0]], pixelX: 0, pixelY: null, pixelW: 32, pixelH: null, bmpW: 64, bmpH: 64);
-        Assert.Equal("Idle", NameOf(Disk(), 8));
-        Assert.Equal([((uint)9, 200), ((uint)11, 200)], Anim(Disk(), 9)); // satellite of the 2-wide group
-
-        _ctx.UndoManager.Undo();
-        AssertSaved();
-        Assert.Equal("Idle", NameOf(Disk(), 9));
-        Assert.DoesNotContain(Disk().Tiles, t => t.ID == 8);
-
-        _ctx.UndoManager.Redo();
-        Assert.Equal("Idle", NameOf(Disk(), 8));
-        Assert.Equal(8, Disk().Tiles.Single(t => t.ID == 9).GetProperty<IntProperty>("ParentId").Value);
-    }
 }

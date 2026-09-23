@@ -67,8 +67,8 @@ namespace AnimationEditor.Core
         string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId);
 
         /// <summary>True when calling <see cref="TrySetTsxOwnerTileId"/> with these exact
-        /// arguments would be a pure no-op -- the chain is already explicitly pinned to <paramref
-        /// name="tileId"/> with no origin-frame/satellite hints left to drop. See <see
+        /// arguments would be a pure no-op -- the chain is already pinned to <paramref
+        /// name="tileId"/> with no satellite hints left to drop. See <see
         /// cref="ProjectManager.IsTsxOwnerTileIdAlreadySet"/>.</summary>
         bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId);
 
