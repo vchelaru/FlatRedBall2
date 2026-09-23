@@ -94,4 +94,27 @@ public class AppCommandsSetChainTsxOwnerTileIdTests : IDisposable
         Assert.Contains("Idle", error);
         Assert.Equal(onDiskBefore, File.ReadAllText(_path));
     }
+
+    // Regression: a repeated "Sync to First Frame" click used to push a fresh undo entry every
+    // time even when the owner tile hadn't changed. Walk loads already owning tile 0, but only via
+    // the origin-frame hint (computed from frame 0), not yet pinned -- so the first explicit set to
+    // 0 is a real change (it drops the hint) and only the second is a true no-op.
+    [Fact]
+    public void RepeatedIdenticalValue_PushesOneUndoEntryThenNoneAfter()
+    {
+        var walk = OpenTsx("Walk");
+        Assert.False(_ctx.ProjectManager.IsTsxOwnerTileIdAlreadySet(walk, 0));
+
+        var firstError = _ctx.AppCommands.SetChainTsxOwnerTileId(walk, 0);
+        Assert.Null(firstError);
+        Assert.Single(_ctx.UndoManager.UndoHistory);
+        Assert.True(_ctx.ProjectManager.IsTsxOwnerTileIdAlreadySet(walk, 0));
+
+        var secondError = _ctx.AppCommands.SetChainTsxOwnerTileId(walk, 0);
+        Assert.Null(secondError);
+        Assert.Single(_ctx.UndoManager.UndoHistory); // no second entry pushed
+
+        _ctx.UndoManager.Undo();
+        Assert.False(_ctx.UndoManager.CanUndo);
+    }
 }

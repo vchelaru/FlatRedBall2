@@ -5489,6 +5489,24 @@ public partial class MainWindow : Window
                 var ownerTileId = _projectManager.GetTsxOwnerTileId(selectedChain!);
                 PropChainTsxOwnerInput.Value = ownerTileId.HasValue ? ownerTileId.Value : null;
                 PropChainTsxOwnerError.IsVisible = false;
+
+                // Label always names the target tile, so it's visible whether or not the button
+                // is enabled; disabled means "already synced" -- there's nothing this click would
+                // change (see IProjectManager.IsTsxOwnerTileIdAlreadySet).
+                var frame0TileId = selectedChain!.Frames.Count > 0
+                    ? _projectManager.ComputeFrameTileId(selectedChain.Frames[0])
+                    : null;
+                if (frame0TileId is { } targetTileId)
+                {
+                    PropChainTsxOwnerSyncButton.Content = $"Sync to First Frame (Tile {targetTileId})";
+                    PropChainTsxOwnerSyncButton.IsEnabled =
+                        !_projectManager.IsTsxOwnerTileIdAlreadySet(selectedChain, targetTileId);
+                }
+                else
+                {
+                    PropChainTsxOwnerSyncButton.Content = "Sync to First Frame";
+                    PropChainTsxOwnerSyncButton.IsEnabled = false;
+                }
             }
             // LoopToggle mirrors the selected chain's Loop regardless of whether a frame/shape
             // within it is also selected (#1120) -- it reflects "the chain currently playing",

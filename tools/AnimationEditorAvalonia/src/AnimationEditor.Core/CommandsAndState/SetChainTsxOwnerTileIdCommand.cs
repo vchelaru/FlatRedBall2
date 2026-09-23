@@ -41,6 +41,15 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
+            // Already exactly this value with nothing left to drop -- returning false here (like
+            // the error path below) keeps UndoManager.Execute from pushing a no-op undo entry for
+            // a repeated "Sync to First Frame" click (#1182 follow-up).
+            if (_pm.IsTsxOwnerTileIdAlreadySet(_chain, _tileId))
+            {
+                Error = null;
+                return false;
+            }
+
             _before = _pm.CaptureTsxState();
             Error = _pm.TrySetTsxOwnerTileId(_chain, _tileId);
             if (Error != null)

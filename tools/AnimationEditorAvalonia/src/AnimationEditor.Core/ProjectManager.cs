@@ -1257,6 +1257,12 @@ namespace AnimationEditor.Core
                     return $"Tile {tileId} is already the owner tile for \"{other.Name}\".";
             }
 
+            // Nothing would actually change -- skip the mutation entirely so a repeated "Sync to
+            // First Frame" click (or any other caller re-committing the same already-explicit
+            // value) doesn't push a spurious undo entry (#1182 follow-up).
+            if (IsTsxOwnerTileIdAlreadySet(chain, tileId))
+                return null;
+
             var updatedEntries = new Dictionary<AnimationChainSave, uint>(_tsxEntryTileIdsByChain, ReferenceEqualityComparer.Instance)
             {
                 [chain] = tileId
@@ -1279,6 +1285,18 @@ namespace AnimationEditor.Core
 
             return null;
         }
+
+        /// <summary>
+        /// True when a chain is already pinned to <paramref name="tileId"/> as an explicit owner
+        /// tile with nothing left for <see cref="TrySetTsxOwnerTileId"/> to change -- no origin-
+        /// frame or satellite hints still tracked for it. A chain whose owner tile only matches
+        /// <paramref name="tileId"/> because it was *computed* (never pinned) is NOT already set:
+        /// pinning it explicitly still drops those hints, which is a real state change.
+        /// </summary>
+        public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) =>
+            _tsxEntryTileIdsByChain.TryGetValue(chain, out var existing) && existing == tileId
+            && !_tsxEntryHintOriginFrames.ContainsKey(chain)
+            && !_tsxSatelliteTileIdsByChain.ContainsKey(chain);
 
         /// <summary>The Tiled tile id a frame's own pixel rect resolves to against this project's
         /// tileset, or <see langword="null"/> for an achx/achj project or a frame whose rect doesn't

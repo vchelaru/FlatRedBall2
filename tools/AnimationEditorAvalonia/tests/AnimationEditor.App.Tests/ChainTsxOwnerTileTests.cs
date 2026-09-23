@@ -192,6 +192,36 @@ public class ChainTsxOwnerTileTests : IDisposable
         finally { window.Close(); }
     }
 
+    // Regression for the sync button's two reported problems: (1) no indication of already-synced
+    // state, (2) repeated clicks pushing a spurious undo entry each time.
+    [AvaloniaFact]
+    public void SyncButton_ShowsTargetTileAndDisablesOnceSynced_RepeatedClickPushesNoExtraUndo()
+    {
+        var (window, ctx) = OpenTsx();
+        try
+        {
+            var chain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == "RiseUp");
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            var syncButton = window.FindControl<Button>("PropChainTsxOwnerSyncButton")!;
+            Assert.True(syncButton.IsEnabled); // owner is tile 9, frame 0 is tile 8 -- not yet synced
+            Assert.Contains("8", syncButton.Content?.ToString());
+
+            syncButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Single(ctx.UndoManager.UndoHistory);
+            Assert.False(syncButton.IsEnabled); // now synced to tile 8 -- nothing left to sync
+
+            syncButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Single(ctx.UndoManager.UndoHistory); // repeated click pushed no extra entry
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void SelectingFrame_ShowsItsOwnTileId_DistinctFromTheChainsOwnerTile()
     {
