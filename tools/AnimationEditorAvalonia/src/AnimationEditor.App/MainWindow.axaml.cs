@@ -778,9 +778,11 @@ public partial class MainWindow : Window
         }
         else
         {
-            await _appCommands.ActivateTabContentAsync(tab);
-            // LoadAnimationChain cleared the stack — restore this tab's saved history.
-            if (tab.UndoSnapshot != null)
+            // A failed reload (missing texture, declined UV conversion, unreadable file) leaves
+            // the previous tab's document still live -- restoring *this* tab's undo snapshot onto
+            // it would apply the wrong tab's history to the wrong document.
+            bool activated = await _appCommands.ActivateTabContentAsync(tab);
+            if (activated && tab.UndoSnapshot != null)
                 _undoManager.RestoreSnapshot(tab.UndoSnapshot);
         }
         SyncProjectPanelSelectionTo(tab);
@@ -921,24 +923,34 @@ public partial class MainWindow : Window
         }
         else
         {
-            // All tabs closed — start fresh. ResetToBlankDocument (#1147) also clears any
-            // native-tsx/texture-size/ReferencedPngs state the just-closed tab left behind.
-            ShowAchxPane();
-            _projectManager.ResetToBlankDocument();
-            _selectedState.Reset();
-            _undoManager.Clear();
-            ProjectPanel.SyncSelectionToActiveFile(null);
-            RefreshTreeView();
-            RefreshFilesPanel();
-            UpdateTitle();
-            UpdateStatusBar();
+            ResetToNoTabsOpen();
         }
+    }
+
+    /// <summary>
+    /// Returns the editor to its startup-empty state: no document, no selection, no undo history.
+    /// Called whenever the last open tab goes away, whether by closing it (<see cref="CloseTabCore"/>)
+    /// or because it failed to load and was dropped (<see cref="RestoreTabsAsync"/>).
+    /// </summary>
+    private void ResetToNoTabsOpen()
+    {
+        // ResetToBlankDocument (#1147) also clears any native-tsx/texture-size/ReferencedPngs
+        // state the last tab left behind.
+        ShowAchxPane();
+        _projectManager.ResetToBlankDocument();
+        _selectedState.Reset();
+        _undoManager.Clear();
+        ProjectPanel.SyncSelectionToActiveFile(null);
+        RefreshTreeView();
+        RefreshFilesPanel();
+        UpdateTitle();
+        UpdateStatusBar();
     }
 
     private async Task ActivateTabAfterCloseAsync(TabEntry tab)
     {
-        await _appCommands.ActivateTabContentAsync(tab);
-        if (tab.UndoSnapshot != null)
+        bool activated = await _appCommands.ActivateTabContentAsync(tab);
+        if (activated && tab.UndoSnapshot != null)
             _undoManager.RestoreSnapshot(tab.UndoSnapshot);
         SyncProjectPanelSelectionTo(tab);
         RebuildTabStrip();
@@ -976,9 +988,24 @@ public partial class MainWindow : Window
         if (active != null)
         {
             if (active.Kind == TabKind.Png)
+            {
                 ShowPngPane(active);
+            }
             else
-                await _appCommands.OpenProjectWorkflowAsync(active.Path.FullPath);
+            {
+                bool opened = await _appCommands.OpenProjectWorkflowAsync(active.Path.FullPath);
+                if (!opened)
+                {
+                    // The file that was open when the editor last closed no longer opens (missing
+                    // texture, declined UV conversion, unreadable file) -- restoring it as a ghost
+                    // active tab would show nothing behind it, so drop it the same way a refused
+                    // File > Open does.
+                    DropUnloadedTab(active.Path);
+                    if (_tabManager.ActiveTab == null)
+                        ResetToNoTabsOpen();
+                    return;
+                }
+            }
             RebuildTabStrip();
         }
     }
@@ -5928,8 +5955,8 @@ public partial class MainWindow : Window
                     StringComparison.OrdinalIgnoreCase);
                 if (!alreadyShown && !string.IsNullOrEmpty(fileName))
                 {
-                    await _appCommands.ActivateTabContentAsync(arrivedTab!);
-                    if (arrivedTab?.UndoSnapshot != null)
+                    bool activated = await _appCommands.ActivateTabContentAsync(arrivedTab!);
+                    if (activated && arrivedTab?.UndoSnapshot != null)
                         _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
                 }
                 RebuildTabStrip();

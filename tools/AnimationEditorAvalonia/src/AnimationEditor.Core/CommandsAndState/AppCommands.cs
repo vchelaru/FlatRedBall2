@@ -424,22 +424,29 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.ActivateTabContentAsync"/>
-        public async Task ActivateTabContentAsync(TabEntry tab)
+        public async Task<bool> ActivateTabContentAsync(TabEntry tab)
         {
             if (TryActivateTabFromCache(tab))
-                return;
+                return true;
 
             // FinishLoadIntoEditor resets selection to the first chain; keep the prior
             // per-tab selection so we can restore it after the disk load.
             string? chainName = tab.CachedSelectedChainName;
             int? frameIndex = tab.CachedSelectedFrameIndex;
 
-            await OpenProjectWorkflowAsync(tab.Path.FullPath);
+            bool loaded = await OpenProjectWorkflowAsync(tab.Path.FullPath);
+            if (!loaded)
+            {
+                // The live document is still whatever the previous tab left behind -- capturing
+                // it here would poison *this* tab's cache with someone else's document.
+                return false;
+            }
 
             tab.CachedSelectedChainName = chainName;
             tab.CachedSelectedFrameIndex = frameIndex;
             RestoreTabSelection(tab);
             CaptureTabEditorState(tab);
+            return true;
         }
 
         /// <inheritdoc cref="IAppCommands.RestoreTabSelection"/>
@@ -564,6 +571,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
+        /// <inheritdoc/>
         public event Action<string, Exception>? TiledSyncFailed;
 
         /// <inheritdoc/>

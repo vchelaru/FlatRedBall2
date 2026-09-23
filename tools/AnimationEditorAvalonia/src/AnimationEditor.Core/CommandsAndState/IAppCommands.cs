@@ -143,9 +143,15 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Activates <paramref name="tab"/>'s content from cache when possible; otherwise runs
-        /// <see cref="OpenAchxWorkflowAsync"/>. Does not restore undo.
+        /// <see cref="OpenProjectWorkflowAsync"/>. Does not restore undo.
         /// </summary>
-        Task ActivateTabContentAsync(TabEntry tab);
+        /// <returns>
+        /// <c>false</c> when the disk reload failed (missing texture, declined UV conversion,
+        /// unreadable file) -- the live document is left as whatever was active before the call,
+        /// and <paramref name="tab"/>'s own cache and selection are left untouched rather than
+        /// being overwritten with that other document.
+        /// </returns>
+        Task<bool> ActivateTabContentAsync(TabEntry tab);
 
         /// <summary>
         /// Restores chain/frame selection from <paramref name="tab"/>'s cached selection fields
