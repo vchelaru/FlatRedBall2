@@ -121,7 +121,7 @@ public static class NativeTsxAnimationSync
             if (result.EntryTileId is not { } entryTileId)
                 continue;
 
-            if (ApplyTile(tileset, tilesById, entryTileId, result.AnchorFrames, explicitName: SyntheticName(entryTileId) == result.ChainName ? null : result.ChainName))
+            if (ApplyTile(tileset, tilesById, entryTileId, result.AnchorFrames, explicitName: TiledAnimationToAchjMapper.SyntheticChainName(entryTileId) == result.ChainName ? null : result.ChainName))
                 changed = true;
 
             foreach (var satellite in result.Satellites)
@@ -251,8 +251,6 @@ public static class NativeTsxAnimationSync
         ObjectLayer = tile.ObjectLayer,
         Animation = tile.Animation.ToList(),
     };
-
-    private static string SyntheticName(uint tileId) => $"ID:{tileId}";
 
     private static bool ApplyTile(
         Tileset tileset, Dictionary<uint, Tile> tilesById, uint tileId, IReadOnlyList<MappedFrame> frames,

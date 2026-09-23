@@ -257,8 +257,16 @@ public static class TiledAnimationToAchjMapper
     private static string ChainName(Tile tile)
     {
         var name = tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == NamePropertyName)?.Value;
-        return string.IsNullOrEmpty(name) ? $"ID:{tile.ID}" : name;
+        return string.IsNullOrEmpty(name) ? SyntheticChainName(tile.ID) : name;
     }
+
+    /// <summary>The placeholder chain name used when a native-tsx tile carries no explicit <see
+    /// cref="NamePropertyName"/> property -- shared with <see cref="NativeTsxAnimationSync"/> (which
+    /// uses it to decide whether a chain's current <c>Name</c> is still just this placeholder, and
+    /// so safe to omit from the write / silently re-derive, rather than a real user-given name) and
+    /// with <see cref="ProjectManager.TrySetTsxOwnerTileId"/> (which re-derives it for the chain's
+    /// *new* owner tile so an unnamed chain's tree label follows its owner instead of going stale).</summary>
+    internal static string SyntheticChainName(uint tileId) => $"ID:{tileId}";
 
     /// <summary>A negative <c>ParentId</c> (hand-edited or corrupt file) is treated the same as a
     /// missing one rather than unchecked-cast into a huge <see cref="uint"/> -- silently wrapping

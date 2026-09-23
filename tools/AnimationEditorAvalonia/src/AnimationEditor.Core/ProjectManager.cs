@@ -1159,7 +1159,14 @@ namespace AnimationEditor.Core
         /// a multi-tile chain's satellites must recompute relative to the new owner position instead
         /// of reusing offsets captured at the old one. There is no auto-follow -- once set (loaded,
         /// computed once, or set here), a chain's owner tile never moves again on its own; only
-        /// another call here (e.g. the "Sync to First Frame" button) changes it.
+        /// another call here (e.g. the "Sync to First Frame" button) changes it. If <paramref
+        /// name="chain"/> has no real name yet -- its <see cref="AnimationChainSave.Name"/> is still
+        /// just the synthetic <c>"ID:{oldTileId}"</c> placeholder <see
+        /// cref="Tiled.TiledAnimationToAchjMapper"/> assigns an unnamed tile -- the name is re-derived
+        /// for the new tile too, so an unnamed chain's tree label follows its owner instead of going
+        /// stale (and, worse, getting baked in as a permanent explicit name on the next save: <see
+        /// cref="Tiled.NativeTsxAnimationSync"/> only omits the <c>Name</c> property when the chain's
+        /// current name still matches its current tile's synthetic one).
         /// </summary>
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId)
         {
@@ -1183,6 +1190,8 @@ namespace AnimationEditor.Core
             if (IsTsxOwnerTileIdAlreadySet(chain, tileId))
                 return null;
 
+            var oldTileId = GetTsxOwnerTileId(chain);
+
             var updatedEntries = new Dictionary<AnimationChainSave, uint>(_tsxEntryTileIdsByChain, ReferenceEqualityComparer.Instance)
             {
                 [chain] = tileId
@@ -1195,6 +1204,9 @@ namespace AnimationEditor.Core
                 updatedSatellites.Remove(chain);
                 _tsxSatelliteTileIdsByChain = updatedSatellites;
             }
+
+            if (oldTileId.HasValue && chain.Name == Tiled.TiledAnimationToAchjMapper.SyntheticChainName(oldTileId.Value))
+                chain.Name = Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId);
 
             return null;
         }

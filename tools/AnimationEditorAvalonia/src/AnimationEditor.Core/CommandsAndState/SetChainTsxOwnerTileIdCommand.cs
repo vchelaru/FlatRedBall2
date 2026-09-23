@@ -10,7 +10,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// "before" state might have had tracked satellite hints that <see
     /// cref="IProjectManager.TrySetTsxOwnerTileId"/> deliberately drops on an explicit set, and
     /// only the full-state capture/restore already used elsewhere for tab-switching knows how to
-    /// put those back.
+    /// put those back. Separately snapshots/restores <see cref="AnimationChainSave.Name"/> itself:
+    /// <see cref="IProjectManager.TrySetTsxOwnerTileId"/> renames an unnamed chain's synthetic
+    /// placeholder to follow its new tile, but that's a chain-level field, not tsx tracking state,
+    /// so <c>CaptureTsxState</c>/<c>RestoreTsxState</c> don't (and shouldn't) round-trip it -- this
+    /// command has to do that itself, the same way <see cref="RenameChainCommand"/> round-trips a
+    /// real rename, or Undo would leave the tree label on the *new* tile's name after reverting the
+    /// tile id back to the old one.
     /// </summary>
     internal sealed class SetChainTsxOwnerTileIdCommand : IUndoableCommand
     {
@@ -20,6 +26,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
         private object? _before;
+        private string? _beforeName;
 
         public string Description { get; }
 
@@ -51,6 +58,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             }
 
             _before = _pm.CaptureTsxState();
+            _beforeName = _chain.Name;
             Error = _pm.TrySetTsxOwnerTileId(_chain, _tileId);
             if (Error != null)
                 return false;
@@ -63,6 +71,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public void Undo()
         {
             _pm.RestoreTsxState(_before);
+            _chain.Name = _beforeName!;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
         }

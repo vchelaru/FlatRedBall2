@@ -23,7 +23,8 @@ public class AppCommandsSetChainTsxOwnerTileIdTests : IDisposable
     public void Dispose() => _dir.Dispose();
 
     // Two single-tile chains: "Walk" on tile 0 (frames 0, 1) and "Idle" on tile 8 (frames 8, 9).
-    // Tile 4 is blank/unused.
+    // Tile 12 has no Name property, so it loads as chain.Name == "ID:12" (TiledAnimationToAchjMapper's
+    // synthetic placeholder). Tile 4 is blank/unused.
     private const string TsxFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
@@ -44,6 +45,12 @@ public class AppCommandsSetChainTsxOwnerTileIdTests : IDisposable
           <animation>
            <frame tileid="8" duration="200"/>
            <frame tileid="9" duration="200"/>
+          </animation>
+         </tile>
+         <tile id="12">
+          <animation>
+           <frame tileid="12" duration="200"/>
+           <frame tileid="13" duration="200"/>
           </animation>
          </tile>
         </tileset>
@@ -115,5 +122,45 @@ public class AppCommandsSetChainTsxOwnerTileIdTests : IDisposable
 
         _ctx.UndoManager.Undo();
         Assert.False(_ctx.UndoManager.CanUndo);
+    }
+
+    // Regression: the tree label for an unnamed chain (its Name is just the "ID:{tileId}"
+    // placeholder TiledAnimationToAchjMapper assigns) went stale after Sync moved the owner tile --
+    // worse, the stale text would get baked in as a permanent explicit Name property on the next
+    // save, since NativeTsxAnimationSync only omits the Name property when it still matches the
+    // *current* tile's synthetic name.
+    [Fact]
+    public void SyncToNewTile_RenamesSyntheticPlaceholder_UndoRestoresOldName_RedoRenamesAgain()
+    {
+        var chain = OpenTsx("ID:12");
+
+        var error = _ctx.AppCommands.SetChainTsxOwnerTileId(chain, 5);
+        Assert.Null(error);
+        Assert.Equal("ID:5", chain.Name);
+        // Still synthetic -- no explicit Name property baked onto disk.
+        Assert.DoesNotContain(Disk().Tiles.Single(t => t.ID == 5).Properties, p => p.Name == "Name");
+
+        _ctx.UndoManager.Undo();
+        Assert.Equal("ID:12", chain.Name);
+        Assert.Equal(12u, _ctx.ProjectManager.GetTsxOwnerTileId(chain));
+
+        _ctx.UndoManager.Redo();
+        Assert.Equal("ID:5", chain.Name);
+        Assert.Equal(5u, _ctx.ProjectManager.GetTsxOwnerTileId(chain));
+    }
+
+    // A chain with a real (user- or file-given) name is never renamed just because its owner tile
+    // moves -- only the synthetic "ID:{tileId}" placeholder gets kept in sync.
+    [Fact]
+    public void SyncToNewTile_OnRealName_DoesNotRename()
+    {
+        var walk = OpenTsx("Walk");
+
+        var error = _ctx.AppCommands.SetChainTsxOwnerTileId(walk, 4);
+        Assert.Null(error);
+        Assert.Equal("Walk", walk.Name);
+
+        _ctx.UndoManager.Undo();
+        Assert.Equal("Walk", walk.Name);
     }
 }
