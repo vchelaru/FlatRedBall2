@@ -230,6 +230,34 @@ public class ChainSingleClickRevealTests
     }
 
     /// <summary>
+    /// Rapid clicks on the selected frame arrive as ClickCount 2, 3, ... rather than 1. Each one
+    /// is still a click and must replay the reveal, not only the first click of the burst.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void RapidClicks_SameFrame_EveryClickReplaysReveal(int clickCount)
+    {
+        var (window, ctx, chainNode, _, frameTvi, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, frameTvi);
+            Assert.Same(chainNode.Children[0].Data, ctx.SelectedState.SelectedFrame);
+
+            // No sleep between clicks: back-to-back presses at the same point register as a
+            // multi-click burst (ClickCount 2, 3, ...), which is exactly the repro.
+            for (int i = 2; i <= clickCount; i++)
+            {
+                wireframe.SettleSelectionReveal();
+                RealSingleClick(window, frameTvi);
+                Assert.True(wireframe.IsSelectionRevealAnimating,
+                    $"Click {i} of a rapid burst on the selected frame must replay the reveal.");
+            }
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
     /// Regression: switching from chain A to a *different* chain B must end with only chain B's
     /// frames highlighted — not a mix, and not chain A's frames caught mid-reveal. The original
     /// bug (<c>MainWindow.OnTreePointerPressed</c> calling <c>WireframeControl.ReplaySelectionReveal</c>

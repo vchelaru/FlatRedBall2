@@ -4888,7 +4888,12 @@ public partial class MainWindow : Window
             if (tvi?.DataContext is TreeNodeVm vm && !AnimTree.SelectedItems.Contains(vm))
                 AnimTree.SelectedItem = vm;
         }
-        else if (props.IsLeftButtonPressed && e.ClickCount == 1)
+        else if (props.IsLeftButtonPressed)
+        {
+            ReplayRevealIfReclick(e);
+        }
+
+        if (props.IsLeftButtonPressed && e.ClickCount == 1)
         {
             // A press on a button embedded in the row template (lock-btn, add-frame-btn) is that
             // button's own click, not a press on the row -- let it flow through untouched.
@@ -4906,21 +4911,6 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
-                // A click that will reproduce the exact same one-frame highlight it found must
-                // still replay the reveal (#716) — WireframeControl's per-frame diffing (#1027)
-                // only starts a frame's reveal the first time it becomes highlighted, and both
-                // re-clicking the already-selected frame AND clicking the lone frame of an
-                // already-selected single-frame chain reproduce an identical highlighted set, so
-                // either would otherwise silently no-op. Only fire this when the *pre-click*
-                // highlighted set is already just this frame: this call runs synchronously at
-                // Tunnel-phase, before AnimTree's own selection update and the async
-                // SelectionChanged→RefreshFrames catch-up, so calling it for a switch to a
-                // *different* frame would restart the reveal while WireframeControl still shows
-                // the previous frame's rects — a visible flash of the wrong frame growing before
-                // the highlight moves.
-                if (WireframeCtrl.IsSoleHighlightedFrame(frame))
-                    WireframeCtrl.ReplaySelectionReveal();
-
                 ClearChainDragCandidate();
                 _frameDragCandidate = frame;
                 _frameDragPressPoint = e.GetPosition(AnimTree);
@@ -4949,14 +4939,6 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
-                // Same reasoning as the frame branch above: only replay when this chain is
-                // *already* the whole-chain selection (SelectedFrame null too — otherwise a
-                // frame within this chain was selected and clicking the chain header is a real
-                // set change, from one frame to all of them, which the async catch-up handles
-                // correctly on its own).
-                if (ReferenceEquals(_selectedState.SelectedChain, chain) && _selectedState.SelectedFrame is null)
-                    WireframeCtrl.ReplaySelectionReveal();
-
                 // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
                 // it on press, so dragging a chain that is part of a multi-selection can move
                 // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -5017,6 +4999,37 @@ public partial class MainWindow : Window
                 HandleAnimTreeNodeDoubleTap(chainVm, isLabelDoubleTap: false);
                 e.Handled = true;
             }
+        }
+    }
+
+    /// <summary>
+    /// Replays the selection reveal when a left press on a tree row reproduces the highlighted
+    /// set it found (#716). WireframeControl's per-frame diffing (#1027) only starts a frame's
+    /// reveal the first time it becomes highlighted, so re-clicking the selected frame, the lone
+    /// frame of a selected single-frame chain, or the selected chain would otherwise no-op. Runs
+    /// for every ClickCount: the 2nd, 3rd, ... press of a rapid burst is still a click.
+    /// Only fires when the *pre-click* highlight already matches: this runs synchronously at
+    /// Tunnel-phase, before AnimTree's selection update and the async SelectionChanged→RefreshFrames
+    /// catch-up, so replaying on a switch to a *different* node would flash the previous node's
+    /// rects growing before the highlight moves.
+    /// </summary>
+    private void ReplayRevealIfReclick(PointerPressedEventArgs e)
+    {
+        // A press on a button embedded in the row template is that button's click, not a row click.
+        if (e.Source is not Control src || src.FindAncestorOfType<Button>(includeSelf: true) is not null)
+            return;
+
+        switch (src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext)
+        {
+            case TreeNodeVm { Data: AnimationFrameSave frame } when WireframeCtrl.IsSoleHighlightedFrame(frame):
+                WireframeCtrl.ReplaySelectionReveal();
+                break;
+            // SelectedFrame must be null too: with a frame of this chain selected, clicking the
+            // chain is a real set change (one frame to all), which the async catch-up handles.
+            case TreeNodeVm { Data: AnimationChainSave chain }
+                when ReferenceEquals(_selectedState.SelectedChain, chain) && _selectedState.SelectedFrame is null:
+                WireframeCtrl.ReplaySelectionReveal();
+                break;
         }
     }
 
