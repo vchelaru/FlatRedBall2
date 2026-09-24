@@ -15,7 +15,7 @@ public readonly record struct HexCoordinate(int Q, int R)
         new(1, -1),
     ];
 
-    /// <summary>Returns the six adjacent axial cells in a stable clockwise order.</summary>
+    /// <summary>Returns the six adjacent axial cells counter-clockwise (Y+ up), starting at +Q.</summary>
     public IReadOnlyList<HexCoordinate> GetNeighbors()
     {
         var result = new HexCoordinate[NeighborOffsets.Length];
@@ -28,11 +28,11 @@ public readonly record struct HexCoordinate(int Q, int R)
     }
 
     /// <summary>Returns the number of cell-to-cell steps to <paramref name="other"/>.</summary>
-    public long DistanceTo(HexCoordinate other)
+    public int DistanceTo(HexCoordinate other)
     {
         long q = (long)Q - other.Q;
         long r = (long)R - other.R;
         long s = -q - r;
-        return (System.Math.Abs(q) + System.Math.Abs(r) + System.Math.Abs(s)) / 2;
+        return checked((int)((System.Math.Abs(q) + System.Math.Abs(r) + System.Math.Abs(s)) / 2));
     }
 }

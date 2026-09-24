@@ -43,6 +43,26 @@ public sealed class HexGrid
         if (!float.IsFinite(worldPosition.X) || !float.IsFinite(worldPosition.Y))
             throw new ArgumentOutOfRangeException(nameof(worldPosition));
 
+        var (q, r) = GetRoundedAxial(worldPosition);
+        if (q < int.MinValue || q > int.MaxValue || r < int.MinValue || r > int.MaxValue)
+            throw new OverflowException("The world position is outside the representable axial coordinate range.");
+
+        return new HexCoordinate((int)q, (int)r);
+    }
+
+    // Like GetCellAt, but clamps to the int range instead of throwing. Collision queries use this
+    // so an entity far outside the grid gets no candidates rather than an exception.
+    internal HexCoordinate GetCellAtClamped(Vector2 worldPosition)
+    {
+        var (q, r) = GetRoundedAxial(worldPosition);
+        return new HexCoordinate(ClampToInt(q), ClampToInt(r));
+    }
+
+    private static int ClampToInt(double value) =>
+        value < int.MinValue ? int.MinValue : value > int.MaxValue ? int.MaxValue : (int)value;
+
+    private (double Q, double R) GetRoundedAxial(Vector2 worldPosition)
+    {
         double x = worldPosition.X - Origin.X;
         double y = worldPosition.Y - Origin.Y;
         double q;
@@ -94,7 +114,7 @@ public sealed class HexGrid
         return corners;
     }
 
-    private static HexCoordinate Round(double q, double r)
+    private static (double Q, double R) Round(double q, double r)
     {
         double s = -q - r;
         double roundedQ = System.Math.Round(q, MidpointRounding.AwayFromZero);
@@ -109,10 +129,7 @@ public sealed class HexGrid
         else if (rError >= sError)
             roundedR = -roundedQ - roundedS;
 
-        if (roundedQ < int.MinValue || roundedQ > int.MaxValue || roundedR < int.MinValue || roundedR > int.MaxValue)
-            throw new OverflowException("The world position is outside the representable axial coordinate range.");
-
-        return new HexCoordinate((int)roundedQ, (int)roundedR);
+        return (roundedQ, roundedR);
     }
 
     private static Vector2 ToVector2(double x, double y)

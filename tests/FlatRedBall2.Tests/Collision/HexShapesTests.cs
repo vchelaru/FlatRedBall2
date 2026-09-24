@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using Shouldly;
@@ -22,6 +22,18 @@ public class HexShapesTests
 
         shapes.Count.ShouldBe(1);
         shapes.ContainsCell(coordinate).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CollidesWith_AARectBeyondAxialRange_ReturnsFalse()
+    {
+        // x=1e12 with radius 10 maps to an axial Q past int.MaxValue.
+        var rectangle = new AARect { X = 1e12f, Y = 0f, Width = 4f, Height = 4f };
+        var shapes = new HexShapes(new HexGrid(10f, HexOrientation.FlatTop, Vector2.Zero));
+        shapes.AddHexAtCell(new HexCoordinate(0, 0));
+
+        shapes.CollidesWith(rectangle).ShouldBeFalse();
+        shapes.GetSeparationVector(rectangle).ShouldBe(Vector2.Zero);
     }
 
     [Fact]
@@ -79,13 +91,31 @@ public class HexShapesTests
         var rectangle = new AARect { X = center.X, Y = center.Y, Width = 1f, Height = 1f };
         var shapes = new HexShapes(grid);
         shapes.AddHexAtCell(coordinate);
-        var getCandidates = typeof(HexShapes).GetMethod(
-            "GetCandidateCoordinates", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var candidates = new List<HexCoordinate>();
 
-        var candidates = ((System.Collections.Generic.IEnumerable<HexCoordinate>)getCandidates.Invoke(
-            shapes, new object[] { rectangle })!).ToArray();
+        shapes.GetCandidateCoordinates(rectangle, candidates);
 
         candidates.ShouldContain(coordinate);
+    }
+
+    [Fact]
+    public void GetSeparationVector_PolygonOverlappingCell_PushesPolygonOut()
+    {
+        // Covers the reused scratch polygon: a second query after moving must use the new position.
+        var polygon = Polygon.FromPoints(new[]
+        {
+            new Vector2(-2f, -2f), new Vector2(2f, -2f), new Vector2(2f, 2f), new Vector2(-2f, 2f)
+        });
+        polygon.X = 9f;
+        var shapes = new HexShapes(new HexGrid(10f, HexOrientation.FlatTop, Vector2.Zero));
+        shapes.AddHexAtCell(new HexCoordinate(0, 0));
+        var firstSeparation = -shapes.GetSeparationVector(polygon);
+        polygon.X = 30f;
+
+        var secondSeparation = -shapes.GetSeparationVector(polygon);
+
+        firstSeparation.X.ShouldBeGreaterThan(0f);
+        secondSeparation.ShouldBe(Vector2.Zero);
     }
 
     [Fact]

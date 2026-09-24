@@ -55,11 +55,28 @@ public class HexGridTests
     {
         var coordinate = new HexCoordinate(2, -1);
         var other = new HexCoordinate(-1, 3);
-        long expectedDistance = 4;
+        int expectedDistance = 4;
 
         coordinate.GetNeighbors().Count.ShouldBe(6);
         coordinate.GetNeighbors().ShouldContain(new HexCoordinate(3, -1));
         coordinate.DistanceTo(other).ShouldBe(expectedDistance);
+    }
+
+    [Fact]
+    public void HexCoordinate_GetNeighbors_ReturnsCounterClockwiseFromPositiveQ()
+    {
+        var coordinate = new HexCoordinate(0, 0);
+        var expected = new[]
+        {
+            new HexCoordinate(1, 0),
+            new HexCoordinate(0, 1),
+            new HexCoordinate(-1, 1),
+            new HexCoordinate(-1, 0),
+            new HexCoordinate(0, -1),
+            new HexCoordinate(1, -1),
+        };
+
+        coordinate.GetNeighbors().ShouldBe(expected);
     }
 
     [Fact]

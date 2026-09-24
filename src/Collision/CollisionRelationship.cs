@@ -622,12 +622,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
         if (sep == Vector2.Zero)
         {
-            if (IsHexContact(effectiveA, effectiveB)
-                && CollisionDispatcher.CollidesWith(effectiveA, effectiveB))
-            {
-                RecordContact(a, b);
-                CollisionOccurred?.Invoke(a, b);
-            }
+            ReportEmbeddedHexContact(a, b, effectiveA, effectiveB);
             TryOfferGroundSnap(a, b);
             return;
         }
@@ -647,8 +642,17 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         TryOfferGroundSnap(a, b);
     }
 
-    private static bool IsHexContact(ICollidable a, ICollidable b) =>
-        a is HexShapes || b is HexShapes;
+    // An actor embedded in HexShapes can overlap while the resolver returns no usable
+    // separation. It is still touching, so record the contact and fire the event.
+    // TileShapes has the same gap and doesn't report it yet (#1200).
+    private void ReportEmbeddedHexContact(A a, B b, ICollidable effectiveA, ICollidable effectiveB)
+    {
+        if (effectiveA is not HexShapes && effectiveB is not HexShapes) return;
+        if (!CollisionDispatcher.CollidesWith(effectiveA, effectiveB)) return;
+
+        RecordContact(a, b);
+        CollisionOccurred?.Invoke(a, b);
+    }
 
     // Both lists are already sorted by their respective factories. radiusA/radiusB are each
     // factory's shared IFactory.PartitionMaxRadius — a single bound per side, not each entity's
@@ -690,12 +694,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (sep == Vector2.Zero)
                 {
-                    if (IsHexContact(effectiveA, effectiveB)
-                        && CollisionDispatcher.CollidesWith(effectiveA, effectiveB))
-                    {
-                        RecordContact(a, b);
-                        CollisionOccurred?.Invoke(a, b);
-                    }
+                    ReportEmbeddedHexContact(a, b, effectiveA, effectiveB);
                     TryOfferGroundSnap(a, b);
                     continue;
                 }

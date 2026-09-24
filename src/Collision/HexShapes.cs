@@ -16,6 +16,11 @@ public sealed class HexShapes : ICollidable, IRenderable
 {
     private readonly Dictionary<HexCoordinate, Polygon> _hexes = new();
     private readonly List<HexCoordinate> _orderedCoordinates = new();
+    // Reused per query so collision against hexes allocates nothing per frame.
+    private readonly List<HexCoordinate> _candidates = new();
+    private AARect? _scratchRectangle;
+    private Circle? _scratchCircle;
+    private Polygon? _scratchPolygon;
 
     /// <summary>Creates an empty collection using <paramref name="grid"/>'s immutable layout.</summary>
     public HexShapes(HexGrid grid) => Grid = grid ?? throw new ArgumentNullException(nameof(grid));
@@ -84,10 +89,23 @@ public sealed class HexShapes : ICollidable, IRenderable
     {
         if (other is HexShapes || other is Line) return false;
 
-        foreach (var shape in Entity.GetLeafShapes(other))
-            foreach (var coordinate in GetCandidateCoordinates(shape))
-                if (CollisionDispatcher.CollidesWith(shape, _hexes[coordinate]))
+        if (other is Entity)
+        {
+            foreach (var shape in Entity.GetLeafShapes(other))
+                if (CollidesWithLeaf(shape))
                     return true;
+            return false;
+        }
+
+        return CollidesWithLeaf(other);
+    }
+
+    private bool CollidesWithLeaf(ICollidable shape)
+    {
+        GetCandidateCoordinates(shape, _candidates);
+        foreach (var coordinate in _candidates)
+            if (CollisionDispatcher.CollidesWith(shape, _hexes[coordinate]))
+                return true;
         return false;
     }
 
@@ -134,6 +152,8 @@ public sealed class HexShapes : ICollidable, IRenderable
 
     internal Vector2 GetSeparationFor(ICollidable shape)
     {
+        if (shape is not Entity) return GetSeparationForLeaf(shape);
+
         foreach (var leaf in Entity.GetLeafShapes(shape))
         {
             var separation = GetSeparationForLeaf(leaf);
@@ -146,9 +166,10 @@ public sealed class HexShapes : ICollidable, IRenderable
 
     private Vector2 GetSeparationForLeaf(ICollidable shape)
     {
-        if (!CollidesWith(shape)) return Vector2.Zero;
+        // The first pass doubles as the overlap test: no penetration returns zero.
+        var provisional = CopyToScratch(shape);
+        if (provisional == null) return Vector2.Zero;
 
-        ICollidable provisional = CreateTranslatedCopy(shape, Vector2.Zero);
         Vector2 totalSeparation = Vector2.Zero;
         const int maximumIterations = 12;
         const float progressToleranceSquared = 0.000001f;
@@ -156,7 +177,8 @@ public sealed class HexShapes : ICollidable, IRenderable
         for (int iteration = 0; iteration < maximumIterations; iteration++)
         {
             bool foundPenetration = false;
-            foreach (var coordinate in GetCandidateCoordinates(provisional))
+            GetCandidateCoordinates(provisional, _candidates);
+            foreach (var coordinate in _candidates)
             {
                 var polygon = _hexes[coordinate];
                 if (!CollisionDispatcher.CollidesWith(provisional, polygon)) continue;
@@ -181,16 +203,18 @@ public sealed class HexShapes : ICollidable, IRenderable
         return Vector2.Zero;
     }
 
-    private IEnumerable<HexCoordinate> GetCandidateCoordinates(ICollidable shape)
+    // Fills result (cleared first) with occupied cells whose area may overlap shape's bounds.
+    internal void GetCandidateCoordinates(ICollidable shape, List<HexCoordinate> result)
     {
+        result.Clear();
         var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(shape);
         if (!float.IsFinite(minX) || !float.IsFinite(maxX) || !float.IsFinite(minY) || !float.IsFinite(maxY))
-            yield break;
+            return;
 
-        var lowerLeft = Grid.GetCellAt(new Vector2(minX, minY));
-        var lowerRight = Grid.GetCellAt(new Vector2(maxX, minY));
-        var upperLeft = Grid.GetCellAt(new Vector2(minX, maxY));
-        var upperRight = Grid.GetCellAt(new Vector2(maxX, maxY));
+        var lowerLeft = Grid.GetCellAtClamped(new Vector2(minX, minY));
+        var lowerRight = Grid.GetCellAtClamped(new Vector2(maxX, minY));
+        var upperLeft = Grid.GetCellAtClamped(new Vector2(minX, maxY));
+        var upperRight = Grid.GetCellAtClamped(new Vector2(maxX, maxY));
         int minQ = ClampToInt((long)System.Math.Min(System.Math.Min(lowerLeft.Q, lowerRight.Q), System.Math.Min(upperLeft.Q, upperRight.Q)) - 2);
         int maxQ = ClampToInt((long)System.Math.Max(System.Math.Max(lowerLeft.Q, lowerRight.Q), System.Math.Max(upperLeft.Q, upperRight.Q)) + 2);
         int minR = ClampToInt((long)System.Math.Min(System.Math.Min(lowerLeft.R, lowerRight.R), System.Math.Min(upperLeft.R, upperRight.R)) - 2);
@@ -202,8 +226,8 @@ public sealed class HexShapes : ICollidable, IRenderable
         {
             foreach (var coordinate in _orderedCoordinates)
                 if (CellBoundsOverlap(coordinate, minX, maxX, minY, maxY))
-                    yield return coordinate;
-            yield break;
+                    result.Add(coordinate);
+            return;
         }
 
         for (long q = minQ; q <= maxQ; q++)
@@ -211,7 +235,7 @@ public sealed class HexShapes : ICollidable, IRenderable
             {
                 var coordinate = new HexCoordinate((int)q, (int)r);
                 if (_hexes.ContainsKey(coordinate))
-                    yield return coordinate;
+                    result.Add(coordinate);
             }
     }
 
@@ -259,31 +283,45 @@ public sealed class HexShapes : ICollidable, IRenderable
         return q != 0 ? q : first.R.CompareTo(second.R);
     }
 
-    private static ICollidable CreateTranslatedCopy(ICollidable shape, Vector2 offset) => shape switch
+    // Copies shape's world geometry into a reused scratch shape the resolver can move freely.
+    // Returns null for shapes hex collision doesn't resolve (Line).
+    private ICollidable? CopyToScratch(ICollidable shape)
     {
-        AARect rectangle => new AARect
+        switch (shape)
         {
-            Width = rectangle.Width,
-            Height = rectangle.Height,
-            X = rectangle.AbsoluteX + offset.X,
-            Y = rectangle.AbsoluteY + offset.Y
-        },
-        Circle circle => new Circle
-        {
-            Radius = circle.Radius,
-            X = circle.AbsoluteX + offset.X,
-            Y = circle.AbsoluteY + offset.Y
-        },
-        Polygon polygon => CreateTranslatedPolygon(polygon, offset),
-        _ => throw new NotSupportedException($"Hex collision does not support {shape.GetType().Name}.")
-    };
+            case AARect rectangle:
+                _scratchRectangle ??= new AARect();
+                _scratchRectangle.Width = rectangle.Width;
+                _scratchRectangle.Height = rectangle.Height;
+                _scratchRectangle.X = rectangle.AbsoluteX;
+                _scratchRectangle.Y = rectangle.AbsoluteY;
+                return _scratchRectangle;
+            case Circle circle:
+                _scratchCircle ??= new Circle();
+                _scratchCircle.Radius = circle.Radius;
+                _scratchCircle.X = circle.AbsoluteX;
+                _scratchCircle.Y = circle.AbsoluteY;
+                return _scratchCircle;
+            case Polygon polygon:
+                _scratchPolygon ??= new Polygon();
+                // SetPoints rebuilds convex parts, so only call it when the source points changed.
+                if (!PointsEqual(_scratchPolygon.Points, polygon.Points))
+                    _scratchPolygon.SetPoints(polygon.Points);
+                _scratchPolygon.X = polygon.AbsoluteX;
+                _scratchPolygon.Y = polygon.AbsoluteY;
+                _scratchPolygon.Rotation = polygon.AbsoluteRotation;
+                return _scratchPolygon;
+            default:
+                return null;
+        }
+    }
 
-    private static Polygon CreateTranslatedPolygon(Polygon polygon, Vector2 offset)
+    private static bool PointsEqual(IReadOnlyList<Vector2> first, IReadOnlyList<Vector2> second)
     {
-        var copy = Polygon.FromPoints(polygon.Points);
-        copy.X = polygon.AbsoluteX + offset.X;
-        copy.Y = polygon.AbsoluteY + offset.Y;
-        copy.Rotation = polygon.AbsoluteRotation;
-        return copy;
+        if (first.Count != second.Count) return false;
+        for (int i = 0; i < first.Count; i++)
+            if (first[i] != second[i])
+                return false;
+        return true;
     }
 }
