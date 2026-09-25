@@ -290,15 +290,17 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <paramref name="path"/> ("Duplicate", "Flip Horizontal"); a click when the popup laid the
     /// item out, else the item's own click event.
     /// </summary>
-    public void PickTreeMenuItem(params string[] path)
+    public void PickTreeMenuItem(params string[] path) => PickMenuItem(TreeMenu, path);
+
+    /// <summary><see cref="PickTreeMenuItem"/> for any open context menu, e.g. the Project panel's.</summary>
+    public void PickMenuItem(ContextMenu menu, params string[] path)
     {
-        ContextMenu menu = TreeMenu;
         IEnumerable<object?> items = menu.Items;
         MenuItem? item = null;
         foreach (string header in path)
         {
             item = items.OfType<MenuItem>().FirstOrDefault(candidate => (string?)candidate.Header == header)
-                ?? throw new InvalidOperationException($"The tree menu has no item \"{header}\"; it shows [{string.Join(", ", items.OfType<MenuItem>().Select(candidate => candidate.Header))}].");
+                ?? throw new InvalidOperationException($"The menu has no item \"{header}\"; it shows [{string.Join(", ", items.OfType<MenuItem>().Select(candidate => candidate.Header))}].");
             items = item.Items;
         }
         if (item!.IsEffectivelyVisible && item.Bounds.Width > 0)

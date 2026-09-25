@@ -142,6 +142,28 @@ public class PanelsScenarioTests
         editor.ChainNamed("Walk").Frames.Count.ShouldBe(2);
     }
 
+    // #1208: the copy sits beside the original, so its relative texture path still resolves.
+    [AvaloniaFact]
+    public async Task ProjectPanel_DuplicateOnAFile_WritesACopyBesideItAndOpensIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string original = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string copy = Path.Combine(editor.ProjectFolder, "heroCopy.achx");
+        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        editor.Layout();
+        ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
+
+        editor.RightClick(RowFor(editor, panel, "hero.achx"));
+        editor.PickMenuItem(panel.ProjectTree.ContextMenu!, "Duplicate");
+        (await editor.WaitUntilAsync(() => editor.Tabs.ActiveTab?.Path == new AnimationEditor.Core.Paths.FilePath(copy), TimeSpan.FromSeconds(5)))
+            .ShouldBeTrue("the copy opens as the active tab");
+
+        File.ReadAllBytes(copy).ShouldBe(File.ReadAllBytes(original));
+        editor.VisibleChainHeaders.ShouldBe(new[] { "Walk" });
+        editor.ThrowIfErrorShown();
+    }
+
     [AvaloniaFact]
     public async Task ShortcutsTab_ListsEveryHotkey_AndItsCloseButtonHidesIt()
     {

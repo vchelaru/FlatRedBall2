@@ -291,6 +291,7 @@ public partial class MainWindow : Window
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
         ProjectPanel.FileCopyPathRequested += relativePath => CopyProjectFilePathToClipboard(relativePath);
         ProjectPanel.FileDeleteRequested += relativePath => _ = DeleteProjectFileAsync(relativePath);
+        ProjectPanel.FileDuplicateRequested += relativePath => _ = DuplicateProjectFileAsync(relativePath);
         // Right-clicking blank space in the tree offers "New Animation" (#908) -- same flow as
         // File > New.
         ProjectPanel.NewAnimationRequested += () => OnNewClick(null, null!);
@@ -2390,6 +2391,37 @@ public partial class MainWindow : Window
         // the user already confirmed a destructive, non-undoable action.
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
             CloseTabCore(openTab);
+    }
+
+    /// <summary>
+    /// Issue #1208: right-click Duplicate on a Project-tree file row. Byte-copies the file into the
+    /// same folder under <see cref="NewAnimationFileNaming.SuggestDuplicateFileName"/>'s name, so
+    /// texture paths (relative to the file) still resolve, then opens the copy the way "New
+    /// Animation File" does. Companion files (<c>.aeproperties</c>, <c>.tiledsync</c>) are not
+    /// copied: a second file pushing into the same tilesets would fight the original. The folder
+    /// watcher refreshes the tree, same as <see cref="DeleteProjectFileAsync"/>.
+    /// </summary>
+    internal async Task DuplicateProjectFileAsync(string relativePath)
+    {
+        var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
+        if (sourcePath is null) return;
+
+        var folder = Path.GetDirectoryName(sourcePath)!;
+        var copyName = NewAnimationFileNaming.SuggestDuplicateFileName(
+            new FilePath(sourcePath).NoPath,
+            Directory.EnumerateFiles(folder).Select(f => new FilePath(f).NoPath));
+        var copyPath = Path.Combine(folder, copyName);
+        try
+        {
+            File.Copy(sourcePath, copyPath, overwrite: false);
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ Could not duplicate {new FilePath(sourcePath).NoPath}: {ex.Message}", isError: true);
+            return;
+        }
+
+        await LoadAnimationFileAsync(copyPath);
     }
 
     /// <summary>

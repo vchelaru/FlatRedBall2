@@ -6,8 +6,9 @@ using System.Linq;
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
-/// Naming rules for "New Animation File" on a Project-tree folder row (issue #1018): which
-/// extension a new file gets, what name it starts out with, and whether a typed name is legal.
+/// Naming rules for "New Animation File" on a Project-tree folder row (issue #1018) and
+/// "Duplicate" on a file row (issue #1208): which extension a new file gets, what name it starts
+/// out with, and whether a typed name is legal.
 /// Pure string logic so both hosts share it and neither needs a filesystem to test it.
 /// </summary>
 public static class NewAnimationFileNaming
@@ -60,6 +61,25 @@ public static class NewAnimationFileNaming
             var candidate = DefaultStem + suffix;
             if (!taken.Contains(candidate)) return candidate + "." + extension;
         }
+    }
+
+    /// <summary>
+    /// Name for a duplicate of <paramref name="sourceFileName"/> in the same folder: the stem plus
+    /// "Copy", numbered from 2 on collision ("HeroCopy", "HeroCopy2"), matching duplicated chain
+    /// names. Keeps the source's extension. Collisions are checked by stem across both animation
+    /// extensions, same as <see cref="Resolve"/>.
+    /// </summary>
+    public static string SuggestDuplicateFileName(string sourceFileName, IEnumerable<string> siblingFileNames)
+    {
+        var source = new FilePath(sourceFileName);
+        var stem = source.NoPathNoExtension + "Copy";
+        var taken = StemSet(siblingFileNames);
+
+        var candidate = stem;
+        for (int suffix = 2; taken.Contains(candidate); suffix++)
+            candidate = stem + suffix;
+
+        return candidate + "." + source.Extension;
     }
 
     /// <summary>

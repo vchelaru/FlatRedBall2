@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using Shouldly;
 using System;
 using Xunit;
 
@@ -61,5 +62,24 @@ public class NewAnimationFileNamingTests
             new[] { "NewAnimation.achj", "NewAnimation2.achx" }, "achj");
 
         Assert.Equal("NewAnimation3.achj", suggested);
+    }
+
+    [Fact]
+    public void SuggestDuplicateFileName_NoCollision_AppendsCopyAndKeepsExtension()
+    {
+        var suggested = NewAnimationFileNaming.SuggestDuplicateFileName("Hero.achx", new[] { "Hero.achx" });
+
+        suggested.ShouldBe("HeroCopy.achx");
+    }
+
+    [Fact]
+    public void SuggestDuplicateFileName_CopyStemTakenByEitherExtension_NumbersFromTwo()
+    {
+        // Same rule as duplicated chains ("WalkCopy", "WalkCopy2") and as the stem-based
+        // collision check for new files: HeroCopy.achj blocks HeroCopy.achx too.
+        var suggested = NewAnimationFileNaming.SuggestDuplicateFileName(
+            "Hero.achx", new[] { "Hero.achx", "herocopy.achj", "HeroCopy2.achx" });
+
+        suggested.ShouldBe("HeroCopy3.achx");
     }
 }

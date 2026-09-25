@@ -91,6 +91,12 @@ public partial class ProjectPanelControl : UserControl
     public event Action<string>? FileCopyPathRequested;
 
     /// <summary>
+    /// Raised when the user picks "Duplicate" for a file row (issue #1208). Carries the file's
+    /// <see cref="AchxTreeNodeVm.RelativePath"/>; the host picks the copy's name and writes it.
+    /// </summary>
+    public event Action<string>? FileDuplicateRequested;
+
+    /// <summary>
     /// Raised when the user picks "Delete" for a file row (issue #919). Carries the file's
     /// <see cref="AchxTreeNodeVm.RelativePath"/> for the host to resolve, same as
     /// <see cref="FolderRevealRequested"/>. The host owns confirming and the actual
@@ -398,6 +404,10 @@ public partial class ProjectPanelControl : UserControl
             ProjectTree.ContextMenu.Items.Add(copyPathItem);
 
             ProjectTree.ContextMenu.Items.Add(new Separator());
+
+            var duplicateItem = new MenuItem { Header = "Duplicate" };
+            duplicateItem.Click += (_, _) => FileDuplicateRequested?.Invoke(fileNode.RelativePath);
+            ProjectTree.ContextMenu.Items.Add(duplicateItem);
 
             var deleteItem = new MenuItem { Header = "Delete" };
             deleteItem.Click += (_, _) => FileDeleteRequested?.Invoke(fileNode.RelativePath);
