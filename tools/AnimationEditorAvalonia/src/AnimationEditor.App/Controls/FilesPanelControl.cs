@@ -1,5 +1,6 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -47,6 +48,12 @@ public partial class FilesPanelControl : UserControl
     private string? _achxFolder;
 
     public ObservableCollection<PngFilesTreeNodeVm> TreeRoots { get; } = new();
+
+    /// <summary>
+    /// Folders the user collapsed, keyed by path relative to the browse root, kept across
+    /// rebuilds (#1209). The host loads and persists it per browse root.
+    /// </summary>
+    public CollapsedFolderSet CollapsedFolders { get; } = new();
 
     /// <summary>The active scope. The owner refreshes referenced-texture data when this changes.</summary>
     public FilesPanelScope Scope { get; private set; } = FilesPanelScope.Project;
@@ -161,6 +168,7 @@ public partial class FilesPanelControl : UserControl
         SetEmptyMessage(null, visible: false);
         foreach (var node in PngFolderTreeBuilder.Build(files, _filesRoot))
             TreeRoots.Add(PngFilesTreeNodeVm.FromNode(node, _thumbnailService, ThumbnailSize));
+        CollapsedFolders.Track(TreeRoots);
     }
 
     private void SetEmptyMessage(string? text, bool visible)
@@ -311,7 +319,7 @@ public partial class FilesPanelControl : UserControl
     }
 }
 
-public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
+public sealed class PngFilesTreeNodeVm : ICollapsibleFolderNode
 {
     private bool _isExpanded = true;
     private bool _isDragging;
@@ -324,6 +332,12 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
     public bool ShowPathHint => !string.IsNullOrEmpty(PathHint);
     public Bitmap? Thumbnail { get; }
     public ObservableCollection<PngFilesTreeNodeVm> Children { get; } = new();
+
+    /// <summary>Path from the browse root, forward-slash separated.</summary>
+    public string? RelativePath { get; }
+
+    string? ICollapsibleFolderNode.FolderKey => IsFolder ? RelativePath : null;
+    IEnumerable<ICollapsibleFolderNode> ICollapsibleFolderNode.ChildNodes => Children;
 
     public bool IsFolderOpen => _isExpanded;
 
@@ -350,9 +364,11 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
         }
     }
 
-    private PngFilesTreeNodeVm(string name, bool isFolder, string? absolutePath, string? pathHint, Bitmap? thumbnail)
+    private PngFilesTreeNodeVm(string name, bool isFolder, string? absolutePath, string? relativePath,
+        string? pathHint, Bitmap? thumbnail)
     {
         Name = name;
+        RelativePath = relativePath;
         IsFolder = isFolder;
         AbsolutePath = absolutePath;
         PathHint = pathHint;
@@ -373,7 +389,7 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
                 pathHint = node.RelativePath[..slash].Replace("/", " › ");
         }
 
-        var vm = new PngFilesTreeNodeVm(node.Name, node.IsFolder, node.AbsolutePath, pathHint, bitmap);
+        var vm = new PngFilesTreeNodeVm(node.Name, node.IsFolder, node.AbsolutePath, node.RelativePath, pathHint, bitmap);
         foreach (var child in node.Children)
             vm.Children.Add(FromNode(child, thumbnails, thumbSize));
 

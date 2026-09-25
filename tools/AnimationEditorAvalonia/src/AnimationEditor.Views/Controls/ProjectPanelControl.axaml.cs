@@ -1,6 +1,7 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
+using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -47,6 +48,12 @@ public partial class ProjectPanelControl : UserControl
     private bool _isProgrammaticSelectionChange;
 
     public ObservableCollection<AchxTreeNodeVm> TreeRoots { get; } = new();
+
+    /// <summary>
+    /// Folders the user collapsed, keyed by <see cref="AchxTreeNodeVm.RelativePath"/>, kept across
+    /// rebuilds (#1207). The host loads and persists it per project folder.
+    /// </summary>
+    public CollapsedFolderSet CollapsedFolders { get; } = new();
 
     /// <summary>The currently selected file entry, or null when no file row is selected.</summary>
     public AchxFileEntry? SelectedEntry => (ProjectTree.SelectedItem as AchxTreeNodeVm)?.Entry;
@@ -182,6 +189,9 @@ public partial class ProjectPanelControl : UserControl
 
         foreach (var node in AchxFolderTreeBuilder.Build(files))
             TreeRoots.Add(AchxTreeNodeVm.FromNode(node));
+
+        // Search results show fully expanded -- a remembered collapse would hide the matches.
+        CollapsedFolders.Track(string.IsNullOrWhiteSpace(_searchQuery) ? TreeRoots : Array.Empty<AchxTreeNodeVm>());
 
         StartThumbnailLoad();
     }
@@ -497,7 +507,7 @@ public partial class ProjectPanelControl : UserControl
 public readonly record struct NewAnimationFileRequest(string FolderRelativePath, string FileName);
 
 /// <summary>Tree node view-model for <see cref="ProjectPanelControl"/>'s <c>TreeView</c>.</summary>
-public sealed class AchxTreeNodeVm : INotifyPropertyChanged
+public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
 {
     private bool _isExpanded = true;
     private Bitmap? _thumbnail;
@@ -565,6 +575,9 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
     public string RelativePath { get; }
 
     public ObservableCollection<AchxTreeNodeVm> Children { get; } = new();
+
+    string? ICollapsibleFolderNode.FolderKey => IsFolder ? RelativePath : null;
+    IEnumerable<ICollapsibleFolderNode> ICollapsibleFolderNode.ChildNodes => Children;
 
     public bool IsFolderOpen => _isExpanded;
 

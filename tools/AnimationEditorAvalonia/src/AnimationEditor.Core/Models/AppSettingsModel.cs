@@ -85,6 +85,18 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public double? SidebarWidth { get; set; }
 
+        /// <summary>
+        /// Folders collapsed in the Animations tab tree (#1207). Keyed by the project folder's
+        /// <see cref="FilePath.Standardized"/> path; each value lists folder paths relative to it.
+        /// </summary>
+        public Dictionary<string, List<string>> CollapsedAnimationFolders { get; set; } = new();
+
+        /// <summary>
+        /// Folders collapsed in the Images tab tree (#1209), keyed and stored the same way as
+        /// <see cref="CollapsedAnimationFolders"/> but by that tab's browse root.
+        /// </summary>
+        public Dictionary<string, List<string>> CollapsedImageFolders { get; set; } = new();
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

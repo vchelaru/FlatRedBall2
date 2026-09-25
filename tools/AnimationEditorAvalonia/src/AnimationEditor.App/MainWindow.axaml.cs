@@ -85,6 +85,7 @@ public partial class MainWindow : Window
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
+    private string? _filesPanelRoot;
     private readonly TabController _tabController;
     // Guards _undoManager.StackChanged's preview-promote reaction (#841) against the Clear()/
     // RestoreSnapshot() calls LoadAnimationFileAsync itself makes while loading a file -- those
@@ -298,6 +299,10 @@ public partial class MainWindow : Window
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
+        ProjectPanel.CollapsedFolders.Changed += () => StoreCollapsedFolders(
+            _appSettings.CollapsedAnimationFolders, _projectManager.ProjectFolderPath, ProjectPanel.CollapsedFolders);
+        FilesPanel.CollapsedFolders.Changed += () => StoreCollapsedFolders(
+            _appSettings.CollapsedImageFolders, _filesPanelRoot, FilesPanel.CollapsedFolders);
         // Single click previews the file in the one reusable preview tab; double-click (or
         // editing it -- see the _undoManager.StackChanged subscription in WireTabBar) promotes
         // it to a permanent tab (#841).
@@ -2743,6 +2748,7 @@ public partial class MainWindow : Window
         _projectFolderWatcher.Watch(path);
         var rootFolder = new DiskEditorFolder(path);
         var entries = await AchxFolderScanner.ScanAsync(rootFolder);
+        ProjectPanel.CollapsedFolders.Load(GetCollapsedFolders(_appSettings.CollapsedAnimationFolders, path));
         ProjectPanel.SetEntries(entries);
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
@@ -4264,6 +4270,21 @@ public partial class MainWindow : Window
 
     // ── Files panel ───────────────────────────────────────────────────────────
 
+    // Both trees' collapsed folders persist per tree root (#1207, #1209). The settings copy is
+    // kept current on every toggle, so re-loading it before each rebuild is always safe.
+    private static IEnumerable<string>? GetCollapsedFolders(Dictionary<string, List<string>> store, string? root) =>
+        root is not null && store.TryGetValue(new FilePath(root).Standardized, out var keys) ? keys : null;
+
+    private void StoreCollapsedFolders(Dictionary<string, List<string>> store, string? root, CollapsedFolderSet set)
+    {
+        if (root is null) return;
+
+        var key = new FilePath(root).Standardized;
+        if (set.Keys.Count == 0) store.Remove(key);
+        else store[key] = set.Keys.ToList();
+        SaveSettingsFile();
+    }
+
     private void RefreshFilesPanel()
     {
         // ProjectFolderPath (#875) is the explicit "open project folder" -- it wins over the
@@ -4273,6 +4294,8 @@ public partial class MainWindow : Window
         string? achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? null
             : new FilePath(_projectManager.FileName).GetDirectoryContainingThis().FullPath;
+        _filesPanelRoot = filesRoot;
+        FilesPanel.CollapsedFolders.Load(GetCollapsedFolders(_appSettings.CollapsedImageFolders, filesRoot));
         FilesPanel.Refresh(filesRoot, referenced, achxFolder);
         _pngFolderWatcher.Watch(filesRoot);
         ActiveFolderLabel.Text = TitleBarHelper.BuildActiveFolderDisplay(

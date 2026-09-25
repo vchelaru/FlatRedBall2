@@ -25,7 +25,7 @@ public static class PngFolderTreeBuilder
             root.Insert(parts, file);
         }
 
-        return root.ToSortedNodes(filesRoot);
+        return root.ToSortedNodes(filesRoot, string.Empty);
     }
 
     private sealed class BuilderNode
@@ -52,19 +52,21 @@ public static class PngFolderTreeBuilder
             child.Insert(remaining, file);
         }
 
-        public List<PngFilesTreeNode> ToSortedNodes(string? folderAbsolutePath)
+        public List<PngFilesTreeNode> ToSortedNodes(string? folderAbsolutePath, string relativePrefix)
         {
             var nodes = new List<PngFilesTreeNode>();
 
             foreach (var (name, folder) in _folders.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
             {
                 var childAbsolutePath = folderAbsolutePath is null ? null : Path.Combine(folderAbsolutePath, name);
+                var childRelativePath = relativePrefix.Length == 0 ? name : $"{relativePrefix}/{name}";
                 nodes.Add(new PngFilesTreeNode
                 {
                     Name = name,
                     IsFolder = true,
                     AbsolutePath = childAbsolutePath,
-                    Children = folder.ToSortedNodes(childAbsolutePath),
+                    RelativePath = childRelativePath,
+                    Children = folder.ToSortedNodes(childAbsolutePath, childRelativePath),
                 });
             }
 
@@ -95,6 +97,7 @@ public sealed class PngFilesTreeNode
     public required string Name { get; init; }
     public required bool IsFolder { get; init; }
     public string? AbsolutePath { get; init; }
+    /// <summary>Path from the browse root, forward-slash separated, for both files and folders.</summary>
     public string? RelativePath { get; init; }
     public IReadOnlyList<PngFilesTreeNode> Children { get; init; } = Array.Empty<PngFilesTreeNode>();
 }
