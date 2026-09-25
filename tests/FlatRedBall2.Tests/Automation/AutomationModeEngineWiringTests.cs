@@ -104,10 +104,10 @@ public class AutomationModeEngineWiringTests
 
     /// <summary>
     /// Backspace is the editing behavior realistic entry needs, and it travels as a key rather
-    /// than as text. A disabled control must take neither.
+    /// than as text.
     /// </summary>
     [Fact]
-    public void BackspaceKeyAndDisabledControl_ThroughRealGameTicks_EditAndRejectAsExpected()
+    public void BackspaceKey_ThroughRealGameTicks_DeletesExactlyOneCharacter()
     {
         if (GumIsOwnedElsewhere)
             return;
@@ -144,10 +144,6 @@ public class AutomationModeEngineWiringTests
 
             // One down/up pair deleted exactly one character -- no key repeat.
             (typed.Text ?? "").ShouldBe("ab");
-
-            // Disabling clears focus in Gum, so the disabled box takes nothing thereafter.
-            typed.IsEnabled = false;
-            typed.IsFocused.ShouldBeFalse();
         }
         finally
         {

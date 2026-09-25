@@ -25,15 +25,11 @@ We are not targeting 100% coverage. Write the fewest tests that meaningfully ver
 
 Test method names follow the pattern `MethodOrProperty_Scenario_ExpectedResult`:
 
-- **Start with the method or property under test**: e.g., `CollidesWith_`, `SeparateFrom_`, `VelocityX_`. This keeps tests sorted and findable — all tests for a given method group together alphabetically.
+- **Start with the method or property under test**: e.g., `CollidesWith_`, `SeparateFrom_`, `VelocityX_`. This makes the tests for a given method easy to find by name.
 - **Scenario**: brief description of the input or setup condition.
 - **Expected result**: what the test asserts.
 
 Example: a test verifying that `CollidesWith` returns false for a non-overlapping AARect vs Circle should be named `CollidesWith_AARectVsCircle_NotOverlapping_ReturnsFalse`, not `AabbVsCircle_NotOverlapping_ReturnsFalse`.
-
-### Test Ordering
-
-Tests within a class must be kept in **alphabetical order** by method name. This makes specific tests easy to find without searching.
 
 ### Terminology
 

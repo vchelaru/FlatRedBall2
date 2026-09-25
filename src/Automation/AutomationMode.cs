@@ -40,6 +40,10 @@ internal class AutomationMode
     // re-asserted every frame by EnsureGumInputInstalled.
     private readonly AutomationGumKeyboard _gumKeyboard;
     private readonly AutomationGumCursor _gumCursor;
+    // Whatever each install displaced, handed back to Gum by Stop so it never keeps reading a
+    // dead session's input. Updated on every re-install, so it tracks the latest Gum-owned pair.
+    private Gum.Wireframe.IInputReceiverKeyboard? _displacedGumKeyboard;
+    private Gum.Wireframe.ICursor? _displacedGumCursor;
 
     // Armed by "record_next_screenshot", consumed by the first Draw() that follows. Screenshots
     // can't be captured inline like query/set — the back buffer for the frame the caller cares
@@ -99,6 +103,7 @@ internal class AutomationMode
     {
         _stopSignal.Set();
         ReaderThread?.Join(TimeSpan.FromMilliseconds(EofRetryDelayMs * 8));
+        RestoreDisplacedGumInput();
     }
 
     /// <summary>
@@ -203,9 +208,25 @@ internal class AutomationMode
     internal void EnsureGumInputInstalled()
     {
         if (!ReferenceEquals(Gum.Forms.FormsUtilities.Keyboard, _gumKeyboard))
+        {
+            _displacedGumKeyboard = Gum.Forms.FormsUtilities.Keyboard;
             Gum.Forms.FormsUtilities.SetKeyboard(_gumKeyboard);
+        }
         if (!ReferenceEquals(Gum.Forms.FormsUtilities.Cursor, _gumCursor))
+        {
+            _displacedGumCursor = Gum.Forms.FormsUtilities.Cursor;
             Gum.Forms.FormsUtilities.SetCursor(_gumCursor);
+        }
+    }
+
+    // Only while still installed: if something replaced ours since, that newer owner stays. Gum
+    // has no way back to "no keyboard", so a session that displaced nothing leaves its own.
+    private void RestoreDisplacedGumInput()
+    {
+        if (_displacedGumKeyboard != null && ReferenceEquals(Gum.Forms.FormsUtilities.Keyboard, _gumKeyboard))
+            Gum.Forms.FormsUtilities.SetKeyboard(_displacedGumKeyboard);
+        if (_displacedGumCursor != null && ReferenceEquals(Gum.Forms.FormsUtilities.Cursor, _gumCursor))
+            Gum.Forms.FormsUtilities.SetCursor(_displacedGumCursor);
     }
 
     internal void RegisterStateProvider(string name, Func<object> provider)
