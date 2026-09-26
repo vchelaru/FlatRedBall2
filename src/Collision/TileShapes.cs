@@ -834,7 +834,7 @@ public class TileShapes : ICollidable
                         // the top face is covered by another tile and isn't a landing
                         // surface.
                         if (sep.X != 0f && sep.Y == 0f && ent != null && ent.VelocityY < 0f
-                            && tile.SolidSides.HasFlag(SolidSides.Up))
+                            && (tile.SolidSides & SolidSides.Up) != 0)
                         {
                             float lastBottom = minY - ent.VelocityY / 60f;
                             if (lastBottom > rectTop)

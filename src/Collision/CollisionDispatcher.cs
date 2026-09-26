@@ -101,10 +101,10 @@ internal static class CollisionDispatcher
         Vector2 best = Vector2.Zero;
         float bestMag = float.MaxValue;
 
-        if (dirs.HasFlag(SolidSides.Down))  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Down),  ref best, ref bestMag);
-        if (dirs.HasFlag(SolidSides.Up))    TryAxis(ComputeAxisSeparation(a, b, SolidSides.Up),    ref best, ref bestMag);
-        if (dirs.HasFlag(SolidSides.Left))  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Left),  ref best, ref bestMag);
-        if (dirs.HasFlag(SolidSides.Right)) TryAxis(ComputeAxisSeparation(a, b, SolidSides.Right), ref best, ref bestMag);
+        if ((dirs & SolidSides.Down) != 0)  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Down),  ref best, ref bestMag);
+        if ((dirs & SolidSides.Up) != 0)    TryAxis(ComputeAxisSeparation(a, b, SolidSides.Up),    ref best, ref bestMag);
+        if ((dirs & SolidSides.Left) != 0)  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Left),  ref best, ref bestMag);
+        if ((dirs & SolidSides.Right) != 0) TryAxis(ComputeAxisSeparation(a, b, SolidSides.Right), ref best, ref bestMag);
 
         return best;
 
@@ -221,19 +221,7 @@ internal static class CollisionDispatcher
                 return (ci.AbsoluteX - ci.Radius, ci.AbsoluteX + ci.Radius,
                         ci.AbsoluteY - ci.Radius, ci.AbsoluteY + ci.Radius);
             case Polygon poly:
-            {
-                var pts = GetWorldPoints(poly);
-                float minX = float.MaxValue, maxX = float.MinValue;
-                float minY = float.MaxValue, maxY = float.MinValue;
-                foreach (var pt in pts)
-                {
-                    if (pt.X < minX) minX = pt.X;
-                    if (pt.X > maxX) maxX = pt.X;
-                    if (pt.Y < minY) minY = pt.Y;
-                    if (pt.Y > maxY) maxY = pt.Y;
-                }
-                return (minX, maxX, minY, maxY);
-            }
+                return GetPolygonWorldBounds(poly);
             case Line line:
             {
                 var p1 = line.AbsolutePoint1;
@@ -377,10 +365,10 @@ internal static class CollisionDispatcher
 
     private static bool IsAllowedDirection(Vector2 v, SolidSides allowed)
     {
-        if (v.X > 0f && !allowed.HasFlag(SolidSides.Right)) return false;
-        if (v.X < 0f && !allowed.HasFlag(SolidSides.Left))  return false;
-        if (v.Y > 0f && !allowed.HasFlag(SolidSides.Up))    return false;
-        if (v.Y < 0f && !allowed.HasFlag(SolidSides.Down))  return false;
+        if (v.X > 0f && (allowed & SolidSides.Right) == 0) return false;
+        if (v.X < 0f && (allowed & SolidSides.Left) == 0)  return false;
+        if (v.Y > 0f && (allowed & SolidSides.Up) == 0)    return false;
+        if (v.Y < 0f && (allowed & SolidSides.Down) == 0)  return false;
         return true;
     }
 
@@ -388,15 +376,20 @@ internal static class CollisionDispatcher
     // (not the tile-side MTV direction returned here — they're negations of each other).
     private static Vector2 PolygonVsAabbFiltered(Polygon poly, AARect rect, SolidSides allowed)
     {
-        var rectPoints = GetAabbPoints(rect);
-        Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
+        Span<Vector2> rectPoints = stackalloc Vector2[4];
+        WriteAabbPoints(rect, rectPoints);
+
+        int maxCount = MaxPartPointCount(poly);
+        Span<Vector2> buffer = maxCount <= MaxStackPoints ? stackalloc Vector2[maxCount] : new Vector2[maxCount];
 
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var part in GetConvexPartsWorldPoints(poly))
+        var parts = poly.ConvexParts;
+        for (int i = 0; i < parts.Count; i++)
         {
-            var mtv = ConvexVsAabbPointsFiltered(part, rectPoints, axesRect, allowed);
+            var part = WritePartWorldPoints(poly, parts[i], buffer);
+            var mtv = ConvexVsAabbPointsFiltered(part, rectPoints, allowed);
             if (mtv == Vector2.Zero) continue;
             float magSq = mtv.LengthSquared();
             if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
@@ -408,11 +401,16 @@ internal static class CollisionDispatcher
     {
         var circleCenter = new Vector2(circle.AbsoluteX, circle.AbsoluteY);
 
+        int maxCount = MaxPartPointCount(poly);
+        Span<Vector2> buffer = maxCount <= MaxStackPoints ? stackalloc Vector2[maxCount] : new Vector2[maxCount];
+
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var part in GetConvexPartsWorldPoints(poly))
+        var parts = poly.ConvexParts;
+        for (int i = 0; i < parts.Count; i++)
         {
+            var part = WritePartWorldPoints(poly, parts[i], buffer);
             var mtv = ConvexPartVsCircleFiltered(part, circle, circleCenter, allowed);
             if (mtv == Vector2.Zero) continue;
             float magSq = mtv.LengthSquared();
@@ -423,35 +421,44 @@ internal static class CollisionDispatcher
 
     private static Vector2 PolygonVsPolygonFiltered(Polygon mover, Polygon tile, SolidSides allowed)
     {
+        int moverMax = MaxPartPointCount(mover);
+        int tileMax = MaxPartPointCount(tile);
+        Span<Vector2> moverBuffer = moverMax <= MaxStackPoints ? stackalloc Vector2[moverMax] : new Vector2[moverMax];
+        Span<Vector2> tileBuffer = tileMax <= MaxStackPoints ? stackalloc Vector2[tileMax] : new Vector2[tileMax];
+
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var partMover in GetConvexPartsWorldPoints(mover))
-        foreach (var partTile  in GetConvexPartsWorldPoints(tile))
+        var moverParts = mover.ConvexParts;
+        var tileParts = tile.ConvexParts;
+        for (int i = 0; i < moverParts.Count; i++)
         {
-            var mtv = ConvexVsConvexFiltered(partMover, partTile, allowed);
-            if (mtv == Vector2.Zero) continue;
-            float magSq = mtv.LengthSquared();
-            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+            var partMover = WritePartWorldPoints(mover, moverParts[i], moverBuffer);
+            for (int j = 0; j < tileParts.Count; j++)
+            {
+                var partTile = WritePartWorldPoints(tile, tileParts[j], tileBuffer);
+                var mtv = ConvexVsConvexFiltered(partMover, partTile, allowed);
+                if (mtv == Vector2.Zero) continue;
+                float magSq = mtv.LengthSquared();
+                if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+            }
         }
         return bestMtv;
     }
 
     // Returned MTV pushes 'a' (the tile-side) — shape-side push is its negation.
-    private static Vector2 ConvexVsAabbPointsFiltered(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect, SolidSides allowed)
+    private static Vector2 ConvexVsAabbPointsFiltered(ReadOnlySpan<Vector2> part, ReadOnlySpan<Vector2> rectPoints, SolidSides allowed)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in GetAxesFromPoints(part))
+        // Part edge axes, then the AABB's X and Y axes.
+        for (int i = 0; i < part.Length + 2; i++)
         {
-            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
-            var candidate = flip ? axis * overlap : -axis * overlap;
-            if (!IsAllowedDirection(-candidate, allowed)) continue;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
-        }
-        foreach (var axis in axesRect)
-        {
+            Vector2 axis;
+            if (i < part.Length) { if (!TryGetEdgeAxis(part, i, out axis)) continue; }
+            else axis = i == part.Length ? Vector2.UnitX : Vector2.UnitY;
+
             if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
             var candidate = flip ? axis * overlap : -axis * overlap;
             if (!IsAllowedDirection(-candidate, allowed)) continue;
@@ -460,19 +467,21 @@ internal static class CollisionDispatcher
         return minMtv;
     }
 
-    private static Vector2 ConvexPartVsCircleFiltered(Vector2[] partPoints, Circle circle, Vector2 circleCenter, SolidSides allowed)
+    private static Vector2 ConvexPartVsCircleFiltered(ReadOnlySpan<Vector2> partPoints, Circle circle, Vector2 circleCenter, SolidSides allowed)
     {
-        var axes = new List<Vector2>(GetAxesFromPoints(partPoints));
-        var closest = ClosestPointOnPoly(partPoints, circleCenter);
-        var toCircle = circleCenter - closest;
-        float len = toCircle.Length();
-        if (len > 1e-6f) axes.Add(toCircle / len);
+        var closestAxis = GetCircleClosestAxis(partPoints, circleCenter, out bool hasClosestAxis);
 
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in axes)
+        // Part edge axes, then the closest-point axis.
+        for (int i = 0; i <= partPoints.Length; i++)
         {
+            Vector2 axis;
+            if (i < partPoints.Length) { if (!TryGetEdgeAxis(partPoints, i, out axis)) continue; }
+            else if (hasClosestAxis) axis = closestAxis;
+            else break;
+
             ProjectPoly(partPoints, axis, out float polyMin, out float polyMax);
             float circC = Vector2.Dot(circleCenter, axis);
             float circMin = circC - circle.Radius;
@@ -493,20 +502,16 @@ internal static class CollisionDispatcher
     }
 
     // Returned MTV pushes the mover (first arg). Shape-side push equals MTV directly.
-    private static Vector2 ConvexVsConvexFiltered(Vector2[] mover, Vector2[] tile, SolidSides allowed)
+    private static Vector2 ConvexVsConvexFiltered(ReadOnlySpan<Vector2> mover, ReadOnlySpan<Vector2> tile, SolidSides allowed)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in GetAxesFromPoints(mover))
+        // Mover edge axes, then tile edge axes.
+        for (int i = 0; i < mover.Length + tile.Length; i++)
         {
-            if (!SatOverlap(mover, tile, axis, out float overlap, out bool flip)) return Vector2.Zero;
-            var candidate = flip ? axis * overlap : -axis * overlap;
-            if (!IsAllowedDirection(candidate, allowed)) continue;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
-        }
-        foreach (var axis in GetAxesFromPoints(tile))
-        {
+            bool fromMover = i < mover.Length;
+            if (!TryGetEdgeAxis(fromMover ? mover : tile, fromMover ? i : i - mover.Length, out var axis)) continue;
             if (!SatOverlap(mover, tile, axis, out float overlap, out bool flip)) return Vector2.Zero;
             var candidate = flip ? axis * overlap : -axis * overlap;
             if (!IsAllowedDirection(candidate, allowed)) continue;
@@ -518,16 +523,27 @@ internal static class CollisionDispatcher
     // Polygon vs Polygon — iterate convex parts of each, return minimum-magnitude MTV.
     private static Vector2 PolygonVsPolygon(Polygon a, Polygon b)
     {
+        int aMax = MaxPartPointCount(a);
+        int bMax = MaxPartPointCount(b);
+        Span<Vector2> aBuffer = aMax <= MaxStackPoints ? stackalloc Vector2[aMax] : new Vector2[aMax];
+        Span<Vector2> bBuffer = bMax <= MaxStackPoints ? stackalloc Vector2[bMax] : new Vector2[bMax];
+
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var partA in GetConvexPartsWorldPoints(a))
-        foreach (var partB in GetConvexPartsWorldPoints(b))
+        var aParts = a.ConvexParts;
+        var bParts = b.ConvexParts;
+        for (int i = 0; i < aParts.Count; i++)
         {
-            var mtv = ConvexVsConvex(partA, partB);
-            if (mtv == Vector2.Zero) continue;
-            float magSq = mtv.LengthSquared();
-            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+            var partA = WritePartWorldPoints(a, aParts[i], aBuffer);
+            for (int j = 0; j < bParts.Count; j++)
+            {
+                var partB = WritePartWorldPoints(b, bParts[j], bBuffer);
+                var mtv = ConvexVsConvex(partA, partB);
+                if (mtv == Vector2.Zero) continue;
+                float magSq = mtv.LengthSquared();
+                if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+            }
         }
         return bestMtv;
     }
@@ -535,15 +551,20 @@ internal static class CollisionDispatcher
     // Polygon vs AABB — iterate convex parts, AABB is always convex.
     private static Vector2 PolygonVsAabb(Polygon poly, AARect rect)
     {
-        var rectPoints = GetAabbPoints(rect);
-        Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
+        Span<Vector2> rectPoints = stackalloc Vector2[4];
+        WriteAabbPoints(rect, rectPoints);
+
+        int maxCount = MaxPartPointCount(poly);
+        Span<Vector2> buffer = maxCount <= MaxStackPoints ? stackalloc Vector2[maxCount] : new Vector2[maxCount];
 
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var part in GetConvexPartsWorldPoints(poly))
+        var parts = poly.ConvexParts;
+        for (int i = 0; i < parts.Count; i++)
         {
-            var mtv = ConvexVsAabbPoints(part, rectPoints, axesRect);
+            var part = WritePartWorldPoints(poly, parts[i], buffer);
+            var mtv = ConvexVsAabbPoints(part, rectPoints);
             if (mtv == Vector2.Zero) continue;
             float magSq = mtv.LengthSquared();
             if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
@@ -556,11 +577,16 @@ internal static class CollisionDispatcher
     {
         var circleCenter = new Vector2(circle.AbsoluteX, circle.AbsoluteY);
 
+        int maxCount = MaxPartPointCount(poly);
+        Span<Vector2> buffer = maxCount <= MaxStackPoints ? stackalloc Vector2[maxCount] : new Vector2[maxCount];
+
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
 
-        foreach (var part in GetConvexPartsWorldPoints(poly))
+        var parts = poly.ConvexParts;
+        for (int i = 0; i < parts.Count; i++)
         {
+            var part = WritePartWorldPoints(poly, parts[i], buffer);
             var mtv = ConvexPartVsCircle(part, circle, circleCenter);
             if (mtv == Vector2.Zero) continue;
             float magSq = mtv.LengthSquared();
@@ -569,79 +595,86 @@ internal static class CollisionDispatcher
         return bestMtv;
     }
 
-    // Transforms each convex part of a polygon from local to world space.
-    private static IEnumerable<Vector2[]> GetConvexPartsWorldPoints(Polygon poly)
+    // Convex parts up to this many points are transformed into a stack buffer; larger ones
+    // fall back to one heap array per call. Tile and hex polygons are far below it.
+    private const int MaxStackPoints = 64;
+
+    private static int MaxPartPointCount(Polygon poly)
+    {
+        var parts = poly.ConvexParts;
+        int max = 0;
+        for (int i = 0; i < parts.Count; i++)
+            if (parts[i].Count > max) max = parts[i].Count;
+        return max;
+    }
+
+    // Transforms one convex part of a polygon from local to world space into 'buffer'.
+    private static ReadOnlySpan<Vector2> WritePartWorldPoints(Polygon poly, IReadOnlyList<Vector2> part, Span<Vector2> buffer)
     {
         float cos = MathF.Cos(poly.AbsoluteRotation.Radians);
         float sin = MathF.Sin(poly.AbsoluteRotation.Radians);
         float ax = poly.AbsoluteX, ay = poly.AbsoluteY;
 
-        foreach (var part in poly.ConvexParts)
+        for (int i = 0; i < part.Count; i++)
         {
-            var worldPts = new Vector2[part.Count];
-            for (int i = 0; i < part.Count; i++)
-            {
-                float lx = part[i].X, ly = part[i].Y;
-                worldPts[i] = new Vector2(ax + lx * cos - ly * sin, ay + lx * sin + ly * cos);
-            }
-            yield return worldPts;
+            float lx = part[i].X, ly = part[i].Y;
+            buffer[i] = new Vector2(ax + lx * cos - ly * sin, ay + lx * sin + ly * cos);
         }
+        return buffer.Slice(0, part.Count);
     }
 
-    // SAT for two convex polygons given as world-space point arrays.
-    private static Vector2 ConvexVsConvex(Vector2[] a, Vector2[] b)
+    // SAT for two convex polygons given as world-space points.
+    private static Vector2 ConvexVsConvex(ReadOnlySpan<Vector2> a, ReadOnlySpan<Vector2> b)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in GetAxesFromPoints(a))
+        // Edge axes of a, then edge axes of b.
+        for (int i = 0; i < a.Length + b.Length; i++)
         {
-            if (!SatOverlap(a, b, axis, out float overlap, out bool flip)) return Vector2.Zero;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
-        }
-        foreach (var axis in GetAxesFromPoints(b))
-        {
+            bool fromA = i < a.Length;
+            if (!TryGetEdgeAxis(fromA ? a : b, fromA ? i : i - a.Length, out var axis)) continue;
             if (!SatOverlap(a, b, axis, out float overlap, out bool flip)) return Vector2.Zero;
             if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         return minMtv;
     }
 
-    // SAT for a convex polygon part vs a set of AABB points with known axes.
-    private static Vector2 ConvexVsAabbPoints(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect)
+    // SAT for a convex polygon part vs AABB points; the AABB contributes the X and Y axes.
+    private static Vector2 ConvexVsAabbPoints(ReadOnlySpan<Vector2> part, ReadOnlySpan<Vector2> rectPoints)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in GetAxesFromPoints(part))
+        // Part edge axes, then the AABB's X and Y axes.
+        for (int i = 0; i < part.Length + 2; i++)
         {
-            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
-        }
-        foreach (var axis in axesRect)
-        {
+            Vector2 axis;
+            if (i < part.Length) { if (!TryGetEdgeAxis(part, i, out axis)) continue; }
+            else axis = i == part.Length ? Vector2.UnitX : Vector2.UnitY;
+
             if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
             if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         return minMtv;
     }
 
-    // SAT for a convex polygon part vs a circle (SAT + closest-point axis).
-    private static Vector2 ConvexPartVsCircle(Vector2[] partPoints, Circle circle, Vector2 circleCenter)
+    // SAT for a convex polygon part vs a circle (edge axes + closest-point axis).
+    private static Vector2 ConvexPartVsCircle(ReadOnlySpan<Vector2> partPoints, Circle circle, Vector2 circleCenter)
     {
-        var axes = new List<Vector2>(GetAxesFromPoints(partPoints));
-
-        // Add axis from the closest point on the part to the circle center.
-        var closest = ClosestPointOnPoly(partPoints, circleCenter);
-        var toCircle = circleCenter - closest;
-        float len = toCircle.Length();
-        if (len > 1e-6f) axes.Add(toCircle / len);
+        var closestAxis = GetCircleClosestAxis(partPoints, circleCenter, out bool hasClosestAxis);
 
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in axes)
+        // Part edge axes, then the closest-point axis.
+        for (int i = 0; i <= partPoints.Length; i++)
         {
+            Vector2 axis;
+            if (i < partPoints.Length) { if (!TryGetEdgeAxis(partPoints, i, out axis)) continue; }
+            else if (hasClosestAxis) axis = closestAxis;
+            else break;
+
             ProjectPoly(partPoints, axis, out float polyMin, out float polyMax);
             float circC = Vector2.Dot(circleCenter, axis);
             float circMin = circC - circle.Radius;
@@ -661,48 +694,57 @@ internal static class CollisionDispatcher
         return minMtv;
     }
 
-    // Returns outward-facing edge normals for a convex polygon (world-space points).
-    private static IEnumerable<Vector2> GetAxesFromPoints(Vector2[] pts)
+    // Axis from the closest point on the part to the circle center.
+    private static Vector2 GetCircleClosestAxis(ReadOnlySpan<Vector2> partPoints, Vector2 circleCenter, out bool hasAxis)
     {
-        for (int i = 0; i < pts.Length; i++)
-        {
-            var edge = pts[(i + 1) % pts.Length] - pts[i];
-            var normal = new Vector2(-edge.Y, edge.X);
-            float len = normal.Length();
-            if (len > 1e-6f) yield return normal / len;
-        }
+        var toCircle = circleCenter - ClosestPointOnPoly(partPoints, circleCenter);
+        float len = toCircle.Length();
+        hasAxis = len > 1e-6f;
+        return hasAxis ? toCircle / len : Vector2.Zero;
     }
 
-    private static Vector2[] GetWorldPoints(Polygon poly)
+    // Outward-facing normal of edge i of a convex polygon; false for a degenerate edge.
+    private static bool TryGetEdgeAxis(ReadOnlySpan<Vector2> pts, int i, out Vector2 axis)
+    {
+        var edge = pts[(i + 1) % pts.Length] - pts[i];
+        var normal = new Vector2(-edge.Y, edge.X);
+        float len = normal.Length();
+        if (len <= 1e-6f) { axis = Vector2.Zero; return false; }
+        axis = normal / len;
+        return true;
+    }
+
+    private static (float minX, float maxX, float minY, float maxY) GetPolygonWorldBounds(Polygon poly)
     {
         var cos = MathF.Cos(poly.AbsoluteRotation.Radians);
         var sin = MathF.Sin(poly.AbsoluteRotation.Radians);
         var pts = poly.Points;
-        var result = new Vector2[pts.Count];
+        float minX = float.MaxValue, maxX = float.MinValue;
+        float minY = float.MaxValue, maxY = float.MinValue;
         for (int i = 0; i < pts.Count; i++)
         {
             float lx = pts[i].X, ly = pts[i].Y;
-            result[i] = new Vector2(
-                poly.AbsoluteX + lx * cos - ly * sin,
-                poly.AbsoluteY + lx * sin + ly * cos);
+            float x = poly.AbsoluteX + lx * cos - ly * sin;
+            float y = poly.AbsoluteY + lx * sin + ly * cos;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
         }
-        return result;
+        return (minX, maxX, minY, maxY);
     }
 
-    private static Vector2[] GetAabbPoints(AARect rect)
+    private static void WriteAabbPoints(AARect rect, Span<Vector2> dest)
     {
         float hw = rect.Width / 2f, hh = rect.Height / 2f;
         float cx = rect.AbsoluteX, cy = rect.AbsoluteY;
-        return new[]
-        {
-            new Vector2(cx - hw, cy - hh),
-            new Vector2(cx + hw, cy - hh),
-            new Vector2(cx + hw, cy + hh),
-            new Vector2(cx - hw, cy + hh)
-        };
+        dest[0] = new Vector2(cx - hw, cy - hh);
+        dest[1] = new Vector2(cx + hw, cy - hh);
+        dest[2] = new Vector2(cx + hw, cy + hh);
+        dest[3] = new Vector2(cx - hw, cy + hh);
     }
 
-    private static bool SatOverlap(Vector2[] a, Vector2[] b, Vector2 axis, out float overlap, out bool flip)
+    private static bool SatOverlap(ReadOnlySpan<Vector2> a, ReadOnlySpan<Vector2> b, Vector2 axis, out float overlap, out bool flip)
     {
         ProjectPoly(a, axis, out float aMin, out float aMax);
         ProjectPoly(b, axis, out float bMin, out float bMax);
@@ -711,7 +753,7 @@ internal static class CollisionDispatcher
         return overlap > 0;
     }
 
-    private static void ProjectPoly(Vector2[] pts, Vector2 axis, out float min, out float max)
+    private static void ProjectPoly(ReadOnlySpan<Vector2> pts, Vector2 axis, out float min, out float max)
     {
         min = float.MaxValue;
         max = float.MinValue;
@@ -723,7 +765,7 @@ internal static class CollisionDispatcher
         }
     }
 
-    private static Vector2 ClosestPointOnPoly(Vector2[] pts, Vector2 point)
+    private static Vector2 ClosestPointOnPoly(ReadOnlySpan<Vector2> pts, Vector2 point)
     {
         Vector2 closest = pts[0];
         float minDist = float.MaxValue;
