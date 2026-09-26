@@ -946,12 +946,20 @@ public partial class MainWindow : Window
         _projectManager.ResetToBlankDocument();
         _selectedState.Reset();
         _undoManager.Clear();
+        ClearWireframeTexture();
         ProjectPanel.SyncSelectionToActiveFile(null);
         RefreshTreeView();
         RefreshFilesPanel();
         UpdateTitle();
         UpdateStatusBar();
     }
+
+    /// <summary>
+    /// Blanks the wireframe when no document is open (#1214). RefreshAll deliberately keeps the
+    /// last texture when nothing is selected, so a new or empty document can seed its first frame
+    /// from it (#618). With no document open that leftover texture only looks like live content.
+    /// </summary>
+    private void ClearWireframeTexture() => WireframeCtrl.LoadTexture(null);
 
     private async Task ActivateTabAfterCloseAsync(TabEntry tab)
     {
@@ -2712,6 +2720,7 @@ public partial class MainWindow : Window
         _appCommands.CloseProject();
 
         ShowAchxPane();
+        ClearWireframeTexture();
         RebuildTabStrip();
         ProjectPanel.SyncSelectionToActiveFile(null);
         ProjectPanel.Clear();

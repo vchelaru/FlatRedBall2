@@ -640,6 +640,8 @@ public partial class App : Application
                 projectManager.ResetToBlankDocument();
                 selectedState.Reset();
                 undoManager.Clear();
+                // Same as desktop (#1214): no document open means no texture on the canvas.
+                wireframe.LoadTexture(null);
             }
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);

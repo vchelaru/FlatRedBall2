@@ -179,4 +179,20 @@ public class TabScenarioTests
         editor.TabLabels.ShouldContain(label => label.Contains("hero-copy"));
         AnimationEditorHarness.ReadSaved(copy).AnimationChains.Single().Name.ShouldBe("Walk");
     }
+
+    [AvaloniaFact]
+    public async Task ClosingTheLastTab_ClearsTheTextureFromTheCanvas()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Wireframe.BitmapSize.ShouldBe((64, 64));
+
+        editor.CloseTab("hero.achx");
+
+        editor.Wireframe.BitmapSize.ShouldBe((0, 0), "with no document open the canvas must be empty, like a fresh launch");
+        editor.Wireframe.LoadedTexturePathCasePreserved.ShouldBeNull();
+    }
 }

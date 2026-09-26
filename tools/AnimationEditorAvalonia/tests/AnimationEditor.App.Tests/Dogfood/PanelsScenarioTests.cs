@@ -26,6 +26,7 @@ public class PanelsScenarioTests
         editor.Layout();
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, "hero.achx"));
         editor.Tabs.Tabs.Count.ShouldBe(1);
+        editor.Wireframe.BitmapSize.ShouldBe((64, 64));
 
         editor.Dialogs.AnswerNextConfirm(true);
         editor.ClickMenu("MenuCloseProject");
@@ -33,6 +34,7 @@ public class PanelsScenarioTests
 
         editor.Tabs.Tabs.ShouldBeEmpty();
         editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.ShouldBeEmpty();
+        editor.Wireframe.BitmapSize.ShouldBe((0, 0), "no document open, so no texture on the canvas");
         editor.ThrowIfErrorShown();
     }
 
