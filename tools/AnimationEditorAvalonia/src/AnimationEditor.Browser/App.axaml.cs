@@ -268,6 +268,7 @@ public partial class App : Application
         });
         animationTree.InitializeServices(selectedState, acls);
         animationTree.EnableRename(appCommands);
+        animationTree.HoveredDataChanged += wireframe.SetTreeHover;
         // Phase 2 of #754: right-click tree context menu, matching desktop's MainWindow menu
         // (see docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md).
         animationTree.EnableContextMenu(

@@ -72,6 +72,8 @@ public class WireframeControl : TextureViewport
         /// </summary>
         public float? OriginTexX, OriginTexY;
         public List<SKRect> PendingCutFrameBounds = new();
+        /// <summary>Frames hovered in the tree (#1216), already minus selected frames.</summary>
+        public List<SKRect> TreeHoverFrameBounds = new();
         /// <summary>
         /// Texture-space bounds of the frame currently under the mouse (#718). Null when
         /// nothing is hovered. Paired with <see cref="HoverLabel"/>, which is resolved on the
@@ -90,6 +92,7 @@ public class WireframeControl : TextureViewport
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
     private static readonly SKColor CellOutlineColor = new(90, 220, 160, 230);
+    private static readonly SKColor TreeHoverColor = new(190, 130, 255, 170);
 
     // ── Overlay rendering ─────────────────────────────────────────────────────
 
@@ -131,6 +134,19 @@ public class WireframeControl : TextureViewport
         {
             frameStroke.Color = isSelected ? new SKColor(80, 160, 255, 230) : new SKColor(80, 160, 255, 120);
             canvas.DrawRect(sr, frameStroke);
+        }
+
+        // Tree-hovered frames (#1216): violet, fainter than the blue selection, so a hover reads
+        // apart from both the selection and the unselected-sibling blue outlines.
+        if (s.TreeHoverFrameBounds.Count > 0)
+        {
+            var hoverRects = s.TreeHoverFrameBounds.Select(b => (s.TextureRectToScreen(b), true)).ToList();
+            using var hoverFill = new SKPaint { Style = SKPaintStyle.Fill, Color = TreeHoverColor.WithAlpha(255) };
+            if (s.FillFrames)
+                DrawFillLayer(canvas, hoverRects, hoverFill, isSelected: true, alpha: 30);
+            frameStroke.Color = TreeHoverColor;
+            foreach (var (sr, _) in hoverRects)
+                canvas.DrawRect(sr, frameStroke);
         }
 
         // Per-cell outlines inside selected spaced-grid frames (#1165): a second colour so the
@@ -314,6 +330,9 @@ public class WireframeControl : TextureViewport
     private const float AutoPanIntervalSeconds = 1f / 60f;
 
     private readonly List<FrameRect> _frameRects = new();
+
+    /// <summary>The chain/frame under the pointer in the tree (#1216); see <see cref="SetTreeHover"/>.</summary>
+    private object? _treeHoverData;
 
     /// <summary>
     /// The single "primary" selected frame's rect — used for resize handles and
@@ -1285,6 +1304,33 @@ public class WireframeControl : TextureViewport
         _frameRects.Select(fr => (fr.Bounds, fr.IsSelected)).ToList();
 
     /// <summary>
+    /// Sets the tree row under the pointer (#1216): a chain highlights all its frames, a frame
+    /// highlights itself, anything else (shape, folder, null) clears the hover highlight.
+    /// </summary>
+    public void SetTreeHover(object? data)
+    {
+        if (ReferenceEquals(_treeHoverData, data)) return;
+        _treeHoverData = data;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Texture-space bounds of the tree-hovered frames (#1216), skipping frames the selection
+    /// already highlights and frames on a texture other than the one shown.
+    /// </summary>
+    public IReadOnlyList<SKRect> GetTreeHoverFrameBounds()
+    {
+        IEnumerable<AnimationFrameSave> frames = _treeHoverData switch
+        {
+            AnimationChainSave chain => chain.Frames,
+            AnimationFrameSave frame => new[] { frame },
+            _ => Array.Empty<AnimationFrameSave>(),
+        };
+        var selected = new HashSet<AnimationFrameSave>(ComputeHighlightedFrames());
+        return BoundsOnShownTexture(frames.Where(f => !selected.Contains(f)));
+    }
+
+    /// <summary>
     /// Test-only: exposes the drag/hover hit-test result at a screen-space point.
     /// Avoids asserting on the Avalonia <see cref="Control.Cursor"/> property, which
     /// exposes no equality on <c>StandardCursorType</c>.
@@ -1322,6 +1368,7 @@ public class WireframeControl : TextureViewport
         }
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
+        snap.TreeHoverFrameBounds.AddRange(GetTreeHoverFrameBounds());
         snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();
@@ -2120,9 +2167,19 @@ public class WireframeControl : TextureViewport
 
     private List<SKRect> BuildPendingCutFrameBounds()
     {
+        if (_pendingCutState is null || !_pendingCutState.IsActive)
+            return new List<SKRect>();
+        return BoundsOnShownTexture(_pendingCutState.WireframeFrames);
+    }
+
+    /// <summary>
+    /// Texture-space pixel bounds of each frame in <paramref name="frames"/> that uses the
+    /// currently shown texture; frames on another texture are skipped.
+    /// </summary>
+    private List<SKRect> BoundsOnShownTexture(IEnumerable<AnimationFrameSave> frames)
+    {
         var result = new List<SKRect>();
-        if (_pendingCutState is null || !_pendingCutState.IsActive || _bitmap is null)
-            return result;
+        if (_bitmap is null) return result;
 
         string? achxFolder = string.IsNullOrEmpty(_projectManager!.FileName)
             ? null
@@ -2131,7 +2188,7 @@ public class WireframeControl : TextureViewport
         float w = _bitmap.Width;
         float h = _bitmap.Height;
 
-        foreach (var frame in _pendingCutState.WireframeFrames)
+        foreach (var frame in frames)
         {
             if (string.IsNullOrEmpty(frame.TextureName)) continue;
             if (achxFolder != null && _loadedTexturePath != null)

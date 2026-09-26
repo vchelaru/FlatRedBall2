@@ -3364,6 +3364,9 @@ public partial class MainWindow : Window
             OnTreeChainDragPointerReleased,
             RoutingStrategies.Bubble);
 
+        // Hovering a chain/frame row highlights it on the wireframe (#1216).
+        TreeHoverTracker.Attach(AnimTree, WireframeCtrl.SetTreeHover);
+
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) => AddAnimationChainAndBeginInlineRename();
 

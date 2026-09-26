@@ -51,7 +51,13 @@ public partial class AnimationTreeControl : UserControl
     {
         InitializeComponent();
         Tree.SelectionChanged += OnTreeSelectionChanged;
+        TreeHoverTracker.Attach(Tree, data => HoveredDataChanged?.Invoke(data));
     }
+
+    /// <summary>
+    /// Raised with the chain/frame/shape under the pointer, or null when none (#1216).
+    /// </summary>
+    public event Action<object?>? HoveredDataChanged;
 
     /// <summary>
     /// Enables double-tap-to-rename on chain nodes, routed through <see cref="IAppCommands.RenameChain"/>.
