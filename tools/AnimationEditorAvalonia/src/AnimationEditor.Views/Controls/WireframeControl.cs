@@ -74,6 +74,8 @@ public class WireframeControl : TextureViewport
         public List<SKRect> PendingCutFrameBounds = new();
         /// <summary>Frames hovered in the tree (#1216), already minus selected frames.</summary>
         public List<SKRect> TreeHoverFrameBounds = new();
+        /// <summary>Shared reveal progress for <see cref="TreeHoverFrameBounds"/> (1 = settled).</summary>
+        public float TreeHoverRevealProgress = 1f;
         /// <summary>
         /// Texture-space bounds of the frame currently under the mouse (#718). Null when
         /// nothing is hovered. Paired with <see cref="HoverLabel"/>, which is resolved on the
@@ -140,7 +142,9 @@ public class WireframeControl : TextureViewport
         // apart from both the selection and the unselected-sibling blue outlines.
         if (s.TreeHoverFrameBounds.Count > 0)
         {
-            var hoverRects = s.TreeHoverFrameBounds.Select(b => (s.TextureRectToScreen(b), true)).ToList();
+            float hoverInflation = RevealAnimation.InflationPixels(s.TreeHoverRevealProgress);
+            var hoverRects = s.TreeHoverFrameBounds
+                .Select(b => (InflateBy(s.TextureRectToScreen(b), hoverInflation), true)).ToList();
             using var hoverFill = new SKPaint { Style = SKPaintStyle.Fill, Color = TreeHoverColor.WithAlpha(255) };
             if (s.FillFrames)
                 DrawFillLayer(canvas, hoverRects, hoverFill, isSelected: true, alpha: 30);
@@ -333,6 +337,9 @@ public class WireframeControl : TextureViewport
 
     /// <summary>The chain/frame under the pointer in the tree (#1216); see <see cref="SetTreeHover"/>.</summary>
     private object? _treeHoverData;
+
+    /// <summary>Reveal pop for the tree-hovered frames; restarted each time the hovered row changes.</summary>
+    private RevealHost? _treeHoverReveal;
 
     /// <summary>
     /// The single "primary" selected frame's rect — used for resize handles and
@@ -1311,8 +1318,21 @@ public class WireframeControl : TextureViewport
     {
         if (ReferenceEquals(_treeHoverData, data)) return;
         _treeHoverData = data;
-        InvalidateVisual();
+        _treeHoverReveal ??= new RevealHost(InvalidateVisual);
+        if (data is null)
+        {
+            _treeHoverReveal.Stop();
+            InvalidateVisual();
+        }
+        else
+        {
+            // Same shrink-to-rest pop a selection plays (#542), replayed per hovered row.
+            _treeHoverReveal.Restart();
+        }
     }
+
+    /// <summary>Test-only: the tree-hover reveal progress (0 = full bump, 1 = settled).</summary>
+    public float TreeHoverRevealProgress => _treeHoverReveal?.Progress ?? 1f;
 
     /// <summary>
     /// Texture-space bounds of the tree-hovered frames (#1216), skipping frames the selection
@@ -1369,6 +1389,7 @@ public class WireframeControl : TextureViewport
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
         snap.TreeHoverFrameBounds.AddRange(GetTreeHoverFrameBounds());
+        snap.TreeHoverRevealProgress = TreeHoverRevealProgress;
         snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();

@@ -69,6 +69,35 @@ public class TreeHoverScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task HoveringARow_PlaysTheShrinkRevealThenSettles()
+    {
+        using AnimationEditorHarness editor = await OpenTwoChainsAsync();
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        AnimationChainSave run = editor.ChainNamed("Run");
+        editor.ClickRow(walk);
+
+        editor.Hover(editor.RowHeaderPoint(run));
+        editor.Wireframe.TreeHoverRevealProgress.ShouldBeLessThan(1f);
+
+        (await editor.WaitUntilAsync(() => editor.Wireframe.TreeHoverRevealProgress >= 1f, TimeSpan.FromSeconds(5))).ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
+    public async Task HoveringADifferentRow_ReplaysTheReveal()
+    {
+        using AnimationEditorHarness editor = await OpenTwoChainsAsync();
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.ClickRow(walk.Frames[0]);
+        editor.Hover(editor.RowHeaderPoint(walk.Frames[1]));
+        (await editor.WaitUntilAsync(() => editor.Wireframe.TreeHoverRevealProgress >= 1f, TimeSpan.FromSeconds(5))).ShouldBeTrue();
+
+        editor.Hover(editor.RowHeaderPoint(editor.ChainNamed("Run")));
+
+        editor.Wireframe.TreeHoverRevealProgress.ShouldBeLessThan(1f);
+    }
+
+    [AvaloniaFact]
     public async Task MovingThePointerOffTheTree_ClearsTheHoverHighlight()
     {
         using AnimationEditorHarness editor = await OpenTwoChainsAsync();
