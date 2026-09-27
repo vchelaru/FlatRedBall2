@@ -65,6 +65,7 @@ internal static class CollisionDispatcher
     {
         if (a is HexShapes hexA) return -hexA.GetSeparationFor(b);
         if (b is HexShapes hexB) return hexB.GetSeparationFor(a);
+        if (a is TileShapes tilesA) return -tilesA.GetSeparationFor(b);
 
         var mtv = (a, b) switch
         {
