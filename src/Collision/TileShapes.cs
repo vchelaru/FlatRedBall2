@@ -1395,7 +1395,16 @@ public class TileShapes : ICollidable
         return false;
     }
     /// <inheritdoc/>
-    public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);
+    public Vector2 GetSeparationVector(ICollidable other)
+    {
+        foreach (var leaf in Entity.GetLeafShapes(other))
+        {
+            var separation = GetSeparationFor(leaf);
+            if (separation != Vector2.Zero)
+                return -separation;
+        }
+        return Vector2.Zero;
+    }
     /// <inheritdoc/>
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }
     /// <inheritdoc/>

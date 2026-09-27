@@ -1506,6 +1506,34 @@ public class TileShapesTests
         collisionCount.ShouldBe(1);
     }
 
+    [Fact]
+    public void GetSeparationVector_TileShapesFirstAndEntitySecond_ReturnsOppositeEntitySeparation()
+    {
+        var body = new AARect { Width = 8f, Height = 8f };
+        var entity = new Entity { X = 8f, Y = 18f };
+        entity.Add(body);
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        var expected = -entity.GetSeparationVector(tiles);
+        expected.ShouldNotBe(Vector2.Zero);
+
+        var separation = tiles.GetSeparationVector(entity);
+
+        separation.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void DispatcherGetSeparationVector_TileShapesFirst_ReturnsOppositeOfShapeFirst()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        var rect = new AARect { Width = 8f, Height = 8f, X = 8f, Y = 18f };
+        var expected = -CollisionDispatcher.GetSeparationVector(rect, tiles);
+        expected.ShouldNotBe(Vector2.Zero);
+
+        CollisionDispatcher.GetSeparationVector(tiles, rect).ShouldBe(expected);
+    }
+
     // ── AddRectangleTileAtCell — sub-cell rect adjacency ────────────────────
 
     [Fact]
