@@ -622,6 +622,74 @@ public class WatchContentIntegrationTests : IDisposable
         reloaderCalls.ShouldBe(0);
     }
 
+    // A source content root can exist and still not contain the requested path. That happens in
+    // real shipping builds: DetectSourceContentRoots walks UP from the executable looking for a
+    // solution or project file, so an unrelated ancestor project (e.g. a stray *.csproj in a home
+    // directory) can be selected as the only root. The fallback then constructed a real
+    // FileSystemDirectoryWatcher on a directory that does not exist, and that constructor throws
+    // ArgumentException - killing the process, because nothing inside the engine guards it.
+    [Fact]
+    public void TryWatchContentDirectory_WhenNoRootContainsTheDirectory_DoesNotThrow()
+    {
+        var engine = MakeEngine();   // _srcRoot exists but has no "Content" child
+
+        Should.NotThrow(() => engine.CurrentScreen.TryWatchContentDirectory("Content", _ => { }, out _));
+    }
+
+    [Fact]
+    public void TryWatchContentDirectory_WhenNoRootContainsTheDirectory_ReportsUnavailableAndRegistersNothing()
+    {
+        var engine = MakeEngine();
+
+        var status = engine.CurrentScreen.TryWatchContentDirectory("Content", _ => { }, out var watcher);
+
+        watcher.ShouldBeNull();
+        status.ShouldBe(ContentWatchRegistrationStatus.SourceContentRootUnavailable);
+        engine.CurrentScreen.ContentDirectoryWatchers.ShouldBeEmpty();
+    }
+
+    // WatchContentDirectory is the nullable wrapper; it must report "no watcher" rather than
+    // hand back a watcher that can never fire.
+    [Fact]
+    public void WatchContentDirectory_WhenNoRootContainsTheDirectory_ReturnsNull()
+    {
+        var engine = MakeEngine();
+
+        var watcher = engine.CurrentScreen.WatchContentDirectory("Content", _ => { });
+
+        watcher.ShouldBeNull();
+        engine.CurrentScreen.ContentDirectoryWatchers.ShouldBeEmpty();
+    }
+
+    // The single-file overload has the same fallback. FileSystemFileWatcher tolerates a missing
+    // file (it simply never fires), so this never crashed - but it registered a dead watcher and
+    // still reported Registered, which is a lie callers can act on.
+    [Fact]
+    public void TryWatchContent_WhenNoRootContainsTheFile_ReportsUnavailableAndRegistersNothing()
+    {
+        var engine = MakeEngine();
+
+        var status = engine.CurrentScreen.TryWatchContent("Content/foo.json", () => { }, out var watcher);
+
+        watcher.ShouldBeNull();
+        status.ShouldBe(ContentWatchRegistrationStatus.SourceContentRootUnavailable);
+        engine.CurrentScreen.ContentWatchers.ShouldBeEmpty();
+    }
+
+    // Guards the fix from over-reaching: a root that DOES contain the path must still register.
+    [Fact]
+    public void TryWatchContentDirectory_WhenARootContainsTheDirectory_StillRegisters()
+    {
+        var engine = MakeEngine();
+        Directory.CreateDirectory(Path.Combine(_srcRoot, "Content"));
+
+        var status = engine.CurrentScreen.TryWatchContentDirectory("Content", _ => { }, out var watcher);
+
+        watcher.ShouldNotBeNull();
+        status.ShouldBe(ContentWatchRegistrationStatus.Registered);
+        engine.CurrentScreen.ContentDirectoryWatchers.ShouldNotBeEmpty();
+    }
+
     private class FakeFileWatcher : IFileWatcher
     {
         public event Action? Changed;

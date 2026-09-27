@@ -734,12 +734,11 @@ public class Screen : ILifecycleEvents
 
         if (!registered)
         {
-            // No root contained the file. Fall back to the first root so the watcher exists
-            // (and will pick the file up if it appears later) — matches the historical
-            // single-root behavior where srcAbs was used regardless of file existence.
-            var srcAbs = Path.Combine(Engine.SourceContentRoots[0], sourcePath);
-            watcher = WatchContent(new FileSystemFileWatcher(srcAbs), onChanged,
-                sourceAbsolutePath: srcAbs, destinationAbsolutePath: destAbs);
+            // No root contained the file. Do NOT fabricate a watcher for a path that does not
+            // exist: FileSystemFileWatcher tolerates such a path (it simply never fires), but the
+            // registration result would be a lie, and the directory overload below turns the same
+            // mistake into a hard crash. Report unavailable so hot reload stays off.
+            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
         }
         return ContentWatchRegistrationStatus.Registered;
     }
@@ -817,12 +816,18 @@ public class Screen : ILifecycleEvents
 
         if (!registered)
         {
-            // No root contained the directory. Fall back to the first root so a watcher exists
-            // (matches historical single-root behavior). The watcher will simply produce no
-            // events until the directory appears.
-            var srcAbs = Path.Combine(Engine.SourceContentRoots[0], sourceDirectory);
-            watcher = WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
-                sourceAbsoluteRoot: srcAbs, destinationAbsoluteRoot: destAbs);
+            // No root contained the directory. This used to fall back to the first root and
+            // construct a FileSystemDirectoryWatcher on the resulting path, on the assumption it
+            // "will simply produce no events until the directory appears". That assumption is
+            // wrong: the constructor throws ArgumentException when the directory does not exist,
+            // and nothing guards this call, so the exception kills the process. It is reachable in
+            // ordinary shipping builds, because DetectSourceContentRoots walks UP from the
+            // executable for a solution or project file - an unrelated ancestor project (a stray
+            // *.csproj in a home directory, say) becomes the only detected root, and it does not
+            // contain the game's Content folder.
+            // Report unavailable instead: no watcher, and hot reload stays off until a root that
+            // actually contains the directory exists.
+            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
         }
 
         return ContentWatchRegistrationStatus.Registered;
