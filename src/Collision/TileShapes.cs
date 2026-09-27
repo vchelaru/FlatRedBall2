@@ -1358,15 +1358,40 @@ public class TileShapes : ICollidable
     /// <inheritdoc/>
     public bool CollidesWith(ICollidable other)
     {
-        var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(other);
+        foreach (var leaf in Entity.GetLeafShapes(other))
+            if (CollidesWithLeaf(leaf))
+                return true;
+        return false;
+    }
+
+    // Tests real geometry rather than separation: an actor fully surrounded by tiles overlaps
+    // tiles whose faces are all suppressed, so their separation is zero but they still collide.
+    private bool CollidesWithLeaf(ICollidable shape)
+    {
+        var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(shape);
         int colMin = (int)MathF.Floor((minX - X) / GridSize);
         int colMax = (int)MathF.Floor((maxX - X) / GridSize);
         int rowMin = (int)MathF.Floor((minY - Y) / GridSize);
         int rowMax = (int)MathF.Floor((maxY - Y) / GridSize);
         for (int col = colMin; col <= colMax; col++)
+        {
             for (int row = rowMin; row <= rowMax; row++)
-                if (_tiles.ContainsKey((col, row)) || _polyTiles.ContainsKey((col, row)))
+            {
+                if (_tiles.TryGetValue((col, row), out var tile)
+                    && CollisionDispatcher.OverlapsIgnoringSolidSides(shape, tile))
                     return true;
+                if (_polyTiles.TryGetValue((col, row), out var poly)
+                    && CollisionDispatcher.OverlapsIgnoringSolidSides(shape, poly))
+                    return true;
+                if (_subCellRects.TryGetValue((col, row), out var subRects))
+                    foreach (var subRect in subRects)
+                        if (CollisionDispatcher.OverlapsIgnoringSolidSides(shape, subRect))
+                            return true;
+            }
+        }
+        foreach (var spanning in _spanningPolygons)
+            if (CollisionDispatcher.OverlapsIgnoringSolidSides(shape, spanning))
+                return true;
         return false;
     }
     /// <inheritdoc/>

@@ -313,6 +313,52 @@ public class TileShapesTests
         rect.CollidesWith(tiles).ShouldBeTrue();
     }
 
+    [Fact]
+    public void CollidesWith_EntityAwayFromOccupiedOriginCell_ReturnsFalse()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        var entity = new Entity { X = 200f, Y = 200f };
+        entity.Add(new AARect { Width = 8f, Height = 8f });
+
+        tiles.CollidesWith(entity).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CollidesWith_EntityOverlappingTile_ReturnsTrue()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(5, 5); // spans [80..96] x [80..96]
+        var entity = new Entity { X = 90f, Y = 90f };
+        entity.Add(new AARect { Width = 8f, Height = 8f });
+
+        tiles.CollidesWith(entity).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CollidesWith_EntityOnlyNonDefaultShapeOverlaps_ReturnsFalse()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(5, 5); // spans [80..96] x [80..96]
+        var entity = new Entity { X = 88f, Y = 120f };
+        entity.Add(new AARect { Width = 8f, Height = 8f });
+        entity.Add(new AARect { Width = 2f, Height = 2f, Y = -32f }, isDefaultCollision: false); // at (88, 88)
+
+        tiles.CollidesWith(entity).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CollidesWith_ShapeInSlopeCellAboveSlopeSurface_ReturnsFalse()
+    {
+        // Up-right slope in cell (0,0): solid below the diagonal from (0,0) to (16,16).
+        // A small rect in the top-left corner shares the cell but not the polygon.
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
+        var rect = new AARect { Width = 2f, Height = 2f, X = 2f, Y = 14f };
+
+        tiles.CollidesWith(rect).ShouldBeFalse();
+    }
+
     // ── GetSeparationFor ─────────────────────────────────────────────────────
 
     [Fact]
@@ -1419,6 +1465,45 @@ public class TileShapesTests
         // Standard mode on this slope produces an SAT MTV with a horizontal component;
         // PlatformerFloor would zero out X.
         MathF.Abs(sep.X).ShouldBeGreaterThan(0.01f, "public entry point should default to Standard SAT");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RunCollisions_EmbeddedWithNoUsableSeparation_ReportsContactWithoutMoving(bool tilesFirst)
+    {
+        // Every side of the actor's cell is blocked, so there is no open direction to push
+        // toward and the separation is zero even though the shapes overlap.
+        // Kept away from cell (0,0) so a bounds lookup that collapses to the origin can't pass.
+        var tiles = new TileShapes { GridSize = 16f };
+        for (int x = 5; x < 8; x++)
+            for (int y = 5; y < 8; y++)
+                tiles.AddTileAtCell(x, y);
+        var actor = new Entity();
+        actor.Add(new AARect { Width = 8f, Height = 8f });
+        actor.X = 104f; actor.Y = 104f;
+        int collisionCount = 0;
+        ICollisionRelationship rel;
+        if (tilesFirst)
+        {
+            var r = new CollisionRelationship<TileShapes, Entity>(new[] { tiles }, new[] { actor });
+            r.CollisionOccurred += (_, _) => collisionCount++;
+            rel = r;
+        }
+        else
+        {
+            var r = new CollisionRelationship<Entity, TileShapes>(new[] { actor }, new[] { tiles });
+            r.CollisionOccurred += (_, _) => collisionCount++;
+            rel = r;
+        }
+
+        actor.GetSeparationVector(tiles).ShouldBe(Vector2.Zero);
+        actor.CollidesWith(tiles).ShouldBeTrue();
+        rel.RunCollisions();
+
+        actor.X.ShouldBe(104f);
+        actor.Y.ShouldBe(104f);
+        collisionCount.ShouldBe(1);
     }
 
     // ── AddRectangleTileAtCell — sub-cell rect adjacency ────────────────────

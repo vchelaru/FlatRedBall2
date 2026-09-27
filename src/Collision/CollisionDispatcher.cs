@@ -43,7 +43,7 @@ internal static class CollisionDispatcher
         // delegate to Line's own intersection test since no separation exists.
         if (a is Line la && b is not AARect) return la.CollidesWith(b);
         if (b is Line lb && a is not AARect) return lb.CollidesWith(a);
-        // TileShapes.CollidesWith uses a direct cell-occupancy scan that is
+        // TileShapes.CollidesWith tests per-tile geometry ignoring SolidSides, so it is
         // correct even when the caller is fully surrounded (net separation == zero).
         if (a is TileShapes tsca) return tsca.CollidesWith(b);
         if (b is TileShapes tscb) return tscb.CollidesWith(a);
@@ -66,7 +66,28 @@ internal static class CollisionDispatcher
         if (a is HexShapes hexA) return -hexA.GetSeparationFor(b);
         if (b is HexShapes hexB) return hexB.GetSeparationFor(a);
 
-        var mtv = (a, b) switch
+        var mtv = GetRawSeparationVector(a, b);
+
+        if (mtv == Vector2.Zero) return Vector2.Zero;
+
+        if (b is AARect rectB && rectB.SolidSides != SolidSides.All)
+            mtv = ComputeDirectionalSeparation(a, rectB);
+
+        return mtv;
+    }
+
+    // True when the two leaf shapes geometrically overlap, ignoring b's SolidSides. Used where
+    // a suppressed interior face must still count as solid (an actor embedded in tiles).
+    internal static bool OverlapsIgnoringSolidSides(ICollidable a, ICollidable b)
+    {
+        if (a is Line la) return la.CollidesWith(b);
+        if (b is Line lb) return lb.CollidesWith(a);
+        return GetRawSeparationVector(a, b) != Vector2.Zero;
+    }
+
+    private static Vector2 GetRawSeparationVector(ICollidable a, ICollidable b)
+    {
+        return (a, b) switch
         {
             (AARect ra, AARect rb) => AabbVsAabb(ra, rb),
             (Circle ca, Circle cb)                             => CircleVsCircle(ca, cb),
@@ -82,13 +103,6 @@ internal static class CollisionDispatcher
             (_, TileShapes tsc)                       => tsc.GetSeparationFor(a),
             _                                                  => Vector2.Zero
         };
-
-        if (mtv == Vector2.Zero) return Vector2.Zero;
-
-        if (b is AARect rectB && rectB.SolidSides != SolidSides.All)
-            mtv = ComputeDirectionalSeparation(a, rectB);
-
-        return mtv;
     }
 
     // Computes the minimum displacement for 'a' restricted to b's allowed axes.

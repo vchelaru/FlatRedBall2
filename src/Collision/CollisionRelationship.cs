@@ -622,7 +622,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
         if (sep == Vector2.Zero)
         {
-            ReportEmbeddedHexContact(a, b, effectiveA, effectiveB);
+            ReportEmbeddedAggregateContact(a, b, effectiveA, effectiveB);
             TryOfferGroundSnap(a, b);
             return;
         }
@@ -642,17 +642,20 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         TryOfferGroundSnap(a, b);
     }
 
-    // An actor embedded in HexShapes can overlap while the resolver returns no usable
-    // separation. It is still touching, so record the contact and fire the event.
-    // TileShapes has the same gap and doesn't report it yet (#1200).
-    private void ReportEmbeddedHexContact(A a, B b, ICollidable effectiveA, ICollidable effectiveB)
+    // An actor embedded in a static aggregate (TileShapes/HexShapes) can overlap while every
+    // push direction is blocked, so the resolver returns zero separation. It is still touching,
+    // so record the contact and fire the event. Gated to aggregates so ordinary non-overlapping
+    // pairs don't pay a second CollidesWith check.
+    private void ReportEmbeddedAggregateContact(A a, B b, ICollidable effectiveA, ICollidable effectiveB)
     {
-        if (effectiveA is not HexShapes && effectiveB is not HexShapes) return;
+        if (!IsStaticAggregate(effectiveA) && !IsStaticAggregate(effectiveB)) return;
         if (!CollisionDispatcher.CollidesWith(effectiveA, effectiveB)) return;
 
         RecordContact(a, b);
         CollisionOccurred?.Invoke(a, b);
     }
+
+    private static bool IsStaticAggregate(ICollidable collidable) => collidable is TileShapes or HexShapes;
 
     // Both lists are already sorted by their respective factories. radiusA/radiusB are each
     // factory's shared IFactory.PartitionMaxRadius — a single bound per side, not each entity's
@@ -694,7 +697,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (sep == Vector2.Zero)
                 {
-                    ReportEmbeddedHexContact(a, b, effectiveA, effectiveB);
+                    ReportEmbeddedAggregateContact(a, b, effectiveA, effectiveB);
                     TryOfferGroundSnap(a, b);
                     continue;
                 }
