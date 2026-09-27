@@ -89,6 +89,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
 - `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
 - `multiplatform-conversion` — Convert a single-target desktop sample into a dual-target desktop + KNI BlazorGL (web/WASM) project
+- `desktop-distribution` — Self-contained per-RID publish profiles and the macOS .app layout
 
 ## Key Architecture Decisions
 
