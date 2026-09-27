@@ -251,9 +251,9 @@ public class FlatRedBallService
 
     /// <summary>
     /// Whether a <see cref="Glue.GlueScreen"/> watches the Glue project's source tree and restarts
-    /// itself when Glue writes to it. On by default; hot-reload is already a no-op in shipping
-    /// builds, where <see cref="SourceContentRoots"/> is empty. Set before starting the first
-    /// screen to opt out.
+    /// itself when Glue writes to it. On by default; hot-reload is already a no-op when no
+    /// <see cref="SourceContentRoots"/> entry contains the watched path, which is the normal case in
+    /// a shipping build. Set before starting the first screen to opt out.
     /// </summary>
     public bool IsGlueHotReloadEnabled { get; set; } = true;
 
