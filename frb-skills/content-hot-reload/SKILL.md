@@ -121,7 +121,11 @@ engine.SourceContentRoots.Add("C:/path/to/my/project");
 
 ## Shipping builds
 
-In a shipped game there's no `.csproj`/`.sln` next to the executable, so `SourceContentRoots` is empty. `WatchContent`/`WatchContentDirectory` return `null` and skip registration. **No `#if DEBUG` needed** — hot-reload is a dev-only no-op in release.
+`SourceContentRoots` comes from `FlatRedBallService.DetectSourceContentRoots`, which searches **upward** from `AppContext.BaseDirectory` for a `.sln`/`.slnx`, falling back to the nearest ancestor owning a `*.csproj`. In a shipped build the list is empty only if no ancestor owns one — a stray `*.csproj` in a home directory is enough to make it non-empty and pointing away from the game's `Content`.
+
+Non-empty does not mean "will register": roots are matched per path, and when none contains the requested file or directory, `WatchContent`/`WatchContentDirectory` return `null` and `TryWatch*` reports `SourceContentRootUnavailable`. Hot-reload is a safe no-op either way — **no `#if DEBUG` needed**.
+
+Landmine for changes here: `new FileSystemDirectoryWatcher(path)` throws `ArgumentException` on a missing directory (`FileSystemFileWatcher` does not), so any fallback that builds a path instead of verifying it converts a no-op into a process-killing exception.
 
 ## Debouncing
 
