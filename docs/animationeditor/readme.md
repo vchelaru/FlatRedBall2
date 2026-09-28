@@ -1,7 +1,21 @@
 # AnimationEditor
 
-## What the AnimationEditor Is
+## What Is the AnimationEditor
+
+The AnimationEditor is a cross-platform app for creating and managing animation files for your game project. Animations are a list of **frames**, where each frame references a source image and indicates which portion of the image to display. Frames can reference an entire image or a portion of an image, as is common when working with sprite sheets and tile maps.
+
+<figure><img src="../.gitbook/assets/animationeditor-walkleft-animation.png" alt="AnimationEditor displaying a WalkLeft animation"><figcaption><p>AnimationEditor displaying a WalkLeft animation</p></figcaption></figure>
 
 ## Supported Files
 
+The AnimationEditor natively works with the .achj file format (*AnimationChain JSON*). Alternatively, the AnimationEditor can also work with .achx files (*AnimationChain XML*).
+
+These files can be loaded at runtime using NuGet packages for custom rendering. Some runtimes, such as MonoGame, also have dedicated NuGet packages which simplify rendering of animations.
+
+The AnimationEditor also works with [Tiled's](https://www.mapeditor.org/) .tsx file format, simplifying the process of creating animated tiles.
+
+<figure><img src="../.gitbook/assets/animationeditor-tsx-animations.png" alt="AnimationEditor displaying animations in a .tsx file"><figcaption><p>AnimationEditor displaying animations in a .tsx file</p></figcaption></figure>
+
 ## Where to Go Next
+
+If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the LinkHow-To Guides.
