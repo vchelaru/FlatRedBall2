@@ -30,6 +30,40 @@ public class PolygonCollisionTests
     // ── Circle vs Polygon ──────────────────────────────────────────────────────
 
     [Fact]
+    public void CircleVsPolygon_ClosedPointList_PushesCircleRight()
+    {
+        // FRB1 .achx polygons repeat the first point at the end to close the outline.
+        var poly = Polygon.FromPoints(new[]
+        {
+            new Vector2(-50f, -50f),
+            new Vector2( 50f, -50f),
+            new Vector2( 50f,  50f),
+            new Vector2(-50f,  50f),
+            new Vector2(-50f, -50f),
+        });
+        var circle = new Circle { X = 60f, Y = 0f, Radius = 20f };
+
+        var sep = circle.GetSeparationVector(poly);
+
+        sep.X.ShouldBe(10f, tolerance: 0.01f);
+        sep.Y.ShouldBe(0f, tolerance: 0.01f);
+        poly.ConvexParts.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ConvexParts_ClosedConcavePointList_DecomposesLikeOpenList()
+    {
+        var poly = Polygon.FromPoints(new[]
+        {
+            new Vector2(0f, 0f), new Vector2(20f, 0f), new Vector2(20f, 10f),
+            new Vector2(10f, 10f), new Vector2(10f, 20f), new Vector2(0f, 20f),
+            new Vector2(0f, 0f),
+        });
+
+        poly.ConvexParts.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public void CircleVsPolygon_CircleToRight_PushesCircleRight()
     {
         var poly   = Square(0f, 0f);
