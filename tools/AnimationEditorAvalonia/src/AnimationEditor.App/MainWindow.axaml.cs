@@ -286,7 +286,7 @@ public partial class MainWindow : Window
         ProjectPanel.Initialize(_projectTreeThumbnailService);
         // Desktop has a real filesystem to reveal a folder in -- the browser build leaves this
         // false (its ProjectPanel is constructed the same way, unmodified) so its tree never
-        // shows a "View in Explorer" item it couldn't act on (#654's reasoning, applied here).
+        // shows a "Reveal in File Manager" item it couldn't act on (#654's reasoning, applied here).
         ProjectPanel.SupportsRevealInExplorer = true;
         ProjectPanel.FolderRevealRequested += relativePath => RevealProjectFolderInExplorer(relativePath);
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
@@ -1150,7 +1150,7 @@ public partial class MainWindow : Window
         _fileAssociation.RegisterAsDefault();
         if (hideBanner)
             DefaultHandlerBanner.IsVisible = false;
-        ShowStatusMessage("Opened Windows settings — choose Animation Editor for .achx files.");
+        ShowStatusMessage("Opened Windows settings — choose AnimationEditor for .achx files.");
     }
 
     private void ShowDefaultHandlerBannerIfAppropriate()
@@ -1184,7 +1184,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Animation Editor update restart failed: {ex}");
+            Debug.WriteLine($"AnimationEditor update restart failed: {ex}");
             ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
         }
     }
@@ -1202,7 +1202,7 @@ public partial class MainWindow : Window
         if (_updateCheckInFlight is null)
             return;
 
-        UpdateAvailableBannerText.Text = $"Downloading Animation Editor update ({percent}%)…";
+        UpdateAvailableBannerText.Text = $"Downloading AnimationEditor update ({percent}%)…";
         RestartForUpdateBtn.IsVisible = false;
         RetryUpdateBtn.IsVisible = false;
         UpdateAvailableBanner.IsVisible = true;
@@ -2321,7 +2321,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Resolves a Project-tree row's <see cref="AchxTreeNodeVm.RelativePath"/> (folder or file) to
     /// an absolute path against <see cref="ProjectManager.ProjectFolderPath"/> (issue #841
-    /// follow-up: "View in Explorer" on a folder row; issue #886: "Copy Full Path" / "Open
+    /// follow-up: "Reveal in File Manager" on a folder row; issue #886: "Copy Full Path" / "Open
     /// Containing Folder" on a file row). Split out from <see cref="RevealProjectFolderInExplorer"/>
     /// so this pure resolution is unit-testable without going through <c>Process.Start</c>.
     /// </summary>
@@ -2597,6 +2597,8 @@ public partial class MainWindow : Window
                                     .Take(5)
                                     .Select(f => (System.IO.Path.GetFileName(f), (Action)(() => _ = LoadAnimationFileAsync(f))))
                                     .ToList(),
+        OpenProjectFolder:  () => _ = OpenProjectFolderAsync(),
+        CloseProjectFolder: () => _ = CloseProjectAsync(),
         Save:            () => OnSaveClick(null, null!),
         SaveAs:          () => _ = _appCommands.SaveCurrentAnimationChainListAsync(),
         Undo:            () => _undoManager.Undo(),
@@ -2711,7 +2713,7 @@ public partial class MainWindow : Window
             string noun = atRiskCount == 1 ? "tab has" : "tabs have";
             bool confirmed = await _appCommands.ConfirmAsync(
                 $"{atRiskCount} untitled {noun} unsaved content that will be discarded. Close the project anyway?",
-                "Close Project");
+                "Close Project Folder");
             if (!confirmed) return;
         }
 
@@ -3014,7 +3016,7 @@ public partial class MainWindow : Window
     /// <summary>Status text shared by the startup banner and the About dialog (issue #1033).</summary>
     private static string DescribeUpdateStatus(ApplicationUpdateResult result) => result.Status switch
     {
-        ApplicationUpdateStatus.ReadyToRestart => $"Animation Editor v{result.Version} is ready. Restart to install it.",
+        ApplicationUpdateStatus.ReadyToRestart => $"AnimationEditor v{result.Version} is ready. Restart to install it.",
         ApplicationUpdateStatus.Failed => result.FailureMessage!,
         _ => "You're up to date.",
     };
@@ -5173,7 +5175,7 @@ public partial class MainWindow : Window
                 AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
                 break;
             case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
-                AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame));
+                AddMenuItem("Reveal Texture in File Manager", () => ViewTextureInExplorer(frame));
                 break;
         }
     }
@@ -6671,7 +6673,7 @@ public partial class MainWindow : Window
             },
             new()
             {
-                Id = "load", Description = "Load...", Category = "File",
+                Id = "load", Description = "Open…", Category = "File",
                 Gestures = new[] { new HotkeyGesture("L", Command) },
                 Action = () => _ = LoadAsync(),
             },
@@ -7694,7 +7696,7 @@ public partial class MainWindow : Window
 
     internal IReadOnlyList<TreeNodeVm> GetTreeRoots() => _treeRoots;
 
-    // ── View Texture in Explorer ──────────────────────────────────────────────
+    // ── Reveal Texture in File Manager ──────────────────────────────────────────────
 
     private void ViewTextureInExplorer(AnimationFrameSave frame)
     {

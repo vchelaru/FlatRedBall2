@@ -8,7 +8,7 @@ using System.Collections.Generic;
 namespace AnimationEditor.Core.Models
 {
     /// <summary>
-    /// Represents a single open tab in the Animation Editor.
+    /// Represents a single open tab in the AnimationEditor.
     /// View state (zoom, pan, grid) is persisted separately in each file's companion
     /// <c>.aeproperties</c> file and restored automatically on load.
     /// </summary>

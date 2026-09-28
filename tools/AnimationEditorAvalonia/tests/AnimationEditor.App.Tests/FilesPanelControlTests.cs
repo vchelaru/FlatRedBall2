@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Issue #1059: right-clicking a folder row in the Files panel showed an empty context menu --
-/// only file rows got "View in Explorer" because folder nodes carried no <c>AbsolutePath</c>.
+/// only file rows got "Reveal in File Manager" because folder nodes carried no <c>AbsolutePath</c>.
 /// </summary>
 public class FilesPanelControlTests
 {
@@ -54,7 +54,7 @@ public class FilesPanelControlTests
 
             var headers = control.FilesTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "View in Explorer" }, headers);
+            Assert.Equal(new object?[] { "Reveal in File Manager" }, headers);
         }
         finally
         {

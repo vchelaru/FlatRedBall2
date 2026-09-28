@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     Pure C#, zero MonoGame/KNI dependency by design. Split out of the main FlatRedBall2 engine
-    assembly so tooling that only needs the animation data (the Animation Editor, an Avalonia app,
+    assembly so tooling that only needs the animation data (the AnimationEditor, an Avalonia app,
     not a MonoGame one) can reference just this project instead of the whole engine. See
     tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md for the motivating #535
     investigation.
@@ -43,7 +43,7 @@
       The .achx animation file-format data model (AnimationChainListSave, AnimationChainSave,
       AnimationFrameSave) and a generic, renderer-agnostic playback runtime (AnimationChain&lt;TFrame&gt;,
       AnimationChainList&lt;TFrame&gt;, AnimationPlayer&lt;TFrame&gt;) used by FlatRedBall2 and the
-      FlatRedBall Animation Editor. Pure C#, no MonoGame/KNI dependency. Most users should install
+      FlatRedBall AnimationEditor. Pure C#, no MonoGame/KNI dependency. Most users should install
       FlatRedBall2.MonoGame or FlatRedBall2.Kni instead, which reference this package automatically.
     </Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

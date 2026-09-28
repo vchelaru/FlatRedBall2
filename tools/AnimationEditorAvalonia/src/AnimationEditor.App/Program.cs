@@ -50,7 +50,7 @@ class Program
         // Set the Dock label BEFORE Avalonia calls [NSApplication sharedApplication]
         // (inside UsePlatformDetect). The Dock caches the process name at that point;
         // calling setProcessName: afterwards has no visible effect on the Dock label.
-        MacOSDockIcon.SetProcessName("Animation Editor");
+        MacOSDockIcon.SetProcessName("AnimationEditor");
 
         // Give the process a stable Windows shell identity before any window is created, so
         // the (unpinned) taskbar button can resolve the exe's icon instead of a blank default.

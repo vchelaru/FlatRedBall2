@@ -6,7 +6,7 @@ using System.Linq;
 namespace AnimationEditor.Core.Models
 {
     /// <summary>
-    /// Manages the set of open tabs in the Animation Editor.
+    /// Manages the set of open tabs in the AnimationEditor.
     /// Each tab corresponds to one open <c>.achx</c> file.
     /// Per-tab view state (zoom, pan, grid) is persisted separately in each
     /// file's companion <c>.aeproperties</c> file and therefore lives outside this class.

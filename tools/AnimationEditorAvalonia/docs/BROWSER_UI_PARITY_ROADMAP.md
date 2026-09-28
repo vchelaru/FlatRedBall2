@@ -1,4 +1,4 @@
-# Animation Editor browser — UI/UX design-parity roadmap (Phases 6–15)
+# AnimationEditor browser — UI/UX design-parity roadmap (Phases 6–15)
 
 **Standing goal (supersedes the "~95%, not pixel-perfect" framing below):** full feature
 parity between `AnimationEditor.App` (desktop) and `AnimationEditor.Browser` (web), achieved by

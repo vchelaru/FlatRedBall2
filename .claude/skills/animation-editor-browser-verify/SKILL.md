@@ -5,7 +5,7 @@ description: >-
   Playwright Browser.Ui, WasmAppHost, __aeUiAutomation, FeatureDemos landmine.
 ---
 
-# Animation Editor — Browser Visual Verify
+# AnimationEditor — Browser Visual Verify
 
 Use when the question is **Browser/WASM-specific** (boot, Browser host wiring, Debug automation bridge). Prefer **Core.Tests + desktop Headless/DocScreenshots** for command behavior and desktop UI — see **`animation-editor-testing`**.
 

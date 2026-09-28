@@ -11,7 +11,7 @@ Sprites animate via `AnimationChain` / `AnimationChainList`, driven automaticall
 
 1. Create a folder in your `*.Common` project's `Content` directory (for example `Content/Animations`).
 2. Copy your source spritesheet PNG into that folder.
-3. Open Animation Editor and save a new `.achx` in the same folder as the PNG.
+3. Open AnimationEditor and save a new `.achx` in the same folder as the PNG.
 4. Ensure your project copies these files to output (for example `Content/Animations/**` in `.csproj`; see `references/platformer-template.md`).
 
 `FileRelativeTextures` in `.achx` expects relative texture paths, so keeping `.achx` and texture content together avoids broken lookups.

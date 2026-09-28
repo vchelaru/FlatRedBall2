@@ -71,12 +71,12 @@ public partial class ProjectPanelControl : UserControl
     /// True when the host can reveal a folder in the OS shell (desktop only -- issue #654 dropped
     /// the equivalent "Open Containing Folder" on the browser build since there's no real
     /// filesystem to reveal). Desktop's <c>MainWindow</c> sets this after construction; left false
-    /// (the default) the tree's context menu never shows "View in Explorer" for a folder row.
+    /// (the default) the tree's context menu never shows "Reveal in File Manager" for a folder row.
     /// </summary>
     public bool SupportsRevealInExplorer { get; set; }
 
     /// <summary>
-    /// Raised when the user picks "View in Explorer" for a folder row (issue #841 follow-up).
+    /// Raised when the user picks "Reveal in File Manager" for a folder row (issue #841 follow-up).
     /// Carries the folder's <see cref="AchxTreeNodeVm.RelativePath"/> -- this control has no
     /// absolute path for a folder node, only the host (which knows the project root) can resolve
     /// one.
@@ -393,7 +393,7 @@ public partial class ProjectPanelControl : UserControl
 
             if (!SupportsRevealInExplorer) return;
 
-            var revealItem = new MenuItem { Header = "View in Explorer" };
+            var revealItem = new MenuItem { Header = "Reveal in File Manager" };
             revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(revealItem);
             return;
@@ -581,7 +581,7 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
 
     /// <summary>Path from the project root, forward-slash separated -- see
     /// <see cref="AchxTreeNode.RelativePath"/>. Used to resolve a folder row's absolute path for
-    /// "View in Explorer" (issue #841 follow-up), since folder nodes carry no <see cref="Entry"/>.</summary>
+    /// "Reveal in File Manager" (issue #841 follow-up), since folder nodes carry no <see cref="Entry"/>.</summary>
     public string RelativePath { get; }
 
     public ObservableCollection<AchxTreeNodeVm> Children { get; } = new();

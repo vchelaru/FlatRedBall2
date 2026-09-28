@@ -43,7 +43,7 @@ public enum TextureCoordinateType
 /// <see cref="FromJsonFile(string)"/> and convert to runtime types with
 /// <c>ToAnimationChainList</c> (an extension method in the <c>FlatRedBall.AnimationChain.MonoGame</c>
 /// package — this type itself has no MonoGame dependency so tooling, like the
-/// Animation Editor, can reference it without pulling MonoGame in at all).
+/// AnimationEditor, can reference it without pulling MonoGame in at all).
 /// </summary>
 public class AnimationChainListSave
 {
@@ -62,7 +62,7 @@ public class AnimationChainListSave
     public List<AnimationChainSave> AnimationChains = new();
 
     /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile(string)"/>;
-    /// tooling (Animation Editor) sets this directly when the user picks a Save-As path.</summary>
+    /// tooling (AnimationEditor) sets this directly when the user picks a Save-As path.</summary>
     public string FileName { get; set; } = string.Empty;
 
     /// <summary>
@@ -73,7 +73,7 @@ public class AnimationChainListSave
 
     /// <summary>
     /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
-    /// for tooling (file pickers in the Animation Editor) where the caller has an absolute path
+    /// for tooling (file pickers in the AnimationEditor) where the caller has an absolute path
     /// and needs to bypass the <c>ContentLoader</c> stream seam. Production runtime code
     /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
     /// to the other overload.
@@ -297,7 +297,7 @@ public class AnimationChainListSave
 
     /// <summary>
     /// Serializes this save to a .achx XML string using the same dialect as <see cref="Save(string)"/>.
-    /// Lets the Animation Editor clipboard share one serializer with file I/O, so copy/paste of
+    /// Lets the AnimationEditor clipboard share one serializer with file I/O, so copy/paste of
     /// frames and chains round-trips per-frame shapes exactly as the on-disk format does. Pair
     /// with <see cref="FromString"/> to read it back.
     /// </summary>

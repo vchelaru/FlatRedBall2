@@ -89,16 +89,16 @@
                              registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New Animation" x:Name="MenuNew" />
-                        <MenuItem Header="_Load..."       x:Name="MenuLoad" />
-                        <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
+                        <MenuItem Header="_Open…"         x:Name="MenuLoad" />
+                        <MenuItem Header="Open _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
                         <Separator />
-                        <MenuItem Header="_Close Project" x:Name="MenuCloseProject" />
+                        <MenuItem Header="_Close Project Folder" x:Name="MenuCloseProject" />
                         <Separator />
                         <MenuItem Header="_Save"          x:Name="MenuSave" />
-                        <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
+                        <MenuItem Header="Save _As…"      x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
-                            <MenuItem Header="_PixiJS..." x:Name="MenuExportPixiJs" />
+                            <MenuItem Header="_PixiJS…" x:Name="MenuExportPixiJs" />
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">
@@ -114,11 +114,11 @@
                         <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate" />
                         <Separator />
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
-                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
+                        <MenuItem Header="Enable _Hot Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
                         <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                         <Separator />
-                        <MenuItem Header="Associate _Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
+                        <MenuItem Header="_Associate Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
                         <Separator />
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
@@ -264,7 +264,7 @@
                               Stretch="Uniform"
                               Fill="{DynamicResource AccentCool}"
                               Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-                        <TextBlock Text="Make the Animation Editor the default app for .achx files?"
+                        <TextBlock Text="Make the AnimationEditor the default app for .achx files?"
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Ink}" />
@@ -347,7 +347,7 @@
                               Fill="{DynamicResource AccentCool}"
                               Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
                         <TextBlock x:Name="UpdateAvailableBannerText"
-                                   Text="A new version of the Animation Editor is available."
+                                   Text="A new version of the AnimationEditor is available."
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Ink}" />

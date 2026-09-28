@@ -3,7 +3,7 @@
 The `.achx` animation file-format data model (`AnimationChainListSave`, `AnimationChainSave`,
 `AnimationFrameSave`, `ColorOperation`, `ShapesSave`) plus a generic, renderer-agnostic playback
 runtime (`AnimationChain<TFrame>`, `AnimationChainList<TFrame>`, `AnimationPlayer<TFrame>`) used by
-[FlatRedBall2](https://github.com/vchelaru/FlatRedBall2) and the FlatRedBall Animation Editor.
+[FlatRedBall2](https://github.com/vchelaru/FlatRedBall2) and the FlatRedBall AnimationEditor.
 
 Pure C#, no MonoGame/KNI dependency — a renderer only has to close the generic runtime types over
 its own texture handle type.

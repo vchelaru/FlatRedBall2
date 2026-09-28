@@ -701,7 +701,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             () => WheelZoomPresets);
 
         // Right-click (when it doesn't hit a guide — see OnPointerPressed) opens this menu
-        // with a "View <filename> in Explorer" item for the currently previewed texture.
+        // with a "Reveal <filename> in File Manager" item for the currently previewed texture.
         var contextMenu = new ContextMenu();
         contextMenu.Opening += OnContextMenuOpening;
         ContextMenu = contextMenu;
@@ -1588,7 +1588,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     }
 
     /// <summary>
-    /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
+    /// Rebuilds the ContextMenu with a single "Reveal &lt;filename&gt; in File Manager" item for the
     /// currently previewed texture, or cancels the menu entirely when there's nothing to reveal.
     /// </summary>
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
@@ -2125,7 +2125,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (props.IsRightButtonPressed)
         {
             // A guide-removing click consumes the right-click; otherwise let it fall through
-            // so Avalonia opens the "View <filename> in Explorer" ContextMenu as normal. Note
+            // so Avalonia opens the "Reveal <filename> in File Manager" ContextMenu as normal. Note
             // that Control's context-menu logic runs in OnPointerReleased against the *released*
             // event's own Handled flag — marking Handled here on the pressed event has no effect
             // on it, so the actual suppression happens in OnPointerReleased below.

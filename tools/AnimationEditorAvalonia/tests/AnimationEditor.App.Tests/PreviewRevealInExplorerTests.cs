@@ -15,7 +15,7 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Issue #573 — right-clicking the Preview pane (away from any guide) shows a
-/// "View &lt;filename&gt; in Explorer" context menu item for the currently previewed texture.
+/// "Reveal &lt;filename&gt; in File Manager" context menu item for the currently previewed texture.
 /// </summary>
 public class PreviewRevealInExplorerTests
 {
@@ -92,7 +92,7 @@ public class PreviewRevealInExplorerTests
         OpenContextMenu(ctrl);
 
         var item = ctrl.ContextMenu!.Items.OfType<MenuItem>().Single();
-        Assert.Equal("View hero.png in Explorer", item.Header);
+        Assert.Equal("Reveal hero.png in File Manager", item.Header);
     }
 
     [AvaloniaFact]
@@ -214,7 +214,7 @@ public class PreviewRevealInExplorerTests
             Dispatcher.UIThread.RunJobs();
 
             var item = preview.ContextMenu!.Items.OfType<MenuItem>().Single();
-            Assert.Equal("View hero.png in Explorer", item.Header);
+            Assert.Equal("Reveal hero.png in File Manager", item.Header);
         }
         finally { window.Close(); }
     }

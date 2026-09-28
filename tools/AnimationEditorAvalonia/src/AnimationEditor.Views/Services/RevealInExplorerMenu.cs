@@ -6,7 +6,7 @@ using System.ComponentModel;
 namespace AnimationEditor.App.Services;
 
 /// <summary>
-/// Shared "View &lt;file&gt; in Explorer" context-menu population for the wireframe and preview
+/// Shared "Reveal &lt;file&gt; in File Manager" context-menu population for the wireframe and preview
 /// canvases (#573 / #695 A6). Both controls open the same one-item menu; only the path source
 /// differs.
 /// </summary>
@@ -29,7 +29,7 @@ internal static class RevealInExplorerMenu
         }
 
         menu.Items.Clear();
-        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
+        var item = new MenuItem { Header = $"Reveal {new FilePath(absPath).NoPath} in File Manager" };
         item.Click += (_, _) =>
         {
             var error = ShellExplorer.RevealFile(absPath);

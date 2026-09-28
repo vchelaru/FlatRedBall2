@@ -1,4 +1,4 @@
-# #535 M1/M2/M3/M4 Spike Findings — Animation Editor on Avalonia.Browser (WASM)
+# #535 M1/M2/M3/M4 Spike Findings — AnimationEditor on Avalonia.Browser (WASM)
 
 Tracking issue: [vchelaru/FlatRedBall2#535](https://github.com/vchelaru/FlatRedBall2/issues/535).
 

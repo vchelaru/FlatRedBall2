@@ -22,7 +22,7 @@ struct VertexShaderOutput
 };
 
 // Per-channel offset added to the sampled texture's RGB before it is multiplied by the vertex
-// color. Range matches the Animation Editor's authored Red/Green/Blue (-255..255 / 255).
+// color. Range matches the AnimationEditor's authored Red/Green/Blue (-255..255 / 255).
 float3 ColorOffset;
 
 float4 MainPS(VertexShaderOutput input) : COLOR

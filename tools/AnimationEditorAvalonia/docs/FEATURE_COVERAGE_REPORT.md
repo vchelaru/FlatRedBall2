@@ -210,7 +210,7 @@
 | TV06 | Right-click context menu | Exposes add/delete/move operations |
 | TV07 | Rename chain | In-place rename via context menu or F2 |
 | TV08 | Rename frame | In-place rename (changes `TextureName` or frame alias) |
-| TV09 | View texture in Explorer | Right-click on a frame → "View Texture in Explorer"; opens Windows File Explorer with the frame's texture file pre-selected via `Process.Start("explorer.exe", "/select,...")`; shows an error message if no texture is set |
+| TV09 | View texture in Explorer | Right-click on a frame → "Reveal Texture in File Manager"; opens Windows File Explorer with the frame's texture file pre-selected via `Process.Start("explorer.exe", "/select,...")`; shows an error message if no texture is set |
 
 **Status:** All extractable logic for WF11 (tile-index UV math) and F13 (pixel-mode UV editing) has been extracted into Core and is fully unit-tested.
 

@@ -88,7 +88,7 @@ public sealed class AchxTreeNode
     public bool IsFolder => Entry is null;
 
     /// <summary>Path from the project root, forward-slash separated (issue #841 follow-up:
-    /// "View in Explorer" on a folder row). For a file node this matches
+    /// "Reveal in File Manager" on a folder row). For a file node this matches
     /// <see cref="AchxFileEntry.RelativePath"/>.</summary>
     public required string RelativePath { get; init; }
 }

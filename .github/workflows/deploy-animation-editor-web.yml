@@ -1,6 +1,6 @@
 name: AnimationEditor Web
 
-# #535 M4: publish the Avalonia.Browser build of the Animation Editor (tools/AnimationEditorAvalonia/
+# #535 M4: publish the Avalonia.Browser build of the AnimationEditor (tools/AnimationEditorAvalonia/
 # src/AnimationEditor.Browser) as a static site under this repo's GitHub Pages, at /FlatRedBall2/AnimationEditor/.
 # Manually triggered (not on every push) since this is still an early spike -- see
 # tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md for what does/doesn't work yet
@@ -41,7 +41,7 @@ jobs:
       - name: Report bundle size
         shell: bash
         run: |
-          echo "### Animation Editor (web) bundle size" >> "$GITHUB_STEP_SUMMARY"
+          echo "### AnimationEditor (web) bundle size" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| | Size |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
@@ -75,4 +75,4 @@ jobs:
           publish_dir: ./publish/wwwroot
           destination_dir: AnimationEditor
           keep_files: true
-          commit_message: 'Deploy Animation Editor (web) (${{ github.sha }})'
+          commit_message: 'Deploy AnimationEditor (web) (${{ github.sha }})'

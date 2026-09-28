@@ -1,6 +1,6 @@
-# Dogfooding the Animation Editor headlessly
+# Dogfooding the AnimationEditor headlessly
 
-This folder is about one thing: the Avalonia Animation Editor as a user works it. It drives the
+This folder is about one thing: the Avalonia AnimationEditor as a user works it. It drives the
 real `MainWindow` with simulated clicks, double-clicks, right-clicks, drags, wheel and key input
 inside an in-process headless window. Nothing reaches the desktop, so it is safe to run while the
 machine is in use. Use it to find bugs the way a user would hit them, pin each one with a test,

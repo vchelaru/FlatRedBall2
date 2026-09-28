@@ -12,12 +12,12 @@ namespace AnimationEditor.App.Services;
 /// </summary>
 internal sealed class SingleInstanceRecoveryWindow : Window
 {
-    /// <summary>True once the user has clicked "Restart Animation Editor".</summary>
+    /// <summary>True once the user has clicked "Restart AnimationEditor".</summary>
     public bool RestartRequested { get; private set; }
 
     private SingleInstanceRecoveryWindow(string message, bool offerRestart)
     {
-        Title = "Animation Editor";
+        Title = "AnimationEditor";
         Width = 380;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
@@ -26,10 +26,10 @@ internal sealed class SingleInstanceRecoveryWindow : Window
     }
 
     public static SingleInstanceRecoveryWindow CreateHungDialog() =>
-        new("A previous instance of Animation Editor is frozen.", offerRestart: true);
+        new("A previous instance of AnimationEditor is frozen.", offerRestart: true);
 
     public static SingleInstanceRecoveryWindow CreateBusyDialog() =>
-        new("Animation Editor appears to be busy. Please wait and try again.", offerRestart: false);
+        new("AnimationEditor appears to be busy. Please wait and try again.", offerRestart: false);
 
     private Control BuildContent(string message, bool offerRestart)
     {
@@ -45,7 +45,7 @@ internal sealed class SingleInstanceRecoveryWindow : Window
 
         if (offerRestart)
         {
-            var restart = new Button { Content = "Restart Animation Editor" };
+            var restart = new Button { Content = "Restart AnimationEditor" };
             restart.Click += (_, _) => ConfirmRestart();
             buttonRow.Children.Add(restart);
         }
@@ -58,7 +58,7 @@ internal sealed class SingleInstanceRecoveryWindow : Window
         return panel;
     }
 
-    /// <summary>Handles "Restart Animation Editor". Internal (not private) so tests can invoke it
+    /// <summary>Handles "Restart AnimationEditor". Internal (not private) so tests can invoke it
     /// directly instead of simulating a real pointer click on the button.</summary>
     internal void ConfirmRestart()
     {

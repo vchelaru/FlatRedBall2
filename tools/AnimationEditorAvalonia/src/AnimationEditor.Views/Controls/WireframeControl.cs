@@ -759,7 +759,7 @@ public class WireframeControl : TextureViewport
                 host.Stop();
         };
 
-        // Right-click opens this menu with a "View <filename> in Explorer" item for the
+        // Right-click opens this menu with a "Reveal <filename> in File Manager" item for the
         // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
         var contextMenu = new ContextMenu();
         contextMenu.Opening += OnContextMenuOpening;
@@ -2228,7 +2228,7 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
+    /// Rebuilds the ContextMenu with a single "Reveal &lt;filename&gt; in File Manager" item for the
     /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
     /// </summary>
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>

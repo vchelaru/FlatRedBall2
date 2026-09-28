@@ -12,7 +12,7 @@ namespace AnimationEditor.App.Tests;
 public class SingleInstanceServerTests
 {
     // Unique per test run so the named system mutex can't collide with a real
-    // running Animation Editor instance on the dev machine.
+    // running AnimationEditor instance on the dev machine.
     private static string UniqueMutexName(string suffix)
         => $"AnimationEditorAvalonia_Test_{suffix}";
 

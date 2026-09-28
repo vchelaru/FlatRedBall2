@@ -318,7 +318,7 @@ public class AnimationTreeControlContextMenuTests
             var items = OpenMenuFor(h, frameNode);
 
             Assert.True(IndexOfItem(items, "Copy Texture Path") >= 0);
-            Assert.Equal(-1, IndexOfItem(items, "View Texture in Explorer"));
+            Assert.Equal(-1, IndexOfItem(items, "Reveal Texture in File Manager"));
         }
         finally { h.Window.Close(); }
     }

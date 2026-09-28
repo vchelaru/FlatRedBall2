@@ -5,9 +5,9 @@ description: >-
   AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui.
 ---
 
-# Animation Editor — Testing
+# AnimationEditor — Testing
 
-Headless-test discipline for the Avalonia Animation Editor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
+Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
 
 ```
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/

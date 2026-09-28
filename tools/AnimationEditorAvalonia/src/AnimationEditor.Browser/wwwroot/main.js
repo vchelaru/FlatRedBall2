@@ -58,7 +58,7 @@ try {
 } catch (err) {
     const msg = err?.message ?? String(err);
     showBootError(
-        'Animation Editor failed to start.\n\n' + msg + '\n\n' +
+        'AnimationEditor failed to start.\n\n' + msg + '\n\n' +
         'Confirm .\\run-browser.ps1 still shows App url, then Ctrl+Shift+R.'
     );
     throw err;

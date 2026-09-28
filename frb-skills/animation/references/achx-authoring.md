@@ -1,6 +1,6 @@
 # .achx / .achj Authoring Reference
 
-`.achx` (XML) and `.achj` (JSON) are two on-disk dialects of the same `AnimationChainListSave` data model — same fields, same semantics, just different serialization. Animation Editor writes `.achx` by default. This reference covers the XML schema for creating or editing `.achx` files directly; the JSON dialect uses the same field set with camelCase names (see `.achj` below).
+`.achx` (XML) and `.achj` (JSON) are two on-disk dialects of the same `AnimationChainListSave` data model — same fields, same semantics, just different serialization. AnimationEditor writes `.achx` by default. This reference covers the XML schema for creating or editing `.achx` files directly; the JSON dialect uses the same field set with camelCase names (see `.achj` below).
 
 ## Which dialect gets loaded
 
@@ -111,7 +111,7 @@ Each `<AnimationChain>` is a named sequence of frames.
 
 `RelativeY` marks where a frame's visual ground contact sits relative to the entity origin — it is not derived from sprite height. Flush-bottom (half-height, e.g. `16` on a 32px-tall frame) is only correct for a strictly side-on camera (Mario-style platformers), where the sprite's bounding-box bottom *is* the ground-contact point. Any camera with vertical tilt — a top-down RPG, isometric, or a platformer with a downward-tilted camera (Donkey Kong Country-style) — shows a sliver of the ground plane, so the contact point sits somewhere inside the bounding box and has to be set by eye per frame. `RelativeX` stays `0` in almost all cases since sprites already draw X-centered on the entity; only an asymmetric frame (a lunging attack, an off-center pivot) needs a nonzero value.
 
-For a top-down game specifically: author every frame's origin (Animation Editor's origin crosshair, or the Adjust Offsets tool) at the center of the character's feet at ground level — where the feet meet the floor, horizontally centered. Once every frame agrees on that point, the entity's `X`/`Y` *is* that ground position, with no offset math at the call site — moving a character to a new level's spawn point is just `entity.X = doorwayX; entity.Y = doorwayY`.
+For a top-down game specifically: author every frame's origin (AnimationEditor's origin crosshair, or the Adjust Offsets tool) at the center of the character's feet at ground level — where the feet meet the floor, horizontally centered. Once every frame agrees on that point, the entity's `X`/`Y` *is* that ground position, with no offset math at the call site — moving a character to a new level's spawn point is just `entity.X = doorwayX; entity.Y = doorwayY`.
 
 ### Coordinate System
 

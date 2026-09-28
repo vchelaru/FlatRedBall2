@@ -20,7 +20,7 @@ new chrome (not just the canvas).
    `DynamicResource`-styled widget desktop's wireframe/preview toolbars and PNG diff bar all use.
    Net simplification: deletes the bespoke stepper wiring entirely.
 4. **Branded header bar.** Visual only, per the roadmap's decision #1 — `IconChain` (closest thing
-   to an app mark in the shared icon set; no dedicated logo asset exists), "Animation Editor", and
+   to an app mark in the shared icon set; no dedicated logo asset exists), "AnimationEditor", and
    the active tab's filename. Explicitly **no** drag-to-move / custom resize /
    minimize-maximize-close — the browser tab already has real OS chrome for those.
 5. **2-zone status bar.** Left zone: active filename + animation count. Right zone: the existing

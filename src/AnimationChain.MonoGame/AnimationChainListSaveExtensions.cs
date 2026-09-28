@@ -5,7 +5,7 @@ namespace FlatRedBall.AnimationChain;
 
 /// <summary>
 /// Converts a portable <see cref="AnimationChainListSave"/> (the .achx/.achj data model, shared
-/// with the Animation Editor and the main FlatRedBall2 engine via <c>AnimationEditorCommon</c>)
+/// with the AnimationEditor and the main FlatRedBall2 engine via <c>AnimationEditorCommon</c>)
 /// into this package's own <see cref="AnimationChain{TFrame}"/>/<see cref="AnimationChainList{TFrame}"/>
 /// runtime closed over <see cref="AnimationFrame"/>. Lives in this package (not
 /// <c>AnimationEditorCommon</c> itself) because it needs <see cref="Texture2D"/> and this package's
@@ -55,7 +55,7 @@ public static class AnimationChainListSaveExtensions
 
             // Sticky color resolution: a frame that omits a channel inherits the most recent
             // explicitly-set value from an earlier frame in this chain, rather than resetting to
-            // null. Mirrors the Animation Editor's EffectiveFrameColor.ResolveAll. This is specific
+            // null. Mirrors the AnimationEditor's EffectiveFrameColor.ResolveAll. This is specific
             // to this package's runtime -- AnimationEditorCommon's own conversion (used by the
             // main engine's Sprite animation) does not apply it.
             int? stickyRed = null, stickyGreen = null, stickyBlue = null, stickyAlpha = null;

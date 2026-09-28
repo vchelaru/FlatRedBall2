@@ -169,13 +169,17 @@ public partial class App : Application
         var a = window.CreateNativeMenuActions();
 
         var fileMenu = new NativeMenu();
-        fileMenu.Add(new NativeMenuItem("New")      { Command = Cmd(a.New),    Gesture = new KeyGesture(Key.N, KeyModifiers.Meta) });
+        fileMenu.Add(new NativeMenuItem("New Animation") { Command = Cmd(a.New),    Gesture = new KeyGesture(Key.N, KeyModifiers.Meta) });
         fileMenu.Add(new NativeMenuItem("Open…")    { Command = Cmd(a.Load),   Gesture = new KeyGesture(Key.L, KeyModifiers.Meta) });
 
         var recentMenu = new NativeMenu();
         foreach (var (header, execute) in a.RecentFiles())
             recentMenu.Add(new NativeMenuItem(header) { Command = Cmd(execute) });
         fileMenu.Add(new NativeMenuItem("Open Recent") { Menu = recentMenu });
+        fileMenu.Add(new NativeMenuItem("Open Project Folder…") { Command = Cmd(a.OpenProjectFolder) });
+
+        fileMenu.Add(new NativeMenuItemSeparator());
+        fileMenu.Add(new NativeMenuItem("Close Project Folder") { Command = Cmd(a.CloseProjectFolder) });
 
         fileMenu.Add(new NativeMenuItemSeparator());
         fileMenu.Add(new NativeMenuItem("Save")     { Command = Cmd(a.Save),   Gesture = new KeyGesture(Key.S, KeyModifiers.Meta) });
@@ -200,7 +204,7 @@ public partial class App : Application
 
         var helpMenu = new NativeMenu();
         helpMenu.Add(new NativeMenuItem("View Log") { Command = Cmd(a.ViewLog) });
-        helpMenu.Add(new NativeMenuItem("About Animation Editor") { Command = Cmd(a.About) });
+        helpMenu.Add(new NativeMenuItem("About AnimationEditor") { Command = Cmd(a.About) });
 
         var appMenu = new NativeMenu();
         appMenu.Add(new NativeMenuItem("File") { Menu = fileMenu });

@@ -21,7 +21,7 @@ namespace AnimationEditor.Core.Models
     }
 
     /// <summary>
-    /// Host-agnostic orchestration of the Animation Editor's open tabs, shared by the desktop
+    /// Host-agnostic orchestration of the AnimationEditor's open tabs, shared by the desktop
     /// and browser hosts. Owns the "leaving tab" capture couplet and "ensure a tab exists for
     /// the current document" logic; broader tab-switch/close sequencing migrates here
     /// incrementally (issue #714).

@@ -47,7 +47,7 @@ jobs:
           if ($kind -eq 'test') { $tag = "$tag-$($env:GITHUB_RUN_NUMBER)" }
           "version=$version"       >> $env:GITHUB_OUTPUT
           "tag=$tag"               >> $env:GITHUB_OUTPUT
-          "title=Animation Editor $title" >> $env:GITHUB_OUTPUT
+          "title=AnimationEditor $title" >> $env:GITHUB_OUTPUT
           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
           "draft=$draft"           >> $env:GITHUB_OUTPUT
 
@@ -214,7 +214,7 @@ jobs:
           --packVersion ${{ needs.meta.outputs.version }}
           --packDir dist/velopack/publish
           --mainExe AnimationEditor.exe
-          --packTitle "Animation Editor"
+          --packTitle "AnimationEditor"
           --packAuthors "FlatRedBall Contributors"
           --icon tools/AnimationEditorAvalonia/src/AnimationEditor.App/Assets/icons/AppIcon.ico
           --outputDir dist/velopack/release
@@ -302,7 +302,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   animationeditor-latest
-          name:       Animation Editor (Latest)
+          name:       AnimationEditor (Latest)
           generate_release_notes: false
           body:       "Always points to the latest ${{ needs.meta.outputs.prerelease == 'true' && 'pre' || '' }}release: [${{ needs.meta.outputs.title }}](../../releases/tag/${{ needs.meta.outputs.tag }})"
           prerelease: ${{ needs.meta.outputs.prerelease }}

@@ -1,4 +1,4 @@
-# Duplication Audit — Avalonia Animation Editor (issue #695)
+# Duplication Audit — Avalonia AnimationEditor (issue #695)
 
 High-level inventory of duplicated logic and refactor wins in `tools/AnimationEditorAvalonia/`.
 Line numbers are from the state of the tree at the time of the audit and are meant as landmarks,

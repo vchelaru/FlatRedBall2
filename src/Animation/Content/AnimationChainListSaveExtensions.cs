@@ -11,7 +11,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// into runtime engine types. Lives in the main engine assembly (not alongside
 /// <see cref="AnimationChainListSave"/> itself) because it needs <see cref="ContentLoader"/> and
 /// MonoGame's <see cref="Texture2D"/> — the Save types stay in a MonoGame-free assembly so tooling
-/// (the Animation Editor) can reference the .achx data model without pulling in MonoGame at all.
+/// (the AnimationEditor) can reference the .achx data model without pulling in MonoGame at all.
 /// </summary>
 public static class AnimationChainListSaveExtensions
 {

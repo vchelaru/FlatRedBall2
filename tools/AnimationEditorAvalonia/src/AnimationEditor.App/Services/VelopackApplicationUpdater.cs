@@ -105,7 +105,7 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Animation Editor update download failed: {ex}");
+            Debug.WriteLine($"AnimationEditor update download failed: {ex}");
             return ApplicationUpdateResult.Failed("The update could not be downloaded. Please try again.");
         }
     }

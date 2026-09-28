@@ -1601,7 +1601,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         // Swaps Left<->Right and/or Up<->Down direction tokens in a chain name (e.g. "WalkRight"
         // flipped horizontally becomes "WalkLeft") so a flipped duplicate reads correctly instead
-        // of "WalkRightCopy". Ported from the old (pre-Avalonia) Animation Editor's duplicate+flip
+        // of "WalkRightCopy". Ported from the old (pre-Avalonia) AnimationEditor's duplicate+flip
         // rename behavior (issue #920). A token must not be immediately followed by a lowercase
         // letter, so it only matches a standalone PascalCase word ("WalkRight", trailing "Up") and
         // not a prefix of a longer word ("Rightful", "Upgrade"). Returns the name unchanged if no

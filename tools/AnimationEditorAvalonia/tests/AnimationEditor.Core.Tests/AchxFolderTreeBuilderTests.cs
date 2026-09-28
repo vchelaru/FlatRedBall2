@@ -52,7 +52,7 @@ public class AchxFolderTreeBuilderTests
         Assert.Same(file, tree[0].Entry!.File);
     }
 
-    // ── RelativePath (issue #841 follow-up: "View in Explorer" on a folder row) ────────────────
+    // ── RelativePath (issue #841 follow-up: "Reveal in File Manager" on a folder row) ────────────────
 
     [Fact]
     public void Build_TopLevelFolder_RelativePathIsJustTheFolderName()

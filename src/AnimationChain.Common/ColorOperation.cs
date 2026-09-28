@@ -3,7 +3,7 @@ namespace FlatRedBall2.Animation;
 /// <summary>
 /// How a frame's per-frame color (<c>AnimationFrame.Red</c>/<c>AnimationFrame.Green</c>/
 /// <c>AnimationFrame.Blue</c>) combines with the sprite's texture. A <c>null</c> operation
-/// means none. Like the channels themselves, this is authored in the Animation Editor and stored in
+/// means none. Like the channels themselves, this is authored in the AnimationEditor and stored in
 /// the <c>.achx</c>, but whether a given runtime applies it is that runtime's choice — the <c>.achx</c>
 /// is a general-purpose format consumed by several renderers (Gum, MonoGame/FNA, FRB1, FRB2).
 /// </summary>

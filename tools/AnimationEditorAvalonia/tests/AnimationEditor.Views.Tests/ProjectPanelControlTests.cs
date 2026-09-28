@@ -160,7 +160,7 @@ public class ProjectPanelControlTests
         finally { window.Close(); }
     }
 
-    // Issue #841 follow-up: right-click a folder row -> "View in Explorer". Real right-click
+    // Issue #841 follow-up: right-click a folder row -> "Reveal in File Manager". Real right-click
     // (MouseDown/MouseUp, not reflection) through the pointer pipeline, same reasoning as
     // PreviewRevealInExplorerTests' RealRightClick_* tests -- ContextRequested fires off the
     // *release* event's own Handled flag, so only driving the full press+release proves routing.
@@ -202,7 +202,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "New Animation File", "View in Explorer" }, headers);
+            Assert.Equal(new object?[] { "New Animation File", "Reveal in File Manager" }, headers);
         }
         finally { window.Close(); }
     }
@@ -222,7 +222,7 @@ public class ProjectPanelControlTests
             control.FolderRevealRequested += path => requested = path;
 
             var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
-                .Single(i => (string)i.Header! == "View in Explorer");
+                .Single(i => (string)i.Header! == "Reveal in File Manager");
             item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Equal("Sprites", requested);

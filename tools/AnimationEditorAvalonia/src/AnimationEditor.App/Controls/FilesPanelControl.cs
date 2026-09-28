@@ -202,12 +202,12 @@ public partial class FilesPanelControl : UserControl
 
         FilesTree.ContextMenu.Items.Clear();
 
-        // Issue #1059: folder rows carry an AbsolutePath too now, so they get "View in Explorer"
+        // Issue #1059: folder rows carry an AbsolutePath too now, so they get "Reveal in File Manager"
         // the same as file rows -- just opening the folder rather than selecting a file in it.
         if (_contextNode is not { AbsolutePath: { } path } node)
             return;
 
-        var revealItem = new MenuItem { Header = "View in Explorer" };
+        var revealItem = new MenuItem { Header = "Reveal in File Manager" };
         revealItem.Click += (_, _) => RevealInExplorer(path, node.IsFolder);
         FilesTree.ContextMenu.Items.Add(revealItem);
     }

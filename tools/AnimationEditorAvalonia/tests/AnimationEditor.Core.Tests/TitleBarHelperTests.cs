@@ -8,7 +8,7 @@ public sealed class TitleBarHelperTests
     [Fact]
     public void AppName_IsBrandedName()
     {
-        Assert.Equal("Animation Editor", TitleBarHelper.AppName);
+        Assert.Equal("AnimationEditor", TitleBarHelper.AppName);
     }
 
     [Fact]

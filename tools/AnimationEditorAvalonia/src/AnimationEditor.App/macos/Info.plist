@@ -4,9 +4,9 @@
 <dict>
     <!-- Display name shown in the macOS Dock, Finder, and Mission Control. -->
     <key>CFBundleDisplayName</key>
-    <string>Animation Editor</string>
+    <string>AnimationEditor</string>
     <key>CFBundleName</key>
-    <string>Animation Editor</string>
+    <string>AnimationEditor</string>
     <key>CFBundleExecutable</key>
     <string>AnimationEditor</string>
     <key>CFBundleIconFile</key>

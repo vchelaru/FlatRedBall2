@@ -18,7 +18,7 @@
     <Authors>Victor Chelaru</Authors>
     <Description>
       A standalone KNI (nkast) library for loading and playing .achx (XML) or .achj (JSON)
-      animation files created by the FlatRedBall Animation Editor. Targets Blazor WASM and other
+      animation files created by the FlatRedBall AnimationEditor. Targets Blazor WASM and other
       KNI platforms. No FlatRedBall2 engine dependency required.
       For MonoGame DesktopGL targets, use FlatRedBall.AnimationChain.MonoGame instead.
     </Description>

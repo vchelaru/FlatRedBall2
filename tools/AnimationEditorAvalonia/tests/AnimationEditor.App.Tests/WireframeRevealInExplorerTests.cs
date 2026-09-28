@@ -62,7 +62,7 @@ public class WireframeRevealInExplorerTests
             OpenContextMenu(ctrl);
 
             var item = ctrl.ContextMenu!.Items.OfType<MenuItem>().Single();
-            Assert.Equal("View hero.png in Explorer", item.Header);
+            Assert.Equal("Reveal hero.png in File Manager", item.Header);
         }
         finally { System.IO.Directory.Delete(dir, recursive: true); }
     }

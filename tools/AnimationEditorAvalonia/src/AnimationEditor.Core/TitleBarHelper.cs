@@ -6,7 +6,7 @@ namespace AnimationEditor.Core;
 public static class TitleBarHelper
 {
     /// <summary>The application name shown in the macOS system menu bar and other OS surfaces.</summary>
-    public const string AppName = "Animation Editor";
+    public const string AppName = "AnimationEditor";
 
     /// <summary>
     /// Returns the window title for the animation editor.

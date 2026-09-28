@@ -1,4 +1,4 @@
-# Start Animation Editor (browser/WASM) on http://localhost:5420
+# Start AnimationEditor (browser/WASM) on http://localhost:5420
 # Usage: .\run-browser.ps1   (from this directory)
 
 $ErrorActionPreference = "Stop"

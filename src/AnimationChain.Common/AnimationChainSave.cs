@@ -14,9 +14,9 @@ public class AnimationChainSave
     public List<AnimationFrameSave> Frames = new();
 
     /// <summary>
-    /// Tooling-only flag (Animation Editor): when <c>true</c>, the chain's frames and shapes
+    /// Tooling-only flag (AnimationEditor): when <c>true</c>, the chain's frames and shapes
     /// should not be edited. Not consumed by any runtime (see the "editor authors, runtimes
-    /// interpret" rule in the Animation Editor's own docs).
+    /// interpret" rule in the AnimationEditor's own docs).
     /// </summary>
     public bool IsLocked;
 

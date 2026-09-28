@@ -1,6 +1,6 @@
 <Project>
   <!--
-    Self-contained CPM file for the Animation Editor tool — isolated from the repo root's
+    Self-contained CPM file for the AnimationEditor tool — isolated from the repo root's
     Directory.Packages.props on purpose. This tool has its own unrelated dependency graph
     (Avalonia/SkiaSharp) and is not part of the main src/tests/samples build.
   -->
