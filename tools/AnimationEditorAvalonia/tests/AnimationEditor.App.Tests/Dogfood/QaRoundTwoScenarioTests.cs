@@ -274,7 +274,11 @@ public class QaRoundTwoScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
-        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        // Long frames: the click below turns Loop off, and a non-looping chain pauses itself at its
+        // last frame, so a short chain can finish during a slow run and read as "Space paused it".
+        AnimationChainSave fixture = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16));
+        foreach (AnimationFrameSave frame in fixture.Frames) frame.FrameLength = 60f;
+        string path = editor.WriteAchx("hero.achx", fixture);
         await editor.OpenAsync(path);
         editor.ClickRow(editor.ChainNamed("Walk"));
         bool playingBefore = editor.Preview.IsPlaying;
