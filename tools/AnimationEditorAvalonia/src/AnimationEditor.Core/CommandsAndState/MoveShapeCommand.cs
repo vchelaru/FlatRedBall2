@@ -4,13 +4,13 @@ using FlatRedBall2.AnimationEditorCommon;
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
-    /// Records a drag-move of a single collision shape (circle or axis-aligned rectangle)
+    /// Records a drag-move of a single collision shape (rectangle, circle, or polygon origin)
     /// so the operation can be undone and redone.
     /// </summary>
     public sealed class MoveShapeCommand : IUndoableCommand
     {
         private readonly AnimationFrameSave _frame;
-        private readonly object _shape;   // AARectSave | CircleSave
+        private readonly object _shape;   // a ShapeSave
         private readonly float _oldX, _oldY;
         private readonly float _newX, _newY;
         private readonly IAppCommands _commands;
@@ -38,8 +38,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private void Apply(float x, float y)
         {
-            if (_shape is AARectSave r) { r.X = x; r.Y = y; }
-            else if (_shape is CircleSave c)          { c.X = x; c.Y = y; }
+            if (_shape is ShapeSave s) { s.X = x; s.Y = y; }
 
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();

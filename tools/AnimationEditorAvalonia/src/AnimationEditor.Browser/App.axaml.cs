@@ -758,10 +758,8 @@ public partial class App : Application
 
         deleteSelectedButton.Click += (_, _) =>
         {
-            if (selectedState.SelectedRectangle is { } rect)
-                appCommands.DeleteShapes(new List<AARectSave> { rect }, new List<CircleSave>());
-            else if (selectedState.SelectedCircle is { } circle)
-                appCommands.DeleteShapes(new List<AARectSave>(), new List<CircleSave> { circle });
+            if (selectedState.SelectedShape is { } shape)
+                appCommands.DeleteShapes(new[] { shape });
             else if (selectedState.SelectedFrame is { } frame)
                 appCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             else if (selectedState.SelectedChain is { } selectedChain)

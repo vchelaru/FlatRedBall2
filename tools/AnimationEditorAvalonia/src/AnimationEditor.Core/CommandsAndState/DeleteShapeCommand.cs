@@ -3,9 +3,10 @@ using System;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
-    internal sealed class DeleteCircleCommand : IUndoableCommand
+    /// <summary>Removes one shape from a frame; undo puts it back at its original index.</summary>
+    internal sealed class DeleteShapeCommand : IUndoableCommand
     {
-        private readonly CircleSave _circle;
+        private readonly ShapeSave _shape;
         private readonly AnimationFrameSave _frame;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
@@ -15,47 +16,48 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public string Description { get; }
 
-        public DeleteCircleCommand(CircleSave circle, AnimationFrameSave frame,
+        public DeleteShapeCommand(ShapeSave shape, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
         {
-            _circle = circle;
+            _shape = shape;
             _frame = frame;
             _commands = commands;
             _events = events;
             _selectedState = selectedState;
-            Description = $"Delete Circle '{circle.Name}'";
+            Description = $"Delete {ShapeUndoLabel.FormatForAddDelete(shape)}";
         }
 
         public bool Do()
         {
-            _originalIndex = _frame.ShapesSave!.Shapes.IndexOf(_circle);
+            _originalIndex = _frame.ShapesSave!.Shapes.IndexOf(_shape);
             if (_originalIndex < 0) return false;
 
             _frame.ShapesSave!.Shapes.RemoveAt(_originalIndex);
-            _commands.RefreshTreeNode(_frame);
-            _commands.RefreshAnimationFrameDisplay();
-            _events.RaiseAnimationChainsChanged();
-            _selectedState.SelectedCircle = null;
+            Refresh();
+            _selectedState.SelectShape(null);
             return true;
         }
 
         public void Undo()
         {
             int idx = Math.Min(_originalIndex, _frame.ShapesSave!.Shapes.Count);
-            _frame.ShapesSave!.Shapes.Insert(idx, _circle);
-            _commands.RefreshTreeNode(_frame);
-            _commands.RefreshAnimationFrameDisplay();
-            _events.RaiseAnimationChainsChanged();
-            _selectedState.SelectedCircle = _circle;
+            _frame.ShapesSave!.Shapes.Insert(idx, _shape);
+            Refresh();
+            _selectedState.SelectShape(_shape);
         }
 
         public void Redo()
         {
-            _frame.ShapesSave!.Shapes.Remove(_circle);
+            _frame.ShapesSave!.Shapes.Remove(_shape);
+            Refresh();
+            _selectedState.SelectShape(null);
+        }
+
+        private void Refresh()
+        {
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
-            _selectedState.SelectedCircle = null;
         }
     }
 }

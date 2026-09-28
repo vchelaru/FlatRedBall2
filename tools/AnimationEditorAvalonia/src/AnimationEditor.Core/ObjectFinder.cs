@@ -10,26 +10,13 @@ namespace AnimationEditor.Core
         {
             _pm = pm;
         }
-        public AnimationFrameSave? GetAnimationFrameContaining(AARectSave rectangle)
+        public AnimationFrameSave? GetAnimationFrameContaining(ShapeSave shape)
         {
             foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
-                    if (frame.ShapesSave?.Shapes.Contains(rectangle) == true)
-                        return frame;
-                }
-            }
-            return null;
-        }
-
-        public AnimationFrameSave? GetAnimationFrameContaining(CircleSave circle)
-        {
-            foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
-            {
-                foreach (var frame in chain.Frames)
-                {
-                    if (frame.ShapesSave?.Shapes.Contains(circle) == true)
+                    if (frame.ShapesSave?.Shapes.Contains(shape) == true)
                         return frame;
                 }
             }

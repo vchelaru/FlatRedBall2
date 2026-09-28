@@ -17,6 +17,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             AARectSave r => new(shape, r.Name, r.X, r.Y, r.ScaleX, r.ScaleY),
             CircleSave c => new(shape, c.Name, c.X, c.Y, c.Radius, 0f),
+            PolygonSave p => new(shape, p.Name, p.X, p.Y, 0f, 0f),
             _ => throw new ArgumentException($"Unsupported shape type: {shape.GetType()}", nameof(shape)),
         };
 
@@ -26,6 +27,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             {
                 case AARectSave r: r.Name = Name; r.X = X; r.Y = Y; r.ScaleX = P1; r.ScaleY = P2; break;
                 case CircleSave c: c.Name = Name; c.X = X; c.Y = Y; c.Radius = P1; break;
+                case PolygonSave p: p.Name = Name; p.X = X; p.Y = Y; break;
             }
         }
     }

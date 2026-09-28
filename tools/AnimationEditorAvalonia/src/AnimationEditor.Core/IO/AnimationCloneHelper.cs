@@ -52,6 +52,7 @@ public static class AnimationCloneHelper
     {
         AARectSave r => new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY },
         CircleSave c => new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius },
+        PolygonSave p => new PolygonSave { Name = p.Name, X = p.X, Y = p.Y, Points = Utilities.PolygonVertices.CopyPoints(p) },
         _ => null,
     };
 }

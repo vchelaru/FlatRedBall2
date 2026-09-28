@@ -26,7 +26,7 @@ public class ClipboardPayloadCrossFolderTests
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
         var text = ClipboardPayload.SerializeFromPayload(payload, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, out var chains, out _, out _, out _);
+        ClipboardPayload.TryDeserialize(text, out var chains, out _, out _);
 
         var expected = new[]
         {
@@ -44,7 +44,7 @@ public class ClipboardPayloadCrossFolderTests
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
         var text = ClipboardPayload.SerializeFromPayload(payload, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _, out _);
+        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
 
         Assert.Equal(TexturePathHelper.ResolveDisplayPath("sheet.png", sourceFolder), frames!.Single().TextureName);
     }
@@ -56,7 +56,7 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
         var text = ClipboardPayload.SerializeFromPayload(payload);
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _, out _);
+        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
 
         Assert.Equal("sheet.png", frames!.Single().TextureName);
     }
@@ -69,7 +69,7 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
         var text = ClipboardPayload.SerializeFromPayload(payload, TestPaths.AbsDir("Project", "Animations", "Player"));
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _, out _);
+        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
 
         Assert.Equal(absolutePath, frames!.Single().TextureName);
     }

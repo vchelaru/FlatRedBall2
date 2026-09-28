@@ -69,6 +69,12 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.DeleteAnimationChains)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAxisAlignedRectangle)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.AddCircle)]                    = Category.MutatingUndoable,
+        [nameof(IAppCommands.AddPolygon)]                   = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetPolygonProps)]              = Category.MutatingUndoable,
+        [nameof(IAppCommands.MovePolygonVertex)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.InsertPolygonVertex)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.DeletePolygonVertex)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.CommitPolygonPoints)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectangleToFrame)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchCircleToFrame)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectanglesToFrames)]      = Category.MutatingUndoable,
@@ -130,8 +136,6 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.HasSameFrameNameCollision)]    = Category.NonMutating,
         [nameof(IAppCommands.PasteChains)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
-        [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
-        [nameof(IAppCommands.PasteCircle)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteShapes)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteChainsCut)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteFramesCut)]               = Category.MutatingUndoable,
@@ -239,6 +243,24 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddAxisAlignedRectangle(Zebra(ctx).Frames[1])));
         yield return Row(nameof(IAppCommands.AddCircle),
             ctx => Sync(() => ctx.AppCommands.AddCircle(Zebra(ctx).Frames[1])));
+        yield return Row(nameof(IAppCommands.AddPolygon),
+            ctx => Sync(() => ctx.AppCommands.AddPolygon(Zebra(ctx).Frames[1])));
+        yield return Row(nameof(IAppCommands.SetPolygonProps),
+            ctx => Sync(() => ctx.AppCommands.SetPolygonProps(Zebra(ctx).Frames[0], Polygon(ctx), "Renamed", 3f, 4f)));
+        yield return Row(nameof(IAppCommands.MovePolygonVertex),
+            ctx => Sync(() => ctx.AppCommands.MovePolygonVertex(Polygon(ctx), 0, -9f, -9f)));
+        yield return Row(nameof(IAppCommands.InsertPolygonVertex),
+            ctx => Sync(() => ctx.AppCommands.InsertPolygonVertex(Polygon(ctx), 1, 0f, -6f)));
+        yield return Row(nameof(IAppCommands.DeletePolygonVertex),
+            ctx => Sync(() => ctx.AppCommands.DeletePolygonVertex(Polygon(ctx), 1)));
+        yield return Row(nameof(IAppCommands.CommitPolygonPoints),
+            ctx => Sync(() =>
+            {
+                var polygon = Polygon(ctx);
+                var before = AnimationEditor.Core.Utilities.PolygonVertices.CopyPoints(polygon);
+                AnimationEditor.Core.Utilities.PolygonVertices.Set(polygon, 2, 7f, 7f);
+                ctx.AppCommands.CommitPolygonPoints(polygon, before, "Move Vertex");
+            }));
         yield return Row(nameof(IAppCommands.MatchRectangleToFrame),
             ctx => Sync(() => ctx.AppCommands.MatchRectangleToFrame(Rect(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.MatchCircleToFrame),
@@ -250,7 +272,7 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.DeleteAxisAlignedRectangle),
             ctx => Sync(() => ctx.AppCommands.DeleteAxisAlignedRectangle(Rect(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.DeleteShapes),
-            ctx => Sync(() => ctx.AppCommands.DeleteShapes(new() { Rect(ctx) }, new() { Circle(ctx) })));
+            ctx => Sync(() => ctx.AppCommands.DeleteShapes(new object[] { Rect(ctx), Circle(ctx), Polygon(ctx) })));
         yield return Row(nameof(IAppCommands.DeleteFrames),
             ctx => Sync(() => ctx.AppCommands.DeleteFrames(new() { Zebra(ctx).Frames[1] })));
         yield return Row(nameof(IAppCommands.AddAnimationChain),
@@ -369,17 +391,10 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.PasteFrames),
             ctx => Sync(() => ctx.AppCommands.PasteFrames(Zebra(ctx),
                 new List<AnimationFrameSave> { new() { ShapesSave = new ShapesSave() } })));
-        yield return Row(nameof(IAppCommands.PasteRectangle),
-            ctx => Sync(() => ctx.AppCommands.PasteRectangle(
-                Zebra(ctx).Frames[1], new AARectSave { Name = "Pasted" })));
-        yield return Row(nameof(IAppCommands.PasteCircle),
-            ctx => Sync(() => ctx.AppCommands.PasteCircle(
-                Zebra(ctx).Frames[1], new CircleSave { Name = "Pasted" })));
         yield return Row(nameof(IAppCommands.PasteShapes),
             ctx => Sync(() => ctx.AppCommands.PasteShapes(
                 Zebra(ctx).Frames[1],
-                new List<AARectSave> { new() { Name = "P1" } },
-                new List<CircleSave> { new() { Name = "C1" } })));
+                new List<object> { new AARectSave { Name = "P1" }, new CircleSave { Name = "C1" }, Polygon(ctx) })));
         yield return Row(nameof(IAppCommands.PasteChainsCut),
             ctx => Sync(() =>
             {
@@ -406,8 +421,7 @@ public class UndoCoverageRosterTests
                 var source = Rect(ctx);
                 ctx.AppCommands.PasteShapesCut(
                     frame,
-                    new List<AARectSave> { new() { Name = "PastedCut" } },
-                    new List<CircleSave>(),
+                    new List<object> { new AARectSave { Name = "PastedCut" } },
                     new List<object> { source },
                     frame);
             }));
@@ -457,6 +471,10 @@ public class UndoCoverageRosterTests
             new CircleSave { Name = "Circle", X = 0f, Y = 0f, Radius = 4f });
         zebra.Frames[0].ShapesSave!.Shapes.Add(
             new CircleSave { Name = "Circle2", X = 8f, Y = 8f, Radius = 2f });
+        var polygon = new PolygonSave { Name = "Polygon", X = 1f, Y = 2f };
+        foreach (var (x, y) in new[] { (-4f, -4f), (4f, -4f), (4f, 4f), (-4f, 4f), (-4f, -4f) })
+            polygon.Points.Add(new Vector2Save { X = x, Y = y });
+        zebra.Frames[0].ShapesSave!.Shapes.Add(polygon);
 
         var alpha = new AnimationChainSave { Name = "Alpha" };
         alpha.Frames.Add(new AnimationFrameSave
@@ -482,6 +500,7 @@ public class UndoCoverageRosterTests
     private static AARectSave SecondRect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.ElementAt(1);
     private static CircleSave Circle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.First();
     private static CircleSave SecondCircle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.ElementAt(1);
+    private static PolygonSave Polygon(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.PolygonSaves.First();
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

@@ -185,12 +185,17 @@ namespace AnimationEditor.Core.CommandsAndState
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);
+        void AddPolygon(AnimationFrameSave frame);
         void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame);
         void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame);
         void MatchRectanglesToFrames(List<AARectSave> rectangles);
         void DeleteCircle(CircleSave circle, AnimationFrameSave owner);
         void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
-        void DeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles);
+        /// <summary>
+        /// Deletes every shape in <paramref name="shapes"/> (any mix of rectangles, circles and
+        /// polygons, possibly across frames) as one undo step. Shapes in a locked chain are skipped.
+        /// </summary>
+        void DeleteShapes(IReadOnlyList<object> shapes);
         void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
@@ -329,7 +334,7 @@ namespace AnimationEditor.Core.CommandsAndState
         AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain);
 
         /// <summary>
-        /// Deep-copies a shape (<see cref="AARectSave"/> or <see cref="CircleSave"/>) into the
+        /// Deep-copies a shape (rectangle, circle, or polygon) into the
         /// frame that contains it, with a unique name, and selects the copy. Returns the copy,
         /// or <c>null</c> if the shape isn't in any frame or its kind isn't duplicable. Undoable.
         /// </summary>
@@ -404,6 +409,30 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 
+        /// <summary>Sets a polygon's name and origin. Consecutive calls on one polygon coalesce into one undo entry.</summary>
+        void SetPolygonProps(AnimationFrameSave? frame, PolygonSave polygon, string name, float x, float y);
+
+        /// <summary>
+        /// Moves vertex <paramref name="index"/> (see <see cref="Utilities.PolygonVertices"/>; the
+        /// repeated closing point is not a vertex) to <paramref name="x"/>, <paramref name="y"/>,
+        /// relative to the polygon's origin. Consecutive calls on the same vertex coalesce into one
+        /// undo entry, for typing a coordinate.
+        /// </summary>
+        void MovePolygonVertex(PolygonSave polygon, int index, float x, float y);
+
+        /// <summary>Inserts a vertex before <paramref name="index"/>; <c>Count</c> appends after the last vertex.</summary>
+        void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y);
+
+        /// <summary>Removes vertex <paramref name="index"/>. Refuses (returns <c>false</c>) when only three vertices are left.</summary>
+        bool DeletePolygonVertex(PolygonSave polygon, int index);
+
+        /// <summary>
+        /// Records an edit the caller already applied to <paramref name="polygon"/>'s points (a live
+        /// vertex drag) as one undo entry whose undo restores <paramref name="pointsBefore"/>. In a
+        /// locked chain the points are put back and nothing is recorded.
+        /// </summary>
+        void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description);
+
         /// <summary>
         /// Sets Name/X/Y/ScaleX/ScaleY on every rectangle in <paramref name="rects"/> as a single
         /// undoable operation — the multi-select counterpart to <see cref="SetRectProps"/>. Rects may
@@ -444,7 +473,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void DiscardPendingEdits();
 
         /// <summary>
-        /// True when two or more of <paramref name="shapes"/> (AARectSave and/or CircleSave) are
+        /// True when two or more of <paramref name="shapes"/> are
         /// owned by the same frame — batch-applying one literal name to all of them would collide,
         /// since shape names only need to be unique within a frame, not across frames.
         /// </summary>
@@ -493,21 +522,13 @@ namespace AnimationEditor.Core.CommandsAndState
         void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null);
 
-        /// <summary>Adds a clipboard rectangle to <paramref name="frame"/>. Undoable.</summary>
-        void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle);
-
-        /// <summary>Adds a clipboard circle to <paramref name="frame"/>. Undoable.</summary>
-        void PasteCircle(AnimationFrameSave frame, CircleSave circle);
-
-        /// <summary>Adds multiple clipboard shapes to <paramref name="frame"/> in one undo step.</summary>
-        void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
-            IReadOnlyList<CircleSave> circles);
+        /// <summary>Adds clones of clipboard shapes to <paramref name="frame"/>, in order, in one undo step.</summary>
+        void PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes);
 
         /// <summary>Adds multiple clipboard shapes to every frame in <paramref name="frames"/> in one
         /// undo step — each frame gets its own independent clone. Frames in a locked chain are
         /// skipped (bulk skip-locked-entries), same as other multi-target paste/delete operations.</summary>
-        void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<AARectSave> rectangles,
-            IReadOnlyList<CircleSave> circles);
+        void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes);
 
         /// <summary>Paste chains then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
         void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains,
@@ -518,8 +539,7 @@ namespace AnimationEditor.Core.CommandsAndState
             int? insertIndex, IReadOnlyList<AnimationFrameSave> sourcesToRemove);
 
         /// <summary>Paste shapes then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteShapesCut(AnimationFrameSave targetFrame,
-            IReadOnlyList<AARectSave> rectangles, IReadOnlyList<CircleSave> circles,
+        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes,
             IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame);
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>

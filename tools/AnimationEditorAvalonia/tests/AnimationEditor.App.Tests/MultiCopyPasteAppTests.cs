@@ -79,7 +79,7 @@ public class MultiCopyPasteAppTests
             FlushUi();
 
             var clip = await window.Clipboard!.TryGetTextAsync();
-            Assert.True(ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out _, out _));
+            Assert.True(ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out _));
             Assert.Equal(3, frames!.Count);
             Assert.Equal(new[] { "a.png", "b.png", "c.png" },
                 frames.Select(f => f.TextureName));

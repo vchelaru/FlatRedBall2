@@ -41,6 +41,16 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
             newX, newY, newRadius, 0f,
             commands, events, ShapeLabel("Circle", circ.Name ?? ""));
 
+    /// <summary>Name and origin only; a polygon's points are edited through <see cref="SetPolygonPointsCommand"/>.</summary>
+    public static SetShapePropsCommand ForPolygon(
+        AnimationFrameSave? frame, PolygonSave polygon,
+        string newName, float newX, float newY,
+        IAppCommands commands, IApplicationEvents events) =>
+        new(frame, polygon, polygon.Name ?? "", newName,
+            polygon.X, polygon.Y, 0f, 0f,
+            newX, newY, 0f, 0f,
+            commands, events, ShapeLabel("Polygon", polygon.Name ?? ""));
+
     private static string ShapeLabel(string type, string name) =>
         string.IsNullOrEmpty(name) ? $"Edit {type}" : $"Edit {type} '{name}'";
 
@@ -88,8 +98,9 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
 
     private void Apply(string name, float x, float y, float p1, float p2)
     {
-        if (_shape is AARectSave r) { r.Name = name; r.X = x; r.Y = y; r.ScaleX = p1; r.ScaleY = p2; }
-        else if (_shape is CircleSave c) { c.Name = name; c.X = x; c.Y = y; c.Radius = p1; }
+        if (_shape is ShapeSave s) { s.Name = name; s.X = x; s.Y = y; }
+        if (_shape is AARectSave r) { r.ScaleX = p1; r.ScaleY = p2; }
+        else if (_shape is CircleSave c) { c.Radius = p1; }
         if (_frame is not null) _commands.RefreshTreeNode(_frame);
         _commands.RefreshAnimationFrameDisplay();
         _commands.RefreshWireframe();

@@ -91,17 +91,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// True when the shape's owning chain is locked. <paramref name="knownFrame"/> is used
         /// when the caller already resolved it (avoids a second lookup); falls back to resolving
-        /// the frame from <paramref name="shape"/> (an <see cref="AARectSave"/> or <see cref="CircleSave"/>)
-        /// when <c>null</c>.
+        /// the frame from <paramref name="shape"/> when <c>null</c>.
         /// </summary>
-        private bool IsShapeLocked(AnimationFrameSave? knownFrame, object shape)
+        private bool IsShapeLocked(AnimationFrameSave? knownFrame, ShapeSave shape)
         {
-            var frame = knownFrame ?? shape switch
-            {
-                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
-                CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
-                _ => null,
-            };
+            var frame = knownFrame ?? _objectFinder.GetAnimationFrameContaining(shape);
             return frame is not null && IsFrameLocked(frame);
         }
 
@@ -806,7 +800,7 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             ApplyRectangleMatch(rectangleSave, frame);
-            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangleSave, frame, this, _events, _selectedState));
+            _undoManager.Execute(new AddShapeCommand(rectangleSave, frame, this, _events, _selectedState));
         }
 
         public void AddCircle(AnimationFrameSave frame)
@@ -821,7 +815,28 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             ApplyCircleMatch(circleSave, frame);
-            _undoManager.Execute(new AddCircleCommand(circleSave, frame, this, _events, _selectedState));
+            _undoManager.Execute(new AddShapeCommand(circleSave, frame, this, _events, _selectedState));
+        }
+
+        /// <summary>
+        /// Adds a 16x16 square polygon centred on the frame's offset. It is stored closed (the first
+        /// point repeated at the end), the FRB1 convention runtimes reading .achx expect.
+        /// </summary>
+        public void AddPolygon(AnimationFrameSave frame)
+        {
+            if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
+
+            var polygonSave = new PolygonSave
+            {
+                X = frame.RelativeX,
+                Y = frame.RelativeY,
+                Name = StringFunctions.MakeStringUnique("PolygonInstance",
+                    GetSelectedFrameShapeNames())
+            };
+            foreach (var (x, y) in new[] { (-8f, -8f), (8f, -8f), (8f, 8f), (-8f, 8f), (-8f, -8f) })
+                polygonSave.Points.Add(new Vector2Save { X = x, Y = y });
+
+            _undoManager.Execute(new AddShapeCommand(polygonSave, frame, this, _events, _selectedState));
         }
 
         /// <summary>
@@ -904,13 +919,13 @@ namespace AnimationEditor.Core.CommandsAndState
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
         {
             if (IsFrameLocked(owner)) return;
-            _undoManager.Execute(new DeleteCircleCommand(circle, owner, this, _events, _selectedState));
+            _undoManager.Execute(new DeleteShapeCommand(circle, owner, this, _events, _selectedState));
         }
 
         public void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner)
         {
             if (IsFrameLocked(owner)) return;
-            _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events, _selectedState));
+            _undoManager.Execute(new DeleteShapeCommand(rectangle, owner, this, _events, _selectedState));
         }
 
         /// <summary>
@@ -921,20 +936,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// (#1102). A shape whose owning chain is locked is skipped; the rest of the batch still
         /// proceeds -- mirrors <see cref="MatchRectanglesToFrames"/>.
         /// </summary>
-        public void DeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
+        public void DeleteShapes(IReadOnlyList<object> shapes)
         {
             var commands = new List<IUndoableCommand>();
-            foreach (var rect in rectangles.ToArray())
+            var deleted = new List<ShapeSave>();
+            foreach (var shape in shapes.OfType<ShapeSave>().ToArray())
             {
-                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(shape);
                 if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
-                commands.Add(new DeleteAxisAlignedRectangleCommand(rect, ownerFrame, this, _events, _selectedState));
-            }
-            foreach (var circle in circles.ToArray())
-            {
-                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
-                if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
-                commands.Add(new DeleteCircleCommand(circle, ownerFrame, this, _events, _selectedState));
+                commands.Add(new DeleteShapeCommand(shape, ownerFrame, this, _events, _selectedState));
+                deleted.Add(shape);
             }
             if (commands.Count == 0) return;
 
@@ -944,10 +955,7 @@ namespace AnimationEditor.Core.CommandsAndState
             string desc = total == 1 ? commands[0].Description : $"Delete {total} Shapes";
             _undoManager.Execute(new CompositeCommand(commands, desc));
 
-            string label = total == 1
-                ? (rectangles.Count == 1 ? rectangles[0].Name : circles[0].Name)
-                : $"{total} shapes";
-            ItemsDeleted?.Invoke(label);
+            ItemsDeleted?.Invoke(total == 1 ? deleted[0].Name : $"{total} shapes");
         }
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
@@ -986,10 +994,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var frame = _selectedState.SelectedFrame;
             if (frame?.ShapesSave == null) return new List<string>();
 
-            return frame.ShapesSave!.Shapes
-                .Select(s => s switch { AARectSave r => r.Name, CircleSave c => c.Name, _ => null })
-                .OfType<string>()
-                .ToList();
+            return frame.ShapesSave!.Shapes.OfType<ShapeSave>().Select(s => s.Name).ToList();
         }
 
         // ── Chain / Frame operations ──────────────────────────────────────────
@@ -1449,20 +1454,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void HandleReorder(int delta)
         {
-            var rect   = _selectedState.SelectedRectangle;
-            var circle = _selectedState.SelectedCircle;
+            var shape  = _selectedState.SelectedShape as ShapeSave;
             var frame  = _selectedState.SelectedFrame;
             var chain  = _selectedState.SelectedChain;
 
-            if (rect is not null)
+            if (shape is not null)
             {
-                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
-                if (ownerFrame is not null) MoveShape(rect, ownerFrame, delta);
-            }
-            else if (circle is not null)
-            {
-                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
-                if (ownerFrame is not null) MoveShape(circle, ownerFrame, delta);
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(shape);
+                if (ownerFrame is not null) MoveShape(shape, ownerFrame, delta);
             }
             else if (frame is not null && chain is not null)
             {
@@ -1723,12 +1722,7 @@ namespace AnimationEditor.Core.CommandsAndState
         private IReadOnlyList<object> DuplicateShapesBatch(IReadOnlyList<object> sources)
         {
             if (sources.Count == 0) return Array.Empty<object>();
-            var frame = sources[0] switch
-            {
-                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
-                CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
-                _ => null,
-            };
+            var frame = sources[0] is ShapeSave first ? _objectFinder.GetAnimationFrameContaining(first) : null;
             if (frame is null || IsFrameLocked(frame)) return Array.Empty<object>();
 
             frame.ShapesSave ??= new ShapesSave();
@@ -1736,20 +1730,10 @@ namespace AnimationEditor.Core.CommandsAndState
             var copies = new List<object>();
             foreach (var source in sources)
             {
-                if (AnimationCloneHelper.CloneShape(source) is not { } copy) continue;
-                switch (copy)
-                {
-                    case AARectSave r:
-                        r.Name = StringFunctions.MakeStringUnique(r.Name, existingNames, 2);
-                        existingNames.Add(r.Name);
-                        copies.Add(r);
-                        break;
-                    case CircleSave c:
-                        c.Name = StringFunctions.MakeStringUnique(c.Name, existingNames, 2);
-                        existingNames.Add(c.Name);
-                        copies.Add(c);
-                        break;
-                }
+                if (AnimationCloneHelper.CloneShape(source) is not ShapeSave copy) continue;
+                copy.Name = StringFunctions.MakeStringUnique(copy.Name, existingNames, 2);
+                existingNames.Add(copy.Name);
+                copies.Add(copy);
             }
             if (copies.Count == 0) return Array.Empty<object>();
             _undoManager.Execute(new DuplicateShapesCommand(frame, copies, this, _events, _selectedState));
@@ -1757,9 +1741,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         private static List<string> GetShapeNames(AnimationFrameSave frame) =>
-            frame.ShapesSave!.AARectSaves.Select(r => r.Name)
-                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
-                .ToList();
+            frame.ShapesSave!.Shapes.OfType<ShapeSave>().Select(s => s.Name).ToList();
 
         public void SortAnimationsAlphabetically()
         {
@@ -2193,6 +2175,60 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, _objectFinder, "Edit Circles"));
         }
 
+        public void SetPolygonProps(AnimationFrameSave? frame, PolygonSave polygon, string name, float x, float y)
+        {
+            if (IsShapeLocked(frame, polygon)) return;
+            _undoManager.Execute(SetShapePropsCommand.ForPolygon(frame, polygon, name, x, y, this, _events));
+        }
+
+        /// <inheritdoc cref="IAppCommands.MovePolygonVertex"/>
+        public void MovePolygonVertex(PolygonSave polygon, int index, float x, float y) =>
+            EditPolygonPoints(polygon, $"Move Vertex {index + 1} of {ShapeUndoLabel.Format(polygon)}",
+                p => PolygonVertices.Set(p, index, x, y),
+                coalesceGroup: $"PolygonVertex:{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(polygon)}:{index}");
+
+        /// <inheritdoc cref="IAppCommands.InsertPolygonVertex"/>
+        public void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y) =>
+            EditPolygonPoints(polygon, $"Add Vertex to {ShapeUndoLabel.Format(polygon)}",
+                p => PolygonVertices.Insert(p, index, x, y));
+
+        /// <inheritdoc cref="IAppCommands.DeletePolygonVertex"/>
+        public bool DeletePolygonVertex(PolygonSave polygon, int index)
+        {
+            if (PolygonVertices.Count(polygon) <= 3) return false;
+            return EditPolygonPoints(polygon, $"Delete Vertex from {ShapeUndoLabel.Format(polygon)}",
+                p => PolygonVertices.RemoveAt(p, index));
+        }
+
+        /// <inheritdoc cref="IAppCommands.CommitPolygonPoints"/>
+        public void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description)
+        {
+            var frame = _objectFinder.GetAnimationFrameContaining(polygon);
+            var before = pointsBefore.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList();
+            if (frame is not null && IsFrameLocked(frame))
+            {
+                // The live drag already moved the points; a locked chain keeps its original outline.
+                polygon.Points.Clear();
+                polygon.Points.AddRange(before);
+                return;
+            }
+            _undoManager.Execute(new SetPolygonPointsCommand(
+                frame, polygon, before, PolygonVertices.CopyPoints(polygon), this, _events, description));
+        }
+
+        // Applies the edit to a scratch copy so the command owns both snapshots, then runs it.
+        private bool EditPolygonPoints(PolygonSave polygon, string description,
+            Action<PolygonSave> edit, string? coalesceGroup = null)
+        {
+            var frame = _objectFinder.GetAnimationFrameContaining(polygon);
+            if (frame is not null && IsFrameLocked(frame)) return false;
+            var scratch = new PolygonSave { Points = PolygonVertices.CopyPoints(polygon) };
+            edit(scratch);
+            _undoManager.Execute(new SetPolygonPointsCommand(frame, polygon,
+                PolygonVertices.CopyPoints(polygon), scratch.Points, this, _events, description, coalesceGroup));
+            return true;
+        }
+
         /// <inheritdoc cref="IAppCommands.SealPendingEdits"/>
         public void SealPendingEdits() => _undoManager.SealCoalescing();
 
@@ -2226,47 +2262,37 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new AddFramesCommand(clones, chain, this, _events, _selectedState, insertIndex));
         }
 
-        /// <inheritdoc cref="IAppCommands.PasteCircle"/>
-        public void PasteCircle(AnimationFrameSave frame, CircleSave circle) =>
-            PasteShapes(frame, Array.Empty<AARectSave>(), new[] { circle });
-
-        /// <inheritdoc cref="IAppCommands.PasteRectangle"/>
-        public void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle) =>
-            PasteShapes(frame, new[] { rectangle }, Array.Empty<CircleSave>());
-
-        /// <inheritdoc cref="IAppCommands.PasteShapes(AnimationFrameSave, IReadOnlyList{AARectSave}, IReadOnlyList{CircleSave})"/>
-        public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
-            IReadOnlyList<CircleSave> circles)
+        /// <inheritdoc cref="IAppCommands.PasteShapes(AnimationFrameSave, IReadOnlyList{object})"/>
+        public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes)
         {
             if (IsAchxOnlyEditBlocked()) return;
-            var clones = BuildShapeClones(frame, rectangles, circles);
+            var clones = BuildShapeClones(frame, shapes);
             if (clones.Count == 0) return;
             _undoManager.Execute(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
         }
 
-        /// <inheritdoc cref="IAppCommands.PasteShapes(IReadOnlyList{AnimationFrameSave}, IReadOnlyList{AARectSave}, IReadOnlyList{CircleSave})"/>
-        public void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<AARectSave> rectangles,
-            IReadOnlyList<CircleSave> circles)
+        /// <inheritdoc cref="IAppCommands.PasteShapes(IReadOnlyList{AnimationFrameSave}, IReadOnlyList{object})"/>
+        public void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes)
         {
             if (frames.Count == 0) return;
             if (frames.Count == 1)
             {
-                PasteShapes(frames[0], rectangles, circles);
+                PasteShapes(frames[0], shapes);
                 return;
             }
 
             var cmds = new List<IUndoableCommand>();
             foreach (var frame in frames)
             {
-                var clones = BuildShapeClones(frame, rectangles, circles);
+                var clones = BuildShapeClones(frame, shapes);
                 if (clones.Count > 0)
                     cmds.Add(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
             }
             if (cmds.Count == 0) return;
 
-            int shapeCount = rectangles.Count + circles.Count;
+            int shapeCount = shapes.Count;
             string desc = shapeCount == 1
-                ? $"Paste {ShapeUndoLabel.Format((object?)rectangles.FirstOrDefault() ?? circles[0])} into {cmds.Count} Frames"
+                ? $"Paste {ShapeUndoLabel.Format(shapes[0])} into {cmds.Count} Frames"
                 : $"Paste {shapeCount} Shapes into {cmds.Count} Frames";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
@@ -2326,12 +2352,11 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.PasteShapesCut"/>
-        public void PasteShapesCut(AnimationFrameSave targetFrame,
-            IReadOnlyList<AARectSave> rectangles, IReadOnlyList<CircleSave> circles,
+        public void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes,
             IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame)
         {
             if (IsAchxOnlyEditBlocked()) return;
-            var clones = BuildShapeClones(targetFrame, rectangles, circles);
+            var clones = BuildShapeClones(targetFrame, shapes);
             if (clones.Count == 0) return;
 
             // A locked source keeps its originals: the paste still happens, but the "cut"
@@ -2341,20 +2366,8 @@ namespace AnimationEditor.Core.CommandsAndState
             var deleteCmds = new List<IUndoableCommand>();
             if (!sourceLocked)
             {
-                foreach (var shape in sourcesToRemove)
-                {
-                    switch (shape)
-                    {
-                        case AARectSave r:
-                            deleteCmds.Add(new DeleteAxisAlignedRectangleCommand(
-                                r, sourceFrame, this, _events, _selectedState));
-                            break;
-                        case CircleSave c:
-                            deleteCmds.Add(new DeleteCircleCommand(
-                                c, sourceFrame, this, _events, _selectedState));
-                            break;
-                    }
-                }
+                foreach (var shape in sourcesToRemove.OfType<ShapeSave>())
+                    deleteCmds.Add(new DeleteShapeCommand(shape, sourceFrame, this, _events, _selectedState));
                 if (deleteCmds.Count == 0) return;
             }
 
@@ -2369,24 +2382,16 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
-        private List<object> BuildShapeClones(AnimationFrameSave frame,
-            IReadOnlyList<AARectSave> rectangles, IReadOnlyList<CircleSave> circles)
+        private List<object> BuildShapeClones(AnimationFrameSave frame, IReadOnlyList<object> shapes)
         {
             if (IsFrameLocked(frame)) return new List<object>();
 
             frame.ShapesSave ??= new ShapesSave();
             var existingNames = GetShapeNames(frame);
             var clones = new List<object>();
-            foreach (var rect in rectangles)
+            foreach (var shape in shapes)
             {
-                if (AnimationCloneHelper.CloneShape(rect) is not AARectSave copy) continue;
-                copy.Name = StringFunctions.MakeStringUnique(copy.Name, existingNames, 2);
-                existingNames.Add(copy.Name);
-                clones.Add(copy);
-            }
-            foreach (var circle in circles)
-            {
-                if (AnimationCloneHelper.CloneShape(circle) is not CircleSave copy) continue;
+                if (AnimationCloneHelper.CloneShape(shape) is not ShapeSave copy) continue;
                 copy.Name = StringFunctions.MakeStringUnique(copy.Name, existingNames, 2);
                 existingNames.Add(copy.Name);
                 clones.Add(copy);

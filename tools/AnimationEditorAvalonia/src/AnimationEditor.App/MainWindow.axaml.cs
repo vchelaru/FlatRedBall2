@@ -6950,7 +6950,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(text)) return;
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out var chains, out var frames, out var rectangles, out var circles);
+            out var chains, out var frames, out var shapes);
         if (!ok) return;
 
         var acls = _projectManager.AnimationChainListSave;
@@ -7000,7 +7000,7 @@ public partial class MainWindow : Window
             _appCommands.RefreshWireframe();
             SyncTreeSelection();
         }
-        else if (rectangles is { Count: > 0 } || circles is { Count: > 0 })
+        else if (shapes is { Count: > 0 })
         {
             if (completingCut && _pendingCutState.Kind != CopySelectionKind.Shape) return;
             var frame = _selectedState.SelectedFrame;
@@ -7014,24 +7014,20 @@ public partial class MainWindow : Window
 
             if (completingCutAcrossDocuments)
             {
-                _appCommands.PasteShapes(targetFrames, rectangles ?? [], circles ?? []);
+                _appCommands.PasteShapes(targetFrames, shapes);
                 RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
             {
-                var sourceFrame = _pendingCutState.Shapes[0] switch
-                {
-                    AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
-                    CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
-                    _ => null,
-                };
+                var sourceFrame = _pendingCutState.Shapes[0] is ShapeSave source
+                    ? _objectFinder.GetAnimationFrameContaining(source)
+                    : null;
                 if (sourceFrame is null) return;
-                _appCommands.PasteShapesCut(
-                    frame, rectangles ?? [], circles ?? [], _pendingCutState.Shapes, sourceFrame);
+                _appCommands.PasteShapesCut(frame, shapes, _pendingCutState.Shapes, sourceFrame);
             }
             else
             {
-                _appCommands.PasteShapes(targetFrames, rectangles ?? [], circles ?? []);
+                _appCommands.PasteShapes(targetFrames, shapes);
             }
             foreach (var targetFrame in targetFrames)
                 RefreshFrameNode(targetFrame);
@@ -7209,18 +7205,11 @@ public partial class MainWindow : Window
                 _appCommands.DeleteFrames(frames.Count > 0 ? frames : new() { frameToDel });
                 break;
             }
-            case AARectSave rectToDel:
+            case ShapeSave shapeToDel:
             {
-                var rects   = _selectedState.SelectedRectangles;
-                var circles = _selectedState.SelectedCircles;
-                _appCommands.DeleteShapes(rects.Count > 0 ? rects : new() { rectToDel }, circles);
-                break;
-            }
-            case CircleSave circleToDel:
-            {
-                var circles = _selectedState.SelectedCircles;
-                var rects   = _selectedState.SelectedRectangles;
-                _appCommands.DeleteShapes(rects, circles.Count > 0 ? circles : new() { circleToDel });
+                var shapes = _selectedState.SelectedShapes;
+                if (!shapes.Contains(shapeToDel)) shapes.Add(shapeToDel);
+                _appCommands.DeleteShapes(shapes);
                 break;
             }
         }

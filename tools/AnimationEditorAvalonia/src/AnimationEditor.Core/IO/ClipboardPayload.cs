@@ -12,7 +12,8 @@ namespace AnimationEditor.Core.IO;
 ///     "List&lt;AnimationChainSave&gt;", "List&lt;AnimationFrameSave&gt;",
 ///     "ShapesSave", "AARectSave", or "CircleSave".
 ///   • Chains, frames, and multi-shape payloads use the engine's .achx serializer.
-///   • Single shapes are flat POCOs on the simple <see cref="XmlFile"/> path.
+///   • A single rectangle or circle is a flat POCO on the simple <see cref="XmlFile"/> path;
+///     a polygon (its points are a nested list) always goes through the multi-shape path.
 /// </summary>
 public static class ClipboardPayload
 {
@@ -104,13 +105,11 @@ public static class ClipboardPayload
         string? text,
         out List<AnimationChainSave>? chains,
         out List<AnimationFrameSave>? frames,
-        out List<AARectSave>? rectangles,
-        out List<CircleSave>? circles)
+        out List<object>? shapes)
     {
-        chains     = null;
-        frames     = null;
-        rectangles = null;
-        circles    = null;
+        chains = null;
+        frames = null;
+        shapes = null;
 
         if (string.IsNullOrEmpty(text)) return false;
         int sep = text.IndexOf(':');
@@ -134,26 +133,25 @@ public static class ClipboardPayload
             }
             if (typeName == ShapesTypeName)
             {
-                var shapes = AnimationChainListSave.FromString(payload)
+                shapes = AnimationChainListSave.FromString(payload)
                     .AnimationChains.SelectMany(c => c.Frames)
                     .SelectMany(f => f.ShapesSave?.Shapes ?? [])
+                    .Where(s => s is ShapeSave)
                     .ToList();
-                rectangles = shapes.OfType<AARectSave>().ToList();
-                circles    = shapes.OfType<CircleSave>().ToList();
-                return rectangles.Count + circles.Count > 0;
+                return shapes.Count > 0;
             }
             if (typeName == nameof(AARectSave))
             {
                 var rect = XmlFile.DeserializeFromString<AARectSave>(payload);
                 if (rect is null) return false;
-                rectangles = new List<AARectSave> { rect };
+                shapes = new List<object> { rect };
                 return true;
             }
             if (typeName == nameof(CircleSave))
             {
                 var circle = XmlFile.DeserializeFromString<CircleSave>(payload);
                 if (circle is null) return false;
-                circles = new List<CircleSave> { circle };
+                shapes = new List<object> { circle };
                 return true;
             }
         }

@@ -12,6 +12,7 @@ internal static class ShapeUndoLabel
     {
         AARectSave r => string.IsNullOrEmpty(r.Name) ? "Rect" : $"Rect '{r.Name}'",
         CircleSave c => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
+        PolygonSave p => string.IsNullOrEmpty(p.Name) ? "Polygon" : $"Polygon '{p.Name}'",
         _ => "Shape",
     };
 
@@ -20,6 +21,7 @@ internal static class ShapeUndoLabel
     {
         AARectSave r => string.IsNullOrEmpty(r.Name) ? "Rectangle" : $"Rectangle '{r.Name}'",
         CircleSave c => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
+        PolygonSave p => string.IsNullOrEmpty(p.Name) ? "Polygon" : $"Polygon '{p.Name}'",
         _ => "Shape",
     };
 }

@@ -87,7 +87,7 @@ public static class SelectionCopyContext
     /// </summary>
     private static bool TryGetFocusedKind(ISelectedState state, out CopySelectionKind kind)
     {
-        if (state.SelectedRectangle is not null || state.SelectedCircle is not null)
+        if (state.SelectedShape is not null)
         {
             kind = CopySelectionKind.Shape;
             return true;
@@ -107,7 +107,7 @@ public static class SelectionCopyContext
         {
             bool hasChain  = state.SelectedNodes.Any(n => n is AnimationChainSave);
             bool hasFrame  = state.SelectedNodes.Any(n => n is AnimationFrameSave);
-            bool hasShape  = state.SelectedNodes.Any(n => n is AARectSave or CircleSave);
+            bool hasShape  = state.SelectedNodes.Any(n => n is ShapeSave);
             int kinds = (hasChain ? 1 : 0) + (hasFrame ? 1 : 0) + (hasShape ? 1 : 0);
             if (kinds == 1)
             {
@@ -130,7 +130,7 @@ public static class SelectionCopyContext
             {
                 CopySelectionKind.Chain => node is AnimationChainSave,
                 CopySelectionKind.Frame => node is AnimationFrameSave,
-                CopySelectionKind.Shape => node is AARectSave or CircleSave,
+                CopySelectionKind.Shape => node is ShapeSave,
                 _ => false,
             };
             if (!matches) return true;
@@ -156,12 +156,7 @@ public static class SelectionCopyContext
         AnimationFrameSave? parent = null;
         foreach (var shape in shapes)
         {
-            var frame = shape switch
-            {
-                AARectSave r => finder.GetAnimationFrameContaining(r),
-                CircleSave c => finder.GetAnimationFrameContaining(c),
-                _ => null,
-            };
+            var frame = shape is ShapeSave s ? finder.GetAnimationFrameContaining(s) : null;
             if (frame is null)
             {
                 failureMessage = MixedSelectionMessage;
@@ -190,18 +185,7 @@ public static class SelectionCopyContext
     private static List<AnimationFrameSave> CollectFrames(ISelectedState state)
         => state.SelectedFrames;
 
-    private static List<object> CollectShapes(ISelectedState state)
-    {
-        var shapes = new List<object>();
-        shapes.AddRange(state.SelectedRectangles.Cast<object>());
-        shapes.AddRange(state.SelectedCircles.Cast<object>());
-        if (shapes.Count == 0)
-        {
-            if (state.SelectedRectangle is { } rect) shapes.Add(rect);
-            else if (state.SelectedCircle is { } circle) shapes.Add(circle);
-        }
-        return shapes;
-    }
+    private static List<object> CollectShapes(ISelectedState state) => state.SelectedShapes;
 
     private static IReadOnlyList<AnimationChainSave> SortChains(
         IReadOnlyList<AnimationChainSave> chains,
