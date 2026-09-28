@@ -171,6 +171,23 @@ public class FileChangeCoalescerTests
         Assert.Empty(result);
     }
 
+    // #1223: the content check couldn't read the file (antivirus/indexer holding it). That is not
+    // evidence of an external write, so the event waits for a later flush instead of reloading.
+    [Fact]
+    public void OwnSave_ContentCheckUnknown_KeepsEventPendingUntilItCanDecide()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        bool? stillOwn = null;
+        c.IsStillOwnContent = _ => stillOwn;
+        c.RecordOwnSave("a.achx", 0);
+        c.Record("a.achx", WatcherChangeType.Modified, 10);
+
+        Assert.Empty(c.Flush(100));
+
+        stillOwn = false;
+        Assert.Single(c.Flush(200));
+    }
+
     // 6c. Path separator mismatch (forward vs back slash) does not prevent own-save suppression.
     [Fact]
     public void Cooldown_PathSeparatorMismatch_StillDiscarded()

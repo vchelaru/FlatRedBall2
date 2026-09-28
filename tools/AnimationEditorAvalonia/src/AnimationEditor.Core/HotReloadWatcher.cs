@@ -36,8 +36,9 @@ namespace AnimationEditor.Core.HotReload
 
         public bool IsEnabled { get; set; } = true;
 
-        // ownSaveHashes[canonical path] = SHA-256 of the file as this editor last wrote it.
-        private readonly Dictionary<string, byte[]> _ownSaveHashes =
+        // ownSaveHashes[canonical path] = SHA-256 of the file as this editor last wrote it, or null
+        // when it was unreadable right after the write (filled in on the first readable check).
+        private readonly Dictionary<string, byte[]?> _ownSaveHashes =
             new(StringComparer.OrdinalIgnoreCase);
 
         public HotReloadWatcher()
@@ -136,20 +137,20 @@ namespace AnimationEditor.Core.HotReload
             lock (_ownSaveLock)
             {
                 write();
+                // Null when something (antivirus, an indexer) holds the file right after our
+                // write; IsStillOwnContent then takes the first readable content as ours.
                 var hash = TryHash(canonical);
                 lock (_lock)
-                {
-                    if (hash is null) _ownSaveHashes.Remove(canonical);
-                    else _ownSaveHashes[canonical] = hash;
-                }
+                    _ownSaveHashes[canonical] = hash;
                 _coalescer.RecordOwnSave(canonical, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             }
         }
 
         /// <summary>Whether <paramref name="filePath"/> still holds exactly what the last <see
-        /// cref="RecordOwnSave"/> saw. Unknown or unreadable counts as "no" so the event fires and
-        /// a reload (or its failure, which marks the file stale) sorts it out.</summary>
-        internal bool IsStillOwnContent(string filePath)
+        /// cref="RunOwnSave"/> wrote: false for a file never saved here or since deleted, null when
+        /// the file exists but can't be read right now (another process holds it), so the caller
+        /// retries instead of treating a lock as an external write.</summary>
+        internal bool? IsStillOwnContent(string filePath)
         {
             var canonical = Canonicalize(filePath);
             lock (_ownSaveLock)
@@ -158,7 +159,14 @@ namespace AnimationEditor.Core.HotReload
                 lock (_lock)
                     if (!_ownSaveHashes.TryGetValue(canonical, out recorded)) return false;
                 var current = TryHash(canonical);
-                return current is not null && current.AsSpan().SequenceEqual(recorded);
+                if (current is null) return File.Exists(canonical) ? null : false;
+                if (recorded is null)
+                {
+                    lock (_lock)
+                        _ownSaveHashes[canonical] = current;
+                    return true;
+                }
+                return current.AsSpan().SequenceEqual(recorded);
             }
         }
 
