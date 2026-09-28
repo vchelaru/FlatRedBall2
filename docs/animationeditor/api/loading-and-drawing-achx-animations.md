@@ -1,8 +1,8 @@
 # Animations in MonoGame
 
-The Animation Editor saves animations as `.achx` (XML) or `.achj` (JSON) files. The `FlatRedBall.AnimationChain.MonoGame` NuGet package loads and plays these files in any MonoGame project. It has no dependency on the FlatRedBall2 engine or a game project structure — it works in a plain `Game` class.
+The AnimationEditor saves animations as `.achx` (XML) or `.achj` (JSON) files. The `FlatRedBall.AnimationChain.MonoGame` NuGet package loads and plays these files in any MonoGame project. It has no dependency on the FlatRedBall2 engine or a game project structure — it works in a plain `Game` class.
 
-This page assumes you already have a `.achx` or `.achj` file and its spritesheet PNG, exported from Animation Editor. This page also assumes that you have an existing _XNA-like_ (MonoGame or KNI) project.
+This page assumes you already have a `.achx` or `.achj` file and its spritesheet PNG, exported from AnimationEditor. This page also assumes that you have an existing _XNA-like_ (MonoGame or KNI) project.
 
 ## Install the package
 
@@ -63,7 +63,7 @@ protected override void Update(GameTime gameTime)
 }
 ```
 
-`Play` looks up the chain by the name given in Animation Editor. Calling `Play` with the currently-playing chain's name is a no-op, so it's safe to call every frame from gameplay code that hasn't changed animation state.
+`Play` looks up the chain by the name given in AnimationEditor. Calling `Play` with the currently-playing chain's name is a no-op, so it's safe to call every frame from gameplay code that hasn't changed animation state.
 
 ## Draw the animation in code
 
@@ -86,7 +86,7 @@ protected override void Draw(GameTime gameTime)
 }
 ```
 
-`SamplerState.PointClamp` keeps pixel art sharp at a non-1x `scale`. The `position` argument is a screen-pixel anchor point; `DrawAnimation` centers the frame on it by default, matching Animation Editor's preview. It also applies flip flags, authored per-frame color/alpha, and `ColorOperation.Add` (via a pixel shader) automatically.
+`SamplerState.PointClamp` keeps pixel art sharp at a non-1x `scale`. The `position` argument is a screen-pixel anchor point; `DrawAnimation` centers the frame on it by default, matching AnimationEditor's preview. It also applies flip flags, authored per-frame color/alpha, and `ColorOperation.Add` (via a pixel shader) automatically.
 {% endtab %}
 
 {% tab title="Manual SpriteBatch.Draw" %}

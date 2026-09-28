@@ -4,12 +4,12 @@
 
 * [Setup](README.md)
 
-## Animation Editor
+## AnimationEditor
 
-* [Animation Editor](animationeditor/readme.md)
+* [AnimationEditor](animationeditor/readme.md)
 * [Quick Start](animationeditor/quick-start.md)
 
-## Animation Editor How-To Guides
+## AnimationEditor How-To Guides
 
 * [Work with Project Folders](animationeditor/how-to/work-with-project-folders.md)
 * [Build an Animation](animationeditor/how-to/build-an-animation.md)
@@ -21,18 +21,18 @@
 * [Add Collision Shapes](animationeditor/how-to/add-collision-shapes.md)
 * [Preview an Animation](animationeditor/how-to/preview-an-animation.md)
 
-## Animation Editor Reference
+## AnimationEditor Reference
 
 * [The Window](animationeditor/reference/the-window.md)
 * [Frame Properties](animationeditor/reference/frame-properties.md)
 * [Keyboard Shortcuts](animationeditor/reference/keyboard-shortcuts.md)
 * [File Formats](animationeditor/reference/file-formats.md)
 
-## Animation Editor Concepts
+## AnimationEditor Concepts
 
 * [How Animations Work](animationeditor/concepts/how-animations-work.md)
 
-## Animation Editor Code
+## AnimationEditor Code
 
 * [Animations in MonoGame](animationeditor/api/loading-and-drawing-achx-animations.md)
 * [Reading Raw Animation Data](animationeditor/api/reading-raw-animation-data.md)

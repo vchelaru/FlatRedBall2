@@ -1,6 +1,6 @@
-# Animation Editor
+# AnimationEditor
 
-## What the Animation Editor Is
+## What the AnimationEditor Is
 
 ## Supported Files
 
