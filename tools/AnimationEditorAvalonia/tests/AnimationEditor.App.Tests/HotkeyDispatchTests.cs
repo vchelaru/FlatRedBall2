@@ -267,14 +267,26 @@ public class HotkeyDispatchTests
         }
     }
 
+    [AvaloniaFact]
+    public void MenuLoad_InputGesture_IsCtrlO()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            Assert.Equal(new KeyGesture(Key.O, KeyModifiers.Control),
+                window.FindControl<MenuItem>("MenuLoad")!.InputGesture);
+        }
+        finally { window.Close(); }
+    }
+
     /// <summary>
     /// The headless platform's StorageProvider returns no files for a file-open request, so this
-    /// only proves Ctrl+L dispatches to the same load path as clicking MenuLoad without throwing —
+    /// only proves Ctrl+O dispatches to the same open path as clicking MenuLoad without throwing —
     /// it does not exercise picking and loading a real file (no test in this suite does; loading a
     /// specific file is covered via LoadAnimationFileAsync directly, see MainWindowMenuFlowTests).
     /// </summary>
     [AvaloniaFact]
-    public void CtrlL_DoesNotThrow()
+    public void CtrlO_DoesNotThrow()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -282,7 +294,7 @@ public class HotkeyDispatchTests
             var chain = new AnimationChainSave { Name = "Walk" };
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
-            window.KeyPress(Key.L, RawInputModifiers.Control, PhysicalKey.None, null);
+            window.KeyPress(Key.O, RawInputModifiers.Control, PhysicalKey.None, null);
             Dispatcher.UIThread.RunJobs();
 
             Assert.Single(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);

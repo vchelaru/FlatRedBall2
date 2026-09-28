@@ -378,7 +378,7 @@ knows where to look. Add to it whenever a scenario has to route around something
   loads as 0..1 UV and converts back on save; `PixelRectOf` does the arithmetic against the
   wireframe's bitmap size.
 - **File > Load cannot be scripted.** `MainWindow.LoadAsync` calls `StorageProvider` directly
-  rather than `IFileDialogService`, so Ctrl+L opens nothing headlessly. Open files with
+  rather than `IFileDialogService`, so Ctrl+O opens nothing headlessly. Open files with
   `OpenAsync`; Save As, File > New and the close-tab prompt do go through the seams.
 - **The sidebar tabs replace each other.** Clicking the History tab hides the inspector, so
   `TypeNumber` / `TypeFlanker` throw with "not visible" until the Inspector tab is clicked again.

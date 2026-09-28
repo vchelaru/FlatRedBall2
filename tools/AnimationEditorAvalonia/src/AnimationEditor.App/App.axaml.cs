@@ -170,7 +170,7 @@ public partial class App : Application
 
         var fileMenu = new NativeMenu();
         fileMenu.Add(new NativeMenuItem("New Animation") { Command = Cmd(a.New),    Gesture = new KeyGesture(Key.N, KeyModifiers.Meta) });
-        fileMenu.Add(new NativeMenuItem("Open…")    { Command = Cmd(a.Load),   Gesture = new KeyGesture(Key.L, KeyModifiers.Meta) });
+        fileMenu.Add(new NativeMenuItem("Open…")    { Command = Cmd(a.Load),   Gesture = new KeyGesture(Key.O, KeyModifiers.Meta) });
 
         var recentMenu = new NativeMenu();
         foreach (var (header, execute) in a.RecentFiles())

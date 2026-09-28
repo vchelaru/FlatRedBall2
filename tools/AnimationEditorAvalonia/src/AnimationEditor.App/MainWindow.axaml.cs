@@ -6674,7 +6674,7 @@ public partial class MainWindow : Window
             new()
             {
                 Id = "load", Description = "Open…", Category = "File",
-                Gestures = new[] { new HotkeyGesture("L", Command) },
+                Gestures = new[] { new HotkeyGesture("O", Command) },
                 Action = () => _ = LoadAsync(),
             },
             new()
