@@ -26,7 +26,7 @@ Click the **Add Animation** button to add a new animation.
 
 <figure><img src="../.gitbook/assets/quick-start-add-animation-button.png" alt="Add Animation button highlighted below the animation list"><figcaption></figcaption></figure>
 
-Give the animation a name - it now displays as an empty animation.
+Give the animation a name. It now displays as an empty animation.
 
 <figure><img src="../.gitbook/assets/quick-start-new-animation.png" alt="New empty animation named Coin in the animation list"><figcaption></figcaption></figure>
 
@@ -38,13 +38,7 @@ Drag the desired image from the **Images** tab onto the new frame to use the ima
 
 <figure><img src="../.gitbook/assets/quick-start-drop-image-on-frame.gif" alt="Dragging Items.png from the Images tab onto the new frame"><figcaption></figcaption></figure>
 
-## Save
-
-Files must be initially saved by clicking **File ▸ Save**. These files should be saved in your game's project, such as in the same folder as your .png image files.
-
-Once a file is saved, the AnimationEditor automatically saves any changes.
-
-<figure><img src="../.gitbook/assets/quick-start-auto-save.png" alt="Status bar showing Auto Save On after the file is saved"><figcaption></figcaption></figure>
+You can save at any time with **File ▸ Save**. Auto-save starts after the first save, so saving early protects your work.
 
 ## Edit Frames
 
@@ -67,3 +61,17 @@ Frames can be moved by dragging the frame. The mouse wheel or touchpad can be us
 Click the animation's name to play it in the preview panel.
 
 <figure><img src="../.gitbook/assets/quick-start-preview.gif" alt="Selecting the Coin animation to play it in the preview"><figcaption></figcaption></figure>
+
+## Save
+
+Files must be initially saved by clicking **File ▸ Save**. These files should be saved in your game's project, such as in the same folder as your `.png` image files.
+
+Once a file is saved, the AnimationEditor automatically saves any changes.
+
+<figure><img src="../.gitbook/assets/quick-start-auto-save.png" alt="Status bar showing Auto Save On after the file is saved"><figcaption></figcaption></figure>
+
+## Next Steps
+
+* [Build an Animation](how-to/build-an-animation.md) covers more ways to add frames and set their timing.
+* [Define Frame Regions](how-to/define-frame-regions.md) covers grid snapping, the magic wand, and exact pixel coordinates.
+* [Preview an Animation](how-to/preview-an-animation.md) covers playback speed and onion skin.
