@@ -125,8 +125,8 @@ public class RenameAndSearchScenarioTests
             AnimationEditorHarness.Chain("Jump", "sheet.png", (32, 0, 16, 16)));
         await editor.OpenAsync(path);
 
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        TextBox box = editor.Control<TextBox>("SearchBox");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        TextBox box = editor.AnimSearch.SearchBox;
         box.IsEffectivelyVisible.ShouldBeTrue();
         editor.TypeAndEnter(box, "ru");
 
@@ -135,7 +135,7 @@ public class RenameAndSearchScenarioTests
         editor.Nodes.First(node => node.Header == "Run").PinnedVisible.ShouldBeTrue();
         editor.Nodes.First(node => node.Header == "Jump").PinnedVisible.ShouldBeFalse();
 
-        editor.Click(editor.Control<Button>("SearchClearBtn"));
+        editor.Click(editor.AnimSearch.SearchClearBtn);
 
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run", "Jump" });
     }

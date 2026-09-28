@@ -87,17 +87,17 @@ public class KeyboardOnlyScenarioTests
             AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
             AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
         await editor.OpenAsync(path);
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "Ru");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "Ru");
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run" }, Case.Sensitive, "Walk stays visible only because it is selected");
         editor.ClickRow(editor.ChainNamed("Run"));
         editor.VisibleChainHeaders.ShouldBe(new[] { "Run" });
-        editor.Control<TextBox>("SearchBox").Focus();
+        editor.AnimSearch.SearchBox.Focus();
         editor.Layout();
 
         editor.Press(Key.Escape);
 
-        editor.Control<TextBox>("SearchBox").IsEffectivelyVisible.ShouldBeFalse("Escape collapses the box");
+        editor.AnimSearch.SearchBox.IsEffectivelyVisible.ShouldBeFalse("Escape collapses the box");
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run" }, Case.Sensitive, "and clears the filter");
     }
 

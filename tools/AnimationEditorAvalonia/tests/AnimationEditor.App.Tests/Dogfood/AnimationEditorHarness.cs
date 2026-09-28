@@ -95,6 +95,9 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public TreeView AnimTree => Control<TreeView>("AnimTree");
 
+    /// <summary>The ANIMATIONS tree's search box. Its parts are reached through it because it has its own namescope.</summary>
+    public SearchToggleBox AnimSearch => Control<SearchToggleBox>("AnimSearchBox");
+
     public WireframeControl Wireframe => Control<WireframeControl>("WireframeCtrl");
 
     public PreviewControl Preview => Control<PreviewControl>("PreviewCtrl");

@@ -454,45 +454,12 @@
                     <DockPanel Margin="10,0">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
                                     VerticalAlignment="Center">
-                            <!-- Inline search box: hidden until the search icon is clicked.
-                                 The trailing ✕ button is a discoverable way to clear the sticky
-                                 filter (Escape / toggling the icon also clear it). -->
-                            <TextBox x:Name="SearchBox"
-                                     Width="140" Height="24"
-                                     Padding="6,2"
-                                     FontSize="11"
-                                     VerticalAlignment="Center"
-                                     VerticalContentAlignment="Center"
-                                     IsVisible="False"
-                                     PlaceholderText="Filter animations…">
-                                <TextBox.InnerRightContent>
-                                    <Button x:Name="SearchClearBtn"
-                                            Width="20" Height="20"
-                                            Padding="0"
-                                            Margin="0,0,2,0"
-                                            Focusable="False"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Foreground="{DynamicResource InkMid}"
-                                            HorizontalContentAlignment="Center"
-                                            VerticalContentAlignment="Center"
-                                            ToolTip.Tip="Clear filter (empties, then closes)">
-                                        <TextBlock Text="&#x2715;" FontSize="10" />
-                                    </Button>
-                                </TextBox.InnerRightContent>
-                            </TextBox>
-                            <!-- Search icon button: toggles the inline search box. -->
-                            <Button x:Name="SearchToggleBtn"
-                                    Width="24" Height="24"
-                                    Padding="0"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="{DynamicResource InkMid}"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    ToolTip.Tip="Search">
-                                <TextBlock Text="&#x1F50D;" FontSize="11" />
-                            </Button>
+                            <!-- Shared with the Project and Images tabs. Sticky: the filter survives selection
+                                 and model edits, and focus moving into the tree keeps the box open. -->
+                            <viewsControls:SearchToggleBox x:Name="AnimSearchBox"
+                                                           Placeholder="Filter animations…"
+                                                           KeepOpenWhenFocusMovesInto="{Binding #AnimTree}"
+                                                           QueryChanged="OnAnimSearchQueryChanged" />
                             <Button x:Name="ExpandAllBtn"
                                     Content="⊞"
                                     Width="24" Height="24"

@@ -330,8 +330,8 @@ public class QaScenarioTests
         await editor.OpenAsync(path);
         editor.ClickRow(editor.ChainNamed("Walk"));
         bool playingBefore = editor.Preview.IsPlaying;
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        TextBox box = editor.Control<TextBox>("SearchBox");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        TextBox box = editor.AnimSearch.SearchBox;
         box.Focus();
         editor.Layout();
 
