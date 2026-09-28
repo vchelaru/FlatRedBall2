@@ -18,4 +18,4 @@ The AnimationEditor also works with [Tiled's](https://www.mapeditor.org/) .tsx f
 
 ## Where to Go Next
 
-If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the [How-To Guides](how-to/work-with-project-folders.md).
+If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the [How-To Guides](how-to/README.md).
