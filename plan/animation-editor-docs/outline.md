@@ -35,11 +35,12 @@ AnimationEditor                          (SUMMARY.md group)
 │
 ├── How-To Guides                        (parent page: how-to/README.md, lists its guides)
 │   ├── Work with project folders
-│   │   ## Open and close a project folder
-│   │   ## Find files (Images and Animations tabs)
-│   │   ## Open, switch, and close files
-│   │   ## Save as .achx or .achj
-│   │   ## Find which animations use an image
+│   │   ## Introduction
+│   │   ## Open and Close a Project Folder
+│   │   ## Find Files (Images and Animations Tabs)
+│   │   ## Open, Switch, and Close Files
+│   │   ## Add Animation Files to a Project
+│   │   ## Find Which Animations Use an Image
 │   ├── Build an animation
 │   │   ## Add animations and frames
 │   │   ## Add many frames at once
