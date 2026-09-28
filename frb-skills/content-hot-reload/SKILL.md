@@ -1,6 +1,6 @@
 ---
 name: content-hot-reload
-description: Content hot-reload in FlatRedBall2. Use when watching content files (JSON configs, PNGs, TMX maps, etc.) for changes during development and reloading them without killing the game. Covers Screen.WatchContentDirectory, Screen.WatchContent, source/output mapping, debouncing, and the in-place vs screen-restart decision.
+description: Content hot-reload in FlatRedBall2. Use when watching content files (JSON configs, PNGs, TMX maps, etc.) for changes during development and reloading them without killing the game. Covers Screen.WatchContentDirectory, source/output mapping, debouncing, and the in-place vs screen-restart decision.
 ---
 
 # Content Hot-Reload in FlatRedBall2
@@ -50,21 +50,23 @@ WatchContentDirectory("Content", relPath =>
 });
 ```
 
-### Single-file watch
+### One file
+
+There is no single-file watch. Filter the directory callback by its relative path:
 
 ```csharp
-WatchContent("Content/player.platformer.json", () =>
-    PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(player.Platformer));
+WatchContentDirectory("Content", relPath =>
+{
+    if (relPath == "player.platformer.json")
+        PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(player.Platformer);
+});
 ```
-
-Use when you want surgical control or to skip the cost of watching a whole tree.
 
 ### Custom source/output mapping
 
 By default, source path == output path. If your build pipeline maps differently (e.g. `<None Update="Assets/..." TargetPath="Content/..." />`), pass the destination explicitly:
 
 ```csharp
-WatchContent("Assets/Configs/player.json", reload, destinationPath: "Content/player.json");
 WatchContentDirectory("Assets", relPath => ..., destinationDirectory: "Content");
 ```
 
@@ -107,9 +109,9 @@ Use when the change invalidates references the game holds.
 
 1. Walk up from `AppContext.BaseDirectory` looking for a `.sln` or `.slnx`. If found, every referenced project that has a `Content/` subdirectory is added to the list — multi-project layouts (e.g. `Common`+`Desktop`+`Web`) just work.
 2. If no solution is found, fall back to the first `.csproj` directory walking up (single root).
-3. If neither, the list is empty and `WatchContent`* methods no-op.
+3. If neither, the list is empty and `WatchContentDirectory` no-ops.
 
-`WatchContent("Content/foo.json", ...)` and `WatchContentDirectory("Content", ...)` resolve the path against every root and register a watcher per root that contains the path.
+`WatchContentDirectory("Content", ...)` resolves the path against every root and register a watcher per root that contains the path.
 
 Override for unusual layouts:
 ```csharp
@@ -123,9 +125,9 @@ engine.SourceContentRoots.Add("C:/path/to/my/project");
 
 `SourceContentRoots` comes from `FlatRedBallService.DetectSourceContentRoots`, which searches **upward** from `AppContext.BaseDirectory` for a `.sln`/`.slnx`, falling back to the nearest ancestor owning a `*.csproj`. In a shipped build the list is empty only if no ancestor owns one — a stray `*.csproj` in a home directory is enough to make it non-empty and pointing away from the game's `Content`.
 
-Non-empty does not mean "will register": roots are matched per path, and when none contains the requested file or directory, `WatchContent`/`WatchContentDirectory` return `null` and `TryWatch*` reports `SourceContentRootUnavailable`. Hot-reload is a safe no-op either way — **no `#if DEBUG` needed**.
+Non-empty does not mean "will register": roots are matched per path, and when none contains the requested directory, `WatchContentDirectory` returns `null` and `TryWatchContentDirectory` reports `SourceContentRootUnavailable`. Hot-reload is a safe no-op either way — **no `#if DEBUG` needed**.
 
-Landmine for changes here: the file-system watchers throw `ArgumentException` when the watched directory is missing, so never construct one on a path that hasn't been checked to exist.
+Landmine for changes here: `FileSystemDirectoryWatcher` throws `ArgumentException` when the watched directory is missing, so never construct one on a path that hasn't been checked to exist.
 
 ## Debouncing
 
@@ -166,6 +168,6 @@ Changes under `bin`, `obj`, `.vs`, `.git` are dropped before they reach the dirt
 
 ## Gotchas
 
-- **Watch the source folder, not `bin/Debug`.** The engine handles this for you when you use the path-based overloads (`WatchContent("Content/foo.json", ...)`); paths are resolved against `SourceContentRoots`. If you bypass it with the `IFileWatcher` injection overload, you choose the path yourself.
-- **Hot-reload is dev-time iteration.** Don't rely on `WatchContent` calls as gameplay logic — in shipping they no-op.
+- **Watch the source folder, not `bin/Debug`.** The engine handles this for you when you use the path-based overload (`WatchContentDirectory("Content", ...)`); paths are resolved against `SourceContentRoots`. If you bypass it with the `IDirectoryWatcher` injection overload, you choose the path yourself.
+- **Hot-reload is dev-time iteration.** Don't rely on `WatchContentDirectory` calls as gameplay logic — in shipping they no-op.
 - **In-place reload requires the type/shape to be unchanged.** A schema change in your JSON still requires a screen restart — the live object's fields don't know about new property names.

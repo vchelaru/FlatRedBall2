@@ -89,7 +89,6 @@ public class FlatRedBallService
 
     /// <summary>
     /// Absolute paths to the project's source content folders, used by
-    /// <see cref="Screen.WatchContent(string, Action, string?)"/> and
     /// <see cref="Screen.WatchContentDirectory(string, Action{string}, string?)"/> to locate the
     /// files the user actually edits (vs the copies MSBuild dropped into the build output).
     /// <para>
@@ -851,7 +850,7 @@ public class FlatRedBallService
 
     private void TeardownCurrentScreen()
     {
-        CurrentScreen.DisposeContentWatchers();
+        CurrentScreen.DisposeContentDirectoryWatchers();
         CurrentScreen.CustomDestroy();
         CurrentScreen.InvokeDestroyed();
         CurrentScreen._tweens.Clear();
@@ -1466,7 +1465,7 @@ public class FlatRedBallService
         // Drain any pending content reloads BEFORE entity / collision / activity passes so the
         // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
         long tWatch = System.Diagnostics.Stopwatch.GetTimestamp();
-        CurrentScreen.TickContentWatchers(DateTime.UtcNow);
+        CurrentScreen.TickContentDirectoryWatchers(DateTime.UtcNow);
         _frameProfile.ContentWatcherMs = ProfileClock.Ms(tWatch, System.Diagnostics.Stopwatch.GetTimestamp());
 
         Time.Update(gameTime, CurrentScreen.IsPaused);

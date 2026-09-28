@@ -39,19 +39,6 @@ public class WatchContentIntegrationTests : IDisposable
     private class TestScreen : Screen { }
 
     [Fact]
-    public void WatchContent_WithEmptySourceContentRoots_ReturnsNullAndDoesNotRegister()
-    {
-        var engine = new FlatRedBallService();
-        engine.SourceContentRoots.Clear();
-        engine.Start<TestScreen>();
-
-        var watcher = engine.CurrentScreen.WatchContent("Content/foo.json", () => { });
-
-        watcher.ShouldBeNull();
-        engine.CurrentScreen.ContentWatchers.ShouldBeEmpty();
-    }
-
-    [Fact]
     public void WatchContentDirectory_IgnoredExtensionAdded_FilesOfThatTypeSuppressed()
     {
         // IgnoredExtensions is empty by default — game opts in by adding extensions whose
@@ -102,103 +89,43 @@ public class WatchContentIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void WatchContent_WithExplicitDestination_CopiesToCustomDestPath()
+    public void WatchContentDirectory_WithSameSourceAndDestination_DoesNotErrorOnSelfCopy()
     {
         var engine = MakeEngine();
-        var srcFile = Path.Combine(_srcRoot, "Assets", "Configs", "player.json");
-        var destFile = Path.Combine(_destRoot, "Content", "player.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(srcFile)!);
-        Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
-        File.WriteAllText(srcFile, "v1");
-        File.WriteAllText(destFile, "v1"); // simulate prior MSBuild copy
+        var dir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "foo.json"), "v1");
+        var fake = new FakeDirectoryWatcher();
+        int calls = 0;
+        engine.CurrentScreen.WatchContentDirectory(fake, _ => calls++,
+            sourceAbsoluteRoot: dir, destinationAbsoluteRoot: dir).Debounce = TimeSpan.Zero;
 
-        var fake = new FakeFileWatcher();
-        var watcher = engine.CurrentScreen.WatchContent(
-            fake,
-            onChanged: () => { },
-            sourceAbsolutePath: srcFile,
-            destinationAbsolutePath: destFile);
-        watcher.Debounce = TimeSpan.Zero;
-
-        File.WriteAllText(srcFile, "v2");
-        fake.Fire();
+        fake.Fire("foo.json");
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
-        File.ReadAllText(destFile).ShouldBe("v2");
+        File.ReadAllText(Path.Combine(dir, "foo.json")).ShouldBe("v1");
+        calls.ShouldBe(1);
     }
 
     [Fact]
-    public void WatchContent_DestinationFileMissing_SkipsCopyAndCallback()
-    {
-        // Models the "editor temp file" scenario: source file appears (e.g. Photoshop scratch
-        // file) but was never built into the output. Engine should leave it alone — no copy,
-        // no callback.
-        var engine = MakeEngine();
-        var srcFile = Path.Combine(_srcRoot, "Content", "~scratch.tmp");
-        var destFile = Path.Combine(_destRoot, "Content", "~scratch.tmp");
-        Directory.CreateDirectory(Path.GetDirectoryName(srcFile)!);
-        Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
-        File.WriteAllText(srcFile, "scratch");
-
-        var fake = new FakeFileWatcher();
-        bool called = false;
-        var watcher = engine.CurrentScreen.WatchContent(
-            fake,
-            onChanged: () => called = true,
-            sourceAbsolutePath: srcFile,
-            destinationAbsolutePath: destFile);
-        watcher.Debounce = TimeSpan.Zero;
-
-        fake.Fire();
-        engine.Update(new Microsoft.Xna.Framework.GameTime());
-
-        File.Exists(destFile).ShouldBeFalse(); // Engine did not create dest
-        called.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void WatchContent_WithSameSourceAndDestination_DoesNotErrorOnSelfCopy()
+    public void WatchContentDirectory_SourceFileDeleted_SkipsCopyAndCallback()
     {
         var engine = MakeEngine();
-        var file = Path.Combine(_destRoot, "Content", "foo.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        File.WriteAllText(file, "v1");
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(destDir, "gone.json"), "old");
+        var fake = new FakeDirectoryWatcher();
+        int calls = 0;
+        engine.CurrentScreen.WatchContentDirectory(fake, _ => calls++,
+            sourceAbsoluteRoot: srcDir, destinationAbsoluteRoot: destDir).Debounce = TimeSpan.Zero;
 
-        var fake = new FakeFileWatcher();
-        var watcher = engine.CurrentScreen.WatchContent(
-            fake,
-            onChanged: () => { },
-            sourceAbsolutePath: file,
-            destinationAbsolutePath: file);
-        watcher.Debounce = TimeSpan.Zero;
-
-        fake.Fire();
+        fake.Fire("gone.json");
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
-        File.ReadAllText(file).ShouldBe("v1");
-    }
-
-    [Fact]
-    public void WatchContent_SourceFileDoesNotExist_SkipsCopySilently()
-    {
-        var engine = MakeEngine();
-        var srcFile = Path.Combine(_srcRoot, "Content", "missing.json");
-        var destFile = Path.Combine(_destRoot, "Content", "missing.json");
-
-        var fake = new FakeFileWatcher();
-        bool called = false;
-        var watcher = engine.CurrentScreen.WatchContent(
-            fake,
-            onChanged: () => called = true,
-            sourceAbsolutePath: srcFile,
-            destinationAbsolutePath: destFile);
-        watcher.Debounce = TimeSpan.Zero;
-
-        fake.Fire();
-        engine.Update(new Microsoft.Xna.Framework.GameTime());
-
-        File.Exists(destFile).ShouldBeFalse();
-        called.ShouldBeFalse(); // No source → no copy → no callback
+        File.ReadAllText(Path.Combine(destDir, "gone.json")).ShouldBe("old");
+        calls.ShouldBe(0);
     }
 
     [Fact]
@@ -661,21 +588,6 @@ public class WatchContentIntegrationTests : IDisposable
         engine.CurrentScreen.ContentDirectoryWatchers.ShouldBeEmpty();
     }
 
-    // The single-file overload has the same fallback. FileSystemFileWatcher tolerates a missing
-    // file (it simply never fires), so this never crashed - but it registered a dead watcher and
-    // still reported Registered, which is a lie callers can act on.
-    [Fact]
-    public void TryWatchContent_WhenNoRootContainsTheFile_ReportsUnavailableAndRegistersNothing()
-    {
-        var engine = MakeEngine();
-
-        var status = engine.CurrentScreen.TryWatchContent("Content/foo.json", () => { }, out var watcher);
-
-        watcher.ShouldBeNull();
-        status.ShouldBe(ContentWatchRegistrationStatus.SourceContentRootUnavailable);
-        engine.CurrentScreen.ContentWatchers.ShouldBeEmpty();
-    }
-
     // Guards the fix from over-reaching: a root that DOES contain the path must still register.
     [Fact]
     public void TryWatchContentDirectory_WhenARootContainsTheDirectory_StillRegisters()
@@ -688,13 +600,6 @@ public class WatchContentIntegrationTests : IDisposable
         watcher.ShouldNotBeNull();
         status.ShouldBe(ContentWatchRegistrationStatus.Registered);
         engine.CurrentScreen.ContentDirectoryWatchers.ShouldNotBeEmpty();
-    }
-
-    private class FakeFileWatcher : IFileWatcher
-    {
-        public event Action? Changed;
-        public void Fire() => Changed?.Invoke();
-        public void Dispose() { }
     }
 
     private class FakeDirectoryWatcher : IDirectoryWatcher

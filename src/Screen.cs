@@ -667,100 +667,10 @@ public class Screen : ILifecycleEvents
 
     // Content watching
 
-    private readonly ScreenRegistry<ContentWatcher> _contentWatchers = new();
     private readonly ScreenRegistry<ContentDirectoryWatcher> _contentDirectoryWatchers = new();
-
-    /// <summary>All <see cref="ContentWatcher"/>s registered against this screen.</summary>
-    public IReadOnlyList<ContentWatcher> ContentWatchers => _contentWatchers.Items;
 
     /// <summary>All <see cref="ContentDirectoryWatcher"/>s registered against this screen.</summary>
     public IReadOnlyList<ContentDirectoryWatcher> ContentDirectoryWatchers => _contentDirectoryWatchers.Items;
-
-    /// <summary>
-    /// Watches a single content file for changes. Resolves <paramref name="sourcePath"/> against
-    /// <see cref="FlatRedBallService.SourceContentRoots"/> (so the user-edited source file is the
-    /// one being watched, not the build-output copy), copies the changed source to the build
-    /// output before invoking <paramref name="onChanged"/>, and invokes the callback on the game
-    /// thread once writes settle.
-    /// <para>
-    /// If no entry in <see cref="FlatRedBallService.SourceContentRoots"/> contains
-    /// <paramref name="sourcePath"/>, this method returns <c>null</c> and no watcher is registered —
-    /// hot-reload is a dev-only convenience. That covers both an empty root list (typical of a
-    /// shipping build) and a non-empty list that does not contain this file; see
-    /// <see cref="FlatRedBallService.DetectSourceContentRoots"/> for how roots are chosen. If
-    /// multiple roots contain <paramref name="sourcePath"/>, a watcher is registered for each; the
-    /// first one is returned. All registered watchers appear in <see cref="ContentWatchers"/>.
-    /// </para>
-    /// <para>
-    /// <paramref name="destinationPath"/> defaults to <paramref name="sourcePath"/>. Override when
-    /// your build pipeline maps the source to a different runtime path
-    /// (e.g. <c>WatchContent("Assets/player.json", ..., "Content/player.json")</c>).
-    /// </para>
-    /// <para>
-    /// For an explicit registration result, call <see cref="TryWatchContent"/>.
-    /// </para>
-    /// </summary>
-    public ContentWatcher? WatchContent(string sourcePath, Action onChanged, string? destinationPath = null)
-    {
-        TryWatchContent(sourcePath, onChanged, out var watcher, destinationPath);
-        return watcher;
-    }
-
-    /// <summary>
-    /// Attempts to watch a single content file and returns a registration status.
-    /// Unlike <see cref="WatchContent(string, Action, string?)"/>, this method lets callers
-    /// distinguish "watcher intentionally unavailable in shipping builds" from successful
-    /// registration without relying on null checks alone.
-    /// </summary>
-    public ContentWatchRegistrationStatus TryWatchContent(
-        string sourcePath,
-        Action onChanged,
-        out ContentWatcher? watcher,
-        string? destinationPath = null)
-    {
-        watcher = null;
-        if (Engine.SourceContentRoots.Count == 0)
-            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
-
-        var destAbs = Path.Combine(Engine.OutputContentRoot, destinationPath ?? sourcePath);
-        bool registered = false;
-        foreach (var root in Engine.SourceContentRoots)
-        {
-            var srcAbs = Path.Combine(root, sourcePath);
-            if (!File.Exists(srcAbs)) continue;
-            var w = WatchContent(new FileSystemFileWatcher(srcAbs), onChanged,
-                sourceAbsolutePath: srcAbs, destinationAbsolutePath: destAbs);
-            watcher ??= w;
-            registered = true;
-        }
-
-        if (!registered)
-        {
-            // No root contained the file. Do NOT fabricate a watcher for a path that does not
-            // exist: FileSystemFileWatcher tolerates such a path (it simply never fires), but the
-            // registration result would be a lie, and the directory overload below turns the same
-            // mistake into a hard crash. Report unavailable so hot reload stays off.
-            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
-        }
-        return ContentWatchRegistrationStatus.Registered;
-    }
-
-    /// <summary>
-    /// Watches an injected <see cref="IFileWatcher"/> source. Lower-level overload primarily for
-    /// tests and custom file event sources. <paramref name="sourceAbsolutePath"/> /
-    /// <paramref name="destinationAbsolutePath"/> are optional; when both are supplied, the
-    /// engine copies source → destination before invoking the callback.
-    /// </summary>
-    public ContentWatcher WatchContent(IFileWatcher source, Action onChanged,
-        string? sourceAbsolutePath = null, string? destinationAbsolutePath = null)
-    {
-        Func<bool>? copy = null;
-        if (sourceAbsolutePath != null && destinationAbsolutePath != null)
-            copy = () => CopyFileIfNeeded(sourceAbsolutePath, destinationAbsolutePath);
-        var watcher = new ContentWatcher(source, onChanged, copy);
-        _contentWatchers.Register(watcher);
-        return watcher;
-    }
 
     /// <summary>
     /// Watches a directory tree for changes. The callback fires once per changed file (after a
@@ -940,19 +850,15 @@ public class Screen : ILifecycleEvents
         return true;
     }
 
-    internal void TickContentWatchers(DateTime now)
+    internal void TickContentDirectoryWatchers(DateTime now)
     {
         // Foreach over count: callbacks may dispose / register watchers.
-        for (int i = 0; i < _contentWatchers.Count; i++)
-            _contentWatchers[i].Tick(now);
         for (int i = 0; i < _contentDirectoryWatchers.Count; i++)
             _contentDirectoryWatchers[i].Tick(now);
     }
 
-    internal void DisposeContentWatchers()
+    internal void DisposeContentDirectoryWatchers()
     {
-        foreach (var w in _contentWatchers) w.Dispose();
-        _contentWatchers.Clear();
         foreach (var w in _contentDirectoryWatchers) w.Dispose();
         _contentDirectoryWatchers.Clear();
     }

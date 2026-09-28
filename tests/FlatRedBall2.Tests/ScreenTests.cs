@@ -649,50 +649,49 @@ public class ScreenTests
         ((HotReloadTrackingScreen)engine.CurrentScreen).Score.ShouldBe(99);
     }
 
-    // ---------- ContentWatcher integration with Screen ----------
+    // ---------- ContentDirectoryWatcher integration with Screen ----------
 
-    private class FakeFileWatcher : IFileWatcher
+    private class FakeDirectoryWatcher : IDirectoryWatcher
     {
-        public event Action? Changed;
+        public event Action<string>? Changed;
         public bool Disposed { get; private set; }
-        public void Fire() => Changed?.Invoke();
+        public void Fire(string relativePath) => Changed?.Invoke(relativePath);
         public void Dispose() => Disposed = true;
     }
 
     [Fact]
-    public void Screen_WatchContent_RegistersWatcherOnScreen()
+    public void Screen_WatchContentDirectory_RegistersWatcherOnScreen()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>();
 
-        var fake = new FakeFileWatcher();
-        var watcher = engine.CurrentScreen.WatchContent(fake, () => { });
+        var watcher = engine.CurrentScreen.WatchContentDirectory(new FakeDirectoryWatcher(), _ => { });
 
-        engine.CurrentScreen.ContentWatchers.ShouldContain(watcher);
+        engine.CurrentScreen.ContentDirectoryWatchers.ShouldContain(watcher);
     }
 
     [Fact]
-    public void Screen_WatchContent_TickedEachFrameByEngineUpdate()
+    public void Screen_WatchContentDirectory_TickedEachFrameByEngineUpdate()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>();
-        var fake = new FakeFileWatcher();
+        var fake = new FakeDirectoryWatcher();
         int calls = 0;
-        engine.CurrentScreen.WatchContent(fake, () => calls++).Debounce = TimeSpan.Zero;
+        engine.CurrentScreen.WatchContentDirectory(fake, _ => calls++).Debounce = TimeSpan.Zero;
 
-        fake.Fire();
+        fake.Fire("a.json");
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
         calls.ShouldBe(1);
     }
 
     [Fact]
-    public void Screen_WatchContent_DisposedOnScreenChange()
+    public void Screen_WatchContentDirectory_DisposedOnScreenChange()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>();
-        var fake = new FakeFileWatcher();
-        engine.CurrentScreen.WatchContent(fake, () => { });
+        var fake = new FakeDirectoryWatcher();
+        engine.CurrentScreen.WatchContentDirectory(fake, _ => { });
 
         engine.CurrentScreen.MoveToScreen<ConfigurableTestScreen>();
         engine.Update(new Microsoft.Xna.Framework.GameTime());
@@ -701,12 +700,12 @@ public class ScreenTests
     }
 
     [Fact]
-    public void Screen_WatchContent_DisposedOnRestartScreen()
+    public void Screen_WatchContentDirectory_DisposedOnRestartScreen()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>();
-        var fake = new FakeFileWatcher();
-        engine.CurrentScreen.WatchContent(fake, () => { });
+        var fake = new FakeDirectoryWatcher();
+        engine.CurrentScreen.WatchContentDirectory(fake, _ => { });
 
         engine.CurrentScreen.RestartScreen();
         engine.Update(new Microsoft.Xna.Framework.GameTime());
