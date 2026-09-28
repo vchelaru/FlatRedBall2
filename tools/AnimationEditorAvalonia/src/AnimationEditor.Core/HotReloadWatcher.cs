@@ -17,6 +17,11 @@ namespace AnimationEditor.Core.HotReload
         private readonly Timer _flushTimer;
         private readonly object _lock = new();
 
+        // Held across an own save's write + record, and across the flush's content check, so the
+        // timer thread never hashes a half-written file (or a written-but-unrecorded one) and
+        // mistakes the editor's own save for an external change (#1223).
+        private readonly object _ownSaveLock = new();
+
         // Directory path → watcher
         private readonly Dictionary<string, FileSystemWatcher> _watchers =
             new(StringComparer.OrdinalIgnoreCase);
@@ -125,19 +130,20 @@ namespace AnimationEditor.Core.HotReload
             }
         }
 
-        /// <summary>Call right AFTER writing <paramref name="filePath"/>: records both the time
-        /// and the content hash, so the write's own change event is recognised by what the file
-        /// holds, not only by when it fired.</summary>
-        public void RecordOwnSave(string filePath)
+        public void RunOwnSave(string filePath, Action write)
         {
             var canonical = Canonicalize(filePath);
-            var hash = TryHash(canonical);
-            lock (_lock)
+            lock (_ownSaveLock)
             {
-                if (hash is null) _ownSaveHashes.Remove(canonical);
-                else _ownSaveHashes[canonical] = hash;
+                write();
+                var hash = TryHash(canonical);
+                lock (_lock)
+                {
+                    if (hash is null) _ownSaveHashes.Remove(canonical);
+                    else _ownSaveHashes[canonical] = hash;
+                }
+                _coalescer.RecordOwnSave(canonical, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             }
-            _coalescer.RecordOwnSave(canonical, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
         /// <summary>Whether <paramref name="filePath"/> still holds exactly what the last <see
@@ -146,11 +152,14 @@ namespace AnimationEditor.Core.HotReload
         internal bool IsStillOwnContent(string filePath)
         {
             var canonical = Canonicalize(filePath);
-            byte[]? recorded;
-            lock (_lock)
-                if (!_ownSaveHashes.TryGetValue(canonical, out recorded)) return false;
-            var current = TryHash(canonical);
-            return current is not null && current.AsSpan().SequenceEqual(recorded);
+            lock (_ownSaveLock)
+            {
+                byte[]? recorded;
+                lock (_lock)
+                    if (!_ownSaveHashes.TryGetValue(canonical, out recorded)) return false;
+                var current = TryHash(canonical);
+                return current is not null && current.AsSpan().SequenceEqual(recorded);
+            }
         }
 
         private static byte[]? TryHash(string path)
@@ -230,7 +239,11 @@ namespace AnimationEditor.Core.HotReload
             }
 
             long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var events = _coalescer.Flush(nowMs);
+            // _ownSaveLock before the coalescer's own lock, matching RunOwnSave's order: Flush
+            // calls IsStillOwnContent, which takes _ownSaveLock, from inside the coalescer lock.
+            IReadOnlyList<(string Path, WatcherChangeType Type)> events;
+            lock (_ownSaveLock)
+                events = _coalescer.Flush(nowMs);
 
             foreach (var (path, type) in events)
             {

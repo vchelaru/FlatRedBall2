@@ -156,6 +156,21 @@ public class FileChangeCoalescerTests
         Assert.Empty(result);
     }
 
+    // #1223: a late FSW delivery (loaded machine) lands past the cooldown. The file still holds
+    // exactly what we wrote, so reloading it would only discard undo history.
+    [Fact]
+    public void OwnSave_EventPastCooldownButContentUnchanged_DoesNotFire()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        c.IsStillOwnContent = _ => true;
+        c.RecordOwnSave("a.achx", 0);
+        c.Record("a.achx", WatcherChangeType.Modified, 600);
+
+        var result = c.Flush(700);
+
+        Assert.Empty(result);
+    }
+
     // 6c. Path separator mismatch (forward vs back slash) does not prevent own-save suppression.
     [Fact]
     public void Cooldown_PathSeparatorMismatch_StillDiscarded()

@@ -525,16 +525,16 @@ namespace AnimationEditor.Core.CommandsAndState
 
                 try
                 {
-                    if (_pm.IsNativeTsxProject)
+                    IReadOnlyList<string>? tsxWarnings = null;
+                    HotReloadWatcher.RunOwnSave(target, () =>
                     {
-                        var warnings = _pm.SaveTsxProject(target);
-                        if (warnings.Count > 0)
-                            TsxSaveCompletedWithWarnings?.Invoke(warnings);
-                    }
-                    else
-                        _pm.SaveAnimationChainList(target);
-                    // After the write, so the watcher can hash what actually landed on disk.
-                    HotReloadWatcher.RecordOwnSave(target);
+                        if (_pm.IsNativeTsxProject)
+                            tsxWarnings = _pm.SaveTsxProject(target);
+                        else
+                            _pm.SaveAnimationChainList(target);
+                    });
+                    if (tsxWarnings is { Count: > 0 })
+                        TsxSaveCompletedWithWarnings?.Invoke(tsxWarnings);
                     _undoManager.MarkSaved();
                     EditorProjectModelChanged?.Invoke(target);
                 }
@@ -562,8 +562,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             try
             {
-                _pm.SaveAnimationChainList(document, targetPath, diskFormat);
-                HotReloadWatcher.RecordOwnSave(targetPath);
+                HotReloadWatcher.RunOwnSave(targetPath, () => _pm.SaveAnimationChainList(document, targetPath, diskFormat));
             }
             catch (Exception ex)
             {

@@ -29,12 +29,13 @@ namespace AnimationEditor.Core.HotReload
             new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Optional content check for an event inside the own-save cooldown: return true when the
-        /// file on disk still holds what this editor wrote (the event is our own echo, drop it),
-        /// false when something else has written it since (fire it). The cooldown alone is a
-        /// timing heuristic; an external write landing inside it -- Tiled saving the same tsx a
-        /// beat after this editor did -- would otherwise be swallowed, leaving the in-memory model
-        /// stale with no reload to mark it. Null keeps the pure timing rule.
+        /// Optional content check for an event on a path this editor has saved: return true when
+        /// the file on disk still holds what this editor wrote (the event is our own echo, drop
+        /// it), false when something else has written it since (fire it). When set, it replaces
+        /// the <see cref="CooldownMs"/> timing heuristic, which both swallows an external write
+        /// landing inside the window (Tiled saving the same tsx a beat after this editor) and
+        /// fires on our own write's echo when a loaded machine delivers it late. Null keeps the
+        /// pure timing rule.
         /// </summary>
         public Func<string, bool>? IsStillOwnContent { get; set; }
 
@@ -108,13 +109,12 @@ namespace AnimationEditor.Core.HotReload
                 {
                     if (nowMs - kv.Value.Ts < DebounceMs) continue; // still in debounce window
 
-                    // Discard events that were triggered by our own save.
-                    // Compare the event's timestamp against the save timestamp: if the
-                    // FSW fired within CooldownMs of our save it was caused by that save.
-                    // Remove from pending so it never fires — even after the cooldown elapses.
+                    // Discard events that were triggered by our own save, and remove them from
+                    // pending so they never fire. With a content check, the file still holding
+                    // what we wrote decides it however late the FSW event arrived; without one,
+                    // an event within CooldownMs of our save is assumed to be caused by it.
                     if (_ownSaves.TryGetValue(kv.Key, out long saveTs) &&
-                        kv.Value.Ts - saveTs < CooldownMs &&
-                        (IsStillOwnContent?.Invoke(kv.Key) ?? true))
+                        (IsStillOwnContent?.Invoke(kv.Key) ?? kv.Value.Ts - saveTs < CooldownMs))
                     {
                         ready.Add(kv.Key);
                         continue;

@@ -214,6 +214,7 @@ public class UnusualProjectScenarioTests
         {
             editor.TypeNumber("PropPixelX", x.ToString());
         }
+        editor.HotReloads.ShouldBeEmpty("the editor's own auto-saves must not read back as external changes");
         editor.PixelRectOf(walk.Frames[0]).X.ShouldBe(100);
         editor.UndoLabels.Count.ShouldBe(100, "every edit is its own undo step");
 

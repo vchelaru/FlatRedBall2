@@ -252,7 +252,7 @@ public class AppCommandsHotReloadTests : IDisposable
 
         public void UpdatePngList(IEnumerable<string> newPngPaths) { }
         public void StopWatching() { }
-        public void RecordOwnSave(string filePath) { }
+        public void RunOwnSave(string filePath, Action write) => write();
         public void Dispose() { }
     }
 }

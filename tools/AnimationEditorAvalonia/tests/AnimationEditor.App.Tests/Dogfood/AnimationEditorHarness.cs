@@ -64,9 +64,17 @@ internal sealed class AnimationEditorHarness : IDisposable
         Services.AppCommands.PromptStringAsync = Dialogs.PromptStringAsync;
         Services.AppCommands.FileDialogService = Dialogs;
         Window.ShowSaveDiscardCancelDialogAsync = Dialogs.SaveDiscardCancelAsync;
+        Services.ApplicationEvents.AchxReloadedFromDisk += path => HotReloads.Add(path);
     }
 
     public TestServices Services { get; }
+
+    /// <summary>
+    /// Every file the hot-reload watcher reloaded from disk, in order. A reload swaps in a freshly
+    /// parsed project and clears undo, so a model reference captured before it goes stale; assert
+    /// this is empty when a scenario only ever edits through the editor.
+    /// </summary>
+    public List<string> HotReloads { get; } = new List<string>();
 
     public MainWindow Window { get; }
 

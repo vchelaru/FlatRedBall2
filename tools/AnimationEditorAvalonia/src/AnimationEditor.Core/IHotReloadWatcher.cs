@@ -31,9 +31,10 @@ namespace AnimationEditor.Core.HotReload
         /// <summary>Stop all watching.</summary>
         void StopWatching();
 
-        /// <summary>Call right after our own write of <paramref name="filePath"/> has landed, so the
-        /// resulting FSW event is recognised as ours by the file's content (not only by timing) and
-        /// suppressed; an external write inside the cooldown still fires.</summary>
-        void RecordOwnSave(string filePath);
+        /// <summary>Runs <paramref name="write"/> (our own write of <paramref name="filePath"/>) and
+        /// records what landed, so the resulting FSW event is recognised as ours by the file's
+        /// content and suppressed, while an external write still fires. The watcher never samples
+        /// the file mid-write: its content check waits for the save to finish.</summary>
+        void RunOwnSave(string filePath, Action write);
     }
 }
