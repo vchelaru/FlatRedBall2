@@ -10,7 +10,7 @@ The AnimationEditor is a cross-platform app for creating and managing animation 
 
 The AnimationEditor natively works with the .achj file format (*AnimationChain JSON*). Alternatively, the AnimationEditor can also work with .achx files (*AnimationChain XML*).
 
-These files can be loaded at runtime using NuGet packages for custom rendering. Some runtimes, such as MonoGame, also have dedicated NuGet packages which simplify rendering of animations.
+These files can be loaded at runtime using [NuGet packages](api/reading-raw-animation-data.md) for custom rendering. Some runtimes, such as [MonoGame](api/loading-and-drawing-achx-animations.md), also have dedicated NuGet packages which simplify rendering of animations.
 
 The AnimationEditor also works with [Tiled's](https://www.mapeditor.org/) .tsx file format, simplifying the process of creating animated tiles.
 
