@@ -4,7 +4,7 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests;
 
-public class AchxSearchFilterTests
+public class RelativePathSearchFilterTests
 {
     private static AchxFileEntry Entry(string relativePath) =>
         new(new FakeEditorFile(relativePath), new FakeEditorFolder("root"), relativePath);
@@ -14,7 +14,7 @@ public class AchxSearchFilterTests
     {
         var entries = new[] { Entry("hero.achx"), Entry("Sprites/enemy.achx") };
 
-        var result = AchxSearchFilter.Filter(entries, query: "");
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: "");
 
         Assert.Equal(2, result.Count);
     }
@@ -24,7 +24,7 @@ public class AchxSearchFilterTests
     {
         var entries = new[] { Entry("hero.achx") };
 
-        var result = AchxSearchFilter.Filter(entries, query: null);
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: null);
 
         Assert.Single(result);
     }
@@ -34,7 +34,7 @@ public class AchxSearchFilterTests
     {
         var entries = new[] { Entry("Sprites/Hero.achx"), Entry("Sprites/Enemy.achx") };
 
-        var result = AchxSearchFilter.Filter(entries, query: "hero");
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: "hero");
 
         Assert.Equal(["Sprites/Hero.achx"], result.Select(e => e.RelativePath));
     }
@@ -44,7 +44,7 @@ public class AchxSearchFilterTests
     {
         var entries = new[] { Entry("Sprites/hero.achx"), Entry("Enemies/boss.achx") };
 
-        var result = AchxSearchFilter.Filter(entries, query: "sprites");
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: "sprites");
 
         Assert.Equal(["Sprites/hero.achx"], result.Select(e => e.RelativePath));
     }
@@ -54,8 +54,22 @@ public class AchxSearchFilterTests
     {
         var entries = new[] { Entry("hero.achx") };
 
-        var result = AchxSearchFilter.Filter(entries, query: "nonexistent");
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: "nonexistent");
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Filter_PngEntries_MatchesRelativePath()
+    {
+        var entries = new[]
+        {
+            new PngFileEntry(@"C:\proj\Sprites\hero.png", "Sprites/hero.png"),
+            new PngFileEntry(@"C:\proj\Tiles\grass.png", "Tiles/grass.png"),
+        };
+
+        var result = RelativePathSearchFilter.Filter(entries, e => e.RelativePath, query: "HERO");
+
+        Assert.Equal(["Sprites/hero.png"], result.Select(e => e.RelativePath));
     }
 }

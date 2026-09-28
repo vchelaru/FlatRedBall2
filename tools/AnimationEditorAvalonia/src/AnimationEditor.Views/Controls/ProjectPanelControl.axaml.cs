@@ -182,7 +182,7 @@ public partial class ProjectPanelControl : UserControl
         var files = excludeBinObj
             ? _allEntries.Where(f => !BinObjPathFilter.IsExcluded(f.RelativePath)).ToList()
             : _allEntries.ToList();
-        files = AchxSearchFilter.Filter(files, _searchQuery).ToList();
+        files = RelativePathSearchFilter.Filter(files, f => f.RelativePath, _searchQuery).ToList();
 
         // ProjectTree stays visible even with zero rows (issue #916): hiding it also hid its
         // right-click "New Animation" context menu, which is exactly what an empty project needs.

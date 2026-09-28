@@ -63,6 +63,40 @@ public class FilesPanelControlTests
         }
     }
 
+    [AvaloniaFact]
+    public void TypingInSearch_FiltersTree_AndSurvivesRefresh()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        WritePng(dir, "hero.png", SKColors.Red);
+        WritePng(dir, "grass.png", SKColors.Green);
+
+        var control = new FilesPanelControl();
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        control.Initialize(new ThumbnailService(new ProjectManager()), window);
+        window.Show();
+
+        try
+        {
+            control.Refresh(dir, Array.Empty<string>(), null);
+            control.FilesSearchBox.SearchBox.Text = "her";
+            Assert.Equal(["hero.png"], control.TreeRoots.Select(n => n.Name));
+
+            // The host re-invokes Refresh on every model change; the filter is sticky like the
+            // ANIMATIONS tree's, so a refresh must not drop it.
+            control.Refresh(dir, Array.Empty<string>(), null);
+            Assert.Equal(["hero.png"], control.TreeRoots.Select(n => n.Name));
+
+            control.FilesSearchBox.SearchBox.Text = "";
+            Assert.Equal(2, control.TreeRoots.Count);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
     private static void RightClick(Window window, FilesPanelControl control, PngFilesTreeNodeVm node)
     {
         var tvi = control.FilesTree.GetVisualDescendants().OfType<TreeViewItem>()

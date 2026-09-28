@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Views.Controls;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -220,6 +221,32 @@ public class DialogScenarioTests
         List<string> names = Flatten(panel.TreeRoots).Where(node => node.IsFile).Select(node => node.Name).ToList();
         names.ShouldContain("sheet.png");
         names.ShouldContain("extra.png");
+    }
+
+    [AvaloniaFact]
+    public async Task FilesTab_Search_FiltersImages_AndSurvivesClickingAResult()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        editor.WritePng("extra.png", 8, 8);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        editor.Click(editor.Control<Control>("FilesTab"));
+        FilesPanelControl panel = editor.Control<FilesPanelControl>("FilesPanel");
+
+        editor.Click(panel.FilesSearchBox); // collapsed, the 🔍 toggle is all there is to hit
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        editor.TypeAndEnter(panel.FilesSearchBox.SearchBox, "she");
+        Flatten(panel.TreeRoots).Where(n => n.IsFile).Select(n => n.Name).ShouldBe(["sheet.png"]);
+
+        // Pressing a result starts drag-to-assign; the filter must not collapse out from under it.
+        TreeViewItem row = panel.FilesTree.GetVisualDescendants().OfType<TreeViewItem>()
+            .First(t => t.DataContext is PngFilesTreeNodeVm { Name: "sheet.png" });
+        editor.ClickAt(row.TranslatePoint(new Point(row.Bounds.Width / 2, 8), editor.Window)!.Value);
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+
+        panel.FilesSearchBox.SearchBox.IsVisible.ShouldBeTrue("clicking a result keeps the search open");
+        Flatten(panel.TreeRoots).Where(n => n.IsFile).Select(n => n.Name).ShouldBe(["sheet.png"]);
     }
 
     private static IEnumerable<PngFilesTreeNodeVm> Flatten(IEnumerable<PngFilesTreeNodeVm> nodes)
