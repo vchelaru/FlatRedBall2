@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 205 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
+About 212 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
 
 ## The pieces
 

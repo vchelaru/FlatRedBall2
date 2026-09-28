@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -149,6 +150,17 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private HandleKind _shapeResizeHandle  = HandleKind.None;
     private float      _shapeDragStartScaleX;  // rect ScaleX or circle Radius at drag start
     private float      _shapeDragStartScaleY;  // rect ScaleY at drag start (0 for circle)
+
+    // -- Polygon vertex drag ----------------------------------------------------
+    // The selected polygon's vertices and edge midpoints are handles: dragging a vertex moves it,
+    // pressing an edge midpoint inserts a vertex there and drags it, double-clicking a vertex
+    // deletes it. The points change live during the drag; release records one undo entry.
+    private PolygonSave?       _draggingVertexPolygon;
+    private int                _draggingVertexIndex = -1;
+    private List<Vector2Save>? _vertexDragPointsBefore;
+    private string             _vertexDragDescription = "";
+    private float              _vertexDragStartX, _vertexDragStartY;
+    private const float        VertexHandleRadius = 5f;
 
     // -- Frame (sprite position) drag -------------------------------------------
     // Repositions AnimationFrameSave.RelativeX/Y by dragging the rendered sprite. Only
@@ -1230,6 +1242,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 Include(r.X * om, -r.Y * om, r.ScaleX * om, r.ScaleY * om);
             foreach (var c in frame.ShapesSave.CircleSaves)
                 Include(c.X * om, -c.Y * om, c.Radius * om, c.Radius * om);
+            foreach (var p in frame.ShapesSave.PolygonSaves)
+                foreach (var point in p.Points)
+                    Include((p.X + point.X) * om, -(p.Y + point.Y) * om, 0f, 0f);
         }
 
         var chain = _selectedState!.SelectedChain;
@@ -1422,8 +1437,17 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 ? GetResizeCursor(_shapeResizeHandle)
                 : StandardCursorType.SizeAll;
 
-        if (_draggingFrame is not null || _draggingChainFrames is not null)
+        if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null)
             return StandardCursorType.SizeAll;
+
+        if (_selectedState!.SelectedPolygon is { } hoverPolygon && !IsShapeLocked(hoverPolygon))
+        {
+            var vertices = PolygonScreenVertices(hoverPolygon);
+            if (PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, vertices, VertexHandleRadius) >= 0
+                || PreviewShapeHitTester.HitEdgeMidpoint((float)pos.X, (float)pos.Y, vertices,
+                    PolygonVertices.IsClosed(hoverPolygon), VertexHandleRadius) >= 0)
+                return StandardCursorType.Hand;
+        }
 
         // A locked chain is inert to every drag gesture below (OnPointerPressed's ~2081-2161
         // guards via IsShapeLocked/IsFrameLocked) -- the hover cursor must not imply otherwise
@@ -1486,8 +1510,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         var frame = pinnedFrame ?? GetCurrentPlaybackFrame();
         if (frame?.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
 
-        var selectedRects   = new HashSet<AARectSave>();
-        var selectedCircles = new HashSet<CircleSave>();
+        var selectedRects    = new HashSet<AARectSave>();
+        var selectedCircles  = new HashSet<CircleSave>();
+        var selectedPolygons = new HashSet<PolygonSave>();
 
         if (pinnedFrame is not null)
         {
@@ -1495,6 +1520,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             if (_selectedState!.SelectedRectangle is { } sr) selectedRects.Add(sr);
             selectedCircles = _selectedState!.SelectedCircles.ToHashSet();
             if (_selectedState!.SelectedCircle is { } sc) selectedCircles.Add(sc);
+            selectedPolygons = _selectedState!.SelectedPolygons.ToHashSet();
         }
 
         bool frameLocked = IsFrameLocked(frame);
@@ -1506,6 +1532,16 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
                 selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked));
+        foreach (var p in frame.ShapesSave!.PolygonSaves)
+        {
+            int n = PolygonVertices.Count(p);
+            var points = new float[n * 2];
+            for (int i = 0; i < n; i++)
+                (points[i * 2], points[i * 2 + 1]) = PolygonVertices.Get(p, i);
+            list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, p.X, p.Y, 0f, 0f,
+                selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
+                points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p)));
+        }
         return list.ToArray();
     }
 
@@ -1627,6 +1663,21 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, selR.ScaleX * om, selR.ScaleY * om, tolerance))
                 return selR;
         }
+        else if (sel is PolygonSave selP)
+        {
+            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(selP), tolerance))
+                return selP;
+        }
+
+        // Polygons are rendered last (on top), so they are checked first.
+        var polygons = frame.ShapesSave!.PolygonSaves.ToList();
+        for (int i = polygons.Count - 1; i >= 0; i--)
+        {
+            var p = polygons[i];
+            if (ReferenceEquals(p, sel)) continue;
+            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(p), tolerance))
+                return p;
+        }
 
         var circles = frame.ShapesSave!.CircleSaves.ToList();
         for (int i = circles.Count - 1; i >= 0; i--)
@@ -1662,9 +1713,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         if (_draggingShape is null) return;
 
-        float newX, newY;
-        if (_draggingShape is AARectSave r)      { newX = r.X; newY = r.Y; }
-        else { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; }
+        var dragged = (ShapeSave)_draggingShape;
+        float newX = dragged.X, newY = dragged.Y;
 
         const float eps = 1e-4f;
         if (MathF.Abs(newX - _shapeDragStartX) > eps || MathF.Abs(newY - _shapeDragStartY) > eps)
@@ -1682,10 +1732,82 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
 
         // Re-assign to fire SelectionChanged so the property panel refreshes.
-        if (_draggingShape is AARectSave rs) _selectedState!.SelectedRectangle = rs;
-        else if (_draggingShape is CircleSave cs)          _selectedState!.SelectedCircle    = cs;
+        _selectedState!.SelectShape(_draggingShape);
 
         _draggingShape = null;
+    }
+
+    /// <summary>Screen-space positions of <paramref name="polygon"/>'s vertices (closing point excluded).</summary>
+    private (float X, float Y)[] PolygonScreenVertices(PolygonSave polygon)
+    {
+        float cx = GetCenterX();
+        float cy = GetCenterY();
+        float om = _appState!.OffsetMultiplier * _zoom;
+        int n = PolygonVertices.Count(polygon);
+        var result = new (float X, float Y)[n];
+        for (int i = 0; i < n; i++)
+        {
+            var (vx, vy) = PolygonVertices.Get(polygon, i);
+            result[i] = (cx + (polygon.X + vx) * om, cy - (polygon.Y + vy) * om);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Starts a vertex gesture on the selected, unlocked polygon when the press lands on one of
+    /// its handles: a vertex (drag it; a double-click deletes it) or an edge midpoint (insert a
+    /// vertex there and drag it). Returns <c>true</c> when the press was consumed.
+    /// </summary>
+    private bool TryBeginPolygonVertexGesture(float px, float py, int clickCount)
+    {
+        if (_selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+        if (px < RulerSize || py < RulerSize) return false;
+
+        var vertices = PolygonScreenVertices(polygon);
+        int vertex = PreviewShapeHitTester.HitVertex(px, py, vertices, VertexHandleRadius);
+        if (vertex >= 0 && clickCount >= 2)
+        {
+            _appCommands!.DeletePolygonVertex(polygon, vertex);
+            InvalidateVisual();
+            return true;
+        }
+
+        var before = PolygonVertices.CopyPoints(polygon);
+        string description;
+        if (vertex >= 0)
+        {
+            description = $"Move Vertex {vertex + 1} of {ShapeUndoLabel.Format(polygon)}";
+        }
+        else
+        {
+            int edge = PreviewShapeHitTester.HitEdgeMidpoint(px, py, vertices,
+                PolygonVertices.IsClosed(polygon), VertexHandleRadius);
+            if (edge < 0) return false;
+            var (ax, ay) = PolygonVertices.Get(polygon, edge);
+            var (bx, by) = PolygonVertices.Get(polygon, (edge + 1) % vertices.Length);
+            vertex = edge + 1;
+            PolygonVertices.Insert(polygon, vertex, SnapToPixel((ax + bx) / 2f), SnapToPixel((ay + by) / 2f));
+            description = $"Add Vertex to {ShapeUndoLabel.Format(polygon)}";
+        }
+
+        _draggingVertexPolygon  = polygon;
+        _draggingVertexIndex    = vertex;
+        _vertexDragPointsBefore = before;
+        _vertexDragDescription  = description;
+        (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
+        InvalidateVisual();
+        return true;
+    }
+
+    private void CommitPolygonVertexDrag()
+    {
+        if (_draggingVertexPolygon is null) return;
+        _appCommands!.CommitPolygonPoints(_draggingVertexPolygon, _vertexDragPointsBefore!, _vertexDragDescription);
+        _selectedState!.SelectShape(_draggingVertexPolygon);
+        _draggingVertexPolygon  = null;
+        _draggingVertexIndex    = -1;
+        _vertexDragPointsBefore = null;
+        InvalidateVisual();
     }
 
     /// <summary>
@@ -1926,7 +2048,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         float om = _appState!.OffsetMultiplier * _zoom;
         const float tolerance = 5f;
 
-        // Circles are rendered after rects (on top), so check circles first.
+        // Polygons render last, then circles, then rects, so check in that order.
+        var polygons = frame.ShapesSave!.PolygonSaves.ToList();
+        for (int i = polygons.Count - 1; i >= 0; i--)
+        {
+            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(polygons[i]), tolerance))
+            {
+                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
+                _selectedState!.SelectedPolygon = polygons[i];
+                return true;
+            }
+        }
+
         var circles = frame.ShapesSave!.CircleSaves.ToList();
         for (int i = circles.Count - 1; i >= 0; i--)
         {
@@ -2188,6 +2321,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         // No guide hit — try to drag a shape (or just select one).
 
+        // The selected polygon's vertex and edge-midpoint handles come first.
+        if (TryBeginPolygonVertexGesture(px, py, e.ClickCount))
+        {
+            if (_draggingVertexPolygon is not null) e.Pointer.Capture(this);
+            return;
+        }
+
         // Check resize handles on the selected shape first.
         var handleKind = HitTestShapeHandle(px, py);
         if (handleKind != HandleKind.None)
@@ -2220,14 +2360,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (hitShape is not null)
         {
             _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
-            if (hitShape is AARectSave hr) _selectedState!.SelectedRectangle = hr;
-            else if (hitShape is CircleSave hc)          _selectedState!.SelectedCircle    = hc;
+            _selectedState!.SelectShape(hitShape);
             if (!IsShapeLocked(hitShape))
             {
                 _draggingShape   = hitShape;
                 _shapeDragAnchor = pos;
-                if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
-                else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
+                _shapeDragStartX = ((ShapeSave)hitShape).X;
+                _shapeDragStartY = ((ShapeSave)hitShape).Y;
                 e.Pointer.Capture(this);
             }
             return;
@@ -2302,15 +2441,26 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             return;
         }
 
+        if (_draggingVertexPolygon is not null)
+        {
+            // The vertex follows the pointer's absolute position, so an inserted vertex does not
+            // jump from the edge midpoint to wherever the press landed within the handle.
+            float om = _appState!.OffsetMultiplier * _zoom;
+            float worldX = ((float)pos.X - GetCenterX()) / om - _draggingVertexPolygon.X;
+            float worldY = -((float)pos.Y - GetCenterY()) / om - _draggingVertexPolygon.Y;
+            PolygonVertices.Set(_draggingVertexPolygon, _draggingVertexIndex, SnapToPixel(worldX), SnapToPixel(worldY));
+            InvalidateVisual();
+            return;
+        }
+
         if (_draggingShape is not null)
         {
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
-            float newX = SnapToPixel(_shapeDragStartX + dx);
-            float newY = SnapToPixel(_shapeDragStartY + dy);
-            if (_draggingShape is AARectSave r) { r.X = newX; r.Y = newY; }
-            else if (_draggingShape is CircleSave c)          { c.X = newX; c.Y = newY; }
+            var dragged = (ShapeSave)_draggingShape;
+            dragged.X = SnapToPixel(_shapeDragStartX + dx);
+            dragged.Y = SnapToPixel(_shapeDragStartY + dy);
             InvalidateVisual();
             return;
         }
@@ -2387,6 +2537,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             return;
         }
 
+        if (_draggingVertexPolygon is not null)
+        {
+            CommitPolygonVertexDrag();
+            e.Pointer.Capture(null);
+            return;
+        }
+
         if (_draggingFrame is not null)
         {
             CommitFrameDrag();
@@ -2431,12 +2588,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     // -- Inner types -----------------------------------------------------------
 
-    internal enum PreviewShapeKind { Rect, Circle }
+    internal enum PreviewShapeKind { Rect, Circle, Polygon }
 
     /// <summary>
     /// Immutable snapshot of a single collision shape, safe to pass to the render thread.
     /// <para>For <see cref="PreviewShapeKind.Rect"/>: Param1=ScaleX, Param2=ScaleY.</para>
     /// <para>For <see cref="PreviewShapeKind.Circle"/>: Param1=Radius, Param2=0.</para>
+    /// <para>For <see cref="PreviewShapeKind.Polygon"/>: X/Y is the origin and <see cref="Points"/>
+    /// holds the vertices as x,y pairs relative to it (closing point excluded).</para>
     /// </summary>
     internal record PreviewShapeInfo(
         PreviewShapeKind Kind,
@@ -2446,7 +2605,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         bool IsPendingCut = false,
         // A locked chain's shape still shows the gold "selected" highlight via IsSelected --
         // only the resize handles (implying it can be dragged) are suppressed (#1032 follow-up).
-        bool IsLocked = false);
+        bool IsLocked = false,
+        float[]? Points = null,
+        bool IsClosed = true,
+        bool IsSelfIntersecting = false);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2491,6 +2653,50 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     }
 
     // -- Shared SkiaSharp rendering (used by both live and off-screen paths) --
+
+    // Outline through the vertices; (originX, originY) is the polygon origin in screen space.
+    private static SKPath BuildPolygonPath(PreviewShapeInfo sh, float originX, float originY, float om)
+    {
+        var path = new SKPath();
+        var pts = sh.Points ?? Array.Empty<float>();
+        for (int i = 0; i + 1 < pts.Length; i += 2)
+        {
+            float x = originX + pts[i] * om;
+            float y = originY - pts[i + 1] * om;
+            if (i == 0) path.MoveTo(x, y);
+            else path.LineTo(x, y);
+        }
+        if (sh.IsClosed) path.Close();
+        return path;
+    }
+
+    // Filled squares on the vertices; hollow dots on the edge midpoints (press one to add a vertex).
+    private static void DrawPolygonHandles(SKCanvas canvas, PreviewShapeInfo sh, float originX, float originY, float om)
+    {
+        var pts = sh.Points ?? Array.Empty<float>();
+        int n = pts.Length / 2;
+        using var vertexFill = new SKPaint { Color = new SKColor(255, 220, 0, 255), Style = SKPaintStyle.Fill, IsAntialias = true };
+        using var vertexEdge = new SKPaint { Color = new SKColor(40, 40, 40, 255), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
+        using var midpoint   = new SKPaint { Color = new SKColor(255, 220, 0, 200), Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
+        const float half = 3.5f;
+
+        int edges = sh.IsClosed ? n : n - 1;
+        for (int i = 0; i < edges; i++)
+        {
+            int j = (i + 1) % n;
+            float mx = originX + (pts[i * 2] + pts[j * 2]) / 2f * om;
+            float my = originY - (pts[i * 2 + 1] + pts[j * 2 + 1]) / 2f * om;
+            canvas.DrawCircle(mx, my, 3f, midpoint);
+        }
+        for (int i = 0; i < n; i++)
+        {
+            float x = originX + pts[i * 2] * om;
+            float y = originY - pts[i * 2 + 1] * om;
+            var rect = new SKRect(x - half, y - half, x + half, y + half);
+            canvas.DrawRect(rect, vertexFill);
+            canvas.DrawRect(rect, vertexEdge);
+        }
+    }
 
     private static void RenderSkCore(
         SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKImage?> cache, CanvasPalette palette)
@@ -2577,7 +2783,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             }
         }
 
-        // Collision shapes (AxisAlignedRectangles and Circles).
+        // Collision shapes (AxisAlignedRectangles, Circles and Polygons).
         if (s.Shapes.Length > 0)
         {
             float om = s.OffsetMultiplier * s.Zoom;
@@ -2595,7 +2801,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 float sx = cx + sh.X * om;
                 float sy = cy - sh.Y * om;
 
-                if (sh.Kind == PreviewShapeKind.Rect)
+                if (sh.Kind == PreviewShapeKind.Polygon)
+                {
+                    // A self-intersecting outline breaks the runtime's collision, so it is drawn in
+                    // red whether or not it is selected.
+                    if (sh.IsSelfIntersecting)
+                        paint.Color = new SKColor(255, 60, 60, 230);
+                    using var path = BuildPolygonPath(sh, sx, sy, om);
+                    canvas.DrawPath(path, paint);
+                    if (sh.IsSelected && !sh.IsLocked)
+                        DrawPolygonHandles(canvas, sh, sx, sy, om);
+                }
+                else if (sh.Kind == PreviewShapeKind.Rect)
                 {
                     float hw = sh.Param1 * om;
                     float hh = sh.Param2 * om;
@@ -2633,7 +2850,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                         IsAntialias = true,
                         PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
                     };
-                    if (sh.Kind == PreviewShapeKind.Rect)
+                    if (sh.Kind == PreviewShapeKind.Polygon)
+                    {
+                        using var cutPath = BuildPolygonPath(sh, sx, sy, om);
+                        canvas.DrawPath(cutPath, cutPaint);
+                    }
+                    else if (sh.Kind == PreviewShapeKind.Rect)
                     {
                         float hw = sh.Param1 * om;
                         float hh = sh.Param2 * om;

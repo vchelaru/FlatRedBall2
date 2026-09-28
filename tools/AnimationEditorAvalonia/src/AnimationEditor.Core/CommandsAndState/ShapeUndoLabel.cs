@@ -6,7 +6,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands;
 /// Shared undo-label fragment for a collision shape — matches
 /// <c>Move Rect 'Hitbox'</c> / <c>Delete Circle 'X'</c> naming.
 /// </summary>
-internal static class ShapeUndoLabel
+public static class ShapeUndoLabel
 {
     public static string Format(object shape) => shape switch
     {

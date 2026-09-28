@@ -4621,8 +4621,7 @@ public partial class MainWindow : Window
 
         // Shapes are more specific than frames — prefer them so clicking a circle or
         // rect in the tree (or preview panel) keeps the shape node highlighted.
-        object? sel = (object?)_selectedState.SelectedCircle
-                   ?? _selectedState.SelectedRectangle
+        object? sel = _selectedState.SelectedShape
                    ?? _selectedState.SelectedFrame
                    ?? (object?)_selectedState.SelectedChain;
 
@@ -5118,7 +5117,7 @@ public partial class MainWindow : Window
         Action? rename = data switch
         {
             AARectSave rect          => () => BeginInlineRename(vm!, rect.Name),
-            CircleSave circle        => () => BeginInlineRename(vm!, circle.Name),
+            ShapeSave shape          => () => BeginInlineRename(vm!, shape.Name),
             AnimationChainSave chain => () => BeginInlineRenameSelected(chain),
             _                        => null
         };
@@ -5249,6 +5248,12 @@ public partial class MainWindow : Window
         PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
 
+        PropPolygonName.LostFocus  += (_, _) => ApplyPolygonProps();
+        PropPolygonName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyPolygonProps(); };
+        PropPolygonX.ValueChanged  += (_, _) => ApplyPolygonProps();
+        PropPolygonY.ValueChanged  += (_, _) => ApplyPolygonProps();
+        PropPolygonAddVertex.Click += (_, _) => AddPolygonVertexFromInspector();
+
         PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
         PropTextureName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyTextureName(); };
         PropTextureBrowseBtn.Click += async (_, _) => await BrowseForFrameTexture();
@@ -5259,7 +5264,7 @@ public partial class MainWindow : Window
         // and Enter seal that entry so the next edit — even to the same field — starts a fresh one.
         SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
             PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
-            PropCircleX, PropCircleY, PropCircleRadius);
+            PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY);
     }
 
     private void SealOnCommit(params InputElement[] inputs)
@@ -5531,12 +5536,8 @@ public partial class MainWindow : Window
         frame is not null && _objectFinder.GetAnimationChainContaining(frame)?.IsLocked == true;
 
     /// <summary>True when the shape's owning frame's chain is locked (#1032 follow-up).</summary>
-    private bool IsShapeLocked(object? shape) => shape switch
-    {
-        AARectSave r => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(r)),
-        CircleSave c => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(c)),
-        _ => false,
-    };
+    private bool IsShapeLocked(object? shape) =>
+        shape is ShapeSave s && IsFrameLocked(_objectFinder.GetAnimationFrameContaining(s));
 
     private void RefreshPropertyPanel()
     {
@@ -5549,9 +5550,10 @@ public partial class MainWindow : Window
             var frame = _selectedState.SelectedFrame;
             var rect  = _selectedState.SelectedRectangle;
             var circ  = _selectedState.SelectedCircle;
-            var hasShapeSelection = rect is not null || circ is not null;
+            var poly  = _selectedState.SelectedPolygon;
+            var hasShapeSelection = rect is not null || circ is not null || poly is not null;
 
-            bool noneSelected = frame is null && rect is null && circ is null;
+            bool noneSelected = frame is null && !hasShapeSelection;
             var selectedChain = _selectedState.SelectedChain;
             // A chain selected with no frame/shape shows PropChainPanel (its own Locked
             // checkbox) instead of PropNoneLabel's generic placeholder (#1032).
@@ -5603,6 +5605,7 @@ public partial class MainWindow : Window
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
             PropCirclePanel.IsVisible = circ  is not null && !_projectManager.IsNativeTsxProject;
+            PropPolygonPanel.IsVisible = poly is not null && !_projectManager.IsNativeTsxProject;
 
             // A native tsx project can't express flip/relative-offset/color data (issue #1140) --
             // hide the sections that would let a user set values that get silently dropped on save.
@@ -5623,6 +5626,7 @@ public partial class MainWindow : Window
             PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
             PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
             PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
+            PropPolygonPanel.IsEnabled = !IsShapeLocked(poly);
 
             if (frame is not null && !hasShapeSelection)
             {
@@ -5743,11 +5747,106 @@ public partial class MainWindow : Window
                 SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
                 SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
             }
+
+            if (poly is not null)
+                RefreshPolygonPanel(poly);
         }
         finally
         {
             _suppressPropRefresh = false;
         }
+    }
+
+    // The polygon panel edits one polygon: name, origin, and its vertex list. The vertex rows are
+    // rebuilt only when the polygon or its vertex count changes, so a row being typed into keeps focus.
+    private PolygonSave? _polygonRowsFor;
+    private readonly List<(NumericUpDown X, NumericUpDown Y)> _polygonVertexRows = new();
+
+    private void RefreshPolygonPanel(PolygonSave polygon)
+    {
+        PropPolygonName.Text = polygon.Name;
+        PropPolygonX.Value = (decimal)polygon.X;
+        PropPolygonY.Value = (decimal)polygon.Y;
+        PropPolygonWarning.IsVisible = PolygonVertices.IsSelfIntersecting(polygon);
+
+        int count = PolygonVertices.Count(polygon);
+        if (!ReferenceEquals(_polygonRowsFor, polygon) || _polygonVertexRows.Count != count)
+            RebuildPolygonVertexRows(polygon, count);
+        for (int i = 0; i < count; i++)
+        {
+            var (x, y) = PolygonVertices.Get(polygon, i);
+            _polygonVertexRows[i].X.Value = (decimal)x;
+            _polygonVertexRows[i].Y.Value = (decimal)y;
+        }
+    }
+
+    private void RebuildPolygonVertexRows(PolygonSave polygon, int count)
+    {
+        _polygonRowsFor = polygon;
+        _polygonVertexRows.Clear();
+        PropPolygonVertices.Children.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            int index = i;
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("22,*,4,*,4,24") };
+            row.Children.Add(new TextBlock
+            {
+                Text = (i + 1).ToString(), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            });
+            var x = NewVertexInput($"PropPolygonVertex{i}X", "X");
+            var y = NewVertexInput($"PropPolygonVertex{i}Y", "Y");
+            Grid.SetColumn(x, 1);
+            Grid.SetColumn(y, 3);
+            row.Children.Add(x);
+            row.Children.Add(y);
+            var remove = new Button
+            {
+                Name = $"PropPolygonVertex{i}Delete", Content = "✕", FontSize = 10, Padding = new Avalonia.Thickness(4, 0),
+                IsEnabled = count > 3,
+            };
+            ToolTip.SetTip(remove, count > 3 ? "Delete vertex" : "A polygon needs at least three vertices");
+            remove.Click += (_, _) => _appCommands.DeletePolygonVertex(polygon, index);
+            Grid.SetColumn(remove, 5);
+            row.Children.Add(remove);
+
+            x.ValueChanged += (_, _) => ApplyPolygonVertex(index);
+            y.ValueChanged += (_, _) => ApplyPolygonVertex(index);
+            SealOnCommit(x, y);
+            _polygonVertexRows.Add((x, y));
+            PropPolygonVertices.Children.Add(row);
+        }
+    }
+
+    private static NumericUpDown NewVertexInput(string name, string watermark) => new()
+    {
+        Name = name, Minimum = -10000, Maximum = 10000, Increment = 1, FormatString = "0.###",
+        FontSize = 11, PlaceholderText = watermark, ShowButtonSpinner = false,
+    };
+
+    private void ApplyPolygonVertex(int index)
+    {
+        if (_suppressPropRefresh || _polygonRowsFor is not { } polygon) return;
+        var (xInput, yInput) = _polygonVertexRows[index];
+        if (xInput.Value is not { } x || yInput.Value is not { } y) return;
+        _appCommands.MovePolygonVertex(polygon, index, (float)x, (float)y);
+    }
+
+    private void AddPolygonVertexFromInspector()
+    {
+        if (_selectedState.SelectedPolygon is not { } polygon) return;
+        // Split the edge from the last vertex back to the first, the one a closed outline ends on.
+        int count = PolygonVertices.Count(polygon);
+        var (ax, ay) = PolygonVertices.Get(polygon, count - 1);
+        var (bx, by) = PolygonVertices.Get(polygon, 0);
+        _appCommands.InsertPolygonVertex(polygon, count, (ax + bx) / 2f, (ay + by) / 2f);
+    }
+
+    private void ApplyPolygonProps()
+    {
+        if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
+        if (PropPolygonX.Value is not { } x || PropPolygonY.Value is not { } y) return;
+        var name = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? polygon.Name : PropPolygonName.Text.Trim();
+        _appCommands.SetPolygonProps(_objectFinder.GetAnimationFrameContaining(polygon), polygon, name, (float)x, (float)y);
     }
 
     // ── Property apply methods ────────────────────────────────────────────────
@@ -6739,10 +6838,8 @@ public partial class MainWindow : Window
         // label is the computed positional "Frame N" (see TreeBuilder).
         if (vm.Data is AnimationChainSave chain)
             BeginInlineRename(vm, chain.Name);
-        else if (vm.Data is AARectSave rect)
-            BeginInlineRename(vm, rect.Name);
-        else if (vm.Data is CircleSave circle)
-            BeginInlineRename(vm, circle.Name);
+        else if (vm.Data is ShapeSave shape)
+            BeginInlineRename(vm, shape.Name);
     }
 
     private void HandleReorderHotkey(int delta)
@@ -6859,8 +6956,7 @@ public partial class MainWindow : Window
     // shape→frame→chain priority in SyncTreeSelection.
     private object? SelectedData =>
         (AnimTree.SelectedItem as TreeNodeVm)?.Data
-        ?? (object?)_selectedState.SelectedCircle
-        ?? _selectedState.SelectedRectangle
+        ?? _selectedState.SelectedShape
         ?? _selectedState.SelectedFrame
         ?? (object?)_selectedState.SelectedChain;
 
@@ -7466,11 +7562,8 @@ public partial class MainWindow : Window
                 // offset, not the entity origin, or a large-offset frame stays off-screen.
                 PreviewCtrl.CenterOnEntityPoint(frame.RelativeX, frame.RelativeY);
                 return true;
-            case AARectSave rect:
-                PreviewCtrl.CenterOnEntityPoint(rect.X, rect.Y);
-                return true;
-            case CircleSave circle:
-                PreviewCtrl.CenterOnEntityPoint(circle.X, circle.Y);
+            case ShapeSave shape:
+                PreviewCtrl.CenterOnEntityPoint(shape.X, shape.Y);
                 return true;
             default:
                 return false;
@@ -7673,6 +7766,13 @@ public partial class MainWindow : Window
                 _appCommands.SetCircleProps(
                     _objectFinder.GetAnimationFrameContaining(circle),
                     circle, newName, circle.X, circle.Y, circle.Radius);
+        }
+        else if (vm.Data is PolygonSave polygon)
+        {
+            if (!string.IsNullOrEmpty(newName) && newName != polygon.Name)
+                _appCommands.SetPolygonProps(
+                    _objectFinder.GetAnimationFrameContaining(polygon),
+                    polygon, newName, polygon.X, polygon.Y);
         }
 
         AnimTree.Focus();
