@@ -125,7 +125,7 @@ engine.SourceContentRoots.Add("C:/path/to/my/project");
 
 Non-empty does not mean "will register": roots are matched per path, and when none contains the requested file or directory, `WatchContent`/`WatchContentDirectory` return `null` and `TryWatch*` reports `SourceContentRootUnavailable`. Hot-reload is a safe no-op either way — **no `#if DEBUG` needed**.
 
-Landmine for changes here: `new FileSystemDirectoryWatcher(path)` throws `ArgumentException` on a missing directory (`FileSystemFileWatcher` does not), so any fallback that builds a path instead of verifying it converts a no-op into a process-killing exception.
+Landmine for changes here: the file-system watchers throw `ArgumentException` when the watched directory is missing, so never construct one on a path that hasn't been checked to exist.
 
 ## Debouncing
 

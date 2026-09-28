@@ -822,17 +822,8 @@ public class Screen : ILifecycleEvents
 
         if (!registered)
         {
-            // No root contained the directory. This used to fall back to the first root and
-            // construct a FileSystemDirectoryWatcher on the resulting path, on the assumption it
-            // "will simply produce no events until the directory appears". That assumption is
-            // wrong: the constructor throws ArgumentException when the directory does not exist,
-            // and nothing guards this call, so the exception kills the process. It is reachable in
-            // ordinary shipping builds, because DetectSourceContentRoots walks UP from the
-            // executable for a solution or project file - an unrelated ancestor project (a stray
-            // *.csproj in a home directory, say) becomes the only detected root, and it does not
-            // contain the game's Content folder.
-            // Report unavailable instead: no watcher, and hot reload stays off until a root that
-            // actually contains the directory exists.
+            // No root contains the directory. Don't guess a path: the watcher throws on a missing
+            // directory, and the detected root may be an unrelated ancestor project.
             return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
         }
 
