@@ -709,6 +709,35 @@ internal sealed class AnimationEditorHarness : IDisposable
         TypeAndEnter(box, text);
     }
 
+    /// <summary>
+    /// Scrolls the combo box named <paramref name="name"/> into view, opens it with a click, and clicks its item whose
+    /// content is <paramref name="item"/>. The dropdown is its own popup top level, so the item
+    /// click goes to that popup rather than the window.
+    /// </summary>
+    public void PickComboItem(string name, string item)
+    {
+        ComboBox combo = Control<ComboBox>(name);
+        // The inspector scrolls; a user scrolls a field into view before clicking it.
+        combo.BringIntoView();
+        Layout();
+        Click(combo);
+        if (!combo.IsDropDownOpen)
+        {
+            throw new InvalidOperationException($"Clicking {name} did not open its dropdown.");
+        }
+        ComboBoxItem container = combo.GetRealizedContainers().OfType<ComboBoxItem>()
+            .FirstOrDefault(candidate => candidate.Content as string == item)
+            ?? throw new InvalidOperationException($"{name} has no item \"{item}\"; it shows [{string.Join(", ", combo.Items.OfType<ComboBoxItem>().Select(candidate => candidate.Content))}].");
+        TopLevel popup = TopLevel.GetTopLevel(container)
+            ?? throw new InvalidOperationException($"The \"{item}\" item is not in a top level.");
+        Point point = container.TranslatePoint(new Point(container.Bounds.Width / 2, container.Bounds.Height / 2), popup)
+            ?? throw new InvalidOperationException($"The \"{item}\" item is not in its popup.");
+        popup.MouseMove(point, RawInputModifiers.None);
+        popup.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        popup.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Layout();
+    }
+
     /// <summary>Types into the text box named <paramref name="name"/> ("PropTextureName") and presses Enter.</summary>
     public void TypeText(string name, string text)
     {

@@ -350,6 +350,23 @@ public class InspectorControlTests
     }
 
     [AvaloniaFact]
+    public void CommitFrameColorOperation_Inherit_ClearsTheMode_AndLeavesTheComboBlank()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+        control.FrameColorModeCombo.SelectedIndex = 2;
+        control.CommitFrameColorOperation();
+
+        control.FrameColorModeCombo.SelectedIndex = 0;
+        control.CommitFrameColorOperation();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(frame.ColorOperation);
+        Assert.Equal(-1, control.FrameColorModeCombo.SelectedIndex);
+        Assert.Equal(new object?[] { "Inherit", "Multiply", "Add" },
+            control.FrameColorModeCombo.Items.OfType<ComboBoxItem>().Select(item => item.Content).ToArray());
+    }
+
+    [AvaloniaFact]
     public void CommitRectProps_AppliesEditedFieldValues()
     {
         var (control, _, rect, _, _) = BuildWithEditableShapes();

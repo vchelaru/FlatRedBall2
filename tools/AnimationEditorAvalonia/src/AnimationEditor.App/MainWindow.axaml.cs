@@ -5126,6 +5126,13 @@ public partial class MainWindow : Window
         PropBlue.KeyDown           += (_, e) => CommitColorChannelOnEnter(e);
         PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
+        // Delete/Backspace clears the mode back to inherited, as deleting a color channel's text does.
+        PropColorMode.KeyDown += (_, e) =>
+        {
+            if (e.Key is not (Key.Delete or Key.Back)) return;
+            ApplyFrameColorOperation(null);
+            e.Handled = true;
+        };
         PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
@@ -5541,16 +5548,12 @@ public partial class MainWindow : Window
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
-                else if (effective.Operation is ColorOperation inherited)
-                {
-                    // Unset here but inherited from an earlier frame — ghost it as a combo placeholder
-                    // (SelectedIndex -1 shows PlaceholderText) so the combo matches the sticky preview.
-                    PropColorMode.SelectedIndex = -1;
-                    PropColorMode.PlaceholderText = $"{inherited} (inherited)";
-                }
                 else
                 {
-                    PropColorMode.SelectedIndex = 0; // None
+                    // Unset: ghost the effective mode as a placeholder, like the channel fields above.
+                    // "None" means nothing earlier sets a mode, so no tint applies.
+                    PropColorMode.SelectedIndex = -1;
+                    PropColorMode.PlaceholderText = effective.Operation?.ToString() ?? "None";
                 }
                 SetNameOrMixed(PropTextureName,
                     frames.Select(f => TexturePathHelper.ComputeDisplayPath(f.TextureName, _projectManager.FileName)).ToList(),
@@ -5856,17 +5859,28 @@ public partial class MainWindow : Window
 
     private void ApplyFrameColorOperation()
     {
+        // ComboBox order: 0 = Inherit (null), 1 = Multiply, 2 = Add. -1 is the blank placeholder
+        // state RefreshPropertyPanel sets, not a user pick.
+        switch (PropColorMode.SelectedIndex)
+        {
+            case 0: ApplyFrameColorOperation(null); break;
+            case 1: ApplyFrameColorOperation(ColorOperation.Multiply); break;
+            case 2: ApplyFrameColorOperation(ColorOperation.Add); break;
+        }
+    }
+
+    private void ApplyFrameColorOperation(ColorOperation? operation)
+    {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
-        ColorOperation? operation = PropColorMode.SelectedIndex switch
+        if (frames.Any(f => f.ColorOperation != operation))
         {
-            1 => ColorOperation.Multiply,
-            2 => ColorOperation.Add,
-            _ => null,
-        };
-        _appCommands.SetFrameColorOperation(frames, operation);
+            _appCommands.SetFrameColorOperation(frames, operation);
+        }
+        // Inherit is an action, not a value to display: once applied, the combo goes back to blank
+        // with the inherited placeholder. Posted because the combo is still mid-SelectionChanged.
+        if (operation is null) Dispatcher.UIThread.Post(RefreshPropertyPanel);
     }
 
     private void ApplyFramePixelCoords()
@@ -6581,7 +6595,8 @@ public partial class MainWindow : Window
             {
                 Id = "delete", Description = "Delete", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Delete") },
-                ShouldSkip = IsTextInputFocused,
+                // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
                 Action = HandleDelete,
             },
             new()
@@ -6617,19 +6632,22 @@ public partial class MainWindow : Window
                 Id = "toggle-play-pause", Description = "Play / Pause Preview", Category = "Playback",
                 Gestures = new[] { new HotkeyGesture("Space") },
                 // Let a focused button receive Space to activate itself rather than hijacking it.
-                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is Button,
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused() || FocusManager?.GetFocusedElement() is Button,
                 Action = () => PreviewCtrl.TogglePlayPause(),
             },
             new()
             {
                 Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Up", Alt) },
+                // Alt+Up/Down opens a focused Inspector combo; don't reorder the selection instead.
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(-1),
             },
             new()
             {
                 Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(+1),
             },
             new()
@@ -6818,6 +6836,12 @@ public partial class MainWindow : Window
     // the text control instead of being swallowed by the window-level handler.
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
+
+    // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
+    // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.
+    private bool IsInspectorFocused()
+        => FocusManager?.GetFocusedElement() is Control focused
+           && (focused == InspectorTabContent || InspectorTabContent.IsVisualAncestorOf(focused));
 
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
