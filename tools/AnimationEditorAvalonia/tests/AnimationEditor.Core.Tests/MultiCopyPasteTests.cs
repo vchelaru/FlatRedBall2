@@ -98,6 +98,26 @@ public class MultiCopyPasteTests
     }
 
     [Fact]
+    public void PasteShapes_MultiFrame_SelectsEveryPastedShape_UndoRestoresSelection()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        var frames = chain.Frames.ToList();
+        ctx.SelectedState.SelectedNodes = frames.Cast<object>().ToList();
+
+        ctx.AppCommands.PasteShapes(frames, new object[] { new AARectSave { Name = "Hit" } });
+
+        var pasted = frames.Select(f => f.ShapesSave!.Shapes.Single()).ToList();
+        Assert.Equal(pasted, ctx.SelectedState.SelectedShapes);
+
+        ctx.UndoManager.Undo();
+        Assert.Equal(frames.Cast<object>(), ctx.SelectedState.SelectedNodes);
+
+        ctx.UndoManager.Redo();
+        Assert.Equal(pasted, ctx.SelectedState.SelectedShapes);
+    }
+
+    [Fact]
     public void PasteShapes_MultiFrame_SkipsFramesInLockedChainButPastesRest()
     {
         var ctx = TestHelpers.SetupFreshAcls();

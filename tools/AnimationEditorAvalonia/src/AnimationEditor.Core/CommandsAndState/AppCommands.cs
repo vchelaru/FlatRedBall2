@@ -2283,20 +2283,22 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            var cmds = new List<IUndoableCommand>();
+            // One command across all frames (not a composite of per-frame commands) so the
+            // selection ends up as every pasted shape, not just the last frame's.
+            var groups = new List<(AnimationFrameSave Frame, IReadOnlyList<object> Shapes)>();
             foreach (var frame in frames)
             {
                 var clones = BuildShapeClones(frame, shapes);
                 if (clones.Count > 0)
-                    cmds.Add(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+                    groups.Add((frame, clones));
             }
-            if (cmds.Count == 0) return;
+            if (groups.Count == 0) return;
 
             int shapeCount = shapes.Count;
             string desc = shapeCount == 1
-                ? $"Paste {ShapeUndoLabel.Format(shapes[0])} into {cmds.Count} Frames"
-                : $"Paste {shapeCount} Shapes into {cmds.Count} Frames";
-            _undoManager.Execute(new CompositeCommand(cmds, desc));
+                ? $"Paste {ShapeUndoLabel.Format(shapes[0])} into {groups.Count} Frames"
+                : $"Paste {shapeCount} Shapes into {groups.Count} Frames";
+            _undoManager.Execute(new PasteShapesCommand(groups, desc, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteChainsCut"/>

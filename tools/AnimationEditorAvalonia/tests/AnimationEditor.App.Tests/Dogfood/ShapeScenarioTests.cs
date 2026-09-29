@@ -56,6 +56,35 @@ public class ShapeScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task CopyShape_ThenPasteOntoTwoSelectedFrames_SelectsBothPastedShapes()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16), (32, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.RightClickRow(walk.Frames[0]);
+        editor.PickTreeMenuItem("Add AxisAlignedRectangle");
+        editor.ClickRow(walk.Frames[0].ShapesSave!.AARectSaves.Single());
+        editor.Press(Key.C, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.ClickRow(walk.Frames[1]);
+        editor.ClickRow(walk.Frames[2], RawInputModifiers.Control);
+
+        editor.Press(Key.V, RawInputModifiers.Control);
+        editor.Layout();
+
+        editor.ThrowIfErrorShown();
+        AARectSave pasted1 = walk.Frames[1].ShapesSave!.AARectSaves.ShouldHaveSingleItem();
+        AARectSave pasted2 = walk.Frames[2].ShapesSave!.AARectSaves.ShouldHaveSingleItem();
+        editor.Services.SelectedState.SelectedShapes.ShouldBe(new object[] { pasted1, pasted2 });
+        editor.AnimTree.SelectedItems.Cast<object>()
+            .ShouldBe(new object[] { editor.NodeFor(pasted1), editor.NodeFor(pasted2) }, ignoreOrder: true);
+    }
+
+    [AvaloniaFact]
     public async Task DeleteKey_OnARectangle_RemovesIt_AndUndoBringsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
