@@ -12,7 +12,7 @@
         own content) isn't needed and won't shadow the ambient tree-node DataContext a consumer's
         IsOpen="{Binding ...}" binding depends on.
     -->
-    <Panel Cursor="Hand" PointerPressed="OnPressed">
+    <Panel Background="Transparent" Cursor="Hand" PointerPressed="OnPressed">
         <svg:Svg IsVisible="{Binding #Root.IsOpen}"
                  Width="16" Height="16"
                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolderOpen.svg"

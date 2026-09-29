@@ -1189,14 +1189,16 @@
                                                                FontWeight="SemiBold"
                                                                Foreground="{DynamicResource InkMid}"
                                                                VerticalAlignment="Center" />
-                                                    <Border Width="14" Height="14" CornerRadius="7"
-                                                            BorderBrush="{DynamicResource InkDim}" BorderThickness="1"
-                                                            VerticalAlignment="Center" Cursor="Help"
-                                                            ToolTip.Tip="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it.">
-                                                        <TextBlock Text="i" FontSize="9"
-                                                                   Foreground="{DynamicResource InkDim}"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Border>
+                                                    <!-- Square transparent host so the whole box is hoverable; a rounded Border hit-tests only its circle. -->
+                                                    <Panel x:Name="ColorHelpIcon" Width="14" Height="14" Background="Transparent"
+                                                           VerticalAlignment="Center" Cursor="Help"
+                                                           ToolTip.Tip="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it.">
+                                                        <Border CornerRadius="7" BorderBrush="{DynamicResource InkDim}" BorderThickness="1">
+                                                            <TextBlock Text="i" FontSize="9"
+                                                                       Foreground="{DynamicResource InkDim}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </Panel>
                                                 </StackPanel>
                                                 <Grid ColumnDefinitions="44,*">
                                                     <TextBlock Text="Mode" VerticalAlignment="Center"
