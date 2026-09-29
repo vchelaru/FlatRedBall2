@@ -44,7 +44,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Duplicate an animation (copy and paste)
 │   │   ## Flip an animation (e.g. WalkRight from WalkLeft)
 │   │   ## Change an animation's speed (Adjust Frame Time)
-│   │   ## Stop an animation from looping (Loop)
+│   │   ## Turn looping on or off (Loop)
 │   │   ## Lock an animation (why the + button disappears)
 │   ├── Edit frames
 │   │   ## Add and delete frames

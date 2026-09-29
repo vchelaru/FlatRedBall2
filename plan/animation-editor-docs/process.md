@@ -19,11 +19,12 @@ Victor writes each page. Claude adds images and links, then reviews.
 - Path depth: `../` from `animationeditor/`, `../../` from its subfolders.
 
 ## Review after placing
-Suggest, don't apply, until Victor says which to fix:
-- Typos, heading style (title case, imperative verbs), bold UI names, `File ▸ Item` menu paths.
-- Shortcuts for both Ctrl (Windows/Linux) and ⌘ (macOS).
-- Screenshots that don't match the text, especially after sections move.
-- Missing links to other docs pages.
+Fix silently, without calling them out: typos, wrong UI labels (check against the code), heading
+style (title case, imperative verbs), bold UI names, `File ▸ Item` menu paths, ⌘ equivalents for
+Ctrl shortcuts, and links to sections on other docs pages.
+
+Suggest, don't apply, until Victor says which to fix: anything that changes what the page says or
+how it's organized, screenshots that don't match the text, and missing coverage.
 
 ## Commits
 Commit and push each page to `animation-editor-docs-structure` (PR #1229). Don't merge until every
