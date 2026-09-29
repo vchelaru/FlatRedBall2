@@ -76,6 +76,18 @@ public class GodotSpriteFramesExporterTests
     }
 
     [Fact]
+    public void Export_MillisecondTimeUnit_SpeedIsFramesPerSecond()
+    {
+        var acls = SingleChain(PixelFrame("a.png", 0, 0, 8, 100f), PixelFrame("a.png", 8, 0, 8, 200f));
+        acls.TimeMeasurementUnit = TimeMeasurementUnit.Millisecond;
+
+        var text = GodotSpriteFramesExporter.Export(acls, _ => null).Text;
+
+        text.ShouldContain("\"speed\": 10.0");
+        text.ShouldContain("\"duration\": 2.0,");
+    }
+
+    [Fact]
     public void Export_FlippedFrame_KeepsFrameAndWarns()
     {
         var frame = PixelFrame("a.png", 0, 0, 8, 0.1f);

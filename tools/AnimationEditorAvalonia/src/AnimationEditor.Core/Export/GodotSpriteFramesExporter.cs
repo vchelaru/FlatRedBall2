@@ -16,7 +16,8 @@ namespace AnimationEditor.Core.Export;
 /// <para>Durations: Godot shows a frame for <c>duration / speed</c> seconds, where <c>speed</c> is
 /// per animation (FPS) and <c>duration</c> is per frame (relative). The exporter sets
 /// <c>speed = 1 / shortest frame length</c>, so the shortest frame has duration 1 and the rest are
-/// multiples of it, which reproduces every .achx frame length exactly.</para>
+/// multiples of it, which reproduces every .achx frame length exactly. Millisecond files are
+/// converted to seconds first.</para>
 /// <para>Texture paths are written relative to the exported file (Godot resolves a non-<c>res://</c>
 /// path against the <c>.tres</c>'s folder), so export into the Godot project next to the copied
 /// textures. No <c>uid</c>s are written; Godot assigns them on import.</para>
@@ -51,6 +52,7 @@ public static class GodotSpriteFramesExporter
         var animationNames = new List<string>();
         int atlasCount = 0;
         bool anyFlip = false, anyOffset = false, anyZeroLength = false;
+        double secondsDivisor = acls.TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000.0 : 1.0;
 
         foreach (var chain in acls.AnimationChains)
         {
@@ -89,7 +91,7 @@ public static class GodotSpriteFramesExporter
                     .Append($"[sub_resource type=\"AtlasTexture\" id=\"AtlasTexture_{atlasCount}\"]\n")
                     .Append($"atlas = ExtResource(\"{textureIds[frame.TextureName]}\")\n")
                     .Append($"region = Rect2({region.X}, {region.Y}, {region.Width}, {region.Height})\n");
-                frames.Add((atlasCount, Math.Round((double)frame.FrameLength, 6)));
+                frames.Add((atlasCount, Math.Round(frame.FrameLength / secondsDivisor, 6)));
             }
 
             var timed = frames.Where(f => f.Seconds > 0).Select(f => f.Seconds).ToList();
