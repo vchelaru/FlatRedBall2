@@ -112,7 +112,7 @@ public class WireframeAddFrameGhostTests
         {
             ctrl.GetAddFrameGhostForScreenPoint(50f, 60f);
 
-            ctrl.RefreshCursorForCtrlChange(isCtrl: false);
+            ctrl.RefreshCursorForCommandModifierChange(isHeld: false);
 
             Assert.Null(ctrl.AddFrameGhost);
         }
@@ -127,7 +127,7 @@ public class WireframeAddFrameGhostTests
         try
         {
             // MainWindow refreshes on every Ctrl press, including Ctrl+S with the pointer in the tree.
-            ctrl.RefreshCursorForCtrlChange(isCtrl: true);
+            ctrl.RefreshCursorForCommandModifierChange(isHeld: true);
 
             Assert.Null(ctrl.AddFrameGhost);
         }

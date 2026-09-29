@@ -21,7 +21,7 @@ right-click-to-remove is already fully self-contained inside `PreviewControl`'s 
 handlers and was working the moment `PreviewControl` was wired in during Phase 1.
 
 The seventh item, PixiJS export, needed real porting work: desktop's
-`AppCommands.ExportToPixiJsAsync` writes the JSON via `System.IO.File.WriteAllText` and copies
+`AppCommands.ExportAsync(ExportFormat.PixiJs)` writes the JSON via `System.IO.File.WriteAllText` and copies
 referenced PNGs via `System.IO.File.Copy` -- both unavailable in the browser.
 
 ## Decision

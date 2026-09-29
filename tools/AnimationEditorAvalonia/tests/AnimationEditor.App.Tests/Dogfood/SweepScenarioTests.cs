@@ -191,6 +191,29 @@ public class SweepScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ExportToGodot_WritesTheTresAndCopiesTheTexture_AndToasts()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        string exportDir = Path.Combine(editor.ProjectFolder, "godot");
+        Directory.CreateDirectory(exportDir);
+        string tres = Path.Combine(exportDir, "hero.tres");
+        editor.Dialogs.AnswerNextSaveFile(tres);
+
+        editor.ClickMenu("MenuExportGodot");
+        editor.Wait(TimeSpan.FromMilliseconds(300));
+
+        editor.ThrowIfErrorShown();
+        File.ReadAllText(tres).ShouldContain("\"name\": &\"Walk\"");
+        File.ReadAllText(tres).ShouldContain("region = Rect2(16, 0, 16, 16)");
+        File.Exists(Path.Combine(exportDir, "sheet.png")).ShouldBeTrue("the texture travels with the .tres");
+        editor.ToastText.ShouldNotBeNull();
+        editor.ToastText!.ShouldContain("hero.tres");
+    }
+
+    [AvaloniaFact]
     public async Task FileMenu_NewThenSave_OpenAnUntitledTab_AndAskWhereToSaveIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

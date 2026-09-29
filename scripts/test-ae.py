@@ -22,7 +22,7 @@ PROJECTS = ["AnimationEditor.Core.Tests", "AnimationEditor.Views.Tests", "Animat
             "AnimationEditor.App.Tests"]
 APP_SHARDS = 6
 # A test that parks on a real dialog never returns; fail it instead of hanging the run.
-HANG_TIMEOUT = "3m"
+HANG_TIMEOUT = "60s"
 
 
 def app_shard_filters():
