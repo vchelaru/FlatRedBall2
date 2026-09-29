@@ -91,12 +91,12 @@ internal sealed class TestServices
     /// <param name="useMacOSChrome">
     /// Off by default so every OS gets the in-window title bar and menu the harness clicks.
     /// </param>
-    public MainWindow CreateMainWindow(bool useMacOSChrome = false) =>
+    public MainWindow CreateMainWindow(bool useMacOSChrome = false, CommandModifier? commandModifier = null) =>
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
             ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot,
-            ApplicationUpdater, EditorDialogHost, useMacOSChrome);
+            ApplicationUpdater, EditorDialogHost, useMacOSChrome, commandModifier);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

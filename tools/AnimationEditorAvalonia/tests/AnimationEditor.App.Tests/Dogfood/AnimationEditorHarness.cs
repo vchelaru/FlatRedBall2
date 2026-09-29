@@ -38,7 +38,11 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// file a first one left behind to start the way the editor does after a crash. Defaults to
     /// a fresh temp file.
     /// </param>
-    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null)
+    /// <param name="commandModifier">
+    /// The platform command modifier the window is built with; <see cref="CommandModifier.Meta"/>
+    /// runs the scenario as macOS would. Defaults to Ctrl.
+    /// </param>
+    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null, CommandModifier? commandModifier = null)
     {
         Services = settingsRoot is null ? new TestServices() : new TestServices { SettingsRoot = settingsRoot };
         if (recoveryFilePath != null)
@@ -52,7 +56,7 @@ internal sealed class AnimationEditorHarness : IDisposable
 
         Dialogs = new ScriptedDialogs();
         Services.EditorDialogHost = Dialogs;
-        Window = Services.CreateMainWindow();
+        Window = Services.CreateMainWindow(commandModifier: commandModifier);
         Window.Width = 1280;
         Window.Height = 800;
         Window.Show();

@@ -208,6 +208,10 @@ public partial class MainWindow : Window
     // (the headless platform has no native menu bar to click).
     private readonly bool _useMacOSChrome;
 
+    // ⌘ on macOS, Ctrl elsewhere, for Ctrl-modified mouse gestures and their user-facing text.
+    // Production passes CommandModifier.ForHost(OperatingSystem.IsMacOS()); tests pick either.
+    private readonly CommandModifier _commandModifier;
+
     private FilePath SettingsFilePath =>
         AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
 
@@ -227,10 +231,12 @@ public partial class MainWindow : Window
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null,
         IEditorDialogHost? dialogHost = null,
-        bool useMacOSChrome = false)
+        bool useMacOSChrome = false,
+        CommandModifier? commandModifier = null)
     {
         _applicationDataRoot = applicationDataRoot;
         _useMacOSChrome = useMacOSChrome;
+        _commandModifier = commandModifier ?? CommandModifier.Control;
 
         _projectManager = projectManager;
         _selectedState = selectedState;
@@ -286,6 +292,7 @@ public partial class MainWindow : Window
         WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
 
+        WireframeCtrl.CommandModifier = _commandModifier;
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
@@ -1367,6 +1374,8 @@ public partial class MainWindow : Window
         TextureCombo.SelectionChanged += OnTextureComboChanged;
         MoveModeToggle.IsCheckedChanged += OnMoveModeToggled;
         MagicWandToggle.IsCheckedChanged += OnMagicWandToggled;
+        ToolTip.SetTip(MagicWandToggle,
+            $"Magic Wand mode — hover to preview region; double-click to apply; {_commandModifier.DisplayName}+click to add new frame");
         SnapToGridCheck.IsCheckedChanged += OnSnapToGridChanged;
         GridSizeInput.Value = 16m;
         GridSizeInput.ValueChanged += (_, _) => ApplyGridSize();
@@ -4925,7 +4934,7 @@ public partial class MainWindow : Window
                 // the press handled to suppress the TreeView's select-on-press, capture so the
                 // move/release still arrive here, and defer the single-select to release if no
                 // drag happens. Ctrl/Shift presses fall through to normal selection editing.
-                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                bool noModifiers = !_commandModifier.IsHeld(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift);
                 if (noModifiers &&
                     FrameDropResolver.IsFrameMultiSelectionContaining(_frameDragSelectionSnapshot, frame))
                 {
@@ -4956,7 +4965,7 @@ public partial class MainWindow : Window
                 // the press handled to suppress the TreeView's select-on-press, capture so the
                 // move/release still arrive here, and defer the single-select to release if no
                 // drag happens. Ctrl/Shift presses fall through to normal selection editing.
-                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                bool noModifiers = !_commandModifier.IsHeld(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift);
                 if (noModifiers &&
                     ChainDropResolver.IsChainMultiSelectionContaining(_chainDragSelectionSnapshot, chain))
                 {
@@ -6802,8 +6811,10 @@ public partial class MainWindow : Window
     // HotkeyDefinition.DisplayText must keep Avalonia's Key enum names verbatim (e.g. "OemPlus")
     // since SetMenuGesture feeds it to KeyGesture.Parse, which only recognizes real Key names.
     // This panel has no such constraint, so swap in words a user would actually recognize.
-    private static string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
-        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus");
+    // DisplayText always spells the command modifier "Ctrl"; swap in ⌘ on macOS.
+    private string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
+        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus")
+            .Replace("Ctrl", _commandModifier.DisplayName);
 
     private void WireKeyboard()
     {
@@ -6818,10 +6829,10 @@ public partial class MainWindow : Window
         {
             if (e.Handled) return;
 
-            // Ctrl+hover over the wireframe shows the add-frame cursor; refresh it immediately
-            // on press so it doesn't wait for the next pointer move (#882).
-            if (e.Key is Key.LeftCtrl or Key.RightCtrl)
-                WireframeCtrl.RefreshCursorForCtrlChange(isCtrl: true);
+            // Command-modifier hover (Ctrl, or ⌘ on macOS) over the wireframe shows the add-frame
+            // cursor; refresh it immediately on press so it doesn't wait for the next pointer move (#882).
+            if (_commandModifier.IsModifierKey(e.Key))
+                WireframeCtrl.RefreshCursorForCommandModifierChange(isHeld: true);
 
             var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
             if (match is null) return;
@@ -6838,9 +6849,9 @@ public partial class MainWindow : Window
             if (e.Handled) return;
 
             // Mirror image of the KeyDown branch above: drop the add-frame cursor the instant
-            // Ctrl is released, without requiring a pointer move (#882).
-            if (e.Key is Key.LeftCtrl or Key.RightCtrl)
-                WireframeCtrl.RefreshCursorForCtrlChange(isCtrl: false);
+            // the command modifier is released, without requiring a pointer move (#882).
+            if (_commandModifier.IsModifierKey(e.Key))
+                WireframeCtrl.RefreshCursorForCommandModifierChange(isHeld: false);
 
             if (e.Key is Key.LeftAlt or Key.RightAlt &&
                 _altMenuActivationSuppressor.TryConsumeIfArmed())

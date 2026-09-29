@@ -1,3 +1,4 @@
+using AnimationEditor.App.Controls;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
@@ -300,7 +301,8 @@ public partial class App : Application
             sp.GetRequiredService<IFileAssociationService>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             sp.GetRequiredService<IApplicationUpdater>(),
-            useMacOSChrome: OperatingSystem.IsMacOS()));
+            useMacOSChrome: OperatingSystem.IsMacOS(),
+            commandModifier: CommandModifier.ForHost(OperatingSystem.IsMacOS())));
 
         return sc.BuildServiceProvider();
     }

@@ -101,7 +101,7 @@ public class WireframeLockedChainCursorTests
         var (ctrl, dir) = BuildCtrlWithSelectedFrame(ctx, locked: true);
         try
         {
-            ctrl.RefreshCursorForCtrlChange(isCtrl: true);
+            ctrl.RefreshCursorForCommandModifierChange(isHeld: true);
             Assert.False(ctrl.IsShowingAddFrameCursor,
                 "Ctrl+click would add into the locked selected chain -- no-op -- so the add-frame cursor must not show.");
         }
@@ -115,7 +115,7 @@ public class WireframeLockedChainCursorTests
         var (ctrl, dir) = BuildCtrlWithSelectedFrame(ctx, locked: false);
         try
         {
-            ctrl.RefreshCursorForCtrlChange(isCtrl: true);
+            ctrl.RefreshCursorForCommandModifierChange(isHeld: true);
             Assert.True(ctrl.IsShowingAddFrameCursor);
         }
         finally { System.IO.Directory.Delete(dir, true); }
