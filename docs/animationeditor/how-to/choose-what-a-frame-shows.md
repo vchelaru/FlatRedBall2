@@ -5,3 +5,5 @@
 ## Select with the Magic Wand
 
 ## Enter Exact Pixel Coordinates
+
+## Move All Frames at Once

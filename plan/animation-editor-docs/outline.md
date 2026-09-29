@@ -60,6 +60,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Snap to a grid
 │   │   ## Select with the magic wand
 │   │   ## Enter exact pixel coordinates
+│   │   ## Move all frames at once (select the whole animation)
 │   ├── Align animations
 │   │   ## Use guides to spot misalignment
 │   │   ## Shift a whole animation (Adjust Offsets)

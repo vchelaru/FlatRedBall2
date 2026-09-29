@@ -54,6 +54,10 @@ To flip individual frames instead, see [Flip a Frame](edit-frames.md#flip-a-fram
 
 Flipping isn't available in [Tiled `.tsx` projects](animate-a-tiled-tileset.md).
 
+## Move All of an Animation's Frames
+
+To move every frame's region on the image at once, see [Move All Frames at Once](choose-what-a-frame-shows.md#move-all-frames-at-once).
+
 ## Change an Animation's Speed
 
 To change an animation's speed, right-click the animation and select **Adjust Frame Time…**.
