@@ -159,6 +159,6 @@ A value of 0,0 indicates a perfectly-centered sprite. Positive X values move the
 Future versions of the AnimationEditor will allow you to control whether positive Y is up or down to match your desired coordinate system.
 {% endhint %}
 
-Offsets can also be changed by dragging the frame in the preview. Every frame in an animation can be adjusted at once by selecting the whole animation, and several animations can be adjusted together by selecting all of them.
+Offsets can also be changed by dragging the frame in the preview. Every frame in an animation can be adjusted at once by selecting the whole animation, and several animations can be adjusted together by selecting all of them. To line animations up against each other, see [Align Animations](align-animations.md).
 
 <figure><img src="../../.gitbook/assets/edit-frames-drag-offset-in-preview.gif" alt="Dragging a frame in the preview to change its offset"><figcaption></figcaption></figure>
