@@ -88,12 +88,15 @@ internal sealed class TestServices
         ThumbnailService  = new ThumbnailService(ProjectManager);
     }
 
-    public MainWindow CreateMainWindow() =>
+    /// <param name="useMacOSChrome">
+    /// Off by default so every OS gets the in-window title bar and menu the harness clicks.
+    /// </param>
+    public MainWindow CreateMainWindow(bool useMacOSChrome = false) =>
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
             ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot,
-            ApplicationUpdater, EditorDialogHost);
+            ApplicationUpdater, EditorDialogHost, useMacOSChrome);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

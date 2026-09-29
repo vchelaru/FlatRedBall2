@@ -203,6 +203,11 @@ public partial class MainWindow : Window
     // Shared per-user config dir, NOT the build output — so recent files / tabs / theme survive
     // rebuilds, dotnet clean, and switching git worktrees (see issue #424). AppContext.BaseDirectory
     // resolves to bin/<Config>/<TFM>/, which is per-build / per-checkout.
+    // Native title bar and system menu bar instead of the in-window ones. Production passes
+    // OperatingSystem.IsMacOS(); tests leave it off so headless runs get the same window on every OS
+    // (the headless platform has no native menu bar to click).
+    private readonly bool _useMacOSChrome;
+
     private FilePath SettingsFilePath =>
         AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
 
@@ -221,9 +226,11 @@ public partial class MainWindow : Window
         IFileAssociationService fileAssociation,
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null,
-        IEditorDialogHost? dialogHost = null)
+        IEditorDialogHost? dialogHost = null,
+        bool useMacOSChrome = false)
     {
         _applicationDataRoot = applicationDataRoot;
+        _useMacOSChrome = useMacOSChrome;
 
         _projectManager = projectManager;
         _selectedState = selectedState;
@@ -249,7 +256,7 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        if (OperatingSystem.IsMacOS())
+        if (_useMacOSChrome)
             ApplyMacOSWindowChrome();
 
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
@@ -2582,7 +2589,7 @@ public partial class MainWindow : Window
         RefreshRecentFiles();
 
         // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
-        if (OperatingSystem.IsMacOS())
+        if (_useMacOSChrome)
             MainMenu.IsVisible = false;
     }
 

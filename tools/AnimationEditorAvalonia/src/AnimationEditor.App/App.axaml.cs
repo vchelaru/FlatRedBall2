@@ -299,7 +299,8 @@ public partial class App : Application
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            sp.GetRequiredService<IApplicationUpdater>()));
+            sp.GetRequiredService<IApplicationUpdater>(),
+            useMacOSChrome: OperatingSystem.IsMacOS()));
 
         return sc.BuildServiceProvider();
     }
