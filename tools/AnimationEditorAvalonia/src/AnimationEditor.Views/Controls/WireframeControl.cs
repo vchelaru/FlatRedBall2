@@ -1444,7 +1444,7 @@ public class WireframeControl : TextureViewport
     {
         var props = e.GetCurrentPoint(this).Properties;
         var pos = e.GetPosition(this);
-        bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
+        bool isCtrl = CommandModifier.IsHeld(e.KeyModifiers);
 
         if (!props.IsLeftButtonPressed) return;
 
@@ -1616,7 +1616,7 @@ public class WireframeControl : TextureViewport
         }
 
         _hoverPointerPos = pos;
-        UpdateHoverCursor(pos, isCtrl: (e.KeyModifiers & KeyModifiers.Control) != 0);
+        UpdateHoverCursor(pos, isCtrl: CommandModifier.IsHeld(e.KeyModifiers));
 
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
@@ -1741,11 +1741,17 @@ public class WireframeControl : TextureViewport
 
     /// <summary>
     /// Re-evaluates the cursor at the last known pointer position without requiring pointer
-    /// movement -- called by <c>MainWindow</c> when Ctrl is pressed or released while the
-    /// pointer sits still over this control, so the add-frame cursor toggles immediately (#882)
-    /// instead of waiting for the next pointer move.
+    /// movement -- called by <c>MainWindow</c> when the <see cref="CommandModifier"/> key is
+    /// pressed or released while the pointer sits still over this control, so the add-frame
+    /// cursor toggles immediately (#882) instead of waiting for the next pointer move.
     /// </summary>
-    public void RefreshCursorForCtrlChange(bool isCtrl) => UpdateHoverCursor(_lastPointerPos, isCtrl);
+    public void RefreshCursorForCommandModifierChange(bool isHeld) => UpdateHoverCursor(_lastPointerPos, isHeld);
+
+    /// <summary>
+    /// The modifier that turns a click into add-frame and shows the add-frame ghost: ⌘ on macOS,
+    /// Ctrl elsewhere. Set by the host, which knows the OS; defaults to Ctrl.
+    /// </summary>
+    public CommandModifier CommandModifier { get; set; } = CommandModifier.Control;
 
     /// <summary>
     /// Pointer position while it hovers this control; null once it leaves. Separate from

@@ -1557,8 +1557,7 @@
                                 <ToggleButton x:Name="MagicWandToggle"
                                               Classes="toolbarToggle"
                                               Foreground="{DynamicResource Ink}"
-                                              CornerRadius="0,3,3,0"
-                                              ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">
+                                              CornerRadius="0,3,3,0">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <svg:Svg Width="16" Height="16"
                                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconMagicWand.svg"
