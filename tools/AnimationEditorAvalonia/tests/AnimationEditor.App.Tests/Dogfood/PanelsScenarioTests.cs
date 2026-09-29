@@ -151,7 +151,7 @@ public class PanelsScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         string original = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        string copy = Path.Combine(editor.ProjectFolder, "heroCopy.achx");
+        string copy = Path.Combine(editor.ProjectFolder, "hero2.achx");
         await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
         editor.Layout();
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");

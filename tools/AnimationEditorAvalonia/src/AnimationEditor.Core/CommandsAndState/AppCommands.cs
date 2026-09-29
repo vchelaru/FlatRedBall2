@@ -1600,7 +1600,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         // Swaps Left<->Right and/or Up<->Down direction tokens in a chain name (e.g. "WalkRight"
         // flipped horizontally becomes "WalkLeft") so a flipped duplicate reads correctly instead
-        // of "WalkRightCopy". Ported from the old (pre-Avalonia) AnimationEditor's duplicate+flip
+        // of "WalkRight2". Ported from the old (pre-Avalonia) AnimationEditor's duplicate+flip
         // rename behavior (issue #920). A token must not be immediately followed by a lowercase
         // letter, so it only matches a standalone PascalCase word ("WalkRight", trailing "Up") and
         // not a prefix of a longer word ("Rightful", "Upgrade"). Returns the name unchanged if no
@@ -1664,8 +1664,10 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 var copy = CloneChainWithFlip(source, flipH, flipV);
                 var invertedName = InvertDirectionTokens(source.Name, flipH, flipV);
-                var desiredName = invertedName != source.Name ? invertedName : source.Name + "Copy";
-                copy.Name = StringFunctions.MakeStringUnique(desiredName, existingNames, 2);
+                // Duplicates increment the trailing number (Walk -> Walk2, Walk2 -> Walk3, Id0 -> Id1)
+                // so repeated duplicates never stack a suffix. Only an unnumbered name skips 1.
+                bool numbered = invertedName.Length > 0 && char.IsDigit(invertedName[^1]);
+                copy.Name = StringFunctions.MakeStringUnique(invertedName, existingNames, numbered ? 1 : 2);
                 existingNames.Add(copy.Name);
                 items.Add((source, copy));
             }

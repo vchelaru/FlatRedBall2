@@ -8,9 +8,9 @@ namespace AnimationEditor.App.Theming;
 /// <para>
 /// Colors that would otherwise vanish against the opposite background live here
 /// (canvas fill, grid lines, texture outline, ruler strips/ticks/labels, and the
-/// preview guide lines — bright cyan on dark, a deep blue on light). Truly saturated
-/// <i>semantic</i> overlays — frame-region blue, origin/shape gold and green —
-/// read legibly on both themes and stay as constants in the controls.
+/// preview guide lines — bright cyan on dark, a deep blue on light). Saturated
+/// <i>semantic</i> overlays (frame-region blue, origin/shape gold and green) read legibly
+/// on both themes and live in <see cref="EditorColors"/>.
 /// </para>
 /// <para>
 /// <see cref="GuideLine"/> is stored opaque; callers apply their own alpha via

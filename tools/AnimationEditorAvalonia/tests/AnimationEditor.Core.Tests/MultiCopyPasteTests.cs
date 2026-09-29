@@ -181,7 +181,7 @@ public class MultiCopyPasteTests
             Chains = new[] { c1, c2 },
         });
 
-        Assert.Equal(new[] { "Chain1", "Chain2", "Chain1Copy", "Chain2Copy", "Chain3", "Chain4" },
+        Assert.Equal(new[] { "Chain1", "Chain2", "Chain5", "Chain6", "Chain3", "Chain4" },
             ctx.Acls.AnimationChains.Select(c => c.Name));
     }
 

@@ -523,8 +523,8 @@ public partial class MainWindow : Window
                     // Create a floating ghost label that follows the pointer
                     _ghostBorder = new Border
                     {
-                        Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3a4150")),
-                        BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#4a90d9")),
+                        Background = new Avalonia.Media.SolidColorBrush(EditorColors.DragLabelBackground),
+                        BorderBrush = new Avalonia.Media.SolidColorBrush(EditorColors.DropIndicator),
                         BorderThickness = new Avalonia.Thickness(1),
                         CornerRadius = new Avalonia.CornerRadius(3),
                         Padding = new Avalonia.Thickness(10, 5),
@@ -534,7 +534,7 @@ public partial class MainWindow : Window
                         {
                             Text = captured.DisplayName,
                             FontSize = 11,
-                            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d4d8de")),
+                            Foreground = new Avalonia.Media.SolidColorBrush(EditorColors.DragLabelText),
                         },
                     };
                     var initPos = args.GetPosition(DragOverlayCanvas);
@@ -3511,7 +3511,7 @@ public partial class MainWindow : Window
             if (target.IsValid)
             {
                 e.DragEffects = DragDropEffects.Move;
-                ShowChainDropIndicator(e);
+                ShowChainDropIndicator(target);
             }
             else
             {
@@ -3873,7 +3873,7 @@ public partial class MainWindow : Window
         _frameDropLine ??= new Border
         {
             Height = 2,
-            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            Background = new SolidColorBrush(EditorColors.DropIndicator),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_frameDropLine))
@@ -3888,10 +3888,10 @@ public partial class MainWindow : Window
     {
         _frameDropBox ??= new Border
         {
-            BorderBrush = new SolidColorBrush(Color.Parse("#4a90d9")),
+            BorderBrush = new SolidColorBrush(EditorColors.DropIndicator),
             BorderThickness = new Avalonia.Thickness(2),
             CornerRadius = new Avalonia.CornerRadius(3),
-            Background = new SolidColorBrush(Color.Parse("#334a90d9")), // faint fill to suggest the target area
+            Background = new SolidColorBrush(EditorColors.DropTargetFill),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_frameDropBox))
@@ -4060,12 +4060,17 @@ public partial class MainWindow : Window
     /// <summary>
     /// Draws a thin insert line at the resolved chain boundary. Chains are root nodes, so the
     /// line spans the full tree width (no box — a box reads as "drop inside", which is the
-    /// frame-into-chain affordance, not a sibling reorder).
+    /// frame-into-chain affordance, not a sibling reorder). Positioned from the resolved
+    /// target, not the hovered row, so it never lands between a chain and its frames.
     /// </summary>
-    private void ShowChainDropIndicator(DragEventArgs e)
+    private void ShowChainDropIndicator(ChainDropTarget target)
     {
-        var (_, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
-        if (tvi is null)
+        var chains = _projectManager.AnimationChainListSave?.AnimationChains;
+        var anchor = chains is null ? null : ChainDropResolver.GetIndicatorAnchor(target, chains);
+        var vm = anchor is null ? null : TreeBuilder.FindNodeForData(_treeRoots, anchor.Value.Chain);
+        // A chain's container spans its header plus any expanded frames, so its bottom edge
+        // is below the last frame.
+        if (vm is null || AnimTree.ContainerFromItem(vm) is not TreeViewItem tvi)
         {
             RemoveFrameDropIndicators();
             return;
@@ -4080,7 +4085,7 @@ public partial class MainWindow : Window
         }
 
         double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
-        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        double y = topLeft.Value.Y + (anchor!.Value.Edge == ChainIndicatorEdge.Top ? 0 : tvi.Bounds.Height);
         RemoveDropBox();
         ShowDropLine(treeOrigin.Value.X, treeRight, y);
     }
@@ -6178,7 +6183,7 @@ public partial class MainWindow : Window
         _tabDropLine ??= new Border
         {
             Width = 2,
-            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            Background = new SolidColorBrush(EditorColors.DropIndicator),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_tabDropLine))

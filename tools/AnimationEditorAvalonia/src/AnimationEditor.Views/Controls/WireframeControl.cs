@@ -1,3 +1,4 @@
+using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
@@ -90,11 +91,9 @@ public class WireframeControl : TextureViewport
         /// <see cref="RevealAnimation.HandleAlpha"/> so the fade overlaps the tail of the
         /// selection shrink.</summary>
         public float HandleAlpha = 1f;
+        /// <summary>Texture-space region a Ctrl+click would create (#1241); null when Ctrl isn't held.</summary>
+        public SKRect? AddFrameGhost;
     }
-
-    private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
-    private static readonly SKColor CellOutlineColor = new(90, 220, 160, 230);
-    private static readonly SKColor TreeHoverColor = new(190, 130, 255, 170);
 
     // ── Overlay rendering ─────────────────────────────────────────────────────
 
@@ -112,7 +111,7 @@ public class WireframeControl : TextureViewport
         // into an offscreen layer (SaveLayerAlpha) — overlapping opaque draws are idempotent —
         // then the whole layer composites onto the canvas once at the tier's target alpha.
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
-        using var solidFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(80, 160, 255, 255) };
+        using var solidFill = new SKPaint { Style = SKPaintStyle.Fill, Color = EditorColors.FrameFill };
 
         var screenRects = new List<(SKRect Sr, bool IsSelected)>(s.Frames.Count);
         foreach (var (bounds, isSelected, revealProgress) in s.Frames)
@@ -134,7 +133,7 @@ public class WireframeControl : TextureViewport
 
         foreach (var (sr, isSelected) in screenRects)
         {
-            frameStroke.Color = isSelected ? new SKColor(80, 160, 255, 230) : new SKColor(80, 160, 255, 120);
+            frameStroke.Color = isSelected ? EditorColors.SelectedFrameStroke : EditorColors.FrameStroke;
             canvas.DrawRect(sr, frameStroke);
         }
 
@@ -145,10 +144,10 @@ public class WireframeControl : TextureViewport
             float hoverInflation = RevealAnimation.InflationPixels(s.TreeHoverRevealProgress);
             var hoverRects = s.TreeHoverFrameBounds
                 .Select(b => (InflateBy(s.TextureRectToScreen(b), hoverInflation), true)).ToList();
-            using var hoverFill = new SKPaint { Style = SKPaintStyle.Fill, Color = TreeHoverColor.WithAlpha(255) };
+            using var hoverFill = new SKPaint { Style = SKPaintStyle.Fill, Color = EditorColors.TreeHover.WithAlpha(255) };
             if (s.FillFrames)
                 DrawFillLayer(canvas, hoverRects, hoverFill, isSelected: true, alpha: 30);
-            frameStroke.Color = TreeHoverColor;
+            frameStroke.Color = EditorColors.TreeHover;
             foreach (var (sr, _) in hoverRects)
                 canvas.DrawRect(sr, frameStroke);
         }
@@ -156,7 +155,7 @@ public class WireframeControl : TextureViewport
         // Per-cell outlines inside selected spaced-grid frames (#1165): a second colour so the
         // strip of gap pixels between cells reads as "inside the frame rect, but not part of any
         // tile". Drawn after the frame strokes so a 1x1 frame's cell edge sits on top of its own outline.
-        frameStroke.Color = CellOutlineColor;
+        frameStroke.Color = EditorColors.GridCell;
         foreach (var bounds in s.FrameCellBounds)
             canvas.DrawRect(s.TextureRectToScreen(bounds), frameStroke);
 
@@ -171,7 +170,7 @@ public class WireframeControl : TextureViewport
         {
             using var cutPaint = new SKPaint
             {
-                Color = CutOutlineColor,
+                Color = EditorColors.PendingCut,
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 2f,
                 PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
@@ -180,16 +179,22 @@ public class WireframeControl : TextureViewport
                 canvas.DrawRect(s.TextureRectToScreen(bounds), cutPaint);
         }
 
+        // Add-frame ghost (#1241): where a Ctrl+click would create a frame. A solid dark underlay
+        // with a white dash on top reads over any texture pixel and either canvas theme.
+        if (s.AddFrameGhost is { } ghost)
+            DrawAddFrameGhost(canvas, s.TextureRectToScreen(ghost));
+
         // Resize handles on selected frame — faded in (#716), not drawn at all once invisible.
         if (s.SelectedHandleBounds.HasValue && s.HandleAlpha > 0f)
             DrawHandles(canvas, s.TextureRectToScreen(s.SelectedHandleBounds.Value), s.HandleAlpha);
 
-        // Magic-wand / grid-snap preview rectangle
-        if (s.ShowPreview)
+        // Magic-wand hover preview. Skipped under the add-frame ghost, which outlines the same
+        // flood-fill region while Ctrl is held.
+        if (s.ShowPreview && s.AddFrameGhost is null)
         {
             using var pvPaint = new SKPaint
             {
-                Color = new SKColor(255, 220, 0, 180),
+                Color = EditorColors.WandPreview,
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1.5f,
                 PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f)
@@ -205,16 +210,37 @@ public class WireframeControl : TextureViewport
             const float ArmLen = 8f;
             using var crossPaint = new SKPaint
             {
-                Color       = new SKColor(255, 220, 0, 230),
+                Color       = EditorColors.Origin,
                 Style       = SKPaintStyle.Stroke,
                 StrokeWidth = 1.5f,
                 IsAntialias = true
             };
             canvas.DrawLine(ox - ArmLen, oy, ox + ArmLen, oy, crossPaint);
             canvas.DrawLine(ox, oy - ArmLen, ox, oy + ArmLen, crossPaint);
-            using var dotPaint = new SKPaint { Color = new SKColor(255, 220, 0, 230) };
+            using var dotPaint = new SKPaint { Color = EditorColors.Origin };
             canvas.DrawCircle(ox, oy, 2f, dotPaint);
         }
+    }
+
+    /// <summary>
+    /// Both strokes use even widths on a pixel-snapped rect so the 2px dash lands exactly in the
+    /// middle of the 4px underlay. Any other mix rounds the dash toward one side, leaving the
+    /// outline outside only on the top/left edges and inside only on the bottom/right.
+    /// </summary>
+    internal static void DrawAddFrameGhost(SKCanvas canvas, SKRect screenRect)
+    {
+        var r = new SKRect(MathF.Round(screenRect.Left), MathF.Round(screenRect.Top),
+                           MathF.Round(screenRect.Right), MathF.Round(screenRect.Bottom));
+        using var underlay = new SKPaint { Color = EditorColors.PendingAddUnderlay, Style = SKPaintStyle.Stroke, StrokeWidth = 4f };
+        using var dash = new SKPaint
+        {
+            Color = EditorColors.PendingAdd,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2f,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 5f, 3f }, 0f),
+        };
+        canvas.DrawRect(r, underlay);
+        canvas.DrawRect(r, dash);
     }
 
     /// <summary>
@@ -243,8 +269,6 @@ public class WireframeControl : TextureViewport
         canvas.Restore();
     }
 
-    private static readonly SKColor HoverLabelBackground = new(80, 160, 255, 235);
-
     /// <summary>
     /// Draws the "Frame N" hover notch (#718) as a filled tag anchored at the top-left corner
     /// of <paramref name="sr"/> (already screen-space), sized purely in fixed pixels so it never
@@ -261,10 +285,10 @@ public class WireframeControl : TextureViewport
         float tagWidth = textWidth + PadX * 2f;
 
         var tagRect = ComputeHoverTagRect(sr, tagWidth, tagHeight);
-        using var bgPaint = new SKPaint { Color = HoverLabelBackground, IsAntialias = true };
+        using var bgPaint = new SKPaint { Color = EditorColors.FrameLabelBackground, IsAntialias = true };
         canvas.DrawRoundRect(tagRect, 3f, 3f, bgPaint);
 
-        using var textPaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        using var textPaint = new SKPaint { Color = EditorColors.FrameLabelText, IsAntialias = true };
         canvas.DrawText(label, tagRect.Left + PadX, tagRect.Top + tagHeight - PadY, font, textPaint);
     }
 
@@ -286,8 +310,8 @@ public class WireframeControl : TextureViewport
     private static void DrawHandles(SKCanvas canvas, SKRect sr, float alpha = 1f)
     {
         byte a = (byte)(Math.Clamp(alpha, 0f, 1f) * 255);
-        using var fill = new SKPaint { Color = SKColors.White.WithAlpha(a), Style = SKPaintStyle.Fill };
-        using var stroke = new SKPaint { Color = SKColors.DodgerBlue.WithAlpha(a), Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+        using var fill = new SKPaint { Color = EditorColors.HandleFill.WithAlpha(a), Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = EditorColors.HandleStroke.WithAlpha(a), Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
         foreach (var pt in HandlePoints(sr))
         {
@@ -1366,6 +1390,7 @@ public class WireframeControl : TextureViewport
         snap.FillFrames = _fillFrames;
         snap.ShowPreview = _showPreview;
         snap.PreviewRect = _previewRect;
+        snap.AddFrameGhost = _addFrameGhost;
 
         foreach (var fr in _frameRects)
             snap.Frames.Add((fr.Bounds, fr.IsSelected, GetSelectionRevealProgress(fr.Frame)));
@@ -1514,19 +1539,18 @@ public class WireframeControl : TextureViewport
 
         var world = ScreenToTexture((float)pos.X, (float)pos.Y);
 
+        // Ctrl+click in any mode creates a new frame from the region the add-frame ghost shows.
+        if (isCtrl)
+        {
+            if (ComputeAddFrameRegion(world) is { } region)
+                FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
+            return;
+        }
+
         // 2. Magic-wand mode
         if (_isMagicWandMode && _inspectableImage != null)
         {
-            if (isCtrl)
-            {
-                // Ctrl+click: create a new frame from the wand's flood-fill bounds.
-                _inspectableImage.GetOpaqueWandBounds(
-                    (int)world.X, (int)world.Y,
-                    out int minX, out int minY, out int maxX, out int maxY);
-                if (maxX >= minX && maxY >= minY)
-                    FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
-            }
-            else if (e.ClickCount >= 2 && _showPreview)
+            if (e.ClickCount >= 2 && _showPreview)
             {
                 // Double-click: apply the currently-hovered preview rect to the selected frame.
                 ApplyPreviewToSelectedFrame();
@@ -1539,34 +1563,37 @@ public class WireframeControl : TextureViewport
             return;
         }
 
-        // 3. Grid mode: Ctrl+click → create a new cell-sized frame; plain click →
-        //    select the frame under the cursor, same as plain mode. Resizing/repositioning
-        //    the selected frame onto a grid cell is an explicit gesture (double-click,
-        //    issue #363/#895) — a plain click must never silently move or resize it.
-        if (_showGrid && _grid.IsValid)
-        {
-            if (isCtrl)
-            {
-                var (gx, gy, gr, gb) = GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
-                FrameCreatedFromRegion?.Invoke(gx, gy, gr, gb);
-            }
-            else
-                TrySelectFrameAtPoint(world);
-            return;
-        }
-
-        // 4. Plain mode: Ctrl+click → create a new frame centered at the click point;
-        //    plain click → select the frame under the cursor.
-        if (isCtrl)
-        {
-            var (lastW, lastH) = GetLastFramePixelSize();
-            var (minX, minY, maxX, maxY) = PlainClickFrameRegionCalculator.Compute(
-                world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
-            FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
-            return;
-        }
-
+        // 3. Grid and plain mode: a plain click selects the frame under the cursor. Resizing or
+        //    repositioning the selected frame onto a grid cell is an explicit gesture
+        //    (double-click, issue #363/#895) — a plain click must never silently move or resize it.
         TrySelectFrameAtPoint(world);
+    }
+
+    /// <summary>
+    /// The texture-pixel region a Ctrl+click at <paramref name="world"/> creates: the wand's
+    /// flood-fill bounds in magic-wand mode, the cell under the point in grid mode, otherwise a
+    /// frame sized like the selected chain's last frame centered on the point. Null when there
+    /// is no bitmap or the wand finds no opaque pixel. Shared by the click and the add-frame
+    /// ghost (#1241) so the outline always matches what the click produces.
+    /// </summary>
+    private (int minX, int minY, int maxX, int maxY)? ComputeAddFrameRegion(SKPoint world)
+    {
+        if (_bitmap is null) return null;
+
+        if (_isMagicWandMode && _inspectableImage != null)
+        {
+            _inspectableImage.GetOpaqueWandBounds(
+                (int)world.X, (int)world.Y,
+                out int minX, out int minY, out int maxX, out int maxY);
+            return maxX >= minX && maxY >= minY ? (minX, minY, maxX, maxY) : null;
+        }
+
+        if (_showGrid && _grid.IsValid)
+            return GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
+
+        var (lastW, lastH) = GetLastFramePixelSize();
+        return PlainClickFrameRegionCalculator.Compute(
+            world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
     }
 
     /// <inheritdoc />
@@ -1588,6 +1615,7 @@ public class WireframeControl : TextureViewport
             return;
         }
 
+        _hoverPointerPos = pos;
         UpdateHoverCursor(pos, isCtrl: (e.KeyModifiers & KeyModifiers.Control) != 0);
 
         // Update hover preview for magic-wand / grid-snap
@@ -1656,6 +1684,7 @@ public class WireframeControl : TextureViewport
         // chain the click would target -- suppressed when that chain is locked (#1032 follow-up),
         // mirroring MainWindow.OnFrameCreatedFromRegion's own chain resolution.
         IsShowingAddFrameCursor = isCtrl && _bitmap != null && !IsAddFrameTargetLocked();
+        UpdateAddFrameGhost();
         if (IsShowingAddFrameCursor)
         {
             Cursor = AddFrameCursor;
@@ -1717,6 +1746,50 @@ public class WireframeControl : TextureViewport
     /// instead of waiting for the next pointer move.
     /// </summary>
     public void RefreshCursorForCtrlChange(bool isCtrl) => UpdateHoverCursor(_lastPointerPos, isCtrl);
+
+    /// <summary>
+    /// Pointer position while it hovers this control; null once it leaves. Separate from
+    /// <see cref="_lastPointerPos"/>, which only tracks drags, so the add-frame ghost follows
+    /// the hover and never appears when Ctrl is pressed with the pointer elsewhere.
+    /// </summary>
+    private Point? _hoverPointerPos;
+
+    private SKRect? _addFrameGhost;
+
+    /// <summary>
+    /// Texture-pixel region a Ctrl+click at the hovered point would create (#1241), outlined
+    /// on the canvas while Ctrl is held. Null when the add-frame cursor is not showing or the
+    /// pointer is not over this control.
+    /// </summary>
+    public SKRect? AddFrameGhost => _addFrameGhost;
+
+    private void UpdateAddFrameGhost()
+    {
+        SKRect? ghost = null;
+        if (IsShowingAddFrameCursor && _hoverPointerPos is { } pos &&
+            ComputeAddFrameRegion(ScreenToTexture((float)pos.X, (float)pos.Y)) is { } r)
+        {
+            ghost = new SKRect(r.minX, r.minY, r.maxX, r.maxY);
+        }
+
+        if (ghost != _addFrameGhost)
+        {
+            _addFrameGhost = ghost;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>
+    /// Test-only: hovers <paramref name="screenX"/>,<paramref name="screenY"/> with Ctrl held,
+    /// running the same path as a real pointer move, and returns <see cref="AddFrameGhost"/>.
+    /// </summary>
+    public SKRect? GetAddFrameGhostForScreenPoint(float screenX, float screenY)
+    {
+        var pos = new Point(screenX, screenY);
+        _hoverPointerPos = pos;
+        UpdateHoverCursor(pos, isCtrl: true);
+        return _addFrameGhost;
+    }
 
     /// <inheritdoc />
     protected override void OnEditPointerReleased(PointerReleasedEventArgs e)
@@ -1851,6 +1924,8 @@ public class WireframeControl : TextureViewport
         Cursor = Cursor.Default;
         if (_showPreview) { _showPreview = false; InvalidateVisual(); }
         ClearHoverFrame();
+        _hoverPointerPos = null;
+        UpdateAddFrameGhost();
     }
 
     // ── Mouse helpers ─────────────────────────────────────────────────────────
@@ -2281,11 +2356,13 @@ public class WireframeControl : TextureViewport
     public void SimulatePlainCtrlClick(float screenX, float screenY)
     {
         if (_bitmap is null || _showGrid || _isMagicWandMode) return;
-        var world = ScreenToTexture(screenX, screenY);
-        var (lastW, lastH) = GetLastFramePixelSize();
-        var (minX, minY, maxX, maxY) = PlainClickFrameRegionCalculator.Compute(
-            world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
-        FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+        SimulateCtrlClick(screenX, screenY);
+    }
+
+    private void SimulateCtrlClick(float screenX, float screenY)
+    {
+        if (ComputeAddFrameRegion(ScreenToTexture(screenX, screenY)) is { } r)
+            FrameCreatedFromRegion?.Invoke(r.minX, r.minY, r.maxX, r.maxY);
     }
 
     /// <summary>
@@ -2312,12 +2389,7 @@ public class WireframeControl : TextureViewport
     public void SimulateWandCtrlClick(float screenX, float screenY)
     {
         if (!_isMagicWandMode || _bitmap is null || _inspectableImage is null) return;
-        var world = ScreenToTexture(screenX, screenY);
-        _inspectableImage.GetOpaqueWandBounds(
-            (int)world.X, (int)world.Y,
-            out int minX, out int minY, out int maxX, out int maxY);
-        if (maxX >= minX && maxY >= minY)
-            FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+        SimulateCtrlClick(screenX, screenY);
     }
 
     /// <summary>

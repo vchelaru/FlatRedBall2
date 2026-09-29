@@ -208,6 +208,31 @@ public class WireframeScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task TrackpadScrollWorthOneNotch_ZoomsOneStep_LikeOneWheelNotch()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", Sheet, Sheet);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 32, 32)));
+        await editor.OpenAsync(path);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        Point point = editor.WireframePointAt(64, 64);
+
+        editor.Wheel(point, 1);
+        await editor.WaitUntilAsync(() => !editor.Wireframe.IsZoomAnimating, TimeSpan.FromSeconds(2));
+        float oneNotch = editor.Wireframe.CameraState.Zoom;
+        editor.Wheel(point, -1);
+        await editor.WaitUntilAsync(() => !editor.Wireframe.IsZoomAnimating, TimeSpan.FromSeconds(2));
+
+        for (int i = 0; i < 20; i++)
+        {
+            editor.Wheel(point, 0.05);
+        }
+        await editor.WaitUntilAsync(() => !editor.Wireframe.IsZoomAnimating, TimeSpan.FromSeconds(2));
+
+        editor.Wireframe.CameraState.Zoom.ShouldBe(oneNotch, 0.001f);
+    }
+
+    [AvaloniaFact]
     public async Task CtrlWheelOverTheWireframe_ZoomsIn_AndTheZoomBoxFollows()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
