@@ -1,9 +1,5 @@
 # Edit Animations
 
-## Introduction
-
-This guide covers how to edit animations in the AnimationEditor.
-
 ## Add an Animation
 
 To add an animation to an existing file, click the **Add Animation** button.
@@ -20,7 +16,7 @@ To rename an animation, select the animation, then change its name in the **Insp
 
 <figure><img src="../../.gitbook/assets/edit-animations-rename-inspector.png" alt="Animation name field in the Inspector tab"><figcaption></figcaption></figure>
 
-Alternatively, double-click the name of the animation, press **F2**, or right-click the animation and select **Rename…**.
+Alternatively, double-click the name of the animation, press **F2** (**Fn+F2** on Mac laptops), or right-click the animation and select **Rename…**.
 
 ## Delete an Animation
 
@@ -28,7 +24,7 @@ To delete an animation, right-click the animation and select **Delete Animation*
 
 <figure><img src="../../.gitbook/assets/edit-animations-delete.png" alt="Right-click menu on an animation with Delete Animation highlighted"><figcaption></figcaption></figure>
 
-Alternatively, press **Delete**, or press **Ctrl+X** (**⌘X** on macOS) to cut the animation if you intend to paste it elsewhere.
+Alternatively, press **Delete** (**Fn+Delete** on Mac laptops), or press **Ctrl+X** (**⌘X** on macOS) to cut the animation if you intend to paste it elsewhere.
 
 ## Reorder Animations
 
@@ -36,7 +32,7 @@ To reorder an animation, drag it to its new position in the list.
 
 <figure><img src="../../.gitbook/assets/edit-animations-reorder.gif" alt="Dragging an animation to a new position in the list"><figcaption></figcaption></figure>
 
-Alternatively, hold down **Alt** and press the **Up** or **Down** arrow key.
+Alternatively, hold down **Alt** (**⌥ Option** on macOS) and press the **Up** or **Down** arrow key.
 
 ## Duplicate an Animation
 
