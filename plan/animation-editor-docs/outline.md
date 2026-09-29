@@ -53,7 +53,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Copy, paste, and duplicate frames (Ctrl+D / ⌘D)
 │   │   ## Reorder frames (drag in the tree)
 │   │   ## Edit several frames at once (multi-select; mixed values)
-│   │   ## Change a frame's image (TEXTURE field, … browse, drop a PNG, View Texture in Explorer)
+│   │   ## Change a frame's image (TEXTURE field, … browse, drop a PNG, Reveal Texture in File Manager)
 │   │   ## Change what part of the image a frame shows (pointer to Choose what a frame shows)
 │   │   ## Flip a frame (Horizontal, Vertical, Diagonal)
 │   │   ## Change how long a frame shows
