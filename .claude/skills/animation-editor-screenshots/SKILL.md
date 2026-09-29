@@ -30,7 +30,7 @@ scripts/ae-before-after.py <capture.cs> <out-dir>
 scripts/push-pr-screenshots.py <pr#> <out-dir>
 ```
 
-`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png`. It works after the code is already edited. `gh` can't upload images, so `push-pr-screenshots.py` puts them on the orphan `pr-assets` branch and prints ready-to-paste `![name](url)` lines; it exits nonzero unless every URL serves, and is safe to run while other agents upload.
+`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png`. It works after the code is already edited. `gh` can't upload images, so `push-pr-screenshots.py` puts them on the orphan `pr-assets` branch and prints ready-to-paste markdown (each before/after pair as a side-by-side table, before on the left); it exits nonzero unless every URL serves, and is safe to run while other agents upload.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 

@@ -7,7 +7,8 @@ Every image directly in <folder> (png, jpg, jpeg, gif, webp) lands at pr-assets:
 other files and subfolders are skipped. Uses the GitHub API through `gh`, so it never touches the
 local checkout. Safe to run concurrently: a lost race for the branch is rebuilt on the new head and
 retried. Each printed URL is pinned to the upload's commit, so re-uploading a file with the same
-name never serves a stale copy, and is checked to serve before the script exits 0.
+name never serves a stale copy, and is checked to serve before the script exits 0. The printed
+markdown lays each before-X/after-X pair out side by side, ready to paste into the PR body.
 """
 import base64, json, os, random, subprocess, sys, time, urllib.error, urllib.request
 
@@ -86,6 +87,19 @@ def serves(url, timeout_s=60):
         time.sleep(3)
 
 
+def format_markdown(images):
+    """`images` is [(file name, url)]. Each before-X/after-X pair becomes a labeled two-column table,
+    before on the left; any other image follows as a plain line."""
+    stem = lambda name: os.path.splitext(name)[0]
+    urls = {stem(name): url for name, url in images}
+    pairs = sorted(s[len("before-"):] for s in urls if s.startswith("before-") and f"after-{s[7:]}" in urls)
+    paired = {f"{p}-{s}" for s in pairs for p in ("before", "after")}
+    blocks = [f"**{s}**\n\n| Before | After |\n| --- | --- |\n"
+              f"| ![before-{s}]({urls['before-' + s]}) | ![after-{s}]({urls['after-' + s]}) |" for s in pairs]
+    blocks += [f"![{s}]({urls[s]})" for s in sorted(urls) if s not in paired]
+    return "\n\n".join(blocks)
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -116,8 +130,7 @@ def main():
     if broken:
         print("Uploaded, but these URLs do not serve:\n" + "\n".join(broken), file=sys.stderr)
         return 1
-    for name, url in urls:
-        print(f"![{os.path.splitext(name)[0]}]({url})")
+    print(format_markdown(urls))
     return 0
 
 
