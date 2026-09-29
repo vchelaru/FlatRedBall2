@@ -133,8 +133,41 @@ public class PolygonScenarioTests
         HighlightedVertex(editor).ShouldBe(1);
     }
 
-    private static int HighlightedVertex(AnimationEditorHarness editor) =>
-        editor.Preview.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon).HighlightedVertex;
+    [AvaloniaFact]
+    public async Task FocusingAVertexRow_StartsItsHighlightEnlarged_ThenSettles_ButHoverDoesNot()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.TypeNumber("PropPolygonVertex1Y", "-8");
+        PolygonShape(editor).HighlightInflation.ShouldBeGreaterThan(0f);
+
+        editor.Preview.SettleVertexReveal();
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+    }
+
+    [AvaloniaFact]
+    public async Task TabbingFromAVertexXToItsY_DoesNotReplayTheReveal()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+        editor.TypeNumber("PropPolygonVertex1X", "8");
+        editor.Preview.SettleVertexReveal();
+
+        editor.Press(Key.Tab);
+
+        editor.Control<NumericUpDown>("PropPolygonVertex1Y").IsKeyboardFocusWithin.ShouldBeTrue();
+        HighlightedVertex(editor).ShouldBe(1);
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+    }
+
+    private static PreviewControl.PreviewShapeInfo PolygonShape(AnimationEditorHarness editor) =>
+        editor.Preview.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon);
+
+    private static int HighlightedVertex(AnimationEditorHarness editor) => PolygonShape(editor).HighlightedVertex;
 
     [AvaloniaFact]
     public async Task DraggingAVertexAcrossTheOutline_ShowsTheSelfIntersectionWarning()

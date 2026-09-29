@@ -5741,10 +5741,13 @@ public partial class MainWindow : Window
             foreach (var input in new[] { x, y })
             {
                 input.GotFocus += (_, _) => PreviewCtrl.InspectorVertexIndex = index;
-                input.LostFocus += (_, _) =>
+                // Deferred so tabbing X -> Y in the same row keeps the index instead of
+                // clearing and resetting it, which would replay the reveal.
+                input.LostFocus += (_, _) => Dispatcher.UIThread.Post(() =>
                 {
-                    if (PreviewCtrl.InspectorVertexIndex == index) PreviewCtrl.InspectorVertexIndex = -1;
-                };
+                    if (!x.IsKeyboardFocusWithin && !y.IsKeyboardFocusWithin && PreviewCtrl.InspectorVertexIndex == index)
+                        PreviewCtrl.InspectorVertexIndex = -1;
+                });
             }
             SealOnCommit(x, y);
             _polygonVertexRows.Add((x, y));

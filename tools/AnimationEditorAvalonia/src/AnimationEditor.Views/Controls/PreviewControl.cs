@@ -163,6 +163,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private const float        VertexHandleRadius = 5f;
     private int                _hoverVertexIndex = -1;
     private int                _inspectorVertexIndex = -1;
+    private RevealHost?        _vertexReveal;
 
     // -- Frame (sprite position) drag -------------------------------------------
     // Repositions AnimationFrameSave.RelativeX/Y by dragging the rendered sprite. Only
@@ -194,13 +195,26 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     /// <summary>
     /// Index of the selected polygon's vertex whose inspector row has focus, or -1. It is drawn
-    /// highlighted unless the pointer is over (or dragging) a different vertex.
+    /// highlighted unless the pointer is over (or dragging) a different vertex. Changing it to a
+    /// vertex plays the same shrink-to-rest reveal as a wireframe frame selection.
     /// </summary>
     public int InspectorVertexIndex
     {
         get => _inspectorVertexIndex;
-        set { if (_inspectorVertexIndex == value) return; _inspectorVertexIndex = value; InvalidateVisual(); }
+        set
+        {
+            if (_inspectorVertexIndex == value) return;
+            _inspectorVertexIndex = value;
+            if (value >= 0)
+                (_vertexReveal ??= new RevealHost(InvalidateVisual)).Restart();
+            else
+                _vertexReveal?.Settle();
+            InvalidateVisual();
+        }
     }
+
+    /// <summary>Test-only: finishes the inspector-focus vertex reveal synchronously.</summary>
+    internal void SettleVertexReveal() => _vertexReveal?.Settle();
 
     public bool ShowOnionSkin
     {
@@ -1552,7 +1566,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, p.X, p.Y, 0f, 0f,
                 selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
                 points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
-                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1));
+                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,
+                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f));
         }
         return list.ToArray();
     }
@@ -1563,6 +1578,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             : _hoverVertexIndex >= 0 ? _hoverVertexIndex
             : _inspectorVertexIndex;
         return index < vertexCount ? index : -1;
+    }
+
+    // Half the frame reveal's bump: a full 24px per side would bury a 5.5px vertex handle and its neighbors.
+    private float VertexRevealInflation()
+    {
+        bool inspectorDriven = _draggingVertexIndex < 0 && _hoverVertexIndex < 0 && _inspectorVertexIndex >= 0;
+        return inspectorDriven && _vertexReveal is { } reveal
+            ? RevealAnimation.InflationPixels(reveal.Progress) / 2f
+            : 0f;
     }
 
     private void UpdateHoverVertex(Point pos)
@@ -2645,7 +2669,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         bool IsClosed = true,
         bool IsSelfIntersecting = false,
         // Polygon vertex drawn enlarged: the one being dragged, else hovered, else focused in the inspector.
-        int HighlightedVertex = -1);
+        int HighlightedVertex = -1,
+        // Extra screen pixels per side on HighlightedVertex while its inspector-focus reveal plays.
+        float HighlightInflation = 0f);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2731,7 +2757,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             bool highlighted = i == sh.HighlightedVertex;
             float x = originX + pts[i * 2] * om;
             float y = originY - pts[i * 2 + 1] * om;
-            float h = highlighted ? highlightHalf : half;
+            float h = highlighted ? highlightHalf + sh.HighlightInflation : half;
             var rect = new SKRect(x - h, y - h, x + h, y + h);
             vertexFill.Color = highlighted ? EditorColors.PolygonVertexHighlight : EditorColors.PolygonVertex;
             canvas.DrawRect(rect, vertexFill);
