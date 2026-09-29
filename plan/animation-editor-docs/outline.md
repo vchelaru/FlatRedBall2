@@ -34,7 +34,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   ## Save
 │   ## Next Steps
 │
-├── How-To Guides                        (parent page: how-to/README.md, lists its guides)
+├── How-To Guides                        (parent page: how-to/README.md, lists its guides; ordered by workflow)
 │   ├── Work with project folders
 │   │   ## Introduction
 │   │   ## Open and Close a Project Folder
@@ -52,37 +52,38 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Add and delete frames
 │   │   ## Copy and paste frames
 │   │   ## Reorder frames (drag in the tree)
+│   │   ## Flip a frame
 │   │   ## Change how long a frame shows
-│   ├── Define frame regions
-│   │   ## Snap regions to a grid
-│   │   ## Select a region with the magic wand
+│   ├── Choose what a frame shows        (was "Define frame regions"; plain-language title)
+│   │   ## Snap to a grid
+│   │   ## Select with the magic wand
 │   │   ## Enter exact pixel coordinates
+│   ├── Preview an animation             (moved up: used after every edit)
+│   │   ## Playback and speed
+│   │   ## Onion skin
 │   ├── Align animations
 │   │   ## Use guides to spot misalignment
 │   │   ## Shift a frame with RelativeX / RelativeY
-│   ├── Flip and tint frames
+│   ├── Tint frames                      (was "Flip and tint frames"; flipping lives in Edit animations/frames)
 │   ├── Animate a Tiled tileset (.tsx)
 │   │   ## Open a .tsx file
 │   │   ## Animate a tile
 │   │   ## Name animations (auto "ID:{tileId}" names)
 │   │   ## Choose the placed tile (Owner tile)
 │   │   ## Fix animations Tiled can't represent (warning icon)
-│   ├── Add collision shapes
-│   └── Preview an animation
-│       ## Playback and speed
-│       ## Onion skin
+│   └── Add collision shapes
+│
+├── How Animations Work                  (explanation: concepts/how-animations-work.md; before Reference)
+│   ## Animations, frames, and textures
+│   ## Why frames point at regions instead of holding images
+│   ## The preview is a reference rendering
+│   ## How Tiled tilesets map to animations (tiles, tile IDs, multi-tile groups)
 │
 ├── Reference                            (parent page: reference/README.md, lists its pages)
 │   ├── The window                       (labeled screenshot, one line per panel)
 │   ├── Frame properties                 (every inspector field: meaning, units, range)
 │   ├── Keyboard shortcuts               (generate from HotkeyRegistry so it can't drift)
 │   └── File formats                     (.achx, .achj, and .tsx: what's stored, which runtimes read each)
-│
-├── How Animations Work                  (explanation: concepts/how-animations-work.md)
-│   ## Animations, frames, and textures
-│   ## Why frames point at regions instead of holding images
-│   ## The preview is a reference rendering
-│   ## How Tiled tilesets map to animations (tiles, tile IDs, multi-tile groups)
 │
 └── Code                                 (parent page: api/README.md, lists its pages)
     ├── Animations in MonoGame           (how-to)
