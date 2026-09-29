@@ -980,8 +980,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
         // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
         // viewport-space pivot. Smooth-zoom retargets and eases toward the next preset (#425).
         var pivot = e.GetPosition(this);
-        _zoomAnimator.Begin((float)pivot.X, (float)pivot.Y, e.Delta.Y > 0);
-        _zoomAnimator.StartTimer();   // live driver; tests drive StepZoomAnimation directly instead
+        _zoomAnimator.Wheel((float)pivot.X, (float)pivot.Y, e.Delta.Y);
         e.Handled = true;
     }
 

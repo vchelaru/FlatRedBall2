@@ -2231,8 +2231,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         // The control IS the viewport, so e.GetPosition(this) is the control-space pivot.
         // Smooth-zoom retargets and eases toward the next preset (#451), mirroring the Wireframe.
         var pt = e.GetPosition(this);
-        _zoomAnimator.Begin((float)pt.X, (float)pt.Y, e.Delta.Y > 0);
-        _zoomAnimator.StartTimer();   // live driver; tests drive StepZoomAnimation directly instead
+        _zoomAnimator.Wheel((float)pt.X, (float)pt.Y, e.Delta.Y);
         e.Handled = true;
     }
 

@@ -27,6 +27,7 @@ internal sealed class ZoomAnimator
     private readonly Action<float, float, float> _applyFactor;
     private readonly Action<float> _snapZoom;
     private readonly Func<int[]?> _getPresets;
+    private readonly WheelZoomAccumulator _wheelAccumulator = new();
 
     private DispatcherTimer? _timer;
     private bool _animating;
@@ -62,8 +63,8 @@ internal sealed class ZoomAnimator
     /// <summary>
     /// Retargets toward the next/previous preset from the given viewport-space pivot. A notch
     /// while already animating steps from the in-flight target so rapid spins accumulate.
-    /// Does NOT start the timer — the live wheel handler calls <see cref="StartTimer"/>; tests
-    /// drive <see cref="Step"/> directly.
+    /// Does NOT start the timer — the live path goes through <see cref="Wheel"/>; tests drive
+    /// <see cref="Step"/> directly.
     /// </summary>
     public void Begin(float pivotVpX, float pivotVpY, bool zoomIn)
     {
@@ -72,6 +73,18 @@ internal sealed class ZoomAnimator
         _pivotVpX = pivotVpX;
         _pivotVpY = pivotVpY;
         _animating = true;
+    }
+
+    /// <summary>
+    /// Live wheel entry point: feeds <paramref name="delta"/> through the notch accumulator and
+    /// retargets once per whole notch crossed, starting the timer if any step was taken.
+    /// </summary>
+    public void Wheel(float pivotVpX, float pivotVpY, double delta)
+    {
+        int steps = _wheelAccumulator.Consume(delta);
+        for (int i = 0; i < Math.Abs(steps); i++)
+            Begin(pivotVpX, pivotVpY, steps > 0);
+        if (steps != 0) StartTimer();
     }
 
     /// <summary>
