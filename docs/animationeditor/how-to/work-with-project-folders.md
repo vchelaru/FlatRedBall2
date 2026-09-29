@@ -45,4 +45,9 @@ If a project is open, you can track which portions of an image are used by anima
 Click on any frame to open the corresponding animation.
 
 <figure><img src="../../.gitbook/assets/project-folders-open-from-usage.gif" alt="Clicking a highlighted frame to open its animation"><figcaption></figcaption></figure>
+
 ## Work Without a Project Folder
+
+The AnimationEditor supports working directly with files without first selecting a project folder. You can create, save, and load files directly. The AnimationEditor remembers previously-opened files when it is closed so you can resume work.
+
+Quick edits and one-off files can be worked with, but the recommended workflow is to load proejcts since it simplifies finding files, adding new files, and tracking which parts of a png is used by animations.
