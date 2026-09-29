@@ -17,6 +17,15 @@ public readonly record struct ChainDropTarget(int InsertIndex, bool IsValid)
     public static readonly ChainDropTarget None = new(-1, false);
 }
 
+/// <summary>Which edge of a chain's tree row (including its expanded frames) the insert line sits on.</summary>
+public enum ChainIndicatorEdge { Top, Bottom }
+
+/// <summary>
+/// Where to draw a chain drop's insert line: the <see cref="Edge"/> of <see cref="Chain"/>'s whole
+/// tree row, so the line never lands between a chain and its own frames.
+/// </summary>
+public readonly record struct ChainIndicatorAnchor(AnimationChainSave Chain, ChainIndicatorEdge Edge);
+
 /// <summary>
 /// Why a chain drag may or may not be initiated from the current selection. Mirrors
 /// <see cref="FrameDragValidity"/>: <see cref="Valid"/> is the only state that starts a drag;
@@ -132,6 +141,23 @@ public static class ChainDropResolver
         int maxSel = indices[^1];
         bool valid = insertIndex <= minSel || insertIndex >= maxSel + 1;
         return new ChainDropTarget(insertIndex, valid);
+    }
+
+    /// <summary>
+    /// Maps a resolved drop to where its insert line is drawn: above the chain now at
+    /// <see cref="ChainDropTarget.InsertIndex"/>, or below the last chain when inserting at the end.
+    /// Derived from the resolved index, not the hovered row, so hovering a frame never draws a
+    /// line between frames. Null when the target is invalid or out of range.
+    /// </summary>
+    public static ChainIndicatorAnchor? GetIndicatorAnchor(
+        ChainDropTarget target, IReadOnlyList<AnimationChainSave> chains)
+    {
+        if (!target.IsValid || target.InsertIndex < 0 || chains.Count == 0) return null;
+        if (target.InsertIndex < chains.Count)
+            return new ChainIndicatorAnchor(chains[target.InsertIndex], ChainIndicatorEdge.Top);
+        if (target.InsertIndex == chains.Count)
+            return new ChainIndicatorAnchor(chains[^1], ChainIndicatorEdge.Bottom);
+        return null;
     }
 
     private static int IndexOf(IReadOnlyList<AnimationChainSave> chains, AnimationChainSave chain)

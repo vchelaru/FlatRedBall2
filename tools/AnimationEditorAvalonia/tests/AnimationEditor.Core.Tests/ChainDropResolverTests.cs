@@ -2,6 +2,7 @@ using AnimationEditor.Core.DragDrop;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
 using System.Linq;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -213,5 +214,44 @@ public class ChainDropResolverTests
         var selection = new List<object> { chains[0], chains[1] };
 
         Assert.False(ChainDropResolver.IsChainMultiSelectionContaining(selection, chains[2]));
+    }
+
+    [Fact]
+    public void GetIndicatorAnchor_InsertIndexInsideList_AnchorsAboveThatChain()
+    {
+        var a = new AnimationChainSave { Name = "A" };
+        var b = new AnimationChainSave { Name = "B" };
+        a.Frames.Add(new AnimationFrameSave());
+        var chains = new List<AnimationChainSave> { a, b };
+
+        // Insert index 1 means "after A", so the line goes above B, not under A's header
+        // (between A and its frames).
+        var anchor = ChainDropResolver.GetIndicatorAnchor(new ChainDropTarget(1, true), chains);
+
+        anchor.ShouldNotBeNull();
+        anchor.Value.Chain.ShouldBeSameAs(b);
+        anchor.Value.Edge.ShouldBe(ChainIndicatorEdge.Top);
+    }
+
+    [Fact]
+    public void GetIndicatorAnchor_InsertIndexAtEnd_AnchorsBelowLastChain()
+    {
+        var a = new AnimationChainSave { Name = "A" };
+        var b = new AnimationChainSave { Name = "B" };
+        var chains = new List<AnimationChainSave> { a, b };
+
+        var anchor = ChainDropResolver.GetIndicatorAnchor(new ChainDropTarget(2, true), chains);
+
+        anchor.ShouldNotBeNull();
+        anchor.Value.Chain.ShouldBeSameAs(b);
+        anchor.Value.Edge.ShouldBe(ChainIndicatorEdge.Bottom);
+    }
+
+    [Fact]
+    public void GetIndicatorAnchor_InvalidTarget_ReturnsNull()
+    {
+        var chains = new List<AnimationChainSave> { new() { Name = "A" } };
+
+        ChainDropResolver.GetIndicatorAnchor(ChainDropTarget.None, chains).ShouldBeNull();
     }
 }

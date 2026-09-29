@@ -3511,7 +3511,7 @@ public partial class MainWindow : Window
             if (target.IsValid)
             {
                 e.DragEffects = DragDropEffects.Move;
-                ShowChainDropIndicator(e);
+                ShowChainDropIndicator(target);
             }
             else
             {
@@ -4060,12 +4060,17 @@ public partial class MainWindow : Window
     /// <summary>
     /// Draws a thin insert line at the resolved chain boundary. Chains are root nodes, so the
     /// line spans the full tree width (no box — a box reads as "drop inside", which is the
-    /// frame-into-chain affordance, not a sibling reorder).
+    /// frame-into-chain affordance, not a sibling reorder). Positioned from the resolved
+    /// target, not the hovered row, so it never lands between a chain and its frames.
     /// </summary>
-    private void ShowChainDropIndicator(DragEventArgs e)
+    private void ShowChainDropIndicator(ChainDropTarget target)
     {
-        var (_, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
-        if (tvi is null)
+        var chains = _projectManager.AnimationChainListSave?.AnimationChains;
+        var anchor = chains is null ? null : ChainDropResolver.GetIndicatorAnchor(target, chains);
+        var vm = anchor is null ? null : TreeBuilder.FindNodeForData(_treeRoots, anchor.Value.Chain);
+        // A chain's container spans its header plus any expanded frames, so its bottom edge
+        // is below the last frame.
+        if (vm is null || AnimTree.ContainerFromItem(vm) is not TreeViewItem tvi)
         {
             RemoveFrameDropIndicators();
             return;
@@ -4080,7 +4085,7 @@ public partial class MainWindow : Window
         }
 
         double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
-        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        double y = topLeft.Value.Y + (anchor!.Value.Edge == ChainIndicatorEdge.Top ? 0 : tvi.Bounds.Height);
         RemoveDropBox();
         ShowDropLine(treeOrigin.Value.X, treeRight, y);
     }
