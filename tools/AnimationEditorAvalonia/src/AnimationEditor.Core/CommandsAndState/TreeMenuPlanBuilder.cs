@@ -63,9 +63,9 @@ public static class TreeMenuPlanBuilder
                 }
                 if (!isNativeTsx)
                 {
-                    items.Add(TreeMenuItem.Item("Add AxisAlignedRectangle", () => appCommands.AddAxisAlignedRectangle(frame)));
-                    items.Add(TreeMenuItem.Item("Add Circle", () => appCommands.AddCircle(frame)));
-                    items.Add(TreeMenuItem.Item("Add Polygon", () => appCommands.AddPolygon(frame)));
+                    items.Add(TreeMenuItem.Item("Add AxisAlignedRectangle", () => appCommands.AddAxisAlignedRectangle(frame), TreeMenuIcon.Rectangle));
+                    items.Add(TreeMenuItem.Item("Add Circle", () => appCommands.AddCircle(frame), TreeMenuIcon.Circle));
+                    items.Add(TreeMenuItem.Item("Add Polygon", () => appCommands.AddPolygon(frame), TreeMenuIcon.Polygon));
                     items.Add(TreeMenuItem.Separator());
                 }
                 items.Add(TreeMenuItem.Item("Copy", actions.Copy));

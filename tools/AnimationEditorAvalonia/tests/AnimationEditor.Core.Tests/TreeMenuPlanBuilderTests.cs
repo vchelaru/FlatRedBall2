@@ -30,6 +30,20 @@ public class TreeMenuPlanBuilderTests
     }
 
     [Fact]
+    public void Build_FrameNode_AddShapeItemsCarryMatchingIcons()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1).Frames[0];
+
+        var items = TreeMenuPlanBuilder.Build(
+            frame, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.Equal(TreeMenuIcon.Rectangle, items.Single(i => i.Header == "Add AxisAlignedRectangle").Icon);
+        Assert.Equal(TreeMenuIcon.Circle, items.Single(i => i.Header == "Add Circle").Icon);
+        Assert.Equal(TreeMenuIcon.Polygon, items.Single(i => i.Header == "Add Polygon").Icon);
+    }
+
+    [Fact]
     public void Build_ChainNode_DuplicateIsSubmenuWithThreeChildren()
     {
         var ctx = TestHelpers.SetupFreshAcls();

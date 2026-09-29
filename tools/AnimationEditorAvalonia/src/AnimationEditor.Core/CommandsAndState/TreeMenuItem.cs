@@ -15,18 +15,21 @@ public sealed class TreeMenuItem
     public IReadOnlyList<TreeMenuItem>? Children { get; }
     public TreeMenuHostSlot? HostSlot { get; }
     public bool IsSeparator { get; }
+    public TreeMenuIcon? Icon { get; }
 
     private TreeMenuItem(string? header, Action? onClick, IReadOnlyList<TreeMenuItem>? children,
-        TreeMenuHostSlot? hostSlot, bool isSeparator)
+        TreeMenuHostSlot? hostSlot, bool isSeparator, TreeMenuIcon? icon = null)
     {
         Header = header;
         OnClick = onClick;
         Children = children;
         HostSlot = hostSlot;
         IsSeparator = isSeparator;
+        Icon = icon;
     }
 
-    public static TreeMenuItem Item(string header, Action onClick) => new(header, onClick, null, null, false);
+    public static TreeMenuItem Item(string header, Action onClick, TreeMenuIcon? icon = null) =>
+        new(header, onClick, null, null, false, icon);
 
     public static TreeMenuItem Separator() => new(null, null, null, null, true);
 
@@ -40,6 +43,16 @@ public sealed class TreeMenuItem
     /// when walking the plan.
     /// </summary>
     public static TreeMenuItem HostSlotItem(TreeMenuHostSlot slot) => new(null, null, null, slot, false);
+}
+
+/// <summary>
+/// A menu-item icon, kept framework-free so each host maps it to its own image type.
+/// </summary>
+public enum TreeMenuIcon
+{
+    Rectangle,
+    Circle,
+    Polygon,
 }
 
 /// <summary>
