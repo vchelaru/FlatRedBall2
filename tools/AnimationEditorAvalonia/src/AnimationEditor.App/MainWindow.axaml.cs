@@ -1332,6 +1332,7 @@ public partial class MainWindow : Window
                 ShowToast($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowToast($"Auto save failed — {message}"));
+        _appCommands.Notified += message => Dispatcher.UIThread.InvokeAsync(() => ShowToast(message));
 
         Notifications.WireUndo(() => _undoManager.Undo());
 

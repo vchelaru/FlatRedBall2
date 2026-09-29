@@ -259,7 +259,7 @@ public class UndoCoverageRosterTests
                 var polygon = Polygon(ctx);
                 var before = AnimationEditor.Core.Utilities.PolygonVertices.CopyPoints(polygon);
                 AnimationEditor.Core.Utilities.PolygonVertices.Set(polygon, 2, 7f, 7f);
-                ctx.AppCommands.CommitPolygonPoints(polygon, before, "Move Vertex");
+                ctx.AppCommands.CommitPolygonPoints(polygon, before, PolygonVertexEdit.Move(2));
             }));
         yield return Row(nameof(IAppCommands.MatchRectangleToFrame),
             ctx => Sync(() => ctx.AppCommands.MatchRectangleToFrame(Rect(ctx), Zebra(ctx).Frames[0])));

@@ -135,7 +135,7 @@ public class AppCommandsPolygonTests
         var before = PolygonVertices.CopyPoints(polygon);
         PolygonVertices.Set(polygon, 2, 30, 30); // the preview mutates live while dragging
 
-        ctx.AppCommands.CommitPolygonPoints(polygon, before, "Move Vertex");
+        ctx.AppCommands.CommitPolygonPoints(polygon, before, PolygonVertexEdit.Move(2));
         ctx.UndoManager.Undo();
 
         PolygonVertices.Get(polygon, 2).ShouldBe((8f, 8f));

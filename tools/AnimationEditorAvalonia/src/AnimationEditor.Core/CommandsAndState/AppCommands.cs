@@ -2184,51 +2184,127 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.MovePolygonVertex"/>
-        public void MovePolygonVertex(PolygonSave polygon, int index, float x, float y) =>
-            EditPolygonPoints(polygon, $"Move Vertex {index + 1} of {ShapeUndoLabel.Format(polygon)}",
+        public void MovePolygonVertex(PolygonSave polygon, int index, float x, float y)
+        {
+            var (oldX, oldY) = PolygonVertices.Get(polygon, index);
+            EditPolygonPoints(polygon, VertexOp.Move, index,
                 p => PolygonVertices.Set(p, index, x, y),
+                p => OffsetVertex(p, index, x - oldX, y - oldY),
                 coalesceGroup: $"PolygonVertex:{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(polygon)}:{index}");
+        }
 
         /// <inheritdoc cref="IAppCommands.InsertPolygonVertex"/>
-        public void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y) =>
-            EditPolygonPoints(polygon, $"Add Vertex to {ShapeUndoLabel.Format(polygon)}",
-                p => PolygonVertices.Insert(p, index, x, y));
+        public void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y)
+        {
+            var (mx, my) = InsertionMidpoint(polygon, index);
+            EditPolygonPoints(polygon, VertexOp.Insert, index,
+                p => PolygonVertices.Insert(p, index, x, y),
+                p => InsertAtMidpoint(p, index, x - mx, y - my));
+        }
 
         /// <inheritdoc cref="IAppCommands.DeletePolygonVertex"/>
         public bool DeletePolygonVertex(PolygonSave polygon, int index)
         {
             if (PolygonVertices.Count(polygon) <= 3) return false;
-            return EditPolygonPoints(polygon, $"Delete Vertex from {ShapeUndoLabel.Format(polygon)}",
+            return EditPolygonPoints(polygon, VertexOp.Delete, index,
+                p => PolygonVertices.RemoveAt(p, index),
                 p => PolygonVertices.RemoveAt(p, index));
         }
 
         /// <inheritdoc cref="IAppCommands.CommitPolygonPoints"/>
-        public void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description)
+        public void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit)
         {
-            var frame = _objectFinder.GetAnimationFrameContaining(polygon);
-            var before = pointsBefore.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList();
-            if (frame is not null && IsFrameLocked(frame))
+            var before = new PolygonSave { Points = pointsBefore.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList() };
+            var after = PolygonVertices.CopyPoints(polygon);
+            // The live drag already moved the points. Put them back so the edit replays through one
+            // command from the "before" snapshot; a locked chain simply keeps its original outline.
+            polygon.Points.Clear();
+            polygon.Points.AddRange(PolygonVertices.CopyPoints(before));
+
+            int i = edit.Index;
+            var (ax, ay) = PolygonVertices.Get(new PolygonSave { Points = after }, i);
+            Action<PolygonSave> replay = p => { p.Points.Clear(); p.Points.AddRange(after); };
+            if (edit.Inserted)
             {
-                // The live drag already moved the points; a locked chain keeps its original outline.
-                polygon.Points.Clear();
-                polygon.Points.AddRange(before);
-                return;
+                var (mx, my) = InsertionMidpoint(before, i);
+                EditPolygonPoints(polygon, VertexOp.Insert, i, replay, p => InsertAtMidpoint(p, i, ax - mx, ay - my));
             }
-            _undoManager.Execute(new SetPolygonPointsCommand(
-                frame, polygon, before, PolygonVertices.CopyPoints(polygon), this, _events, description));
+            else
+            {
+                var (bx, by) = PolygonVertices.Get(before, i);
+                EditPolygonPoints(polygon, VertexOp.Move, i, replay, p => OffsetVertex(p, i, ax - bx, ay - by));
+            }
         }
 
-        // Applies the edit to a scratch copy so the command owns both snapshots, then runs it.
-        private bool EditPolygonPoints(PolygonSave polygon, string description,
-            Action<PolygonSave> edit, string? coalesceGroup = null)
+        /// <inheritdoc cref="IAppCommands.Notified"/>
+        public event Action<string>? Notified;
+
+        private enum VertexOp { Move, Insert, Delete }
+
+        private static void OffsetVertex(PolygonSave polygon, int index, float dx, float dy)
+        {
+            var (x, y) = PolygonVertices.Get(polygon, index);
+            PolygonVertices.Set(polygon, index, x + dx, y + dy);
+        }
+
+        // Midpoint of the edge a vertex inserted at `index` splits: from the vertex before it to the
+        // one it pushes along, wrapping to the first vertex when appending.
+        private static (float X, float Y) InsertionMidpoint(PolygonSave polygon, int index)
+        {
+            int count = PolygonVertices.Count(polygon);
+            var (ax, ay) = PolygonVertices.Get(polygon, (index - 1 + count) % count);
+            var (bx, by) = PolygonVertices.Get(polygon, index % count);
+            return ((ax + bx) / 2f, (ay + by) / 2f);
+        }
+
+        private static void InsertAtMidpoint(PolygonSave polygon, int index, float dx, float dy)
+        {
+            var (mx, my) = InsertionMidpoint(polygon, index);
+            PolygonVertices.Insert(polygon, index, mx + dx, my + dy);
+        }
+
+        // Applies `edit` to `polygon` and, when it is part of a polygon multi-selection, `peerEdit` to
+        // every other selected, unlocked polygon with the same vertex count (issue #1255). Edits run
+        // on scratch copies so one command owns every snapshot and undoes them together.
+        private bool EditPolygonPoints(PolygonSave polygon, VertexOp op, int index,
+            Action<PolygonSave> edit, Action<PolygonSave> peerEdit, string? coalesceGroup = null)
         {
             var frame = _objectFinder.GetAnimationFrameContaining(polygon);
             if (frame is not null && IsFrameLocked(frame)) return false;
+
+            var entries = new List<SetPolygonPointsCommand.Entry> { Edited(frame, polygon, edit) };
+            var selected = _selectedState.SelectedPolygons;
+            var peers = selected.Contains(polygon)
+                ? selected.Where(p => !ReferenceEquals(p, polygon) && !IsShapeLocked(null, p)).ToList()
+                : new List<PolygonSave>();
+            int count = PolygonVertices.Count(polygon);
+            foreach (var peer in peers.Where(p => PolygonVertices.Count(p) == count))
+                entries.Add(Edited(_objectFinder.GetAnimationFrameContaining(peer), peer, peerEdit));
+
+            string target = entries.Count == 1 ? ShapeUndoLabel.Format(polygon) : $"{entries.Count} Polygons";
+            string description = op switch
+            {
+                VertexOp.Insert => $"Add Vertex to {target}",
+                VertexOp.Delete => $"Delete Vertex from {target}",
+                _ => $"Move Vertex {index + 1} of {target}",
+            };
+            _undoManager.Execute(new SetPolygonPointsCommand(entries, this, _events, description, coalesceGroup));
+
+            int skipped = peers.Count + 1 - entries.Count;
+            if (skipped > 0)
+            {
+                string verb = op switch { VertexOp.Insert => "Added", VertexOp.Delete => "Deleted", _ => "Moved" };
+                Notified?.Invoke($"{verb} vertex on {entries.Count} of {peers.Count + 1} polygons, " +
+                    $"{skipped} skipped: different vertex count");
+            }
+            return true;
+        }
+
+        private static SetPolygonPointsCommand.Entry Edited(AnimationFrameSave? frame, PolygonSave polygon, Action<PolygonSave> edit)
+        {
             var scratch = new PolygonSave { Points = PolygonVertices.CopyPoints(polygon) };
             edit(scratch);
-            _undoManager.Execute(new SetPolygonPointsCommand(frame, polygon,
-                PolygonVertices.CopyPoints(polygon), scratch.Points, this, _events, description, coalesceGroup));
-            return true;
+            return new(frame, polygon, PolygonVertices.CopyPoints(polygon), scratch.Points);
         }
 
         /// <inheritdoc cref="IAppCommands.SealPendingEdits"/>

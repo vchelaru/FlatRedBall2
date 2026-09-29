@@ -85,6 +85,61 @@ public class PolygonScenarioTests
         editor.UndoLabels[^1].ShouldBe("Add Vertex to Polygon 'PolygonInstance'");
     }
 
+    // Two frames with a polygon each, both Ctrl-selected in the tree. Returns the one the preview
+    // shows (the one a drag edits) first.
+    private static async Task<(AnimationEditorHarness Editor, PolygonSave First, PolygonSave Second)> OpenWithTwoSelectedPolygonsAsync()
+    {
+        var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        var polygons = new List<PolygonSave>();
+        foreach (var frame in walk.Frames)
+        {
+            editor.RightClickRow(frame);
+            editor.PickTreeMenuItem("Add Polygon");
+            polygons.Add(frame.ShapesSave!.PolygonSaves.Single());
+        }
+        editor.ClickRow(polygons[1]);
+        editor.ClickRow(polygons[0], RawInputModifiers.Control);
+        editor.Services.SelectedState.SelectedPolygons.Count.ShouldBe(2);
+        var shown = editor.Services.SelectedState.SelectedPolygon.ShouldNotBeNull();
+        return (editor, shown, polygons.Single(p => !ReferenceEquals(p, shown)));
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAVertex_WithTwoPolygonsSelected_MovesTheSameVertexOnBoth_InOneUndo()
+    {
+        var (editor, first, second) = await OpenWithTwoSelectedPolygonsAsync();
+        using var _ = editor;
+
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14));
+
+        PolygonVertices.Get(first, 2).ShouldBe((20f, 14f));
+        PolygonVertices.Get(second, 2).ShouldBe((20f, 14f));
+        editor.UndoLabels[^1].ShouldBe("Move Vertex 3 of 2 Polygons");
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        PolygonVertices.Get(second, 2).ShouldBe((8f, 8f));
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAVertex_SkipsASelectedPolygonWithADifferentVertexCount_AndSaysSo()
+    {
+        var (editor, first, second) = await OpenWithTwoSelectedPolygonsAsync();
+        using var _ = editor;
+        PolygonVertices.Insert(second, 1, 0, -10);
+
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14));
+
+        PolygonVertices.Get(first, 2).ShouldBe((20f, 14f));
+        PolygonVertices.Get(second, 3).ShouldBe((8f, 8f));
+        editor.ToastText.ShouldBe("Moved vertex on 1 of 2 polygons, 1 skipped: different vertex count");
+    }
+
     [AvaloniaFact]
     public async Task DoubleClickingAVertex_DeletesIt_ButNeverBelowThree()
     {

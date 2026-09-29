@@ -428,10 +428,22 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Records an edit the caller already applied to <paramref name="polygon"/>'s points (a live
-        /// vertex drag) as one undo entry whose undo restores <paramref name="pointsBefore"/>. In a
-        /// locked chain the points are put back and nothing is recorded.
+        /// vertex drag, described by <paramref name="edit"/>) as one undo entry whose undo restores
+        /// <paramref name="pointsBefore"/>. In a locked chain the points are put back and nothing is
+        /// recorded.
         /// </summary>
-        void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description);
+        /// <remarks>
+        /// This and the other vertex edits (<see cref="MovePolygonVertex"/>,
+        /// <see cref="InsertPolygonVertex"/>, <see cref="DeletePolygonVertex"/>) repeat on every other
+        /// selected polygon with the same vertex count, in that polygon's local space: a move adds the
+        /// same delta to the same vertex index, an insert lands at that polygon's own edge midpoint
+        /// plus the same offset. Different vertex counts are skipped and reported through
+        /// <see cref="Notified"/>. The whole batch is one undo entry.
+        /// </remarks>
+        void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit);
+
+        /// <summary>A one-line message for the user about an edit that only partly applied.</summary>
+        event Action<string>? Notified;
 
         /// <summary>
         /// Sets Name/X/Y/ScaleX/ScaleY on every rectangle in <paramref name="rects"/> as a single
