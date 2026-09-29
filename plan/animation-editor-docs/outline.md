@@ -62,6 +62,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   ├── Preview an animation             (right after editing: used after every change)
 │   │   ## Playback and speed
 │   │   ## Show the previous frame (onion skin)
+│   │   ## Preview several animations together (multi-select stacks them)
 │   ├── Choose what a frame shows        (was "Define frame regions"; plain-language title)
 │   │   ## Snap to a grid (set cell size; drag moves and keeps size, double-click fits a cell)
 │   │   ## Select with the magic wand
