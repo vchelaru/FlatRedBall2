@@ -95,6 +95,9 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public TreeView AnimTree => Control<TreeView>("AnimTree");
 
+    /// <summary>The ANIMATIONS tree's search box. Its parts are reached through it because it has its own namescope.</summary>
+    public SearchToggleBox AnimSearch => Control<SearchToggleBox>("AnimSearchBox");
+
     public WireframeControl Wireframe => Control<WireframeControl>("WireframeCtrl");
 
     public PreviewControl Preview => Control<PreviewControl>("PreviewCtrl");
@@ -128,8 +131,14 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <summary>Every node in the tree, depth first.</summary>
     public IEnumerable<TreeNodeVm> Nodes => Flatten(AnimTree.ItemsSource?.OfType<TreeNodeVm>() ?? Enumerable.Empty<TreeNodeVm>());
 
+    /// <summary>
+    /// The control named <paramref name="name"/>. Falls back to a visual-tree search for controls the
+    /// window builds in code (the polygon vertex rows), which are not in the XAML name scope.
+    /// </summary>
     public T Control<T>(string name) where T : Control =>
-        Window.FindControl<T>(name) ?? throw new InvalidOperationException($"The window has no control named {name}.");
+        Window.FindControl<T>(name)
+        ?? Window.GetVisualDescendants().OfType<T>().FirstOrDefault(control => control.Name == name)
+        ?? throw new InvalidOperationException($"The window has no control named {name}.");
 
     #region Project fixtures
 
@@ -400,6 +409,23 @@ internal sealed class AnimationEditorHarness : IDisposable
         (float panX, float panY, float zoom) = Wireframe.CameraState;
         (float left, float top, _, _) = CanvasTransform.TextureRectToScreen(x, y, x, y, panX, panY, zoom);
         return PointIn(Wireframe, left, top);
+    }
+
+    /// <summary>
+    /// Window point over entity-space (<paramref name="x"/>, <paramref name="y"/>) in the preview, Y+
+    /// up, where shapes are drawn. Derived from the preview's own screen-to-world mapping so it
+    /// follows pan and zoom.
+    /// </summary>
+    public Point PreviewPointAt(float x, float y)
+    {
+        Layout();
+        (float originX, float originY) = Preview.ScreenToWorldForTest(0f, 0f);
+        (float oneX, _) = Preview.ScreenToWorldForTest(1f, 1f);
+        float zoom = 1f / (oneX - originX);
+        float centerX = -originX * zoom;
+        float centerY = -originY * zoom;
+        float scale = Services.AppState.OffsetMultiplier * zoom;
+        return PointIn(Preview, centerX + x * scale, centerY - y * scale);
     }
 
     /// <summary>The pixel rectangle (x, y, width, height) <paramref name="frame"/> covers on its texture.</summary>

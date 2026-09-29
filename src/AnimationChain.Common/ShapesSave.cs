@@ -42,16 +42,21 @@ public class Frb1ShapeData
     public float Blue = 1f;
 }
 
-/// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
-/// <remarks>Serialized as <c>&lt;AxisAlignedRectangleSave&gt;</c> inside <c>&lt;AxisAlignedRectangleSaves&gt;</c>.</remarks>
-public class AARectSave : Frb1ShapeData
+/// <summary>Fields every per-frame shape has: <see cref="AARectSave"/>, <see cref="CircleSave"/>, <see cref="PolygonSave"/>.</summary>
+public abstract class ShapeSave : Frb1ShapeData
 {
     /// <summary>Shape name; matched by name against entity-attached shapes.</summary>
     public string Name = string.Empty;
-    /// <summary>Center X relative to the entity.</summary>
+    /// <summary>X relative to the entity: the center of a rectangle or circle, the origin of a polygon.</summary>
     public float X;
-    /// <summary>Center Y relative to the entity.</summary>
+    /// <summary>Y relative to the entity (Y+ up): the center of a rectangle or circle, the origin of a polygon.</summary>
     public float Y;
+}
+
+/// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
+/// <remarks>Serialized as <c>&lt;AxisAlignedRectangleSave&gt;</c> inside <c>&lt;AxisAlignedRectangleSaves&gt;</c>.</remarks>
+public class AARectSave : ShapeSave
+{
     /// <summary>Half-width (FRB1 convention). Loaded as <c>Width = ScaleX * 2</c>.</summary>
     public float ScaleX = 16f;
     /// <summary>Half-height (FRB1 convention). Loaded as <c>Height = ScaleY * 2</c>.</summary>
@@ -59,28 +64,19 @@ public class AARectSave : Frb1ShapeData
 }
 
 /// <summary>Serialized circle entry within a <see cref="ShapesSave"/>.</summary>
-public class CircleSave : Frb1ShapeData
+public class CircleSave : ShapeSave
 {
-    /// <summary>Shape name.</summary>
-    public string Name = string.Empty;
-    /// <summary>Center X relative to the entity.</summary>
-    public float X;
-    /// <summary>Center Y relative to the entity.</summary>
-    public float Y;
     /// <summary>Circle radius.</summary>
     public float Radius = 16f;
 }
 
 /// <summary>Serialized polygon entry within a <see cref="ShapesSave"/>.</summary>
-public class PolygonSave : Frb1ShapeData
+public class PolygonSave : ShapeSave
 {
-    /// <summary>Shape name.</summary>
-    public string Name = string.Empty;
-    /// <summary>Origin X relative to the entity.</summary>
-    public float X;
-    /// <summary>Origin Y relative to the entity.</summary>
-    public float Y;
-    /// <summary>Polygon vertices in local space.</summary>
+    /// <summary>
+    /// Vertices relative to the origin (<see cref="ShapeSave.X"/>/<see cref="ShapeSave.Y"/>), Y+ up.
+    /// FRB1 closes an outline by repeating the first point at the end; that repeated point is stored here as-is.
+    /// </summary>
     public List<Vector2Save> Points = new();
 }
 

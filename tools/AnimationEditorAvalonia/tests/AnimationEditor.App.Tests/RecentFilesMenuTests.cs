@@ -8,7 +8,7 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Verifies the Load Recent submenu shows abbreviated file names with full-path
+/// Verifies the Open Recent submenu shows abbreviated file names with full-path
 /// tooltips and limits to five items.
 /// </summary>
 public class RecentFilesMenuTests

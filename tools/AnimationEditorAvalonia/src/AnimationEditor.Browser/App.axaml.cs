@@ -319,7 +319,7 @@ public partial class App : Application
                 Children =
                 {
                     Icon("IconChain", 18, "Accent"),
-                    new TextBlock { Text = "Animation Editor", FontWeight = Avalonia.Media.FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center },
+                    new TextBlock { Text = "AnimationEditor", FontWeight = Avalonia.Media.FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center },
                     new TextBlock { Text = "—", Opacity = 0.5, VerticalAlignment = VerticalAlignment.Center },
                     headerFileNameText,
                 },
@@ -758,10 +758,8 @@ public partial class App : Application
 
         deleteSelectedButton.Click += (_, _) =>
         {
-            if (selectedState.SelectedRectangle is { } rect)
-                appCommands.DeleteShapes(new List<AARectSave> { rect }, new List<CircleSave>());
-            else if (selectedState.SelectedCircle is { } circle)
-                appCommands.DeleteShapes(new List<AARectSave>(), new List<CircleSave> { circle });
+            if (selectedState.SelectedShape is { } shape)
+                appCommands.DeleteShapes(new[] { shape });
             else if (selectedState.SelectedFrame is { } frame)
                 appCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             else if (selectedState.SelectedChain is { } selectedChain)
@@ -1113,7 +1111,7 @@ public partial class App : Application
         // changed" event to subscribe to instead. See docs/BROWSER_FILES_PANEL_DECISION.md.
         var filesTab = new TabItem
         {
-            Header = "Textures",
+            Header = "Images",
             FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
             VerticalContentAlignment = VerticalAlignment.Center,
@@ -1124,7 +1122,7 @@ public partial class App : Application
         var projectPanel = new ProjectPanelControl();
         var projectTab = new TabItem
         {
-            Header = "Project",
+            Header = "Animations",
             FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
             VerticalContentAlignment = VerticalAlignment.Center,
@@ -1368,7 +1366,7 @@ public partial class App : Application
         // delegates to a command already exposed via a toolbar button in Phases 2/5/8, either by
         // re-raising that button's existing Click handler (RoutedEventArgs(Button.ClickEvent),
         // zero logic duplication) or calling the same already-tested helper the button's handler
-        // calls. Items with no real browser-side implementation (Load Recent, Copy/Cut/Paste/
+        // calls. Items with no real browser-side implementation (Open Recent, Copy/Cut/Paste/
         // Duplicate, Settings, View Log) are omitted rather than shown as disabled no-ops --
         // see docs/BROWSER_MENU_BAR_DECISION.md. No window controls (minimize/maximize/close) --
         // the browser tab already has real OS chrome for those.
@@ -1401,12 +1399,12 @@ public partial class App : Application
         menuSave.Click += (_, _) => saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuSaveAs = new MenuItem { Header = "Save _As…" };
         menuSaveAs.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        var menuExport = new MenuItem { Header = "_Export to PixiJS" };
+        var menuExport = new MenuItem { Header = "_PixiJS…" };
         menuExport.Click += (_, _) => exportPixiJsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var fileMenu = new MenuItem
         {
             Header = "_File",
-            Items = { menuNew, menuLoad, new Separator(), menuSave, menuSaveAs, new Separator(), menuExport },
+            Items = { menuNew, menuLoad, new Separator(), menuSave, menuSaveAs, new Separator(), new MenuItem { Header = "_Export", Items = { menuExport } } },
         };
 
         var menuUndo = new MenuItem { Header = "_Undo" };
@@ -1435,11 +1433,11 @@ public partial class App : Application
             },
         };
 
-        var menuWireframeZoomIn = new MenuItem { Header = "_Wireframe Zoom In" };
+        var menuWireframeZoomIn = new MenuItem { Header = "Wireframe _Zoom In" };
         menuWireframeZoomIn.Click += (_, _) => wireframeZoom.StepUp();
         var menuWireframeZoomOut = new MenuItem { Header = "Wireframe Zoom _Out" };
         menuWireframeZoomOut.Click += (_, _) => wireframeZoom.StepDown();
-        var menuPreviewZoomIn = new MenuItem { Header = "_Preview Zoom In" };
+        var menuPreviewZoomIn = new MenuItem { Header = "Preview Zoom _In" };
         menuPreviewZoomIn.Click += (_, _) => previewZoom.StepUp();
         var menuPreviewZoomOut = new MenuItem { Header = "Preview Zoom O_ut" };
         menuPreviewZoomOut.Click += (_, _) => previewZoom.StepDown();
@@ -1462,10 +1460,10 @@ public partial class App : Application
             },
         };
 
-        var menuDiagnostics = new MenuItem { Header = "_Diagnostics (F3)" };
+        var menuDiagnostics = new MenuItem { Header = "Show _Render Diagnostics", InputGesture = new KeyGesture(Key.F3) };
         menuDiagnostics.Click += (_, _) => ApplyDiagnostics(diagnosticsButton.IsChecked != true);
         var menuAbout = new MenuItem { Header = "_About" };
-        menuAbout.Click += (_, _) => status.Text = "Animation Editor (Avalonia Browser build).";
+        menuAbout.Click += (_, _) => status.Text = "AnimationEditor (Avalonia Browser build).";
         var helpMenu = new MenuItem { Header = "_Help", Items = { menuDiagnostics, new Separator(), menuAbout } };
 
         var menuBar = new Menu { Items = { fileMenu, editMenu, viewMenu, helpMenu } };

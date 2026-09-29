@@ -4,7 +4,7 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Issue #573 follow-up — "View in Explorer" opened Explorer at a default folder instead of
+/// Issue #573 follow-up — "Reveal in File Manager" opened Explorer at a default folder instead of
 /// selecting the file when the resolved path used forward slashes (e.g. from
 /// <c>AnimationEditor.Core.Paths.FilePath</c>). explorer.exe's <c>/select,</c> switch mis-parses
 /// forward slashes as extra switches, so the path must be backslash-normalized first.
@@ -29,7 +29,7 @@ public class ShellExplorerTests
         Assert.Equal(@"C:\proj\textures\hero.png", ShellExplorer.ToWindowsSelectPath(@"C:/proj\textures/hero.png"));
     }
 
-    // Issue #1059: OpenFolder backs "View in Explorer" on a folder row. Only the guard clauses
+    // Issue #1059: OpenFolder backs "Reveal in File Manager" on a folder row. Only the guard clauses
     // are unit-testable without actually launching the shell.
     [Fact]
     public void OpenFolder_MissingFolder_ReturnsError()

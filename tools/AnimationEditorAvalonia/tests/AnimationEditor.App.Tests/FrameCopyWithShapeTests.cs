@@ -92,8 +92,8 @@ public class FrameCopyWithShapeTests
             Dispatcher.UIThread.RunJobs();
 
             var clip = await window.Clipboard!.TryGetTextAsync();
-            ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out var rectangles, out _);
-            var rectangle = rectangles is { Count: > 0 } ? rectangles[0] : null;
+            ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out var shapes);
+            var rectangle = shapes?.OfType<AARectSave>().FirstOrDefault();
 
             Assert.True(frames is { Count: > 0 },
                 $"AnimTree.SelectedItem.Data = {Describe(selectedData)}; " +

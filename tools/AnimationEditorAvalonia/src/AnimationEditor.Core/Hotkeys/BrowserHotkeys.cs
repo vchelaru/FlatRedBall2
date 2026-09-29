@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.Hotkeys;
 /// Filters a hotkey table down to the subset safe to dispatch in a browser-hosted build.
 /// <see cref="ReservedIds"/> are ids the desktop table (<c>MainWindow.BuildHotkeyDefinitions</c>)
 /// defines whose gesture is hard-reserved by browsers before the page ever sees the keypress —
-/// Ctrl+N (new window), Ctrl+L (address bar), Ctrl+D (bookmark), Ctrl+Plus/Minus (page zoom).
+/// Ctrl+N (new window), Ctrl+O (open file), Ctrl+D (bookmark), Ctrl+Plus/Minus (page zoom).
 /// </summary>
 public static class BrowserHotkeys
 {

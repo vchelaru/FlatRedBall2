@@ -30,7 +30,7 @@ internal static class CrashLogging
         var path = LogFileLocation.Resolve(baseDirectory, applicationDataRoot, IsDirectoryWritable);
         LogFilePath = path.FullPath;
         _logger = new FileLogger(path.FullPath);
-        _logger.LogInformation("=== Animation Editor session started ===");
+        _logger.LogInformation("=== AnimationEditor session started ===");
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             LogCrash("AppDomain.UnhandledException", e.ExceptionObject as Exception);

@@ -186,8 +186,8 @@ public class TwoThingsAtOnceScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         await editor.OpenAsync(path);
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "Ru");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "Ru");
 
         editor.WriteAchx("hero.achx",
             AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
@@ -197,9 +197,9 @@ public class TwoThingsAtOnceScenarioTests
 
         // Model changes are grow-only by design: they never hide a row, only typing does.
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run", "Jump" });
-        editor.Control<TextBox>("SearchBox").Text.ShouldBe("Ru", "the filter text survives the reload");
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "R");
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "Ru");
+        editor.AnimSearch.SearchBox.Text.ShouldBe("Ru", "the filter text survives the reload");
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "R");
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "Ru");
         editor.VisibleChainHeaders.ShouldContain("Run");
         editor.VisibleChainHeaders.ShouldNotContain("Jump", "retyping the filter hides what does not match");
     }
@@ -216,8 +216,8 @@ public class TwoThingsAtOnceScenarioTests
         editor.ClickRow(editor.ChainNamed("Run"));
         editor.Press(Key.C, RawInputModifiers.Control);
         editor.Wait(TimeSpan.FromMilliseconds(100));
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "Walk");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "Walk");
         editor.ClickRow(editor.ChainNamed("Walk"));
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk" });
 

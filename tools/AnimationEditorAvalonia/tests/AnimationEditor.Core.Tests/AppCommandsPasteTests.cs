@@ -78,14 +78,14 @@ public class AppCommandsPasteTests
     }
 
     [Fact]
-    public void PasteRectangle_AddsRectangleToFrameAndIsUndoable()
+    public void PasteShapes_Rectangle_AddsRectangleToFrameAndIsUndoable()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Pasted" };
 
-        ctx.AppCommands.PasteRectangle(frame, rect);
+        ctx.AppCommands.PasteShapes(frame, new object[] { rect });
 
         Assert.Equal("Pasted", frame.ShapesSave!.AARectSaves.First().Name);
 
@@ -94,14 +94,14 @@ public class AppCommandsPasteTests
     }
 
     [Fact]
-    public void PasteCircle_AddsCircleToFrameAndIsUndoable()
+    public void PasteShapes_Circle_AddsCircleToFrameAndIsUndoable()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Pasted", Radius = 3 };
 
-        ctx.AppCommands.PasteCircle(frame, circle);
+        ctx.AppCommands.PasteShapes(frame, new object[] { circle });
 
         Assert.Equal("Pasted", frame.ShapesSave!.CircleSaves.First().Name);
 

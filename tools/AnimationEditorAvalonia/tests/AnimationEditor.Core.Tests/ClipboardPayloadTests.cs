@@ -30,7 +30,7 @@ public class ClipboardPayloadTests
         var text   = ClipboardPayload.Serialize(chains);
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out var gotChains, out _, out _, out _);
+            out var gotChains, out _, out _);
 
         Assert.True(ok);
         Assert.NotNull(gotChains);
@@ -55,7 +55,7 @@ public class ClipboardPayloadTests
         var text   = ClipboardPayload.Serialize(frames);
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out _, out var gotFrames, out _, out _);
+            out _, out var gotFrames, out _);
 
         Assert.True(ok);
         Assert.NotNull(gotFrames);
@@ -79,10 +79,10 @@ public class ClipboardPayloadTests
         var text = ClipboardPayload.Serialize(rect);
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out _, out _, out var gotRects, out _);
+            out _, out _, out var gotShapes);
 
         Assert.True(ok);
-        var gotRect = Assert.Single(gotRects!);
+        var gotRect = Assert.IsType<AARectSave>(Assert.Single(gotShapes!));
         Assert.Equal("HitBox", gotRect.Name);
         Assert.Equal(8f,  gotRect.ScaleX, precision: 4);
         Assert.Equal(16f, gotRect.ScaleY, precision: 4);
@@ -104,10 +104,10 @@ public class ClipboardPayloadTests
         var text   = ClipboardPayload.Serialize(circle);
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out _, out _, out _, out var gotCircles);
+            out _, out _, out var gotShapes);
 
         Assert.True(ok);
-        var gotCircle = Assert.Single(gotCircles!);
+        var gotCircle = Assert.IsType<CircleSave>(Assert.Single(gotShapes!));
         Assert.Equal("Sensor", gotCircle.Name);
         Assert.Equal(12f, gotCircle.Radius, precision: 4);
     }
@@ -128,19 +128,18 @@ public class ClipboardPayloadTests
     public void TryDeserialize_InvalidInput_ReturnsFalse(string? input)
     {
         bool ok = ClipboardPayload.TryDeserialize(input,
-            out var c, out var f, out var r, out var ci);
+            out var c, out var f, out var s);
         Assert.False(ok);
         Assert.Null(c);
         Assert.Null(f);
-        Assert.Null(r);
-        Assert.Null(ci);
+        Assert.Null(s);
     }
 
     [Fact]
     public void TryDeserialize_UnknownTypeName_ReturnsFalse()
     {
         bool ok = ClipboardPayload.TryDeserialize("UnknownType:<xml/>",
-            out _, out _, out _, out _);
+            out _, out _, out _);
         Assert.False(ok);
     }
 
@@ -148,7 +147,7 @@ public class ClipboardPayloadTests
     public void TryDeserialize_MalformedXml_ReturnsFalse()
     {
         bool ok = ClipboardPayload.TryDeserialize("CircleSave:<<<NOT XML>>>",
-            out _, out _, out _, out _);
+            out _, out _, out _);
         Assert.False(ok);
     }
 
@@ -158,21 +157,19 @@ public class ClipboardPayloadTests
     public void TryDeserialize_ChainList_OnlyChainsIsPopulated()
     {
         var text = ClipboardPayload.Serialize(new List<AnimationChainSave> { MakeChain("A") });
-        ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var rects, out var circles);
+        ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var shapes);
         Assert.NotNull(chains);
         Assert.Null(frames);
-        Assert.Null(rects);
-        Assert.Null(circles);
+        Assert.Null(shapes);
     }
 
     [Fact]
     public void TryDeserialize_FrameList_OnlyFramesIsPopulated()
     {
         var text = ClipboardPayload.Serialize(new List<AnimationFrameSave> { MakeFrame("a.png") });
-        ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var rects, out var circles);
+        ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var shapes);
         Assert.Null(chains);
         Assert.NotNull(frames);
-        Assert.Null(rects);
-        Assert.Null(circles);
+        Assert.Null(shapes);
     }
 }

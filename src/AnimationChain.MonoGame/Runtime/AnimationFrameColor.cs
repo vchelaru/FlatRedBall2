@@ -54,7 +54,7 @@ public static class AnimationFrameColor
     /// Computes the per-channel offset (range -1..1) that <see cref="SpriteBatchExtensions.DrawAnimation"/>
     /// passes to the add-color pixel shader for a frame whose <see cref="AnimationFrameBase.ColorOperation"/>
     /// is <see cref="ColorOperation.Add"/>. Unset channels default to 0 (the identity for Add). Values
-    /// are clamped to the Animation Editor's authored range (-255..255) before scaling.
+    /// are clamped to the AnimationEditor's authored range (-255..255) before scaling.
     /// </summary>
     public static Vector3 GetAddOffset(AnimationFrame frame)
     {

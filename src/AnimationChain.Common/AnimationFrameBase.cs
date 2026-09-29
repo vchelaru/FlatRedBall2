@@ -26,7 +26,7 @@ public abstract class AnimationFrameBase
 
     /// <summary>
     /// When <c>true</c>, the source region is transposed (flipped along the diagonal). Authored
-    /// and round-tripped by the Animation Editor; a renderer's draw call decides whether to apply
+    /// and round-tripped by the AnimationEditor; a renderer's draw call decides whether to apply
     /// it — MonoGame's <c>SpriteEffects</c> has no diagonal option, for example.
     /// </summary>
     public bool FlipDiagonal;

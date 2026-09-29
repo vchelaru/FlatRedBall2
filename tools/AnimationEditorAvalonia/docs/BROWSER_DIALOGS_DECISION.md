@@ -42,7 +42,7 @@ bitmap through `ThumbnailService`; desktop preserves its wireframe bitmap behavi
 
 - Headless tests cover overlay confirm/cancel behavior, the three browser menu entries, and a
   confirmed Add Multiple Frames mutation.
-- The complete Animation Editor solution builds with zero warnings and errors, including the
+- The complete AnimationEditor solution builds with zero warnings and errors, including the
   `net10.0-browser` WASM target.
 - Live-browser verification should confirm card styling, keyboard focus, background input
   blocking, and all three chain-dialog workflows.

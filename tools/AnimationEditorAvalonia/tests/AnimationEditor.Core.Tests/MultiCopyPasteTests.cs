@@ -46,7 +46,7 @@ public class MultiCopyPasteTests
         var r2 = new AARectSave { Name = "R2" };
         var c1 = new CircleSave { Name = "C1", Radius = 2 };
 
-        ctx.AppCommands.PasteShapes(frame, new[] { r1, r2 }, new[] { c1 });
+        ctx.AppCommands.PasteShapes(frame, new object[] { r1, r2, c1 });
 
         Assert.Equal(3, frame.ShapesSave!.Shapes.Count);
         Assert.Equal(3, ctx.SelectedState.SelectedNodes.Count);
@@ -63,7 +63,7 @@ public class MultiCopyPasteTests
         var frame = chain.Frames[0];
         frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "Hit" });
 
-        ctx.AppCommands.PasteShapes(frame, new[] { new AARectSave { Name = "Hit" } }, []);
+        ctx.AppCommands.PasteShapes(frame, new object[] { new AARectSave { Name = "Hit" } });
 
         var names = frame.ShapesSave.AARectSaves.Select(r => r.Name).ToList();
         Assert.Equal(2, names.Count);
@@ -82,7 +82,7 @@ public class MultiCopyPasteTests
         var rect = new AARectSave { Name = "Hit" };
         var circle = new CircleSave { Name = "Hurt", Radius = 2 };
 
-        ctx.AppCommands.PasteShapes(new[] { f0, f1, f2 }, new[] { rect }, new[] { circle });
+        ctx.AppCommands.PasteShapes(new[] { f0, f1, f2 }, new object[] { rect, circle });
 
         Assert.Equal(2, f0.ShapesSave!.Shapes.Count);
         Assert.Equal(2, f1.ShapesSave!.Shapes.Count);
@@ -108,7 +108,7 @@ public class MultiCopyPasteTests
         var unlockedFrame = unlockedChain.Frames[0];
         var rect = new AARectSave { Name = "Hit" };
 
-        ctx.AppCommands.PasteShapes(new[] { lockedFrame, unlockedFrame }, new[] { rect }, []);
+        ctx.AppCommands.PasteShapes(new[] { lockedFrame, unlockedFrame }, new object[] { rect });
 
         Assert.Empty(lockedFrame.ShapesSave!.Shapes);
         Assert.Single(unlockedFrame.ShapesSave!.Shapes);
@@ -337,9 +337,9 @@ public class MultiCopyPasteTests
         };
         var xml = ClipboardPayload.SerializeShapes(shapes);
 
-        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out var rects, out var circles));
-        Assert.Equal(2, rects!.Count);
-        Assert.Single(circles!);
+        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out var deserialized));
+        Assert.Equal(2, deserialized!.OfType<AARectSave>().Count());
+        Assert.Single(deserialized!.OfType<CircleSave>());
     }
 
     [Fact]
@@ -357,7 +357,7 @@ public class MultiCopyPasteTests
             out var payload, out _));
 
         var xml = ClipboardPayload.SerializeFromPayload(payload);
-        ClipboardPayload.TryDeserialize(xml, out _, out var frames, out _, out _);
+        ClipboardPayload.TryDeserialize(xml, out _, out var frames, out _);
         Assert.Equal(new[] { walkF.TextureName, runF.TextureName },
             frames!.Select(f => f.TextureName));
     }
@@ -380,7 +380,7 @@ public class MultiCopyPasteTests
             ctx.SelectedState, ctx.ObjectFinder, ctx.Acls,
             out var payload, out _));
         var xml = ClipboardPayload.SerializeFromPayload(payload);
-        ClipboardPayload.TryDeserialize(xml, out _, out var clipboardFrames, out _, out _);
+        ClipboardPayload.TryDeserialize(xml, out _, out var clipboardFrames, out _);
 
         var (target, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
             ctx.Acls, f2, ctx.ObjectFinder, ctx.SelectedState);

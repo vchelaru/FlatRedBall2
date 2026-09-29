@@ -78,6 +78,30 @@ public class CloseProjectTests
     }
 
     [AvaloniaFact]
+    public void NativeMenuCloseProjectFolder_ClearsTabsAndProjectState()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.AppCommands.AddAnimationChainWithName("Walk");
+            typeof(MainWindow)
+                .GetMethod("EnsureCurrentEditorContentHasTab", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, null);
+            Dispatcher.UIThread.RunJobs();
+
+            var tabManager = GetTabManager(window);
+            Assert.NotEmpty(tabManager.Tabs);
+
+            window.CreateNativeMenuActions().CloseProjectFolder();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Empty(tabManager.Tabs);
+            Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task CloseProjectAsync_ProjectFolderOpen_ClearsProjectPanelTree()
     {
         var (window, ctx) = CreateWindow();

@@ -142,8 +142,7 @@ public class AppCommandsDeleteTests
         frame.ShapesSave!.Shapes.Add(rect);
         frame.ShapesSave!.Shapes.Add(circle);
 
-        ctx.AppCommands.DeleteShapes(
-            new List<AARectSave> { rect }, new List<CircleSave> { circle });
+        ctx.AppCommands.DeleteShapes(new object[] { rect, circle });
 
         Assert.Empty(frame.ShapesSave!.AARectSaves);
         Assert.Empty(frame.ShapesSave!.CircleSaves);
@@ -169,7 +168,7 @@ public class AppCommandsDeleteTests
         frameA.ShapesSave!.Shapes.Add(rect);
         frameB.ShapesSave!.Shapes.Add(circle);
 
-        ctx.AppCommands.DeleteShapes(new List<AARectSave> { rect }, new List<CircleSave> { circle });
+        ctx.AppCommands.DeleteShapes(new object[] { rect, circle });
 
         Assert.Empty(frameA.ShapesSave!.Shapes);
         Assert.Empty(frameB.ShapesSave!.Shapes);
@@ -193,8 +192,7 @@ public class AppCommandsDeleteTests
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 
-        ctx.AppCommands.DeleteShapes(
-            new List<AARectSave> { rect }, new List<CircleSave> { circle });
+        ctx.AppCommands.DeleteShapes(new object[] { rect, circle });
 
         Assert.Equal("2 shapes", label);
     }
@@ -210,8 +208,7 @@ public class AppCommandsDeleteTests
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 
-        ctx.AppCommands.DeleteShapes(
-            new List<AARectSave> { rect }, new List<CircleSave>());
+        ctx.AppCommands.DeleteShapes(new object[] { rect });
 
         Assert.Equal("BodyCollision", label);
     }

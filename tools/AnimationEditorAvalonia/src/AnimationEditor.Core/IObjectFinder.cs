@@ -4,8 +4,7 @@ namespace AnimationEditor.Core
 {
     public interface IObjectFinder
     {
-        AnimationFrameSave? GetAnimationFrameContaining(AARectSave rectangle);
-        AnimationFrameSave? GetAnimationFrameContaining(CircleSave circle);
+        AnimationFrameSave? GetAnimationFrameContaining(ShapeSave shape);
         AnimationChainSave? GetAnimationChainContaining(AnimationFrameSave frame);
     }
 }

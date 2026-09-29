@@ -24,6 +24,7 @@ namespace AnimationEditor.Core
         private AnimationFrameSave? _selectedFrame;
         private AARectSave? _selectedRectangle;
         private CircleSave? _selectedCircle;
+        private PolygonSave? _selectedPolygon;
         private List<object> _selectedNodes = new List<object>();
 
         private SelectionSnapshot mSnapshot = new SelectionSnapshot();
@@ -42,6 +43,7 @@ namespace AnimationEditor.Core
                 _selectedFrame = null;
                 _selectedRectangle = null;
                 _selectedCircle = null;
+                _selectedPolygon = null;
                 SelectionChanged?.Invoke();
             }
         }
@@ -65,6 +67,7 @@ namespace AnimationEditor.Core
                 }
                 _selectedRectangle = null;
                 _selectedCircle = null;
+                _selectedPolygon = null;
                 SelectionChanged?.Invoke();
             }
         }
@@ -75,7 +78,7 @@ namespace AnimationEditor.Core
             set
             {
                 _selectedRectangle = value;
-                if (value != null) _selectedCircle = null;
+                if (value != null) { _selectedCircle = null; _selectedPolygon = null; }
                 SelectionChanged?.Invoke();
             }
         }
@@ -86,12 +89,40 @@ namespace AnimationEditor.Core
             set
             {
                 _selectedCircle = value;
-                if (value != null) _selectedRectangle = null;
+                if (value != null) { _selectedRectangle = null; _selectedPolygon = null; }
                 SelectionChanged?.Invoke();
             }
         }
 
-        public object? SelectedShape => (object?)_selectedRectangle ?? _selectedCircle;
+        public PolygonSave? SelectedPolygon
+        {
+            get => _selectedPolygon;
+            set
+            {
+                _selectedPolygon = value;
+                if (value != null) { _selectedRectangle = null; _selectedCircle = null; }
+                SelectionChanged?.Invoke();
+            }
+        }
+
+        public object? SelectedShape => (object?)_selectedRectangle ?? (object?)_selectedCircle ?? _selectedPolygon;
+
+        /// <inheritdoc/>
+        public void SelectShape(object? shape)
+        {
+            switch (shape)
+            {
+                case AARectSave r: SelectedRectangle = r; break;
+                case CircleSave c: SelectedCircle = c; break;
+                case PolygonSave p: SelectedPolygon = p; break;
+                default:
+                    _selectedRectangle = null;
+                    _selectedCircle = null;
+                    _selectedPolygon = null;
+                    SelectionChanged?.Invoke();
+                    break;
+            }
+        }
 
         public List<AnimationChainSave> SelectedChains =>
             _selectedNodes.OfType<AnimationChainSave>().ToList();
@@ -129,9 +160,31 @@ namespace AnimationEditor.Core
             }
         }
 
+        public List<PolygonSave> SelectedPolygons
+        {
+            get
+            {
+                var polygons = _selectedNodes.OfType<PolygonSave>().ToList();
+                if (polygons.Count == 0 && _selectedPolygon != null)
+                    polygons.Add(_selectedPolygon);
+                return polygons;
+            }
+        }
+
+        public List<object> SelectedShapes
+        {
+            get
+            {
+                var shapes = _selectedNodes.Where(n => n is ShapeSave).ToList();
+                if (shapes.Count == 0 && SelectedShape is { } single)
+                    shapes.Add(single);
+                return shapes;
+            }
+        }
+
         /// <summary>
         /// Multi-selection bag. Can hold AnimationChainSave, AnimationFrameSave,
-        /// AARectSave, or CircleSave objects.
+        /// AARectSave, CircleSave, or PolygonSave objects.
         /// </summary>
         public List<object> SelectedNodes
         {
@@ -197,6 +250,7 @@ namespace AnimationEditor.Core
             _selectedFrame = null;
             _selectedRectangle = null;
             _selectedCircle = null;
+            _selectedPolygon = null;
             _selectedNodes = new List<object>();
             SelectionChanged?.Invoke();
         }

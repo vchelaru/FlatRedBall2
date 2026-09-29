@@ -1,11 +1,11 @@
 ---
 name: animation-editor-rendering
-description: SkiaSharp rendering & performance in the Animation Editor — GPU vs CPU draw paths, SKImage/SKBitmap gotchas, diagnosing slow frames. Triggers: ICustomDrawOperation, DrawFrameCore, WireframeControl.DrawOp, GrContext, SKImage, F3 diagnostics overlay, ThumbnailService.
+description: SkiaSharp rendering & performance in the AnimationEditor — GPU vs CPU draw paths, SKImage/SKBitmap gotchas, diagnosing slow frames. Triggers: ICustomDrawOperation, DrawFrameCore, WireframeControl.DrawOp, GrContext, SKImage, F3 diagnostics overlay, ThumbnailService.
 ---
 
-# Animation Editor — Rendering & Performance
+# AnimationEditor — Rendering & Performance
 
-Where and how the Animation Editor draws pixels, and the SkiaSharp gotchas that come with it. Editor location/layout lives in the **`animation-editor`** skill; headless test discipline in **`animation-editor-testing`**.
+Where and how the AnimationEditor draws pixels, and the SkiaSharp gotchas that come with it. Editor location/layout lives in the **`animation-editor`** skill; headless test discipline in **`animation-editor-testing`**.
 
 Both panels render through a SkiaSharp `ICustomDrawOperation` on Avalonia's render thread (top: `WireframeControl.DrawOp.Render`; bottom: `PreviewControl.DrawFrameCore`). `lease.GrContext != null` means the GPU (ANGLE) path; null means CPU (software) — the two behave differently, so always know which you're on before reasoning about cost.
 

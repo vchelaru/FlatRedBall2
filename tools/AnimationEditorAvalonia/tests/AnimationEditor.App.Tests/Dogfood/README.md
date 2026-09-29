@@ -1,6 +1,6 @@
-# Dogfooding the Animation Editor headlessly
+# Dogfooding the AnimationEditor headlessly
 
-This folder is about one thing: the Avalonia Animation Editor as a user works it. It drives the
+This folder is about one thing: the Avalonia AnimationEditor as a user works it. It drives the
 real `MainWindow` with simulated clicks, double-clicks, right-clicks, drags, wheel and key input
 inside an in-process headless window. Nothing reaches the desktop, so it is safe to run while the
 machine is in use. Use it to find bugs the way a user would hit them, pin each one with a test,
@@ -17,7 +17,7 @@ strip are all part of what is tested.
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 205 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
+About 212 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
 
 ## The pieces
 
@@ -378,7 +378,7 @@ knows where to look. Add to it whenever a scenario has to route around something
   loads as 0..1 UV and converts back on save; `PixelRectOf` does the arithmetic against the
   wireframe's bitmap size.
 - **File > Load cannot be scripted.** `MainWindow.LoadAsync` calls `StorageProvider` directly
-  rather than `IFileDialogService`, so Ctrl+L opens nothing headlessly. Open files with
+  rather than `IFileDialogService`, so Ctrl+O opens nothing headlessly. Open files with
   `OpenAsync`; Save As, File > New and the close-tab prompt do go through the seams.
 - **The sidebar tabs replace each other.** Clicking the History tab hides the inspector, so
   `TypeNumber` / `TypeFlanker` throw with "not visible" until the Inspector tab is clicked again.

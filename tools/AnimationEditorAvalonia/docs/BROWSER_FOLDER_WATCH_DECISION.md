@@ -6,7 +6,7 @@ Related: [#535](https://github.com/vchelaru/FlatRedBall2/issues/535) M3,
 
 ## Problem
 
-On desktop, the Animation Editor's PNG folder-scan panel doesn't just list
+On desktop, the AnimationEditor's PNG folder-scan panel doesn't just list
 textures once — it watches the folder (`PngFolderWatcher`, backed by
 `FileSystemWatcher`) so editing a texture in an external image editor and
 saving it is picked up automatically, no manual refresh. The browser build

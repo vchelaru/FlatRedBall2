@@ -252,7 +252,7 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// Mirrors the texture across its diagonal (transposes width/height) when <c>true</c>.
     /// Combines with <see cref="FlipHorizontal"/>/<see cref="FlipVertical"/> in the same D→H→V
-    /// order Tiled and the Animation Editor use. MonoGame's <c>SpriteEffects</c> has no diagonal
+    /// order Tiled and the AnimationEditor use. MonoGame's <c>SpriteEffects</c> has no diagonal
     /// value, so this is implemented as a rotation offset rather than a texture-sampling flag —
     /// see <see cref="ComputeDrawTransform"/>. Overwritten by the current animation frame while
     /// <see cref="Animate"/> is on.

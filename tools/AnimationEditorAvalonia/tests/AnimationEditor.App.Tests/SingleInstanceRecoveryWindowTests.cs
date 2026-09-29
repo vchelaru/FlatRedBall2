@@ -31,7 +31,7 @@ public class SingleInstanceRecoveryWindowTests
 
         var buttonRow = (StackPanel)((StackPanel)window.Content!).Children[1];
         var hasRestartButton = buttonRow.Children.OfType<Button>()
-            .Any(b => b.Content as string == "Restart Animation Editor");
+            .Any(b => b.Content as string == "Restart AnimationEditor");
 
         Assert.False(hasRestartButton);
     }

@@ -154,6 +154,15 @@ public static class TreeBuilder
                             IsCircleNode = true,
                         });
                         break;
+                    case PolygonSave p:
+                        node.Children.Add(new TreeNodeVm
+                        {
+                            Header = p.Name,
+                            Data = p,
+                            Kind = NodeKind.PolygonShape,
+                            IsPolygonNode = true,
+                        });
+                        break;
                 }
             }
         }
@@ -189,7 +198,7 @@ public static class TreeBuilder
             for (int i = frameNode.Children.Count - 1; i >= 0; i--)
             {
                 var child = frameNode.Children[i];
-                bool keep = child.Data is AARectSave || child.Data is CircleSave;
+                bool keep = child.Data is ShapeSave;
                 if (keep) keep = shapes.Contains(child.Data!);
                 if (!keep) frameNode.Children.RemoveAt(i);
             }
@@ -228,6 +237,23 @@ public static class TreeBuilder
                         else
                         {
                             vm.Header = c.Name;
+                            int cur = frameNode.Children.IndexOf(vm);
+                            if (cur != pos) { frameNode.Children.RemoveAt(cur); frameNode.Children.Insert(pos, vm); }
+                        }
+                        pos++;
+                        break;
+                    }
+                    case PolygonSave p:
+                    {
+                        var vm = frameNode.Children.FirstOrDefault(n => ReferenceEquals(n.Data, p));
+                        if (vm is null)
+                        {
+                            vm = new TreeNodeVm { Header = p.Name, Data = p, Kind = NodeKind.PolygonShape, IsPolygonNode = true };
+                            frameNode.Children.Insert(pos, vm);
+                        }
+                        else
+                        {
+                            vm.Header = p.Name;
                             int cur = frameNode.Children.IndexOf(vm);
                             if (cur != pos) { frameNode.Children.RemoveAt(cur); frameNode.Children.Insert(pos, vm); }
                         }
@@ -468,6 +494,16 @@ public static class TreeBuilder
                     selectedState.SelectedFrame = parentFrame; // stops playback; clears previous shape
                 if (selectedState.SelectedCircle != circle)
                     selectedState.SelectedCircle = circle;
+                return true;
+            }
+            case PolygonSave polygon:
+            {
+                var parentFrame = FindParentFrameFor(polygon, acls);
+                if (parentFrame is null) return true; // stale — shape not reachable from live project
+                if (selectedState.SelectedFrame != parentFrame)
+                    selectedState.SelectedFrame = parentFrame; // stops playback; clears previous shape
+                if (selectedState.SelectedPolygon != polygon)
+                    selectedState.SelectedPolygon = polygon;
                 return true;
             }
             default:

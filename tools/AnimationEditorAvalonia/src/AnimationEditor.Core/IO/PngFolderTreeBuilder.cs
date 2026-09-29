@@ -90,7 +90,7 @@ public static class PngFolderTreeBuilder
 /// <summary>
 /// A folder or PNG file node in the files-panel tree. <see cref="AbsolutePath"/> is populated for
 /// both -- use <see cref="IsFolder"/>, not its nullability, to tell them apart (issue #1059: a
-/// folder's path is needed too, for "View in Explorer").
+/// folder's path is needed too, for "Reveal in File Manager").
 /// </summary>
 public sealed class PngFilesTreeNode
 {

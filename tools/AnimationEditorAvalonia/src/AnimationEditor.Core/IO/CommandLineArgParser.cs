@@ -1,7 +1,7 @@
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
-/// Parses command-line arguments for the Animation Editor (IO12).
+/// Parses command-line arguments for the AnimationEditor (IO12).
 /// Separated into its own class so the logic can be unit-tested without
 /// starting the Avalonia application.
 /// </summary>

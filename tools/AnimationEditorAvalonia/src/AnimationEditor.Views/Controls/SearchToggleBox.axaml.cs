@@ -10,8 +10,8 @@ using System;
 namespace AnimationEditor.Views.Controls;
 
 /// <summary>
-/// Icon-toggled inline search box shared by any folder/tree panel that wants a filter field
-/// (#770 follow-up; first consumer is <see cref="ProjectPanelControl"/>). Owns only presentation
+/// Icon-toggled inline search box shared by every tree that wants a filter field (ANIMATIONS,
+/// Project, Images). Owns only presentation
 /// and the toggle/clear/Escape/click-away interactions -- what a query change means is entirely
 /// up to the caller via <see cref="QueryChanged"/>.
 /// </summary>

@@ -87,21 +87,9 @@ public class HeadlessTreeViewTests
         method.Invoke(window, null);
     }
 
-    /// <summary>
-    /// Sets the private <c>_treeFilterQuery</c> field and invokes the private
-    /// <c>ApplyQueryFilter</c> method — mirroring exactly what the search box's
-    /// TextChanged handler does on a keystroke.
-    /// </summary>
-    private static void SetFilterAndApply(MainWindow window, string query)
-    {
-        typeof(MainWindow)
-            .GetField("_treeFilterQuery", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(window, query);
-        typeof(MainWindow)
-            .GetMethod("ApplyQueryFilter", BindingFlags.NonPublic | BindingFlags.Instance,
-                       null, Type.EmptyTypes, null)!
-            .Invoke(window, null);
-    }
+    /// <summary>Types <paramref name="query"/> into the real ANIMATIONS search box.</summary>
+    private static void SetFilterAndApply(MainWindow window, string query) =>
+        window.FindControl<AnimationEditor.Views.Controls.SearchToggleBox>("AnimSearchBox")!.SearchBox.Text = query;
 
     private static List<string?> ContextMenuHeaders(MainWindow window)
     {
@@ -1165,14 +1153,10 @@ public class HeadlessTreeViewTests
         finally { window.Close(); }
     }
 
-    // ── #726 regression diagnosis: drive the REAL SearchBox, not a reflection shortcut ──
+    // ── #726 regression diagnosis: assert on the real rendered container, not just the VM ──
     //
-    // SetFilterAndApply (used by every other search test) sets the private _treeFilterQuery
-    // field and reflection-invokes ApplyQueryFilter() directly, bypassing the actual named
-    // "SearchBox" TextBox and its wired TextChanged handler entirely. If that wiring itself
-    // were ever broken, no existing test would catch it. This test drives the real control's
-    // Text property (which fires the real TextChanged handler) and asserts on the real
-    // rendered TreeViewItem container's IsVisible, not just the view-model's PinnedVisible.
+    // Drives the real search box and asserts on the rendered TreeViewItem's IsVisible, not
+    // just the view-model's PinnedVisible.
     [AvaloniaFact]
     public void SearchBox_RealTextChanged_HidesNonMatchingChainContainer()
     {
@@ -1194,10 +1178,7 @@ public class HeadlessTreeViewTests
             var walkNode = roots.First(n => ReferenceEquals(n.Data, walk));
             var idleNode = roots.First(n => ReferenceEquals(n.Data, idle));
 
-            var searchBox = window.FindControl<TextBox>("SearchBox")
-                ?? throw new InvalidOperationException("SearchBox control not found");
-
-            searchBox.Text = "walk"; // fires the real TextChanged handler, not a shortcut
+            SetFilterAndApply(window, "walk");
             Dispatcher.UIThread.RunJobs();
 
             Assert.True(walkNode.PinnedVisible);

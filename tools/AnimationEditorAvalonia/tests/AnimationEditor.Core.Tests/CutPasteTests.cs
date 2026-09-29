@@ -122,7 +122,7 @@ public class CutPasteTests
         frame.ShapesSave!.Shapes.Add(rect);
 
         var pastedRect = (AARectSave)AnimationCloneHelper.CloneShape(rect)!;
-        ctx.AppCommands.PasteShapesCut(frame, new[] { pastedRect }, [], new[] { rect }, frame);
+        ctx.AppCommands.PasteShapesCut(frame, new object[] { pastedRect }, new[] { rect }, frame);
 
         Assert.Single(frame.ShapesSave.Shapes);
         Assert.DoesNotContain(rect, frame.ShapesSave.Shapes);

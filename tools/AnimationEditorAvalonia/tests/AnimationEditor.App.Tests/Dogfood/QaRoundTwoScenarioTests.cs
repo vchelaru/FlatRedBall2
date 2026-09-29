@@ -127,8 +127,8 @@ public class QaRoundTwoScenarioTests
             AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
         await editor.OpenAsync(path);
         editor.ClickRow(editor.ChainNamed("Walk"));
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "ru");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "ru");
 
         editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Run" });
         editor.RowFor(editor.ChainNamed("Walk")).IsVisible.ShouldBeTrue();
@@ -226,8 +226,8 @@ public class QaRoundTwoScenarioTests
             AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
             AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
         await editor.OpenAsync(path);
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "wa");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "wa");
         AnimationChainSave walk = editor.ChainNamed("Walk");
         editor.ClickRow(walk);
 
@@ -240,7 +240,7 @@ public class QaRoundTwoScenarioTests
         editor.VisibleChainHeaders.ShouldBe(new[] { "Jump" });
 
         // The filter is not re-applied by a rename, only by the next change to the box.
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "ru");
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "ru");
 
         editor.Nodes.First(node => node.Header == "Run").PinnedVisible.ShouldBeTrue();
         editor.Nodes.First(node => node.Header == "Jump").PinnedVisible.ShouldBeFalse();
@@ -274,7 +274,11 @@ public class QaRoundTwoScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
-        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        // Long frames: the click below turns Loop off, and a non-looping chain pauses itself at its
+        // last frame, so a short chain can finish during a slow run and read as "Space paused it".
+        AnimationChainSave fixture = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16));
+        foreach (AnimationFrameSave frame in fixture.Frames) frame.FrameLength = 60f;
+        string path = editor.WriteAchx("hero.achx", fixture);
         await editor.OpenAsync(path);
         editor.ClickRow(editor.ChainNamed("Walk"));
         bool playingBefore = editor.Preview.IsPlaying;

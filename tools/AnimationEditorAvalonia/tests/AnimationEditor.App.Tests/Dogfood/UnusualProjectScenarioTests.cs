@@ -441,10 +441,10 @@ public class UnusualProjectScenarioTests
         await editor.OpenAsync(path);
 
         editor.Nodes.Count(node => node.IsChainNode).ShouldBe(200);
-        editor.Click(editor.Control<Button>("SearchToggleBtn"));
-        editor.TypeAndEnter(editor.Control<TextBox>("SearchBox"), "Chain19");
+        editor.Click(editor.AnimSearch.SearchToggleBtn);
+        editor.TypeAndEnter(editor.AnimSearch.SearchBox, "Chain19");
         editor.VisibleChainHeaders.Count.ShouldBe(10, "Chain190..Chain199 match");
-        editor.Click(editor.Control<Button>("SearchClearBtn"));
+        editor.Click(editor.AnimSearch.SearchClearBtn);
         editor.VisibleChainHeaders.Count.ShouldBe(200);
 
         editor.RightClickRow(editor.ChainNamed("Chain000"));

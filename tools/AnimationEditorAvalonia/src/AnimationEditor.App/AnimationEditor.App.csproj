@@ -6,10 +6,8 @@
     <!-- Rename the executable to "AnimationEditor" so the macOS Dock label reads
          "AnimationEditor" instead of "AnimationEditor.App". The Dock reads
          NSRunningApplication.localizedName, which is derived from the executable
-         filename. Spaces are not valid in avares:// URI authority, so the best
-         we can achieve for an unpackaged dotnet run is the dash-free camel-case name.
-         The human-readable "Animation Editor" label is used for bundled .app
-         distribution via CFBundleName / CFBundleDisplayName in Info.plist. -->
+         filename. Bundled .app distribution gets the same name from CFBundleName /
+         CFBundleDisplayName in Info.plist. -->
     <AssemblyName>AnimationEditor</AssemblyName>
     <!-- Windows shell icons (taskbar pin, Explorer, .achx association) come from the embedded
          .exe resource, not Avalonia's runtime window icon. -->
@@ -38,7 +36,7 @@
        CFBundleName sets the human-readable app name for bundled distribution. -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('osx'))">
     <CFBundleIconFile>AppIcon</CFBundleIconFile>
-    <CFBundleName>Animation Editor</CFBundleName>
+    <CFBundleName>AnimationEditor</CFBundleName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -75,7 +73,7 @@
   <!--
     macOS app bundle for development. Creates AnimationEditor.app/ in the build
     output so that `open bin/…/AnimationEditor.app` launches with the Dock label
-    "Animation Editor" (from CFBundleDisplayName in Info.plist) instead of the
+    "AnimationEditor" (from CFBundleDisplayName in Info.plist) instead of the
     raw executable filename "AnimationEditor".
 
     The executable inside the bundle is a relative symlink pointing back to the

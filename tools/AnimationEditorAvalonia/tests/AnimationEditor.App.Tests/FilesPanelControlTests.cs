@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Issue #1059: right-clicking a folder row in the Files panel showed an empty context menu --
-/// only file rows got "View in Explorer" because folder nodes carried no <c>AbsolutePath</c>.
+/// only file rows got "Reveal in File Manager" because folder nodes carried no <c>AbsolutePath</c>.
 /// </summary>
 public class FilesPanelControlTests
 {
@@ -54,7 +54,41 @@ public class FilesPanelControlTests
 
             var headers = control.FilesTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "View in Explorer" }, headers);
+            Assert.Equal(new object?[] { "Reveal in File Manager" }, headers);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void TypingInSearch_FiltersTree_AndSurvivesRefresh()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        WritePng(dir, "hero.png", SKColors.Red);
+        WritePng(dir, "grass.png", SKColors.Green);
+
+        var control = new FilesPanelControl();
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        control.Initialize(new ThumbnailService(new ProjectManager()), window);
+        window.Show();
+
+        try
+        {
+            control.Refresh(dir, Array.Empty<string>(), null);
+            control.FilesSearchBox.SearchBox.Text = "her";
+            Assert.Equal(["hero.png"], control.TreeRoots.Select(n => n.Name));
+
+            // The host re-invokes Refresh on every model change; the filter is sticky like the
+            // ANIMATIONS tree's, so a refresh must not drop it.
+            control.Refresh(dir, Array.Empty<string>(), null);
+            Assert.Equal(["hero.png"], control.TreeRoots.Select(n => n.Name));
+
+            control.FilesSearchBox.SearchBox.Text = "";
+            Assert.Equal(2, control.TreeRoots.Count);
         }
         finally
         {

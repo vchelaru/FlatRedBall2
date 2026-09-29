@@ -12,31 +12,31 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class CommandDescriptionTests
 {
-    // ── AddCircleCommand / AddAxisAlignedRectangleCommand ─────────────────────
+    // ── AddShapeCommand ───────────────────────────────────────────────────────
 
     [Fact]
-    public void AddAxisAlignedRectangleCommand_Description_IncludesName()
+    public void AddShapeCommand_RectangleDescription_IncludesName()
     {
         var expected = "Add Rectangle 'Hitbox'";
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var rect = new AARectSave { Name = "Hitbox" };
         chain.Frames[0].ShapesSave = new ShapesSave();
-        var cmd = new AddAxisAlignedRectangleCommand(
+        var cmd = new AddShapeCommand(
             rect, chain.Frames[0], ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
 
         Assert.Equal(expected, cmd.Description);
     }
 
     [Fact]
-    public void AddCircleCommand_Description_IncludesName()
+    public void AddShapeCommand_CircleDescription_IncludesName()
     {
         var expected = "Add Circle 'Hurtbox'";
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var circle = new CircleSave { Name = "Hurtbox" };
         chain.Frames[0].ShapesSave = new ShapesSave();
-        var cmd = new AddCircleCommand(
+        var cmd = new AddShapeCommand(
             circle, chain.Frames[0], ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
 
         Assert.Equal(expected, cmd.Description);
@@ -162,7 +162,7 @@ public class CommandDescriptionTests
         frame.ShapesSave!.Shapes.Add(rect);
         var pasted = new AARectSave { Name = "Hitbox" };
 
-        ctx.AppCommands.PasteShapesCut(frame, new[] { pasted }, [], new[] { rect }, frame);
+        ctx.AppCommands.PasteShapesCut(frame, new object[] { pasted }, new[] { rect }, frame);
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }

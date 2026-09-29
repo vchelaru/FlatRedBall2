@@ -41,7 +41,7 @@ public sealed class SingleInstanceServer : IDisposable
     public SingleInstanceServer() : this(MutexName) { }
 
     // Test-only: lets tests isolate the named system mutex so it can't collide
-    // with a real running Animation Editor instance.
+    // with a real running AnimationEditor instance.
     internal SingleInstanceServer(string mutexName)
     {
         _mutex = new Mutex(initiallyOwned: true, name: mutexName, out bool createdNew);

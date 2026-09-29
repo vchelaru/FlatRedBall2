@@ -67,6 +67,6 @@ public class UpdateCheckStartupTests
         Dispatcher.UIThread.RunJobs();
 
         var progressText = window.FindControl<TextBlock>("UpdateAvailableBannerText");
-        Assert.Equal("Downloading Animation Editor update (42%)…", progressText!.Text);
+        Assert.Equal("Downloading AnimationEditor update (42%)…", progressText!.Text);
     }
 }

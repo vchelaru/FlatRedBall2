@@ -25,7 +25,7 @@ Each sample is a complete runnable game built on the engine — open the source 
 
 ## Tools
 
-**Animation Editor** — author and preview sprite animation chains (`.achx`). Self-contained downloads (no .NET install required):
+**AnimationEditor** — author and preview sprite animation chains (`.achx`). Self-contained downloads (no .NET install required):
 
 | Platform | Download |
 |---|---|

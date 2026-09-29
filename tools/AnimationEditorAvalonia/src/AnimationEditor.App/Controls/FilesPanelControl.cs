@@ -46,6 +46,7 @@ public partial class FilesPanelControl : UserControl
     private string? _filesRoot;
     private IReadOnlyList<string> _referencedTextureNames = Array.Empty<string>();
     private string? _achxFolder;
+    private string _searchQuery = string.Empty;
 
     public ObservableCollection<PngFilesTreeNodeVm> TreeRoots { get; } = new();
 
@@ -98,6 +99,12 @@ public partial class FilesPanelControl : UserControl
         // The owner (MainWindow) handles ScopeChanged synchronously by re-invoking Refresh with
         // the current referenced textures, which rebuilds the tree — so no rebuild here.
         ScopeChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnSearchQueryChanged(object? sender, string query)
+    {
+        _searchQuery = query;
+        Rebuild();
     }
 
     public void Initialize(ThumbnailService thumbnailService, Window ownerWindow,
@@ -165,10 +172,18 @@ public partial class FilesPanelControl : UserControl
             return;
         }
 
+        files = RelativePathSearchFilter.Filter(files, f => f.RelativePath, _searchQuery);
+        if (files.Count == 0)
+        {
+            SetEmptyMessage("No images match your search.", visible: true);
+            return;
+        }
+
         SetEmptyMessage(null, visible: false);
         foreach (var node in PngFolderTreeBuilder.Build(files, _filesRoot))
             TreeRoots.Add(PngFilesTreeNodeVm.FromNode(node, _thumbnailService, ThumbnailSize));
-        CollapsedFolders.Track(TreeRoots);
+        // Search results show fully expanded -- a remembered collapse would hide the matches.
+        CollapsedFolders.Track(string.IsNullOrWhiteSpace(_searchQuery) ? TreeRoots : Array.Empty<PngFilesTreeNodeVm>());
     }
 
     private void SetEmptyMessage(string? text, bool visible)
@@ -202,12 +217,12 @@ public partial class FilesPanelControl : UserControl
 
         FilesTree.ContextMenu.Items.Clear();
 
-        // Issue #1059: folder rows carry an AbsolutePath too now, so they get "View in Explorer"
+        // Issue #1059: folder rows carry an AbsolutePath too now, so they get "Reveal in File Manager"
         // the same as file rows -- just opening the folder rather than selecting a file in it.
         if (_contextNode is not { AbsolutePath: { } path } node)
             return;
 
-        var revealItem = new MenuItem { Header = "View in Explorer" };
+        var revealItem = new MenuItem { Header = "Reveal in File Manager" };
         revealItem.Click += (_, _) => RevealInExplorer(path, node.IsFolder);
         FilesTree.ContextMenu.Items.Add(revealItem);
     }

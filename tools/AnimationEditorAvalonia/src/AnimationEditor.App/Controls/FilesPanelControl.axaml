@@ -15,19 +15,27 @@
                 BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="8,5">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <RadioButton x:Name="ScopeProjectRadio"
-                             GroupName="FilesPanelScope"
-                             Content="Project"
-                             FontSize="11"
-                             IsChecked="True"
-                             ToolTip.Tip="Show every PNG in the project folder" />
-                <RadioButton x:Name="ScopeThisFileRadio"
-                             GroupName="FilesPanelScope"
-                             Content="This File"
-                             FontSize="11"
-                             ToolTip.Tip="Show only the PNGs referenced by the open .achx" />
-            </StackPanel>
+            <DockPanel>
+                <!-- Same search widget as the Project tab. Sticky like the ANIMATIONS tree's:
+                     the filter survives Refresh and scope changes. -->
+                <viewsControls:SearchToggleBox x:Name="FilesSearchBox" x:FieldModifier="Public"
+                                               DockPanel.Dock="Right"
+                                               Placeholder="Filter images…"
+                                               QueryChanged="OnSearchQueryChanged" />
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <RadioButton x:Name="ScopeProjectRadio"
+                                 GroupName="FilesPanelScope"
+                                 Content="Project"
+                                 FontSize="11"
+                                 IsChecked="True"
+                                 ToolTip.Tip="Show every PNG in the project folder" />
+                    <RadioButton x:Name="ScopeThisFileRadio"
+                                 GroupName="FilesPanelScope"
+                                 Content="This File"
+                                 FontSize="11"
+                                 ToolTip.Tip="Show only the PNGs referenced by the open .achx" />
+                </StackPanel>
+            </DockPanel>
         </Border>
 
         <TreeView x:Name="FilesTree"

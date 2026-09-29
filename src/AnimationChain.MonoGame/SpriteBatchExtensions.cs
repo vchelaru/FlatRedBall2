@@ -39,7 +39,7 @@ public static class SpriteBatchExtensions
     /// </param>
     /// <param name="origin">
     /// Pivot point within the source rectangle, in pixels. Defaults to <c>null</c>, which centers
-    /// on the frame (matching the Animation Editor's default preview alignment and classic
+    /// on the frame (matching the AnimationEditor's default preview alignment and classic
     /// FlatRedBall's centered <c>Sprite</c>). Pass <see cref="Vector2.Zero"/> explicitly for
     /// top-left-origin drawing.
     /// </param>

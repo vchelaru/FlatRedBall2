@@ -375,6 +375,11 @@ public partial class AnimationTreeControl : UserControl
                     _objectFinder.GetAnimationFrameContaining(circle), circle, trimmed,
                     circle.X, circle.Y, circle.Radius);
                 break;
+            case PolygonSave polygon when trimmed != polygon.Name && _objectFinder is not null:
+                _appCommands.SetPolygonProps(
+                    _objectFinder.GetAnimationFrameContaining(polygon), polygon, trimmed,
+                    polygon.X, polygon.Y);
+                break;
         }
     }
 
@@ -541,7 +546,7 @@ public partial class AnimationTreeControl : UserControl
         var text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        if (!ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var rectangles, out var circles))
+        if (!ClipboardPayload.TryDeserialize(text, out var chains, out var frames, out var shapes))
             return;
 
         var acls = _projectManager!.AnimationChainListSave;
@@ -580,7 +585,7 @@ public partial class AnimationTreeControl : UserControl
             else if (completingCut) _appCommands!.PasteFramesCut(targetChain, frames, insertIndex, pendingCut.Frames);
             else _appCommands!.PasteFrames(targetChain, frames, insertIndex);
         }
-        else if (rectangles is { Count: > 0 } || circles is { Count: > 0 })
+        else if (shapes is { Count: > 0 })
         {
             if (completingCut && pendingCut.Kind != CopySelectionKind.Shape) return;
             var frame = _selectedState!.SelectedFrame;
@@ -594,25 +599,20 @@ public partial class AnimationTreeControl : UserControl
 
             if (completingCutAcrossDocuments)
             {
-                _appCommands!.PasteShapes(targetFrames, rectangles ?? new List<AARectSave>(), circles ?? new List<CircleSave>());
+                _appCommands!.PasteShapes(targetFrames, shapes);
                 pendingCut.RemoveSourcesFrom(pendingCut.SourceDocument!);
             }
             else if (completingCut)
             {
-                var sourceFrame = pendingCut.Shapes[0] switch
-                {
-                    AARectSave r => _objectFinder!.GetAnimationFrameContaining(r),
-                    CircleSave c => _objectFinder!.GetAnimationFrameContaining(c),
-                    _ => null,
-                };
+                var sourceFrame = pendingCut.Shapes[0] is ShapeSave source
+                    ? _objectFinder!.GetAnimationFrameContaining(source)
+                    : null;
                 if (sourceFrame is null) return;
-                _appCommands!.PasteShapesCut(
-                    frame, rectangles ?? new List<AARectSave>(), circles ?? new List<CircleSave>(),
-                    pendingCut.Shapes, sourceFrame);
+                _appCommands!.PasteShapesCut(frame, shapes, pendingCut.Shapes, sourceFrame);
             }
             else
             {
-                _appCommands!.PasteShapes(targetFrames, rectangles ?? new List<AARectSave>(), circles ?? new List<CircleSave>());
+                _appCommands!.PasteShapes(targetFrames, shapes);
             }
         }
 
@@ -653,20 +653,11 @@ public partial class AnimationTreeControl : UserControl
                     frames.Count > 0 ? frames : new List<AnimationFrameSave> { frameToDel });
                 break;
             }
-            case AARectSave rectToDel:
+            case ShapeSave shapeToDel:
             {
-                var rects = _selectedState!.SelectedRectangles;
-                var circles = _selectedState.SelectedCircles;
-                _appCommands!.DeleteShapes(
-                    rects.Count > 0 ? rects : new List<AARectSave> { rectToDel }, circles);
-                break;
-            }
-            case CircleSave circleToDel:
-            {
-                var circles = _selectedState!.SelectedCircles;
-                var rects = _selectedState.SelectedRectangles;
-                _appCommands!.DeleteShapes(
-                    rects, circles.Count > 0 ? circles : new List<CircleSave> { circleToDel });
+                var shapes = _selectedState!.SelectedShapes;
+                if (!shapes.Contains(shapeToDel)) shapes.Add(shapeToDel);
+                _appCommands!.DeleteShapes(shapes);
                 break;
             }
         }

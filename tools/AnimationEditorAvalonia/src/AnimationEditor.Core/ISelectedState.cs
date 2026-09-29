@@ -14,11 +14,26 @@ namespace AnimationEditor.Core
         AnimationFrameSave? SelectedFrame { get; set; }
         AARectSave? SelectedRectangle { get; set; }
         CircleSave? SelectedCircle { get; set; }
+        PolygonSave? SelectedPolygon { get; set; }
         object? SelectedShape { get; }
+
+        /// <summary>
+        /// Sets whichever of <see cref="SelectedRectangle"/>, <see cref="SelectedCircle"/> or
+        /// <see cref="SelectedPolygon"/> matches <paramref name="shape"/>'s type, clearing the other
+        /// two; <c>null</c> (or a non-shape) clears all three.
+        /// </summary>
+        void SelectShape(object? shape);
         List<AnimationChainSave> SelectedChains { get; }
         List<AnimationFrameSave> SelectedFrames { get; }
         List<AARectSave> SelectedRectangles { get; }
         List<CircleSave> SelectedCircles { get; }
+        List<PolygonSave> SelectedPolygons { get; }
+
+        /// <summary>
+        /// Every selected shape (rectangles, circles and polygons) in multi-selection order, or the
+        /// single <see cref="SelectedShape"/> when the multi-selection holds no shapes.
+        /// </summary>
+        List<object> SelectedShapes { get; }
         List<object> SelectedNodes { get; set; }
         string? SelectedTextureName { get; }
         TileMapInformation? SelectedTileMapInformation { get; }

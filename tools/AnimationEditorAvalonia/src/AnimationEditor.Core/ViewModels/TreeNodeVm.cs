@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.ViewModels;
 /// <summary>
 /// Lightweight view-model for a single node in the animation tree.
 /// The <see cref="Data"/> field holds the underlying data object
-/// (AnimationChainSave, AnimationFrameSave, AARectSave, CircleSave).
+/// (AnimationChainSave, AnimationFrameSave, AARectSave, CircleSave, PolygonSave).
 /// </summary>
 public class TreeNodeVm : INotifyPropertyChanged
 {
@@ -139,6 +139,9 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>True when this node represents a CircleSave shape. Set once at construction time.</summary>
     public bool IsCircleNode { get; set; }
 
+    /// <summary>True when this node represents a PolygonSave shape. Set once at construction time.</summary>
+    public bool IsPolygonNode { get; set; }
+
     private bool _pinnedVisible = true;
     /// <summary>
     /// Whether this row is shown by the ANIMATIONS search filter. Defaults to
@@ -247,4 +250,5 @@ public enum NodeKind
     Frame,
     RectShape,
     CircleShape,
+    PolygonShape,
 }

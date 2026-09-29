@@ -5,7 +5,7 @@ namespace AnimationEditor.Core.CommandsAndState;
 
 /// <summary>
 /// Builds the ordered tree right-click menu plan shared by every editor host, branching on the
-/// selected tree node's data type (rectangle, circle, frame, chain, or nothing selected).
+/// selected tree node's data type (rectangle, circle, polygon, frame, chain, or nothing selected).
 /// </summary>
 public static class TreeMenuPlanBuilder
 {
@@ -44,6 +44,15 @@ public static class TreeMenuPlanBuilder
                 items.Add(TreeMenuItem.Item("Delete Circle", actions.Delete));
                 break;
 
+            case PolygonSave polygon:
+                AddShapeReorderItems(items, polygon, objectFinder.GetAnimationFrameContaining(polygon), appCommands);
+                AddCopyCutPasteDuplicate(items, actions);
+                items.Add(TreeMenuItem.Separator());
+                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
+                items.Add(TreeMenuItem.Separator());
+                items.Add(TreeMenuItem.Item("Delete Polygon", actions.Delete));
+                break;
+
             case AnimationFrameSave frame:
             {
                 var chain = objectFinder.GetAnimationChainContaining(frame);
@@ -56,6 +65,7 @@ public static class TreeMenuPlanBuilder
                 {
                     items.Add(TreeMenuItem.Item("Add AxisAlignedRectangle", () => appCommands.AddAxisAlignedRectangle(frame)));
                     items.Add(TreeMenuItem.Item("Add Circle", () => appCommands.AddCircle(frame)));
+                    items.Add(TreeMenuItem.Item("Add Polygon", () => appCommands.AddPolygon(frame)));
                     items.Add(TreeMenuItem.Separator());
                 }
                 items.Add(TreeMenuItem.Item("Copy", actions.Copy));

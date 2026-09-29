@@ -41,7 +41,7 @@ internal static class PrimaryInstanceHangChecker
         return PrimaryInstanceHangResult.BusyNotHung;
     }
 
-    /// <summary>Kills the other Animation Editor process and waits (best-effort) for it to exit.
+    /// <summary>Kills the other AnimationEditor process and waits (best-effort) for it to exit.
     /// Failures are swallowed — the caller re-checks mutex ownership afterward and gives up
     /// cleanly if it still isn't available.</summary>
     public static void KillOtherInstance()
@@ -60,7 +60,7 @@ internal static class PrimaryInstanceHangChecker
         }
     }
 
-    /// <summary>Finds the other running Animation Editor process (excluding this one). Only one
+    /// <summary>Finds the other running AnimationEditor process (excluding this one). Only one
     /// other should exist under the single-instance mutex.</summary>
     private static Process? FindOtherInstanceProcess()
     {

@@ -3,11 +3,9 @@
              x:Class="AnimationEditor.Views.Controls.SearchToggleBox"
              x:Name="Root">
     <!--
-        Icon-toggled inline search box (#770 follow-up): same visual pattern as the ANIMATIONS
-        tree's search box in MainWindow.axaml (magnifier toggles a box with a two-stage clear),
-        extracted here as the second consumer (Project tab). MainWindow's own search box is left
-        as-is, since it is "sticky" (filter survives selection) while callers of this control
-        decide their own post-selection behavior (e.g. ProjectPanelControl clears on selection).
+        Icon-toggled inline search box shared by the ANIMATIONS tree, the Project tab, and the
+        Images tab. The magnifier toggles a box with a two-stage clear; what a query means
+        (sticky vs. clear-on-select) is up to each caller.
     -->
     <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
         <TextBox x:Name="SearchBox" x:FieldModifier="Public"
@@ -19,7 +17,7 @@
                  IsVisible="False"
                  PlaceholderText="{Binding #Root.Placeholder}">
             <TextBox.InnerRightContent>
-                <Button x:Name="SearchClearBtn"
+                <Button x:Name="SearchClearBtn" x:FieldModifier="Public"
                         Width="20" Height="20"
                         Padding="0"
                         Margin="0,0,2,0"
@@ -34,7 +32,7 @@
                 </Button>
             </TextBox.InnerRightContent>
         </TextBox>
-        <Button x:Name="SearchToggleBtn"
+        <Button x:Name="SearchToggleBtn" x:FieldModifier="Public"
                 Width="24" Height="24"
                 Padding="0"
                 Background="Transparent"

@@ -1,15 +1,17 @@
 ---
 name: animation-editor
-description: FlatRedBall2 Animation Editor (Avalonia) — where the source lives, project layout, and the two-panel model. Triggers: AnimationEditor, AnimationEditorAvalonia, .achx editing, wireframe/preview panels, animationeditor label.
+description: FlatRedBall2 AnimationEditor (Avalonia) — where the source lives, project layout, and the two-panel model. Triggers: AnimationEditor, AnimationEditorAvalonia, .achx editing, wireframe/preview panels, animationeditor label.
 ---
 
-# Animation Editor — Location & Layout
+# AnimationEditor — Location & Layout
 
-The Animation Editor is the desktop tool that lets users edit `.achx` animation chain files (frames, regions, shapes, onion-skinning, preview playback). It is being rewritten on top of Avalonia and lives **inside this repository** at:
+The AnimationEditor is the desktop tool that lets users edit `.achx` animation chain files (frames, regions, shapes, onion-skinning, preview playback). It is being rewritten on top of Avalonia and lives **inside this repository** at:
 
 ```
 tools/AnimationEditorAvalonia/
 ```
+
+**The product name is always `AnimationEditor`, one word**, in UI strings, docs, comments, and PR text. Never write "Animation Editor".
 
 > The legacy WinForms version (`FlatRedBall.AnimationEditorForms`) lives in the separate `FlatRedBall` (FRB1) repo at `FRBDK/FlatRedBall.AnimationEditorForms/`. Do **not** edit it for FRB2 issues — that codebase is being replaced. Issues filed in `vchelaru/FlatRedBall2` always refer to the Avalonia version.
 

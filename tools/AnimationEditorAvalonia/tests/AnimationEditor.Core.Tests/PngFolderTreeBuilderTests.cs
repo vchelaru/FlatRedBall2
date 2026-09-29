@@ -42,7 +42,7 @@ public class PngFolderTreeBuilderTests
         Assert.Equal("root.png", tree[1].Name);
     }
 
-    // Issue #1059: a folder row needs its own AbsolutePath so "View in Explorer" can open it --
+    // Issue #1059: a folder row needs its own AbsolutePath so "Reveal in File Manager" can open it --
     // previously only file nodes carried one.
     [Fact]
     public void Build_WithFilesRoot_GivesFolderNodesAbsolutePaths()

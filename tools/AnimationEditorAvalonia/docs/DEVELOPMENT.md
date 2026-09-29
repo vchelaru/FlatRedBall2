@@ -26,8 +26,8 @@ dotnet test tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood
 ## Running on macOS — Dock name and icon
 
 On macOS, `dotnet run` launches the bare executable and the Dock shows
-`AnimationEditor` (the assembly name). To get the full `Animation Editor`
-label with the correct icon, launch via the `.app` bundle that the build
+`AnimationEditor` (the assembly name) but no custom icon. To get the
+correct icon, launch via the `.app` bundle that the build
 produces automatically:
 
 ```bash

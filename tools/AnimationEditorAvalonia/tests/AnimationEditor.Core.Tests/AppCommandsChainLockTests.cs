@@ -134,7 +134,7 @@ public class AppCommandsChainLockTests
         lockedFrame.ShapesSave!.Shapes.Add(lockedRect);
         unlockedFrame.ShapesSave!.Shapes.Add(unlockedCircle);
 
-        ctx.AppCommands.DeleteShapes(new() { lockedRect }, new() { unlockedCircle });
+        ctx.AppCommands.DeleteShapes(new object[] { lockedRect, unlockedCircle });
 
         Assert.Single(lockedFrame.ShapesSave!.Shapes);
         Assert.Empty(unlockedFrame.ShapesSave!.Shapes);
@@ -150,7 +150,7 @@ public class AppCommandsChainLockTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Copied" };
 
-        ctx.AppCommands.PasteShapes(frame, new[] { rect }, System.Array.Empty<CircleSave>());
+        ctx.AppCommands.PasteShapes(frame, new object[] { rect });
 
         Assert.Empty(frame.ShapesSave!.Shapes);
         Assert.False(ctx.UndoManager.CanUndo);
@@ -169,7 +169,7 @@ public class AppCommandsChainLockTests
         targetChain.IsLocked = true;
         var targetFrame = targetChain.Frames[0];
 
-        ctx.AppCommands.PasteShapesCut(targetFrame, new[] { rect }, System.Array.Empty<CircleSave>(),
+        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect },
             new object[] { rect }, sourceFrame);
 
         Assert.Empty(targetFrame.ShapesSave!.Shapes);
@@ -190,7 +190,7 @@ public class AppCommandsChainLockTests
         var targetChain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1);
         var targetFrame = targetChain.Frames[0];
 
-        ctx.AppCommands.PasteShapesCut(targetFrame, new[] { rect }, System.Array.Empty<CircleSave>(),
+        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect },
             new object[] { rect }, sourceFrame);
 
         Assert.Single(sourceFrame.ShapesSave!.Shapes); // cut-from-locked-source stays blocked

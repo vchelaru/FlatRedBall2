@@ -6,12 +6,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands;
 /// Shared undo-label fragment for a collision shape — matches
 /// <c>Move Rect 'Hitbox'</c> / <c>Delete Circle 'X'</c> naming.
 /// </summary>
-internal static class ShapeUndoLabel
+public static class ShapeUndoLabel
 {
     public static string Format(object shape) => shape switch
     {
         AARectSave r => string.IsNullOrEmpty(r.Name) ? "Rect" : $"Rect '{r.Name}'",
         CircleSave c => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
+        PolygonSave p => string.IsNullOrEmpty(p.Name) ? "Polygon" : $"Polygon '{p.Name}'",
         _ => "Shape",
     };
 
@@ -20,6 +21,7 @@ internal static class ShapeUndoLabel
     {
         AARectSave r => string.IsNullOrEmpty(r.Name) ? "Rectangle" : $"Rectangle '{r.Name}'",
         CircleSave c => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
+        PolygonSave p => string.IsNullOrEmpty(p.Name) ? "Polygon" : $"Polygon '{p.Name}'",
         _ => "Shape",
     };
 }

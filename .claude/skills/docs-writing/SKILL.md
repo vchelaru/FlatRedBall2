@@ -9,8 +9,8 @@ FlatRedBall2's user docs live in **this repo's own `docs/` folder** — not the 
 
 ## Where FlatRedBall2 Docs Live
 
-- Nav: `docs/SUMMARY.md` — a flat list today (`Setup`, `Animation Editor`, `Your First Animation`), no nesting yet. A page not listed there is unreachable even if it exists on disk.
-- Every page in `docs/` today is an **Animation Editor tool doc** (the desktop app's UI — see `your-first-animation.md`). A runtime/code doc (loading a file format in a game, an engine API) is a different kind of page and needs its own new section in `SUMMARY.md` — mirrors Gum's own tool-docs-vs-code-docs split (`Gum/.claude/skills/gum-docs-writing/SKILL.md`, "Tool Docs vs Code Docs"). Don't fold a code doc into the Animation Editor section.
+- Nav: `docs/SUMMARY.md` — a flat list today (`Setup`, `AnimationEditor`, `Your First Animation`), no nesting yet. A page not listed there is unreachable even if it exists on disk.
+- Every page in `docs/` today is an **AnimationEditor tool doc** (the desktop app's UI — see `your-first-animation.md`). A runtime/code doc (loading a file format in a game, an engine API) is a different kind of page and needs its own new section in `SUMMARY.md` — mirrors Gum's own tool-docs-vs-code-docs split (`Gum/.claude/skills/gum-docs-writing/SKILL.md`, "Tool Docs vs Code Docs"). Don't fold a code doc into the AnimationEditor section.
 - Images live in a flat `docs/images/`, referenced with a plain relative path (`images/foo.png`). There is no `.gitbook/assets/` folder or path convention here — that's specific to Gum/FlatRedBallDocs' GitBook setup; don't port it.
 
 ## Match the Plain-Markdown Style Already In Use

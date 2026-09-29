@@ -13,7 +13,7 @@ namespace FlatRedBall2.Tests.Rendering;
 // FlipDiagonal is implemented as a +/-90 degree rotation offset combined with a single vertical-
 // mirror choice (Sprite.ComputeDrawTransform) — a reflection is always expressible as a rotation
 // composed with one axis mirror. That composition is verified here against an independent ground
-// truth: the same (a,b,c,d) transpose matrix used by the Animation Editor's already-tested
+// truth: the same (a,b,c,d) transpose matrix used by the AnimationEditor's already-tested
 // AnimationEditor.Core.Rendering.FlipScaleCalculator.ComputeMatrix, which drives the SkiaSharp
 // preview this issue is required to match. Both sides are pure CPU math — no GraphicsDevice.
 public class SpriteDiagonalFlipTests

@@ -67,34 +67,8 @@ internal sealed class PasteShapesCommand : IUndoableCommand
         _events.RaiseAnimationChainsChanged();
     }
 
-    private void SelectPrimaryShape(object shape)
-    {
-        switch (shape)
-        {
-            case AARectSave r:
-                _selectedState.SelectedRectangle = r;
-                break;
-            case CircleSave c:
-                _selectedState.SelectedCircle = c;
-                break;
-        }
-    }
+    private void SelectPrimaryShape(object shape) => _selectedState.SelectShape(shape);
 
-    private void RestorePrimarySelection(List<object> nodes)
-    {
-        _selectedState.SelectedRectangle = null;
-        _selectedState.SelectedCircle = null;
-        foreach (var node in nodes)
-        {
-            switch (node)
-            {
-                case AARectSave r:
-                    _selectedState.SelectedRectangle = r;
-                    return;
-                case CircleSave c:
-                    _selectedState.SelectedCircle = c;
-                    return;
-            }
-        }
-    }
+    private void RestorePrimarySelection(List<object> nodes) =>
+        _selectedState.SelectShape(nodes.FirstOrDefault(n => n is ShapeSave));
 }

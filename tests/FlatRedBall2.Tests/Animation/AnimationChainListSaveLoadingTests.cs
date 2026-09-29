@@ -94,7 +94,7 @@ public class AnimationChainListSaveLoadingTests
         save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe("Sword");
     }
 
-    // ToXmlString is the in-memory companion to Save(path): the Animation Editor clipboard
+    // ToXmlString is the in-memory companion to Save(path): the AnimationEditor clipboard
     // serializes copied frames/chains through it, so it must round-trip per-frame shapes.
     [Fact]
     public void ToXmlString_RoundTripsFrameShapesViaFromString()
@@ -142,7 +142,7 @@ public class AnimationChainListSaveLoadingTests
     }
 
     // Frames are not renameable — their identity is the index. Legacy .achx that carry a
-    // per-frame <Name>/<HasCustomName> (written by older Animation Editor builds) must still
+    // per-frame <Name>/<HasCustomName> (written by older AnimationEditor builds) must still
     // load cleanly; the elements are simply ignored rather than throwing or being honored.
     [Fact]
     public void FromFile_FrameWithLegacyNameElements_IgnoresThemAndLoads()

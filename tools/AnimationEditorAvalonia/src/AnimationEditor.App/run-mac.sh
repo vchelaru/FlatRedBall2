@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds and launches Animation Editor as a macOS .app bundle.
-# The bundle's Info.plist sets CFBundleDisplayName = "Animation Editor" so the
-# Dock shows the correct name with a space. Use this instead of `dotnet run`
+# Builds and launches AnimationEditor as a macOS .app bundle.
+# The bundle's Info.plist sets CFBundleDisplayName = "AnimationEditor" so the
+# Dock shows the correct name. Use this instead of `dotnet run`
 # when working on macOS.
 #
 # Usage:

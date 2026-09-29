@@ -101,11 +101,11 @@ internal static class UndoLabelsDemo
 
         var pasteCircle = (CircleSave)AnimationCloneHelper.CloneShape(circle)!;
         pasteCircle.Name = "HurtboxPaste";
-        cmds.PasteShapes(shapeFrame, Array.Empty<AARectSave>(), new[] { pasteCircle });
+        cmds.PasteShapes(shapeFrame, new object[] { pasteCircle });
 
         var cutSource = shapeFrame.ShapesSave!.AARectSaves.First(r => r.Name == "Other");
         var cutClone = (AARectSave)AnimationCloneHelper.CloneShape(cutSource)!;
-        cmds.PasteShapesCut(shapeFrame, new[] { cutClone }, [], new[] { (object)cutSource }, shapeFrame);
+        cmds.PasteShapesCut(shapeFrame, new object[] { cutClone }, new[] { (object)cutSource }, shapeFrame);
 
         var cutFrameSrc = scrap.Frames[0];
         cmds.PasteFramesCut(walk, new[] { AnimationCloneHelper.CloneFrame(cutFrameSrc) },

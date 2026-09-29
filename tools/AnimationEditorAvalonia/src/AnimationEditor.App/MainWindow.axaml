@@ -89,16 +89,16 @@
                              registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New Animation" x:Name="MenuNew" />
-                        <MenuItem Header="_Load..."       x:Name="MenuLoad" />
-                        <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
+                        <MenuItem Header="_Open…"         x:Name="MenuLoad" />
+                        <MenuItem Header="Open _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
                         <Separator />
-                        <MenuItem Header="_Close Project" x:Name="MenuCloseProject" />
+                        <MenuItem Header="_Close Project Folder" x:Name="MenuCloseProject" />
                         <Separator />
                         <MenuItem Header="_Save"          x:Name="MenuSave" />
-                        <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
+                        <MenuItem Header="Save _As…"      x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
-                            <MenuItem Header="_PixiJS..." x:Name="MenuExportPixiJs" />
+                            <MenuItem Header="_PixiJS…" x:Name="MenuExportPixiJs" />
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">
@@ -114,11 +114,11 @@
                         <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate" />
                         <Separator />
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
-                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
+                        <MenuItem Header="Enable _Hot Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
                         <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                         <Separator />
-                        <MenuItem Header="Associate _Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
+                        <MenuItem Header="_Associate Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
                         <Separator />
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
@@ -264,7 +264,7 @@
                               Stretch="Uniform"
                               Fill="{DynamicResource AccentCool}"
                               Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-                        <TextBlock Text="Make the Animation Editor the default app for .achx files?"
+                        <TextBlock Text="Make the AnimationEditor the default app for .achx files?"
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Ink}" />
@@ -347,7 +347,7 @@
                               Fill="{DynamicResource AccentCool}"
                               Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
                         <TextBlock x:Name="UpdateAvailableBannerText"
-                                   Text="A new version of the Animation Editor is available."
+                                   Text="A new version of the AnimationEditor is available."
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Ink}" />
@@ -454,45 +454,12 @@
                     <DockPanel Margin="10,0">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
                                     VerticalAlignment="Center">
-                            <!-- Inline search box: hidden until the search icon is clicked.
-                                 The trailing ✕ button is a discoverable way to clear the sticky
-                                 filter (Escape / toggling the icon also clear it). -->
-                            <TextBox x:Name="SearchBox"
-                                     Width="140" Height="24"
-                                     Padding="6,2"
-                                     FontSize="11"
-                                     VerticalAlignment="Center"
-                                     VerticalContentAlignment="Center"
-                                     IsVisible="False"
-                                     PlaceholderText="Filter animations…">
-                                <TextBox.InnerRightContent>
-                                    <Button x:Name="SearchClearBtn"
-                                            Width="20" Height="20"
-                                            Padding="0"
-                                            Margin="0,0,2,0"
-                                            Focusable="False"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Foreground="{DynamicResource InkMid}"
-                                            HorizontalContentAlignment="Center"
-                                            VerticalContentAlignment="Center"
-                                            ToolTip.Tip="Clear filter (empties, then closes)">
-                                        <TextBlock Text="&#x2715;" FontSize="10" />
-                                    </Button>
-                                </TextBox.InnerRightContent>
-                            </TextBox>
-                            <!-- Search icon button: toggles the inline search box. -->
-                            <Button x:Name="SearchToggleBtn"
-                                    Width="24" Height="24"
-                                    Padding="0"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="{DynamicResource InkMid}"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    ToolTip.Tip="Search">
-                                <TextBlock Text="&#x1F50D;" FontSize="11" />
-                            </Button>
+                            <!-- Shared with the Project and Images tabs. Sticky: the filter survives selection
+                                 and model edits, and focus moving into the tree keeps the box open. -->
+                            <viewsControls:SearchToggleBox x:Name="AnimSearchBox"
+                                                           Placeholder="Filter animations…"
+                                                           KeepOpenWhenFocusMovesInto="{Binding #AnimTree}"
+                                                           QueryChanged="OnAnimSearchQueryChanged" />
                             <Button x:Name="ExpandAllBtn"
                                     Content="⊞"
                                     Width="24" Height="24"
@@ -762,6 +729,12 @@
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCircle.svg"
+                                             CurrentColor="{DynamicResource IconInkDim}" />
+                                    <svg:Svg IsVisible="{Binding IsPolygonNode}"
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPolygon.svg"
                                              CurrentColor="{DynamicResource IconInkDim}" />
                                     <!-- Native tsx project validation issue (#1140): a multi-tile group whose
                                          satellite tile has drifted out of lockstep with its anchor, or a
@@ -1351,6 +1324,51 @@
                                                                    Minimum="0.001" Maximum="10000"
                                                                    Increment="0.5" FormatString="0.###" />
                                                 </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- ── Polygon properties ── -->
+                                    <StackPanel x:Name="PropPolygonPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="POLYGON"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Name" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <TextBox x:Name="PropPolygonName" Grid.Column="1" FontSize="11" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropPolygonX" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.###" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropPolygonY" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.###" />
+                                                </Grid>
+                                                <TextBlock x:Name="PropPolygonWarning" IsVisible="False"
+                                                           TextWrapping="Wrap" FontSize="11"
+                                                           Text="The outline crosses itself. Runtimes can't collide against a self-intersecting polygon.">
+                                                    <TextBlock.Foreground>
+                                                        <SolidColorBrush Color="{DynamicResource IconWarning}" />
+                                                    </TextBlock.Foreground>
+                                                </TextBlock>
+                                                <TextBlock Text="Vertices (relative to X, Y)" FontSize="11"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <StackPanel x:Name="PropPolygonVertices" Spacing="4" />
+                                                <Button x:Name="PropPolygonAddVertex" Content="Add Vertex"
+                                                        FontSize="11" HorizontalAlignment="Left" />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
