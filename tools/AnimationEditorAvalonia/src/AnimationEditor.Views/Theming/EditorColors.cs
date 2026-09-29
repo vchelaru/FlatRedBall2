@@ -70,6 +70,8 @@ internal static class EditorColors
     /// <summary>A shape the runtime cannot collide with correctly (self-intersecting polygon).</summary>
     public static readonly SKColor InvalidShape = new(255, 60, 60, 230);
     public static readonly SKColor PolygonVertex = Gold;
+    /// <summary>The vertex under the pointer or focused in the inspector (#1258).</summary>
+    public static readonly SKColor PolygonVertexHighlight = SKColors.White;
     public static readonly SKColor PolygonVertexEdge = new(40, 40, 40);
     public static readonly SKColor PolygonMidpoint = Gold.WithAlpha(200);
 

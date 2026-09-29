@@ -161,6 +161,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private string             _vertexDragDescription = "";
     private float              _vertexDragStartX, _vertexDragStartY;
     private const float        VertexHandleRadius = 5f;
+    private int                _hoverVertexIndex = -1;
+    private int                _inspectorVertexIndex = -1;
 
     // -- Frame (sprite position) drag -------------------------------------------
     // Repositions AnimationFrameSave.RelativeX/Y by dragging the rendered sprite. Only
@@ -189,6 +191,16 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private float[]? _chainFrameStartY;
 
     // -- Public properties -----------------------------------------------------
+
+    /// <summary>
+    /// Index of the selected polygon's vertex whose inspector row has focus, or -1. It is drawn
+    /// highlighted unless the pointer is over (or dragging) a different vertex.
+    /// </summary>
+    public int InspectorVertexIndex
+    {
+        get => _inspectorVertexIndex;
+        set { if (_inspectorVertexIndex == value) return; _inspectorVertexIndex = value; InvalidateVisual(); }
+    }
 
     public bool ShowOnionSkin
     {
@@ -1539,9 +1551,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 (points[i * 2], points[i * 2 + 1]) = PolygonVertices.Get(p, i);
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, p.X, p.Y, 0f, 0f,
                 selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
-                points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p)));
+                points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
+                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1));
         }
         return list.ToArray();
+    }
+
+    private int HighlightedVertexIndex(int vertexCount)
+    {
+        int index = _draggingVertexIndex >= 0 ? _draggingVertexIndex
+            : _hoverVertexIndex >= 0 ? _hoverVertexIndex
+            : _inspectorVertexIndex;
+        return index < vertexCount ? index : -1;
+    }
+
+    private void UpdateHoverVertex(Point pos)
+    {
+        int index = -1;
+        if (_selectedState!.SelectedPolygon is { } polygon && !IsShapeLocked(polygon))
+            index = PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, PolygonScreenVertices(polygon), VertexHandleRadius);
+        if (index == _hoverVertexIndex) return;
+        _hoverVertexIndex = index;
+        InvalidateVisual();
     }
 
     /// <summary>Returns the frame in <see cref="ISelectedState.SelectedChain"/> at the current playback index.</summary>
@@ -2504,6 +2535,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
 
         UpdateHoverCursor(pos);
+        UpdateHoverVertex(pos);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -2582,6 +2614,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         base.OnPointerExited(e);
         Cursor = Cursor.Default;
+        if (_hoverVertexIndex >= 0)
+        {
+            _hoverVertexIndex = -1;
+            InvalidateVisual();
+        }
     }
 
     // -- Inner types -----------------------------------------------------------
@@ -2606,7 +2643,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         bool IsLocked = false,
         float[]? Points = null,
         bool IsClosed = true,
-        bool IsSelfIntersecting = false);
+        bool IsSelfIntersecting = false,
+        // Polygon vertex drawn enlarged: the one being dragged, else hovered, else focused in the inspector.
+        int HighlightedVertex = -1);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2677,6 +2716,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         using var vertexEdge = new SKPaint { Color = EditorColors.PolygonVertexEdge, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
         using var midpoint   = new SKPaint { Color = EditorColors.PolygonMidpoint, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
         const float half = 3.5f;
+        const float highlightHalf = 5.5f;
 
         int edges = sh.IsClosed ? n : n - 1;
         for (int i = 0; i < edges; i++)
@@ -2688,9 +2728,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
         for (int i = 0; i < n; i++)
         {
+            bool highlighted = i == sh.HighlightedVertex;
             float x = originX + pts[i * 2] * om;
             float y = originY - pts[i * 2 + 1] * om;
-            var rect = new SKRect(x - half, y - half, x + half, y + half);
+            float h = highlighted ? highlightHalf : half;
+            var rect = new SKRect(x - h, y - h, x + h, y + h);
+            vertexFill.Color = highlighted ? EditorColors.PolygonVertexHighlight : EditorColors.PolygonVertex;
             canvas.DrawRect(rect, vertexFill);
             canvas.DrawRect(rect, vertexEdge);
         }

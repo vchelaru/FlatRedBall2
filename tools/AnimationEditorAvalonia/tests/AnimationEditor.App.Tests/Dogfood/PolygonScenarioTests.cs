@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
@@ -107,6 +108,33 @@ public class PolygonScenarioTests
 
         PolygonVertices.Get(polygon, 1).ShouldBe((12f, -8f));
     }
+
+    [AvaloniaFact]
+    public async Task HoveringAVertexInThePreview_HighlightsIt_UntilThePointerLeavesIt()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        HighlightedVertex(editor).ShouldBe(2);
+
+        editor.Hover(editor.PreviewPointAt(0, 0));
+        HighlightedVertex(editor).ShouldBe(-1);
+    }
+
+    [AvaloniaFact]
+    public async Task FocusingAVertexRowInTheInspector_HighlightsThatVertex()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.TypeNumber("PropPolygonVertex1Y", "-8");
+
+        HighlightedVertex(editor).ShouldBe(1);
+    }
+
+    private static int HighlightedVertex(AnimationEditorHarness editor) =>
+        editor.Preview.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon).HighlightedVertex;
 
     [AvaloniaFact]
     public async Task DraggingAVertexAcrossTheOutline_ShowsTheSelfIntersectionWarning()
