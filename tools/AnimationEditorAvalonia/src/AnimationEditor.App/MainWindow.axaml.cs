@@ -5126,6 +5126,13 @@ public partial class MainWindow : Window
         PropBlue.KeyDown           += (_, e) => CommitColorChannelOnEnter(e);
         PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
+        // Delete/Backspace clears the mode back to inherited, as deleting a color channel's text does.
+        PropColorMode.KeyDown += (_, e) =>
+        {
+            if (e.Key is not (Key.Delete or Key.Back)) return;
+            ApplyFrameColorOperation(null);
+            e.Handled = true;
+        };
         PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
@@ -5541,16 +5548,12 @@ public partial class MainWindow : Window
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
-                else if (effective.Operation is ColorOperation inherited)
-                {
-                    // Unset here but inherited from an earlier frame — ghost it as a combo placeholder
-                    // (SelectedIndex -1 shows PlaceholderText) so the combo matches the sticky preview.
-                    PropColorMode.SelectedIndex = -1;
-                    PropColorMode.PlaceholderText = $"{inherited} (inherited)";
-                }
                 else
                 {
-                    PropColorMode.SelectedIndex = 0; // None
+                    // Unset: ghost the effective mode as a placeholder, like the channel fields above.
+                    // "None" means nothing earlier sets a mode, so no tint applies.
+                    PropColorMode.SelectedIndex = -1;
+                    PropColorMode.PlaceholderText = effective.Operation?.ToString() ?? "None";
                 }
                 SetNameOrMixed(PropTextureName,
                     frames.Select(f => TexturePathHelper.ComputeDisplayPath(f.TextureName, _projectManager.FileName)).ToList(),
@@ -5856,17 +5859,28 @@ public partial class MainWindow : Window
 
     private void ApplyFrameColorOperation()
     {
+        // ComboBox order: 0 = Inherit (null), 1 = Multiply, 2 = Add. -1 is the blank placeholder
+        // state RefreshPropertyPanel sets, not a user pick.
+        switch (PropColorMode.SelectedIndex)
+        {
+            case 0: ApplyFrameColorOperation(null); break;
+            case 1: ApplyFrameColorOperation(ColorOperation.Multiply); break;
+            case 2: ApplyFrameColorOperation(ColorOperation.Add); break;
+        }
+    }
+
+    private void ApplyFrameColorOperation(ColorOperation? operation)
+    {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
-        ColorOperation? operation = PropColorMode.SelectedIndex switch
+        if (frames.Any(f => f.ColorOperation != operation))
         {
-            1 => ColorOperation.Multiply,
-            2 => ColorOperation.Add,
-            _ => null,
-        };
-        _appCommands.SetFrameColorOperation(frames, operation);
+            _appCommands.SetFrameColorOperation(frames, operation);
+        }
+        // Inherit is an action, not a value to display: once applied, the combo goes back to blank
+        // with the inherited placeholder. Posted because the combo is still mid-SelectionChanged.
+        if (operation is null) Dispatcher.UIThread.Post(RefreshPropertyPanel);
     }
 
     private void ApplyFramePixelCoords()
@@ -6581,7 +6595,8 @@ public partial class MainWindow : Window
             {
                 Id = "delete", Description = "Delete", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Delete") },
-                ShouldSkip = IsTextInputFocused,
+                // A focused combo (the color Mode) takes Delete to clear its value, like a text field.
+                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is ComboBox,
                 Action = HandleDelete,
             },
             new()

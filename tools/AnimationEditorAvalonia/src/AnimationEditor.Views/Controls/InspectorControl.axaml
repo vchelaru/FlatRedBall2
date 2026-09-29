@@ -120,7 +120,7 @@
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
                         <ComboBox x:Name="FrameColorModeCombo" x:FieldModifier="Public" Grid.Column="1"
                                   HorizontalAlignment="Stretch">
-                            <ComboBoxItem>None</ComboBoxItem>
+                            <ComboBoxItem>Inherit</ComboBoxItem>
                             <ComboBoxItem>Multiply</ComboBoxItem>
                             <ComboBoxItem>Add</ComboBoxItem>
                         </ComboBox>

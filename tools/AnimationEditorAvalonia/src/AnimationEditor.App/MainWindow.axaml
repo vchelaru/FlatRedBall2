@@ -1205,8 +1205,16 @@
                                                     <TextBlock Text="Mode" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <ComboBox x:Name="PropColorMode" Grid.Column="1"
-                                                              HorizontalAlignment="Stretch">
-                                                        <ComboBoxItem>None</ComboBoxItem>
+                                                              HorizontalAlignment="Stretch"
+                                                              PlaceholderForeground="{DynamicResource TextControlPlaceholderForeground}"
+                                                              ToolTip.Tip="Blank shows the mode inherited from an earlier frame. Pick Inherit (or press Delete) to clear an explicit mode.">
+                                                        <!-- Grey the inherited-mode placeholder like the channel fields' (TextBox dims its placeholder to 0.5). -->
+                                                        <ComboBox.Styles>
+                                                            <Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
+                                                                <Setter Property="Opacity" Value="0.5" />
+                                                            </Style>
+                                                        </ComboBox.Styles>
+                                                        <ComboBoxItem>Inherit</ComboBoxItem>
                                                         <ComboBoxItem>Multiply</ComboBoxItem>
                                                         <ComboBoxItem>Add</ComboBoxItem>
                                                     </ComboBox>

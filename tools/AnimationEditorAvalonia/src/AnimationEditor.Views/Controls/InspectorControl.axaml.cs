@@ -5,6 +5,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Rendering;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -239,14 +240,23 @@ public partial class InspectorControl : UserControl
         if (_suppressCommit || _appCommands is null) return;
         if (_selectedState?.SelectedFrame is not { } frame) return;
 
-        // ComboBox order matches desktop: 0 = None (null), 1 = Multiply, 2 = Add.
-        ColorOperation? operation = FrameColorModeCombo.SelectedIndex switch
+        // ComboBox order matches desktop: 0 = Inherit (null), 1 = Multiply, 2 = Add. -1 is the
+        // blank unset state ShowFrame sets, not a user pick.
+        ColorOperation? operation;
+        switch (FrameColorModeCombo.SelectedIndex)
         {
-            1 => ColorOperation.Multiply,
-            2 => ColorOperation.Add,
-            _ => null,
-        };
-        _appCommands.SetFrameColorOperation(new List<AnimationFrameSave> { frame }, operation);
+            case 0: operation = null; break;
+            case 1: operation = ColorOperation.Multiply; break;
+            case 2: operation = ColorOperation.Add; break;
+            default: return;
+        }
+        if (frame.ColorOperation != operation)
+        {
+            _appCommands.SetFrameColorOperation(new List<AnimationFrameSave> { frame }, operation);
+        }
+        // Inherit is an action, not a value to display: the combo goes back to blank, like a cleared
+        // channel field. Posted because the combo is still mid-SelectionChanged.
+        if (operation is null) Dispatcher.UIThread.Post(Refresh);
     }
 
     /// <summary>
@@ -341,7 +351,7 @@ public partial class InspectorControl : UserControl
         {
             ColorOperation.Multiply => 1,
             ColorOperation.Add => 2,
-            _ => 0,
+            _ => -1,
         };
     }
 
