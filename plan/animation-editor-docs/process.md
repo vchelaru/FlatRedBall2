@@ -1,6 +1,6 @@
 # AnimationEditor Docs: Collaboration Process (temporary)
 
-Delete this file and outline.md before PR #1229 merges.
+Delete this file and outline.md before the part 2 docs PR merges.
 
 ## Who does what
 Victor writes each page. Claude adds images and links, then reviews.
@@ -33,5 +33,5 @@ Suggest, don't apply, until Victor says which to fix: anything that changes what
 how it's organized, screenshots that don't match the text, and missing coverage.
 
 ## Commits
-Commit and push each page to `animation-editor-docs-structure` (PR #1229). Don't merge until every
-page has content.
+Commit and push each page to `animation-editor-docs-part-2`. PR #1229 published the finished pages;
+this branch holds the rest. Don't merge until every page has content.
