@@ -1995,6 +1995,36 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
         }
 
+        public void AddFrameEvent(AnimationFrameSave frame, string name)
+        {
+            if (!CanEditFrameEvents(frame)) return;
+            var after = frame.Events.Append(new AnimationFrameEvent { Name = name });
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Add Event '{name}'", this, _events));
+        }
+
+        public void SetFrameEvent(AnimationFrameSave frame, int index, string name, string? data)
+        {
+            if (!CanEditFrameEvents(frame) || (uint)index >= (uint)frame.Events.Count) return;
+            var after = frame.Events.Select(e => e.Clone()).ToList();
+            after[index] = new AnimationFrameEvent
+            {
+                Name = name,
+                Data = string.IsNullOrWhiteSpace(data) ? null : data,
+            };
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Edit Event '{name}'", this, _events));
+        }
+
+        public void RemoveFrameEvent(AnimationFrameSave frame, int index)
+        {
+            if (!CanEditFrameEvents(frame) || (uint)index >= (uint)frame.Events.Count) return;
+            var removedName = frame.Events[index].Name;
+            var after = frame.Events.Where((_, i) => i != index);
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Remove Event '{removedName}'", this, _events));
+        }
+
+        private bool CanEditFrameEvents(AnimationFrameSave? frame) =>
+            frame != null && !IsFrameLocked(frame) && !IsAchxOnlyEditBlocked();
+
         public void SetFrameTextureName(IReadOnlyList<AnimationFrameSave> frames, string? textureName)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();

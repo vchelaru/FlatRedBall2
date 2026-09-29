@@ -285,6 +285,7 @@ public partial class MainWindow : Window
         WireTreeView();
         WireWindowFileDrop();
         WirePropertyPanel();
+        WireFrameEventsSection();
         WirePlaybackControls();
         WireTimelineTransport();
         WireKeyboard();
@@ -5099,6 +5100,32 @@ public partial class MainWindow : Window
         _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain);
     }
 
+    // ── Frame events (#1121) ──────────────────────────────────────────────────
+
+    private void WireFrameEventsSection()
+    {
+        PropFrameEvents.AddRequested += () =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.AddFrameEvent(frame, "Event");
+        };
+        PropFrameEvents.EditCommitted += (index, name, data) =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.SetFrameEvent(frame, index, name, data);
+        };
+        PropFrameEvents.RemoveRequested += index =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.RemoveFrameEvent(frame, index);
+        };
+    }
+
+    // Events are per frame, so a multi-frame selection shows a hint instead of one frame's list.
+    // Hidden for a native tsx project, which can't store events (see AppCommands.IsAchxOnlyEditBlocked).
+    private void RefreshFrameEventsSection(AnimationFrameSave? frame)
+    {
+        PropEventsSection.IsVisible = !_projectManager.IsNativeTsxProject;
+        PropFrameEvents.ShowEvents(frame is not null && _selectedState.SelectedFrames.Count <= 1 ? frame.Events : null);
+    }
+
     // ── Property panel wiring ─────────────────────────────────────────────────
 
     private void WirePropertyPanel()
@@ -5482,6 +5509,7 @@ public partial class MainWindow : Window
             // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
             // only way to unlock a chain from the inspector.
             PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
+            RefreshFrameEventsSection(frame);
             PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
             PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
             PropPolygonPanel.IsEnabled = !IsShapeLocked(poly);

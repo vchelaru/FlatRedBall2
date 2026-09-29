@@ -71,6 +71,17 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
     }
 
     [Fact]
+    public void AddFrameEvent_InNativeTsxProject_DoesNothing()
+    {
+        var chain = OpenTsx();
+
+        _ctx.AppCommands.AddFrameEvent(chain.Frames[0], "Footstep");
+
+        Assert.Empty(chain.Frames[0].Events);
+        Assert.False(_ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
     public void DuplicateChains_FlippedInNativeTsxProject_CopiesWithoutTheFlip()
     {
         var chain = OpenTsx();

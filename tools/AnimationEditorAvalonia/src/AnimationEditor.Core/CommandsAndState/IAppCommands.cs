@@ -372,6 +372,23 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
         /// <summary>
+        /// Appends an event named <paramref name="name"/> to <paramref name="frame"/>'s
+        /// <see cref="AnimationFrameSave.Events"/>. Undoable. No-op on a locked frame or in a native
+        /// tsx project (a Tiled tile animation can't hold events).
+        /// </summary>
+        void AddFrameEvent(AnimationFrameSave frame, string name);
+
+        /// <summary>
+        /// Replaces the name and data of the event at <paramref name="index"/>. Blank
+        /// <paramref name="data"/> is stored as <c>null</c> so it is omitted from the file. Undoable;
+        /// records nothing when both values are unchanged. Same no-op guards as <see cref="AddFrameEvent"/>.
+        /// </summary>
+        void SetFrameEvent(AnimationFrameSave frame, int index, string name, string? data);
+
+        /// <summary>Removes the event at <paramref name="index"/>. Undoable. Same no-op guards as <see cref="AddFrameEvent"/>.</summary>
+        void RemoveFrameEvent(AnimationFrameSave frame, int index);
+
+        /// <summary>
         /// Assigns <paramref name="textureName"/> to every frame in <paramref name="frames"/>
         /// as a single undoable operation — the multi-select counterpart to the single-frame
         /// overload, mirroring <see cref="SetFrameLength"/> and friends. No-op when

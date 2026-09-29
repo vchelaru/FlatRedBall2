@@ -143,6 +143,9 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.DuplicateSelection)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLocked)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLoop)]                 = Category.MutatingUndoable,
+        [nameof(IAppCommands.AddFrameEvent)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameEvent)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.RemoveFrameEvent)]             = Category.MutatingUndoable,
         // Undoable (see AppCommandsSetChainTsxOwnerTileIdTests), but excluded from
         // UndoableInvocations() -- see RoundTripVerifiedElsewhere's doc comment.
         [nameof(IAppCommands.SetChainTsxOwnerTileId)]       = Category.MutatingUndoable,
@@ -435,6 +438,12 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetChainLocked(Zebra(ctx), true)));
         yield return Row(nameof(IAppCommands.SetChainLoop),
             ctx => Sync(() => ctx.AppCommands.SetChainLoop(Zebra(ctx), false)));
+        yield return Row(nameof(IAppCommands.AddFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.AddFrameEvent(Zebra(ctx).Frames[0], "Added")));
+        yield return Row(nameof(IAppCommands.SetFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.SetFrameEvent(Zebra(ctx).Frames[1], 0, "Renamed", "payload")));
+        yield return Row(nameof(IAppCommands.RemoveFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.RemoveFrameEvent(Zebra(ctx).Frames[1], 0)));
     }
 
     // ── Fixture ───────────────────────────────────────────────────────────────
@@ -475,6 +484,7 @@ public class UndoCoverageRosterTests
         foreach (var (x, y) in new[] { (-4f, -4f), (4f, -4f), (4f, 4f), (-4f, 4f), (-4f, -4f) })
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
         zebra.Frames[0].ShapesSave!.Shapes.Add(polygon);
+        zebra.Frames[1].Events.Add(new AnimationFrameEvent { Name = "Step" });
 
         var alpha = new AnimationChainSave { Name = "Alpha" };
         alpha.Frames.Add(new AnimationFrameSave

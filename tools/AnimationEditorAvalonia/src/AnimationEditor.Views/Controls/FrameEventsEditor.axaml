@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.FrameEventsEditor">
+    <!-- Per-frame named events (#1121): one Name/Data row per event plus an add button. Rows are
+         built in code-behind (see ShowEvents) so edits commit on focus loss/Enter, same commit
+         boundary as the other inspector text fields. -->
+    <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="EVENTS" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource InkMid}" VerticalAlignment="Center" />
+                <Panel Width="14" Height="14" Background="Transparent"
+                       VerticalAlignment="Center" Cursor="Help"
+                       ToolTip.Tip="Raised by name when playback enters this frame, so game code reacts to &quot;Footstep&quot; instead of a frame number. Data is an optional free-form string your game interprets.">
+                    <Border CornerRadius="7" BorderBrush="{DynamicResource InkDim}" BorderThickness="1">
+                        <TextBlock Text="i" FontSize="9" Foreground="{DynamicResource InkDim}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Panel>
+            </StackPanel>
+            <Button x:Name="AddButton" x:FieldModifier="Public" Grid.Column="1"
+                    Content="+ Add" FontSize="10" Height="22" Padding="6,0"
+                    VerticalContentAlignment="Center"
+                    ToolTip.Tip="Add an event to this frame" />
+        </Grid>
+        <StackPanel x:Name="RowsPanel" x:FieldModifier="Public" Spacing="4" />
+        <TextBlock x:Name="HintText" x:FieldModifier="Public" FontSize="11" FontStyle="Italic"
+                   TextWrapping="Wrap" Foreground="{DynamicResource InkDim}" />
+    </StackPanel>
+</UserControl>

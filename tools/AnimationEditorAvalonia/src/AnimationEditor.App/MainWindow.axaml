@@ -1242,6 +1242,14 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Border>
+
+                                        <!-- EVENTS section (#1121): named events raised when playback enters the frame. -->
+                                        <Border x:Name="PropEventsSection"
+                                                BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <viewsControls:FrameEventsEditor x:Name="PropFrameEvents" />
+                                        </Border>
                                     </StackPanel>
 
                                     <!-- ── Rectangle properties ── -->
