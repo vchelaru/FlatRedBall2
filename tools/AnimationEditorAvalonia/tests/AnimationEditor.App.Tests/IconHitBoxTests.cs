@@ -46,6 +46,10 @@ public class IconHitBoxTests
 
         Control icon = editor.Control<Control>("ColorHelpIcon");
         icon.BringIntoView();
+        // Twice: failed once on Ubuntu CI with every point hitting the icon's ancestor, the
+        // symptom of a hit test running a render tick behind. Suspected (not reproduced) cause:
+        // the scroll applies during the first tick, so its composition update needs a second.
+        editor.Layout();
         editor.Layout();
 
         ShouldHitTestAcrossWholeBox(editor.Window, icon);
@@ -106,7 +110,10 @@ public class IconHitBoxTests
             .Where(x => (x.hit as Control)?.Name is not ("GripW" or "GripE"))
             .Select(x => $"{x.point} hit {x.hit?.GetType().Name ?? "nothing"} '{(x.hit as Control)?.Name}'")
             .ToList();
-        misses.ShouldBeEmpty($"icon at {icon.TranslatePoint(new Point(0, 0), window)} size {icon.Bounds.Size}");
+        ScrollViewer? scroller = icon.FindAncestorOfType<ScrollViewer>();
+        misses.ShouldBeEmpty($"icon at {icon.TranslatePoint(new Point(0, 0), window)} size {icon.Bounds.Size}; " +
+            $"scroller '{scroller?.Name}' offset {scroller?.Offset} viewport {scroller?.Viewport} " +
+            $"at {scroller?.TranslatePoint(new Point(0, 0), window)}");
     }
 
     /// <summary>A 5x5 grid of window points spanning the control's bounds, inset half a pixel.</summary>
