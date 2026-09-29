@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
+description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished and named frame events (FrameEventRaised), and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -18,7 +18,7 @@ Sprites animate via `AnimationChain` / `AnimationChainList`, driven automaticall
 
 ## Runtime Types
 
-- `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection
+- `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection + optional `Events` (`AnimationFrameEvent`: `Name`, free-form `Data`)
 - `AnimationChain : List<AnimationFrame>` — named sequence; `TotalLength` = sum of `FrameLength`s
 - `AnimationChainList : List<AnimationChain>` — string indexer for lookup by name; the unit of "ownership" for per-frame shapes (see Topics)
 
@@ -43,6 +43,7 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends |
+| `FrameEventRaised` | — | Fires per `AnimationFrameEvent` when its frame is entered. Branch on `e.Name`, never on a frame index, so reordering frames in the AnimationEditor can't break it. Skipped frames still fire; the XML doc has the loop/frame-0 rules |
 
 `PlayAnimation` resets time to frame 0 and sets `Animate = true`. Calling it every frame with the same chain restarts on frame 0 every tick — guard with `CurrentAnimation?.Name != "Run"`.
 

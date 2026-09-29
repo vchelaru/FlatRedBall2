@@ -8,6 +8,20 @@ namespace AnimationEditor.Core.Tests;
 public class AnimationCloneHelperTests
 {
     [Fact]
+    public void CloneFrame_WithEvents_DeepCopiesEvents()
+    {
+        var source = new AnimationFrameSave();
+        source.Events.Add(new AnimationFrameEvent { Name = "Footstep", Data = "left" });
+
+        var copy = AnimationCloneHelper.CloneFrame(source);
+
+        var copied = Assert.Single(copy.Events);
+        Assert.Equal("Footstep", copied.Name);
+        Assert.Equal("left", copied.Data);
+        Assert.NotSame(source.Events[0], copied);
+    }
+
+    [Fact]
     public void CloneFrame_AllFieldsSetToNonDefaultValues_CopiesEveryField()
     {
         var source = new AnimationFrameSave

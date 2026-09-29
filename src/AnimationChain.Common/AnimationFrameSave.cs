@@ -76,4 +76,11 @@ public class AnimationFrameSave
 
     /// <summary>Per-frame shape definitions. Empty by default.</summary>
     public ShapesSave? ShapesSave;
+
+    /// <summary>
+    /// Named events raised when playback enters this frame. Saved only when non-empty, so files
+    /// without events stay byte-identical. An FRB2 extension: Gum and FRB1 ignore these and drop
+    /// them if they re-save the file.
+    /// </summary>
+    public List<AnimationFrameEvent> Events { get; } = new();
 }

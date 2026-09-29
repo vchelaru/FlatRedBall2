@@ -90,4 +90,10 @@ public class AnimationFrame
     /// the animation system is allowed to touch.
     /// </summary>
     public List<AnimationShapeFrame> Shapes { get; } = new();
+
+    /// <summary>
+    /// Named events raised through <see cref="FlatRedBall2.Rendering.Sprite.FrameEventRaised"/> when
+    /// playback enters this frame. See that event for skipped-frame, loop, and frame-0 semantics.
+    /// </summary>
+    public List<AnimationFrameEvent> Events { get; } = new();
 }

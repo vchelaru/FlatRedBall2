@@ -70,5 +70,12 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>AnimationChain.Common.Tests</_Parameter1>
     </AssemblyAttribute>
+    <!-- FrameEventRange: the engine's Sprite shares AnimationPlayer's frame-event semantics. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Kni</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

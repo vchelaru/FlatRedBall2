@@ -37,6 +37,9 @@ public static class AnimationCloneHelper
                     copy.ShapesSave.Shapes.Add(shapeCopy);
         }
 
+        foreach (var frameEvent in source.Events)
+            copy.Events.Add(frameEvent.Clone());
+
         return copy;
     }
 

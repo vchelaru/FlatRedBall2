@@ -198,4 +198,19 @@ public class AnimationChainListSaveRoundTripTests
         Assert.Null(frame.Red);
         Assert.Null(frame.ColorOperation);
     }
+
+    [Fact]
+    public void ToAnimationChainList_FrameEvents_CopiedToRuntimeFrame()
+    {
+        var frameSave = new AnimationFrameSave { FrameLength = 0.1f };
+        frameSave.Events.Add(new AnimationFrameEvent { Name = "Footstep", Data = "left" });
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frameSave } });
+
+        var frameEvent = Assert.Single(save.ToAnimationChainList(_ => null)["Walk"]![0].Events);
+
+        Assert.Equal("Footstep", frameEvent.Name);
+        Assert.Equal("left", frameEvent.Data);
+        Assert.NotSame(frameSave.Events[0], frameEvent);
+    }
 }

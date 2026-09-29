@@ -346,4 +346,21 @@ public class AnimationPlayerTests
 
         player.Update(Sec(0.1));
     }
+
+    [Fact]
+    public void Update_DeltaSkipsFramesAndWraps_RaisesEachEnteredFrameEventInOrder()
+    {
+        var list = MakeList(("Walk", new[] { 0.1, 0.1, 0.1 }));
+        for (int i = 0; i < 3; i++)
+            list["Walk"]![i].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "F" + i });
+        var player = new AnimationPlayer<TestFrame>(list);
+        var raised = new System.Collections.Generic.List<string>();
+        player.FrameEventRaised += e => raised.Add(e.Name);
+
+        player.Play("Walk"); // enters frame 0
+        player.Update(TimeSpan.FromSeconds(0.25)); // skips frame 1, lands on 2
+        player.Update(TimeSpan.FromSeconds(0.1)); // wraps to frame 0
+
+        raised.ShouldBe(new[] { "F0", "F1", "F2", "F0" });
+    }
 }

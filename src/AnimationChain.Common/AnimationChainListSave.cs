@@ -243,6 +243,9 @@ public class AnimationChainListSave
     /// The <c>&lt;ShapeCollectionSave&gt;</c> wrapper is written only when a frame's
     /// <see cref="AnimationFrameSave.ShapesSave"/> is non-null, mirroring whether the source frame
     /// had one (some FRB1 files omit it for shapeless frames, others write an empty one).
+    /// Frame <see cref="AnimationFrameSave.Events"/> (an FRB2 extension) are written last in the frame as
+    /// <c>&lt;Events&gt;&lt;Event&gt;&lt;Name/&gt;&lt;Data/&gt;&lt;/Event&gt;&lt;/Events&gt;</c>, only when the frame has any;
+    /// <c>Data</c> is omitted when <c>null</c>.
     /// AxisAlignedCubeSaves and SphereSaves are FRB1 3D placeholders FRB2 does not model — always
     /// emitted empty for dialect parity.
     /// </remarks>
@@ -393,6 +396,17 @@ public class AnimationChainListSave
         if (frame.Alpha.HasValue) obj["alpha"] = frame.Alpha.Value;
         if (frame.ColorOperation.HasValue) obj["colorOperation"] = frame.ColorOperation.Value.ToString();
         if (frame.ShapesSave is { } shapes) obj["shapes"] = WriteShapesJson(shapes);
+        if (frame.Events.Count > 0)
+        {
+            var eventsArray = new JsonArray();
+            foreach (var frameEvent in frame.Events)
+            {
+                var eventObj = new JsonObject { ["name"] = frameEvent.Name };
+                if (frameEvent.Data != null) eventObj["data"] = frameEvent.Data;
+                eventsArray.Add((JsonNode)eventObj);
+            }
+            obj["events"] = eventsArray;
+        }
         return obj;
     }
 
@@ -501,6 +515,20 @@ public class AnimationChainListSave
         // zero shapes). Mirror whichever the source used instead of injecting or dropping it.
         if (frame.ShapesSave is { } shapes)
             el.Add(WriteShapes(shapes));
+
+        // FRB2 extension with no FRB1 precedent: written last, and only when present, so frames
+        // without events stay byte-identical and FRB1's XmlSerializer skips it as an unknown element.
+        if (frame.Events.Count > 0)
+        {
+            var eventsEl = new XElement("Events");
+            foreach (var frameEvent in frame.Events)
+            {
+                var eventEl = new XElement("Event", new XElement("Name", frameEvent.Name));
+                if (frameEvent.Data != null) eventEl.Add(new XElement("Data", frameEvent.Data));
+                eventsEl.Add(eventEl);
+            }
+            el.Add(eventsEl);
+        }
         return el;
     }
 
@@ -600,6 +628,15 @@ public class AnimationChainListSave
         var shapesEl = el.Element("ShapeCollectionSave");
         if (shapesEl != null)
             frame.ShapesSave = ParseShapes(shapesEl);
+
+        var eventsEl = el.Element("Events");
+        if (eventsEl != null)
+            foreach (var eventEl in eventsEl.Elements("Event"))
+                frame.Events.Add(new AnimationFrameEvent
+                {
+                    Name = (string?)eventEl.Element("Name") ?? string.Empty,
+                    Data = (string?)eventEl.Element("Data"),
+                });
 
         return frame;
     }
@@ -830,6 +867,15 @@ public class AnimationChainListSave
 
         if (el["shapes"] is JsonObject shapesObj)
             frame.ShapesSave = ParseShapesJson(shapesObj);
+
+        if (el["events"] is JsonArray eventsArray)
+            foreach (var eventNode in eventsArray)
+                if (eventNode is JsonObject eventObj)
+                    frame.Events.Add(new AnimationFrameEvent
+                    {
+                        Name = eventObj["name"]?.GetValue<string>() ?? string.Empty,
+                        Data = eventObj["data"]?.GetValue<string>(),
+                    });
 
         return frame;
     }

@@ -96,6 +96,8 @@ public static class AnimationChainListSaveExtensions
                 }
 
                 AppendShapes(frame, frameSave.ShapesSave);
+                foreach (var frameEvent in frameSave.Events)
+                    frame.Events.Add(frameEvent.Clone());
 
                 chain.Add(frame);
             }

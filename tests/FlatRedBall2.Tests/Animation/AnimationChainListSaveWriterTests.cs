@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -208,5 +209,41 @@ public class AnimationChainListSaveWriterTests
         var first = doc.Root!.Elements().Take(3).Select(e => e.Name.LocalName).ToList();
         first.ShouldBe(new[] { "FileRelativeTextures", "TimeMeasurementUnit", "CoordinateType" });
         doc.Root.Element("CoordinateType")!.Value.ShouldBe("Pixel");
+    }
+    [Fact]
+    public void Save_FrameWithoutEvents_OmitsEventsElement()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { new AnimationFrameSave() } });
+
+        var doc = SaveAndParse(save);
+
+        doc.Descendants("Events").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Save_FrameWithEvents_RoundTripsNameAndOptionalData()
+    {
+        var frame = new AnimationFrameSave();
+        frame.Events.Add(new AnimationFrameEvent { Name = "Footstep" });
+        frame.Events.Add(new AnimationFrameEvent { Name = "Spawn", Data = "{\"count\":3}" });
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
+
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".achx");
+        try
+        {
+            save.Save(tempPath);
+            var events = AnimationChainListSave.FromFile(tempPath).AnimationChains[0].Frames[0].Events;
+
+            events.Select(e => e.Name).ShouldBe(new[] { "Footstep", "Spawn" });
+            events[0].Data.ShouldBeNull();
+            events[1].Data.ShouldBe("{\"count\":3}");
+            XDocument.Load(tempPath).Descendants("Event").First().Element("Data").ShouldBeNull();
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
     }
 }
