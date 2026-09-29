@@ -3610,32 +3610,16 @@ public partial class MainWindow : Window
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        string resolvedFilePath = droppedFilePath;
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+        string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath,
+            retried => ApplyResolvedPngDrop(targetChain, targetFrame, retried, createFrameOnCtrl));
+        return resolvedFilePath is not null
+            && ApplyResolvedPngDrop(targetChain, targetFrame, resolvedFilePath, createFrameOnCtrl);
+    }
 
-        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, droppedFilePath))
-        {
-            var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
-            if (choice == TextureCopyChoice.Cancel) return false;
-
-            if (choice == TextureCopyChoice.Copy)
-            {
-                string destination = Path.Combine(achxFolder, Path.GetFileName(droppedFilePath));
-                try
-                {
-                    File.Copy(droppedFilePath, destination, overwrite: true);
-                    resolvedFilePath = destination;
-                }
-                catch (Exception ex)
-                {
-                    ShowToast($"Could not copy: {ex.Message}");
-                    return false;
-                }
-            }
-        }
-
+    private bool ApplyResolvedPngDrop(
+        AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
+        string resolvedFilePath, bool createFrameOnCtrl)
+    {
         var (result, relPath) = TextureDropProcessor.ComputePngDrop(
             targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
@@ -5271,97 +5255,60 @@ public partial class MainWindow : Window
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
 
+        string? resolvedAbsPath = await ResolveTextureForProjectAsync(pickedPath,
+            retried => CommitPickedTexture(frames, retried));
+        if (resolvedAbsPath is not null)
+            CommitPickedTexture(frames, resolvedAbsPath);
+    }
+
+    private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath)
+    {
+        // Store relative path when possible; ../relative paths are allowed for textures
+        // outside the .achx folder so they round-trip correctly.
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-
-        // resolvedAbsPath tracks the actual file we will use (may change if user copies it)
-        string resolvedAbsPath = pickedPath;
-
-        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, pickedPath))
-        {
-            var choice = await ShowTextureCopyDialogAsync(pickedPath);
-            if (choice == TextureCopyChoice.Cancel) return;
-
-            if (choice == TextureCopyChoice.Copy)
-            {
-                string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
-                try
-                {
-                    File.Copy(pickedPath, destination, overwrite: true);
-                    resolvedAbsPath = destination;
-                }
-                catch (Exception ex)
-                {
-                    var capturedSource = pickedPath;
-                    var capturedDest   = destination;
-                    ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
-                    {
-                        try
-                        {
-                            File.Copy(capturedSource, capturedDest, overwrite: true);
-                            CommitFrameTexture(frames, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
-                        }
-                        catch (Exception retryEx)
-                        {
-                            ShowToast($"Retry failed: {retryEx.Message}");
-                        }
-                    });
-                }
-            }
-        }
-
-        // Store relative path when possible; ../relative paths are allowed for textures
-        // outside the .achx folder so they round-trip correctly.
         string storePath = string.IsNullOrEmpty(achxFolder)
-            ? resolvedAbsPath
-            : TexturePathHelper.ComputeStorePath(resolvedAbsPath, achxFolder);
+            ? absolutePath
+            : TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
 
-        CommitFrameTexture(frames, storePath, resolvedAbsPath);
+        CommitFrameTexture(frames, storePath, absolutePath);
     }
 
-    private enum TextureCopyChoice { Copy, Keep, Cancel }
-
-    private async Task<TextureCopyChoice> ShowTextureCopyDialogAsync(string absoluteTexturePath)
+    /// <summary>
+    /// The one "bring a user's texture into the project" step shared by Browse… and every PNG drop.
+    /// When <paramref name="texturePath"/> is outside the .achx's folder (<see cref="TextureCopyDecider"/>),
+    /// asks whether to copy it, keep it, or (when a different same-named file is already there)
+    /// overwrite or use that file, and carries the answer out. Returns the absolute path to
+    /// reference, or null when cancelled or the copy failed; a failed copy shows a toast whose
+    /// Retry re-runs the same choice and hands the result to <paramref name="applyAfterRetry"/>.
+    /// </summary>
+    private async Task<string?> ResolveTextureForProjectAsync(string texturePath, Action<string> applyAfterRetry)
     {
-        var tcs = new TaskCompletionSource<TextureCopyChoice>();
+        var plan = TextureCopyDecider.PlanCopyForProject(_projectManager, texturePath);
+        if (plan is null) return texturePath;
 
-        var dialog = new Window
+        var choice = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
+        try
         {
-            Title = "This frame does not share a folder",
-            Width = 560,
-            Height = 220,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 10 };
-        panel.Children.Add(new TextBlock
+            return TextureCopyDecider.Apply(plan, choice);
+        }
+        catch (Exception ex)
         {
-            Text = $"The selected file:\n\n{absoluteTexturePath}\n\nis not relative to the Animation file.  What would you like to do?",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-        });
-
-        var copyBtn = new Button
-        {
-            Content = "Copy the file to the same folder as the Animation",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
-        };
-        var keepBtn = new Button
-        {
-            Content = "Keep the file where it is (this may limit the portability of the Animation file)",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
-        };
-
-        copyBtn.Click += (_, _) => { tcs.TrySetResult(TextureCopyChoice.Copy);   dialog.Close(); };
-        keepBtn.Click += (_, _) => { tcs.TrySetResult(TextureCopyChoice.Keep);   dialog.Close(); };
-        panel.Children.Add(copyBtn);
-        panel.Children.Add(keepBtn);
-
-        dialog.Content = panel;
-        dialog.Closed += (_, _) => tcs.TrySetResult(TextureCopyChoice.Cancel);
-
-        await dialog.ShowDialog(this);
-        return await tcs.Task;
+            ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+            {
+                try
+                {
+                    if (TextureCopyDecider.Apply(plan, choice) is { } retried)
+                        applyAfterRetry(retried);
+                }
+                catch (Exception retryEx)
+                {
+                    ShowToast($"Retry failed: {retryEx.Message}");
+                }
+            });
+            return null;
+        }
     }
 
     /// <summary>

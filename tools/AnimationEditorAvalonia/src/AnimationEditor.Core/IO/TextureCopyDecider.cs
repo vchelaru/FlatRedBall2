@@ -2,6 +2,41 @@ using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO;
 
+/// <summary>What already sits at the destination a texture would be copied to.</summary>
+public enum TextureCopyConflict
+{
+    None,
+    /// <summary>A file with the same name and the same bytes; copying would change nothing.</summary>
+    IdenticalFileExists,
+    /// <summary>A different file with the same name; copying would replace it.</summary>
+    DifferentFileExists,
+}
+
+/// <summary>The user's answer to the "does not share a folder" prompt.</summary>
+public enum TextureCopyChoice
+{
+    Cancel,
+    /// <summary>Reference the texture where it is.</summary>
+    KeepInPlace,
+    /// <summary>Copy next to the .achx; never replaces a different file.</summary>
+    Copy,
+    /// <summary>Copy next to the .achx, replacing the different same-named file there.</summary>
+    Overwrite,
+    /// <summary>Reference the same-named file already next to the .achx, copying nothing.</summary>
+    UseExisting,
+}
+
+/// <summary>
+/// A pending "copy this texture next to the .achx" decision. <see cref="Choices"/> lists what the
+/// prompt offers, first entry being the safe default for Enter.
+/// </summary>
+public sealed record TextureCopyPlan(string SourcePath, string DestinationPath, TextureCopyConflict Conflict)
+{
+    public IReadOnlyList<TextureCopyChoice> Choices => Conflict == TextureCopyConflict.DifferentFileExists
+        ? new[] { TextureCopyChoice.KeepInPlace, TextureCopyChoice.Overwrite, TextureCopyChoice.UseExisting }
+        : new[] { TextureCopyChoice.Copy, TextureCopyChoice.KeepInPlace };
+}
+
 /// <summary>
 /// Determines whether the user should be prompted to copy a texture file next to the
 /// loaded .achx.  Mirrors the "ask to copy" dialog logic from the WinForms
@@ -22,6 +57,64 @@ public static class TextureCopyDecider
 
         var achxFolder = new FilePath(projectManager.FileName).GetDirectoryContainingThis().FullPath;
         return ShouldPromptToCopy(texturePath, achxFolder, projectManager.ProjectFolderPath);
+    }
+
+    /// <summary>
+    /// The copy decision for assigning <paramref name="texturePath"/>, or null when no prompt is
+    /// needed (see <see cref="ShouldPromptToCopyForProject"/>).
+    /// </summary>
+    public static TextureCopyPlan? PlanCopyForProject(IProjectManager projectManager, string texturePath)
+    {
+        if (!ShouldPromptToCopyForProject(projectManager, texturePath)) return null;
+
+        var achxFolder = new FilePath(projectManager.FileName!).GetDirectoryContainingThis().FullPath;
+        return PlanCopy(texturePath, achxFolder);
+    }
+
+    /// <summary>
+    /// Plans copying <paramref name="sourcePath"/> into <paramref name="achxFolder"/> under the same
+    /// file name, reading the destination from disk to detect a same-named file.
+    /// </summary>
+    public static TextureCopyPlan PlanCopy(string sourcePath, string achxFolder)
+    {
+        string destination = Path.Combine(achxFolder, Path.GetFileName(sourcePath));
+        var conflict = !File.Exists(destination) ? TextureCopyConflict.None
+            : HasSameBytes(sourcePath, destination) ? TextureCopyConflict.IdenticalFileExists
+            : TextureCopyConflict.DifferentFileExists;
+        return new TextureCopyPlan(sourcePath, destination, conflict);
+    }
+
+    /// <summary>
+    /// Carries out <paramref name="choice"/> and returns the absolute path the frame should now
+    /// reference, or null for <see cref="TextureCopyChoice.Cancel"/>. <see cref="TextureCopyChoice.Copy"/>
+    /// never replaces a file: if one appeared after planning, it throws <see cref="IOException"/>.
+    /// </summary>
+    public static string? Apply(TextureCopyPlan plan, TextureCopyChoice choice)
+    {
+        switch (choice)
+        {
+            case TextureCopyChoice.Cancel:
+                return null;
+            case TextureCopyChoice.KeepInPlace:
+                return plan.SourcePath;
+            case TextureCopyChoice.UseExisting:
+                return plan.DestinationPath;
+            case TextureCopyChoice.Overwrite:
+                File.Copy(plan.SourcePath, plan.DestinationPath, overwrite: true);
+                return plan.DestinationPath;
+            case TextureCopyChoice.Copy:
+                if (plan.Conflict != TextureCopyConflict.IdenticalFileExists)
+                    File.Copy(plan.SourcePath, plan.DestinationPath, overwrite: false);
+                return plan.DestinationPath;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(choice), choice, null);
+        }
+    }
+
+    private static bool HasSameBytes(string a, string b)
+    {
+        if (new FileInfo(a).Length != new FileInfo(b).Length) return false;
+        return File.ReadAllBytes(a).AsSpan().SequenceEqual(File.ReadAllBytes(b));
     }
 
     /// <summary>

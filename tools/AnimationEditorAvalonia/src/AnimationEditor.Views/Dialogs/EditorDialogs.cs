@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -62,6 +63,56 @@ public static class EditorDialogs
             (cancelLabel, dialog.Cancel)));
         return host.ShowAsync(dialog);
     }
+
+    /// <summary>
+    /// The "does not share a folder" prompt for a texture outside the .achx's folder. Offers
+    /// <see cref="TextureCopyPlan.Choices"/>; Enter picks the first, Escape or closing cancels.
+    /// </summary>
+    public static Task<TextureCopyChoice> ChooseTextureCopyAsync(IEditorDialogHost host, TextureCopyPlan plan)
+    {
+        string fileName = Path.GetFileName(plan.DestinationPath);
+        string question = "is not relative to the Animation file.";
+        if (plan.Conflict == TextureCopyConflict.DifferentFileExists)
+            question += $"  A different file named {fileName} is already in the Animation's folder.";
+        question += "  What would you like to do?";
+
+        // Separate blocks rather than one message with blank lines: a wrapping TextBlock holding
+        // an empty line never finishes layout under Avalonia's headless text shaper.
+        var panel = new StackPanel { Margin = new Thickness(16), Spacing = 10 };
+        panel.Children.Add(new TextBlock { Text = "The selected file:" });
+        panel.Children.Add(new TextBlock { Text = plan.SourcePath, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(new TextBlock { Text = question, TextWrapping = TextWrapping.Wrap });
+
+        var dialog = new EditorDialog<TextureCopyChoice>(
+            new EditorDialogOptions("This frame does not share a folder", 560, SizeToContentHeight: true),
+            panel, cancelResult: TextureCopyChoice.Cancel);
+        dialog.Confirm = () => dialog.Complete(plan.Choices[0]);
+        dialog.Cancel = () => dialog.Complete(TextureCopyChoice.Cancel);
+
+        foreach (var choice in plan.Choices)
+        {
+            var button = new Button
+            {
+                Content = TextureCopyChoiceLabel(choice, plan.Conflict, fileName),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+            button.Click += (_, _) => dialog.Complete(choice);
+            panel.Children.Add(button);
+        }
+        return host.ShowAsync(dialog);
+    }
+
+    private static string TextureCopyChoiceLabel(TextureCopyChoice choice, TextureCopyConflict conflict, string fileName) =>
+        choice switch
+        {
+            TextureCopyChoice.Copy when conflict == TextureCopyConflict.IdenticalFileExists =>
+                $"Use the identical {fileName} already in the Animation's folder",
+            TextureCopyChoice.Copy => "Copy the file to the same folder as the Animation",
+            TextureCopyChoice.KeepInPlace => "Keep the file where it is (this may limit the portability of the Animation file)",
+            TextureCopyChoice.Overwrite => $"Copy and overwrite the existing {fileName} in the Animation's folder",
+            TextureCopyChoice.UseExisting => $"Use the existing {fileName} in the Animation's folder (no copy)",
+            _ => choice.ToString(),
+        };
 
     public static Task<string?> PromptStringAsync(
         IEditorDialogHost host, string title, string prompt, string initial = "")

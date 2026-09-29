@@ -396,6 +396,9 @@ knows where to look. Add to it whenever a scenario has to route around something
   label's coordinates lands on nothing. `RowFor` calls `BringIntoView` on the row and
   `RowHeaderPoint` throws when the point is still outside the tree, so a scenario never silently
   clicks past a row.
+- **A wrapping `TextBlock` whose text holds a blank line (`"a\n\nb"`) never finishes layout** under
+  the headless text shaper, so a dialog built that way hangs the scenario inside
+  `ScriptedDialogs.ShowAsync`. Put each paragraph in its own `TextBlock` instead.
 - **The preview auto-plays once a chain is selected**, and the Play button toggles. A scenario
   that wants playback running checks `Preview.IsPlaying` first and only clicks when stopped;
   clicking blindly pauses it and every later assertion reads as "playback stopped".
