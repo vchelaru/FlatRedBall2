@@ -10,7 +10,10 @@ If your animation doesn't have any frames yet, you can drag an image from the **
 
 <figure><img src="../../.gitbook/assets/edit-frames-drop-image-on-animation.gif" alt="Dragging an image from the Images tab onto an empty animation"><figcaption></figcaption></figure>
 
-If **Grid** is enabled, and you have at least one frame already set with a texture, additional frames can be added by holding down **Ctrl** and clicking cells in the grid.
+To add a frame by clicking the image, hold down **Ctrl** (**⌘** on macOS) and click in the editor window. The new frame depends on the mode:
+
+* With **Grid** enabled, the new frame fills the clicked grid cell.
+* Otherwise, the new frame is centered on the click and matches the size of the animation's last frame. If the animation has no frames yet, the new frame is 16×16 pixels.
 
 <figure><img src="../../.gitbook/assets/edit-frames-ctrl-click-grid.gif" alt="Ctrl+clicking grid cells to add frames"><figcaption></figcaption></figure>
 
@@ -39,6 +42,8 @@ If **Grid** is enabled, you can also double-click a cell to change coordinates. 
 Alternatively you can edit the coordinate values in the **Inspector** tab.
 
 <figure><img src="../../.gitbook/assets/edit-frames-coordinates.png" alt="Coordinates section of the Inspector tab"><figcaption></figcaption></figure>
+
+To move every frame of an animation at once, select the animation, then drag in the editor window.
 
 ## Reorder Frames
 
@@ -116,7 +121,7 @@ Multiply, also sometimes called `modulate`, darkens the color of a frame. These 
 
 For example, if Multiply with (R, G, B) values of (255, 0, 0) are set, then the red channel is still fully drawn, but the green and blue channels are completely removed from the frame.
 
-Effective color values appear in the tree view, Animations project tab, and preview.
+Effective color values appear in the tree view (using the first frame's color), the timeline, and the preview.
 
 <figure><img src="../../.gitbook/assets/edit-frames-multiply.png" alt="Multiply with R, G, B of 255, 0, 0 shown in the tree, timeline, and preview"><figcaption></figcaption></figure>
 

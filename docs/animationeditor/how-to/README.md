@@ -5,7 +5,6 @@ Each guide covers one task in the AnimationEditor.
 * [Edit Animations](edit-animations.md)
 * [Edit Frames](edit-frames.md)
 * [Preview an Animation](preview-an-animation.md)
-* [Choose What a Frame Shows](choose-what-a-frame-shows.md)
 * [Align Animations](align-animations.md)
 * [Animate a Tiled Tileset (.tsx)](animate-a-tiled-tileset.md)
 * [Add Collision Shapes](add-collision-shapes.md)

@@ -4,4 +4,4 @@
 
 ## Shift a Whole Animation (Adjust Offsets)
 
-## Shift One Frame (Relative X / Relative Y)
+To shift a single frame, see [Offset a Frame](edit-frames.md#offset-a-frame).

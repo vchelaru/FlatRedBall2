@@ -47,38 +47,30 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Turn looping on or off (Loop)
 │   │   ## Lock an animation (why the + button disappears)
 │   ├── Edit frames
-│   │   ## Add frames
+│   │   ## Add frames (+ button, drop a PNG, Ctrl+click, copy/paste, duplicate)
 │   │   ## Delete frames
-│   │   ## Add a frame with the magic wand (Ctrl+click)
-│   │   ## Copy, paste, and duplicate frames (Ctrl+D / ⌘D)
+│   │   ## Change what part of the image a frame shows (drag, grid snap, double-click a cell, pixel coordinates, move all frames)
 │   │   ## Reorder frames (drag in the tree)
 │   │   ## Edit several frames at once (multi-select; mixed values)
-│   │   ## Change a frame's image (TEXTURE field, … browse, drop a PNG, Reveal Texture in File Manager)
-│   │   ## Change what part of the image a frame shows (pointer to Choose what a frame shows)
+│   │   ## Change a frame's image (TEXTURE field, … browse, drop a PNG)
 │   │   ## Flip a frame (Horizontal, Vertical, Diagonal)
 │   │   ## Change how long a frame shows
 │   │   ## Tint a frame (Color Mode + R/G/B/A)
-│   │   ## Offset a frame (pointer to Align animations ▸ Relative X / Y)
+│   │   ## Offset a frame (Relative X / Y, drag in the preview)
 │   ├── Preview an animation             (right after editing: used after every change)
 │   │   ## Playback and speed
 │   │   ## Show the previous frame (onion skin)
 │   │   ## Preview several animations together (multi-select stacks them)
-│   ├── Choose what a frame shows        (was "Define frame regions"; plain-language title)
-│   │   ## Snap to a grid (set cell size; drag moves and keeps size, double-click fits a cell)
-│   │   ## Select with the magic wand
-│   │   ## Enter exact pixel coordinates
-│   │   ## Move all frames at once (select the whole animation)
 │   ├── Align animations
 │   │   ## Use guides to spot misalignment
 │   │   ## Shift a whole animation (Adjust Offsets)
-│   │   ## Shift one frame (Relative X / Relative Y)
 │   ├── Animate a Tiled tileset (.tsx)
 │   │   ## Open a .tsx file
 │   │   ## Animate a tile
 │   │   ## Name animations (auto "ID:{tileId}" names)
 │   │   ## Choose the placed tile (Placed Tile)
 │   │   ## Fix animations Tiled can't represent (warning icon)
-│   │   ## What isn't available in .tsx projects (collision shapes, flipping, Adjust Offsets)
+│   │   ## What isn't available in .tsx projects (flipping, offsets/Adjust Offsets, color, collision shapes; Grid always on)
 │   ├── Add collision shapes
 │   │   ## Add a rectangle, circle, or polygon (Add AxisAlignedRectangle / Add Circle / Add Polygon)
 │   ├── Work with project folders
@@ -120,3 +112,5 @@ AnimationEditor                          (SUMMARY.md group)
 - **The landing page's How-To Guides link** points at `how-to/README.md` once it exists.
 - **Promote Tiled support up front.** The docs landing page and the first line of Quick Start should say the editor works with both `.achx` and Tiled `.tsx` tilesets, and link to "Animate a Tiled tileset". A feature buried in the how-to list isn't promoted.
 - **PixiJS export is not documented.** It's experimental; add a page when someone asks.
+
+- **Choose What a Frame Shows was merged into Edit Frames.** Region editing is a section there. The magic wand is intentionally undocumented for now (rarely used).

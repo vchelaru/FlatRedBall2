@@ -56,7 +56,7 @@ Flipping isn't available in [Tiled `.tsx` projects](animate-a-tiled-tileset.md).
 
 ## Move All of an Animation's Frames
 
-To move every frame's region on the image at once, see [Move All Frames at Once](choose-what-a-frame-shows.md#move-all-frames-at-once).
+To move every frame's region on the image at once, see [Change What Part of the Image a Frame Shows](edit-frames.md#change-what-part-of-the-image-a-frame-shows).
 
 ## Change an Animation's Speed
 

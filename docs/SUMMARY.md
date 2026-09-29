@@ -12,7 +12,6 @@
   * [Edit Animations](animationeditor/how-to/edit-animations.md)
   * [Edit Frames](animationeditor/how-to/edit-frames.md)
   * [Preview an Animation](animationeditor/how-to/preview-an-animation.md)
-  * [Choose What a Frame Shows](animationeditor/how-to/choose-what-a-frame-shows.md)
   * [Align Animations](animationeditor/how-to/align-animations.md)
   * [Animate a Tiled Tileset (.tsx)](animationeditor/how-to/animate-a-tiled-tileset.md)
   * [Add Collision Shapes](animationeditor/how-to/add-collision-shapes.md)
