@@ -2,4 +2,4 @@
 
 ## Playback and Speed
 
-## Onion Skin
+## Show the Previous Frame (Onion Skin)

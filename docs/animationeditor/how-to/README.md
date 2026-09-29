@@ -3,11 +3,11 @@
 Each guide covers one task in the AnimationEditor.
 
 * [Work with Project Folders](work-with-project-folders.md)
+* [Save and Undo Changes](save-and-undo-changes.md)
 * [Edit Animations](edit-animations.md)
 * [Edit Frames](edit-frames.md)
-* [Define Frame Regions](define-frame-regions.md)
+* [Preview an Animation](preview-an-animation.md)
+* [Choose What a Frame Shows](choose-what-a-frame-shows.md)
 * [Align Animations](align-animations.md)
-* [Flip and Tint Frames](flip-and-tint-frames.md)
 * [Animate a Tiled Tileset (.tsx)](animate-a-tiled-tileset.md)
 * [Add Collision Shapes](add-collision-shapes.md)
-* [Preview an Animation](preview-an-animation.md)

@@ -45,3 +45,4 @@ If a project is open, you can track which portions of an image are used by anima
 Click on any frame to open the corresponding animation.
 
 <figure><img src="../../.gitbook/assets/project-folders-open-from-usage.gif" alt="Clicking a highlighted frame to open its animation"><figcaption></figcaption></figure>
+## Work Without a Project Folder

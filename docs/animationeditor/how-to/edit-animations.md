@@ -9,3 +9,7 @@
 ## Flip an Animation
 
 ## Change an Animation's Speed
+
+## Stop an Animation from Looping
+
+## Lock an Animation

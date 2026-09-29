@@ -9,3 +9,5 @@
 ## Choose the Placed Tile
 
 ## Fix Animations Tiled Can't Represent
+
+## What Isn't Available in .tsx Projects
