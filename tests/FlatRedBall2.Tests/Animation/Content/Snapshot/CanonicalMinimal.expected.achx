@@ -37,14 +37,14 @@
             <Y>0</Y>
             <Z>0</Z>
             <Points>
-              <Vector2Save>
+              <Point>
                 <X>0</X>
                 <Y>0</Y>
-              </Vector2Save>
-              <Vector2Save>
+              </Point>
+              <Point>
                 <X>10</X>
                 <Y>0</Y>
-              </Vector2Save>
+              </Point>
             </Points>
             <Alpha>1</Alpha>
             <Red>1</Red>

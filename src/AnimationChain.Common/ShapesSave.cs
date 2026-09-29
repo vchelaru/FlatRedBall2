@@ -4,9 +4,10 @@ using System.Linq;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// Per-frame shape definitions in a .achx file. Inert in FRB1; live in FRB2 — entries are
-/// converted to runtime <c>AnimationShapeFrame</c> instances by
-/// <c>AnimationChainListSaveExtensions.ToAnimationChainList</c> (main engine assembly).
+/// Per-frame shape definitions in a .achx file. FRB1 reads them too (<c>Sprite.SyncShapesFromAnimation</c>),
+/// so element names must match FRB1's. In FRB2, entries are converted to runtime
+/// <c>AnimationShapeFrame</c> instances by <c>AnimationChainListSaveExtensions.ToAnimationChainList</c>
+/// (main engine assembly).
 /// </summary>
 /// <remarks>Serialized as <c>&lt;ShapeCollectionSave&gt;</c> in .achx XML.</remarks>
 public class ShapesSave
@@ -81,6 +82,7 @@ public class PolygonSave : ShapeSave
 }
 
 /// <summary>Serialized 2D point used by <see cref="PolygonSave"/>.</summary>
+/// <remarks>Written as <c>&lt;Point&gt;</c> in .achx XML to match FRB1's <c>FlatRedBall.Math.Geometry.Point</c>.</remarks>
 public class Vector2Save
 {
     /// <summary>X coordinate.</summary>

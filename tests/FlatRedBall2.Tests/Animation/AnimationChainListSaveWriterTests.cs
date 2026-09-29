@@ -114,8 +114,24 @@ public class AnimationChainListSaveWriterTests
         doc.Descendants("FlipHorizontal").Single().Value.ShouldBe("true");
     }
 
+    // Shape of FRB1's FlatRedBall.Content.Polygon.PolygonSave, which FRB1 reads with XmlSerializer:
+    // Points is FlatRedBall.Math.Geometry.Point[] (a struct of double X/Y). Unrecognized point
+    // elements are skipped silently, so a name mismatch loads a polygon with zero points.
+    [System.Xml.Serialization.XmlType("Point")]
+    public struct Frb1Point { public double X; public double Y; }
+
+    [System.Xml.Serialization.XmlRoot("PolygonSave")]
+    public class Frb1PolygonSave
+    {
+        public float X;
+        public float Y;
+        public float Z;
+        public Frb1Point[] Points = [];
+        public string Name = string.Empty;
+    }
+
     [Fact]
-    public void Save_Polygon_EmitsPointsWithVector2Save()
+    public void Save_Polygon_PointsAreReadableByFrb1PolygonSave()
     {
         var save = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "P" };
@@ -128,12 +144,14 @@ public class AnimationChainListSaveWriterTests
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
-        var doc = SaveAndParse(save);
+        var polyEl = SaveAndParse(save).Descendants("PolygonSave").Single();
+        var frb1 = (Frb1PolygonSave)new System.Xml.Serialization.XmlSerializer(typeof(Frb1PolygonSave))
+            .Deserialize(polyEl.CreateReader())!;
 
-        var points = doc.Descendants("PolygonSave").Single().Element("Points")!.Elements("Vector2Save").ToList();
-        points.Count.ShouldBe(2);
-        points[0].Element("X")!.Value.ShouldBe("1");
-        points[1].Element("Y")!.Value.ShouldBe("4");
+        frb1.Name.ShouldBe("Shape");
+        frb1.Points.Length.ShouldBe(2);
+        frb1.Points[0].X.ShouldBe(1);
+        frb1.Points[1].Y.ShouldBe(4);
     }
 
     [Fact]

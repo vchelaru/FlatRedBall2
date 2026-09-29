@@ -525,7 +525,7 @@ public class AnimationChainListSave
         {
             var pointsEl = new XElement("Points");
             foreach (var v in p.Points)
-                pointsEl.Add(new XElement("Vector2Save",
+                pointsEl.Add(new XElement("Point",
                     new XElement("X", FloatStr(v.X)),
                     new XElement("Y", FloatStr(v.Y))));
             polysEl.Add(new XElement("PolygonSave",
@@ -650,7 +650,7 @@ public class AnimationChainListSave
                 var pointsEl = p.Element("Points");
                 if (pointsEl != null)
                 {
-                    foreach (var v in pointsEl.Elements("Vector2Save"))
+                    foreach (var v in pointsEl.Elements("Point"))
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
