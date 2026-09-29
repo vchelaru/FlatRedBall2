@@ -10,10 +10,11 @@ description: >-
 Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
 
 ```
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
+scripts/test-ae.py                                     # build, then every AE test (~1 min)
+scripts/test-ae.py --filter "FullyQualifiedName~Grid"  # same, filtered
 ```
+
+`test-ae.py` builds once, runs every test project in parallel with App.Tests split into shards, prints only failures, and exits nonzero on any. It works from any worktree and can run in several worktrees at once: build outputs, temp folders and settings roots are all per worktree or per test.
 
 ## Pick the right layer (do not duplicate)
 
@@ -100,4 +101,8 @@ For an unexplained hang, `dotnet test ... --blame-hang-timeout 45s` kills and re
 
 ## Tests must never write the developer's real settings
 
-`MainWindow` persists app settings (recent files, open tabs, theme) to `%APPDATA%\AnimationEditor\AESettings.json` in its `Closed` handler. A headless test that constructs and closes a window would otherwise overwrite the developer's real settings with test fixtures. The application-data root is a `MainWindow` constructor parameter precisely so tests can redirect it: `ctx.CreateMainWindow()` passes `ctx.SettingsRoot` (a unique temp dir), while production (`App.axaml.cs`) passes `Environment.GetFolderPath(SpecialFolder.ApplicationData)`. Build the window through `ctx.CreateMainWindow()` — never reconstruct one with the production root in a test. General rule: any component that reads or writes a real per-user location (config, registry, recent-files) takes its root as an injected dependency, so tests land in temp and never on real user data.
+`MainWindow` persists app settings (recent files, open tabs, theme) to `AnimationEditor/AESettings.json` under the per-user application-data folder in its `Closed` handler. A headless test that constructs and closes a window would otherwise overwrite the developer's real settings with test fixtures. The application-data root is a `MainWindow` constructor parameter precisely so tests can redirect it: `ctx.CreateMainWindow()` passes `ctx.SettingsRoot` (a unique temp dir), while production (`App.axaml.cs`) passes `Environment.GetFolderPath(SpecialFolder.ApplicationData)`. Build the window through `ctx.CreateMainWindow()` — never reconstruct one with the production root in a test. General rule: any component that reads or writes a real per-user location (config, registry, recent-files) takes its root as an injected dependency, so tests land in temp and never on real user data.
+
+## Host-OS branches go through the constructor
+
+A `MainWindow` branch on `OperatingSystem.IsMacOS()` makes every test depend on the machine running it. Platform presentation is a constructor parameter instead (`useMacOSChrome`, which production sets from the host and `ctx.CreateMainWindow()` leaves off), so headless runs get the same in-window title bar and menu on every OS and a test can opt into the other mode.

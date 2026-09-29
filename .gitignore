@@ -81,6 +81,8 @@ diagnostics/manual-test/
 
 # AnimationEditor ad-hoc visual proof screenshots (DocScreenshots / browser capture)
 tools/AnimationEditorAvalonia/tests/_out/
+# Scratch capture scenarios copied in by scripts/ae-before-after.py
+tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/_Local/
 
 # Glue writes per-user editor state next to the project; it is not part of the project.
 **/*.settings.user.json

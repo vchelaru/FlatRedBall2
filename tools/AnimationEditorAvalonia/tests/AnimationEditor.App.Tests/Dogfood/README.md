@@ -14,10 +14,11 @@ strip are all part of what is tested.
 ## Run it
 
 ```
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
+scripts/test-ae.py --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 212 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
+About 230 scenarios. The runner splits them across processes, so this takes under a minute
+instead of the ~100 seconds a single `dotnet test` process needs. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
 
 ## The pieces
 

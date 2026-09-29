@@ -23,9 +23,14 @@ Headless PNG capture of the AnimationEditor's UI, for illustrating documentation
 
 ## Every visual change ships before/after screenshots in its PR
 
-Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional. Take the before shot before editing any code. If the code is already edited, add a detached worktree of `origin/main` under `.claude/worktrees/`, copy the scratch capture into it, and shoot there.
+Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional.
 
-`gh` can't upload images, so `scripts/push-pr-screenshots.py <pr#> <folder>` puts the PNGs on the orphan `pr-assets` branch and prints the `raw.githubusercontent.com` URLs to embed.
+```
+scripts/ae-before-after.py <capture.cs> <out-dir>
+scripts/push-pr-screenshots.py <pr#> <out-dir>
+```
+
+`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png`. It works after the code is already edited. `gh` can't upload images, so `push-pr-screenshots.py` puts them on the orphan `pr-assets` branch and prints ready-to-paste `![name](url)` lines; it exits nonzero unless every URL serves, and is safe to run while other agents upload.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 
@@ -43,11 +48,11 @@ This only covers *creation*. Once a chain/frame exists with real defaults, hand-
 
 ## Ad hoc "take a screenshot of X" requests
 
-For a one-off request (not a permanent doc-page scenario), hand-edit a scratch file like `_ScratchCapture.cs` in this project — a single `[AvaloniaFact]` test that builds the scenario and calls `ScreenshotCapture.Capture`. Don't add one-off requests to `DocScreenshotManifest` (`DocScreenshotGeneratorTests.cs`) — that manifest is for scenarios a real doc page will regenerate repeatedly. "Ad hoc" relaxes *where the test lives*, not *how the scenario is built* — the `AppCommands`/`FileName` landmines above still apply in full.
+For a one-off request (not a permanent doc-page scenario), write a scratch capture class modeled on `_ScratchCapture.cs`: a single `[AvaloniaFact]` test with a unique class name that builds the scenario and calls `ScreenshotCapture.Capture`. Keep it out of the commit: pass it to `ae-before-after.py` from a scratch folder, or put it in this project's gitignored `_Local/` folder. Don't add one-off requests to `DocScreenshotManifest` (`DocScreenshotGeneratorTests.cs`) — that manifest is for scenarios a real doc page will regenerate repeatedly. "Ad hoc" relaxes *where the test lives*, not *how the scenario is built* — the `AppCommands`/`FileName` landmines above still apply in full.
 
-Iterate fast: `dotnet build tests/AnimationEditor.DocScreenshots/...csproj`, then run the built `.exe -method "AnimationEditor.DocScreenshots._ScratchCapture.Capture"` directly — faster than `dotnet test` for one scenario, and its `Console.WriteLine` output is visible, unlike `dotnet test`'s VSTest adapter which swallows it on failure.
+Iterate fast: `dotnet build` the DocScreenshots project, then run the built test runner directly, `tests/AnimationEditor.DocScreenshots/bin/Debug/net10.0/AnimationEditor.DocScreenshots -method "AnimationEditor.DocScreenshots.<Class>.<Method>"` (`.exe` on Windows). It is faster than `dotnet test` for one scenario, and its `Console.WriteLine` output is visible, unlike `dotnet test`'s VSTest adapter which swallows it on failure.
 
-Write output via **`ScreenshotOutput.ResolveFeatureDir("<feature>")`** → `tools/AnimationEditorAvalonia/tests/_out/<feature>/` (not a temp dir you delete). Open with `Invoke-Item`, then `Read` the PNG yourself before showing the user.
+Write output via **`ScreenshotOutput.ResolveFeatureDir("<feature>")`** → `tools/AnimationEditorAvalonia/tests/_out/<feature>/` (not a temp dir you delete). `Read` the PNG yourself before showing the user.
 
 ## Feature proof (History / undo labels / similar)
 
