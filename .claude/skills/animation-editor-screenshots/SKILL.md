@@ -25,7 +25,7 @@ Headless PNG capture of the AnimationEditor's UI, for illustrating documentation
 
 Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional. Take the before shot before editing any code. If the code is already edited, add a detached worktree of `origin/main` under `.claude/worktrees/`, copy the scratch capture into it, and shoot there.
 
-`gh` can't upload images, so push the PNGs to the orphan `pr-assets` branch under `<pr#>/` and embed them as `https://raw.githubusercontent.com/vchelaru/FlatRedBall2/pr-assets/<pr#>/<file>.png`.
+`gh` can't upload images, so `scripts/push-pr-screenshots.py <pr#> <folder>` puts the PNGs on the orphan `pr-assets` branch and prints the `raw.githubusercontent.com` URLs to embed.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 
