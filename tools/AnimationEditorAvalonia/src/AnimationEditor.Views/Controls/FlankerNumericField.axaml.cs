@@ -119,6 +119,19 @@ public partial class FlankerNumericField : UserControl
         ValueBox.AddHandler(KeyDownEvent, OnValueBoxKeyDown);
     }
 
+    // #1242: wheel steps the value like NumericUpDown's ButtonSpinner does -- only while focused,
+    // so scrolling a panel past an unfocused field doesn't edit it.
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        if (!IsKeyboardFocusWithin || e.Delta.Y == 0) return;
+
+        // Focus stays in ValueBox, so typed-but-uncommitted text would otherwise be overwritten.
+        Commit();
+        Step(Math.Sign(e.Delta.Y));
+        e.Handled = true;
+    }
+
     private void OnValueBoxKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
