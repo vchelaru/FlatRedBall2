@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Captures the same AnimationEditor screenshot scenario on origin/main and on this worktree.
 
-Usage: scripts/ae-before-after.py <capture.cs> <out-dir>
+Usage: scripts/ae-before-after.py <capture.cs>
 
 <capture.cs> is one DocScreenshots [AvaloniaFact] class that writes PNGs through
 ScreenshotOutput.ResolveFeatureDir (see the animation-editor-screenshots skill). It can live
 anywhere, such as a scratch folder. The script copies it into the gitignored
 tests/AnimationEditor.DocScreenshots/_Local/ folder of this worktree and of a reusable detached
 origin/main worktree (<this worktree's name>-before, under the main checkout's .claude/worktrees/),
-runs it in both at once, and writes every PNG each run produced to <out-dir> as before-<name>.png
-and after-<name>.png. Upload them with scripts/push-pr-screenshots.py.
+runs it in both at once, and writes every PNG each run produced as before-<name>.png and
+after-<name>.png to this worktree's gitignored tests/_out/before-after/ folder, emptied first so
+nothing from an earlier run or another agent can ride along. It prints that folder's path; upload
+it with scripts/push-pr-screenshots.py <pr#> <that path>.
 """
 import os, re, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -41,6 +43,14 @@ def before_tree():
     return path
 
 
+def reset_out_dir(tree):
+    """Empties and returns this worktree's before/after folder."""
+    path = os.path.join(tree, OUT, "before-after")
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path)
+    return path
+
+
 def capture(label, tree, source, test_class, log_dir):
     local = os.path.join(tree, PROJECT, "_Local")
     os.makedirs(local, exist_ok=True)
@@ -59,7 +69,8 @@ def capture(label, tree, source, test_class, log_dir):
         # A leftover copy would collide with the next capture that reuses its class name.
         os.remove(target)
     shots = []
-    for folder, _, names in os.walk(out_root):
+    for folder, dirs, names in os.walk(out_root):
+        dirs[:] = [d for d in dirs if d != "before-after"]
         for name in names:
             path = os.path.join(folder, name)
             if name.lower().endswith(".png") and os.path.getmtime(path) >= start - 1:
@@ -68,15 +79,15 @@ def capture(label, tree, source, test_class, log_dir):
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         print(__doc__)
         return 2
-    source, out_dir = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+    source = os.path.abspath(sys.argv[1])
     match = re.search(r"\bclass\s+(\w+)", open(source).read())
     if not match:
         raise SystemExit(f"No class found in {source}.")
     test_class = match.group(1)
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = reset_out_dir(HERE)
     log_dir = out_dir
 
     before = before_tree()
