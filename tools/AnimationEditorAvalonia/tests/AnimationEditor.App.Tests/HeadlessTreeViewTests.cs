@@ -316,8 +316,8 @@ public class HeadlessTreeViewTests
             var headers = ContextMenuHeaders(window);
             Assert.Contains("Flip Horizontally", headers);
             Assert.Contains("Flip Vertically",   headers);
-            Assert.Contains("^  Move Up",         headers);
-            Assert.Contains("v  Move Down",        headers);
+            Assert.Contains("Move Up",         headers);
+            Assert.Contains("Move Down",        headers);
         }
         finally { window.Close(); }
     }
@@ -341,10 +341,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -370,10 +370,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",            headers);
-            Assert.Contains("vv Move To Bottom",       headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.Contains("Move Down",            headers);
+            Assert.Contains("Move To Bottom",       headers);
         }
         finally { window.Close(); }
     }
@@ -399,10 +399,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",          headers);
-            Assert.Contains("^  Move Up",              headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",          headers);
+            Assert.Contains("Move Up",              headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -449,10 +449,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -482,10 +482,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",            headers);
-            Assert.Contains("vv Move To Bottom",       headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.Contains("Move Down",            headers);
+            Assert.Contains("Move To Bottom",       headers);
         }
         finally { window.Close(); }
     }
@@ -515,10 +515,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",          headers);
-            Assert.Contains("^  Move Up",              headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",          headers);
+            Assert.Contains("Move Up",              headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -548,10 +548,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",   headers);
-            Assert.Contains("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",      headers);
-            Assert.Contains("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",   headers);
+            Assert.Contains("Move Up",        headers);
+            Assert.Contains("Move Down",      headers);
+            Assert.Contains("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }

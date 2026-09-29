@@ -166,10 +166,10 @@ public class TreeContextMenuTests
             var (_, rect, _) = SetupFrameWithTwoShapes(ctx);
             var items = OpenMenuFor(window, rect, "Rect");
 
-            Assert.True(IndexOfItem(items, "v  Move Down")      >= 0);
-            Assert.True(IndexOfItem(items, "vv Move To Bottom") >= 0);
-            Assert.Equal(-1, IndexOfItem(items, "^  Move Up"));
-            Assert.Equal(-1, IndexOfItem(items, "^^ Move To Top"));
+            Assert.True(IndexOfItem(items, "Move Down")      >= 0);
+            Assert.True(IndexOfItem(items, "Move To Bottom") >= 0);
+            Assert.Equal(-1, IndexOfItem(items, "Move Up"));
+            Assert.Equal(-1, IndexOfItem(items, "Move To Top"));
         }
         finally { window.Close(); }
     }

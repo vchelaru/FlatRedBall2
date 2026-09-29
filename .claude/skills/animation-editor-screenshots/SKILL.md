@@ -1,11 +1,11 @@
 ---
 name: animation-editor-screenshots
-description: Generating headless documentation screenshots of the AnimationEditor UI — not correctness tests. Triggers: "take a screenshot", DocScreenshots, ScreenshotCapture, DocScreenshotManifest, illustrating a doc page.
+description: Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change's PR needs. Triggers: "take a screenshot", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest.
 ---
 
-# AnimationEditor — Documentation Screenshots
+# AnimationEditor — Screenshots
 
-Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) — not for verifying behavior. For correctness tests, use **`animation-editor-testing`**. For WASM browser smoke (not a Core/App mirror), see **`animation-editor-browser-verify`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
+Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change's PR must carry. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. For WASM browser smoke (not a Core/App mirror), see **`animation-editor-browser-verify`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
 
 ## Where, and why it's a separate project
 
@@ -18,6 +18,14 @@ Headless PNG capture of the AnimationEditor's UI, for illustrating documentation
 `ScreenshotCapture.Capture(visual, outputPath)` — pass a `Window`/dialog (`TopLevel`) for full chrome, or any `Control` (e.g. `window.FindControl<Control>("AnimTree")`) to crop to just that control's bounds. Built on `TopLevel.CaptureRenderedFrame()`, not a hand-rolled `RenderTargetBitmap.Render(visual)` — the latter silently writes an empty PNG under headless (see the decision doc).
 
 **Default to capturing the whole `window`, not a cropped control.** A screenshot showing only one panel strips the viewer's frame of reference for where that panel sits in the app. Crop to a specific control only when the user explicitly asks to see just that panel.
+
+**Landmine — context menus.** `ContextMenu.Open()` skips the tree's `Opening` handler, so the menu opens empty. Open it with a real right-click on the row (`window.MouseDown(point, MouseButton.Right)`). The menu draws in the window's overlay layer, so capture `window`.
+
+## Every visual change ships before/after screenshots in its PR
+
+Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional. Take the before shot before editing any code. If the code is already edited, add a detached worktree of `origin/main` under `.claude/worktrees/`, copy the scratch capture into it, and shoot there.
+
+`gh` can't upload images, so push the PNGs to the orphan `pr-assets` branch under `<pr#>/` and embed them as `https://raw.githubusercontent.com/vchelaru/FlatRedBall2/pr-assets/<pr#>/<file>.png`.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 

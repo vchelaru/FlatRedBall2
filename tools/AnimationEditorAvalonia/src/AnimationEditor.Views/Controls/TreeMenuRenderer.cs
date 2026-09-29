@@ -35,12 +35,35 @@ public static class TreeMenuRenderer
         return item;
     }
 
-    public static string IconAssetPath(TreeMenuIcon icon) => icon switch
+    public static string IconAssetPath(TreeMenuIcon icon) =>
+        $"avares://AnimationEditor.Views/Assets/icons/svg/{IconFileName(icon)}.svg";
+
+    private static string IconFileName(TreeMenuIcon icon) => icon switch
     {
         // The tree view shows rectangles with the generic shape icon, so the menu matches it.
-        TreeMenuIcon.Rectangle => "avares://AnimationEditor.Views/Assets/icons/svg/IconShape.svg",
-        TreeMenuIcon.Circle    => "avares://AnimationEditor.Views/Assets/icons/svg/IconCircle.svg",
-        TreeMenuIcon.Polygon   => "avares://AnimationEditor.Views/Assets/icons/svg/IconPolygon.svg",
+        TreeMenuIcon.Rectangle      => "IconShape",
+        TreeMenuIcon.Circle         => "IconCircle",
+        TreeMenuIcon.Polygon        => "IconPolygon",
+        TreeMenuIcon.Frame          => "IconFrame",
+        TreeMenuIcon.Animation      => "IconChain",
+        TreeMenuIcon.Copy           => "IconCopy",
+        TreeMenuIcon.Cut            => "IconCut",
+        TreeMenuIcon.Paste          => "IconPaste",
+        TreeMenuIcon.Duplicate      => "IconDuplicate",
+        TreeMenuIcon.Delete         => "IconTrash",
+        TreeMenuIcon.Rename         => "IconRename",
+        TreeMenuIcon.MoveToTop      => "IconMoveToTop",
+        TreeMenuIcon.MoveUp         => "IconMoveUp",
+        TreeMenuIcon.MoveDown       => "IconMoveDown",
+        TreeMenuIcon.MoveToBottom   => "IconMoveToBottom",
+        TreeMenuIcon.Sort           => "IconSortAZ",
+        TreeMenuIcon.FlipHorizontal => "IconFlipH",
+        TreeMenuIcon.FlipVertical   => "IconFlipV",
+        TreeMenuIcon.Reverse        => "IconReverse",
+        TreeMenuIcon.FrameTime      => "IconTimer",
+        TreeMenuIcon.Offsets        => "IconMove",
+        TreeMenuIcon.RevealFile     => "IconFolderOpen",
+        TreeMenuIcon.MatchSize      => "IconBoundingBox",
         _ => throw new ArgumentOutOfRangeException(nameof(icon), icon, null),
     };
 

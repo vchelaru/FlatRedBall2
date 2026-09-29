@@ -33,8 +33,8 @@ public sealed class TreeMenuItem
 
     public static TreeMenuItem Separator() => new(null, null, null, null, true);
 
-    public static TreeMenuItem SubMenu(string header, params TreeMenuItem[] children) =>
-        new(header, null, children, null, false);
+    public static TreeMenuItem SubMenu(string header, TreeMenuIcon icon, params TreeMenuItem[] children) =>
+        new(header, null, children, null, false, icon);
 
     /// <summary>
     /// A placeholder for a menu item the host builds itself — a dialog or filesystem action
@@ -53,6 +53,26 @@ public enum TreeMenuIcon
     Rectangle,
     Circle,
     Polygon,
+    Frame,
+    Animation,
+    Copy,
+    Cut,
+    Paste,
+    Duplicate,
+    Delete,
+    Rename,
+    MoveToTop,
+    MoveUp,
+    MoveDown,
+    MoveToBottom,
+    Sort,
+    FlipHorizontal,
+    FlipVertical,
+    Reverse,
+    FrameTime,
+    Offsets,
+    RevealFile,
+    MatchSize,
 }
 
 /// <summary>

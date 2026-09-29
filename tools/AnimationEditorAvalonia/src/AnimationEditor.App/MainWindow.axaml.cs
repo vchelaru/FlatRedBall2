@@ -5072,22 +5072,22 @@ public partial class MainWindow : Window
         switch (slot)
         {
             case TreeMenuHostSlot.AdjustFrameTime when nodeData is AnimationChainSave chain:
-                AddMenuItem("Adjust Frame Time…", () => AskAdjustFrameTime(chain));
+                AddMenuItem("Adjust Frame Time…", TreeMenuIcon.FrameTime, () => AskAdjustFrameTime(chain));
                 break;
             case TreeMenuHostSlot.AddMultipleFrames when nodeData is AnimationChainSave chain:
-                AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
+                AddMenuItem("Add Multiple Frames…", TreeMenuIcon.Frame, () => _ = AskAddMultipleFramesAsync(chain));
                 break;
             case TreeMenuHostSlot.AdjustOffsets when nodeData is AnimationChainSave chain:
-                AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
+                AddMenuItem("Adjust Offsets…", TreeMenuIcon.Offsets, () => _ = AskAdjustOffsetsAsync(chain));
                 break;
             case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
-                AddMenuItem("Reveal Texture in File Manager", () => ViewTextureInExplorer(frame));
+                AddMenuItem("Reveal Texture in File Manager", TreeMenuIcon.RevealFile, () => ViewTextureInExplorer(frame));
                 break;
         }
     }
 
-    private void AddMenuItem(string header, Action onClick) =>
-        AnimTree.ContextMenu!.Items.Add(TreeMenuRenderer.CreateMenuItem(header, onClick));
+    private void AddMenuItem(string header, TreeMenuIcon icon, Action onClick) =>
+        AnimTree.ContextMenu!.Items.Add(TreeMenuRenderer.CreateMenuItem(header, onClick, icon));
 
     private void AskAdjustFrameTime(AnimationChainSave chain)
     {

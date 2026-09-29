@@ -26,31 +26,31 @@ public static class TreeMenuPlanBuilder
         {
             case AARectSave rect:
                 AddShapeReorderItems(items, rect, objectFinder.GetAnimationFrameContaining(rect), appCommands);
-                items.Add(TreeMenuItem.Item("Match Frame Size", () => MatchFrameSize(rect, appCommands, selectedState)));
+                items.Add(TreeMenuItem.Item("Match Frame Size", () => MatchFrameSize(rect, appCommands, selectedState), TreeMenuIcon.MatchSize));
                 items.Add(TreeMenuItem.Separator());
                 AddCopyCutPasteDuplicate(items, actions);
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
+                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Delete Rectangle", actions.Delete));
+                items.Add(TreeMenuItem.Item("Delete Rectangle", actions.Delete, TreeMenuIcon.Delete));
                 break;
 
             case CircleSave circle:
                 AddShapeReorderItems(items, circle, objectFinder.GetAnimationFrameContaining(circle), appCommands);
                 AddCopyCutPasteDuplicate(items, actions);
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
+                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Delete Circle", actions.Delete));
+                items.Add(TreeMenuItem.Item("Delete Circle", actions.Delete, TreeMenuIcon.Delete));
                 break;
 
             case PolygonSave polygon:
                 AddShapeReorderItems(items, polygon, objectFinder.GetAnimationFrameContaining(polygon), appCommands);
                 AddCopyCutPasteDuplicate(items, actions);
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
+                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Delete Polygon", actions.Delete));
+                items.Add(TreeMenuItem.Item("Delete Polygon", actions.Delete, TreeMenuIcon.Delete));
                 break;
 
             case AnimationFrameSave frame:
@@ -68,15 +68,15 @@ public static class TreeMenuPlanBuilder
                     items.Add(TreeMenuItem.Item("Add Polygon", () => appCommands.AddPolygon(frame), TreeMenuIcon.Polygon));
                     items.Add(TreeMenuItem.Separator());
                 }
-                items.Add(TreeMenuItem.Item("Copy", actions.Copy));
-                items.Add(TreeMenuItem.Item("Cut", actions.Cut));
-                items.Add(TreeMenuItem.Item("Paste", actions.Paste));
+                items.Add(TreeMenuItem.Item("Copy", actions.Copy, TreeMenuIcon.Copy));
+                items.Add(TreeMenuItem.Item("Cut", actions.Cut, TreeMenuIcon.Cut));
+                items.Add(TreeMenuItem.Item("Paste", actions.Paste, TreeMenuIcon.Paste));
                 if (chain is not null)
-                    items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate));
+                    items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate, TreeMenuIcon.Duplicate));
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.ViewTextureInExplorer));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Delete Frame", actions.Delete));
+                items.Add(TreeMenuItem.Item("Delete Frame", actions.Delete, TreeMenuIcon.Delete));
                 break;
             }
 
@@ -91,46 +91,46 @@ public static class TreeMenuPlanBuilder
                 items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustFrameTime));
                 if (!isNativeTsx)
                 {
-                    items.Add(TreeMenuItem.Item("Flip Horizontally", () => appCommands.FlipChainHorizontally(chain2)));
-                    items.Add(TreeMenuItem.Item("Flip Vertically", () => appCommands.FlipChainVertically(chain2)));
+                    items.Add(TreeMenuItem.Item("Flip Horizontally", () => appCommands.FlipChainHorizontally(chain2), TreeMenuIcon.FlipHorizontal));
+                    items.Add(TreeMenuItem.Item("Flip Vertically", () => appCommands.FlipChainVertically(chain2), TreeMenuIcon.FlipVertical));
                 }
-                items.Add(TreeMenuItem.Item("Invert Frame Order", () => appCommands.InvertFrameOrder(chain2)));
+                items.Add(TreeMenuItem.Item("Invert Frame Order", () => appCommands.InvertFrameOrder(chain2), TreeMenuIcon.Reverse));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!));
+                items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!, TreeMenuIcon.Animation));
                 // A locked chain refuses new frames (AddFrame and AddMultipleFrames are no-ops on
                 // it) and the row hides its + button; the menu must not offer inert items either.
                 if (!chain2.IsLocked)
                 {
-                    items.Add(TreeMenuItem.Item("Add Frame", () => appCommands.AddFrame(chain2)));
+                    items.Add(TreeMenuItem.Item("Add Frame", () => appCommands.AddFrame(chain2), TreeMenuIcon.Frame));
                     items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AddMultipleFrames));
                 }
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Copy", actions.Copy));
-                items.Add(TreeMenuItem.Item("Cut", actions.Cut));
-                items.Add(TreeMenuItem.Item("Paste", actions.Paste));
+                items.Add(TreeMenuItem.Item("Copy", actions.Copy, TreeMenuIcon.Copy));
+                items.Add(TreeMenuItem.Item("Cut", actions.Cut, TreeMenuIcon.Cut));
+                items.Add(TreeMenuItem.Item("Paste", actions.Paste, TreeMenuIcon.Paste));
                 if (isNativeTsx)
-                    items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate));
+                    items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate, TreeMenuIcon.Duplicate));
                 else
-                    items.Add(TreeMenuItem.SubMenu("Duplicate",
-                        TreeMenuItem.Item("Original", actions.Duplicate),
-                        TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(true, false)),
-                        TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(false, true))));
+                    items.Add(TreeMenuItem.SubMenu("Duplicate", TreeMenuIcon.Duplicate,
+                        TreeMenuItem.Item("Original", actions.Duplicate, TreeMenuIcon.Duplicate),
+                        TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(true, false), TreeMenuIcon.FlipHorizontal),
+                        TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(false, true), TreeMenuIcon.FlipVertical)));
                 items.Add(TreeMenuItem.Separator());
                 if (!isNativeTsx)
                     items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustOffsets));
-                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!));
+                items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));
                 items.Add(TreeMenuItem.Separator());
-                items.Add(TreeMenuItem.Item("Delete Animation", actions.Delete));
+                items.Add(TreeMenuItem.Item("Delete Animation", actions.Delete, TreeMenuIcon.Delete));
                 break;
             }
 
             default:
-                items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!));
+                items.Add(TreeMenuItem.Item("Add Animation", actions.AddAnimation!, TreeMenuIcon.Animation));
                 break;
         }
 
         items.Add(TreeMenuItem.Separator());
-        items.Add(TreeMenuItem.Item("Sort Animations Alphabetically", appCommands.SortAnimationsAlphabetically));
+        items.Add(TreeMenuItem.Item("Sort Animations Alphabetically", appCommands.SortAnimationsAlphabetically, TreeMenuIcon.Sort));
 
         return items;
     }
@@ -149,10 +149,10 @@ public static class TreeMenuPlanBuilder
 
     private static void AddCopyCutPasteDuplicate(List<TreeMenuItem> items, TreeMenuActions actions)
     {
-        items.Add(TreeMenuItem.Item("Copy", actions.Copy));
-        items.Add(TreeMenuItem.Item("Cut", actions.Cut));
-        items.Add(TreeMenuItem.Item("Paste", actions.Paste));
-        items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate));
+        items.Add(TreeMenuItem.Item("Copy", actions.Copy, TreeMenuIcon.Copy));
+        items.Add(TreeMenuItem.Item("Cut", actions.Cut, TreeMenuIcon.Cut));
+        items.Add(TreeMenuItem.Item("Paste", actions.Paste, TreeMenuIcon.Paste));
+        items.Add(TreeMenuItem.Item("Duplicate", actions.Duplicate, TreeMenuIcon.Duplicate));
     }
 
     // Mirrors the shape/frame/chain reorder convention: four items (Move to Top/Up/Down/Bottom)
@@ -166,10 +166,10 @@ public static class TreeMenuPlanBuilder
         int index = shapes.IndexOf(shape);
         bool isFirst = index == 0;
         bool isLast = index == shapes.Count - 1;
-        if (!isFirst) items.Add(TreeMenuItem.Item("^^ Move To Top", () => appCommands.MoveShapeToTop(shape, frame!)));
-        if (!isFirst) items.Add(TreeMenuItem.Item("^  Move Up", () => appCommands.MoveShape(shape, frame!, -1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("v  Move Down", () => appCommands.MoveShape(shape, frame!, +1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("vv Move To Bottom", () => appCommands.MoveShapeToBottom(shape, frame!)));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move To Top", () => appCommands.MoveShapeToTop(shape, frame!), TreeMenuIcon.MoveToTop));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move Up", () => appCommands.MoveShape(shape, frame!, -1), TreeMenuIcon.MoveUp));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move Down", () => appCommands.MoveShape(shape, frame!, +1), TreeMenuIcon.MoveDown));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move To Bottom", () => appCommands.MoveShapeToBottom(shape, frame!), TreeMenuIcon.MoveToBottom));
         items.Add(TreeMenuItem.Separator());
     }
 
@@ -179,10 +179,10 @@ public static class TreeMenuPlanBuilder
         int index = chain.Frames.IndexOf(frame);
         bool isFirst = index == 0;
         bool isLast = index == chain.Frames.Count - 1;
-        if (!isFirst) items.Add(TreeMenuItem.Item("^^ Move To Top", () => appCommands.MoveFrameToTop(frame, chain)));
-        if (!isFirst) items.Add(TreeMenuItem.Item("^  Move Up", () => appCommands.MoveFrame(frame, chain, -1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("v  Move Down", () => appCommands.MoveFrame(frame, chain, +1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("vv Move To Bottom", () => appCommands.MoveFrameToBottom(frame, chain)));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move To Top", () => appCommands.MoveFrameToTop(frame, chain), TreeMenuIcon.MoveToTop));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move Up", () => appCommands.MoveFrame(frame, chain, -1), TreeMenuIcon.MoveUp));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move Down", () => appCommands.MoveFrame(frame, chain, +1), TreeMenuIcon.MoveDown));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move To Bottom", () => appCommands.MoveFrameToBottom(frame, chain), TreeMenuIcon.MoveToBottom));
     }
 
     private static void AddChainReorderItems(
@@ -191,9 +191,9 @@ public static class TreeMenuPlanBuilder
         int index = chains.IndexOf(chain);
         bool isFirst = index == 0;
         bool isLast = index == chains.Count - 1;
-        if (!isFirst) items.Add(TreeMenuItem.Item("^^ Move To Top", () => appCommands.MoveChainToTop(chain)));
-        if (!isFirst) items.Add(TreeMenuItem.Item("^  Move Up", () => appCommands.MoveChain(chain, -1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("v  Move Down", () => appCommands.MoveChain(chain, +1)));
-        if (!isLast) items.Add(TreeMenuItem.Item("vv Move To Bottom", () => appCommands.MoveChainToBottom(chain)));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move To Top", () => appCommands.MoveChainToTop(chain), TreeMenuIcon.MoveToTop));
+        if (!isFirst) items.Add(TreeMenuItem.Item("Move Up", () => appCommands.MoveChain(chain, -1), TreeMenuIcon.MoveUp));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move Down", () => appCommands.MoveChain(chain, +1), TreeMenuIcon.MoveDown));
+        if (!isLast) items.Add(TreeMenuItem.Item("Move To Bottom", () => appCommands.MoveChainToBottom(chain), TreeMenuIcon.MoveToBottom));
     }
 }
