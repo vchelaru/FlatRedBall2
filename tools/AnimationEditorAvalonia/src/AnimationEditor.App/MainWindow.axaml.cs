@@ -6595,8 +6595,8 @@ public partial class MainWindow : Window
             {
                 Id = "delete", Description = "Delete", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Delete") },
-                // A focused combo (the color Mode) takes Delete to clear its value, like a text field.
-                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is ComboBox,
+                // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
                 Action = HandleDelete,
             },
             new()
@@ -6632,19 +6632,22 @@ public partial class MainWindow : Window
                 Id = "toggle-play-pause", Description = "Play / Pause Preview", Category = "Playback",
                 Gestures = new[] { new HotkeyGesture("Space") },
                 // Let a focused button receive Space to activate itself rather than hijacking it.
-                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is Button,
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused() || FocusManager?.GetFocusedElement() is Button,
                 Action = () => PreviewCtrl.TogglePlayPause(),
             },
             new()
             {
                 Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Up", Alt) },
+                // Alt+Up/Down opens a focused Inspector combo; don't reorder the selection instead.
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(-1),
             },
             new()
             {
                 Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(+1),
             },
             new()
@@ -6833,6 +6836,12 @@ public partial class MainWindow : Window
     // the text control instead of being swallowed by the window-level handler.
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
+
+    // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
+    // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.
+    private bool IsInspectorFocused()
+        => FocusManager?.GetFocusedElement() is Control focused
+           && (focused == InspectorTabContent || InspectorTabContent.IsVisualAncestorOf(focused));
 
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
