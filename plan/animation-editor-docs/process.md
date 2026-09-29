@@ -11,6 +11,11 @@ Victor writes each page. Claude adds images and links, then reviews.
 - `Link` — link the text before it. A URL on the line means use that URL; no URL means link the
   best-matching docs page. If no page clearly fits, ask.
 
+## Notes
+A paragraph starting with "Note" becomes a GitBook hint block, with the "Note that" / "Note -" lead-in
+dropped (the block already says it's a note):
+`{% hint style="info" %}` … `{% endhint %}`. Same syntax as the Gum docs.
+
 ## Placing images
 - Copy to `docs/.gitbook/assets/` as `<page>-<what>.png` (or `.gif`).
 - Use GitBook figure markup: `<figure><img src="../.gitbook/assets/x.png" alt="…"><figcaption><p>caption</p></figcaption></figure>`.
