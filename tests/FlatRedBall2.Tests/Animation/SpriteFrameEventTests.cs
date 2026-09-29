@@ -128,4 +128,37 @@ public class SpriteFrameEventTests
         frameEvent.Data.ShouldBe("left");
         frameEvent.ShouldNotBeSameAs(frameSave.Events[0]);
     }
+
+    [Fact]
+    public void AnimateSelf_FinishedHandlerSwitchesAnimation_LastFrameEventAlreadyRaised()
+    {
+        var list = MakeChain("Die", null, "Last");
+        list.Add(MakeChain("Idle", "IdleStart")[0]);
+        var sprite = new Sprite { AnimationChains = list };
+        var raised = Record(sprite);
+        sprite.AnimationFinished += () => { raised.Add("Finished"); sprite.PlayAnimation("Idle"); };
+        sprite.PlayAnimation("Die");
+        sprite.IsLooping = false;
+
+        sprite.AnimateSelf(1.0);
+
+        raised.ShouldBe(new[] { "Last", "Finished", "IdleStart" });
+    }
+
+    [Fact]
+    public void AnimateSelf_EventHandlerSwitchesAnimation_SkipsOldChainAnimationFinished()
+    {
+        var list = MakeChain("Die", null, "Last");
+        list.Add(MakeChain("Idle", "IdleStart")[0]);
+        var sprite = new Sprite { AnimationChains = list };
+        var raised = Record(sprite);
+        sprite.AnimationFinished += () => raised.Add("Finished");
+        sprite.FrameEventRaised += e => { if (e.Name == "Last") sprite.PlayAnimation("Idle"); };
+        sprite.PlayAnimation("Die");
+        sprite.IsLooping = false;
+
+        sprite.AnimateSelf(1.0);
+
+        raised.ShouldBe(new[] { "Last", "IdleStart" });
+    }
 }

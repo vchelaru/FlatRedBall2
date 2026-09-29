@@ -363,4 +363,50 @@ public class AnimationPlayerTests
 
         raised.ShouldBe(new[] { "F0", "F1", "F2", "F0" });
     }
+
+    private static (AnimationPlayer<TestFrame> player, System.Collections.Generic.List<string> log) MakeDieThenIdle()
+    {
+        var list = MakeList(("Die", new[] { 0.1, 0.1 }), ("Idle", new[] { 0.1 }));
+        list["Die"]![1].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Last" });
+        list["Idle"]![0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "IdleStart" });
+        var player = new AnimationPlayer<TestFrame>(list);
+        var log = new System.Collections.Generic.List<string>();
+        player.FrameEventRaised += e => log.Add(e.Name);
+        player.AnimationFinished += () => log.Add("Finished");
+        player.Play("Die");
+        player.IsLooping = false;
+        return (player, log);
+    }
+
+    [Fact]
+    public void Update_NonLoopingReachesEnd_RaisesLastFrameEventBeforeAnimationFinished()
+    {
+        var (player, log) = MakeDieThenIdle();
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "Finished" });
+    }
+
+    [Fact]
+    public void Update_FinishedHandlerSwitchesAnimation_LastFrameEventAlreadyRaised()
+    {
+        var (player, log) = MakeDieThenIdle();
+        player.AnimationFinished += () => player.Play("Idle");
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "Finished", "IdleStart" });
+    }
+
+    [Fact]
+    public void Update_EventHandlerSwitchesAnimation_SkipsOldChainAnimationFinished()
+    {
+        var (player, log) = MakeDieThenIdle();
+        player.FrameEventRaised += e => { if (e.Name == "Last") player.Play("Idle"); };
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "IdleStart" });
+    }
 }
