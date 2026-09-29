@@ -72,6 +72,7 @@ Once a file is saved, the AnimationEditor automatically saves any changes.
 
 ## Next Steps
 
-* [Build an Animation](how-to/build-an-animation.md) covers more ways to add frames and set their timing.
+* [Edit Animations](how-to/edit-animations.md) covers renaming, duplicating, flipping, and changing an animation's speed.
+* [Edit Frames](how-to/edit-frames.md) covers adding, copying, reordering, and timing frames.
 * [Define Frame Regions](how-to/define-frame-regions.md) covers grid snapping, the magic wand, and exact pixel coordinates.
 * [Preview an Animation](how-to/preview-an-animation.md) covers playback speed and onion skin.

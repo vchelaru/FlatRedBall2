@@ -11,7 +11,8 @@ Reviewed against Diátaxis (tutorial / how-to / reference / explanation). Each p
 5. **Timing is too thin for a page.** Two sections. Fold it into "Build an animation".
 6. **The API pages are a different audience** (programmers, not artists). They get their own Code section, nested under AnimationEditor like the others.
 7. **Everything sits under one AnimationEditor section.** GitBook groups can't nest, so How-To Guides, Reference and Code are parent pages (each with its own README listing its children) inside a single AnimationEditor group.
-8. **No single-child sections.** Concepts would hold one page, so How Animations Work sits directly under AnimationEditor instead.
+8. **How-to pages cover common operations only, grouped by what you're editing.** Edit Animations is whole-animation actions; Edit Frames is frame actions. Rare options (Add Multiple Frames, Invert Frame Order) are left out. Frame properties beyond frame length live on Reference ▸ Frame Properties.
+9. **No single-child sections.** Concepts would hold one page, so How Animations Work sits directly under AnimationEditor instead.
 
 ## Proposed nav
 
@@ -41,11 +42,17 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Open, Switch, and Close Files
 │   │   ## Add Animation Files to a Project
 │   │   ## Find Which Animations Use an Image
-│   ├── Build an animation
-│   │   ## Add animations and frames
-│   │   ## Add many frames at once
-│   │   ## Set frame length
-│   │   ## Retime a whole animation
+│   ├── Edit animations
+│   │   ## Add, rename, and delete an animation
+│   │   ## Reorder animations (drag in the tree)
+│   │   ## Duplicate an animation (copy and paste)
+│   │   ## Flip an animation (e.g. WalkRight from WalkLeft)
+│   │   ## Change an animation's speed (Adjust Frame Time)
+│   ├── Edit frames
+│   │   ## Add and delete frames
+│   │   ## Copy and paste frames
+│   │   ## Reorder frames (drag in the tree)
+│   │   ## Change how long a frame shows
 │   ├── Define frame regions
 │   │   ## Snap regions to a grid
 │   │   ## Select a region with the magic wand
@@ -54,9 +61,6 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Use guides to spot misalignment
 │   │   ## Shift a frame with RelativeX / RelativeY
 │   ├── Flip and tint frames
-│   ├── Organize animations
-│   │   ## Rename and reorder
-│   │   ## Duplicate and mirror an animation
 │   ├── Animate a Tiled tileset (.tsx)
 │   │   ## Open a .tsx file
 │   │   ## Animate a tile
