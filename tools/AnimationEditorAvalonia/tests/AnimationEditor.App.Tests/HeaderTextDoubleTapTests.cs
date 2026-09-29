@@ -15,7 +15,7 @@ namespace AnimationEditor.App.Tests;
 /// <summary>
 /// Tests for <see cref="MainWindow.HandleHeaderTextDoubleTap"/> — issue #234.
 /// Double-tapping a frame's text label must center the wireframe on the frame,
-/// never start an inline rename; a chain's text label still inline-renames.
+/// never start an inline rename; a chain's or shape's text label inline-renames.
 /// </summary>
 public class HeaderTextDoubleTapTests
 {
@@ -54,6 +54,32 @@ public class HeaderTextDoubleTapTests
 
         Assert.True(vm.IsEditing,
             "Double-tapping a chain's text label should start an inline rename — its name is meaningful.");
+
+        window.Close();
+    }
+
+    [AvaloniaTheory]
+    [InlineData("rect")]
+    [InlineData("circle")]
+    [InlineData("polygon")]
+    public void HandleHeaderTextDoubleTap_ShapeNode_BeginsInlineRename(string kind)
+    {
+        var ctx    = ResetSingletons();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+
+        ShapeSave shape = kind switch
+        {
+            "rect"   => new AARectSave { Name = "Hitbox" },
+            "circle" => new CircleSave { Name = "Hitbox" },
+            _        => new PolygonSave { Name = "Hitbox" },
+        };
+        var vm = new TreeNodeVm { Data = shape };
+
+        window.HandleHeaderTextDoubleTap(vm);
+
+        Assert.True(vm.IsEditing,
+            "Double-tapping a shape's text label should start an inline rename, same as a chain.");
 
         window.Close();
     }

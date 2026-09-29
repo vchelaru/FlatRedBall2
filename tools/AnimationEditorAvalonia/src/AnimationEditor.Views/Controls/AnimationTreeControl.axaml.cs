@@ -287,9 +287,18 @@ public partial class AnimationTreeControl : UserControl
         if (sender is not Control src) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
-        if (vm.Data is not AnimationChainSave chain) return;
-        e.Handled = true;
+        if (HandleHeaderDoubleTap(vm)) e.Handled = true;
+    }
+
+    /// <summary>
+    /// Double-tap on a node's header label: chains and shapes begin an inline rename. Frames are
+    /// not renameable (their label is the positional "Frame N"), so they return <c>false</c>.
+    /// </summary>
+    public bool HandleHeaderDoubleTap(TreeNodeVm vm)
+    {
+        if (vm.Data is not (AnimationChainSave or ShapeSave)) return false;
         vm.BeginEdit();
+        return true;
     }
 
     private void OnAddFrameBtnClick(object? sender, RoutedEventArgs e)

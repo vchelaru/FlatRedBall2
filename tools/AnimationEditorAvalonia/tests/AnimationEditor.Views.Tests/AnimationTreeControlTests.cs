@@ -273,6 +273,31 @@ public class AnimationTreeControlTests
         Assert.False(walkNode.IsEditing);
     }
 
+    [AvaloniaTheory]
+    [InlineData(0, true)]      // chain "Walk"
+    [InlineData(-1, false)]    // frame: never renameable
+    [InlineData(-2, true)]     // rect "Hitbox"
+    [InlineData(-3, true)]     // circle "Hurtbox"
+    public void HandleHeaderDoubleTap_BeginsEditOnlyForChainsAndShapes(int which, bool expectEditing)
+    {
+        var (control, _, _) = BuildWithCommands();
+        var roots = ((System.Collections.IEnumerable)control.TreeView.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        var frameNode = roots[0].Children[0];
+        var node = which switch
+        {
+            0  => roots[0],
+            -1 => frameNode,
+            -2 => frameNode.Children[0],
+            _  => frameNode.Children[1],
+        };
+
+        bool handled = control.HandleHeaderDoubleTap(node);
+
+        Assert.Equal(expectEditing, handled);
+        Assert.Equal(expectEditing, node.IsEditing);
+    }
+
     [AvaloniaFact]
     public void CommitRename_ChainNode_EmptyName_DoesNotRename()
     {

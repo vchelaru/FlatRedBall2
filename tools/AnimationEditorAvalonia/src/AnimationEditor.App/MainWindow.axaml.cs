@@ -7423,12 +7423,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Routes a double-tap on a tree node's text <em>label</em>. A chain inline-renames
-    /// (its name is meaningful and used to look the chain up); every other node type —
-    /// frame, rect, circle — routes to <see cref="HandleAnimTreeNodeDoubleTap"/>, so a
-    /// frame centers the wireframe on itself. <see cref="AnimationFrameSave.Name"/> is
-    /// only a tree display label and is not referenced anywhere else, so the more useful
-    /// center-on-frame gesture wins the text-label real estate over an inline rename.
+    /// Routes a double-tap on a tree node's text <em>label</em>. Chains and shapes inline-rename
+    /// (their names are meaningful); a frame centers the wireframe on itself instead.
+    /// <see cref="AnimationFrameSave.Name"/> is only a tree display label and is not referenced
+    /// anywhere else, so the more useful center-on-frame gesture wins the text-label real estate.
     /// </summary>
     internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
         => HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: true);
@@ -7463,8 +7461,9 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Routes a double-tap on a tree node to the appropriate action.
-    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain → inline
-    /// rename) from every other double-tap on the row (chain → focus/fit its frames, #716).
+    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain/shape →
+    /// inline rename) from every other double-tap on the row (chain → focus/fit its frames, #716;
+    /// shape → center the preview on it).
     /// Returns <c>true</c> when a recognised action was performed.
     /// </summary>
     internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm, bool isLabelDoubleTap = false)
@@ -7487,6 +7486,9 @@ public partial class MainWindow : Window
                 // Bring the sprite into view in the preview too — center on the frame's
                 // offset, not the entity origin, or a large-offset frame stays off-screen.
                 PreviewCtrl.CenterOnEntityPoint(frame.RelativeX, frame.RelativeY);
+                return true;
+            case ShapeSave shape when isLabelDoubleTap:
+                BeginInlineRename(vm, shape.Name);
                 return true;
             case ShapeSave shape:
                 PreviewCtrl.CenterOnEntityPoint(shape.X, shape.Y);
