@@ -372,6 +372,21 @@ public class AppCommandsChainTests
     // ── DuplicateChain ───────────────────────────────────────────────────────
 
     [Fact]
+    public void DuplicateChain_RepeatedDuplicates_IncrementNumberSuffixInsteadOfStacking()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk");
+
+        var first = ctx.AppCommands.DuplicateChain(walk);
+        var second = ctx.AppCommands.DuplicateChain(walk);
+        var ofCopy = ctx.AppCommands.DuplicateChain(first!);
+
+        Assert.Equal("Walk2", first!.Name);
+        Assert.Equal("Walk3", second!.Name);
+        Assert.Equal("Walk4", ofCopy!.Name);
+    }
+
+    [Fact]
     public void DuplicateChain_CreatesDeepCopyWithAllFrames()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -590,7 +605,7 @@ public class AppCommandsChainTests
     }
 
     [Fact]
-    public void DuplicateChain_WithFlipH_WhenNameHasNoDirectionToken_FallsBackToCopySuffix()
+    public void DuplicateChain_WithFlipH_WhenNameHasNoDirectionToken_FallsBackToNumberSuffix()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -598,7 +613,7 @@ public class AppCommandsChainTests
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
 
-        Assert.Equal("IdleCopy", copy!.Name);
+        Assert.Equal("Idle2", copy!.Name);
     }
 
     [Fact]
@@ -612,7 +627,7 @@ public class AppCommandsChainTests
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
 
-        Assert.Equal("RightfulCopy", copy!.Name);
+        Assert.Equal("Rightful2", copy!.Name);
     }
 
     [Fact]
@@ -625,7 +640,7 @@ public class AppCommandsChainTests
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
 
-        Assert.Equal("UpgradeCopy", copy!.Name);
+        Assert.Equal("Upgrade2", copy!.Name);
     }
 
     [Fact]
@@ -644,14 +659,14 @@ public class AppCommandsChainTests
     [Fact]
     public void DuplicateChain_WithFlipH_IsCaseSensitiveAboutDirectionToken()
     {
-        // Lowercase "right" is not the "Right" PascalCase token — falls back to Copy suffix.
+        // Lowercase "right" is not the "Right" PascalCase token — falls back to the number suffix.
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "walkright");
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
 
-        Assert.Equal("walkrightCopy", copy!.Name);
+        Assert.Equal("walkright2", copy!.Name);
     }
 
     [Fact]

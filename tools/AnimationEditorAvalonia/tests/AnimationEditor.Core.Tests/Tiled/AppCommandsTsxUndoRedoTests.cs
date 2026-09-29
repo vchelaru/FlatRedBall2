@@ -117,14 +117,14 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         AssertSaved();
         Assert.Empty(_warnings);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 4));
-        Assert.Equal("WalkCopy", NameOf(Disk(), 4));
+        Assert.Equal("Walk2", NameOf(Disk(), 4));
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 0));
         Assert.Equal("Walk", NameOf(Disk(), 0));
 
         _ctx.UndoManager.Redo();
         AssertSaved();
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], Anim(Disk(), 4));
-        Assert.Equal("WalkCopy", NameOf(Disk(), 4));
+        Assert.Equal("Walk2", NameOf(Disk(), 4));
     }
 
     [Fact]

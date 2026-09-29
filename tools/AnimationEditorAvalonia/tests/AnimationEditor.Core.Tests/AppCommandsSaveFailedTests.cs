@@ -57,7 +57,7 @@ public class AppCommandsSaveFailedTests : IDisposable
         Assert.Equal(SaveState.AutoSaveOn, _ctx.UndoManager.SaveState);
         Assert.Null(saveFailure);
         var warning = Assert.Single(warnings!);
-        Assert.Contains("ID:0Copy", warning);
+        Assert.Contains("ID:1", warning);
         Assert.Contains("ID:0", warning);
         var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
         Assert.Equal([0u], tileset.Tiles.Where(t => t.Animation.Count > 0).Select(t => t.ID));
@@ -68,7 +68,7 @@ public class AppCommandsSaveFailedTests : IDisposable
         Assert.Equal(SaveState.AutoSaveOn, _ctx.UndoManager.SaveState);
         tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], tileset.Tiles.Single(t => t.ID == 4).Animation.Select(f => (f.TileID, f.Duration)));
-        Assert.Equal("ID:0Copy", tileset.Tiles.Single(t => t.ID == 4).GetProperty<DotTiled.StringProperty>("Name").Value);
+        Assert.Equal("ID:1", tileset.Tiles.Single(t => t.ID == 4).GetProperty<DotTiled.StringProperty>("Name").Value);
     }
 
     [Fact]

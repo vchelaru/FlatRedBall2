@@ -64,22 +64,25 @@ public static class NewAnimationFileNaming
     }
 
     /// <summary>
-    /// Name for a duplicate of <paramref name="sourceFileName"/> in the same folder: the stem plus
-    /// "Copy", numbered from 2 on collision ("HeroCopy", "HeroCopy2"), matching duplicated chain
-    /// names. Keeps the source's extension. Collisions are checked by stem across both animation
+    /// Name for a duplicate of <paramref name="sourceFileName"/> in the same folder: the stem's
+    /// trailing number incremented to the next free one, starting at 2 ("Hero" -> "Hero2",
+    /// "Hero2" -> "Hero3"), matching duplicated chain names. Keeps the source's extension. Collisions are checked by stem across both animation
     /// extensions, same as <see cref="Resolve"/>.
     /// </summary>
     public static string SuggestDuplicateFileName(string sourceFileName, IEnumerable<string> siblingFileNames)
     {
         var source = new FilePath(sourceFileName);
-        var stem = source.NoPathNoExtension + "Copy";
+        var stem = source.NoPathNoExtension;
+        var baseStem = stem.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
         var taken = StemSet(siblingFileNames);
 
-        var candidate = stem;
-        for (int suffix = 2; taken.Contains(candidate); suffix++)
-            candidate = stem + suffix;
+        int suffix = baseStem.Length < stem.Length && int.TryParse(stem[baseStem.Length..], out var n)
+            ? n + 1
+            : 2;
+        while (taken.Contains(baseStem + suffix))
+            suffix++;
 
-        return candidate + "." + source.Extension;
+        return baseStem + suffix + "." + source.Extension;
     }
 
     /// <summary>

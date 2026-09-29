@@ -65,21 +65,30 @@ public class NewAnimationFileNamingTests
     }
 
     [Fact]
-    public void SuggestDuplicateFileName_NoCollision_AppendsCopyAndKeepsExtension()
+    public void SuggestDuplicateFileName_NoCollision_AppendsTwoAndKeepsExtension()
     {
         var suggested = NewAnimationFileNaming.SuggestDuplicateFileName("Hero.achx", new[] { "Hero.achx" });
 
-        suggested.ShouldBe("HeroCopy.achx");
+        suggested.ShouldBe("Hero2.achx");
     }
 
     [Fact]
-    public void SuggestDuplicateFileName_CopyStemTakenByEitherExtension_NumbersFromTwo()
+    public void SuggestDuplicateFileName_SourceEndsInNumber_IncrementsInsteadOfAppending()
     {
-        // Same rule as duplicated chains ("WalkCopy", "WalkCopy2") and as the stem-based
-        // collision check for new files: HeroCopy.achj blocks HeroCopy.achx too.
         var suggested = NewAnimationFileNaming.SuggestDuplicateFileName(
-            "Hero.achx", new[] { "Hero.achx", "herocopy.achj", "HeroCopy2.achx" });
+            "Hero2.achx", new[] { "Hero.achx", "Hero2.achx" });
 
-        suggested.ShouldBe("HeroCopy3.achx");
+        suggested.ShouldBe("Hero3.achx");
+    }
+
+    [Fact]
+    public void SuggestDuplicateFileName_StemTakenByEitherExtension_SkipsToNextFreeNumber()
+    {
+        // Same rule as duplicated chains ("Walk2", "Walk3") and as the stem-based collision
+        // check for new files: hero2.achj blocks Hero2.achx too.
+        var suggested = NewAnimationFileNaming.SuggestDuplicateFileName(
+            "Hero.achx", new[] { "Hero.achx", "hero2.achj", "Hero3.achx" });
+
+        suggested.ShouldBe("Hero4.achx");
     }
 }
