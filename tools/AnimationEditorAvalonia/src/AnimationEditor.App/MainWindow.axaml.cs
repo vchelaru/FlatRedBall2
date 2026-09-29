@@ -523,8 +523,8 @@ public partial class MainWindow : Window
                     // Create a floating ghost label that follows the pointer
                     _ghostBorder = new Border
                     {
-                        Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3a4150")),
-                        BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#4a90d9")),
+                        Background = new Avalonia.Media.SolidColorBrush(EditorColors.DragLabelBackground),
+                        BorderBrush = new Avalonia.Media.SolidColorBrush(EditorColors.DropIndicator),
                         BorderThickness = new Avalonia.Thickness(1),
                         CornerRadius = new Avalonia.CornerRadius(3),
                         Padding = new Avalonia.Thickness(10, 5),
@@ -534,7 +534,7 @@ public partial class MainWindow : Window
                         {
                             Text = captured.DisplayName,
                             FontSize = 11,
-                            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d4d8de")),
+                            Foreground = new Avalonia.Media.SolidColorBrush(EditorColors.DragLabelText),
                         },
                     };
                     var initPos = args.GetPosition(DragOverlayCanvas);
@@ -3873,7 +3873,7 @@ public partial class MainWindow : Window
         _frameDropLine ??= new Border
         {
             Height = 2,
-            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            Background = new SolidColorBrush(EditorColors.DropIndicator),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_frameDropLine))
@@ -3888,10 +3888,10 @@ public partial class MainWindow : Window
     {
         _frameDropBox ??= new Border
         {
-            BorderBrush = new SolidColorBrush(Color.Parse("#4a90d9")),
+            BorderBrush = new SolidColorBrush(EditorColors.DropIndicator),
             BorderThickness = new Avalonia.Thickness(2),
             CornerRadius = new Avalonia.CornerRadius(3),
-            Background = new SolidColorBrush(Color.Parse("#334a90d9")), // faint fill to suggest the target area
+            Background = new SolidColorBrush(EditorColors.DropTargetFill),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_frameDropBox))
@@ -6183,7 +6183,7 @@ public partial class MainWindow : Window
         _tabDropLine ??= new Border
         {
             Width = 2,
-            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            Background = new SolidColorBrush(EditorColors.DropIndicator),
             IsHitTestVisible = false,
         };
         if (!DragOverlayCanvas.Children.Contains(_tabDropLine))

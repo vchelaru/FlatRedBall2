@@ -78,4 +78,47 @@ public class AddFrameCursorCtrlToggleTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [AvaloniaFact]
+    public void CtrlPress_WithoutPointerMove_ShowsGhostUnderPointer()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // Larger than the wireframe so the pointer is always over texture pixels.
+            var texPath = WriteSolidPng(dir, "large.png", size: 2048);
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = window.FindControl<WireframeControl>("WireframeCtrl")
+                       ?? throw new InvalidOperationException("WireframeCtrl not found");
+            ctrl.LoadTexture(texPath);
+            ctrl.SetCamera(0f, 0f, 1f); // screen pixels == texture pixels
+            Dispatcher.UIThread.RunJobs();
+
+            var localPoint = new Point(ctrl.Bounds.Width / 2, ctrl.Bounds.Height / 2);
+            var windowPoint = ctrl.TranslatePoint(localPoint, window) ?? localPoint;
+            window.MouseMove(windowPoint);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(ctrl.AddFrameGhost);
+
+            window.KeyPress(Key.LeftCtrl, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+            var ghost = ctrl.AddFrameGhost;
+
+            Assert.NotNull(ghost);
+            Assert.True(ghost.Value.Contains((float)localPoint.X, (float)localPoint.Y),
+                $"Ghost {ghost} should surround the hovered point {localPoint}.");
+
+            window.KeyRelease(Key.LeftCtrl, RawInputModifiers.None, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(ctrl.AddFrameGhost);
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

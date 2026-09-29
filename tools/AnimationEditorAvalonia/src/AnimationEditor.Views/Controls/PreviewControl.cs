@@ -623,7 +623,6 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private IPendingCutState? _pendingCutState;
     private Action<string>? _showError;
 
-    private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
     // -- Chain lock (#1032) -----------------------------------------------------
     // A locked chain must be inert to drag gestures: it can be displayed (e.g. as a multi-
@@ -2674,9 +2673,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         var pts = sh.Points ?? Array.Empty<float>();
         int n = pts.Length / 2;
-        using var vertexFill = new SKPaint { Color = new SKColor(255, 220, 0, 255), Style = SKPaintStyle.Fill, IsAntialias = true };
-        using var vertexEdge = new SKPaint { Color = new SKColor(40, 40, 40, 255), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
-        using var midpoint   = new SKPaint { Color = new SKColor(255, 220, 0, 200), Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
+        using var vertexFill = new SKPaint { Color = EditorColors.PolygonVertex, Style = SKPaintStyle.Fill, IsAntialias = true };
+        using var vertexEdge = new SKPaint { Color = EditorColors.PolygonVertexEdge, Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
+        using var midpoint   = new SKPaint { Color = EditorColors.PolygonMidpoint, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
         const float half = 3.5f;
 
         int edges = sh.IsClosed ? n : n - 1;
@@ -2751,7 +2750,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             using var gp = new SKPaint
             {
-                Color       = new SKColor(100, 200, 100, 160),
+                Color       = EditorColors.PreviewOriginAxes,
                 StrokeWidth = 1f,
                 IsAntialias = false
             };
@@ -2793,8 +2792,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             {
                 var paint = sh.IsSelected ? selectedPaint : shapePaint;
                 paint.Color = sh.IsSelected
-                    ? new SKColor(255, 220, 0, 230)   // gold for selected
-                    : new SKColor(0,   230, 80,  200); // green for unselected
+                    ? EditorColors.SelectedShape
+                    : EditorColors.Shape;
 
                 // Shape coords: X right, Y up (FRB convention); negate Y for screen
                 float sx = cx + sh.X * om;
@@ -2805,7 +2804,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                     // A self-intersecting outline breaks the runtime's collision, so it is drawn in
                     // red whether or not it is selected.
                     if (sh.IsSelfIntersecting)
-                        paint.Color = new SKColor(255, 60, 60, 230);
+                        paint.Color = EditorColors.InvalidShape;
                     using var path = BuildPolygonPath(sh, sx, sy, om);
                     canvas.DrawPath(path, paint);
                     if (sh.IsSelected && !sh.IsLocked)
@@ -2827,7 +2826,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                         // Draw the bounding square outline for the circle so handles have context.
                         using var boxPaint = new SKPaint
                         {
-                            Color       = new SKColor(255, 220, 0, 120),
+                            Color       = EditorColors.SelectedShapeBounds,
                             Style       = SKPaintStyle.Stroke,
                             StrokeWidth = 1f,
                             PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
@@ -2843,7 +2842,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 {
                     using var cutPaint = new SKPaint
                     {
-                        Color = CutOutlineColor,
+                        Color = EditorColors.PendingCut,
                         Style = SKPaintStyle.Stroke,
                         StrokeWidth = 2f,
                         IsAntialias = true,
@@ -3074,7 +3073,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         using var op = new SKPaint
         {
-            Color       = new SKColor(255, 255, 255, (byte)(200 * alpha)),
+            Color       = EditorColors.FrameBoundingBox.WithAlpha((byte)(200 * alpha)),
             StrokeWidth = 1f,
             IsStroke    = true
         };
@@ -3127,8 +3126,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             (left  - Hs, bottom + Hs), (cx, bottom + Hs), (right + Hs, bottom + Hs),
         };
 
-        using var fill   = new SKPaint { Color = SKColors.White,     Style = SKPaintStyle.Fill };
-        using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f };
+        using var fill   = new SKPaint { Color = EditorColors.HandleFill,   Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = EditorColors.HandleStroke, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f };
 
         foreach (var (hx, hy) in pts)
         {
