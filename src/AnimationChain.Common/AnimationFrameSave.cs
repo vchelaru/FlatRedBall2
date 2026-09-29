@@ -45,32 +45,31 @@ public class AnimationFrameSave
     public float RelativeY;
 
     /// <summary>
-    /// Optional per-frame red channel, 0–255. <c>null</c> (the default) means unset, so it is
-    /// omitted from the saved <c>.achx</c>. The AnimationEditor previews these as a reference tint
-    /// (via <see cref="ColorOperation"/>); the FlatRedBall2 runtime does <b>not</b> auto-apply them —
-    /// game code reads them via <c>FlatRedBall2.Rendering.Sprite.CurrentFrame</c> and decides how
-    /// to use them (tint, flash, etc.). See <see cref="Green"/>, <see cref="Blue"/>.
+    /// Optional per-frame red channel, -255..255 (negative values subtract under
+    /// <see cref="FlatRedBall2.Animation.ColorOperation.Add"/>). <c>null</c> (the default) is omitted from the
+    /// saved <c>.achx</c> and inherits the most recent earlier frame in the same chain that sets it
+    /// (see <see cref="EffectiveFrameColor"/>). FlatRedBall2's <c>Sprite.Draw</c> applies the resolved
+    /// value per <see cref="ColorOperation"/>. See <see cref="Green"/>, <see cref="Blue"/>.
     /// </summary>
     public int? Red;
 
-    /// <summary>Optional per-frame green channel, 0–255. See <see cref="Red"/> for the game-consumed contract.</summary>
+    /// <summary>Optional per-frame green channel, -255..255. See <see cref="Red"/>.</summary>
     public int? Green;
 
-    /// <summary>Optional per-frame blue channel, 0–255. See <see cref="Red"/> for the game-consumed contract.</summary>
+    /// <summary>Optional per-frame blue channel, -255..255. See <see cref="Red"/>.</summary>
     public int? Blue;
 
     /// <summary>
-    /// Optional per-frame alpha (transparency) channel, 0–255. <c>null</c> (the default) means unset, so it
-    /// is omitted from the saved <c>.achx</c>. Straight transparency, independent of <see cref="ColorOperation"/>.
-    /// The AnimationEditor previews it as opacity (a reference render); the FlatRedBall2 runtime does <b>not</b>
-    /// auto-apply it — game code reads it via <c>FlatRedBall2.Rendering.Sprite.CurrentFrame</c>. See <see cref="Red"/>.
+    /// Optional per-frame alpha (straight transparency), 0–255, independent of <see cref="ColorOperation"/>.
+    /// <c>null</c> inherits the same way as <see cref="Red"/>. FlatRedBall2's <c>Sprite.Draw</c> multiplies
+    /// the resolved value into the sprite's alpha.
     /// </summary>
     public int? Alpha;
 
     /// <summary>
     /// Optional per-frame color operation describing how <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/>
-    /// combine with the texture. <c>null</c> (the default) means none and is omitted from the saved
-    /// <c>.achx</c>. Like the channels, runtimes interpret this as they choose. See <see cref="FlatRedBall2.Animation.ColorOperation"/>.
+    /// combine with the texture. <c>null</c> inherits the same way as <see cref="Red"/>; if no frame in the
+    /// chain sets it, R/G/B are not applied. See <see cref="FlatRedBall2.Animation.ColorOperation"/>.
     /// </summary>
     public ColorOperation? ColorOperation;
 

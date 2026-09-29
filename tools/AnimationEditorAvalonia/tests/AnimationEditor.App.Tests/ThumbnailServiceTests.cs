@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;

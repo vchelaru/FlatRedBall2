@@ -68,7 +68,7 @@ public class ThumbnailSourceTests
                     ColorOperation = ColorOperation.Multiply, Red = 200 },
             new() { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f },
         };
-        var colors = Rendering.EffectiveFrameColor.ResolveAll(frames);
+        var colors = EffectiveFrameColor.ResolveAll(frames);
 
         var frame1Source = ThumbnailSource.FromFrame(frames[1], colors[1]);
 

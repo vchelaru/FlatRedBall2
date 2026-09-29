@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AnimationEditor.Core;
-using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Platform;
 using FlatRedBall2.Animation;

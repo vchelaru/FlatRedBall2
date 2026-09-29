@@ -1,14 +1,14 @@
 using System.Collections.Generic;
-using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using Xunit;
 
-namespace AnimationEditor.Core.Tests;
+namespace AnimationEditorCommon.Tests;
 
 /// <summary>
-/// Tests for <see cref="EffectiveFrameColor"/> — the sticky "unset = keep the last value"
-/// resolution the editor uses so its preview and inspector match runtime behavior.
+/// Tests for <see cref="EffectiveFrameColor"/>: a null channel inherits the most recent earlier
+/// frame that sets it.
 /// </summary>
 public class EffectiveFrameColorTests
 {
@@ -24,7 +24,7 @@ public class EffectiveFrameColorTests
             new AnimationFrameSave(),
             new AnimationFrameSave());
 
-        Assert.Equal(250, EffectiveFrameColor.Resolve(frames, 2).Alpha);
+        EffectiveFrameColor.Resolve(frames, 2).Alpha.ShouldBe(250);
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class EffectiveFrameColorTests
     {
         var frames = Chain(new AnimationFrameSave(), new AnimationFrameSave());
 
-        Assert.Null(EffectiveFrameColor.Resolve(frames, 1).Alpha);
+        EffectiveFrameColor.Resolve(frames, 1).Alpha.ShouldBeNull();
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class EffectiveFrameColorTests
             new AnimationFrameSave { Alpha = 100 },
             new AnimationFrameSave());
 
-        Assert.Equal(100, EffectiveFrameColor.Resolve(frames, 2).Alpha);
+        EffectiveFrameColor.Resolve(frames, 2).Alpha.ShouldBe(100);
     }
 
     [Fact]
@@ -57,9 +57,9 @@ public class EffectiveFrameColorTests
             new AnimationFrameSave());
 
         var resolved = EffectiveFrameColor.Resolve(frames, 2);
-        Assert.Equal(200, resolved.Red);
-        Assert.Equal(50, resolved.Blue);
-        Assert.Null(resolved.Green);
+        resolved.Red.ShouldBe(200);
+        resolved.Blue.ShouldBe(50);
+        resolved.Green.ShouldBeNull();
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class EffectiveFrameColorTests
             new AnimationFrameSave { ColorOperation = ColorOperation.Add },
             new AnimationFrameSave());
 
-        Assert.Equal(ColorOperation.Add, EffectiveFrameColor.Resolve(frames, 1).Operation);
+        EffectiveFrameColor.Resolve(frames, 1).Operation.ShouldBe(ColorOperation.Add);
     }
 
     // ── ResolveAll (O(n) whole-strip resolution) ──────────────────────────────
@@ -87,9 +87,9 @@ public class EffectiveFrameColorTests
 
         var all = EffectiveFrameColor.ResolveAll(frames);
 
-        Assert.Equal(frames.Count, all.Length);
+        all.Length.ShouldBe(frames.Count);
         for (int i = 0; i < frames.Count; i++)
-            Assert.Equal(EffectiveFrameColor.Resolve(frames, i), all[i]);
+            all[i].ShouldBe(EffectiveFrameColor.Resolve(frames, i));
     }
 
     [Fact]
@@ -105,10 +105,10 @@ public class EffectiveFrameColorTests
 
         var all = EffectiveFrameColor.ResolveAll(frames);
 
-        Assert.Equal(200, all[0].Red);
-        Assert.Equal(200, all[1].Red);
-        Assert.Equal(10, all[2].Red);
-        Assert.Equal(10, all[3].Red);
+        all[0].Red.ShouldBe(200);
+        all[1].Red.ShouldBe(200);
+        all[2].Red.ShouldBe(10);
+        all[3].Red.ShouldBe(10);
     }
 
     [Fact]
@@ -126,24 +126,24 @@ public class EffectiveFrameColorTests
         frames[1].Alpha = 100;
         var after = EffectiveFrameColor.ResolveAll(frames);
 
-        Assert.Equal(before[0], after[0]);      // upstream unchanged
-        Assert.NotEqual(before[1], after[1]);   // edited frame
-        Assert.NotEqual(before[2], after[2]);   // downstream inherits the edit
-        Assert.Equal(before[3], after[3]);      // frame 3 re-sets alpha, so it's shielded
+        after[0].ShouldBe(before[0]);      // upstream unchanged
+        after[1].ShouldNotBe(before[1]);   // edited frame
+        after[2].ShouldNotBe(before[2]);   // downstream inherits the edit
+        after[3].ShouldBe(before[3]);      // frame 3 re-sets alpha, so it's shielded
     }
 
     [Fact]
     public void ResolveAll_EmptyList_ReturnsEmptyArray()
-        => Assert.Empty(EffectiveFrameColor.ResolveAll(new System.Collections.Generic.List<AnimationFrameSave>()));
+        => EffectiveFrameColor.ResolveAll(new System.Collections.Generic.List<AnimationFrameSave>()).ShouldBeEmpty();
 
     [Fact]
     public void ChannelDefault_Add_ReturnsZero()
-        => Assert.Equal(0, EffectiveFrameColor.ChannelDefault(ColorOperation.Add));
+        => EffectiveFrameColor.ChannelDefault(ColorOperation.Add).ShouldBe(0);
 
     [Fact]
     public void ChannelDefault_MultiplyOrNone_Returns255()
     {
-        Assert.Equal(255, EffectiveFrameColor.ChannelDefault(ColorOperation.Multiply));
-        Assert.Equal(255, EffectiveFrameColor.ChannelDefault(null));
+        EffectiveFrameColor.ChannelDefault(ColorOperation.Multiply).ShouldBe(255);
+        EffectiveFrameColor.ChannelDefault(null).ShouldBe(255);
     }
 }

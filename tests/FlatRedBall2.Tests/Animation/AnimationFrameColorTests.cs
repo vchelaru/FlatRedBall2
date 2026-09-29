@@ -8,8 +8,8 @@ using Xunit;
 
 namespace FlatRedBall2.Tests.Animation;
 
-// Per-frame Red/Green/Blue/Alpha (0-255, nullable) are stored on the frame and surfaced to game code,
-// but are NOT applied by the engine — game code reads Sprite.CurrentFrame and decides how to use them.
+// Per-frame Red/Green/Blue (-255..255), Alpha (0-255) and ColorOperation are nullable. On conversion a null
+// inherits the most recent earlier frame in the same chain that sets it; Sprite.Draw applies the result.
 public class AnimationFrameColorTests
 {
     [Fact]
@@ -152,5 +152,58 @@ public class AnimationFrameColorTests
         var frame = save.ToAnimationChainList(null!)[0][0];
 
         frame.ColorOperation.ShouldBe(ColorOperation.Multiply);
+    }
+    [Fact]
+    public void ToAnimationChainList_NullChannels_InheritEarlierFramePerChannel()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Flash" };
+        chain.Frames.Add(new AnimationFrameSave { Red = 10, Alpha = 50, ColorOperation = ColorOperation.Add });
+        chain.Frames.Add(new AnimationFrameSave { Green = 20 });
+        chain.Frames.Add(new AnimationFrameSave { Red = 30 });
+        save.AnimationChains.Add(chain);
+
+        var frames = save.ToAnimationChainList(null!)[0];
+
+        frames[1].Red.ShouldBe(10);
+        frames[1].Green.ShouldBe(20);
+        frames[1].Blue.ShouldBeNull();
+        frames[1].Alpha.ShouldBe(50);
+        frames[1].ColorOperation.ShouldBe(ColorOperation.Add);
+        frames[2].Red.ShouldBe(30);
+        frames[2].Green.ShouldBe(20);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_LeadingNullFrames_StayNullUntilSet()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Late" };
+        chain.Frames.Add(new AnimationFrameSave());
+        chain.Frames.Add(new AnimationFrameSave { Red = 5, ColorOperation = ColorOperation.Multiply });
+        save.AnimationChains.Add(chain);
+
+        var frames = save.ToAnimationChainList(null!)[0];
+
+        frames[0].Red.ShouldBeNull();
+        frames[0].ColorOperation.ShouldBeNull();
+        frames[1].Red.ShouldBe(5);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_Inheritance_DoesNotCrossChains()
+    {
+        var save = new AnimationChainListSave();
+        var first = new AnimationChainSave { Name = "Tinted" };
+        first.Frames.Add(new AnimationFrameSave { Red = 10, ColorOperation = ColorOperation.Add });
+        var second = new AnimationChainSave { Name = "Plain" };
+        second.Frames.Add(new AnimationFrameSave());
+        save.AnimationChains.Add(first);
+        save.AnimationChains.Add(second);
+
+        var frame = save.ToAnimationChainList(null!)[1][0];
+
+        frame.Red.ShouldBeNull();
+        frame.ColorOperation.ShouldBeNull();
     }
 }

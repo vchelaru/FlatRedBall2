@@ -1,5 +1,4 @@
 using AnimationEditor.App.Services;
-using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Input;

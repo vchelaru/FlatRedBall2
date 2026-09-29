@@ -26,6 +26,8 @@ public static class AnimationChainListSaveExtensions
     /// <remarks>
     /// Texture names are resolved relative to the .achx file location when
     /// <see cref="AnimationChainListSave.FileRelativeTextures"/> is <c>true</c>.
+    /// A frame's null color channel or operation inherits the most recent earlier frame in the
+    /// same chain that sets it (see <see cref="EffectiveFrameColor"/>).
     /// </remarks>
     public static AnimationChainList ToAnimationChainList(this AnimationChainListSave save, ContentLoader contentManager)
     {
@@ -52,9 +54,12 @@ public static class AnimationChainListSaveExtensions
         foreach (var chainSave in save.AnimationChains)
         {
             var chain = new AnimationChain { Name = chainSave.Name, Loop = chainSave.Loop };
+            var colors = EffectiveFrameColor.ResolveAll(chainSave.Frames);
 
-            foreach (var frameSave in chainSave.Frames)
+            for (int i = 0; i < chainSave.Frames.Count; i++)
             {
+                var frameSave = chainSave.Frames[i];
+                var color = colors[i];
                 var frame = new AnimationFrame
                 {
                     TextureName = frameSave.TextureName,
@@ -64,11 +69,11 @@ public static class AnimationChainListSaveExtensions
                     FlipDiagonal = frameSave.FlipDiagonal,
                     RelativeX = frameSave.RelativeX,
                     RelativeY = frameSave.RelativeY,
-                    Red = frameSave.Red,
-                    Green = frameSave.Green,
-                    Blue = frameSave.Blue,
-                    Alpha = frameSave.Alpha,
-                    ColorOperation = frameSave.ColorOperation,
+                    Red = color.Red,
+                    Green = color.Green,
+                    Blue = color.Blue,
+                    Alpha = color.Alpha,
+                    ColorOperation = color.Operation,
                 };
 
                 frame.Texture = loadTexture(frameSave);
