@@ -954,7 +954,7 @@ public partial class App : Application
             wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16m));
 
         // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
-        // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
+        // AppCommands.ExportAsync(ExportFormat.PixiJs) calls -- what differs here is entirely the output path:
         // desktop writes the JSON + copies referenced PNGs to disk next to it; the browser has no
         // disk to write to, so both the JSON and each referenced texture (re-encoded from
         // ThumbnailService's already-decoded bitmap, never read from disk) are handed to the
@@ -980,7 +980,7 @@ public partial class App : Application
                 ? "spritesheet"
                 : System.IO.Path.GetFileNameWithoutExtension(projectManager.FileName);
 
-            DownloadInterop.DownloadText($"{baseName}.json", result.Json, "application/json");
+            DownloadInterop.DownloadText($"{baseName}.json", result.Text, "application/json");
 
             var warnings = new List<string>(result.Warnings);
             foreach (var textureName in result.ReferencedTextures)

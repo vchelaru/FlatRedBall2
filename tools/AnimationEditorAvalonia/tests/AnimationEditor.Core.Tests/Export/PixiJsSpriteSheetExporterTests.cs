@@ -45,7 +45,7 @@ public class PixiJsSpriteSheetExporterTests
             Frames = { UvFrame("hero.png", 0f, 0.5f, 0.5f, 1f) },
         });
 
-        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Json);
+        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Text);
 
         foreach (var key in sheet.Animations.Values.SelectMany(keys => keys))
             Assert.Contains(key, sheet.Frames.Keys);
@@ -75,7 +75,7 @@ public class PixiJsSpriteSheetExporterTests
             Name = "Walk",
             Frames = { UvFrame("hero.png", 0f, 0f, 0.5f, 0.5f), UvFrame("hero.png", 0.5f, 0f, 1f, 0.5f) },
         });
-        var json = PixiJsSpriteSheetExporter.Export(acls, Size64).Json;
+        var json = PixiJsSpriteSheetExporter.Export(acls, Size64).Text;
 
         var schemaPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "pixijs-spritesheet.schema.json");
         var schema = await JsonSchema.FromFileAsync(schemaPath);
@@ -96,7 +96,7 @@ public class PixiJsSpriteSheetExporterTests
         });
 
         // Resolver returns null to prove pixel input never consults it.
-        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, _ => null).Json);
+        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, _ => null).Text);
 
         var rect = sheet.Frames["Walk_0"].Frame;
         Assert.Equal((8, 8, 24, 24), (rect.X, rect.Y, rect.W, rect.H));
@@ -112,7 +112,7 @@ public class PixiJsSpriteSheetExporterTests
             Frames = { UvFrame("hero.png", 0f, 0f, 1f, 1f) },
         });
 
-        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Json);
+        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Text);
 
         Assert.Equal("hero.png", sheet.Meta.Image);
     }
@@ -128,7 +128,7 @@ public class PixiJsSpriteSheetExporterTests
             Frames = { UvFrame("hero.png", 0f, 0f, 0.5f, 0.5f) },
         });
 
-        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Json);
+        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Text);
 
         var rect = sheet.Frames["Walk_0"].Frame;
         Assert.Equal((0, 0, 32, 32), (rect.X, rect.Y, rect.W, rect.H));
@@ -149,7 +149,7 @@ public class PixiJsSpriteSheetExporterTests
             },
         });
 
-        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Json);
+        var sheet = Parse(PixiJsSpriteSheetExporter.Export(acls, Size64).Text);
 
         Assert.Equal(new List<string> { "Walk_0", "Walk_1", "Walk_2" }, sheet.Animations["Walk"]);
     }

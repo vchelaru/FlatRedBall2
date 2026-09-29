@@ -2,6 +2,7 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
+using AnimationEditor.Core.Export;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
@@ -1325,7 +1326,7 @@ public partial class MainWindow : Window
         _appCommands.ItemsDeleted += label =>
             Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
 
-        _appCommands.PixiJsExportCompleted += (path, warnings) =>
+        _appCommands.ExportCompleted += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var name = System.IO.Path.GetFileName(path);
@@ -2524,6 +2525,7 @@ public partial class MainWindow : Window
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
+        MenuExportGodot.Click += OnExportGodotClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
@@ -2912,7 +2914,10 @@ public partial class MainWindow : Window
         _ = _appCommands.AddAssociatedTiledTilesetViaDialogAsync();
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.ExportToPixiJsAsync();
+        _ = _appCommands.ExportAsync(ExportFormat.PixiJs);
+
+    private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
+        _ = _appCommands.ExportAsync(ExportFormat.Godot);
 
     internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 

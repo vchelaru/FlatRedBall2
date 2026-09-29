@@ -42,11 +42,11 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? SaveAsCompleted;
 
         /// <summary>
-        /// Raised after <see cref="ExportToPixiJsAsync"/> writes a PixiJS spritesheet JSON. The first
-        /// argument is the export path; the second is a (possibly empty) list of non-fatal warnings
-        /// (e.g. dropped per-frame duration, multiple source textures) for the app layer to surface.
+        /// Raised after <see cref="ExportAsync"/> writes an export file. The first argument is the
+        /// export path; the second is a (possibly empty) list of non-fatal warnings (e.g. data the
+        /// format can't carry, textures that couldn't be copied) for the app layer to surface.
         /// </summary>
-        event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+        event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <summary>
         /// Raised after <see cref="SaveCurrentAnimationChainList"/> saves a native tsx project
@@ -181,7 +181,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// A failure is reported through <see cref="SaveFailed"/>.
         /// </summary>
         void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
-        Task ExportToPixiJsAsync();
+        Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);
