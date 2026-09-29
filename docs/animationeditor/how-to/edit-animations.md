@@ -52,7 +52,7 @@ To flip an animation, right-click the animation and select **Flip Horizontally**
 
 To flip individual frames instead, see [Flip a Frame](edit-frames.md#flip-a-frame).
 
-Flipping isn't available in [Tiled `.tsx` projects](animate-a-tiled-tileset.md).
+Flipping isn't available in Tiled `.tsx` projects.
 
 ## Move All of an Animation's Frames
 
