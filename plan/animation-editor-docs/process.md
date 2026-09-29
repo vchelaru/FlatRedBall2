@@ -20,8 +20,9 @@ Victor writes each page. Claude adds images and links, then reviews.
 
 ## Review after placing
 Fix silently, without calling them out: typos, wrong UI labels (check against the code), heading
-style (title case, imperative verbs), bold UI names, `File ▸ Item` menu paths, ⌘ equivalents for
-Ctrl shortcuts, and links to sections on other docs pages.
+style (title case, imperative verbs), bold UI names, `File ▸ Item` menu paths, Mac equivalents for
+every shortcut (Ctrl → ⌘, Alt → ⌥ Option, F-keys and Delete → Fn+ on Mac laptops), verifying
+each shortcut against the hotkey table in `MainWindow.axaml.cs` (`Id = "…"` entries), and links to sections on other docs pages.
 
 Suggest, don't apply, until Victor says which to fix: anything that changes what the page says or
 how it's organized, screenshots that don't match the text, and missing coverage.
