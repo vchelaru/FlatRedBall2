@@ -1,3 +1,3 @@
 # Add Collision Shapes
 
-## Add a Rectangle or Circle
+## Add a Rectangle, Circle, or Polygon

@@ -13,7 +13,7 @@ Reviewed against Diátaxis (tutorial / how-to / reference / explanation). Each p
 7. **Everything sits under one AnimationEditor section.** GitBook groups can't nest, so How-To Guides, Reference and Code are parent pages (each with its own README listing its children) inside a single AnimationEditor group.
 8. **How-to pages cover common operations only, grouped by what you're editing.** Edit Animations is whole-animation actions; Edit Frames is frame actions. Rare options (Add Multiple Frames, Invert Frame Order) are left out. Properties beyond frame length, Loop, and Locked live on Reference ▸ Inspector Properties.
 9. **Use the editor's own labels in headings** (Placed Tile, Relative X / Relative Y, Add AxisAlignedRectangle), not internal names.
-10. **Tint Frames is cut.** It was a one-section page for a rarely used setting; color fields live on Reference ▸ Inspector Properties.
+10. **Tint Frames is cut as a page.** Tinting is a section of Edit Frames instead; the full color field list lives on Reference ▸ Inspector Properties.
 11. **Save/undo and single-file work get coverage.** Every user needs them, and they were only mentioned in Quick Start.
 12. **No single-child sections.** Concepts would hold one page, so How Animations Work sits directly under AnimationEditor instead.
 
@@ -47,17 +47,23 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Turn looping on or off (Loop)
 │   │   ## Lock an animation (why the + button disappears)
 │   ├── Edit frames
-│   │   ## Add and delete frames
+│   │   ## Add frames
+│   │   ## Delete frames
 │   │   ## Add a frame with the magic wand (Ctrl+click)
-│   │   ## Copy and paste frames
+│   │   ## Copy, paste, and duplicate frames (Ctrl+D / ⌘D)
 │   │   ## Reorder frames (drag in the tree)
-│   │   ## Flip a frame
+│   │   ## Edit several frames at once (multi-select; mixed values)
+│   │   ## Change a frame's image (TEXTURE field, … browse, drop a PNG, View Texture in Explorer)
+│   │   ## Change what part of the image a frame shows (pointer to Choose what a frame shows)
+│   │   ## Flip a frame (Horizontal, Vertical, Diagonal)
 │   │   ## Change how long a frame shows
+│   │   ## Tint a frame (Color Mode + R/G/B/A)
+│   │   ## Offset a frame (pointer to Align animations ▸ Relative X / Y)
 │   ├── Preview an animation             (right after editing: used after every change)
 │   │   ## Playback and speed
 │   │   ## Show the previous frame (onion skin)
 │   ├── Choose what a frame shows        (was "Define frame regions"; plain-language title)
-│   │   ## Snap to a grid
+│   │   ## Snap to a grid (set cell size; drag moves and keeps size, double-click fits a cell)
 │   │   ## Select with the magic wand
 │   │   ## Enter exact pixel coordinates
 │   │   ## Move all frames at once (select the whole animation)
@@ -73,7 +79,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Fix animations Tiled can't represent (warning icon)
 │   │   ## What isn't available in .tsx projects (collision shapes, flipping, Adjust Offsets)
 │   ├── Add collision shapes
-│   │   ## Add a rectangle or circle (Add AxisAlignedRectangle / Add Circle)
+│   │   ## Add a rectangle, circle, or polygon (Add AxisAlignedRectangle / Add Circle / Add Polygon)
 │   ├── Work with project folders
 │   │   ## Introduction
 │   │   ## Open and Close a Project Folder
