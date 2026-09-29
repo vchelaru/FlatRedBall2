@@ -37,20 +37,7 @@ AnimationEditor                          (SUMMARY.md group)
 │   ## Save
 │   ## Next Steps
 │
-├── How-To Guides                        (parent page: how-to/README.md, lists its guides; ordered by workflow)
-│   ├── Work with project folders
-│   │   ## Introduction
-│   │   ## Open and Close a Project Folder
-│   │   ## Find Files (Images and Animations Tabs)
-│   │   ## Open, Switch, and Close Files
-│   │   ## Add Animation Files to a Project
-│   │   ## Find Which Animations Use an Image
-│   │   ## Work without a project folder      (File ▸ New Animation / Load… / Load Recent)
-│   ├── Save and undo changes
-│   │   ## Save and Save As
-│   │   ## Auto-save
-│   │   ## Undo, redo, and the History tab
-│   │   ## Reload from disk
+├── How-To Guides                        (parent page: how-to/README.md, lists its guides; ordered by how often a new user needs each; file management last since Quick Start covers the basics)
 │   ├── Edit animations
 │   │   ## Add, rename, and delete an animation
 │   │   ## Reorder animations (drag in the tree)
@@ -84,8 +71,21 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Choose the placed tile (Placed Tile)
 │   │   ## Fix animations Tiled can't represent (warning icon)
 │   │   ## What isn't available in .tsx projects (collision shapes, flipping, Adjust Offsets)
-│   └── Add collision shapes
-│       ## Add a rectangle or circle (Add AxisAlignedRectangle / Add Circle)
+│   ├── Add collision shapes
+│   │   ## Add a rectangle or circle (Add AxisAlignedRectangle / Add Circle)
+│   ├── Work with project folders
+│   │   ## Introduction
+│   │   ## Open and Close a Project Folder
+│   │   ## Find Files (Images and Animations Tabs)
+│   │   ## Open, Switch, and Close Files
+│   │   ## Add Animation Files to a Project
+│   │   ## Find Which Animations Use an Image
+│   │   ## Work without a project folder      (File ▸ New Animation / Load… / Load Recent)
+│   └── Save and undo changes
+│       ## Save and Save As
+│       ## Auto-save
+│       ## Undo, redo, and the History tab
+│       ## Reload from disk
 │
 ├── How Animations Work                  (explanation: concepts/how-animations-work.md; before Reference)
 │   ## Animations, frames, and textures
