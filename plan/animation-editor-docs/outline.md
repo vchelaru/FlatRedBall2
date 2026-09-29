@@ -11,8 +11,11 @@ Reviewed against Diátaxis (tutorial / how-to / reference / explanation). Each p
 5. **Timing is too thin for a page.** Two sections. Fold it into "Build an animation".
 6. **The API pages are a different audience** (programmers, not artists). They get their own Code section, nested under AnimationEditor like the others.
 7. **Everything sits under one AnimationEditor section.** GitBook groups can't nest, so How-To Guides, Reference and Code are parent pages (each with its own README listing its children) inside a single AnimationEditor group.
-8. **How-to pages cover common operations only, grouped by what you're editing.** Edit Animations is whole-animation actions; Edit Frames is frame actions. Rare options (Add Multiple Frames, Invert Frame Order) are left out. Frame properties beyond frame length live on Reference ▸ Frame Properties.
-9. **No single-child sections.** Concepts would hold one page, so How Animations Work sits directly under AnimationEditor instead.
+8. **How-to pages cover common operations only, grouped by what you're editing.** Edit Animations is whole-animation actions; Edit Frames is frame actions. Rare options (Add Multiple Frames, Invert Frame Order) are left out. Properties beyond frame length, Loop, and Locked live on Reference ▸ Inspector Properties.
+9. **Use the editor's own labels in headings** (Placed Tile, Relative X / Relative Y, Add AxisAlignedRectangle), not internal names.
+10. **Tint Frames is cut.** It was a one-section page for a rarely used setting; color fields live on Reference ▸ Inspector Properties.
+11. **Save/undo and single-file work get coverage.** Every user needs them, and they were only mentioned in Quick Start.
+12. **No single-child sections.** Concepts would hold one page, so How Animations Work sits directly under AnimationEditor instead.
 
 ## Proposed nav
 
@@ -42,36 +45,47 @@ AnimationEditor                          (SUMMARY.md group)
 │   │   ## Open, Switch, and Close Files
 │   │   ## Add Animation Files to a Project
 │   │   ## Find Which Animations Use an Image
+│   │   ## Work without a project folder      (File ▸ New Animation / Load… / Load Recent)
+│   ├── Save and undo changes
+│   │   ## Save and Save As
+│   │   ## Auto-save
+│   │   ## Undo, redo, and the History tab
+│   │   ## Reload from disk
 │   ├── Edit animations
 │   │   ## Add, rename, and delete an animation
 │   │   ## Reorder animations (drag in the tree)
 │   │   ## Duplicate an animation (copy and paste)
 │   │   ## Flip an animation (e.g. WalkRight from WalkLeft)
 │   │   ## Change an animation's speed (Adjust Frame Time)
+│   │   ## Stop an animation from looping (Loop)
+│   │   ## Lock an animation (why the + button disappears)
 │   ├── Edit frames
 │   │   ## Add and delete frames
+│   │   ## Add a frame with the magic wand (Ctrl+click)
 │   │   ## Copy and paste frames
 │   │   ## Reorder frames (drag in the tree)
 │   │   ## Flip a frame
 │   │   ## Change how long a frame shows
+│   ├── Preview an animation             (right after editing: used after every change)
+│   │   ## Playback and speed
+│   │   ## Show the previous frame (onion skin)
 │   ├── Choose what a frame shows        (was "Define frame regions"; plain-language title)
 │   │   ## Snap to a grid
 │   │   ## Select with the magic wand
 │   │   ## Enter exact pixel coordinates
-│   ├── Preview an animation             (moved up: used after every edit)
-│   │   ## Playback and speed
-│   │   ## Onion skin
 │   ├── Align animations
 │   │   ## Use guides to spot misalignment
-│   │   ## Shift a frame with RelativeX / RelativeY
-│   ├── Tint frames                      (was "Flip and tint frames"; flipping lives in Edit animations/frames)
+│   │   ## Shift a whole animation (Adjust Offsets)
+│   │   ## Shift one frame (Relative X / Relative Y)
 │   ├── Animate a Tiled tileset (.tsx)
 │   │   ## Open a .tsx file
 │   │   ## Animate a tile
 │   │   ## Name animations (auto "ID:{tileId}" names)
-│   │   ## Choose the placed tile (Owner tile)
+│   │   ## Choose the placed tile (Placed Tile)
 │   │   ## Fix animations Tiled can't represent (warning icon)
+│   │   ## What isn't available in .tsx projects (collision shapes, flipping, Adjust Offsets)
 │   └── Add collision shapes
+│       ## Add a rectangle or circle (Add AxisAlignedRectangle / Add Circle)
 │
 ├── How Animations Work                  (explanation: concepts/how-animations-work.md; before Reference)
 │   ## Animations, frames, and textures
@@ -81,7 +95,7 @@ AnimationEditor                          (SUMMARY.md group)
 │
 ├── Reference                            (parent page: reference/README.md, lists its pages)
 │   ├── The window                       (labeled screenshot, one line per panel)
-│   ├── Frame properties                 (every inspector field: meaning, units, range)
+│   ├── Inspector properties             (every animation and frame field, incl. Loop, Locked, Placed Tile, color: meaning, units, range)
 │   ├── Keyboard shortcuts               (generate from HotkeyRegistry so it can't drift)
 │   └── File formats                     (.achx, .achj, and .tsx: what's stored, which runtimes read each)
 │
