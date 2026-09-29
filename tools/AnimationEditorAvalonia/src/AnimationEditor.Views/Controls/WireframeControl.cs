@@ -182,19 +182,7 @@ public class WireframeControl : TextureViewport
         // Add-frame ghost (#1241): where a Ctrl+click would create a frame. A solid dark underlay
         // with a white dash on top reads over any texture pixel and either canvas theme.
         if (s.AddFrameGhost is { } ghost)
-        {
-            var gr = s.TextureRectToScreen(ghost);
-            using var underlay = new SKPaint { Color = EditorColors.PendingAddUnderlay, Style = SKPaintStyle.Stroke, StrokeWidth = 3f };
-            using var dash = new SKPaint
-            {
-                Color = EditorColors.PendingAdd,
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1.5f,
-                PathEffect = SKPathEffect.CreateDash(new float[] { 5f, 3f }, 0f),
-            };
-            canvas.DrawRect(gr, underlay);
-            canvas.DrawRect(gr, dash);
-        }
+            DrawAddFrameGhost(canvas, s.TextureRectToScreen(ghost));
 
         // Resize handles on selected frame — faded in (#716), not drawn at all once invisible.
         if (s.SelectedHandleBounds.HasValue && s.HandleAlpha > 0f)
@@ -232,6 +220,27 @@ public class WireframeControl : TextureViewport
             using var dotPaint = new SKPaint { Color = EditorColors.Origin };
             canvas.DrawCircle(ox, oy, 2f, dotPaint);
         }
+    }
+
+    /// <summary>
+    /// Both strokes use even widths on a pixel-snapped rect so the 2px dash lands exactly in the
+    /// middle of the 4px underlay. Any other mix rounds the dash toward one side, leaving the
+    /// outline outside only on the top/left edges and inside only on the bottom/right.
+    /// </summary>
+    internal static void DrawAddFrameGhost(SKCanvas canvas, SKRect screenRect)
+    {
+        var r = new SKRect(MathF.Round(screenRect.Left), MathF.Round(screenRect.Top),
+                           MathF.Round(screenRect.Right), MathF.Round(screenRect.Bottom));
+        using var underlay = new SKPaint { Color = EditorColors.PendingAddUnderlay, Style = SKPaintStyle.Stroke, StrokeWidth = 4f };
+        using var dash = new SKPaint
+        {
+            Color = EditorColors.PendingAdd,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2f,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 5f, 3f }, 0f),
+        };
+        canvas.DrawRect(r, underlay);
+        canvas.DrawRect(r, dash);
     }
 
     /// <summary>
