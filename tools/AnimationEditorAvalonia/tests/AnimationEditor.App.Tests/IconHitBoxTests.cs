@@ -44,13 +44,12 @@ public class IconHitBoxTests
     {
         using AnimationEditorHarness editor = await OpenWithFrameSelectedAsync();
 
+        // A short window forces the Inspector to scroll, so the test exercises the scrolled layout on
+        // every OS instead of only where larger fonts push the Color section off screen.
+        editor.Window.Height = 300;
+        editor.Layout();
         Control icon = editor.Control<Control>("ColorHelpIcon");
-        icon.BringIntoView();
-        // Twice: failed once on Ubuntu CI with every point hitting the icon's ancestor, the
-        // symptom of a hit test running a render tick behind. Suspected (not reproduced) cause:
-        // the scroll applies during the first tick, so its composition update needs a second.
-        editor.Layout();
-        editor.Layout();
+        editor.ScrollIntoView(icon);
 
         ShouldHitTestAcrossWholeBox(editor.Window, icon);
     }

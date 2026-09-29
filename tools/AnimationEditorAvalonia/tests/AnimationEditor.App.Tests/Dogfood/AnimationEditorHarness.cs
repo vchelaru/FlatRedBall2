@@ -245,9 +245,21 @@ internal sealed class AnimationEditorHarness : IDisposable
         // TreeView.ScrollIntoView only knows its top-level items: a frame row a hundred rows down
         // a long chain stayed off screen and the click landed on nothing (the chain kept the
         // selection, so Delete removed the chain). Ask the row itself to scroll into the viewport.
-        row.BringIntoView();
-        Layout();
+        ScrollIntoView(row);
         return row;
+    }
+
+    /// <summary>
+    /// Scrolls <paramref name="control"/> into its viewport and settles layout and hit-testing.
+    /// The scroll offset from <see cref="Visual.BringIntoView()"/> lands during the first pass, so
+    /// one <see cref="Layout"/> leaves the composition tree a tick behind: the control's bounds
+    /// report the scrolled position while pointer hit-tests still see the old content there.
+    /// </summary>
+    public void ScrollIntoView(Control control)
+    {
+        control.BringIntoView();
+        Layout();
+        Layout();
     }
 
     /// <summary>
