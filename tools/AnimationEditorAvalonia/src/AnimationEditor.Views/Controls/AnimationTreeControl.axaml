@@ -45,28 +45,27 @@
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
             </Style>
+            <!-- Unlocked, the lock sits left of add-frame (30). Locked hides add-frame
+                 (CanAddFrame), so the lock takes its slot at the edge (4) instead of leaving a gap. -->
+            <Style Selector="Button.lock-btn">
+                <Setter Property="Margin" Value="0,0,30,0" />
+            </Style>
             <Style Selector="Button.lock-btn.locked">
+                <Setter Property="Margin" Value="0,0,4,0" />
                 <Setter Property="Opacity" Value="1" />
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
             </Style>
-            <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are
-                 actually visible, not always assume one. Locking a chain hides the add-frame
-                 button (CanAddFrame) and always shows the lock icon, so only two cases exist: no
-                 icon lane visible (tight), or the lock icon's lane visible (locked, or hovered
-                 while unlocked, since hover reveals both add-frame and lock together). The lock
-                 lane sits further from the edge than add-frame's, so clearing it clears both. The
-                 ":not(.locked)" on the hover rule keeps a locked+hovered row on the locked margin
-                 rather than depending on style declaration order.
-                 The hover rule is also scoped to TextBlock.meta.chain (bound to IsChainNode):
-                 only the chain's own meta text may ever grow a lane (frames never show
-                 add-frame/lock icons), so without the ".chain" class this rule would widen a
-                 frame's own meta text on hover of that same frame, for no reason (see #1173). -->
+            <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are visible:
+                 none (8), locked (30, one lane, since the lock takes add-frame's slot), or hovered
+                 while unlocked (56, both lanes). ":not(.locked)" on the hover rule keeps a
+                 locked+hovered row on the locked margin regardless of declaration order. The hover
+                 rule is scoped to TextBlock.meta.chain (#1173) since frames never show these icons. -->
             <Style Selector="TextBlock.meta">
                 <Setter Property="Margin" Value="8,0,8,0" />
             </Style>
             <Style Selector="TextBlock.meta.locked">
-                <Setter Property="Margin" Value="8,0,56,0" />
+                <Setter Property="Margin" Value="8,0,30,0" />
             </Style>
             <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
                 <Setter Property="Margin" Value="8,0,56,0" />
@@ -126,7 +125,6 @@
                             VerticalAlignment="Center"
                             Width="22" Height="22"
                             Padding="0"
-                            Margin="0,0,30,0"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
                             Click="OnLockBtnClick" />
