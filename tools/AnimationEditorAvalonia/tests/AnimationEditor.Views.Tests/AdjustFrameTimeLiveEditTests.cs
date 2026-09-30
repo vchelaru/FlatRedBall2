@@ -194,4 +194,24 @@ public class AdjustFrameTimeLiveEditTests
         Assert.Equal("0.4", before);
         Assert.Equal("0.5", after);
     }
+
+    [AvaloniaFact]
+    public async Task EachFrameLabel_SetAllSame_ShowsNoTrailingZeros()
+    {
+        var (chain, appCommands, _) = Setup(); // 0.4 total over 2 frames
+        string? label = null;
+
+        var host = new ScriptedDialogHost(
+            interact: content =>
+            {
+                var panel = (StackPanel)content;
+                panel.Children.OfType<RadioButton>().Single(r => (string?)r.Content == "Set All Frames Same").IsChecked = true;
+                label = panel.Children.OfType<TextBlock>().Last().Text;
+            },
+            confirm: false);
+
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+
+        Assert.Equal("Each frame: 0.2 seconds", label);
+    }
 }

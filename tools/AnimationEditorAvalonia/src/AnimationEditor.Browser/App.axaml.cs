@@ -1235,7 +1235,7 @@ public partial class App : Application
             Minimum = 0.1m,
             Maximum = 10m,
             Increment = 0.1m,
-            FormatString = "0.0#",
+            FormatString = "0.##",
             Value = 1.0m,
         };
         ToolTip.SetTip(speedPill, "Playback speed (1.0 = runtime speed)");

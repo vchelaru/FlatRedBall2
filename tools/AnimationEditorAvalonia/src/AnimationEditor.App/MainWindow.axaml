@@ -1085,7 +1085,7 @@
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <viewsControls:FlankerNumericField x:Name="PropFrameLen" Grid.Column="1"
                                                                    Minimum="0.001" Maximum="60"
-                                                                   Increment="0.05" FormatString="0.000" />
+                                                                   Increment="0.05" FormatString="0.###" />
                                                     <TextBlock Text="s" Grid.Column="2"
                                                                VerticalAlignment="Center" Margin="4,0,0,0"
                                                                Foreground="{DynamicResource InkDim}" FontSize="11" />
@@ -1827,7 +1827,7 @@
                                 <viewsControls:FlankerNumericField x:Name="SpeedInput"
                                                                     Width="92" VerticalAlignment="Center"
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"
-                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.0#" />
+                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                             </StackPanel>
                         </Border>
 
