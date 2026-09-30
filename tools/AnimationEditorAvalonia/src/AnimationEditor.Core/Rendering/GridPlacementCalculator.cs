@@ -42,10 +42,20 @@ public static class GridPlacementCalculator
     /// <summary>The <see cref="TileGrid"/> form: the cell containing the point (a click in the
     /// spacing gap after a cell counts as that cell), sized to the cell alone -- never the gap.</summary>
     public static (int minX, int minY, int maxX, int maxY) SnapToCell(
-        float worldX, float worldY, TileGrid grid)
+        float worldX, float worldY, TileGrid grid) => SpanCells(worldX, worldY, worldX, worldY, grid);
+
+    /// <summary>The Ctrl+drag add-frame region (#1275): every cell between the cells containing
+    /// the two points, in either drag direction. Inner gaps are included; the gap after the last
+    /// cell is not. Both points in one cell gives that cell, same as <see cref="SnapToCell(float, float, TileGrid)"/>.</summary>
+    public static (int minX, int minY, int maxX, int maxY) SpanCells(
+        float startX, float startY, float endX, float endY, TileGrid grid)
     {
-        int gx = grid.CellLeft(grid.ColumnContaining(worldX));
-        int gy = grid.CellTop(grid.RowContaining(worldY));
-        return (gx, gy, gx + grid.CellWidth, gy + grid.CellHeight);
+        int startColumn = grid.ColumnContaining(startX), endColumn = grid.ColumnContaining(endX);
+        int startRow = grid.RowContaining(startY), endRow = grid.RowContaining(endY);
+        int left = grid.CellLeft(Math.Min(startColumn, endColumn));
+        int top = grid.CellTop(Math.Min(startRow, endRow));
+        int right = grid.CellLeft(Math.Max(startColumn, endColumn)) + grid.CellWidth;
+        int bottom = grid.CellTop(Math.Max(startRow, endRow)) + grid.CellHeight;
+        return (left, top, right, bottom);
     }
 }

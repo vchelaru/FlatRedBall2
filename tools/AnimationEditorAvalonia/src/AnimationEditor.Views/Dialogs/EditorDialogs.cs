@@ -166,7 +166,7 @@ public static class EditorDialogs
             Minimum = 0m,
             Maximum = 3600m,
             Increment = 0.1m,
-            FormatString = "0.000",
+            FormatString = "0.###",
             Width = 160,
         };
         var radioProportional = new RadioButton
@@ -187,7 +187,7 @@ public static class EditorDialogs
             float value = (float)(durationInput.Value ?? 0m);
             perFrameLabel.IsVisible = radioSetAll.IsChecked == true;
             if (perFrameLabel.IsVisible)
-                perFrameLabel.Text = $"Each frame: {value / frameCount:F3} seconds";
+                perFrameLabel.Text = $"Each frame: {value / frameCount:0.###} seconds";
         }
 
         void ApplyLive()

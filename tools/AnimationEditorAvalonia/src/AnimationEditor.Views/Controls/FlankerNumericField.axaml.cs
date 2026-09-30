@@ -91,6 +91,11 @@ public partial class FlankerNumericField : UserControl
         // handler per instance created and fire N times once N instances exist.
         ValueProperty.Changed.AddClassHandler<FlankerNumericField>((c, _) => c.OnValueChanged());
 
+        // #1274: an initializer that sets Value before FormatString would otherwise keep showing
+        // the default format until the first +/- step.
+        FormatStringProperty.Changed.AddClassHandler<FlankerNumericField>(
+            (c, _) => c.ValueBox.Text = c.Format(c.Value));
+
         // #1114: dims the whole field as one unit on disable, in code rather than a
         // Selector="UserControl:disabled" style -- Avalonia type selectors match the exact type,
         // not subclasses, so that selector never matches a UserControl subclass like this one.

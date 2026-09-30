@@ -368,7 +368,29 @@ public class ChainLockTests
             Dispatcher.UIThread.RunJobs();
 
             var meta = GetMetaTextForChainRow(window, chain);
-            Assert.Equal(56, meta.Margin.Right);
+            Assert.Equal(30, meta.Margin.Right);
+        }
+        finally { window.Close(); }
+    }
+
+    // Locking hides add-frame, so the lock icon takes add-frame's slot at the edge instead of
+    // leaving an empty lane beside it.
+    [AvaloniaFact]
+    public void LockButtonMargin_Locked_SlidesIntoAddFrameSlot()
+    {
+        var (window, ctx, chain) = CreateWindowWithChain();
+        try
+        {
+            var lockBtn = GetLockButtonForChainRow(window, chain);
+            Assert.Equal(30, lockBtn.Margin.Right);
+
+            ctx.AppCommands.SetChainLocked(chain, true);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(4, lockBtn.Margin.Right);
+
+            HoverChainRow(window, chain);
+            Assert.Equal(4, lockBtn.Margin.Right);
         }
         finally { window.Close(); }
     }

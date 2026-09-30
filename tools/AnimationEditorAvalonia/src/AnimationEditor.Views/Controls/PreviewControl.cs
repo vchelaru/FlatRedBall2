@@ -158,7 +158,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private PolygonSave?       _draggingVertexPolygon;
     private int                _draggingVertexIndex = -1;
     private List<Vector2Save>? _vertexDragPointsBefore;
-    private string             _vertexDragDescription = "";
+    private PolygonVertexEdit  _vertexDragEdit;
     private float              _vertexDragStartX, _vertexDragStartY;
     private const float        VertexHandleRadius = 5f;
     private int                _hoverVertexIndex = -1;
@@ -1827,10 +1827,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
 
         var before = PolygonVertices.CopyPoints(polygon);
-        string description;
+        PolygonVertexEdit edit;
         if (vertex >= 0)
         {
-            description = $"Move Vertex {vertex + 1} of {ShapeUndoLabel.Format(polygon)}";
+            edit = PolygonVertexEdit.Move(vertex);
         }
         else
         {
@@ -1841,13 +1841,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             var (bx, by) = PolygonVertices.Get(polygon, (edge + 1) % vertices.Length);
             vertex = edge + 1;
             PolygonVertices.Insert(polygon, vertex, SnapToPixel((ax + bx) / 2f), SnapToPixel((ay + by) / 2f));
-            description = $"Add Vertex to {ShapeUndoLabel.Format(polygon)}";
+            edit = PolygonVertexEdit.Insert(vertex);
         }
 
         _draggingVertexPolygon  = polygon;
         _draggingVertexIndex    = vertex;
         _vertexDragPointsBefore = before;
-        _vertexDragDescription  = description;
+        _vertexDragEdit         = edit;
         (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
         InvalidateVisual();
         return true;
@@ -1856,7 +1856,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private void CommitPolygonVertexDrag()
     {
         if (_draggingVertexPolygon is null) return;
-        _appCommands!.CommitPolygonPoints(_draggingVertexPolygon, _vertexDragPointsBefore!, _vertexDragDescription);
+        _appCommands!.CommitPolygonPoints(_draggingVertexPolygon, _vertexDragPointsBefore!, _vertexDragEdit);
         _selectedState!.SelectShape(_draggingVertexPolygon);
         _draggingVertexPolygon  = null;
         _draggingVertexIndex    = -1;

@@ -437,7 +437,14 @@ public class AnimationTreeControlTests
             control.Refresh();
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Equal(56, meta.Margin.Right); // locked: clears the lock icon's lane
+            Assert.Equal(30, meta.Margin.Right); // locked: clears the lock icon's lane
+
+            var lockBtn = control.TreeView.GetVisualDescendants()
+                .OfType<Button>()
+                .First(b => b.Classes.Contains("lock-btn") &&
+                            b.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, chain));
+            Assert.Equal(4, lockBtn.Margin.Right); // locked: takes the hidden add-frame's slot
         }
         finally { window.Close(); }
     }

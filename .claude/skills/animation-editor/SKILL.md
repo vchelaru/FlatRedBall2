@@ -74,6 +74,8 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 **Scan for an existing control before adding one to a second surface; extract on the second copy.** `ZoomControl` exists because the widget was first duplicated as raw XAML plus per-host event wiring across three toolbars. When a control *and its wiring* would be copied a second time, factor it into a reusable `UserControl` — duplicated markup and its feedback-loop plumbing drift apart otherwise. (Testing an extracted `UserControl` has a namescope gotcha — see `animation-editor-testing`.)
 
+**Number fields never pad trailing zeros.** Every `FlankerNumericField`/`NumericUpDown` `FormatString` uses optional decimals (`0.###`, not `0.000` or `0.0#`), so 0.1 shows as `0.1`; `NumberFieldFormatTests` enforces this for `MainWindow`.
+
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 
 **Never use `System.IO.Path.GetFileName`, `Path.GetDirectoryName`, or `Path.Combine` on paths stored in `ProjectManager.FileName` or any user-supplied path.** These methods are OS-native: on Linux they only recognise `/` as a separator, so a Windows-authored `C:\foo\bar.achx` path would be returned whole by `Path.GetFileName`.

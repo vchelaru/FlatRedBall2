@@ -9,6 +9,7 @@ using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
@@ -1540,10 +1541,15 @@ public class WireframeControl : TextureViewport
         var world = ScreenToTexture((float)pos.X, (float)pos.Y);
 
         // Ctrl+click in any mode creates a new frame from the region the add-frame ghost shows.
+        // The frame is created on release so a grid-mode Ctrl+drag can span several cells (#1275);
+        // a click without a drag creates the same single-cell frame as before.
         if (isCtrl)
         {
-            if (ComputeAddFrameRegion(world) is { } region)
-                FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
+            _addFrameDragAnchor = world;
+            _addFrameDragCurrent = world;
+            _addFrameDragPointer = e.Pointer;
+            SetAddFrameGhost(ComputeAddFrameRegion(world, world));
+            e.Pointer.Capture(this);
             return;
         }
 
@@ -1574,26 +1580,28 @@ public class WireframeControl : TextureViewport
     /// flood-fill bounds in magic-wand mode, the cell under the point in grid mode, otherwise a
     /// frame sized like the selected chain's last frame centered on the point. Null when there
     /// is no bitmap or the wand finds no opaque pixel. Shared by the click and the add-frame
-    /// ghost (#1241) so the outline always matches what the click produces.
+    /// ghost (#1241) so the outline always matches what the click produces. In grid mode a
+    /// Ctrl+drag from <paramref name="anchor"/> to <paramref name="world"/> spans every cell
+    /// between them (#1275); the other modes use <paramref name="anchor"/> alone.
     /// </summary>
-    private (int minX, int minY, int maxX, int maxY)? ComputeAddFrameRegion(SKPoint world)
+    private (int minX, int minY, int maxX, int maxY)? ComputeAddFrameRegion(SKPoint anchor, SKPoint world)
     {
         if (_bitmap is null) return null;
 
         if (_isMagicWandMode && _inspectableImage != null)
         {
             _inspectableImage.GetOpaqueWandBounds(
-                (int)world.X, (int)world.Y,
+                (int)anchor.X, (int)anchor.Y,
                 out int minX, out int minY, out int maxX, out int maxY);
             return maxX >= minX && maxY >= minY ? (minX, minY, maxX, maxY) : null;
         }
 
         if (_showGrid && _grid.IsValid)
-            return GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
+            return GridPlacementCalculator.SpanCells(anchor.X, anchor.Y, world.X, world.Y, _grid);
 
         var (lastW, lastH) = GetLastFramePixelSize();
         return PlainClickFrameRegionCalculator.Compute(
-            world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
+            anchor.X, anchor.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
     }
 
     /// <inheritdoc />
@@ -1612,6 +1620,13 @@ public class WireframeControl : TextureViewport
         {
             _lastPointerPos = pos;
             ApplyChainDrag(pos);
+            return;
+        }
+
+        if (_addFrameDragAnchor is { } anchor)
+        {
+            _addFrameDragCurrent = ScreenToTexture((float)pos.X, (float)pos.Y);
+            SetAddFrameGhost(ComputeAddFrameRegion(anchor, _addFrameDragCurrent));
             return;
         }
 
@@ -1762,6 +1777,57 @@ public class WireframeControl : TextureViewport
 
     private SKRect? _addFrameGhost;
 
+    /// <summary>Texture point where a Ctrl+press started an add-frame gesture; null when none is in
+    /// progress. The frame is created on release from this and <see cref="_addFrameDragCurrent"/>.</summary>
+    private SKPoint? _addFrameDragAnchor;
+    private SKPoint _addFrameDragCurrent;
+    private IPointer? _addFrameDragPointer;
+    private TopLevel? _escapeKeyHost;
+
+    /// <summary>
+    /// Escape cancels an in-progress Ctrl+click/drag add: no frame, no undo entry, and the release
+    /// that follows does nothing. Hooked on the top level (Tunnel) because the wireframe itself
+    /// never takes keyboard focus, and so every host (desktop and browser) gets it for free.
+    /// </summary>
+    private void OnTopLevelKeyDownForAddFrameCancel(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || _addFrameDragAnchor is null) return;
+        _addFrameDragAnchor = null;
+        var pointer = _addFrameDragPointer;
+        _addFrameDragPointer = null;
+        // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
+        pointer?.Capture(null);
+        SetAddFrameGhost(null);
+        e.Handled = true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _escapeKeyHost = TopLevel.GetTopLevel(this);
+        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel, RoutingStrategies.Tunnel);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel);
+        _escapeKeyHost = null;
+    }
+
+    /// <summary>Ends the Ctrl+click/drag add-frame gesture, creating the frame the ghost shows.</summary>
+    private void CommitAddFrameDrag()
+    {
+        if (_addFrameDragAnchor is not { } anchor) return;
+        _addFrameDragAnchor = null;
+        _addFrameDragPointer = null;
+        if (ComputeAddFrameRegion(anchor, _addFrameDragCurrent) is { } region)
+            FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
+        UpdateAddFrameGhost();
+    }
+
     /// <summary>
     /// Texture-pixel region a Ctrl+click at the hovered point would create (#1241), outlined
     /// on the canvas while Ctrl is held. Null when the add-frame cursor is not showing or the
@@ -1771,13 +1837,19 @@ public class WireframeControl : TextureViewport
 
     private void UpdateAddFrameGhost()
     {
-        SKRect? ghost = null;
-        if (IsShowingAddFrameCursor && _hoverPointerPos is { } pos &&
-            ComputeAddFrameRegion(ScreenToTexture((float)pos.X, (float)pos.Y)) is { } r)
+        if (_addFrameDragAnchor != null) return;
+        (int minX, int minY, int maxX, int maxY)? region = null;
+        if (IsShowingAddFrameCursor && _hoverPointerPos is { } pos)
         {
-            ghost = new SKRect(r.minX, r.minY, r.maxX, r.maxY);
+            var world = ScreenToTexture((float)pos.X, (float)pos.Y);
+            region = ComputeAddFrameRegion(world, world);
         }
+        SetAddFrameGhost(region);
+    }
 
+    private void SetAddFrameGhost((int minX, int minY, int maxX, int maxY)? region)
+    {
+        SKRect? ghost = region is { } r ? new SKRect(r.minX, r.minY, r.maxX, r.maxY) : null;
         if (ghost != _addFrameGhost)
         {
             _addFrameGhost = ghost;
@@ -1800,6 +1872,15 @@ public class WireframeControl : TextureViewport
     /// <inheritdoc />
     protected override void OnEditPointerReleased(PointerReleasedEventArgs e)
     {
+        if (_addFrameDragAnchor != null)
+        {
+            var pos = e.GetPosition(this);
+            _addFrameDragCurrent = ScreenToTexture((float)pos.X, (float)pos.Y);
+            CommitAddFrameDrag();
+            e.Pointer.Capture(null);
+            return;
+        }
+
         if (IsDragging)
         {
             CommitActiveDrag();
@@ -1815,6 +1896,7 @@ public class WireframeControl : TextureViewport
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        CommitAddFrameDrag();
         if (IsDragging)
             CommitActiveDrag();
     }
@@ -2367,7 +2449,8 @@ public class WireframeControl : TextureViewport
 
     private void SimulateCtrlClick(float screenX, float screenY)
     {
-        if (ComputeAddFrameRegion(ScreenToTexture(screenX, screenY)) is { } r)
+        var world = ScreenToTexture(screenX, screenY);
+        if (ComputeAddFrameRegion(world, world) is { } r)
             FrameCreatedFromRegion?.Invoke(r.minX, r.minY, r.maxX, r.maxY);
     }
 
