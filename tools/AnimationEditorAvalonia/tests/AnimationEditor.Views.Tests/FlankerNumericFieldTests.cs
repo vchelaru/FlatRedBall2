@@ -29,4 +29,14 @@ public class FlankerNumericFieldTests
         Assert.Equal(1.0, field.MinusBtn.Opacity);
         Assert.Equal(1.0, field.PlusBtn.Opacity);
     }
+
+    // #1274: an object initializer that sets Value before FormatString must not leave the text
+    // in the default format until the first +/- step reformats it.
+    [AvaloniaFact]
+    public void FormatString_SetAfterValue_ReformatsDisplayedText()
+    {
+        var field = new FlankerNumericField { Value = 1.5m, FormatString = "0.000" };
+
+        Assert.Equal("1.500", field.ValueBox.Text);
+    }
 }

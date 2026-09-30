@@ -171,4 +171,27 @@ public class AdjustFrameTimeLiveEditTests
         Assert.Equal(0.3f, chain.Frames[1].FrameLength, 3);
         Assert.False(undoManager.CanUndo);
     }
+
+    // #1274: the field opened as "0.4" but the + button produced "0.500".
+    [AvaloniaFact]
+    public async Task DurationField_PlusStep_ShowsNoTrailingZeros()
+    {
+        var (chain, appCommands, _) = Setup(); // 0.1 + 0.3 = 0.4 total
+        string? before = null, after = null;
+
+        var host = new ScriptedDialogHost(
+            interact: content =>
+            {
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
+                before = durationInput.ValueBox.Text;
+                durationInput.PlusBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                after = durationInput.ValueBox.Text;
+            },
+            confirm: false);
+
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+
+        Assert.Equal("0.4", before);
+        Assert.Equal("0.5", after);
+    }
 }
