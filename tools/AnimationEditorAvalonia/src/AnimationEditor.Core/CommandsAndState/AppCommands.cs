@@ -1577,10 +1577,11 @@ namespace AnimationEditor.Core.CommandsAndState
         // behave identically whether one or many chains are selected.
         private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, bool flipH, bool flipV)
         {
-            var copy = new AnimationChainSave { Name = source.Name };
-            foreach (var frame in source.Frames)
+            var copy = AnimationCloneHelper.CloneChain(source);
+            for (int i = 0; i < copy.Frames.Count; i++)
             {
-                var fCopy = AnimationCloneHelper.CloneFrame(frame);
+                var frame = source.Frames[i];
+                var fCopy = copy.Frames[i];
                 fCopy.FlipHorizontal = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal;
                 fCopy.FlipVertical   = flipV ? !frame.FlipVertical   : frame.FlipVertical;
                 // Mirror the sprite offset about the entity origin so an off-center frame stays
@@ -1590,7 +1591,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 if (fCopy.ShapesSave is not null)
                     foreach (var shape in fCopy.ShapesSave.Shapes)
                         ShapeFlip.Mirror(shape, flipH, flipV);
-                copy.Frames.Add(fCopy);
             }
             return copy;
         }

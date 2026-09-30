@@ -387,6 +387,20 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_NonLoopingLockedChain_CopyKeepsLoopAndLock()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Die", 2);
+        source.Loop = false;
+        source.IsLocked = true;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+
+        Assert.False(copy!.Loop);
+        Assert.True(copy.IsLocked);
+    }
+
+    [Fact]
     public void DuplicateChain_CreatesDeepCopyWithAllFrames()
     {
         var ctx = TestHelpers.SetupFreshAcls();
