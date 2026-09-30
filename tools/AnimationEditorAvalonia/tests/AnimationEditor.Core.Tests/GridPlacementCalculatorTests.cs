@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Rendering;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -35,5 +36,21 @@ public class GridPlacementCalculatorTests
         var grid = new TileGrid(16, 16, Margin: 2, Spacing: 1);
         var region = GridPlacementCalculator.SnapToCell(35.5f, 20f, grid);
         Assert.Equal((19, 19, 35, 35), region);
+    }
+
+    [Fact]
+    public void SpanCells_DragUpAndLeft_CoversEveryCellBetweenBothPoints()
+    {
+        // 32px cells: (100,70) is cell (3,2), (10,40) is cell (0,1); the span is columns 0..3, rows 1..2.
+        var grid = TileGrid.Uniform(32);
+        GridPlacementCalculator.SpanCells(100f, 70f, 10f, 40f, grid).ShouldBe((0, 32, 128, 96));
+    }
+
+    [Fact]
+    public void SpanCells_SpacedGrid_IncludesInnerGapsButNotTheTrailingOne()
+    {
+        // 16px cells, margin 2, spacing 1: columns 0..1 span 2..35, rows 0..0 span 2..18.
+        var grid = new TileGrid(16, 16, Margin: 2, Spacing: 1);
+        GridPlacementCalculator.SpanCells(3f, 3f, 34.5f, 10f, grid).ShouldBe((2, 2, 35, 18));
     }
 }
