@@ -9,6 +9,7 @@ using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
@@ -1546,6 +1547,7 @@ public class WireframeControl : TextureViewport
         {
             _addFrameDragAnchor = world;
             _addFrameDragCurrent = world;
+            _addFrameDragPointer = e.Pointer;
             SetAddFrameGhost(ComputeAddFrameRegion(world, world));
             e.Pointer.Capture(this);
             return;
@@ -1779,12 +1781,48 @@ public class WireframeControl : TextureViewport
     /// progress. The frame is created on release from this and <see cref="_addFrameDragCurrent"/>.</summary>
     private SKPoint? _addFrameDragAnchor;
     private SKPoint _addFrameDragCurrent;
+    private IPointer? _addFrameDragPointer;
+    private TopLevel? _escapeKeyHost;
+
+    /// <summary>
+    /// Escape cancels an in-progress Ctrl+click/drag add: no frame, no undo entry, and the release
+    /// that follows does nothing. Hooked on the top level (Tunnel) because the wireframe itself
+    /// never takes keyboard focus, and so every host (desktop and browser) gets it for free.
+    /// </summary>
+    private void OnTopLevelKeyDownForAddFrameCancel(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || _addFrameDragAnchor is null) return;
+        _addFrameDragAnchor = null;
+        var pointer = _addFrameDragPointer;
+        _addFrameDragPointer = null;
+        // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
+        pointer?.Capture(null);
+        SetAddFrameGhost(null);
+        e.Handled = true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _escapeKeyHost = TopLevel.GetTopLevel(this);
+        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel, RoutingStrategies.Tunnel);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel);
+        _escapeKeyHost = null;
+    }
 
     /// <summary>Ends the Ctrl+click/drag add-frame gesture, creating the frame the ghost shows.</summary>
     private void CommitAddFrameDrag()
     {
         if (_addFrameDragAnchor is not { } anchor) return;
         _addFrameDragAnchor = null;
+        _addFrameDragPointer = null;
         if (ComputeAddFrameRegion(anchor, _addFrameDragCurrent) is { } region)
             FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
         UpdateAddFrameGhost();

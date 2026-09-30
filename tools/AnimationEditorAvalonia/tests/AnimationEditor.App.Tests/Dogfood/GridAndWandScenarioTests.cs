@@ -65,6 +65,35 @@ public class GridAndWandScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task GridMode_EscapeDuringCtrlDrag_CancelsTheAdd()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 128, 128);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk);
+        editor.Click(editor.Control<ToggleButton>("SnapToGridCheck"));
+        editor.TypeFlanker("GridSizeInput", "32");
+        Avalonia.Point from = editor.WireframePointAt(70, 40);
+        Avalonia.Point to = editor.WireframePointAt(10, 100);
+        int undoCountBefore = editor.UndoLabels.Count;
+
+        editor.Window.MouseMove(from, RawInputModifiers.Control);
+        editor.Window.MouseDown(from, MouseButton.Left, RawInputModifiers.Control);
+        editor.Window.MouseMove(to, RawInputModifiers.Control | RawInputModifiers.LeftMouseButton);
+        editor.Press(Key.Escape, RawInputModifiers.Control);
+
+        editor.Wireframe.AddFrameGhost.ShouldBeNull();
+
+        editor.Window.MouseUp(to, MouseButton.Left, RawInputModifiers.None);
+        editor.Layout();
+
+        walk.Frames.Count.ShouldBe(1);
+        editor.UndoLabels.Count.ShouldBe(undoCountBefore);
+    }
+
+    [AvaloniaFact]
     public async Task GridMode_DoubleClickingACell_SnapsTheSelectedFrameToIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
