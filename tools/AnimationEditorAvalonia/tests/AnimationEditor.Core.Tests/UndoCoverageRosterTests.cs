@@ -75,6 +75,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.InsertPolygonVertex)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.DeletePolygonVertex)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.CommitPolygonPoints)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.FlipPolygonHorizontally)]      = Category.MutatingUndoable,
+        [nameof(IAppCommands.FlipPolygonVertically)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectangleToFrame)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchCircleToFrame)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectanglesToFrames)]      = Category.MutatingUndoable,
@@ -256,6 +258,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.InsertPolygonVertex(Polygon(ctx), 1, 0f, -6f)));
         yield return Row(nameof(IAppCommands.DeletePolygonVertex),
             ctx => Sync(() => ctx.AppCommands.DeletePolygonVertex(Polygon(ctx), 1)));
+        yield return Row(nameof(IAppCommands.FlipPolygonHorizontally),
+            ctx => Sync(() => ctx.AppCommands.FlipPolygonHorizontally(Polygon(ctx))));
+        yield return Row(nameof(IAppCommands.FlipPolygonVertically),
+            ctx => Sync(() => ctx.AppCommands.FlipPolygonVertically(Polygon(ctx))));
         yield return Row(nameof(IAppCommands.CommitPolygonPoints),
             ctx => Sync(() =>
             {

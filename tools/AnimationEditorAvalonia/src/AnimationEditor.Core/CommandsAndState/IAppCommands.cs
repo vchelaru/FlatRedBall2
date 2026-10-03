@@ -459,6 +459,17 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </remarks>
         void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit);
 
+        /// <summary>
+        /// Mirrors <paramref name="polygon"/>'s points left-to-right about the center of their
+        /// bounds, so the shape stays in place and its origin is untouched. When the polygon is part
+        /// of a polygon multi-selection the whole selection flips, each about its own center, in one
+        /// undo entry. Locked polygons are skipped.
+        /// </summary>
+        void FlipPolygonHorizontally(PolygonSave polygon);
+
+        /// <summary>The top-to-bottom counterpart of <see cref="FlipPolygonHorizontally"/>.</summary>
+        void FlipPolygonVertically(PolygonSave polygon);
+
         /// <summary>A one-line message for the user about an edit that only partly applied.</summary>
         event Action<string>? Notified;
 

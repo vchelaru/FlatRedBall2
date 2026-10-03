@@ -85,6 +85,26 @@ public class PolygonScenarioTests
         editor.UndoLabels[^1].ShouldBe("Add Vertex to Polygon 'PolygonInstance'");
     }
 
+    [AvaloniaFact]
+    public async Task FlipHorizontal_FromThePolygonMenu_MirrorsTheOutlineInPlace_SavesIt_AndUndoRestores()
+    {
+        var (editor, path, _, polygon) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14)); // x now spans -8..20
+
+        editor.RightClickRow(polygon);
+        editor.PickTreeMenuItem("Flip Horizontal");
+
+        PolygonVertices.Get(polygon, 0).ShouldBe((20f, -8f));
+        PolygonVertices.Get(polygon, 2).ShouldBe((-8f, 14f));
+        editor.UndoLabels[^1].ShouldBe("Flip Horizontal Polygon 'PolygonInstance'");
+        var saved = AnimationEditorHarness.ReadSaved(path).AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.Single();
+        (saved.Points[0].X, saved.Points[^1].X).ShouldBe((20f, 20f));
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        PolygonVertices.Get(polygon, 0).ShouldBe((-8f, -8f));
+        editor.ThrowIfErrorShown();
+    }
+
     // Two frames with a polygon each, both Ctrl-selected in the tree. Returns the one the preview
     // shows (the one a drag edits) first.
     private static async Task<(AnimationEditorHarness Editor, PolygonSave First, PolygonSave Second)> OpenWithTwoSelectedPolygonsAsync()

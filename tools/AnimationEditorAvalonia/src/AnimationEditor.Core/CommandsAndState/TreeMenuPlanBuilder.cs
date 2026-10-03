@@ -46,6 +46,9 @@ public static class TreeMenuPlanBuilder
 
             case PolygonSave polygon:
                 AddShapeReorderItems(items, polygon, objectFinder.GetAnimationFrameContaining(polygon), appCommands);
+                items.Add(TreeMenuItem.Item("Flip Horizontal", () => appCommands.FlipPolygonHorizontally(polygon), TreeMenuIcon.FlipHorizontal));
+                items.Add(TreeMenuItem.Item("Flip Vertical", () => appCommands.FlipPolygonVertically(polygon), TreeMenuIcon.FlipVertical));
+                items.Add(TreeMenuItem.Separator());
                 AddCopyCutPasteDuplicate(items, actions);
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));

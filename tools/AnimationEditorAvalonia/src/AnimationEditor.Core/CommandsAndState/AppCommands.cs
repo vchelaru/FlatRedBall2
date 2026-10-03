@@ -2266,6 +2266,45 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
+        /// <inheritdoc cref="IAppCommands.FlipPolygonHorizontally"/>
+        public void FlipPolygonHorizontally(PolygonSave polygon) => FlipPolygons(polygon, horizontal: true);
+
+        /// <inheritdoc cref="IAppCommands.FlipPolygonVertically"/>
+        public void FlipPolygonVertically(PolygonSave polygon) => FlipPolygons(polygon, horizontal: false);
+
+        // Mirrors `polygon` and, when it is part of a polygon multi-selection, every other selected
+        // unlocked polygon, each about its own bounds center. Unlike a vertex edit this needs no
+        // matching vertex count, so nothing is skipped.
+        private void FlipPolygons(PolygonSave polygon, bool horizontal)
+        {
+            var selected = _selectedState.SelectedPolygons;
+            var targets = selected.Contains(polygon) ? selected.ToList() : new List<PolygonSave> { polygon };
+            var entries = targets
+                .Where(p => !IsShapeLocked(null, p) && p.Points.Count > 0)
+                .Select(p => Edited(_objectFinder.GetAnimationFrameContaining(p), p, scratch => MirrorPoints(scratch, horizontal)))
+                .ToList();
+            if (entries.Count == 0) return;
+
+            string target = entries.Count == 1 ? ShapeUndoLabel.Format(entries[0].Polygon) : $"{entries.Count} Polygons";
+            _undoManager.Execute(new SetPolygonPointsCommand(
+                entries, this, _events, $"Flip {(horizontal ? "Horizontal" : "Vertical")} {target}"));
+        }
+
+        private static void MirrorPoints(PolygonSave polygon, bool horizontal)
+        {
+            var points = polygon.Points;
+            if (horizontal)
+            {
+                float sum = points.Min(p => p.X) + points.Max(p => p.X);
+                foreach (var p in points) p.X = sum - p.X;
+            }
+            else
+            {
+                float sum = points.Min(p => p.Y) + points.Max(p => p.Y);
+                foreach (var p in points) p.Y = sum - p.Y;
+            }
+        }
+
         /// <inheritdoc cref="IAppCommands.Notified"/>
         public event Action<string>? Notified;
 
