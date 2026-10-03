@@ -133,17 +133,9 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
 
-    // ── Shape drag-and-drop reorder state (issue #1285) ─────────────────────────
-    // Single-shape only: a shape reorders within its own frame, so there is no multi-select
-    // press-deferral like the frame/chain paths. Reuses _frameDropLine/_frameDropBox for feedback.
-    private static readonly DataFormat<string> ShapeDragDataFormat =
-        DataFormat.CreateStringApplicationFormat("animationeditor-shape-drag");
-    private const string ShapeDragToken = "shape";
-    private (object Shape, AnimationFrameSave Frame)? _pendingShapeDrag;
-    private (object Shape, AnimationFrameSave Frame)? _shapeDragCandidate;
+    // ── Shape drag attempt (issue #1285): shapes can't be reordered by drag, so a drag past the
+    // threshold on a shape row only shows an explanatory toast (once per press).
     private Avalonia.Point? _shapeDragPressPoint;
-    private PointerPressedEventArgs? _shapeDragPressArgs;
-    private bool _shapeDragInProgress;
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
@@ -3555,24 +3547,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Internal shape reorder drag (within one frame).
-        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
-        {
-            var target = ResolveShapeDrop(e, shapeDrag);
-            if (target.IsValid)
-            {
-                e.DragEffects = DragDropEffects.Move;
-                ShowShapeDropIndicator(target, shapeDrag.Frame);
-            }
-            else
-            {
-                e.DragEffects = DragDropEffects.None;
-                RemoveFrameDropIndicators();
-            }
-            e.Handled = true;
-            return;
-        }
-
         // Internal chain reorder drag.
         if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
@@ -3624,17 +3598,6 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
                 _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
-            e.Handled = true;
-            return;
-        }
-
-        // Internal shape reorder drop.
-        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
-        {
-            RemoveFrameDropIndicators();
-            var target = ResolveShapeDrop(e, shapeDrag);
-            if (target.IsValid)
-                _appCommands.MoveShapeToIndex(shapeDrag.Shape, shapeDrag.Frame, target.InsertIndex);
             e.Handled = true;
             return;
         }
@@ -3993,20 +3956,13 @@ public partial class MainWindow : Window
         RemoveDropBox();
     }
 
-    // ── Internal shape drag-and-drop reorder (issue #1285) ─────────────────────
+    // ── Shape drag attempt (issue #1285) ───────────────────────────────────────
 
-    private void ClearShapeDragCandidate()
-    {
-        _shapeDragCandidate = null;
-        _shapeDragPressPoint = null;
-        _shapeDragPressArgs = null;
-    }
+    private void ClearShapeDragCandidate() => _shapeDragPressPoint = null;
 
-    private async void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
+    private void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_shapeDragInProgress || _shapeDragCandidate is not { } candidate ||
-            _shapeDragPressPoint is null || _shapeDragPressArgs is null)
-            return;
+        if (_shapeDragPressPoint is not { } pressPoint) return;
 
         if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
         {
@@ -4015,65 +3971,11 @@ public partial class MainWindow : Window
         }
 
         var pos = e.GetPosition(AnimTree);
-        if (Math.Abs(pos.X - _shapeDragPressPoint.Value.X) <= 4 &&
-            Math.Abs(pos.Y - _shapeDragPressPoint.Value.Y) <= 4)
+        if (Math.Abs(pos.X - pressPoint.X) <= 4 && Math.Abs(pos.Y - pressPoint.Y) <= 4)
             return;
 
-        var pressArgs = _shapeDragPressArgs;
-        e.Pointer.Capture(null); // release our press-capture so the drag system can take over
-        _pendingShapeDrag = candidate;
-        _shapeDragInProgress = true;
-
-        var data = new DataTransfer();
-        data.Add(DataTransferItem.Create(ShapeDragDataFormat, ShapeDragToken));
-        try
-        {
-            await DragDrop.DoDragDropAsync(pressArgs, data, DragDropEffects.Move);
-        }
-        finally
-        {
-            _pendingShapeDrag = null;
-            _shapeDragInProgress = false;
-            RemoveFrameDropIndicators();
-            ClearShapeDragCandidate();
-        }
-    }
-
-    private ShapeDropTarget ResolveShapeDrop(DragEventArgs e, (object Shape, AnimationFrameSave Frame) drag)
-    {
-        var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
-        return ShapeDropResolver.Resolve(
-            nodeData,
-            half == FrameRowHalf.Upper ? ShapeRowHalf.Upper : ShapeRowHalf.Lower,
-            drag.Shape, drag.Frame,
-            s => s is ShapeSave ss ? _objectFinder.GetAnimationFrameContaining(ss) : null);
-    }
-
-    /// <summary>
-    /// Draws a line at the exact slot the shape will land in. The slot is derived from the resolved
-    /// insert index (not the raw pointer half) so the line always matches where the drop commits.
-    /// </summary>
-    private void ShowShapeDropIndicator(ShapeDropTarget target, AnimationFrameSave frame)
-    {
-        var shapes = frame.ShapesSave?.Shapes;
-        if (shapes is null || shapes.Count == 0) { RemoveFrameDropIndicators(); return; }
-
-        // The slot sits above shape[InsertIndex], or below the last shape when appending.
-        bool below = target.InsertIndex >= shapes.Count;
-        object anchor = shapes[below ? shapes.Count - 1 : target.InsertIndex];
-        var tvi = AnimTree.GetVisualDescendants().OfType<TreeViewItem>()
-            .FirstOrDefault(t => t.DataContext is TreeNodeVm vm && ReferenceEquals(vm.Data, anchor));
-        var topLeft = tvi is null ? null : Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), DragOverlayCanvas);
-        var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
-        if (tvi is null || topLeft is null || treeOrigin is null)
-        {
-            RemoveFrameDropIndicators();
-            return;
-        }
-
-        RemoveDropBox();
-        ShowDropLine(HeaderContentLeft(tvi), treeOrigin.Value.X + AnimTree.Bounds.Width,
-            topLeft.Value.Y + (below ? tvi.Bounds.Height : 0));
+        ClearShapeDragCandidate();
+        ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
     }
 
     // ── Internal chain drag-and-drop reorder ───────────────────────────────────
@@ -5121,15 +5023,11 @@ public partial class MainWindow : Window
             }
             else if (e.Source is Control shapeSrc &&
                 shapeSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
-                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave } shapeVm &&
-                _objectFinder.GetAnimationFrameContaining((ShapeSave)shapeVm.Data) is { } shapeFrame)
+                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave })
             {
-                // Arm a shape-drag candidate. No selection handling needed: shapes drag one at a time.
                 ClearFrameDragCandidate();
                 ClearChainDragCandidate();
-                _shapeDragCandidate = (shapeVm.Data, shapeFrame);
                 _shapeDragPressPoint = e.GetPosition(AnimTree);
-                _shapeDragPressArgs = e;
             }
             else
             {

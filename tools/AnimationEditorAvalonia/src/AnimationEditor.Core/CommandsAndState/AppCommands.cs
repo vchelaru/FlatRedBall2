@@ -1441,22 +1441,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 $"Move {ShapeReorderLabel(shape)} to Bottom"));
         }
 
-        public void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex)
-        {
-            if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null) return;
-            int idx = shapes.IndexOf(shape);
-            if (idx < 0) return;
-            int slot = Math.Clamp(insertIndex, 0, shapes.Count);
-            if (slot == idx || slot == idx + 1) return;
-            _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.RemoveAt(idx); shapes.Insert(slot > idx ? slot - 1 : slot, shape); },
-                this, _events, () => RefreshTreeNode(frame),
-                $"Move {ShapeReorderLabel(shape)}"));
-        }
-
         private static string ShapeReorderLabel(object shape) => ShapeUndoLabel.Format(shape);
 
         /// <summary>
