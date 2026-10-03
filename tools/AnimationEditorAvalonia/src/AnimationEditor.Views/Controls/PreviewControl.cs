@@ -1883,7 +1883,47 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// currently previewed texture, or cancels the menu entirely when there's nothing to reveal.
     /// </summary>
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
+        PopulateContextMenu(_contextMenuPos, e);
+
+    // Where the last right-press landed; the menu opens after the release, by which time the
+    // pointer may have moved.
+    private Point _contextMenuPos;
+
+    private void PopulateContextMenu(Point pos, System.ComponentModel.CancelEventArgs e)
+    {
+        if (TryPopulateVertexMenu(pos)) return;
         RevealInExplorerMenu.Populate(ContextMenu, ResolveSelectedTexturePath(), _showError, e);
+    }
+
+    /// <summary>Right-click on a vertex of the selected polygon: a single "Delete Vertex" item (disabled at three vertices).</summary>
+    private bool TryPopulateVertexMenu(Point pos)
+    {
+        if (ContextMenu is null || _selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+        if (pos.X < RulerSize || pos.Y < RulerSize) return false;
+        int vertex = PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, PolygonScreenVertices(polygon), VertexHandleRadius);
+        if (vertex < 0) return false;
+
+        bool canDelete = PolygonVertices.Count(polygon) > 3;
+        var item = new MenuItem { Header = "Delete Vertex", IsEnabled = canDelete };
+        if (!canDelete) ToolTip.SetTip(item, "A polygon needs at least three vertices");
+        item.Click += (_, _) =>
+        {
+            _appCommands!.DeletePolygonVertex(polygon, vertex);
+            InvalidateVisual();
+        };
+        ContextMenu.Items.Clear();
+        ContextMenu.Items.Add(item);
+        return true;
+    }
+
+    /// <summary>Test hook: the context menu as it would be built for a right-click at <paramref name="pos"/> (control-local).</summary>
+    internal ContextMenu BuildContextMenuForTest(Point pos, out bool cancelled)
+    {
+        var e = new System.ComponentModel.CancelEventArgs();
+        PopulateContextMenu(pos, e);
+        cancelled = e.Cancel;
+        return ContextMenu!;
+    }
 
     /// <summary>
     /// Returns the topmost collision shape under the given screen-space point, or
@@ -2552,6 +2592,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             // that Control's context-menu logic runs in OnPointerReleased against the *released*
             // event's own Handled flag — marking Handled here on the pressed event has no effect
             // on it, so the actual suppression happens in OnPointerReleased below.
+            _contextMenuPos = pos;
             _suppressContextMenuOnRelease = TryRemoveGuideAt(px, py);
             return;
         }

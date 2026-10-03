@@ -1,4 +1,6 @@
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -91,6 +93,58 @@ public class PolygonVertexDeleteTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.DoesNotContain(polygon, frame.ShapesSave!.PolygonSaves);
+        }
+        finally { window.Close(); }
+    }
+
+    private static MenuItem? DeleteVertexItem(ContextMenu menu) =>
+        menu.Items.OfType<MenuItem>().FirstOrDefault(i => (i.Header as string) == "Delete Vertex");
+
+    [AvaloniaFact]
+    public void RightClickVertex_MenuOffersDeleteVertex_AndItDeletesThatPoint()
+    {
+        var (ctx, window, preview, center, polygon, frame) = PolygonVertexHoverHighlightTests.Build();
+        try
+        {
+            var menu = preview.BuildContextMenuForTest(window.TranslatePoint(Vertex2(ctx, preview, center), preview)!.Value, out bool cancelled);
+
+            Assert.False(cancelled);
+            var item = Assert.IsType<MenuItem>(DeleteVertexItem(menu));
+            Assert.True(item.IsEnabled);
+
+            item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(3, PolygonVertices.Count(polygon));
+            Assert.Contains(polygon, frame.ShapesSave!.PolygonSaves);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RightClickVertexOfTriangle_DeleteVertexIsDisabled()
+    {
+        var (ctx, window, preview, center, polygon, _) =
+            PolygonVertexHoverHighlightTests.Build((-40f, -40f), (40f, -40f), (40f, 40f));
+        try
+        {
+            var menu = preview.BuildContextMenuForTest(window.TranslatePoint(Vertex2(ctx, preview, center), preview)!.Value, out _);
+
+            Assert.False(Assert.IsType<MenuItem>(DeleteVertexItem(menu)).IsEnabled);
+            Assert.Equal(3, PolygonVertices.Count(polygon));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RightClickAwayFromVertices_HasNoDeleteVertexItem()
+    {
+        var (ctx, window, preview, center, _, _) = PolygonVertexHoverHighlightTests.Build();
+        try
+        {
+            var menu = preview.BuildContextMenuForTest(window.TranslatePoint(center, preview)!.Value, out _);
+
+            Assert.Null(DeleteVertexItem(menu));
         }
         finally { window.Close(); }
     }
