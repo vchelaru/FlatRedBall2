@@ -40,6 +40,10 @@ namespace AnimationEditor.Core
             set
             {
                 _selectedChain = value;
+                // A chain picked outside the tree (e.g. a texture dropped onto it) replaces the
+                // multi-select bag; commands that set SelectedNodes first keep theirs.
+                if (value != null && !_selectedNodes.Contains(value))
+                    _selectedNodes = new List<object>();
                 _selectedFrame = null;
                 _selectedRectangle = null;
                 _selectedCircle = null;

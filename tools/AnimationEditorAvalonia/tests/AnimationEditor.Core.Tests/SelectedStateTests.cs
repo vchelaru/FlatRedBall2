@@ -70,4 +70,33 @@ public class SelectedStateTests
         Assert.Single(result);
         Assert.Same(circle, result[0]);
     }
+
+    [Fact]
+    public void SelectedChain_SetOutsideBag_DropsStaleMultiSelection()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var a = TestHelpers.MakeChain(ctx.Acls, "A", 1);
+        var b = TestHelpers.MakeChain(ctx.Acls, "B", 1);
+        var c = TestHelpers.MakeChain(ctx.Acls, "C", 1);
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+
+        // e.g. a texture dropped onto a chain that isn't part of the multi-select.
+        ctx.SelectedState.SelectedChain = c;
+
+        Assert.DoesNotContain(a, ctx.SelectedState.SelectedChains);
+        Assert.DoesNotContain(b, ctx.SelectedState.SelectedChains);
+    }
+
+    [Fact]
+    public void SelectedChain_SetInsideBag_KeepsMultiSelection()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var a = TestHelpers.MakeChain(ctx.Acls, "A", 1);
+        var b = TestHelpers.MakeChain(ctx.Acls, "B", 1);
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+
+        ctx.SelectedState.SelectedChain = a;
+
+        Assert.Equal(2, ctx.SelectedState.SelectedChains.Count);
+    }
 }
