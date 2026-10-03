@@ -1615,10 +1615,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
-                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked));
+                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked, IsHovered: pinned && ReferenceEquals(r, _hoverShape)));
         foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
-                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked));
+                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked, IsHovered: pinned && ReferenceEquals(c, _hoverShape)));
         foreach (var p in frame.ShapesSave!.PolygonSaves)
         {
             int n = PolygonVertices.Count(p);
@@ -1629,7 +1629,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
                 points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,
-                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f));
+                ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f,
+                pinned && ReferenceEquals(p, _hoverShape)));
         }
         return list.ToArray();
     }
@@ -1754,71 +1755,72 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     private object? HitTestShape(float px, float py)
     {
+        // Selected shape has priority so the user can drag what they already selected.
+        var under = ShapesUnder(px, py);
+        var sel = _selectedState!.SelectedShape;
+        if (sel is not null && under.Any(s => ReferenceEquals(s, sel))) return sel;
+        return under.Count > 0 ? under[0] : null;
+    }
+
+    /// <summary>
+    /// Every collision shape of the pinned frame under the point, topmost first (polygons render
+    /// last, then circles, then rects; later list entries draw on top). Empty outside the ruler
+    /// strips or when no frame is pinned. Selection is ignored here — see <see cref="HitTestShape"/>.
+    /// </summary>
+    private List<object> ShapesUnder(float px, float py)
+    {
+        var result = new List<object>();
         var frame = _selectedState!.SelectedFrame;
-        if (frame?.ShapesSave is null) return null;
-        if (px < RulerSize || py < RulerSize) return null;
+        if (frame?.ShapesSave is null || px < RulerSize || py < RulerSize) return result;
 
         float cx = GetCenterX();
         float cy = GetCenterY();
         float om = _appState!.OffsetMultiplier * _zoom;
         const float tolerance = 5f;
 
-        // Selected shape has priority so the user can drag what they already selected.
-        var sel = _selectedState!.SelectedShape;
-        if (sel is CircleSave selC)
-        {
-            float sx = cx + selC.X * om;
-            float sy = cy - selC.Y * om;
-            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, selC.Radius * om, tolerance))
-                return selC;
-        }
-        else if (sel is AARectSave selR)
-        {
-            float sx = cx + selR.X * om;
-            float sy = cy - selR.Y * om;
-            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, selR.ScaleX * om, selR.ScaleY * om, tolerance))
-                return selR;
-        }
-        else if (sel is PolygonSave selP)
-        {
-            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(selP), tolerance))
-                return selP;
-        }
-
-        // Polygons are rendered last (on top), so they are checked first.
-        var polygons = frame.ShapesSave!.PolygonSaves.ToList();
+        var polygons = frame.ShapesSave.PolygonSaves.ToList();
         for (int i = polygons.Count - 1; i >= 0; i--)
-        {
-            var p = polygons[i];
-            if (ReferenceEquals(p, sel)) continue;
-            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(p), tolerance))
-                return p;
-        }
+            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(polygons[i]), tolerance))
+                result.Add(polygons[i]);
 
-        var circles = frame.ShapesSave!.CircleSaves.ToList();
+        var circles = frame.ShapesSave.CircleSaves.ToList();
         for (int i = circles.Count - 1; i >= 0; i--)
         {
             var c = circles[i];
-            if (ReferenceEquals(c, sel)) continue;
-            float sx = cx + c.X * om;
-            float sy = cy - c.Y * om;
-            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
-                return c;
+            if (PreviewShapeHitTester.HitsCircle(px, py, cx + c.X * om, cy - c.Y * om, c.Radius * om, tolerance))
+                result.Add(c);
         }
 
-        var rects = frame.ShapesSave!.AARectSaves.ToList();
+        var rects = frame.ShapesSave.AARectSaves.ToList();
         for (int i = rects.Count - 1; i >= 0; i--)
         {
             var r = rects[i];
-            if (ReferenceEquals(r, sel)) continue;
-            float sx = cx + r.X * om;
-            float sy = cy - r.Y * om;
-            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
-                return r;
+            if (PreviewShapeHitTester.HitsRect(px, py, cx + r.X * om, cy - r.Y * om, r.ScaleX * om, r.ScaleY * om, tolerance))
+                result.Add(r);
         }
-
-        return null;
+        return result;
     }
+
+    /// <summary>The shape a plain click at the point would select (see <see cref="ShapeClickCycle"/>).</summary>
+    private object? ShapeClickTarget(float px, float py)
+        => ShapeClickCycle.NextTarget(ShapesUnder(px, py), _selectedState!.SelectedShape);
+
+    // The shape the hover preview outlines; set from pointer moves, cleared on exit/drag.
+    private object? _hoverShape;
+
+    private void UpdateHoverShape(Point pos)
+    {
+        // Only worth outlining when a click would actually change the selection.
+        var target = ShapeClickTarget((float)pos.X, (float)pos.Y);
+        if (ReferenceEquals(target, _selectedState!.SelectedShape)) target = null;
+        if (ReferenceEquals(target, _hoverShape)) return;
+        _hoverShape = target;
+        InvalidateVisual();
+    }
+
+    // Set on press of the already-selected shape while others overlap there: a release without
+    // moving it cycles to this shape instead.
+    private object? _pendingCycleShape;
 
     /// <summary>
     /// Finalises an in-progress shape drag: records an undo command (unless the delta is
@@ -2472,8 +2474,24 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             return;
         }
         var hitShape = HitTestShape(px, py);
+        _hoverShape = null;
+        _pendingCycleShape = null;
         if (hitShape is not null)
         {
+            // Pressing the already-selected shape where others overlap: drag it as usual, but a
+            // release without moving cycles to the next shape beneath (a locked shape can't be
+            // dragged, so it cycles right away).
+            object? cycleTarget = ReferenceEquals(hitShape, _selectedState!.SelectedShape)
+                ? ShapeClickTarget(px, py) : null;
+            if (ReferenceEquals(cycleTarget, hitShape)) cycleTarget = null;
+            if (cycleTarget is not null && IsShapeLocked(hitShape))
+            {
+                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
+                _selectedState!.SelectShape(cycleTarget);
+                return;
+            }
+            _pendingCycleShape = cycleTarget;
+
             _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
             _selectedState!.SelectShape(hitShape);
             if (!IsShapeLocked(hitShape))
@@ -2622,6 +2640,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         UpdateHoverCursor(pos);
         UpdateHoverVertex(pos);
+        UpdateHoverShape(pos);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -2648,8 +2667,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         if (_draggingShape is not null)
         {
+            var cycle = _pendingCycleShape;
+            _pendingCycleShape = null;
+            var pressed = (ShapeSave)_draggingShape;
+            bool moved = pressed.X != _shapeDragStartX || pressed.Y != _shapeDragStartY;
             CommitShapeDrag();
             e.Pointer.Capture(null);
+            if (cycle is not null && !moved)
+                _selectedState!.SelectShape(cycle);
             return;
         }
 
@@ -2700,9 +2725,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         base.OnPointerExited(e);
         Cursor = Cursor.Default;
-        if (_hoverVertexIndex >= 0)
+        if (_hoverVertexIndex >= 0 || _hoverShape is not null)
         {
             _hoverVertexIndex = -1;
+            _hoverShape = null;
             InvalidateVisual();
         }
     }
@@ -2733,7 +2759,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         // Polygon vertex drawn enlarged: the one being dragged, else hovered, else focused in the inspector.
         int HighlightedVertex = -1,
         // Extra screen pixels per side on HighlightedVertex while its inspector-focus reveal plays.
-        float HighlightInflation = 0f);
+        float HighlightInflation = 0f,
+        // The shape a click would select (light-blue preview outline).
+        bool IsHovered = false);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2921,10 +2949,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
             foreach (var sh in s.Shapes)
             {
-                var paint = sh.IsSelected ? selectedPaint : shapePaint;
+                var paint = sh.IsSelected || sh.IsHovered ? selectedPaint : shapePaint;
                 paint.Color = sh.IsSelected
                     ? EditorColors.SelectedShape
-                    : EditorColors.Shape;
+                    : sh.IsHovered ? EditorColors.HoveredShape : EditorColors.Shape;
 
                 // Shape coords: X right, Y up (FRB convention); negate Y for screen
                 float sx = cx + sh.X * om;

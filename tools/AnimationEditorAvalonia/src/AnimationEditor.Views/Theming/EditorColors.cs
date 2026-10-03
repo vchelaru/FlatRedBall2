@@ -65,6 +65,8 @@ internal static class EditorColors
 
     public static readonly SKColor Shape = new(0, 230, 80, 200);
     public static readonly SKColor SelectedShape = Gold.WithAlpha(230);
+    /// <summary>Outline of the shape a click would select (hover preview).</summary>
+    public static readonly SKColor HoveredShape = new(80, 200, 255, 255);
     /// <summary>Dashed bounding square around a selected circle.</summary>
     public static readonly SKColor SelectedShapeBounds = Gold.WithAlpha(120);
     /// <summary>A shape the runtime cannot collide with correctly (self-intersecting polygon).</summary>
