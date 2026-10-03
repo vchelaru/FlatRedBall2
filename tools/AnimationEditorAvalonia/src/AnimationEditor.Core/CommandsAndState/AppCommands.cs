@@ -1,5 +1,6 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -1424,6 +1425,14 @@ namespace AnimationEditor.Core.CommandsAndState
             if (frame.ShapesSave is not { } shapes) return;
             ExecuteShapeReorder(shapes, frame, () => shapes.MoveToEdge(shape, toStart: false),
                 $"Move {ShapeReorderLabel(shape)} to Bottom");
+        }
+
+        public void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex)
+        {
+            if (IsFrameLocked(frame)) return;
+            if (frame.ShapesSave is not { } shapes) return;
+            var order = ShapeDropResolver.ApplyDrop(shapes, shape, insertIndex);
+            ExecuteShapeReorder(shapes, frame, () => shapes.SetOrder(order), $"Move {ShapeReorderLabel(shape)}");
         }
 
         private void ExecuteShapeReorder(ShapesSave shapes, AnimationFrameSave frame, Action reorder, string description)

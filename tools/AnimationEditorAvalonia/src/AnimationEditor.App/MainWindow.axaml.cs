@@ -133,9 +133,17 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
 
-    // ── Shape drag attempt (issue #1285): shapes can't be reordered by drag, so a drag past the
-    // threshold on a shape row only shows an explanatory toast (once per press).
+    // ── Shape drag-and-drop reorder (issue #1285): a shape moves only among shapes of its own
+    // type in its frame, since the file format saves shapes grouped by type. The dragged shape
+    // lives in _pendingShapeDrag because the drag is always same-process.
+    private static readonly DataFormat<string> ShapeDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("animationeditor-shape-drag");
+    private const string ShapeDragToken = "shape";
+    private (object Shape, AnimationFrameSave Frame)? _pendingShapeDrag;
+    private object? _shapeDragCandidate;
     private Avalonia.Point? _shapeDragPressPoint;
+    private PointerPressedEventArgs? _shapeDragPressArgs;
+    private bool _shapeDragInProgress;
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
@@ -3582,6 +3590,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Internal shape reorder drag: only a same-type landing shows a line; a different type
+        // stays droppable so the drop can explain why it is refused.
+        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
+        {
+            var target = ResolveShapeDrop(e, shapeDrag);
+            e.DragEffects = target.Outcome == ShapeDropOutcome.None ? DragDropEffects.None : DragDropEffects.Move;
+            if (target.IsValid) ShowShapeDropIndicator(e);
+            else RemoveFrameDropIndicators();
+            e.Handled = true;
+            return;
+        }
+
         // Internal chain reorder drag.
         if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
@@ -3633,6 +3653,19 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
                 _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
+            e.Handled = true;
+            return;
+        }
+
+        // Internal shape reorder drop.
+        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
+        {
+            RemoveFrameDropIndicators();
+            var target = ResolveShapeDrop(e, shapeDrag);
+            if (target.IsValid)
+                _appCommands.MoveShapeToIndex(shapeDrag.Shape, shapeDrag.Frame, target.InsertIndex);
+            else if (target.Outcome == ShapeDropOutcome.CrossType)
+                ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
             e.Handled = true;
             return;
         }
@@ -3993,11 +4026,18 @@ public partial class MainWindow : Window
 
     // ── Shape drag attempt (issue #1285) ───────────────────────────────────────
 
-    private void ClearShapeDragCandidate() => _shapeDragPressPoint = null;
-
-    private void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
+    private void ClearShapeDragCandidate()
     {
-        if (_shapeDragPressPoint is not { } pressPoint) return;
+        _shapeDragCandidate = null;
+        _shapeDragPressPoint = null;
+        _shapeDragPressArgs = null;
+    }
+
+    private async void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_shapeDragInProgress || _shapeDragCandidate is not { } shape ||
+            _shapeDragPressPoint is not { } pressPoint || _shapeDragPressArgs is null)
+            return;
 
         if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
         {
@@ -4009,8 +4049,55 @@ public partial class MainWindow : Window
         if (Math.Abs(pos.X - pressPoint.X) <= 4 && Math.Abs(pos.Y - pressPoint.Y) <= 4)
             return;
 
-        ClearShapeDragCandidate();
-        ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
+        var frame = shape is ShapeSave shapeSave ? _objectFinder.GetAnimationFrameContaining(shapeSave) : null;
+        if (frame is null)
+        {
+            ClearShapeDragCandidate();
+            return;
+        }
+
+        e.Pointer.Capture(null); // release press-capture so the drag system can take over
+        _pendingShapeDrag = (shape, frame);
+        _shapeDragInProgress = true;
+
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ShapeDragDataFormat, ShapeDragToken));
+        try
+        {
+            await DragDrop.DoDragDropAsync(_shapeDragPressArgs, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _pendingShapeDrag = null;
+            _shapeDragInProgress = false;
+            RemoveFrameDropIndicators();
+            ClearShapeDragCandidate();
+        }
+    }
+
+    private ShapeDropTarget ResolveShapeDrop(DragEventArgs e, (object Shape, AnimationFrameSave Frame) drag)
+    {
+        if (drag.Frame.ShapesSave is not { } shapes) return ShapeDropTarget.None;
+        var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
+        return ShapeDropResolver.Resolve(nodeData, half, drag.Shape, shapes);
+    }
+
+    /// <summary>Draws the insert line at the hovered same-type shape row's upper or lower edge.</summary>
+    private void ShowShapeDropIndicator(DragEventArgs e)
+    {
+        var (_, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
+        var topLeft = tvi is null ? null : Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        if (tvi is null || topLeft is null || treeOrigin is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
+        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        RemoveDropBox();
+        ShowDropLine(HeaderContentLeft(tvi), treeRight, y);
     }
 
     // ── Internal chain drag-and-drop reorder ───────────────────────────────────
@@ -5058,11 +5145,13 @@ public partial class MainWindow : Window
             }
             else if (e.Source is Control shapeSrc &&
                 shapeSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
-                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave })
+                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave } shapeVm)
             {
                 ClearFrameDragCandidate();
                 ClearChainDragCandidate();
+                _shapeDragCandidate = shapeVm.Data;
                 _shapeDragPressPoint = e.GetPosition(AnimTree);
+                _shapeDragPressArgs = e;
             }
             else
             {
