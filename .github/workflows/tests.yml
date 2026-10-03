@@ -40,6 +40,21 @@ jobs:
         if: failure()
         run: find "$RUNNER_TEMP/engine-test-results" -name "Sequence_*.xml" -exec sh -c 'echo "== $1"; tail -n 20 "$1"' _ {} \;
 
+      # The record above printed nothing on a PR run (#1296) that still produced a crash dump, so
+      # list what --blame-crash wrote and keep the dump itself for offline inspection.
+      - name: List engine test crash files
+        if: failure()
+        run: find "$RUNNER_TEMP/engine-test-results" -type f -exec ls -l {} \;
+
+      - name: Upload engine test crash files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-test-crash
+          path: ${{ runner.temp }}/engine-test-results
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Test AnimationChain.Common
         run: dotnet test tests/AnimationChain.Common.Tests/AnimationChain.Common.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
