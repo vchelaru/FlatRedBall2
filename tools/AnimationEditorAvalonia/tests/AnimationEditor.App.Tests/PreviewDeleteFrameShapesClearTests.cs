@@ -18,7 +18,7 @@ public class PreviewDeleteFrameShapesClearTests
     {
         var frame = new AnimationFrameSave { FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { ScaleX = scaleX, ScaleY = scaleY });
+        frame.ShapesSave.Add(new AARectSave { ScaleX = scaleX, ScaleY = scaleY });
         return frame;
     }
 

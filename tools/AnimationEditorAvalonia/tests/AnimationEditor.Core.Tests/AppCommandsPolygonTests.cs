@@ -62,7 +62,7 @@ public class AppCommandsPolygonTests
     {
         var (ctx, frame) = FrameWithNoShapes();
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "PolygonInstance" });
+        frame.ShapesSave.Add(new AARectSave { Name = "PolygonInstance" });
 
         var polygon = AddPolygon(ctx, frame);
 
@@ -81,7 +81,7 @@ public class AppCommandsPolygonTests
         frame.ShapesSave!.Shapes.ShouldBeEmpty();
         ctx.UndoManager.Undo();
 
-        frame.ShapesSave!.Shapes.ShouldBe(new object[] { circle, polygon });
+        frame.ShapesSave!.Shapes.ShouldBe(new object[] { polygon, circle });
     }
 
     [Fact]

@@ -133,7 +133,7 @@ public class AnimationChainListSaveJsonTests
         var chain = new AnimationChainSave { Name = "Attack" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Sword", X = 5, Y = 1, ScaleX = 15, ScaleY = 5 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Sword", X = 5, Y = 1, ScaleX = 15, ScaleY = 5 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 

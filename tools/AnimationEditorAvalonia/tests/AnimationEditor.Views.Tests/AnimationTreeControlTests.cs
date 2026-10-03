@@ -77,8 +77,8 @@ public class AnimationTreeControlTests
             TextureName = "a.png",
             ShapesSave = new ShapesSave(),
         };
-        frame1.ShapesSave!.Shapes.Add(rect);
-        frame1.ShapesSave!.Shapes.Add(circle);
+        frame1.ShapesSave!.Add(rect);
+        frame1.ShapesSave!.Add(circle);
 
         var frame2 = new AnimationFrameSave { TextureName = "b.png" };
 

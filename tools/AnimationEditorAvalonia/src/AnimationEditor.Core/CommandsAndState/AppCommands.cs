@@ -1402,43 +1402,38 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null) return;
-            int idx    = shapes.IndexOf(shape);
-            if (idx < 0) return;
-            int newIdx = Math.Clamp(idx + delta, 0, shapes.Count - 1);
-            if (newIdx == idx) return;
-            _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
-                this, _events, () => RefreshTreeNode(frame),
+            if (frame.ShapesSave is not { } shapes) return;
+            // Shapes only reorder within their own type: the file groups them by type, so a cross-type move would be lost on save.
+            ExecuteShapeReorder(shapes, frame, () => shapes.Move(shape, delta),
                 delta > 0
                     ? $"Move {ShapeReorderLabel(shape)} Down"
-                    : $"Move {ShapeReorderLabel(shape)} Up"));
+                    : $"Move {ShapeReorderLabel(shape)} Up");
         }
 
         public void MoveShapeToTop(object shape, AnimationFrameSave frame)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null || !shapes.Contains(shape)) return;
-            _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.Remove(shape); shapes.Insert(0, shape); },
-                this, _events, () => RefreshTreeNode(frame),
-                $"Move {ShapeReorderLabel(shape)} to Top"));
+            if (frame.ShapesSave is not { } shapes) return;
+            ExecuteShapeReorder(shapes, frame, () => shapes.MoveToEdge(shape, toStart: true),
+                $"Move {ShapeReorderLabel(shape)} to Top");
         }
 
         public void MoveShapeToBottom(object shape, AnimationFrameSave frame)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null || !shapes.Contains(shape)) return;
+            if (frame.ShapesSave is not { } shapes) return;
+            ExecuteShapeReorder(shapes, frame, () => shapes.MoveToEdge(shape, toStart: false),
+                $"Move {ShapeReorderLabel(shape)} to Bottom");
+        }
+
+        private void ExecuteShapeReorder(ShapesSave shapes, AnimationFrameSave frame, Action reorder, string description)
+        {
             _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.Remove(shape); shapes.Add(shape); },
+                () => shapes.Shapes.ToArray(),
+                order => shapes.SetOrder(order),
+                reorder,
                 this, _events, () => RefreshTreeNode(frame),
-                $"Move {ShapeReorderLabel(shape)} to Bottom"));
+                description));
         }
 
         private static string ShapeReorderLabel(object shape) => ShapeUndoLabel.Format(shape);

@@ -159,7 +159,7 @@ public class CommandDescriptionTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         var pasted = new AARectSave { Name = "Hitbox" };
 
         ctx.AppCommands.PasteShapesCut(frame, new object[] { pasted }, new[] { rect }, frame);
@@ -448,8 +448,8 @@ public class CommandDescriptionTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Other" });
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(new AARectSave { Name = "Other" });
 
         ctx.AppCommands.MoveShape(rect, frame, +1);
 

@@ -139,8 +139,8 @@ public class AppCommandsDeleteTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave!.Add(circle);
 
         ctx.AppCommands.DeleteShapes(new object[] { rect, circle });
 
@@ -165,8 +165,8 @@ public class AppCommandsDeleteTests
         var frameB = chain.Frames[1];
         var rect = new AARectSave { Name = "RectInA" };
         var circle = new CircleSave { Name = "CircleInB", Radius = 10 };
-        frameA.ShapesSave!.Shapes.Add(rect);
-        frameB.ShapesSave!.Shapes.Add(circle);
+        frameA.ShapesSave!.Add(rect);
+        frameB.ShapesSave!.Add(circle);
 
         ctx.AppCommands.DeleteShapes(new object[] { rect, circle });
 
@@ -187,8 +187,8 @@ public class AppCommandsDeleteTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave!.Add(circle);
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 
@@ -204,7 +204,7 @@ public class AppCommandsDeleteTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "BodyCollision" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 

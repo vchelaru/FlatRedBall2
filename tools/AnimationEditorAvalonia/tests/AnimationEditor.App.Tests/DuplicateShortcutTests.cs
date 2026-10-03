@@ -128,7 +128,7 @@ public class DuplicateShortcutTests
             var frame = new AnimationFrameSave { TextureName = "run.png" };
             frame.ShapesSave = new ShapesSave();
             var rect = new AARectSave { Name = "HitBox" };
-            frame.ShapesSave.Shapes.Add(rect);
+            frame.ShapesSave.Add(rect);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             SeedAndSelect(window, rect, "HitBox");
@@ -154,7 +154,7 @@ public class DuplicateShortcutTests
             var frame = new AnimationFrameSave { TextureName = "run.png" };
             frame.ShapesSave = new ShapesSave();
             var circle = new CircleSave { Name = "Hurt", Radius = 4 };
-            frame.ShapesSave.Shapes.Add(circle);
+            frame.ShapesSave.Add(circle);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             SeedAndSelect(window, circle, "Hurt");

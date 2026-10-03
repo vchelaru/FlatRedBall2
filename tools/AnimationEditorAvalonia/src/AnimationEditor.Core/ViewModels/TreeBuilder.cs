@@ -187,12 +187,12 @@ public static class TreeBuilder
     /// <paramref name="shapesSave"/> are reused and their
     /// <see cref="TreeNodeVm.Header"/> is resynced (so a renamed shape is reflected).
     /// VMs for removed shapes are deleted; new VMs are created for added shapes.
-    /// Order matches the insertion order of <see cref="ShapesSave.Shapes"/>.
+    /// Order matches the order of <see cref="ShapesSave.Shapes"/> (grouped by type, matching the saved file).
     /// </para>
     /// </summary>
     public static void SyncShapesInto(TreeNodeVm frameNode, ShapesSave? shapesSave)
     {
-            var shapes = shapesSave?.Shapes ?? new System.Collections.Generic.List<object>();
+            var shapes = shapesSave?.Shapes ?? System.Array.Empty<object>();
 
             // Remove shape VMs that no longer exist in the data list.
             for (int i = frameNode.Children.Count - 1; i >= 0; i--)

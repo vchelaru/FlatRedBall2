@@ -94,7 +94,7 @@ public class AnimationCloneHelperTests
     {
         var source = new AnimationFrameSave { TextureName = "walk.png" };
         source.ShapesSave = new ShapesSave();
-        source.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+        source.ShapesSave.Add(new AARectSave { Name = "HitBox" });
 
         var copy = AnimationCloneHelper.CloneFrame(source);
 

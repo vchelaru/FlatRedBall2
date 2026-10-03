@@ -59,8 +59,8 @@ public class CrossFrameShapeDeleteAppTests
             var frameB = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
             var rect = new AARectSave { Name = "RectInA" };
             var circle = new CircleSave { Name = "CircleInB", Radius = 10 };
-            frameA.ShapesSave.Shapes.Add(rect);
-            frameB.ShapesSave.Shapes.Add(circle);
+            frameA.ShapesSave.Add(rect);
+            frameB.ShapesSave.Add(circle);
             chain.Frames.AddRange(new[] { frameA, frameB });
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 

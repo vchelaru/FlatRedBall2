@@ -255,8 +255,8 @@ public class AnimationTreeControlContextMenuTests
         var frame = new AnimationFrameSave { TextureName = "run.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Rect" };
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(rect);
+        frame.ShapesSave.Add(circle);
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
         acls.AnimationChains.Add(chain);
@@ -285,8 +285,8 @@ public class AnimationTreeControlContextMenuTests
         var frame = new AnimationFrameSave { TextureName = "run.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Rect" };
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(rect);
+        frame.ShapesSave.Add(circle);
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
         acls.AnimationChains.Add(chain);
@@ -368,7 +368,7 @@ public class AnimationTreeControlContextMenuTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "R0" };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
         acls.AnimationChains.Add(chain);
@@ -427,7 +427,7 @@ public class AnimationTreeControlContextMenuTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Hitbox" };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
         acls.AnimationChains.Add(chain);

@@ -58,7 +58,7 @@ internal sealed class PasteShapesCommand : IUndoableCommand
         {
             frame.ShapesSave ??= new ShapesSave();
             foreach (var shape in shapes)
-                frame.ShapesSave.Shapes.Add(shape);
+                frame.ShapesSave.Add(shape);
         }
         RaiseSideEffects();
         _selectedState.SelectedNodes = all;
@@ -70,7 +70,7 @@ internal sealed class PasteShapesCommand : IUndoableCommand
     {
         foreach (var (frame, shapes) in _groups)
             foreach (var shape in shapes)
-                frame.ShapesSave!.Shapes.Remove(shape);
+                frame.ShapesSave!.Remove(shape);
         RaiseSideEffects();
         _selectedState.SelectedNodes = _preSelection;
         _selectedState.SelectShape(_preSelection.FirstOrDefault(n => n is ShapeSave));

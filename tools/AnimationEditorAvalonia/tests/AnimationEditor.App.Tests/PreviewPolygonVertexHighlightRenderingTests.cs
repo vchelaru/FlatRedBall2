@@ -20,7 +20,7 @@ public class PreviewPolygonVertexHighlightRenderingTests
         foreach (var (x, y) in new[] { (-8f, -8f), (8f, -8f), (8f, 8f), (-8f, 8f), (-8f, -8f) })
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
         var frame = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(polygon);
+        frame.ShapesSave!.Add(polygon);
         var chain = new AnimationChainSave { Name = "Test" };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();

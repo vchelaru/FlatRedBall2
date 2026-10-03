@@ -34,7 +34,7 @@ public static class AnimationCloneHelper
             copy.ShapesSave = new ShapesSave();
             foreach (var shape in source.ShapesSave.Shapes)
                 if (CloneShape(shape) is { } shapeCopy)
-                    copy.ShapesSave.Shapes.Add(shapeCopy);
+                    copy.ShapesSave.Add(shapeCopy);
         }
 
         foreach (var frameEvent in source.Events)

@@ -34,7 +34,7 @@ public class PolygonVertexHoverHighlightTests
         foreach (var (x, y) in points.Append(points[0]))
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
         var frame = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(polygon);
+        frame.ShapesSave!.Add(polygon);
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
         var acls = ctx.ProjectManager.AnimationChainListSave;

@@ -57,8 +57,8 @@ public class PreviewSingleSelectClearsTreeMultiSelectionTests
             var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
             var rect0 = new AARectSave { Name = "Box0", ScaleX = 8f, ScaleY = 8f };
             var rect1 = new AARectSave { Name = "Box1", ScaleX = 8f, ScaleY = 8f };
-            frame.ShapesSave!.Shapes.Add(rect0);
-            frame.ShapesSave!.Shapes.Add(rect1);
+            frame.ShapesSave!.Add(rect0);
+            frame.ShapesSave!.Add(rect1);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 

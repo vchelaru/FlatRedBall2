@@ -34,8 +34,8 @@ public class PreviewShapeClickCycleTests
         var bottom = new CircleSave { Radius = 20f };
         var top    = new CircleSave { Radius = 10f }; // later in the list == drawn on top
         var frame  = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(bottom);
-        frame.ShapesSave.Shapes.Add(top);
+        frame.ShapesSave!.Add(bottom);
+        frame.ShapesSave.Add(top);
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chain);
@@ -135,7 +135,7 @@ public class PreviewShapeClickCycleTests
         {
             circle = new CircleSave { Radius = 10f };
             var f = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-            f.ShapesSave!.Shapes.Add(circle);
+            f.ShapesSave!.Add(circle);
             var c = new AnimationChainSave { Name = chainName };
             c.Frames.Add(f);
             chains.Add(c);

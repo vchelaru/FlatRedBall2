@@ -34,18 +34,18 @@ public class AchxByteSnapshotTests
             RelativeX = 5f,
             ShapesSave = new ShapesSave(),
         };
-        frame.ShapesSave.Shapes.Add(new AARectSave
+        frame.ShapesSave.Add(new AARectSave
         {
             Name = "Hit", X = 1, Y = 2, ScaleX = 3, ScaleY = 4,
         });
-        frame.ShapesSave.Shapes.Add(new CircleSave
+        frame.ShapesSave.Add(new CircleSave
         {
             Name = "Origin", X = 5, Y = 6, Radius = 7,
         });
         var poly = new PolygonSave { Name = "Edge", X = 0, Y = 0 };
         poly.Points.Add(new Vector2Save { X = 0, Y = 0 });
         poly.Points.Add(new Vector2Save { X = 10, Y = 0 });
-        frame.ShapesSave.Shapes.Add(poly);
+        frame.ShapesSave.Add(poly);
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
         return save;

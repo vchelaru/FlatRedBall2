@@ -21,7 +21,7 @@ public class AppCommandsDuplicateShapeTests
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = TestHelpers.MakeChain(ctx.Acls, "Walk", 1).Frames[0];
         var rect = new AARectSave { Name = "HitBox", X = 1, Y = 2, ScaleX = 3, ScaleY = 4 };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
 
         var copy = (AARectSave)ctx.AppCommands.DuplicateShape(rect)!;
 
@@ -38,7 +38,7 @@ public class AppCommandsDuplicateShapeTests
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = TestHelpers.MakeChain(ctx.Acls, "Walk", 1).Frames[0];
         var rect = new AARectSave { Name = "HitBox" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
 
         ctx.AppCommands.DuplicateShape(rect);
         Assert.Equal(2, frame.ShapesSave!.AARectSaves.Count());
@@ -53,7 +53,7 @@ public class AppCommandsDuplicateShapeTests
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = TestHelpers.MakeChain(ctx.Acls, "Walk", 1).Frames[0];
         var circle = new CircleSave { Name = "Hurt", X = 1, Y = 2, Radius = 5 };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
 
         var copy = (CircleSave)ctx.AppCommands.DuplicateShape(circle)!;
 

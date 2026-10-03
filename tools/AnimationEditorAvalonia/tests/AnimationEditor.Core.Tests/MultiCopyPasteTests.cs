@@ -61,7 +61,7 @@ public class MultiCopyPasteTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "Hit" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "Hit" });
 
         ctx.AppCommands.PasteShapes(frame, new object[] { new AARectSave { Name = "Hit" } });
 
@@ -332,8 +332,8 @@ public class MultiCopyPasteTests
         var frame = chain.Frames[0];
         var r = new AARectSave { Name = "R" };
         var c = new CircleSave { Name = "C", Radius = 1 };
-        frame.ShapesSave!.Shapes.Add(r);
-        frame.ShapesSave.Shapes.Add(c);
+        frame.ShapesSave!.Add(r);
+        frame.ShapesSave.Add(c);
 
         ctx.AppCommands.DuplicateSelection(new CopySelectionPayload
         {

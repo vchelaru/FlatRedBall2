@@ -103,8 +103,8 @@ public class GroupPreviewPlaybackTests
         Register(ctx, a, b);
         for (int i = 0; i < 3; i++)
         {
-            a.Frames[i].ShapesSave!.Shapes.Add(new AARectSave { X = 100 + i, ScaleX = 1, ScaleY = 1 });
-            b.Frames[i].ShapesSave!.Shapes.Add(new AARectSave { X = 200 + i, ScaleX = 1, ScaleY = 1 });
+            a.Frames[i].ShapesSave!.Add(new AARectSave { X = 100 + i, ScaleX = 1, ScaleY = 1 });
+            b.Frames[i].ShapesSave!.Add(new AARectSave { X = 200 + i, ScaleX = 1, ScaleY = 1 });
         }
 
         var ctrl = ctx.CreatePreviewControl();
@@ -181,8 +181,8 @@ public class GroupPreviewPlaybackTests
         var a = MakeChain("A", 3);
         var b = MakeChain("B", 3);
         Register(ctx, a, b);
-        a.Frames[2].ShapesSave!.Shapes.Add(new AARectSave { X = 102, ScaleX = 1, ScaleY = 1 });
-        b.Frames[1].ShapesSave!.Shapes.Add(new AARectSave { X = 201, ScaleX = 1, ScaleY = 1 });
+        a.Frames[2].ShapesSave!.Add(new AARectSave { X = 102, ScaleX = 1, ScaleY = 1 });
+        b.Frames[1].ShapesSave!.Add(new AARectSave { X = 201, ScaleX = 1, ScaleY = 1 });
 
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();

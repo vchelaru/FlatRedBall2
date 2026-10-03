@@ -44,8 +44,8 @@ public class TreeNodeIconSizeTests
         window.Show();
 
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box" });
-        frame.ShapesSave.Shapes.Add(new CircleSave { Name = "Bounds" });
+        frame.ShapesSave.Add(new AARectSave { Name = "Box" });
+        frame.ShapesSave.Add(new CircleSave { Name = "Bounds" });
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

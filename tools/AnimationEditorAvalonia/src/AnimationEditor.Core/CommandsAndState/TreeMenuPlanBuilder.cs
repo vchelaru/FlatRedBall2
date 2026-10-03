@@ -1,5 +1,6 @@
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState;
 
@@ -164,11 +165,12 @@ public static class TreeMenuPlanBuilder
     private static void AddShapeReorderItems(
         List<TreeMenuItem> items, object shape, AnimationFrameSave? frame, IAppCommands appCommands)
     {
-        var shapes = frame?.ShapesSave?.Shapes;
-        if (shapes is null || shapes.Count <= 1) return;
-        int index = shapes.IndexOf(shape);
+        // Shapes reorder only among shapes of the same type (the file groups them by type).
+        var siblings = frame?.ShapesSave?.Shapes.Where(s => s.GetType() == shape.GetType()).ToList();
+        if (siblings is null || siblings.Count <= 1) return;
+        int index = siblings.IndexOf(shape);
         bool isFirst = index == 0;
-        bool isLast = index == shapes.Count - 1;
+        bool isLast = index == siblings.Count - 1;
         if (!isFirst) items.Add(TreeMenuItem.Item("Move To Top", () => appCommands.MoveShapeToTop(shape, frame!), TreeMenuIcon.MoveToTop));
         if (!isFirst) items.Add(TreeMenuItem.Item("Move Up", () => appCommands.MoveShape(shape, frame!, -1), TreeMenuIcon.MoveUp));
         if (!isLast) items.Add(TreeMenuItem.Item("Move Down", () => appCommands.MoveShape(shape, frame!, +1), TreeMenuIcon.MoveDown));

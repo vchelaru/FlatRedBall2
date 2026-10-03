@@ -122,7 +122,7 @@ public class InspectorControlTests
         var (control, state) = Build();
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Hitbox", X = 4f, Y = -2f, ScaleX = 8f, ScaleY = 16f };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
 
         state.SelectedFrame = frame;
         state.SelectedRectangle = rect;
@@ -143,7 +143,7 @@ public class InspectorControlTests
         var (control, state) = Build();
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var circle = new CircleSave { Name = "Hurtbox", X = 1f, Y = 2f, Radius = 12f };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
 
         state.SelectedFrame = frame;
         state.SelectedCircle = circle;
@@ -208,8 +208,8 @@ public class InspectorControlTests
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Hitbox", X = 4f, Y = -2f, ScaleX = 8f, ScaleY = 16f };
         var circle = new CircleSave { Name = "Hurtbox", X = 1f, Y = 2f, Radius = 12f };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave!.Add(circle);
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
@@ -450,7 +450,7 @@ public class InspectorControlTests
         var (control, _, rectA, _, state) = BuildWithEditableShapes();
         var frame = state.SelectedFrame!;
         var rectB = new AARectSave { Name = "Other", X = 100f, Y = 200f, ScaleX = 30f, ScaleY = 40f };
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectB);
 
         // Edit rectA's fields (each ValueChanged commits immediately per the fix above), then
         // switch selection to rectB. Populating the panel for rectB sets each field in turn
@@ -478,7 +478,7 @@ public class InspectorControlTests
     {
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "Hitbox", X = 0f, Y = 0f, ScaleX = 1f, ScaleY = 1f };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();

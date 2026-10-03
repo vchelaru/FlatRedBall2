@@ -160,7 +160,7 @@ public sealed class PendingCutState : IPendingCutState
                 foreach (var shape in _payload.Shapes)
                 {
                     if (FrameContaining(acls, shape) is { ShapesSave: { } shapes } &&
-                        shapes.Shapes.Remove(shape))
+                        shapes.Remove(shape))
                         removedAnyShape = true;
                 }
                 return removedAnyShape;

@@ -29,10 +29,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _originalIndex = _frame.ShapesSave!.Shapes.IndexOf(_shape);
+            _originalIndex = _frame.ShapesSave!.IndexOf(_shape);
             if (_originalIndex < 0) return false;
 
-            _frame.ShapesSave!.Shapes.RemoveAt(_originalIndex);
+            _frame.ShapesSave!.Remove(_shape);
             Refresh();
             _selectedState.SelectShape(null);
             return true;
@@ -40,15 +40,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            int idx = Math.Min(_originalIndex, _frame.ShapesSave!.Shapes.Count);
-            _frame.ShapesSave!.Shapes.Insert(idx, _shape);
+            _frame.ShapesSave!.Insert(_originalIndex, _shape);
             Refresh();
             _selectedState.SelectShape(_shape);
         }
 
         public void Redo()
         {
-            _frame.ShapesSave!.Shapes.Remove(_shape);
+            _frame.ShapesSave!.Remove(_shape);
             Refresh();
             _selectedState.SelectShape(null);
         }

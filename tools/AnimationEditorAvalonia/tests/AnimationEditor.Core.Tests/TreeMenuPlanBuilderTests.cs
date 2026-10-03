@@ -118,7 +118,7 @@ public class TreeMenuPlanBuilderTests
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             circle, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
@@ -180,6 +180,24 @@ public class TreeMenuPlanBuilderTests
     }
 
     [Fact]
+    public void Build_RectNode_OnlyRectAmongOtherTypes_ShowsNoMoveItems()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var frame = TestHelpers.MakeFrame();
+        chain.Frames.Add(frame);
+        var rect = new AARectSave { Name = "Rect" };
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(new CircleSave { Name = "Circle" });
+
+        var items = TreeMenuPlanBuilder.Build(
+            rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.Equal(-1, IndexOf(items, "Move Down"));
+        Assert.Equal(-1, IndexOf(items, "Move Up"));
+    }
+
+    [Fact]
     public void Build_RectNode_FirstOfTwoShapes_ShowsMoveDownButNotMoveUp()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -187,9 +205,9 @@ public class TreeMenuPlanBuilderTests
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
         var rect = new AARectSave { Name = "Rect" };
-        var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        var circle = new AARectSave { Name = "Rect2" };
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
@@ -209,8 +227,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frame);
         var rect = new AARectSave { Name = "Rect" };
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
@@ -238,8 +256,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frame);
         var r0 = new AARectSave { Name = "R0", X = 1f, Y = 1f };
         var r1 = new AARectSave { Name = "R1", X = 2f, Y = 2f };
-        frame.ShapesSave!.Shapes.Add(r0);
-        frame.ShapesSave.Shapes.Add(r1);
+        frame.ShapesSave!.Add(r0);
+        frame.ShapesSave.Add(r1);
         ctx.SelectedState.SelectedNodes = new List<object> { r0, r1 };
 
         // Menu built for r0 (the right-clicked node) — Click must still act on the whole
@@ -267,8 +285,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frameB);
         var rectInA = new AARectSave { Name = "InA", X = 1f, Y = 1f };
         var rectInB = new AARectSave { Name = "InB", X = 2f, Y = 2f };
-        frameA.ShapesSave!.Shapes.Add(rectInA);
-        frameB.ShapesSave!.Shapes.Add(rectInB);
+        frameA.ShapesSave!.Add(rectInA);
+        frameB.ShapesSave!.Add(rectInB);
         ctx.SelectedState.SelectedNodes = new List<object> { rectInA, rectInB };
 
         var items = TreeMenuPlanBuilder.Build(

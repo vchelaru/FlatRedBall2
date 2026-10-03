@@ -669,7 +669,7 @@ public class AnimationChainListSave
                     ScaleY = FloatEl(r, "ScaleY", 16f),
                 };
                 ReadColor(r, rect);
-                shapes.Shapes.Add(rect);
+                shapes.Add(rect);
             }
         }
 
@@ -691,7 +691,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
-                shapes.Shapes.Add(poly);
+                shapes.Add(poly);
             }
         }
 
@@ -708,7 +708,7 @@ public class AnimationChainListSave
                     Radius = FloatEl(c, "Radius", 16f),
                 };
                 ReadColor(c, circle);
-                shapes.Shapes.Add(circle);
+                shapes.Add(circle);
             }
         }
 
@@ -737,7 +737,7 @@ public class AnimationChainListSave
                         ScaleY = FloatEl(child, "ScaleY", 16f),
                     };
                     ReadColor(child, rect);
-                    shapes.Shapes.Add(rect);
+                    shapes.Add(rect);
                     break;
                 case "CircleSave":
                     var circle = new CircleSave
@@ -748,7 +748,7 @@ public class AnimationChainListSave
                         Radius = FloatEl(child, "Radius", 16f),
                     };
                     ReadColor(child, circle);
-                    shapes.Shapes.Add(circle);
+                    shapes.Add(circle);
                     break;
                 case "PolygonSave":
                     var poly = new PolygonSave
@@ -762,7 +762,7 @@ public class AnimationChainListSave
                         foreach (var v in pointsEl.Elements("Vector2Save"))
                             poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                     ReadColor(child, poly);
-                    shapes.Shapes.Add(poly);
+                    shapes.Add(poly);
                     break;
             }
         }
@@ -898,7 +898,7 @@ public class AnimationChainListSave
                     ScaleY = FloatProp(r, "scaleY", 16f),
                 };
                 ReadColorJson(r, rect);
-                shapes.Shapes.Add(rect);
+                shapes.Add(rect);
             }
         }
 
@@ -915,7 +915,7 @@ public class AnimationChainListSave
                     Radius = FloatProp(c, "radius", 16f),
                 };
                 ReadColorJson(c, circle);
-                shapes.Shapes.Add(circle);
+                shapes.Add(circle);
             }
         }
 
@@ -937,7 +937,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
                     }
                 ReadColorJson(p, poly);
-                shapes.Shapes.Add(poly);
+                shapes.Add(poly);
             }
         }
 

@@ -12,6 +12,8 @@ namespace AnimationEditor.Core.Tests;
 
 public class ProjectManagerTsxProjectTests : IDisposable
 {
+    private static ShapesSave NewShapesSave(object shape) { var s = new ShapesSave(); s.Add(shape); return s; }
+
     private readonly TestHelpers.TempDir _dir = new();
 
     public void Dispose() => _dir.Dispose();
@@ -934,7 +936,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
         var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
         pm.LoadTsxProject(new FilePath(path));
         var chain = pm.AnimationChainListSave!.AnimationChains.Single();
-        chain.Frames[0].ShapesSave = new ShapesSave { Shapes = { new AARectSave { Name = "Hit" } } };
+        chain.Frames[0].ShapesSave = NewShapesSave(new AARectSave { Name = "Hit" });
         chain.Frames[1].FrameLength = 0.3f;
 
         var warnings = pm.SaveTsxProject();

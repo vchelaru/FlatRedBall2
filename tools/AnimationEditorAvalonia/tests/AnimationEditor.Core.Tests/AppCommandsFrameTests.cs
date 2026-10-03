@@ -543,7 +543,7 @@ public class AppCommandsFrameTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Attack", 1);
-        chain.Frames[0].ShapesSave!.Shapes.Add(
+        chain.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "HitBox", ScaleX = 4, ScaleY = 4 });
 
         var copy = ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);

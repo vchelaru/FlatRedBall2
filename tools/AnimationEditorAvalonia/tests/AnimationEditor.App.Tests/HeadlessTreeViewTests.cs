@@ -709,7 +709,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.Shapes.Add(circle);
+            frame.ShapesSave.Add(circle);
             var chain  = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -751,7 +751,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.Shapes.Add(rect);
+            frame.ShapesSave.Add(rect);
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -1214,7 +1214,7 @@ public class HeadlessTreeViewTests
 
             var walk = new AnimationChainSave { Name = "walkLeft" };
             var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-            frame.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+            frame.ShapesSave.Add(new AARectSave { Name = "HitBox" });
             walk.Frames.Add(frame);
             var idle = new AnimationChainSave { Name = "Idle" };
 
@@ -1249,7 +1249,7 @@ public class HeadlessTreeViewTests
 
             var walk = new AnimationChainSave { Name = "Walk" };
             var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-            frame.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+            frame.ShapesSave.Add(new AARectSave { Name = "HitBox" });
             walk.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
 

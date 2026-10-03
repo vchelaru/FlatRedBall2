@@ -435,8 +435,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rectA;
 
@@ -455,8 +455,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rectB;
 
@@ -476,8 +476,8 @@ public class AppCommandsReorderTests
         var frame = walk.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rectA;
 
@@ -499,8 +499,8 @@ public class AppCommandsReorderTests
         var frame  = chain.Frames[0];
         var circA  = new CircleSave { Name = "A" };
         var circB  = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
         ctx.SelectedState.SelectedFrame  = frame;
         ctx.SelectedState.SelectedCircle = circA;
 
@@ -519,8 +519,8 @@ public class AppCommandsReorderTests
         var frame  = chain.Frames[0];
         var circA  = new CircleSave { Name = "A" };
         var circB  = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
         ctx.SelectedState.SelectedFrame  = frame;
         ctx.SelectedState.SelectedCircle = circB;
 
@@ -540,8 +540,8 @@ public class AppCommandsReorderTests
         var frame = walk.Frames[0];
         var circA = new CircleSave { Name = "A" };
         var circB = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
         ctx.SelectedState.SelectedFrame  = frame;
         ctx.SelectedState.SelectedCircle = circA;
 
@@ -562,8 +562,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
 
         ctx.AppCommands.MoveShape(rectA, frame, +1);
 
@@ -580,8 +580,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
 
         ctx.AppCommands.MoveShape(rectB, frame, -1);
 
@@ -598,8 +598,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
 
         ctx.AppCommands.MoveShape(rectB, frame, +1);
 
@@ -618,8 +618,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var circA = new CircleSave { Name = "A" };
         var circB = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
 
         ctx.AppCommands.MoveShape(circA, frame, +1);
 
@@ -636,8 +636,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var circA = new CircleSave { Name = "A" };
         var circB = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
 
         ctx.AppCommands.MoveShape(circB, frame, -1);
 
@@ -654,8 +654,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var circA = new CircleSave { Name = "A" };
         var circB = new CircleSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(circA);
-        frame.ShapesSave!.Shapes.Add(circB);
+        frame.ShapesSave!.Add(circA);
+        frame.ShapesSave!.Add(circB);
 
         ctx.AppCommands.MoveShape(circB, frame, +1);
 
@@ -674,9 +674,9 @@ public class AppCommandsReorderTests
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
         var rectC = new AARectSave { Name = "C" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
-        frame.ShapesSave!.Shapes.Add(rectC);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
+        frame.ShapesSave!.Add(rectC);
 
         ctx.AppCommands.MoveShapeToBottom(rectA, frame);
 
@@ -696,9 +696,9 @@ public class AppCommandsReorderTests
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
         var rectC = new AARectSave { Name = "C" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
-        frame.ShapesSave!.Shapes.Add(rectC);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
+        frame.ShapesSave!.Add(rectC);
 
         ctx.AppCommands.MoveShapeToTop(rectC, frame);
 
@@ -715,8 +715,8 @@ public class AppCommandsReorderTests
         var frame = chain.Frames[0];
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave!.Shapes.Add(rectA);
-        frame.ShapesSave!.Shapes.Add(rectB);
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave!.Add(rectB);
 
         ctx.AppCommands.MoveShapeToTop(rectB, frame);
         ctx.UndoManager.Undo();
@@ -725,42 +725,59 @@ public class AppCommandsReorderTests
         Assert.Equal(rectB, frame.ShapesSave.Shapes[1]);
     }
 
-    // ── MoveShape — cross-type ────────────────────────────────────────────────
+    // ── MoveShape — shapes never cross types (the file groups them by type) ──
 
     [Fact]
-    public void MoveShape_RectPastCircle_DeltaPos1_SwapsOrder()
+    public void MoveShape_RectPastCircle_DeltaPos1_IsNoOp()
     {
         var ctx   = TestHelpers.SetupFreshAcls();
-        var acls  = ctx.Acls;
-        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect  = new AARectSave  { Name = "Rect" };
         var circ  = new CircleSave  { Name = "Circ" };
-        frame.ShapesSave!.Shapes.Add(rect);  // index 0
-        frame.ShapesSave!.Shapes.Add(circ);  // index 1
+        frame.ShapesSave!.Add(circ);
+        frame.ShapesSave!.Add(rect);
 
         ctx.AppCommands.MoveShape(rect, frame, +1);
 
-        Assert.Equal(circ, frame.ShapesSave.Shapes[0]);
-        Assert.Equal(rect, frame.ShapesSave.Shapes[1]);
+        Assert.Equal(rect, frame.ShapesSave.Shapes[0]);
+        Assert.Equal(circ, frame.ShapesSave.Shapes[1]);
     }
 
     [Fact]
-    public void MoveShape_CirclePastRect_DeltaNeg1_SwapsOrder()
+    public void MoveShape_CirclePastRect_DeltaNeg1_IsNoOp()
     {
         var ctx   = TestHelpers.SetupFreshAcls();
-        var acls  = ctx.Acls;
-        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect  = new AARectSave  { Name = "Rect" };
         var circ  = new CircleSave  { Name = "Circ" };
-        frame.ShapesSave!.Shapes.Add(rect);  // index 0
-        frame.ShapesSave!.Shapes.Add(circ);  // index 1
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave!.Add(circ);
 
         ctx.AppCommands.MoveShape(circ, frame, -1);
 
-        Assert.Equal(circ, frame.ShapesSave.Shapes[0]);
-        Assert.Equal(rect, frame.ShapesSave.Shapes[1]);
+        Assert.Equal(rect, frame.ShapesSave.Shapes[0]);
+        Assert.Equal(circ, frame.ShapesSave.Shapes[1]);
+    }
+
+    [Fact]
+    public void MoveShapeToTop_Circle_StaysBehindRects_AndUndoRestores()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rect  = new AARectSave { Name = "Rect" };
+        var c1    = new CircleSave { Name = "C1" };
+        var c2    = new CircleSave { Name = "C2" };
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave!.Add(c1);
+        frame.ShapesSave!.Add(c2);
+
+        ctx.AppCommands.MoveShapeToTop(c2, frame);
+        Assert.Equal(new object[] { rect, c2, c1 }, frame.ShapesSave.Shapes);
+
+        ctx.UndoManager.Undo();
+        Assert.Equal(new object[] { rect, c1, c2 }, frame.ShapesSave.Shapes);
     }
 }
-

@@ -16,8 +16,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var rectA = new AARectSave { Name = "A", ScaleX = 8f, ScaleY = 8f };
         var rectB = new AARectSave { Name = "B", ScaleX = 8f, ScaleY = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[1].ShapesSave!.Add(rectB);
 
         ctx.AppCommands.SetRectPropsBulk(
             new List<AARectSave> { rectA, rectB }, null, null, null, 20f, 20f);
@@ -35,8 +35,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var rectA = new AARectSave { Name = "A", X = 1f, Y = 2f, ScaleX = 8f, ScaleY = 8f };
         var rectB = new AARectSave { Name = "B", X = 3f, Y = 4f, ScaleX = 8f, ScaleY = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[1].ShapesSave!.Add(rectB);
 
         ctx.AppCommands.SetRectPropsBulk(
             new List<AARectSave> { rectA, rectB }, null, null, null, 20f, 20f);
@@ -53,7 +53,7 @@ public class AppCommandsShapePropsBulkTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var rect = new AARectSave { Name = "A", ScaleX = 8f, ScaleY = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rect);
+        chain.Frames[0].ShapesSave!.Add(rect);
 
         ctx.AppCommands.SetRectPropsBulk(new List<AARectSave> { rect }, null, null, null, 20f, 20f);
         ctx.UndoManager.Undo();
@@ -70,7 +70,7 @@ public class AppCommandsShapePropsBulkTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var rect = new AARectSave { Name = "A", X = 0f, ScaleX = 8f, ScaleY = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rect);
+        chain.Frames[0].ShapesSave!.Add(rect);
 
         ctx.AppCommands.SetRectPropsBulk(new List<AARectSave> { rect }, null, 3f, null, null, null);
         ctx.AppCommands.SetRectPropsBulk(new List<AARectSave> { rect }, null, 32f, null, null, null);
@@ -87,8 +87,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Jump", 2);
         var circleA = new CircleSave { Name = "A", Radius = 8f };
         var circleB = new CircleSave { Name = "B", Radius = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(circleA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(circleB);
+        chain.Frames[0].ShapesSave!.Add(circleA);
+        chain.Frames[1].ShapesSave!.Add(circleB);
 
         ctx.AppCommands.SetCirclePropsBulk(
             new List<CircleSave> { circleA, circleB }, null, null, null, 15f);
@@ -103,7 +103,7 @@ public class AppCommandsShapePropsBulkTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Jump", 1);
         var circle = new CircleSave { Name = "A", X = 0f, Radius = 8f };
-        chain.Frames[0].ShapesSave!.Shapes.Add(circle);
+        chain.Frames[0].ShapesSave!.Add(circle);
 
         ctx.AppCommands.SetCirclePropsBulk(new List<CircleSave> { circle }, null, 3f, null, null);
         ctx.AppCommands.SetCirclePropsBulk(new List<CircleSave> { circle }, null, 32f, null, null);
@@ -120,8 +120,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[1].ShapesSave!.Add(rectB);
 
         ctx.AppCommands.SetRectPropsBulk(
             new List<AARectSave> { rectA, rectB }, "Hitbox", null, null, null, null);
@@ -137,8 +137,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Jump", 2);
         var circleA = new CircleSave { Name = "A" };
         var circleB = new CircleSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(circleA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(circleB);
+        chain.Frames[0].ShapesSave!.Add(circleA);
+        chain.Frames[1].ShapesSave!.Add(circleB);
 
         ctx.AppCommands.SetCirclePropsBulk(
             new List<CircleSave> { circleA, circleB }, "Hurtbox", null, null, null);
@@ -154,8 +154,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[1].ShapesSave!.Add(rectB);
 
         Assert.False(ctx.AppCommands.HasSameFrameNameCollision(new List<object> { rectA, rectB }));
     }
@@ -167,8 +167,8 @@ public class AppCommandsShapePropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[0].ShapesSave!.Add(rectB);
 
         Assert.True(ctx.AppCommands.HasSameFrameNameCollision(new List<object> { rectA, rectB }));
     }
@@ -186,8 +186,8 @@ public class AppCommandsPolygonPropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var a = Poly("A", y: 2f);
         var b = Poly("B", y: 4f);
-        chain.Frames[0].ShapesSave!.Shapes.Add(a);
-        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+        chain.Frames[0].ShapesSave!.Add(a);
+        chain.Frames[1].ShapesSave!.Add(b);
 
         ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, "Blade", 9f, null);
 
@@ -206,8 +206,8 @@ public class AppCommandsPolygonPropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var a = Poly("A");
         var b = Poly("B");
-        chain.Frames[0].ShapesSave!.Shapes.Add(a);
-        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+        chain.Frames[0].ShapesSave!.Add(a);
+        chain.Frames[1].ShapesSave!.Add(b);
 
         ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 5f, 5f);
 
@@ -222,8 +222,8 @@ public class AppCommandsPolygonPropsBulkTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var a = Poly("A", x: 1f);
         var b = Poly("B", x: 3f);
-        chain.Frames[0].ShapesSave!.Shapes.Add(a);
-        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+        chain.Frames[0].ShapesSave!.Add(a);
+        chain.Frames[1].ShapesSave!.Add(b);
 
         ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 50f, null);
         ctx.UndoManager.Undo();
@@ -241,8 +241,8 @@ public class AppCommandsPolygonPropsBulkTests
         locked.IsLocked = true;
         var a = Poly("A", x: 1f);
         var b = Poly("B", x: 3f);
-        locked.Frames[0].ShapesSave!.Shapes.Add(a);
-        open.Frames[0].ShapesSave!.Shapes.Add(b);
+        locked.Frames[0].ShapesSave!.Add(a);
+        open.Frames[0].ShapesSave!.Add(b);
 
         ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 50f, null);
 

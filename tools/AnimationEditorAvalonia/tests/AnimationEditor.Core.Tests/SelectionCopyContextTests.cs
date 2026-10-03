@@ -117,8 +117,8 @@ public class SelectionCopyContextTests
         var frame = chain.Frames[0];
         var rect   = new AARectSave { Name = "R" };
         var circle = new CircleSave { Name = "C" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(circle);
         ctx.SelectedState.SelectedRectangle = rect;
         ctx.SelectedState.SelectedNodes = new List<object> { circle, rect };
 
@@ -152,7 +152,7 @@ public class SelectionCopyContextTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "R" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         ctx.SelectedState.SelectedRectangle = rect;
         ctx.SelectedState.SelectedNodes = new List<object> { frame, rect };
 
@@ -169,8 +169,8 @@ public class SelectionCopyContextTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var rect0 = new AARectSave { Name = "R0" };
         var rect1 = new AARectSave { Name = "R1" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rect0);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rect1);
+        chain.Frames[0].ShapesSave!.Add(rect0);
+        chain.Frames[1].ShapesSave!.Add(rect1);
         ctx.SelectedState.SelectedRectangle = rect0;
         ctx.SelectedState.SelectedNodes = new List<object> { rect0, rect1 };
 

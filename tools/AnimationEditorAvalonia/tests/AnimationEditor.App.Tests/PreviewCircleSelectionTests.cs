@@ -56,7 +56,7 @@ public class PreviewCircleSelectionTests
         {
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(circle);
         return frame;
     }
 
@@ -146,7 +146,7 @@ public class PreviewCircleSelectionTests
 
         var rect = new AARectSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);
@@ -179,7 +179,7 @@ public class PreviewCircleSelectionTests
 
         var rect = new AARectSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedNodes = new List<object> { new object(), new object() };
 
@@ -217,8 +217,8 @@ public class PreviewCircleSelectionTests
         var rect   = new AARectSave { X = 0f, Y = 0f, ScaleX = 30f, ScaleY = 30f };
         var circle = new CircleSave              { X = 0f, Y = 0f, Radius = 20f };
         var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(rect);
+        frame.ShapesSave.Add(circle);
         ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);

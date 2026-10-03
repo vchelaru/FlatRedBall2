@@ -260,7 +260,7 @@ public class MultiCopyPasteAppTests
             var chain = new AnimationChainSave { Name = "Walk" };
             var sourceFrame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
             sourceFrame.ShapesSave = new ShapesSave();
-            sourceFrame.ShapesSave.Shapes.Add(new AARectSave { Name = "Hit" });
+            sourceFrame.ShapesSave.Add(new AARectSave { Name = "Hit" });
             var targetFrame1 = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f };
             var targetFrame2 = new AnimationFrameSave { TextureName = "c.png", FrameLength = 0.1f };
             chain.Frames.AddRange(new[] { sourceFrame, targetFrame1, targetFrame2 });

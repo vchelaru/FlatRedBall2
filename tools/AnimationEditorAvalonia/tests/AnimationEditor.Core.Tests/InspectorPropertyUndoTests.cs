@@ -459,7 +459,7 @@ public class InspectorPropertyUndoTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         var rect = new AARectSave { Name = "OldName", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetRectProps(frame, rect, "NewName", 10f, 20f, 30f, 40f);
@@ -481,7 +481,7 @@ public class InspectorPropertyUndoTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         var rect = new AARectSave { Name = "Same", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetRectProps(frame, rect, "Same", 1f, 2f, 3f, 4f);
@@ -496,7 +496,7 @@ public class InspectorPropertyUndoTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         var rect = new AARectSave { Name = "Hitbox", X = 0f, Y = 2f, ScaleX = 3f, ScaleY = 4f };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetRectProps(frame, rect, "Hitbox", 3f, 2f, 3f, 4f);
@@ -516,7 +516,7 @@ public class InspectorPropertyUndoTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         var circ = new CircleSave { Name = "OldCircle", X = 5f, Y = 6f, Radius = 7f };
-        frame.ShapesSave!.Shapes.Add(circ);
+        frame.ShapesSave!.Add(circ);
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetCircleProps(frame, circ, "NewCircle", 50f, 60f, 70f);
@@ -537,7 +537,7 @@ public class InspectorPropertyUndoTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         var circ = new CircleSave { Name = "Hurtbox", X = 0f, Y = 6f, Radius = 7f };
-        frame.ShapesSave!.Shapes.Add(circ);
+        frame.ShapesSave!.Add(circ);
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetCircleProps(frame, circ, "Hurtbox", 3f, 6f, 7f);

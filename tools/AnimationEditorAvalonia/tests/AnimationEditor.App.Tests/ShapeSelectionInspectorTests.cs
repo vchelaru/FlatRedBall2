@@ -37,7 +37,7 @@ public class ShapeSelectionInspectorTests
     private static AnimationFrameSave NewFrame(params ShapeSave[] shapes)
     {
         var f = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        foreach (var s in shapes) f.ShapesSave!.Shapes.Add(s);
+        foreach (var s in shapes) f.ShapesSave!.Add(s);
         return f;
     }
 

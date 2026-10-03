@@ -481,18 +481,18 @@ public class UndoCoverageRosterTests
                 ShapesSave       = new ShapesSave(),
             });
         }
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "Rect", X = 0f, Y = 0f, ScaleX = 4f, ScaleY = 4f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "Rect2", X = 8f, Y = 8f, ScaleX = 2f, ScaleY = 2f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new CircleSave { Name = "Circle", X = 0f, Y = 0f, Radius = 4f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new CircleSave { Name = "Circle2", X = 8f, Y = 8f, Radius = 2f });
         var polygon = new PolygonSave { Name = "Polygon", X = 1f, Y = 2f };
         foreach (var (x, y) in new[] { (-4f, -4f), (4f, -4f), (4f, 4f), (-4f, 4f), (-4f, -4f) })
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(polygon);
+        zebra.Frames[0].ShapesSave!.Add(polygon);
         zebra.Frames[1].Events.Add(new AnimationFrameEvent { Name = "Step" });
 
         var alpha = new AnimationChainSave { Name = "Alpha" };

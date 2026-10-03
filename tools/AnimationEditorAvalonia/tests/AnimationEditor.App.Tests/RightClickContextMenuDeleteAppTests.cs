@@ -127,8 +127,8 @@ public class RightClickContextMenuDeleteAppTests
             var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
             var r0 = new AARectSave { Name = "R0" };
             var r1 = new AARectSave { Name = "R1" };
-            frame.ShapesSave.Shapes.Add(r0);
-            frame.ShapesSave.Shapes.Add(r1);
+            frame.ShapesSave.Add(r0);
+            frame.ShapesSave.Add(r1);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
