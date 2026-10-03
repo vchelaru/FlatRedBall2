@@ -103,6 +103,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveShapeToIndex)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameFlip)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainHorizontally)]        = Category.MutatingUndoable,
@@ -334,6 +335,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveShapeToTop(SecondCircle(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.MoveShapeToBottom),
             ctx => Sync(() => ctx.AppCommands.MoveShapeToBottom(Rect(ctx), Zebra(ctx).Frames[0]))); // Rect is not already last
+        yield return Row(nameof(IAppCommands.MoveShapeToIndex),
+            // Second circle to the first circle's slot, so the circles list actually reorders.
+            ctx => Sync(() => ctx.AppCommands.MoveShapeToIndex(SecondCircle(ctx), Zebra(ctx).Frames[0],
+                Zebra(ctx).Frames[0].ShapesSave!.IndexOf(Circle(ctx)))));
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
         yield return Row(nameof(IAppCommands.SetFrameFlip),

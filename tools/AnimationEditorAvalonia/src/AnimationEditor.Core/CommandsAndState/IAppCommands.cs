@@ -298,6 +298,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
+        /// <summary>Moves <paramref name="shape"/> to <paramref name="insertIndex"/> (a position in the current shape list, clamped to its type group). No-op when the order is unchanged.</summary>
+        void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex);
         void HandleReorder(int delta);
         /// <summary>
         /// Sets the horizontal/vertical/diagonal flip flags on every frame in <paramref name="frames"/>

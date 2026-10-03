@@ -19,8 +19,8 @@ public class TreeShapeHoverScenarioTests
         AARectSave first = new AARectSave { Name = "A", ScaleX = 4, ScaleY = 4 };
         AARectSave second = new AARectSave { Name = "B", X = 20, ScaleX = 4, ScaleY = 4 };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(first);
-        frame.ShapesSave.Shapes.Add(second);
+        frame.ShapesSave.Add(first);
+        frame.ShapesSave.Add(second);
         await editor.OpenAsync(editor.WriteAchx("hero.achx", chain));
         AnimationChainSave walk = editor.ChainNamed("Walk");
         editor.Expand(walk);
