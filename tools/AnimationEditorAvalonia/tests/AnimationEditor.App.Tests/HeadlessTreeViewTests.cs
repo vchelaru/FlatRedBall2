@@ -1236,6 +1236,41 @@ public class HeadlessTreeViewTests
         finally { window.Close(); }
     }
 
+    // #1290: a frame node's expand toggle must reach the companion file, like a chain's does.
+    [AvaloniaFact]
+    public void ExpandingFrameNode_SavesFrameToCompanionFile()
+    {
+        var (window, ctx) = CreateWindow();
+        var tempFile = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), $"AE1290_{Guid.NewGuid():N}.achx");
+        try
+        {
+            ctx.ProjectManager.FileName = tempFile;
+
+            var walk = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+            frame.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+            walk.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            GetRoots(GetTree(window))[0].Children[0].IsExpanded = true;
+
+            var saved = ctx.IoManager.TryLoadCompanionSettings(tempFile);
+            var entry = Assert.Single(saved!.ExpandedFrames);
+            Assert.Equal("Walk", entry.ChainName);
+            Assert.Equal(0, entry.FrameIndex);
+        }
+        finally
+        {
+            window.Close();
+            foreach (var f in System.IO.Directory.GetFiles(System.IO.Path.GetTempPath(), System.IO.Path.GetFileNameWithoutExtension(tempFile) + "*"))
+                System.IO.File.Delete(f);
+        }
+    }
+
     [AvaloniaFact]
     public void RenameChain_DoesNotCollapseChainNode()
     {

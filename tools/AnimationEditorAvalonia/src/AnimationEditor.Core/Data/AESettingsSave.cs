@@ -7,6 +7,13 @@ namespace AnimationEditor.Core.Data
     {
     }
 
+    /// <summary>A frame is identified by its chain's name plus its index in that chain; frames have no name of their own.</summary>
+    public class ExpandedFrameSave
+    {
+        public string ChainName { get; set; } = string.Empty;
+        public int FrameIndex { get; set; }
+    }
+
     public class AESettingsSave
     {
         public float OffsetMultiplier = 1;
@@ -22,6 +29,10 @@ namespace AnimationEditor.Core.Data
 
         [XmlElement("ExpandedNode")]
         public List<string> ExpandedNodes { get; set; } = new List<string>();
+
+        /// <summary>Frame nodes (those with shape children) the user left expanded.</summary>
+        [XmlElement("ExpandedFrame")]
+        public List<ExpandedFrameSave> ExpandedFrames { get; set; } = new List<ExpandedFrameSave>();
 
         public bool SnapToGrid { get; set; }
         public int GridSize { get; set; } = 16;

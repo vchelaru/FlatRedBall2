@@ -105,6 +105,22 @@ public class AESettingsSaveRoundTripTests
         Assert.Equal("B", loaded.ExpandedNodes[2]);
     }
 
+    [Fact]
+    public void ExpandedFrames_RoundTrip_PreservesChainNameAndIndex()
+    {
+        var s = new AESettingsSave();
+        s.ExpandedFrames.Add(new ExpandedFrameSave { ChainName = "Walk", FrameIndex = 2 });
+        s.ExpandedFrames.Add(new ExpandedFrameSave { ChainName = "Run", FrameIndex = 0 });
+
+        var loaded = Deserialize(Serialize(s));
+
+        Assert.Equal(2, loaded.ExpandedFrames.Count);
+        Assert.Equal("Walk", loaded.ExpandedFrames[0].ChainName);
+        Assert.Equal(2, loaded.ExpandedFrames[0].FrameIndex);
+        Assert.Equal("Run", loaded.ExpandedFrames[1].ChainName);
+        Assert.Equal(0, loaded.ExpandedFrames[1].FrameIndex);
+    }
+
     // ── Grid settings ─────────────────────────────────────────────────────────
 
     [Fact]

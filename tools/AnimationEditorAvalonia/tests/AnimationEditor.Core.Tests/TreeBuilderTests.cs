@@ -284,6 +284,68 @@ public class TreeBuilderPureTests
         Assert.Empty(names);
     }
 
+    // ── Expanded frame persistence (#1290) ────────────────────────────────────
+
+    private static AnimationChainListSave ChainsWithShapedFrames()
+    {
+        var acls = new AnimationChainListSave();
+        foreach (var name in new[] { "Walk", "Run" })
+        {
+            var chain = new AnimationChainSave { Name = name };
+            for (int i = 0; i < 2; i++)
+            {
+                var frame = new AnimationFrameSave();
+                frame.ShapesSave = new ShapesSave();
+                frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Rect" });
+                chain.Frames.Add(frame);
+            }
+            acls.AnimationChains.Add(chain);
+        }
+        return acls;
+    }
+
+    [Fact]
+    public void GetExpandedFrames_ReturnsChainNameAndIndexOfExpandedFrames()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+        roots[1].Children[1].IsExpanded = true;
+
+        var expanded = TreeBuilder.GetExpandedFrames(roots).ToList();
+
+        var entry = Assert.Single(expanded);
+        Assert.Equal("Run", entry.ChainName);
+        Assert.Equal(1, entry.FrameIndex);
+    }
+
+    [Fact]
+    public void ApplyExpandedFrames_ExpandsMatchingFramesOnly()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+
+        TreeBuilder.ApplyExpandedFrames(roots, new[]
+        {
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Walk", FrameIndex = 0 },
+        });
+
+        Assert.True(roots[0].Children[0].IsExpanded);
+        Assert.False(roots[0].Children[1].IsExpanded);
+        Assert.False(roots[1].Children[0].IsExpanded);
+    }
+
+    [Fact]
+    public void ApplyExpandedFrames_IgnoresUnknownChainAndOutOfRangeIndex()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+
+        TreeBuilder.ApplyExpandedFrames(roots, new[]
+        {
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Gone", FrameIndex = 0 },
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Walk", FrameIndex = 99 },
+        });
+
+        Assert.DoesNotContain(roots.SelectMany(r => r.Children), f => f.IsExpanded);
+    }
+
     // ── FindNodeForData ───────────────────────────────────────────────────────
 
     [Fact]

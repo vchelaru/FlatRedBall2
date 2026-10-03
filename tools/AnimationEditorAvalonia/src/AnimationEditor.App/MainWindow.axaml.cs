@@ -2027,6 +2027,7 @@ public partial class MainWindow : Window
         PreviewPanY          = PreviewCtrl.PanOffset.Y,
         OffsetMultiplier     = _appState.OffsetMultiplier,
         ExpandedNodes        = TreeBuilder.GetExpandedChainNames(_treeRoots).ToList(),
+        ExpandedFrames       = TreeBuilder.GetExpandedFrames(_treeRoots).ToList(),
         HorizontalGuides     = PreviewCtrl.HGuides.ToList(),
         VerticalGuides       = PreviewCtrl.VGuides.ToList(),
     };
@@ -2059,6 +2060,7 @@ public partial class MainWindow : Window
                 if (node.Data is AnimationChainSave chain)
                     node.IsExpanded = expandedSet.Contains(chain.Name);
             }
+            TreeBuilder.ApplyExpandedFrames(_treeRoots, settings.ExpandedFrames);
 
             PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
         }
@@ -2074,11 +2076,39 @@ public partial class MainWindow : Window
         {
             if (args.NewItems != null)
                 foreach (TreeNodeVm vm in args.NewItems)
-                    vm.PropertyChanged += OnTreeNodeIsExpandedChanged;
+                    HookExpandedChanged(vm);
             if (args.OldItems != null)
                 foreach (TreeNodeVm vm in args.OldItems)
-                    vm.PropertyChanged -= OnTreeNodeIsExpandedChanged;
+                    UnhookExpandedChanged(vm);
         };
+    }
+
+    // Chain nodes and their frame children both persist IsExpanded, and frames are added and
+    // removed under a live chain node, so each node also watches its own Children.
+    private void HookExpandedChanged(TreeNodeVm vm)
+    {
+        vm.PropertyChanged += OnTreeNodeIsExpandedChanged;
+        vm.Children.CollectionChanged += OnTreeNodeChildrenChanged;
+        foreach (var child in vm.Children)
+            HookExpandedChanged(child);
+    }
+
+    private void UnhookExpandedChanged(TreeNodeVm vm)
+    {
+        vm.PropertyChanged -= OnTreeNodeIsExpandedChanged;
+        vm.Children.CollectionChanged -= OnTreeNodeChildrenChanged;
+        foreach (var child in vm.Children)
+            UnhookExpandedChanged(child);
+    }
+
+    private void OnTreeNodeChildrenChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+    {
+        if (args.NewItems != null)
+            foreach (TreeNodeVm vm in args.NewItems)
+                HookExpandedChanged(vm);
+        if (args.OldItems != null)
+            foreach (TreeNodeVm vm in args.OldItems)
+                UnhookExpandedChanged(vm);
     }
 
     private void OnTreeNodeIsExpandedChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

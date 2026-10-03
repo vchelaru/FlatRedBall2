@@ -440,6 +440,39 @@ public static class TreeBuilder
             .Where(n => n.Data is AnimationChainSave && n.IsExpanded)
             .Select(n => ((AnimationChainSave)n.Data!).Name);
 
+    /// <summary>
+    /// Returns every expanded frame node as (chain name, frame index), for persistence in
+    /// <c>AESettingsSave.ExpandedFrames</c>. Frames have no name, so position within the chain is the key.
+    /// </summary>
+    public static IEnumerable<AnimationEditor.Core.Data.ExpandedFrameSave> GetExpandedFrames(IEnumerable<TreeNodeVm> roots)
+    {
+        foreach (var root in roots)
+        {
+            if (root.Data is not AnimationChainSave chain) continue;
+            for (int i = 0; i < root.Children.Count; i++)
+            {
+                if (root.Children[i].Data is AnimationFrameSave && root.Children[i].IsExpanded)
+                    yield return new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = chain.Name, FrameIndex = i };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Expands the frame nodes named by <paramref name="expandedFrames"/>. Entries whose chain no longer
+    /// exists or whose index is out of range are ignored; other frames are left as they are.
+    /// </summary>
+    public static void ApplyExpandedFrames(IEnumerable<TreeNodeVm> roots, IEnumerable<AnimationEditor.Core.Data.ExpandedFrameSave> expandedFrames)
+    {
+        var rootList = roots as IList<TreeNodeVm> ?? roots.ToList();
+        foreach (var entry in expandedFrames)
+        {
+            var root = rootList.FirstOrDefault(r => r.Data is AnimationChainSave c && c.Name == entry.ChainName);
+            if (root is null || entry.FrameIndex < 0 || entry.FrameIndex >= root.Children.Count) continue;
+            if (root.Children[entry.FrameIndex].Data is AnimationFrameSave)
+                root.Children[entry.FrameIndex].IsExpanded = true;
+        }
+    }
+
     // ── Selection routing ─────────────────────────────────────────────────────
 
     /// <summary>
