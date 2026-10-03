@@ -273,6 +273,8 @@ public partial class MainWindow : Window
         ApplyPersistedTheme();
         ApplyPersistedCanvasColors();
         ApplyPersistedPreviewPaneHeight();
+        ShowBoundingBoxCheck.IsChecked = _appSettings.ShowBoundingBox;
+        PreviewCtrl.ShowBoundingBox = _appSettings.ShowBoundingBox;
         ApplyPersistedSidebarWidth();
         ApplyPersistedWindowState();
         WireMenuEvents();
@@ -3220,7 +3222,11 @@ public partial class MainWindow : Window
             PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
 
         ShowBoundingBoxCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowBoundingBox = ShowBoundingBoxCheck.IsChecked == true;
+        {
+            var show = ShowBoundingBoxCheck.IsChecked == true;
+            PreviewCtrl.ShowBoundingBox = show;
+            _appSettings.ShowBoundingBox = show;
+        };
 
         ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
         {
