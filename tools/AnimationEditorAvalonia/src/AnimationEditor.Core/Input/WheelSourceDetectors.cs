@@ -15,6 +15,12 @@ public interface IWheelSourceDetector
     /// touchpad's event a pinch rather than a scroll.
     /// </summary>
     WheelReading Read(Vector2 delta, bool controlHeld);
+
+    /// <summary>
+    /// True while the OS is likely feeding the editor a touchpad pinch. Windows presses a real Ctrl key
+    /// for a pinch, which the editor must not mistake for the user holding Ctrl; only Windows says yes.
+    /// </summary>
+    bool IsPinchInProgress => false;
 }
 
 /// <summary>Treats every event as a mouse wheel: the default for the browser head and for tests.</summary>
@@ -78,9 +84,14 @@ public sealed class WindowsWheelSourceDetector(Func<long> clockMs, WindowsTouchp
     /// <summary>A gap this long means no fingers are on the pad.</summary>
     public const long ReportWindowMs = 100;
 
+    /// <summary>Two fingers on a pad that is still reporting: a pinch, or the start of a two-finger scroll.</summary>
+    public bool IsPinchInProgress => IsTouchpadReporting() && state.PanTracker.HasTwoFingers;
+
+    private bool IsTouchpadReporting() => state.LastReportMs is { } last && clockMs() - last <= ReportWindowMs;
+
     public WheelReading Read(Vector2 delta, bool controlHeld)
     {
-        if (state.LastReportMs is not { } last || clockMs() - last > ReportWindowMs)
+        if (!IsTouchpadReporting())
         {
             return new WheelReading(WheelSource.Wheel);
         }

@@ -2,6 +2,7 @@ using Vector = Avalonia.Vector;
 using Vector2 = System.Numerics.Vector2;
 using AnimationEditor.Core.Input;
 using Avalonia;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Shouldly;
@@ -95,6 +96,38 @@ public class TouchpadScrollScenarioTests
         await editor.WaitUntilAsync(() => !editor.Wireframe.IsZoomAnimating, TimeSpan.FromSeconds(2));
 
         editor.Wireframe.CameraState.Zoom.ShouldBeGreaterThan(zoom);
+    }
+
+    private sealed class PinchingDetector(bool pinching) : IWheelSourceDetector
+    {
+        public bool IsPinchInProgress { get; } = pinching;
+
+        public WheelReading Read(Vector2 delta, bool controlHeld) => new(WheelSource.WindowsTouchpad);
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlPressInjectedByAWindowsPinch_DoesNotShowTheAddFrameCursor()
+    {
+        // Windows presses Ctrl for a precision-touchpad pinch; it must not look like the user holding Ctrl.
+        using AnimationEditorHarness editor = await OpenWalkAsync();
+        editor.Wireframe.WheelSourceDetector = new PinchingDetector(pinching: true);
+        editor.Hover(editor.WireframePointAt(64, 64));
+
+        editor.Window.KeyPress(Key.LeftCtrl, RawInputModifiers.Control, PhysicalKey.None, null);
+
+        editor.Wireframe.IsShowingAddFrameCursor.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlPressWithNoPinchInProgress_StillShowsTheAddFrameCursor()
+    {
+        using AnimationEditorHarness editor = await OpenWalkAsync();
+        editor.Wireframe.WheelSourceDetector = new PinchingDetector(pinching: false);
+        editor.Hover(editor.WireframePointAt(64, 64));
+
+        editor.Window.KeyPress(Key.LeftCtrl, RawInputModifiers.Control, PhysicalKey.None, null);
+
+        editor.Wireframe.IsShowingAddFrameCursor.ShouldBeTrue();
     }
 
     [AvaloniaFact]

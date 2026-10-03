@@ -184,6 +184,40 @@ public class WheelGestureTests
         detector.Read(new Vector2(0, 0.1f), controlHeld: false).TouchpadPan.ShouldBe(Vector2.Zero);
     }
 
+    [Fact]
+    public void WindowsDetector_PinchInProgress_OnlyWhileTwoFingersAreOnThePad()
+    {
+        // Windows injects a Ctrl key press for a precision-touchpad pinch; the editor must be able
+        // to tell that press from the user's own, and two fingers on the pad is the tell.
+        long now = 1000;
+        var state = new WindowsTouchpadState();
+        var detector = new WindowsWheelSourceDetector(() => now, state);
+        detector.IsPinchInProgress.ShouldBeFalse();
+
+        state.OnReport(now);
+        state.OnFrame([new TouchpadContact(1, 10, 10)]);
+        detector.IsPinchInProgress.ShouldBeFalse();
+
+        state.OnFrame([new TouchpadContact(1, 10, 10), new TouchpadContact(2, 30, 10)]);
+        detector.IsPinchInProgress.ShouldBeTrue();
+
+        now += WindowsWheelSourceDetector.ReportWindowMs + 1;
+        detector.IsPinchInProgress.ShouldBeFalse();
+
+        now = 2000;
+        state.OnReport(now);
+        state.OnFrame([]);
+        detector.IsPinchInProgress.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OtherDetectors_NeverReportAPinchInProgress()
+    {
+        ((IWheelSourceDetector)NullWheelSourceDetector.Instance).IsPinchInProgress.ShouldBeFalse();
+        ((IWheelSourceDetector)new LinuxWheelSourceDetector(() => 0)).IsPinchInProgress.ShouldBeFalse();
+        ((IWheelSourceDetector)new MacWheelSourceDetector(new FakeMacReader(true, true))).IsPinchInProgress.ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(0.0f, -1.0f, WheelSource.Wheel)]
     [InlineData(0.0f, 3.0f, WheelSource.Wheel)]

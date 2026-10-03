@@ -7081,7 +7081,8 @@ public partial class MainWindow : Window
 
             // Command-modifier hover (Ctrl, or ⌘ on macOS) over the wireframe shows the add-frame
             // cursor; refresh it immediately on press so it doesn't wait for the next pointer move (#882).
-            if (_commandModifier.IsModifierKey(e.Key))
+            // Windows presses Ctrl itself for a touchpad pinch, which isn't the user holding it.
+            if (_commandModifier.IsModifierKey(e.Key) && !WireframeCtrl.WheelSourceDetector.IsPinchInProgress)
                 WireframeCtrl.RefreshCursorForCommandModifierChange(isHeld: true);
 
             var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));

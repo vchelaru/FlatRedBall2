@@ -65,6 +65,9 @@ public sealed class TouchpadPanTracker
     // +1 when the content follows the fingers (Windows' default for touchpads), -1 when reversed.
     private int _direction = 1;
 
+    /// <summary>True when the latest frame had exactly two fingers on the pad.</summary>
+    public bool HasTwoFingers => _twoFingers != null;
+
     /// <summary>Records a frame of the fingers on the pad.</summary>
     public void OnFrame(IReadOnlyList<TouchpadContact> contacts)
     {
