@@ -5671,9 +5671,14 @@ public partial class MainWindow : Window
 
     private void RefreshPolygonPanel(PolygonSave polygon)
     {
-        PropPolygonName.Text = polygon.Name;
-        PropPolygonX.Value = (decimal)polygon.X;
-        PropPolygonY.Value = (decimal)polygon.Y;
+        // Name/X/Y apply to every selected polygon, so they show "(mixed)" when the selection
+        // disagrees, exactly like multi-selected rects and circles (see ApplyRectProps).
+        var polygons = _selectedState.SelectedPolygons;
+        bool namesCollide = polygons.Count > 1 &&
+            _appCommands.HasSameFrameNameCollision(polygons.Cast<object>().ToList());
+        SetNameOrMixed(PropPolygonName, polygons.Select(p => p.Name ?? "").ToList(), namesCollide);
+        SetValueOrMixed(PropPolygonX, polygons.Select(p => (decimal)p.X).ToList());
+        SetValueOrMixed(PropPolygonY, polygons.Select(p => (decimal)p.Y).ToList());
         PropPolygonWarning.IsVisible = PolygonVertices.IsSelfIntersecting(polygon);
 
         int count = PolygonVertices.Count(polygon);
@@ -5798,6 +5803,18 @@ public partial class MainWindow : Window
     private void ApplyPolygonProps()
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
+        var polygons = _selectedState.SelectedPolygons;
+
+        if (polygons.Count > 1)
+        {
+            // A null component means "showing (mixed)/disabled, not edited" -- see ApplyRectProps.
+            float? bx = PropPolygonX.Value.HasValue ? (float)PropPolygonX.Value.Value : null;
+            float? by = PropPolygonY.Value.HasValue ? (float)PropPolygonY.Value.Value : null;
+            string? bname = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? null : PropPolygonName.Text.Trim();
+            _appCommands.SetPolygonPropsBulk(polygons, bname, bx, by);
+            return;
+        }
+
         if (PropPolygonX.Value is not { } x || PropPolygonY.Value is not { } y) return;
         var name = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? polygon.Name : PropPolygonName.Text.Trim();
         _appCommands.SetPolygonProps(_objectFinder.GetAnimationFrameContaining(polygon), polygon, name, (float)x, (float)y);

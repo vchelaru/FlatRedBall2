@@ -2207,6 +2207,25 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, _objectFinder, "Edit Circles"));
         }
 
+        public void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons,
+            string? name, float? x, float? y)
+        {
+            polygons = polygons.Where(p => !IsShapeLocked(null, p)).ToList();
+            if (polygons.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                polygons.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var p in polygons)
+                    {
+                        if (name != null) p.Name = name;
+                        if (x.HasValue) p.X = x.Value;
+                        if (y.HasValue) p.Y = y.Value;
+                    }
+                },
+                this, _events, _objectFinder, "Edit Polygons"));
+        }
+
         public void SetPolygonProps(AnimationFrameSave? frame, PolygonSave polygon, string name, float x, float y)
         {
             if (IsShapeLocked(frame, polygon)) return;

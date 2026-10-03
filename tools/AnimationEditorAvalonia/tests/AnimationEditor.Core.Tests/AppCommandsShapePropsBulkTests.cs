@@ -173,3 +173,80 @@ public class AppCommandsShapePropsBulkTests
         Assert.True(ctx.AppCommands.HasSameFrameNameCollision(new List<object> { rectA, rectB }));
     }
 }
+
+[Collection("SequentialSingletons")]
+public class AppCommandsPolygonPropsBulkTests
+{
+    private static PolygonSave Poly(string name, float x = 0f, float y = 0f) => new() { Name = name, X = x, Y = y };
+
+    [Fact]
+    public void SetPolygonPropsBulk_AppliesNameAndXToAll_LeavingNullYPerPolygon()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var a = Poly("A", y: 2f);
+        var b = Poly("B", y: 4f);
+        chain.Frames[0].ShapesSave!.Shapes.Add(a);
+        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+
+        ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, "Blade", 9f, null);
+
+        Assert.Equal("Blade", a.Name);
+        Assert.Equal("Blade", b.Name);
+        Assert.Equal(9f, a.X);
+        Assert.Equal(9f, b.X);
+        Assert.Equal(2f, a.Y);
+        Assert.Equal(4f, b.Y);
+    }
+
+    [Fact]
+    public void SetPolygonPropsBulk_NullName_KeepsEachName()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var a = Poly("A");
+        var b = Poly("B");
+        chain.Frames[0].ShapesSave!.Shapes.Add(a);
+        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+
+        ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 5f, 5f);
+
+        Assert.Equal("A", a.Name);
+        Assert.Equal("B", b.Name);
+    }
+
+    [Fact]
+    public void SetPolygonPropsBulk_Undo_RestoresEveryPolygonInOneStep()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var a = Poly("A", x: 1f);
+        var b = Poly("B", x: 3f);
+        chain.Frames[0].ShapesSave!.Shapes.Add(a);
+        chain.Frames[1].ShapesSave!.Shapes.Add(b);
+
+        ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 50f, null);
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(1f, a.X);
+        Assert.Equal(3f, b.X);
+    }
+
+    [Fact]
+    public void SetPolygonPropsBulk_SkipsPolygonsInLockedChains()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var locked = TestHelpers.MakeChain(ctx.Acls, "Locked", 1);
+        var open = TestHelpers.MakeChain(ctx.Acls, "Open", 1);
+        locked.IsLocked = true;
+        var a = Poly("A", x: 1f);
+        var b = Poly("B", x: 3f);
+        locked.Frames[0].ShapesSave!.Shapes.Add(a);
+        open.Frames[0].ShapesSave!.Shapes.Add(b);
+
+        ctx.AppCommands.SetPolygonPropsBulk(new List<PolygonSave> { a, b }, null, 50f, null);
+
+        Assert.Equal(1f, a.X);
+        Assert.Equal(50f, b.X);
+    }
+}

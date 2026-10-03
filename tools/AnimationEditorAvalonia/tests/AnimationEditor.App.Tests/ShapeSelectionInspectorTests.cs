@@ -13,7 +13,7 @@ namespace AnimationEditor.App.Tests;
 /// Inspector behavior when the selection holds several shapes or a mix of kinds/levels. The
 /// rules these pin down: shapes beat frames beat chains; the panel shown is for the kind of the
 /// primary (last-clicked) shape; rect/circle panels bulk-edit every selected shape of that kind;
-/// the polygon panel edits only the primary polygon.
+/// the polygon panel bulk-edits name/X/Y the same way (its vertex list follows the vertex fan-out).
 /// </summary>
 public class ShapeSelectionInspectorTests
 {
@@ -109,36 +109,58 @@ public class ShapeSelectionInspectorTests
         finally { window.Close(); }
     }
 
-    /// <summary>
-    /// Pins today's behavior: with two polygons selected the panel shows and edits only the
-    /// primary (<c>SelectedPolygon</c>); the other is left untouched and nothing says "mixed".
-    /// </summary>
+
     [AvaloniaFact]
-    public void TwoPolygonsSelected_PanelEditsOnlyThePrimaryPolygon()
+    public void TwoPolygonsAcrossFrames_NameAndXEditsApplyToBoth_YKeptPerPolygon()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var p0 = new PolygonSave { Name = "P0", Y = 2f };
+            var p1 = new PolygonSave { Name = "P1", Y = 4f };
+            var chain = NewChain("Walk", NewFrame(p0), NewFrame(p1));
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TreeSelect(window, p0, p1);
+
+            var nameBox = window.FindControl<TextBox>("PropPolygonName")!;
+            var xBox = window.FindControl<NumericUpDown>("PropPolygonX")!;
+            Assert.Null(nameBox.Text); // names disagree: "(mixed)"
+            Assert.NotNull(xBox.Value);
+            Assert.Null(window.FindControl<NumericUpDown>("PropPolygonY")!.Value); // Y disagrees
+
+            nameBox.Focus();
+            nameBox.Text = "Blade";
+            xBox.Focus(); // raises LostFocus on the name box
+            FlushUi();
+            xBox.Value = 7m;
+            FlushUi();
+
+            Assert.Equal("Blade", p0.Name);
+            Assert.Equal("Blade", p1.Name);
+            Assert.Equal(7f, p0.X);
+            Assert.Equal(7f, p1.X);
+            Assert.Equal(2f, p0.Y);
+            Assert.Equal(4f, p1.Y);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>Two polygons on the same frame can't share one name, so the field is disabled (same as rects).</summary>
+    [AvaloniaFact]
+    public void TwoPolygonsSameFrame_NameFieldDisabled()
     {
         var (window, ctx) = CreateWindow();
         try
         {
             var p0 = new PolygonSave { Name = "P0" };
             var p1 = new PolygonSave { Name = "P1" };
-            var chain = NewChain("Walk", NewFrame(p0), NewFrame(p1));
+            var chain = NewChain("Walk", NewFrame(p0, p1));
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             TreeSelect(window, p0, p1);
 
-            var primary = ctx.SelectedState.SelectedPolygon!;
-            var other = ReferenceEquals(primary, p0) ? p1 : p0;
-            var nameBox = window.FindControl<TextBox>("PropPolygonName")!;
-            Assert.Equal(primary.Name, nameBox.Text);
-
-            var otherName = other.Name;
-            nameBox.Focus();
-            nameBox.Text = "Renamed";
-            window.FindControl<NumericUpDown>("PropPolygonX")!.Focus(); // raises LostFocus on the name box
-            FlushUi();
-
-            Assert.Equal("Renamed", primary.Name);
-            Assert.Equal(otherName, other.Name);
+            Assert.False(window.FindControl<TextBox>("PropPolygonName")!.IsEnabled);
         }
         finally { window.Close(); }
     }

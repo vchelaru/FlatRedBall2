@@ -133,6 +133,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectPropsBulk)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCirclePropsBulk)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetPolygonPropsBulk)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SealPendingEdits)]             = Category.NonMutating, // resets undo-coalescing state only
         [nameof(IAppCommands.DiscardPendingEdits)]          = Category.MutatingNotUndoable, // reverts via Undo(); not itself a new undo entry
         [nameof(IAppCommands.HasSameFrameNameCollision)]    = Category.NonMutating,
@@ -392,6 +393,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetCircleProps(Zebra(ctx).Frames[0], Circle(ctx), "Renamed", 5f, 6f, 9f)));
         yield return Row(nameof(IAppCommands.SetRectPropsBulk),
             ctx => Sync(() => ctx.AppCommands.SetRectPropsBulk(new[] { Rect(ctx), SecondRect(ctx) }, null, null, null, 20f, 20f)));
+        yield return Row(nameof(IAppCommands.SetPolygonPropsBulk),
+            ctx => Sync(() => ctx.AppCommands.SetPolygonPropsBulk(new[] { Polygon(ctx) }, null, 9f, null)));
         yield return Row(nameof(IAppCommands.SetCirclePropsBulk),
             ctx => Sync(() => ctx.AppCommands.SetCirclePropsBulk(new[] { Circle(ctx), SecondCircle(ctx) }, null, null, null, 20f)));
         yield return Row(nameof(IAppCommands.PasteChains),

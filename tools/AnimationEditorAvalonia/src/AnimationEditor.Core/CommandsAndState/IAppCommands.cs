@@ -495,6 +495,14 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, float? x, float? y, float? radius);
 
         /// <summary>
+        /// Sets Name/X/Y on every polygon in <paramref name="polygons"/> as one undoable operation —
+        /// the multi-select counterpart to <see cref="SetPolygonProps"/>. Points are untouched (see
+        /// <see cref="MovePolygonVertex"/> for the vertex fan-out). See <see cref="SetRectPropsBulk"/>
+        /// for the null-means-"don't touch" semantics and the same-frame name-collision caveat.
+        /// </summary>
+        void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons, string? name, float? x, float? y);
+
+        /// <summary>
         /// Ends the current edit session for the coalescing NumericUpDown fields (rect/circle
         /// props, frame length/offset/pixel-region/color/alpha — see <see cref="SetRectProps"/> and
         /// siblings) so the next edit records a fresh undo entry instead of merging into the last
