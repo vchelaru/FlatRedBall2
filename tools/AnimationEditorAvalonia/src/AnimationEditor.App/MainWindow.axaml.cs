@@ -133,6 +133,10 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
 
+    // ── Shape drag attempt (issue #1285): shapes can't be reordered by drag, so a drag past the
+    // threshold on a shape row only shows an explanatory toast (once per press).
+    private Avalonia.Point? _shapeDragPressPoint;
+
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
     // Pixel-diff tolerance = 0: any inequality is a change. PNG is lossless, so a differing pixel
@@ -3426,6 +3430,16 @@ public partial class MainWindow : Window
             OnTreeChainDragPointerReleased,
             RoutingStrategies.Bubble);
 
+        // Shape drag-and-drop reorder within a frame (#1285).
+        AnimTree.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeShapeDragPointerMoved,
+            RoutingStrategies.Bubble);
+        AnimTree.AddHandler(
+            InputElement.PointerReleasedEvent,
+            (_, _) => ClearShapeDragCandidate(),
+            RoutingStrategies.Bubble);
+
         // Hovering a chain/frame row highlights it on the wireframe (#1216).
         TreeHoverTracker.Attach(AnimTree, WireframeCtrl.SetTreeHover);
 
@@ -3971,6 +3985,28 @@ public partial class MainWindow : Window
     {
         RemoveDropLine();
         RemoveDropBox();
+    }
+
+    // ── Shape drag attempt (issue #1285) ───────────────────────────────────────
+
+    private void ClearShapeDragCandidate() => _shapeDragPressPoint = null;
+
+    private void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_shapeDragPressPoint is not { } pressPoint) return;
+
+        if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
+        {
+            ClearShapeDragCandidate();
+            return;
+        }
+
+        var pos = e.GetPosition(AnimTree);
+        if (Math.Abs(pos.X - pressPoint.X) <= 4 && Math.Abs(pos.Y - pressPoint.Y) <= 4)
+            return;
+
+        ClearShapeDragCandidate();
+        ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
     }
 
     // ── Internal chain drag-and-drop reorder ───────────────────────────────────
@@ -4952,6 +4988,8 @@ public partial class MainWindow : Window
             if (e.Source is Control btnSrc && btnSrc.FindAncestorOfType<Button>(includeSelf: true) is not null)
                 return;
 
+            ClearShapeDragCandidate();
+
             // Arm a frame-drag candidate. Snapshot the selection BEFORE the TreeView mutates
             // it on press, so dragging a frame that is part of a multi-selection can move the
             // whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -5014,10 +5052,19 @@ public partial class MainWindow : Window
                     _pendingSingleSelectChain = null;
                 }
             }
+            else if (e.Source is Control shapeSrc &&
+                shapeSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
+                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave })
+            {
+                ClearFrameDragCandidate();
+                ClearChainDragCandidate();
+                _shapeDragPressPoint = e.GetPosition(AnimTree);
+            }
             else
             {
                 ClearFrameDragCandidate();
                 ClearChainDragCandidate();
+                ClearShapeDragCandidate();
             }
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 2)

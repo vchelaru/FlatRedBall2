@@ -91,9 +91,9 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 Tests that exercise path logic **must** use Windows-style backslash literals (e.g. `@"C:\projects\MyAnim.achx"`) to prove the cross-platform handling works — not `Path.Combine`, which would only exercise the current OS's separator.
 
-## Tree reorder — chains and frames; shape order is fixed
+## Tree reorder: chains and frames; shapes cannot drag
 
-Drag-and-drop tree reorder covers **chains and frames** (pure resolvers `ChainDropResolver` / `FrameDropResolver`, wired in `MainWindow`). **Do not add shape DnD reorder:** collision shapes in `.achx` keep a **fixed list order** for FRB1 runtime compatibility — order is meaningful to legacy consumers, not a cosmetic tree sort. Menu/Alt+Arrow shape reorder exists in `AppCommands.MoveShape` today; treat new reorder UX as chain/frame-only unless an issue explicitly revisits shape ordering across runtimes.
+Drag-and-drop tree reorder covers **chains and frames** (pure resolvers `ChainDropResolver` / `FrameDropResolver`, wired in `MainWindow`). **Do not add shape DnD reorder (#1285):** both `.achx` and `.achj` save shapes grouped by type (rects, polygons, circles; `WriteShapes` / `WriteShapesJson`), so a cross-type order is lost on save and reload. Dragging a shape row shows a toast (`ShapeReorderNotice`) instead. Menu/Alt+Arrow `MoveShape` has the same cross-type loss.
 
 ## Grid mode: double-click resizes; click/drag only repositions
 
