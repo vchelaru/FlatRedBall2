@@ -1531,15 +1531,31 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     private PreviewShapeInfo[] BuildShapeInfos()
     {
+        if (IsGroupPreviewActive)
+        {
+            // Group mode: every track's shapes follow that track's own playhead (the singular
+            // pinned frame/playback controller belongs to a different chain), unselected.
+            var all = new List<PreviewShapeInfo>();
+            foreach (var chain in _selectedState!.SelectedChains)
+                if (GetCurrentPlaybackFrame(chain) is { } groupFrame)
+                    all.AddRange(BuildShapeInfos(groupFrame, pinned: false));
+            return all.ToArray();
+        }
+
         var pinnedFrame = _selectedState!.SelectedFrame;
         var frame = pinnedFrame ?? GetCurrentPlaybackFrame();
-        if (frame?.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
+        return frame is null ? Array.Empty<PreviewShapeInfo>() : BuildShapeInfos(frame, pinnedFrame is not null);
+    }
 
-        var selectedRects    = new HashSet<AARectSave>();
+    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned)
+    {
+        if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
+
+        var selectedRects   = new HashSet<AARectSave>();
         var selectedCircles  = new HashSet<CircleSave>();
         var selectedPolygons = new HashSet<PolygonSave>();
 
-        if (pinnedFrame is not null)
+        if (pinned)
         {
             selectedRects = _selectedState!.SelectedRectangles.ToHashSet();
             if (_selectedState!.SelectedRectangle is { } sr) selectedRects.Add(sr);
@@ -1612,9 +1628,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private AnimationFrameSave? GetCurrentPlaybackFrame(AnimationChainSave chain)
     {
         if (chain.Frames.Count == 0) return null;
-        var controller = ReferenceEquals(chain, _selectedState!.SelectedChain)
-            ? _playback
-            : _groupPlayback.GetValueOrDefault(chain);
+        var controller = _groupPlayback.GetValueOrDefault(chain)
+            ?? (ReferenceEquals(chain, _selectedState!.SelectedChain) ? _playback : null);
         if (controller is null) return null;
         int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
         return chain.Frames[idx];

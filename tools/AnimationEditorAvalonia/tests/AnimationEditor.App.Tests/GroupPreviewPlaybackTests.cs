@@ -120,6 +120,34 @@ public class GroupPreviewPlaybackTests
     }
 
     /// <summary>
+    /// Scrubbing a group track moves that chain's shapes along with its sprite, and the
+    /// other chain's shapes stay on its own current frame.
+    /// </summary>
+    [AvaloniaFact]
+    public void ScrubGroupTrack_ShapesFollowEachTracksCurrentFrame()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        for (int i = 0; i < 3; i++)
+        {
+            a.Frames[i].ShapesSave!.Shapes.Add(new AARectSave { X = 100 + i, ScaleX = 1, ScaleY = 1 });
+            b.Frames[i].ShapesSave!.Shapes.Add(new AARectSave { X = 200 + i, ScaleX = 1, ScaleY = 1 });
+        }
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+
+        ctrl.ScrubGroupTrack(a, frameIndex: 2, fraction: 0);
+        ctrl.ScrubGroupTrack(b, frameIndex: 1, fraction: 0);
+
+        var xs = ctrl.GetShapeInfosForTest().Select(s => s.X).OrderBy(x => x).ToArray();
+        Assert.Equal(new float[] { 102, 201 }, xs);
+    }
+
+    /// <summary>
     /// The transport Play/Pause resumes every group track together, overriding an
     /// individually-scrubbed pause (#576 scope item 7).
     /// </summary>
