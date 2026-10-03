@@ -3,6 +3,7 @@ using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Input;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using Avalonia;
@@ -28,7 +29,7 @@ namespace AnimationEditor.App.Controls;
 /// (one frame = FrameLength seconds). When a single frame is selected, shows that
 /// frame statically with optional onion-skin overlay.
 /// </summary>
-public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
+public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInputTarget
 {
     // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;
@@ -60,6 +61,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     // ZoomAnimator owns target/pivot/timer; this control supplies ApplyZoomTowardPivot and a
     // settle-tick snap onto the exact target scalar.
     private readonly ZoomAnimator _zoomAnimator;
+    private readonly PanZoomWheelInput _wheelInput;
 
     // -- Render diagnostics (#514) ---------------------------------------------
     // When enabled, overlays the rolling-average Skia render time (ms/frame + fps) top-left.
@@ -921,6 +923,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             (px, py, factor) => ApplyZoomTowardPivot(px, py, factor),
             z => _zoom = z,
             () => WheelZoomPresets);
+        _wheelInput = new PanZoomWheelInput(
+            PanBy,
+            (px, py, notches) => _zoomAnimator.Wheel(px, py, notches),
+            () => PanChanged?.Invoke(_panX, _panY));
+        _wheelInput.AttachPinch(this, this);
 
         // Right-click (when it doesn't hit a guide — see OnPointerPressed) opens this menu
         // with a "Reveal <filename> in File Manager" item for the currently previewed texture.
@@ -2581,10 +2588,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         base.OnPointerWheelChanged(e);
         // The control IS the viewport, so e.GetPosition(this) is the control-space pivot.
-        // Smooth-zoom retargets and eases toward the next preset (#451), mirroring the Wireframe.
-        var pt = e.GetPosition(this);
-        _zoomAnimator.Wheel((float)pt.X, (float)pt.Y, e.Delta.Y);
-        e.Handled = true;
+        // A mouse wheel smooth-zooms toward the next preset (#451), mirroring the Wireframe; a
+        // touchpad scroll pans (#1237, #1238).
+        _wheelInput.HandleWheel(e, this);
+    }
+
+    /// <inheritdoc/>
+    public IWheelSourceDetector WheelSourceDetector
+    {
+        get => _wheelInput.Detector;
+        set => _wheelInput.Detector = value;
+    }
+
+    /// <summary>Moves the content by (<paramref name="dx"/>, <paramref name="dy"/>) control pixels,
+    /// clamped to the pan band, as a touchpad scroll does.</summary>
+    public void PanBy(float dx, float dy)
+    {
+        CancelZoomAnimation();   // a scroll pan takes over from any in-flight wheel ease
+        _panX += dx;
+        _panY += dy;
+        ClampPan();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     // -- Escape cancels a drag ---------------------------------------------------

@@ -285,6 +285,7 @@ public partial class App : Application
             sc.AddSingleton<IFileAssociationService, NullFileAssociationService>();
 
         sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
+        sc.AddSingleton(_ => PlatformWheelInput.CreateForHost());
 
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
@@ -302,7 +303,8 @@ public partial class App : Application
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             sp.GetRequiredService<IApplicationUpdater>(),
             useMacOSChrome: OperatingSystem.IsMacOS(),
-            commandModifier: CommandModifier.ForHost(OperatingSystem.IsMacOS())));
+            commandModifier: CommandModifier.ForHost(OperatingSystem.IsMacOS()),
+            wheelInput: sp.GetRequiredService<PlatformWheelInput>()));
 
         return sc.BuildServiceProvider();
     }

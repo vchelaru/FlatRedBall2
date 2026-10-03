@@ -669,6 +669,14 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
+    /// <summary>A wheel event with a horizontal component too, as a touchpad's two-finger scroll sends.</summary>
+    public void Scroll(Point point, Vector delta, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        Window.MouseMove(point, modifiers);
+        Window.MouseWheel(point, delta, modifiers);
+        Layout();
+    }
+
     public void Press(Key key, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         Window.KeyPress(key, modifiers, PhysicalKey.None, null);

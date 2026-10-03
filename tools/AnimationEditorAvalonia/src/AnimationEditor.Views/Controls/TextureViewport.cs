@@ -1,4 +1,5 @@
 using AnimationEditor.App.Theming;
+using AnimationEditor.Core.Input;
 using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
@@ -71,7 +72,7 @@ public class TextureViewportSnapshot
 /// and the <c>OnEditPointer*</c> hooks — the base handles pan/zoom before any of those fire.
 /// </para>
 /// </summary>
-public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
+public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInputTarget
 {
     // ── Inner types ───────────────────────────────────────────────────────────
 
@@ -274,6 +275,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
     // ZoomAnimator owns target/pivot/timer; this control supplies ZoomToward and a settle-tick
     // snap onto the exact target scalar.
     private readonly ZoomAnimator _zoomAnimator;
+    private readonly PanZoomWheelInput _wheelInput;
 
     protected bool _showGrid;
     protected TileGrid _grid = TileGrid.Uniform(16);
@@ -446,6 +448,11 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
             (px, py, factor) => ZoomToward(px, py, factor),
             z => _zoom = z,
             () => WheelZoomPresets);
+        _wheelInput = new PanZoomWheelInput(
+            PanBy,
+            (px, py, notches) => _zoomAnimator.Wheel(px, py, notches),
+            () => PanChanged?.Invoke(_panX, _panY));
+        _wheelInput.AttachPinch(this, this);
 
         // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
@@ -978,10 +985,28 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
     {
         base.OnPointerWheelChanged(e);
         // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
-        // viewport-space pivot. Smooth-zoom retargets and eases toward the next preset (#425).
-        var pivot = e.GetPosition(this);
-        _zoomAnimator.Wheel((float)pivot.X, (float)pivot.Y, e.Delta.Y);
-        e.Handled = true;
+        // viewport-space pivot. A mouse wheel smooth-zooms toward the next preset (#425); a touchpad
+        // scroll pans (#1237, #1238).
+        _wheelInput.HandleWheel(e, this);
+    }
+
+    /// <inheritdoc/>
+    public IWheelSourceDetector WheelSourceDetector
+    {
+        get => _wheelInput.Detector;
+        set => _wheelInput.Detector = value;
+    }
+
+    /// <summary>Moves the content by (<paramref name="dx"/>, <paramref name="dy"/>) viewport pixels,
+    /// clamped to the pan band, as a touchpad scroll does.</summary>
+    public void PanBy(float dx, float dy)
+    {
+        CancelZoomAnimation();   // a scroll pan takes over from any in-flight wheel ease
+        _panX += dx;
+        _panY += dy;
+        ClampCamera();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     /// <summary>Stops any in-flight wheel-zoom animation, holding the camera at its current value.
