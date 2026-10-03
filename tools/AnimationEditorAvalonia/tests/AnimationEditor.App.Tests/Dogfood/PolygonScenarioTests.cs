@@ -161,14 +161,16 @@ public class PolygonScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DoubleClickingAVertex_DeletesIt_ButNeverBelowThree()
+    public async Task HoveringAVertexAndPressingDelete_RemovesIt_ButNeverBelowThree()
     {
         var (editor, _, _, polygon) = await OpenWithNewPolygonAsync();
         using var _ = editor;
 
-        editor.DoubleClickAt(editor.PreviewPointAt(8, 8));
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        editor.Press(Key.Delete);
         PolygonVertices.Count(polygon).ShouldBe(3);
-        editor.DoubleClickAt(editor.PreviewPointAt(8, -8));
+        editor.Hover(editor.PreviewPointAt(8, -8));
+        editor.Press(Key.Delete);
 
         PolygonVertices.Count(polygon).ShouldBe(3, "a triangle keeps its last three vertices");
     }

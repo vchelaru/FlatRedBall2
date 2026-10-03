@@ -153,8 +153,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     // -- Polygon vertex drag ----------------------------------------------------
     // The selected polygon's vertices and edge midpoints are handles: dragging a vertex moves it,
-    // pressing an edge midpoint inserts a vertex there and drags it, double-clicking a vertex
-    // deletes it. The points change live during the drag; release records one undo entry.
+    // pressing an edge midpoint inserts a vertex there and drags it, and hovering a vertex then
+    // pressing Delete removes it (TryDeleteHoveredVertex). The points change live during the drag;
+    // release records one undo entry.
     private PolygonSave?       _draggingVertexPolygon;
     private int                _draggingVertexIndex = -1;
     private List<Vector2Save>? _vertexDragPointsBefore;
@@ -2031,22 +2032,16 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     /// <summary>
     /// Starts a vertex gesture on the selected, unlocked polygon when the press lands on one of
-    /// its handles: a vertex (drag it; a double-click deletes it) or an edge midpoint (insert a
+    /// its handles: a vertex (drag it; hover it and press Delete to remove it) or an edge midpoint (insert a
     /// vertex there and drag it). Returns <c>true</c> when the press was consumed.
     /// </summary>
-    private bool TryBeginPolygonVertexGesture(float px, float py, int clickCount)
+    private bool TryBeginPolygonVertexGesture(float px, float py)
     {
         if (_selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
         if (px < RulerSize || py < RulerSize) return false;
 
         var vertices = PolygonScreenVertices(polygon);
         int vertex = PreviewShapeHitTester.HitVertex(px, py, vertices, VertexHandleRadius);
-        if (vertex >= 0 && clickCount >= 2)
-        {
-            _appCommands!.DeletePolygonVertex(polygon, vertex);
-            InvalidateVisual();
-            return true;
-        }
 
         var before = PolygonVertices.CopyPoints(polygon);
         PolygonVertexEdit edit;
@@ -2072,6 +2067,24 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         _vertexDragPointsBefore = before;
         _vertexDragEdit         = edit;
         (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
+        InvalidateVisual();
+        return true;
+    }
+
+    /// <summary>
+    /// Deletes the selected polygon's vertex under the pointer (the Delete key's first claim, ahead
+    /// of deleting the shape). Returns <c>true</c> when the pointer is over such a vertex, even if
+    /// the polygon refused (a triangle keeps its three vertices), so Delete never falls through
+    /// to removing the whole shape by accident.
+    /// </summary>
+    public bool TryDeleteHoveredVertex()
+    {
+        int vertex = _hoverVertexIndex;
+        if (vertex < 0 || _selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+
+        _appCommands!.DeletePolygonVertex(polygon, vertex);
+        _hoverVertexIndex = -1; // the old index may be gone; the next pointer move re-resolves it
+        NotifyActiveVertex();
         InvalidateVisual();
         return true;
     }
@@ -2599,7 +2612,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         // No guide hit — try to drag a shape (or just select one).
 
         // The selected polygon's vertex and edge-midpoint handles come first.
-        if (TryBeginPolygonVertexGesture(px, py, e.ClickCount))
+        if (TryBeginPolygonVertexGesture(px, py))
         {
             if (_draggingVertexPolygon is not null) e.Pointer.Capture(this);
             return;

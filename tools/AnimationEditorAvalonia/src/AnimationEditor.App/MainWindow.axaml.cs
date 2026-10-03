@@ -7260,6 +7260,9 @@ public partial class MainWindow : Window
         // so the wireframe draws their frames again. See issue #1172.
         FlushPendingTreeSelectionBurst();
 
+        // Pointer over a polygon vertex: Delete removes that point, not the shape.
+        if (PreviewCtrl.TryDeleteHoveredVertex()) return;
+
         // Delete the whole multi-selection of the focused node's kind, not just the
         // focused node — the delete commands batch them into a single undo step.
         // All kinds are fully undoable, so they delete immediately and surface an

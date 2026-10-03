@@ -19,7 +19,8 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class PolygonVertexHoverHighlightTests
 {
-    private static (TestServices Ctx, MainWindow Window, PreviewControl Preview, Point Center) Build()
+    internal static (TestServices Ctx, MainWindow Window, PreviewControl Preview, Point Center, PolygonSave Polygon, AnimationFrameSave Frame) Build(
+        params (float X, float Y)[] points)
     {
         var ctx = TestHelpers.BuildServices();
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -29,13 +30,14 @@ public class PolygonVertexHoverHighlightTests
         ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
 
         var polygon = new PolygonSave { Name = "Blade" };
-        foreach (var (x, y) in new[] { (-40f, -40f), (40f, -40f), (40f, 40f), (-40f, 40f), (-40f, -40f) })
+        if (points.Length == 0) points = new[] { (-40f, -40f), (40f, -40f), (40f, 40f), (-40f, 40f) };
+        foreach (var (x, y) in points.Append(points[0]))
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
         var frame = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
         frame.ShapesSave!.Shapes.Add(polygon);
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame);
-        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chain);
+        var acls = ctx.ProjectManager.AnimationChainListSave;
         ctx.SelectedState.SelectedChain = chain;
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedPolygon = polygon;
@@ -44,13 +46,15 @@ public class PolygonVertexHoverHighlightTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
         Dispatcher.UIThread.RunJobs();
+        ctx.ProjectManager.AnimationChainListSave = acls; // the window resets the project when created
+        acls.AnimationChains.Add(chain);
         ctx.SelectedState.SelectedPolygon = polygon; // after the window exists, so the inspector builds its vertex rows
         Dispatcher.UIThread.RunJobs();
         Dispatcher.UIThread.RunJobs();
         var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
         var center = preview.TranslatePoint(
             new Point((preview.Bounds.Width - 20) / 2 + 20, (preview.Bounds.Height - 20) / 2 + 20), window)!.Value;
-        return (ctx, window, preview, center);
+        return (ctx, window, preview, center, polygon, frame);
     }
 
     private static bool IsRowActive(MainWindow window, int vertex) =>
@@ -62,7 +66,7 @@ public class PolygonVertexHoverHighlightTests
     [AvaloniaFact]
     public void HoverVertex_HighlightsThatRowsXAndYBoxes_AndClearsWhenLeaving()
     {
-        var (ctx, window, preview, center) = Build();
+        var (ctx, window, preview, center, _, _) = Build();
         try
         {
             float scale = ctx.AppState.OffsetMultiplier * preview.Zoom;
