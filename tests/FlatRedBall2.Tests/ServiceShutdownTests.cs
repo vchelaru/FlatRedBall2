@@ -22,24 +22,11 @@ namespace FlatRedBall2.Tests;
 [Collection(GraphicsDeviceCollection.Name)]
 public class ServiceShutdownTests
 {
-    private static bool GumIsOwnedElsewhere => SystemManagers.Default is not null;
+    private readonly GraphicsDeviceFixture _fixture;
 
-    private static Game? TryCreateGame()
-    {
-        try
-        {
-            var game = new Game();
-            _ = new GraphicsDeviceManager(game) { PreferredBackBufferWidth = 64, PreferredBackBufferHeight = 64 };
-            game.RunOneFrame();
-            return game;
-        }
-        catch (Exception e)
-        {
-            // No display, no driver, or a headless agent — same contract as GraphicsDeviceFixture.
-            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
-            return null;
-        }
-    }
+    public ServiceShutdownTests(GraphicsDeviceFixture fixture) => _fixture = fixture;
+
+    private static bool GumIsOwnedElsewhere => SystemManagers.Default is not null;
 
     [Fact]
     public void Shutdown_AfterInitialize_ReleasesTheProcessWideGumState()
@@ -47,7 +34,7 @@ public class ServiceShutdownTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 
@@ -70,7 +57,7 @@ public class ServiceShutdownTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 

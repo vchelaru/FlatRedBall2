@@ -21,33 +21,11 @@ namespace FlatRedBall2.Tests.Automation;
 [Collection(GraphicsDeviceCollection.Name)]
 public class AutomationModeEngineWiringTests
 {
+    private readonly GraphicsDeviceFixture _fixture;
+
+    public AutomationModeEngineWiringTests(GraphicsDeviceFixture fixture) => _fixture = fixture;
+
     private static bool GumIsOwnedElsewhere => SystemManagers.Default is not null;
-
-    // Update/Draw call through to the engine, matching how a real Game1 wires FlatRedBallService.
-    // Engine is null during the throwaway RunOneFrame() TryCreateGame uses to force device creation.
-    private class WiredGame : Game
-    {
-        public FlatRedBallService? Engine;
-        protected override void Update(GameTime gameTime) => Engine?.Update(gameTime);
-        protected override void Draw(GameTime gameTime) => Engine?.Draw();
-    }
-
-    private static WiredGame? TryCreateGame()
-    {
-        try
-        {
-            var game = new WiredGame();
-            _ = new GraphicsDeviceManager(game) { PreferredBackBufferWidth = 64, PreferredBackBufferHeight = 64 };
-            game.RunOneFrame();
-            return game;
-        }
-        catch (Exception e)
-        {
-            // No display, no driver, or a headless agent — same contract as GraphicsDeviceFixture.
-            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
-            return null;
-        }
-    }
 
     /// <summary>
     /// The whole point of the feature: an automation client types into a focused Gum TextBox and
@@ -68,7 +46,7 @@ public class AutomationModeEngineWiringTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 
@@ -98,6 +76,7 @@ public class AutomationModeEngineWiringTests
         }
         finally
         {
+            game.Engine = null;
             engine.Shutdown();
         }
     }
@@ -112,7 +91,7 @@ public class AutomationModeEngineWiringTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 
@@ -147,6 +126,7 @@ public class AutomationModeEngineWiringTests
         }
         finally
         {
+            game.Engine = null;
             engine.Shutdown();
         }
     }
@@ -162,7 +142,7 @@ public class AutomationModeEngineWiringTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 
@@ -206,6 +186,7 @@ public class AutomationModeEngineWiringTests
         }
         finally
         {
+            game.Engine = null;
             engine.Shutdown();
         }
     }
@@ -216,7 +197,7 @@ public class AutomationModeEngineWiringTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        var game = _fixture.Game;
         if (game is null)
             return;
 
