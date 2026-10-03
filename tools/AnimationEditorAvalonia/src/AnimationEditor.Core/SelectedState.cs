@@ -138,6 +138,22 @@ namespace AnimationEditor.Core
             }
         }
 
+        public List<AnimationChainSave> PreviewChains
+        {
+            get
+            {
+                var chains = new List<AnimationChainSave>();
+                foreach (var node in _selectedNodes)
+                {
+                    var chain = node as AnimationChainSave
+                        ?? (node is AnimationFrameSave frame ? FindChainForFrame(frame) : null);
+                    if (chain is not null && !chains.Contains(chain))
+                        chains.Add(chain);
+                }
+                return chains;
+            }
+        }
+
         public List<AARectSave> SelectedRectangles
         {
             get

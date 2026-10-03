@@ -4614,7 +4614,7 @@ public partial class MainWindow : Window
         // sharing a row with it, so growing it never resizes/shifts the canvas (reported: selecting
         // a 2nd animation visibly shifted the centered preview). PreviewVScroll/PreviewHScroll's
         // Margin is kept in sync so their trough ends above the dock instead of running under it.
-        bool groupActive = _selectedState.SelectedChains.Count >= 2;
+        bool groupActive = _selectedState.PreviewChains.Count >= 2;
         TimelineScrubSurface.IsVisible = !groupActive;
         GroupTimelineScrubHost.IsVisible = groupActive;
         double dockHeight = groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight;

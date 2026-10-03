@@ -340,7 +340,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         get
         {
             if (_groupPlayback.Count == 0) return Array.Empty<(AnimationChainSave, PlaybackController)>();
-            var chains = _selectedState!.SelectedChains;
+            var chains = _selectedState!.PreviewChains;
             var result = new List<(AnimationChainSave, PlaybackController)>(chains.Count);
             foreach (var chain in chains)
                 if (_groupPlayback.TryGetValue(chain, out var controller))
@@ -375,6 +375,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         foreach (var c in _groupPlayback.Values) c.Pause();
         if (_groupPlayback.TryGetValue(chain, out var controller))
             controller.SeekToFrame(frameIndex, fraction);
+        SelectGroupCurrentFrames();
         InvalidateVisual();
         GroupPlaybackTicked?.Invoke();
     }
@@ -386,7 +387,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     private void SyncGroupPlayback()
     {
-        var chains = _selectedState!.SelectedChains;
+        var chains = _selectedState!.PreviewChains;
         if (chains.Count < 2)
         {
             bool hadAny = _groupPlayback.Count > 0;
@@ -409,8 +410,52 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             _groupPlayback[chain] = controller;
         }
 
+        PinGroupTracksToSelectedFrames();
+
         if (toAdd.Count > 0 || toRemove.Count > 0)
             GroupTracksChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// The selected frame that pins <paramref name="chain"/>'s group track (the first selected
+    /// frame it owns), or null when the chain is selected whole and so keeps playing.
+    /// </summary>
+    private AnimationFrameSave? GroupPinnedFrame(AnimationChainSave chain)
+    {
+        foreach (var node in _selectedState!.SelectedNodes)
+            if (node is AnimationFrameSave frame && chain.Frames.Contains(frame))
+                return frame;
+        return null;
+    }
+
+    /// <summary>
+    /// Parks each track whose frame is selected on that frame and pauses it. Skips the seek when
+    /// the track is already on the frame so a scrub's sub-frame position survives the selection
+    /// change it triggered.
+    /// </summary>
+    private void PinGroupTracksToSelectedFrames()
+    {
+        foreach (var (chain, controller) in _groupPlayback)
+        {
+            if (GroupPinnedFrame(chain) is not { } pinned) continue;
+            int idx = chain.Frames.IndexOf(pinned);
+            if (controller.CurrentFrameIndex != idx) controller.SeekToFrame(idx);
+            controller.Pause();
+        }
+    }
+
+    /// <summary>
+    /// Replaces the selection with the frame each group track is currently showing; the
+    /// <c>SelectedNodes</c> setter ignores an identical list, so this only changes anything on a
+    /// frame-boundary change.
+    /// </summary>
+    private void SelectGroupCurrentFrames()
+    {
+        var frames = new List<object>();
+        foreach (var chain in _selectedState!.PreviewChains)
+            if (chain.Frames.Count > 0 && _groupPlayback.TryGetValue(chain, out var controller))
+                frames.Add(chain.Frames[Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1)]);
+        _selectedState!.SelectedNodes = frames;
     }
 
     /// <summary>
@@ -420,15 +465,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     private PreviewLayer[] BuildGroupLayers()
     {
-        var chains = _selectedState!.SelectedChains;
+        var chains = _selectedState!.PreviewChains;
         var layers = new List<PreviewLayer>(chains.Count);
         foreach (var chain in chains)
         {
-            if (!_groupPlayback.TryGetValue(chain, out var controller)) continue;
-            if (chain.Frames.Count == 0) continue;
-
-            int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
-            var frame = chain.Frames[idx];
+            if (!_groupPlayback.ContainsKey(chain)) continue;
+            if (GetCurrentPlaybackFrame(chain) is not { } frame) continue;
             string? texPath = _thumbnailService!.ResolveTexturePath(frame);
             _thumbnailService.GetImage(texPath);
             layers.Add(new PreviewLayer(frame, texPath, frame.RelativeX, frame.RelativeY, ResolveColor(chain, frame)));
@@ -464,6 +506,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         // Skipped in group mode (#576): singular SelectedFrame must stay untouched by group code.
         if (!IsGroupPreviewActive && _selectedState!.SelectedFrame is not null)
             _selectedState!.SelectedFrame = null;
+        // A pinned group (frames selected) goes back to its whole chains; each frame's owner is
+        // already known, so nothing needs remembering.
+        if (IsGroupPreviewActive && _selectedState!.SelectedNodes.Any(n => n is AnimationFrameSave))
+            _selectedState!.SelectedNodes = _selectedState!.PreviewChains.Cast<object>().ToList();
         _playback.Play();
         foreach (var c in _groupPlayback.Values) c.Play();
         StartAutoTimer();
@@ -1536,7 +1582,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             // Group mode: every track's shapes follow that track's own playhead (the singular
             // pinned frame/playback controller belongs to a different chain), unselected.
             var all = new List<PreviewShapeInfo>();
-            foreach (var chain in _selectedState!.SelectedChains)
+            foreach (var chain in _selectedState!.PreviewChains)
                 if (GetCurrentPlaybackFrame(chain) is { } groupFrame)
                     all.AddRange(BuildShapeInfos(groupFrame, pinned: false));
             return all.ToArray();
@@ -1628,6 +1674,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private AnimationFrameSave? GetCurrentPlaybackFrame(AnimationChainSave chain)
     {
         if (chain.Frames.Count == 0) return null;
+        if (IsGroupPreviewActive && GroupPinnedFrame(chain) is { } pinned) return pinned;
         var controller = _groupPlayback.GetValueOrDefault(chain)
             ?? (ReferenceEquals(chain, _selectedState!.SelectedChain) ? _playback : null);
         if (controller is null) return null;

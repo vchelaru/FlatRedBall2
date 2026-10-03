@@ -99,6 +99,7 @@ public class GroupPreviewPlaybackTests
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 3);
         var b = MakeChain("B", 3);
+        Register(ctx, a, b);
 
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
@@ -129,6 +130,7 @@ public class GroupPreviewPlaybackTests
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 3);
         var b = MakeChain("B", 3);
+        Register(ctx, a, b);
         for (int i = 0; i < 3; i++)
         {
             a.Frames[i].ShapesSave!.Shapes.Add(new AARectSave { X = 100 + i, ScaleX = 1, ScaleY = 1 });
@@ -145,6 +147,105 @@ public class GroupPreviewPlaybackTests
 
         var xs = ctrl.GetShapeInfosForTest().Select(s => s.X).OrderBy(x => x).ToArray();
         Assert.Equal(new float[] { 102, 201 }, xs);
+    }
+
+    private static void Register(TestServices ctx, params AnimationChainSave[] chains)
+    {
+        var acls = new AnimationChainListSave();
+        foreach (var c in chains) acls.AnimationChains.Add(c);
+        ctx.ProjectManager.AnimationChainListSave = acls;
+    }
+
+    /// <summary>
+    /// Scrubbing in multi-select turns the chain selection into a frame selection: one frame
+    /// per track, at the frame each track is stopped on.
+    /// </summary>
+    [AvaloniaFact]
+    public void ScrubGroupTrack_ReplacesChainSelectionWithEachTracksFrame()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        Register(ctx, a, b);
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+
+        ctrl.ScrubGroupTrack(b, frameIndex: 2, fraction: 0.5);
+
+        Assert.Equal(new object[] { a.Frames[0], b.Frames[2] }, ctx.SelectedState.SelectedNodes);
+        Assert.True(ctrl.IsGroupPreviewActive); // still a 2-track group, now pinned
+        Assert.Equal(2, ctrl.GroupTracks.First(t => t.Chain == b).Playback.CurrentFrameIndex);
+        Assert.Equal(0.5, ctrl.GroupTracks.First(t => t.Chain == b).Playback.FrameElapsed / b.Frames[2].FrameLength, 3);
+    }
+
+    /// <summary>Scrubbing within one frame does not touch the selection (only boundary changes do).</summary>
+    [AvaloniaFact]
+    public void ScrubGroupTrack_WithinSameFrame_DoesNotFireSelectionChanged()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        Register(ctx, a, b);
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+        ctrl.ScrubGroupTrack(b, frameIndex: 1, fraction: 0.2);
+
+        int fired = 0;
+        ctx.SelectedState.SelectionChanged += () => fired++;
+        ctrl.ScrubGroupTrack(b, frameIndex: 1, fraction: 0.8);
+
+        Assert.Equal(0, fired);
+    }
+
+    /// <summary>Selecting a frame in each of two chains previews both chains, each pinned at its frame.</summary>
+    [AvaloniaFact]
+    public void FramesSelectedInTwoChains_ShowsBothPinnedAtThoseFrames()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        Register(ctx, a, b);
+        a.Frames[2].ShapesSave!.Shapes.Add(new AARectSave { X = 102, ScaleX = 1, ScaleY = 1 });
+        b.Frames[1].ShapesSave!.Shapes.Add(new AARectSave { X = 201, ScaleX = 1, ScaleY = 1 });
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedNodes = new List<object> { a.Frames[2], b.Frames[1] };
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(ctrl.IsGroupPreviewActive);
+        Assert.Equal(2, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex);
+        Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == b).Playback.CurrentFrameIndex);
+        Assert.All(ctrl.GroupTracks, t => Assert.False(t.Playback.IsPlaying));
+        Assert.Equal(new float[] { 102, 201 }, ctrl.GetShapeInfosForTest().Select(s => s.X).OrderBy(x => x).ToArray());
+    }
+
+    /// <summary>Resuming from a pinned group restores the chain selection and plays every track.</summary>
+    [AvaloniaFact]
+    public void Resume_FromPinnedGroup_RestoresChainSelectionAndPlays()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        Register(ctx, a, b);
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0);
+
+        ctrl.TogglePlayPause();
+
+        Assert.Equal(new object[] { a, b }, ctx.SelectedState.SelectedNodes);
+        Assert.True(ctrl.GroupTracks.All(t => t.Playback.IsPlaying));
+        Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex); // resumes in place
     }
 
     /// <summary>
