@@ -30,8 +30,15 @@ jobs:
       # --verbosity minimal drops the MSBuild compile/copy spam; the console logger
       # at verbosity=minimal prints only failed tests + the final summary (no per-test
       # "Passed" lines), so a failure is not buried under hundreds of passes.
+      # --blame-crash records which test was running when the test host died, so a host crash
+      # (seen once on Linux CI after 360 tests, never locally) names its culprit instead of just
+      # "Test host process crashed". The next step prints that record when the run fails.
       - name: Test engine
-        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --blame-crash --results-directory "$RUNNER_TEMP/engine-test-results"
+
+      - name: Show engine test crash record
+        if: failure()
+        run: find "$RUNNER_TEMP/engine-test-results" -name "Sequence_*.xml" -exec sh -c 'echo "== $1"; tail -n 20 "$1"' _ {} \;
 
       - name: Test AnimationChain.Common
         run: dotnet test tests/AnimationChain.Common.Tests/AnimationChain.Common.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
