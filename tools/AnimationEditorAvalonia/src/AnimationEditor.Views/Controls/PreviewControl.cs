@@ -193,6 +193,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     // -- Public properties -----------------------------------------------------
 
+    /// <summary>The selected polygon's vertex being dragged, else the one under the pointer, else -1.</summary>
+    public int ActiveVertexIndex => _draggingVertexIndex >= 0 ? _draggingVertexIndex : _hoverVertexIndex;
+
+    /// <summary>Fires when <see cref="ActiveVertexIndex"/> changes, so the inspector can highlight that vertex's row.</summary>
+    public event Action<int>? ActiveVertexChanged;
+
+    private int _lastNotifiedVertex = -1;
+
+    private void NotifyActiveVertex()
+    {
+        int vertex = ActiveVertexIndex;
+        if (vertex == _lastNotifiedVertex) return;
+        _lastNotifiedVertex = vertex;
+        ActiveVertexChanged?.Invoke(vertex);
+    }
+
     /// <summary>
     /// Index of the selected polygon's vertex whose inspector row has focus, or -1. It is drawn
     /// highlighted unless the pointer is over (or dragging) a different vertex. Changing it to a
@@ -1779,6 +1795,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             index = PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, PolygonScreenVertices(polygon), VertexHandleRadius);
         if (index == _hoverVertexIndex) return;
         _hoverVertexIndex = index;
+        NotifyActiveVertex();
         InvalidateVisual();
     }
 
@@ -2051,6 +2068,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         _draggingVertexPolygon  = polygon;
         _draggingVertexIndex    = vertex;
+        NotifyActiveVertex();
         _vertexDragPointsBefore = before;
         _vertexDragEdit         = edit;
         (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
@@ -2065,6 +2083,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         _selectedState!.SelectShape(_draggingVertexPolygon);
         _draggingVertexPolygon  = null;
         _draggingVertexIndex    = -1;
+        NotifyActiveVertex();
         _vertexDragPointsBefore = null;
         InvalidateVisual();
     }
@@ -2868,6 +2887,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             _hoverVertexIndex = -1;
             _hoverShape = null;
+            NotifyActiveVertex();
             InvalidateVisual();
         }
     }

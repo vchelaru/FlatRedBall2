@@ -3279,6 +3279,7 @@ public partial class MainWindow : Window
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
         PreviewCtrl.GroupTracksChanged += RefreshGroupTimelineTracks;
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
+        PreviewCtrl.ActiveVertexChanged += HighlightVertexRow;
         // Same "no save, just a live refresh" handler the WireframeControl frame-region drag uses,
         // so dragging a frame's offset in the Preview panel tracks in the property panel too (#900 follow-up).
         PreviewCtrl.FrameLiveUpdated += OnFrameLiveUpdated;
@@ -5665,6 +5666,8 @@ public partial class MainWindow : Window
     // rebuilt only when the polygon or its vertex count changes, so a row being typed into keeps focus.
     private PolygonSave? _polygonRowsFor;
     private readonly List<(NumericUpDown X, NumericUpDown Y)> _polygonVertexRows = new();
+    private readonly List<(Border X, Border Y)> _polygonVertexCells = new();
+    private int _activeVertexRow = -1;
 
     private void RefreshPolygonPanel(PolygonSave polygon)
     {
@@ -5688,6 +5691,7 @@ public partial class MainWindow : Window
     {
         _polygonRowsFor = polygon;
         _polygonVertexRows.Clear();
+        _polygonVertexCells.Clear();
         PreviewCtrl.InspectorVertexIndex = -1;
         PropPolygonVertices.Children.Clear();
         for (int i = 0; i < count; i++)
@@ -5700,10 +5704,12 @@ public partial class MainWindow : Window
             });
             var x = NewVertexInput($"PropPolygonVertex{i}X", "X");
             var y = NewVertexInput($"PropPolygonVertex{i}Y", "Y");
-            Grid.SetColumn(x, 1);
-            Grid.SetColumn(y, 3);
-            row.Children.Add(x);
-            row.Children.Add(y);
+            var xCell = NewVertexCell(x);
+            var yCell = NewVertexCell(y);
+            Grid.SetColumn(xCell, 1);
+            Grid.SetColumn(yCell, 3);
+            row.Children.Add(xCell);
+            row.Children.Add(yCell);
             var remove = new Button
             {
                 Name = $"PropPolygonVertex{i}Delete", Content = "✕", FontSize = 10, Padding = new Avalonia.Thickness(4, 0),
@@ -5729,7 +5735,39 @@ public partial class MainWindow : Window
             }
             SealOnCommit(x, y);
             _polygonVertexRows.Add((x, y));
+            _polygonVertexCells.Add((xCell, yCell));
             PropPolygonVertices.Children.Add(row);
+        }
+        ApplyVertexRowHighlight(); // the rows were just rebuilt; keep the highlight on the hovered vertex
+    }
+
+    // A vertex box inside a bordered cell. The border stays 2px (transparent when idle) so
+    // highlighting a row never shifts the layout.
+    private static Border NewVertexCell(NumericUpDown input) => new()
+    {
+        Child = input, BorderThickness = new Avalonia.Thickness(2), CornerRadius = new Avalonia.CornerRadius(4),
+        BorderBrush = Avalonia.Media.Brushes.Transparent,
+    };
+
+    /// <summary>Highlights the X/Y boxes of vertex <paramref name="index"/> (-1 clears), as the pointer hovers or drags it in the preview.</summary>
+    private void HighlightVertexRow(int index)
+    {
+        _activeVertexRow = index;
+        ApplyVertexRowHighlight();
+    }
+
+    private void ApplyVertexRowHighlight()
+    {
+        var accent = this.TryFindResource("AccentSoft", ActualThemeVariant, out var found) && found is Avalonia.Media.IBrush brush
+            ? brush : Avalonia.Media.Brushes.Gold;
+        for (int i = 0; i < _polygonVertexCells.Count; i++)
+        {
+            bool active = i == _activeVertexRow;
+            foreach (var cell in new[] { _polygonVertexCells[i].X, _polygonVertexCells[i].Y })
+            {
+                cell.Classes.Set("vertexActive", active);
+                cell.BorderBrush = active ? accent : Avalonia.Media.Brushes.Transparent;
+            }
         }
     }
 
