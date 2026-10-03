@@ -685,6 +685,86 @@ public class AppCommandsReorderTests
         Assert.Equal(rectA, frame.ShapesSave.Shapes[2]);
     }
 
+    // ── MoveShapeToIndex ──────────────────────────────────────────────────────
+
+    private static (TestServices Ctx, AnimationFrameSave Frame, AARectSave A, AARectSave B, AARectSave C) FrameWithABC()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var a = new AARectSave { Name = "A" };
+        var b = new AARectSave { Name = "B" };
+        var c = new AARectSave { Name = "C" };
+        frame.ShapesSave!.Shapes.Add(a);
+        frame.ShapesSave!.Shapes.Add(b);
+        frame.ShapesSave!.Shapes.Add(c);
+        return (ctx, frame, a, b, c);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_ForwardSlot_LandsBeforeTheShapeAtThatSlot()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+
+        ctx.AppCommands.MoveShapeToIndex(a, frame, 2); // slot 2 = between B and C
+
+        Assert.Equal(new object[] { b, a, c }, frame.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_PastEnd_AppendsToEnd()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+
+        ctx.AppCommands.MoveShapeToIndex(a, frame, 3);
+
+        Assert.Equal(new object[] { b, c, a }, frame.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_BackwardSlot_MovesEarlier()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+
+        ctx.AppCommands.MoveShapeToIndex(c, frame, 0);
+
+        Assert.Equal(new object[] { c, a, b }, frame.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_SlotAdjacentToItself_IsNoOpWithoutUndoEntry()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+
+        ctx.AppCommands.MoveShapeToIndex(b, frame, 1);
+        ctx.AppCommands.MoveShapeToIndex(b, frame, 2);
+
+        Assert.Equal(new object[] { a, b, c }, frame.ShapesSave!.Shapes);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_Undo_RestoresOrder()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+
+        ctx.AppCommands.MoveShapeToIndex(a, frame, 3);
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(new object[] { a, b, c }, frame.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void MoveShapeToIndex_ChainLocked_IsNoOp()
+    {
+        var (ctx, frame, a, b, c) = FrameWithABC();
+        ctx.Acls.AnimationChains[0].IsLocked = true;
+
+        ctx.AppCommands.MoveShapeToIndex(a, frame, 3);
+
+        Assert.Equal(new object[] { a, b, c }, frame.ShapesSave!.Shapes);
+    }
+
     // ── MoveShapeToTop ────────────────────────────────────────────────────────
 
     [Fact]

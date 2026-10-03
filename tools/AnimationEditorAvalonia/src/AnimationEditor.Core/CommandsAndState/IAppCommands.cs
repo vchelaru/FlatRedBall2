@@ -298,6 +298,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
+        /// <summary>
+        /// Moves <paramref name="shape"/> to the drop slot <paramref name="insertIndex"/>, interpreted
+        /// against the frame's shape list before the shape is removed (0 = first, Count = after the last).
+        /// Drives drag-and-drop reorder; a slot adjacent to the shape's own position is a no-op.
+        /// </summary>
+        void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex);
         void HandleReorder(int delta);
         /// <summary>
         /// Sets the horizontal/vertical/diagonal flip flags on every frame in <paramref name="frames"/>
