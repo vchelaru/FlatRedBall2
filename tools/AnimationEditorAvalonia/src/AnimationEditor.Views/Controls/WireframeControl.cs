@@ -1530,6 +1530,7 @@ public class WireframeControl : TextureViewport
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 _lastPointerPos = pos;
+                _dragPointer = e.Pointer;
                 StartAutoPanTimer();
                 e.Pointer.Capture(this);
                 return;
@@ -1784,21 +1785,84 @@ public class WireframeControl : TextureViewport
     private IPointer? _addFrameDragPointer;
     private TopLevel? _escapeKeyHost;
 
+    /// <summary>Pointer that started the in-progress handle or chain drag; released on cancel.</summary>
+    private IPointer? _dragPointer;
+
     /// <summary>
-    /// Escape cancels an in-progress Ctrl+click/drag add: no frame, no undo entry, and the release
-    /// that follows does nothing. Hooked on the top level (Tunnel) because the wireframe itself
-    /// never takes keyboard focus, and so every host (desktop and browser) gets it for free.
+    /// Escape cancels an in-progress Ctrl+click/drag add, resize-handle drag or chain drag: nothing
+    /// is created or moved, no undo entry is recorded, and the release that follows does nothing.
+    /// Hooked on the top level (Tunnel) because the wireframe itself never takes keyboard focus,
+    /// and so every host (desktop and browser) gets it for free.
     /// </summary>
-    private void OnTopLevelKeyDownForAddFrameCancel(object? sender, KeyEventArgs e)
+    private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || _addFrameDragAnchor is null) return;
-        _addFrameDragAnchor = null;
-        var pointer = _addFrameDragPointer;
-        _addFrameDragPointer = null;
-        // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
+        if (e.Key != Key.Escape) return;
+        if (_addFrameDragAnchor is not null)
+        {
+            _addFrameDragAnchor = null;
+            var pointer = _addFrameDragPointer;
+            _addFrameDragPointer = null;
+            // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
+            pointer?.Capture(null);
+            SetAddFrameGhost(null);
+            e.Handled = true;
+        }
+        else if (IsDragging)
+        {
+            CancelActiveDrag();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Puts every frame of the in-progress handle or chain drag back to its start-of-drag region,
+    /// ends the drag without recording undo or saving, and releases pointer capture.
+    /// </summary>
+    private void CancelActiveDrag()
+    {
+        if (_bitmap is not null)
+        {
+            if (_draggingRect is not null)
+            {
+                if (_bulkHandleDragStarts.Count > 0)
+                    RestoreStarts(_bulkHandleDragStarts);
+                else
+                {
+                    _draggingRect.Bounds = _dragStartBounds;
+                    var f = _draggingRect.Frame;
+                    f.LeftCoordinate = _dragBeforeL;
+                    f.TopCoordinate = _dragBeforeT;
+                    f.RightCoordinate = _dragBeforeR;
+                    f.BottomCoordinate = _dragBeforeB;
+                }
+                FrameLiveUpdated?.Invoke(_draggingRect.Frame);
+            }
+            if (_draggingChain) RestoreStarts(_chainDragStarts);
+        }
+
+        _draggingRect = null;
+        _draggingHandle = HandleKind.None;
+        _bulkHandleDragStarts.Clear();
+        _draggingChain = false;
+        _chainDragStarts.Clear();
+        StopAutoPanTimer();
+        var pointer = _dragPointer;
+        _dragPointer = null;
+        // Drag state is cleared first, so the capture-lost this raises cannot commit anything.
         pointer?.Capture(null);
-        SetAddFrameGhost(null);
-        e.Handled = true;
+        InvalidateVisual();
+
+        static void RestoreStarts(List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> starts)
+        {
+            foreach (var (fr, startBounds, bl, bt, br, bb) in starts)
+            {
+                fr.Bounds = startBounds;
+                fr.Frame.LeftCoordinate = bl;
+                fr.Frame.TopCoordinate = bt;
+                fr.Frame.RightCoordinate = br;
+                fr.Frame.BottomCoordinate = bb;
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -1806,14 +1870,14 @@ public class WireframeControl : TextureViewport
     {
         base.OnAttachedToVisualTree(e);
         _escapeKeyHost = TopLevel.GetTopLevel(this);
-        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel, RoutingStrategies.Tunnel);
+        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel, RoutingStrategies.Tunnel);
     }
 
     /// <inheritdoc />
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForAddFrameCancel);
+        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel);
         _escapeKeyHost = null;
     }
 

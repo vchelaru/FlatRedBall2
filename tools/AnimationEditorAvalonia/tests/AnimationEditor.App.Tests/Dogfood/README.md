@@ -146,7 +146,7 @@ tiny window, Tab-key traversal, ten tab switches in a row.
 Confirmed correct: two Ctrl+N give distinct untitled names, undo/redo with nothing to do is
 silent, Delete inside an inspector box edits text not the frame, Delete twice deletes two chains
 and two undos restore both, deleting the playing chain stops the preview, three duplicates get
-three names, Escape during a handle drag leaves either the original or an undoable edit, junk in
+three names, Escape during a handle or chain drag restores the frames with no undo entry, junk in
 the frame-length box changes nothing and records no undo, a grid size of 0 does not break the
 wireframe, re-opening the open file focuses its tab and keeps the edit and its undo history, an
 empty clipboard pastes nothing quietly, a name with a trailing space is not a rename, renaming
