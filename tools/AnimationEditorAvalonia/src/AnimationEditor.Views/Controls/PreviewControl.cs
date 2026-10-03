@@ -141,6 +141,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
     private bool _draggingHGuide;                  // true = horizontal guide
+    private bool  _guideDragIsNew;                 // the dragged guide was created by this press
+    private float _guideDragStart;                 // its world coordinate when the drag began
 
     // -- Shape drag -----------------------------------------------------------
     private object?    _draggingShape;   // AARectSave or CircleSave
@@ -2566,6 +2568,102 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         e.Handled = true;
     }
 
+    // -- Escape cancels a drag ---------------------------------------------------
+
+    private IPointer? _dragPointer;
+    private TopLevel? _escapeKeyHost;
+
+    /// <summary>
+    /// Escape cancels whichever drag is in progress (shape move or resize, polygon vertex, frame or
+    /// whole-animation offset, guide): everything goes back to its start-of-drag value, no undo entry
+    /// is recorded, and the release that follows does nothing. Hooked on the top level (Tunnel) so
+    /// it runs before any focused control or window hotkey sees the key.
+    /// </summary>
+    private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || !CancelActiveDrag()) return;
+        e.Handled = true;
+    }
+
+    /// <summary>Restores the in-progress drag's start state and ends it; false when no drag is active.</summary>
+    private bool CancelActiveDrag()
+    {
+        if (_draggingVertexPolygon is { } polygon)
+        {
+            // Also removes a vertex an edge-midpoint press inserted.
+            polygon.Points.Clear();
+            polygon.Points.AddRange(_vertexDragPointsBefore!);
+            _draggingVertexPolygon  = null;
+            _draggingVertexIndex    = -1;
+            _vertexDragPointsBefore = null;
+            NotifyActiveVertex();
+        }
+        else if (_draggingShape is not null)
+        {
+            var shape = (ShapeSave)_draggingShape;
+            shape.X = _shapeDragStartX;
+            shape.Y = _shapeDragStartY;
+            if (_shapeResizeHandle != HandleKind.None)
+            {
+                if (shape is AARectSave rect) { rect.ScaleX = _shapeDragStartScaleX; rect.ScaleY = _shapeDragStartScaleY; }
+                else if (shape is CircleSave circle) circle.Radius = _shapeDragStartScaleX;
+            }
+            _draggingShape     = null;
+            _shapeResizeHandle = HandleKind.None;
+            _pendingCycleShape = null;
+        }
+        else if (_draggingFrame is { } frame)
+        {
+            frame.RelativeX = _frameDragStartX;
+            frame.RelativeY = _frameDragStartY;
+            _draggingFrame = null;
+            FrameLiveUpdated?.Invoke(frame);
+        }
+        else if (_draggingChainFrames is { } frames)
+        {
+            for (int i = 0; i < frames.Length; i++)
+            {
+                frames[i].RelativeX = _chainFrameStartX![i];
+                frames[i].RelativeY = _chainFrameStartY![i];
+            }
+            _draggingChainFrames = null;
+            _chainFrameStartX    = null;
+            _chainFrameStartY    = null;
+            FrameLiveUpdated?.Invoke(frames[0]);
+        }
+        else if (_draggedGuideIdx >= 0)
+        {
+            var guides = _draggingHGuide ? _hGuides : _vGuides;
+            if (_guideDragIsNew) guides.RemoveAt(_draggedGuideIdx);
+            else guides[_draggedGuideIdx] = _guideDragStart;
+            _draggedGuideIdx = -1;
+            GuidesChanged?.Invoke();
+        }
+        else return false;
+
+        var pointer = _dragPointer;
+        _dragPointer = null;
+        pointer?.Capture(null);
+        InvalidateVisual();
+        return true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _escapeKeyHost = TopLevel.GetTopLevel(this);
+        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel);
+        _escapeKeyHost = null;
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -2574,6 +2672,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         var pos   = e.GetPosition(this);
         float px  = (float)pos.X;
         float py  = (float)pos.Y;
+        _dragPointer = e.Pointer;
 
         if (PointerGestures.IsPanGesture(props.IsMiddleButtonPressed, props.IsLeftButtonPressed, e.KeyModifiers))
         {
@@ -2606,6 +2705,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             _hGuides.Add(wy);
             _draggedGuideIdx = _hGuides.Count - 1;
             _draggingHGuide  = true;
+            _guideDragIsNew  = true;
+            _guideDragStart  = wy;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -2618,6 +2719,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             _vGuides.Add(wx);
             _draggedGuideIdx = _vGuides.Count - 1;
             _draggingHGuide  = false;
+            _guideDragIsNew  = true;
+            _guideDragStart  = wx;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -2634,6 +2737,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 {
                     _draggedGuideIdx = i;
                     _draggingHGuide  = true;
+                    _guideDragIsNew  = false;
+                    _guideDragStart  = _hGuides[i];
                     e.Pointer.Capture(this);
                     return;
                 }
@@ -2644,6 +2749,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 {
                     _draggedGuideIdx = i;
                     _draggingHGuide  = false;
+                    _guideDragIsNew  = false;
+                    _guideDragStart  = _vGuides[i];
                     e.Pointer.Capture(this);
                     return;
                 }
