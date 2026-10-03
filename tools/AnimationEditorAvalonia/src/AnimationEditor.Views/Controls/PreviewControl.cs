@@ -371,14 +371,82 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     public void ScrubGroupTrack(AnimationChainSave chain, int frameIndex, double fraction)
     {
-        _playback.Pause();
-        foreach (var c in _groupPlayback.Values) c.Pause();
+        // Scrubbing pins only the scrubbed track; every other track keeps doing what it was doing.
         if (_groupPlayback.TryGetValue(chain, out var controller))
+        {
+            controller.Pause();
             controller.SeekToFrame(frameIndex, fraction);
-        SelectGroupCurrentFrames();
+            PinTrackSelection(chain);
+        }
         InvalidateVisual();
         GroupPlaybackTicked?.Invoke();
     }
+
+    /// <summary>True while <paramref name="chain"/>'s group track is playing (not pinned to a frame).</summary>
+    public bool IsTrackPlaying(AnimationChainSave chain) =>
+        _groupPlayback.TryGetValue(chain, out var c) && c.IsPlaying && GroupPinnedFrame(chain) is null;
+
+    /// <summary>
+    /// The per-track play/pause button: a playing track pins at its current frame, a pinned track
+    /// resumes from where it stopped. Other tracks are untouched.
+    /// </summary>
+    public void ToggleTrackPlayPause(AnimationChainSave chain)
+    {
+        if (!_groupPlayback.TryGetValue(chain, out var controller)) return;
+        if (IsTrackPlaying(chain))
+        {
+            controller.Pause();
+            PinTrackSelection(chain);
+        }
+        else
+        {
+            UnpinTrackSelection(chain);
+            controller.Play();
+        }
+        InvalidateVisual();
+        GroupPlaybackTicked?.Invoke();
+    }
+
+    /// <summary>
+    /// Swaps <paramref name="chain"/>'s selection entry for the frame its track is showing,
+    /// keeping a frame or shape already selected there; the other tracks' entries are left as
+    /// they are. The <c>SelectedNodes</c> setter ignores an identical list, so scrubbing inside a
+    /// frame changes nothing.
+    /// </summary>
+    private void PinTrackSelection(AnimationChainSave chain)
+    {
+        if (chain.Frames.Count == 0 || !_groupPlayback.TryGetValue(chain, out var controller)) return;
+        var current = chain.Frames[Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1)];
+
+        var next = new List<object>();
+        bool placed = false;
+        foreach (var node in _selectedState!.SelectedNodes)
+        {
+            var owned = FrameOfBagNode(chain, node);
+            if (!ReferenceEquals(node, chain) && owned is null) { next.Add(node); continue; }
+            if (owned is not null && ReferenceEquals(owned, current)) { next.Add(node); placed = true; continue; }
+            if (!placed) { next.Add(current); placed = true; }
+        }
+        if (!placed) next.Add(current);
+        _selectedState!.SelectedNodes = next;
+    }
+
+    /// <summary>Swaps <paramref name="chain"/>'s frame/shape entries for the chain itself (a playing track).</summary>
+    private void UnpinTrackSelection(AnimationChainSave chain)
+    {
+        var next = new List<object>();
+        bool placed = false;
+        foreach (var node in _selectedState!.SelectedNodes)
+        {
+            if (!ReferenceEquals(node, chain) && FrameOfBagNode(chain, node) is null) { next.Add(node); continue; }
+            if (!placed) { next.Add(chain); placed = true; }
+        }
+        if (!placed) next.Add(chain);
+        _selectedState!.SelectedNodes = next;
+    }
+
+    // Tracks the selection paused; when their frame leaves the selection they play again.
+    private readonly HashSet<AnimationChainSave> _pinnedBySelection = new();
 
     /// <summary>
     /// Adds/removes per-chain PlaybackControllers to match <see cref="ISelectedState.SelectedChains"/>.
@@ -392,13 +460,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             bool hadAny = _groupPlayback.Count > 0;
             _groupPlayback.Clear();
+            _pinnedBySelection.Clear();
             if (hadAny) GroupTracksChanged?.Invoke();
             return;
         }
 
         var (toAdd, toRemove) = AnimationEditor.Core.CommandsAndState.GroupPlaybackSync.ComputeDiff(
             _groupPlayback.Keys, chains);
-        foreach (var chain in toRemove) _groupPlayback.Remove(chain);
+        foreach (var chain in toRemove) { _groupPlayback.Remove(chain); _pinnedBySelection.Remove(chain); }
         foreach (var chain in toAdd)
         {
             // Loop is deliberately not seeded from _playback here -- PlaybackController.Loop
@@ -488,33 +557,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     {
         foreach (var (chain, controller) in _groupPlayback)
         {
-            if (GroupPinnedFrame(chain) is not { } pinned) continue;
+            if (GroupPinnedFrame(chain) is not { } pinned)
+            {
+                if (_pinnedBySelection.Remove(chain)) controller.Play(); // its frame left the selection
+                continue;
+            }
             int idx = chain.Frames.IndexOf(pinned);
             if (controller.CurrentFrameIndex != idx) controller.SeekToFrame(idx);
             controller.Pause();
+            _pinnedBySelection.Add(chain);
         }
     }
 
-    /// <summary>
-    /// Replaces the selection with the frame each group track is currently showing; the
-    /// <c>SelectedNodes</c> setter ignores an identical list, so this only changes anything on a
-    /// frame-boundary change.
-    /// </summary>
-    private void SelectGroupCurrentFrames()
-    {
-        var bagNow = _selectedState!.SelectedNodes;
-        var next = new List<object>();
-        foreach (var chain in _selectedState!.PreviewChains)
-        {
-            if (chain.Frames.Count == 0 || !_groupPlayback.TryGetValue(chain, out var controller)) continue;
-            var current = chain.Frames[Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1)];
-            if (ReferenceEquals(GroupPinnedFrame(chain), current))
-                next.AddRange(bagNow.Where(n => FrameOfBagNode(chain, n) is not null)); // keeps a selected shape
-            else
-                next.Add(current);
-        }
-        _selectedState!.SelectedNodes = next;
-    }
 
     /// <summary>
     /// Builds the back-to-front layer list for the active group (#576 scope items 2–4): each
@@ -549,8 +603,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// <summary>Toggles between playing (<see cref="ResumePlayback"/>) and paused (<see cref="PausePlayback"/>).</summary>
     public void TogglePlayPause()
     {
-        if (_playback.IsPlaying) PausePlayback();
-        else                     ResumePlayback();
+        // In a group, Space pauses everything while any track plays, else resumes every track.
+        bool playing = IsGroupPreviewActive
+            ? _groupPlayback.Keys.Any(IsTrackPlaying)
+            : _playback.IsPlaying;
+        if (playing) PausePlayback();
+        else         ResumePlayback();
     }
 
     /// <summary>
@@ -585,7 +643,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         _playback.Pause();
         foreach (var c in _groupPlayback.Values) c.Pause();
 
-        if (!IsGroupPreviewActive)
+        if (IsGroupPreviewActive)
+        {
+            foreach (var chain in _selectedState!.PreviewChains) PinTrackSelection(chain);
+        }
+        else
         {
             var chain = _selectedState!.SelectedChain;
             if (chain is not null && chain.Frames.Count > 0)

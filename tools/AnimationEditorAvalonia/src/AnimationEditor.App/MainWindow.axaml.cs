@@ -4621,6 +4621,7 @@ public partial class MainWindow : Window
         // a 2nd animation visibly shifted the centered preview). PreviewVScroll/PreviewHScroll's
         // Margin is kept in sync so their trough ends above the dock instead of running under it.
         bool groupActive = _selectedState.PreviewChains.Count >= 2;
+        PlayPauseBtn.IsVisible = !groupActive; // group rows carry their own play/pause buttons
         TimelineScrubSurface.IsVisible = !groupActive;
         GroupTimelineScrubHost.IsVisible = groupActive;
         double dockHeight = groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight;
@@ -4786,6 +4787,7 @@ public partial class MainWindow : Window
             var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
             if (track is null || track.Frames.Count == 0) continue;
 
+            track.IsPlaying = PreviewCtrl.IsTrackPlaying(chain);
             int idx = Math.Clamp(playback.CurrentFrameIndex, 0, track.Frames.Count - 1);
             for (int i = 0; i < track.Frames.Count; i++)
                 track.Frames[i].IsCurrent = i == idx;
@@ -4795,6 +4797,12 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private void OnGroupTrackPlayPauseClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: ChainTimelineTrackVm track })
+            PreviewCtrl.ToggleTrackPlayPause(track.Chain);
+    }
     private (ChainTimelineTrackVm Track, ItemsControl FramesList)? FindGroupTrackAndFramesList(PointerEventArgs e)
     {
         if (e.Source is not Avalonia.Visual source) return null;

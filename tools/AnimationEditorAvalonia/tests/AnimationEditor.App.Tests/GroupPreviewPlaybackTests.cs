@@ -89,36 +89,6 @@ public class GroupPreviewPlaybackTests
         Assert.Equal(2, longTrack.Playback.CurrentFrameIndex);  // still progressing
     }
 
-    /// <summary>
-    /// Scrubbing one track seeks only that track's controller but pauses every group track in
-    /// place (#576 scope item 6), and leaves the singular SelectedChain/SelectedFrame untouched.
-    /// </summary>
-    [AvaloniaFact]
-    public void ScrubGroupTrack_SeeksOnlyThatChain_ButPausesAllTracks()
-    {
-        var ctx = TestHelpers.BuildServices();
-        var a = MakeChain("A", 3);
-        var b = MakeChain("B", 3);
-        Register(ctx, a, b);
-
-        var ctrl = ctx.CreatePreviewControl();
-        ctrl.PauseAutoPlayback();
-        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
-        Dispatcher.UIThread.RunJobs();
-
-        foreach (var (_, playback) in ctrl.GroupTracks) playback.Play();
-
-        ctrl.ScrubGroupTrack(b, frameIndex: 2, fraction: 0.5);
-
-        var trackA = ctrl.GroupTracks.First(t => t.Chain == a);
-        var trackB = ctrl.GroupTracks.First(t => t.Chain == b);
-        Assert.Equal(0, trackA.Playback.CurrentFrameIndex); // untouched, just paused
-        Assert.False(trackA.Playback.IsPlaying);
-        Assert.Equal(2, trackB.Playback.CurrentFrameIndex); // seeked
-        Assert.False(trackB.Playback.IsPlaying);
-
-        Assert.Null(ctx.SelectedState.SelectedFrame); // singular selection left untouched
-    }
 
     /// <summary>
     /// Scrubbing a group track moves that chain's shapes along with its sprite, and the
@@ -157,11 +127,11 @@ public class GroupPreviewPlaybackTests
     }
 
     /// <summary>
-    /// Scrubbing in multi-select turns the chain selection into a frame selection: one frame
-    /// per track, at the frame each track is stopped on.
+    /// Scrubbing a track swaps its chain in the selection for the frame it stopped on; the others
+    /// stay as they are.
     /// </summary>
     [AvaloniaFact]
-    public void ScrubGroupTrack_ReplacesChainSelectionWithEachTracksFrame()
+    public void ScrubGroupTrack_SwapsOnlyThatChainForItsFrame()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 3);
@@ -175,7 +145,7 @@ public class GroupPreviewPlaybackTests
 
         ctrl.ScrubGroupTrack(b, frameIndex: 2, fraction: 0.5);
 
-        Assert.Equal(new object[] { a.Frames[0], b.Frames[2] }, ctx.SelectedState.SelectedNodes);
+        Assert.Equal(new object[] { a, b.Frames[2] }, ctx.SelectedState.SelectedNodes);
         Assert.True(ctrl.IsGroupPreviewActive); // still a 2-track group, now pinned
         Assert.Equal(2, ctrl.GroupTracks.First(t => t.Chain == b).Playback.CurrentFrameIndex);
         Assert.Equal(0.5, ctrl.GroupTracks.First(t => t.Chain == b).Playback.FrameElapsed / b.Frames[2].FrameLength, 3);
@@ -226,49 +196,123 @@ public class GroupPreviewPlaybackTests
         Assert.Equal(new float[] { 102, 201 }, ctrl.GetShapeInfosForTest().Select(s => s.X).OrderBy(x => x).ToArray());
     }
 
-    /// <summary>Resuming from a pinned group restores the chain selection and plays every track.</summary>
-    [AvaloniaFact]
-    public void Resume_FromPinnedGroup_RestoresChainSelectionAndPlays()
+    private static (TestServices Ctx, PreviewControl Ctrl, AnimationChainSave A, AnimationChainSave B) TwoPlayingTracks()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 3);
         var b = MakeChain("B", 3);
         Register(ctx, a, b);
-
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
         ctx.SelectedState.SelectedNodes = new List<object> { a, b };
         Dispatcher.UIThread.RunJobs();
-        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0);
-
-        ctrl.TogglePlayPause();
-
-        Assert.Equal(new object[] { a, b }, ctx.SelectedState.SelectedNodes);
-        Assert.True(ctrl.GroupTracks.All(t => t.Playback.IsPlaying));
-        Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex); // resumes in place
+        return (ctx, ctrl, a, b);
     }
 
-    /// <summary>
-    /// The transport Play/Pause resumes every group track together, overriding an
-    /// individually-scrubbed pause (#576 scope item 7).
-    /// </summary>
+    /// <summary>Scrubbing a playing track pins only that track; the others keep playing.</summary>
     [AvaloniaFact]
-    public void TogglePlayPause_ResumesEveryGroupTrackTogether()
+    public void ScrubGroupTrack_PinsOnlyThatTrack_OthersKeepPlaying()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+
+        ctrl.ScrubGroupTrack(a, frameIndex: 2, fraction: 0);
+
+        Assert.False(ctrl.IsTrackPlaying(a));
+        Assert.True(ctrl.IsTrackPlaying(b));
+        Assert.Equal(new object[] { a.Frames[2], b }, ctx.SelectedState.SelectedNodes);
+    }
+
+    /// <summary>Scrubbing the already-pinned track leaves the playing tracks alone.</summary>
+    [AvaloniaFact]
+    public void ScrubGroupTrack_OnPinnedTrack_DoesNotStopPlayingTracks()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0);
+
+        ctrl.ScrubGroupTrack(a, frameIndex: 2, fraction: 0.5);
+
+        Assert.True(ctrl.IsTrackPlaying(b));
+        Assert.Equal(new object[] { a.Frames[2], b }, ctx.SelectedState.SelectedNodes);
+    }
+
+    /// <summary>A frame selected next to a whole chain: the frame's track is pinned, the chain's keeps playing.</summary>
+    [AvaloniaFact]
+    public void FrameAndChainSelected_PinsTheFrameTrack_AndPlaysTheChain()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 3);
         var b = MakeChain("B", 3);
-
+        Register(ctx, a, b);
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
+
+        ctx.SelectedState.SelectedNodes = new List<object> { a.Frames[1], b };
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(ctrl.IsTrackPlaying(a));
+        Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex);
+        Assert.True(ctrl.IsTrackPlaying(b));
+    }
+
+    /// <summary>The per-track button: pins a playing track, resumes a pinned one in place, touches no other track.</summary>
+    [AvaloniaFact]
+    public void ToggleTrackPlayPause_PinsThenResumesOnlyThatTrack()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+
+        ctrl.ToggleTrackPlayPause(a);
+        Assert.False(ctrl.IsTrackPlaying(a));
+        Assert.True(ctrl.IsTrackPlaying(b));
+        Assert.Equal(new object[] { a.Frames[0], b }, ctx.SelectedState.SelectedNodes);
+
+        ctrl.ToggleTrackPlayPause(a);
+        Assert.True(ctrl.IsTrackPlaying(a));
+        Assert.True(ctrl.IsTrackPlaying(b));
+        Assert.Equal(new object[] { a, b }, ctx.SelectedState.SelectedNodes);
+    }
+
+    /// <summary>Taking a pinned track's frame out of the selection (tree click) sets that track playing again.</summary>
+    [AvaloniaFact]
+    public void PinnedTrack_FrameLeavesSelection_ResumesPlaying()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0);
+        Dispatcher.UIThread.RunJobs();
+
         ctx.SelectedState.SelectedNodes = new List<object> { a, b };
         Dispatcher.UIThread.RunJobs();
 
-        foreach (var (_, playback) in ctrl.GroupTracks) playback.Play();
-        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0); // pauses both tracks
+        Assert.True(ctrl.IsTrackPlaying(a));
+    }
 
-        ctrl.TogglePlayPause(); // global resume
+    /// <summary>Space with any track playing pauses (and pins) every track.</summary>
+    [AvaloniaFact]
+    public void TogglePlayPause_AnyTrackPlaying_PausesAndPinsEveryTrack()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0); // a pinned, b playing
 
-        Assert.True(ctrl.GroupTracks.All(t => t.Playback.IsPlaying));
+        ctrl.TogglePlayPause();
+
+        Assert.False(ctrl.IsTrackPlaying(a));
+        Assert.False(ctrl.IsTrackPlaying(b));
+        Assert.Equal(new object[] { a.Frames[1], b.Frames[0] }, ctx.SelectedState.SelectedNodes);
+    }
+
+    /// <summary>Space with every track pinned resumes them all in place and restores the chain selection.</summary>
+    [AvaloniaFact]
+    public void TogglePlayPause_AllPinned_ResumesEveryTrackInPlace()
+    {
+        var (ctx, ctrl, a, b) = TwoPlayingTracks();
+        ctrl.ScrubGroupTrack(a, frameIndex: 1, fraction: 0);
+        ctrl.ScrubGroupTrack(b, frameIndex: 2, fraction: 0);
+
+        ctrl.TogglePlayPause();
+
+        Assert.Equal(new object[] { a, b }, ctx.SelectedState.SelectedNodes);
+        Assert.True(ctrl.IsTrackPlaying(a));
+        Assert.True(ctrl.IsTrackPlaying(b));
+        Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex);
+        Assert.Equal(2, ctrl.GroupTracks.First(t => t.Chain == b).Playback.CurrentFrameIndex);
     }
 }

@@ -235,7 +235,7 @@ public class GroupTimelineUiTests
     /// pauses every track, without touching the singular SelectedFrame (#576 scope item 6).
     /// </summary>
     [AvaloniaFact]
-    public void ClickingSecondTrackFrameCell_ScrubsOnlyThatChainAndPausesAll()
+    public void ClickingSecondTrackFrameCell_ScrubsAndPinsOnlyThatChain()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 2);
@@ -278,7 +278,7 @@ public class GroupTimelineUiTests
             var trackB = window.FindControl<AnimationEditor.App.Controls.PreviewControl>("PreviewCtrl")!.GroupTracks.First(t => t.Chain == b);
             Assert.Equal(2, trackB.Playback.CurrentFrameIndex);
             Assert.False(trackB.Playback.IsPlaying);
-            Assert.False(trackA.Playback.IsPlaying); // scrubbing pauses every track
+            Assert.True(trackA.Playback.IsPlaying); // scrubbing pins only the scrubbed track
             Assert.Null(ctx.SelectedState.SelectedFrame); // singular selection untouched
         }
         finally { window.Close(); }

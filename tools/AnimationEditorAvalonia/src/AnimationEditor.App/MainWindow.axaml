@@ -1915,17 +1915,32 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="models:ChainTimelineTrackVm">
-                                                <Grid ColumnDefinitions="70,*" Height="40">
+                                                <Grid ColumnDefinitions="96,*" Height="40">
                                                     <Border Grid.Column="0"
                                                             Background="{DynamicResource BgRail}"
                                                             BorderBrush="{DynamicResource LineBrush}"
                                                             BorderThickness="0,0,1,1"
                                                             Padding="6,0">
-                                                        <TextBlock Text="{Binding ChainName}"
-                                                                   FontSize="9" FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource InkDim}"
-                                                                   VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Grid ColumnDefinitions="Auto,*">
+                                                            <Button Grid.Column="0"
+                                                                    Width="22" Height="22" Padding="0"
+                                                                    Margin="0,0,4,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{DynamicResource Ink}"
+                                                                    ToolTip.Tip="{Binding PlayPauseTip}"
+                                                                    Click="OnGroupTrackPlayPauseClick">
+                                                                <svg:Svg Width="11" Height="11"
+                                                                         Path="{Binding PlayPauseIconPath}"
+                                                                         CurrentColor="{DynamicResource IconInk}"
+                                                                         VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                            </Button>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding ChainName}"
+                                                                       FontSize="9" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource InkDim}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
                                                     </Border>
                                                     <Border Grid.Column="1"
                                                             Background="{DynamicResource BgCanvas}"
