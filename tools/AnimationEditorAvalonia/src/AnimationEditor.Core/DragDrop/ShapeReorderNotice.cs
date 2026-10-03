@@ -14,6 +14,6 @@ public static class ShapeReorderNotice
     {
         string extension = string.IsNullOrEmpty(openFilePath) ? "" : "." + new FilePath(openFilePath).Extension;
         string format = extension.Length > 1 ? extension : ".achx/.achj";
-        return $"Shapes can't be reordered by dragging. The {format} format saves shapes grouped by type, so a custom order wouldn't be kept.";
+        return $"Can't reorder shapes: {format} saves them grouped by type.";
     }
 }
