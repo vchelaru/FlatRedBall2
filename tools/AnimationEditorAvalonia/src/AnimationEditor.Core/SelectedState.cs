@@ -146,7 +146,8 @@ namespace AnimationEditor.Core
                 foreach (var node in _selectedNodes)
                 {
                     var chain = node as AnimationChainSave
-                        ?? (node is AnimationFrameSave frame ? FindChainForFrame(frame) : null);
+                        ?? (node is AnimationFrameSave frame ? FindChainForFrame(frame) : null)
+                        ?? (node is ShapeSave shape ? FindChainForShape(shape) : null);
                     if (chain is not null && !chains.Contains(chain))
                         chains.Add(chain);
                 }
@@ -246,6 +247,16 @@ namespace AnimationEditor.Core
         {
             get => mSnapshot;
             set => mSnapshot = value;
+        }
+
+        private AnimationChainSave? FindChainForShape(ShapeSave shape)
+        {
+            if (AnimationChainListSave == null) return null;
+            foreach (var chain in AnimationChainListSave.AnimationChains)
+                foreach (var frame in chain.Frames)
+                    if (frame.ShapesSave?.Shapes.Contains(shape) == true)
+                        return chain;
+            return null;
         }
 
         private AnimationChainSave? FindChainForFrame(AnimationFrameSave frame)

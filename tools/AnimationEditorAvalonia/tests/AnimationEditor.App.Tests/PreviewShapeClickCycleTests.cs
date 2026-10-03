@@ -119,4 +119,56 @@ public class PreviewShapeClickCycleTests
 
         window.Close();
     }
+
+    [AvaloniaFact]
+    public void Group_ClickShape_ReplacesItsFrameInSelection_KeepsOtherFrames_AndCyclesAcrossFrames()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+
+        var chains = new List<AnimationChainSave>();
+        AnimationFrameSave MakeFrameWithCircle(string chainName, out CircleSave circle)
+        {
+            circle = new CircleSave { Radius = 10f };
+            var f = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+            f.ShapesSave!.Shapes.Add(circle);
+            var c = new AnimationChainSave { Name = chainName };
+            c.Frames.Add(f);
+            chains.Add(c);
+            return f;
+        }
+        var fa = MakeFrameWithCircle("A", out var ca);
+        var fb = MakeFrameWithCircle("B", out var cb);
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.AddRange(chains);
+        ctx.ProjectManager.AnimationChainListSave = acls; // after the window, which resets the project
+        ctx.SelectedState.SelectedNodes = new List<object> { fa, fb }; // two frames, two chains
+        Dispatcher.UIThread.RunJobs();
+        var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+        preview.SetPan(0, -50); // lift the shapes clear of the group timeline dock over the preview bottom
+        var center = preview.TranslatePoint(
+            new Point((preview.Bounds.Width - 20) / 2 + 20, (preview.Bounds.Height - 20) / 2 + 20 - 50), window)!.Value;
+
+        void Click() { window.MouseDown(center, MouseButton.Left); window.MouseUp(center, MouseButton.Left); Dispatcher.UIThread.RunJobs(); }
+
+        Click(); // nothing selected: topmost (later frame's circle)
+        Assert.Equal(new object[] { fa, cb }, ctx.SelectedState.SelectedNodes);
+        Assert.True(preview.IsGroupPreviewActive);
+
+        Click(); // cycles to the other frame's circle; the first circle falls back to its frame
+        Assert.Equal(new object[] { ca, fb }, ctx.SelectedState.SelectedNodes);
+
+        Click(); // wraps
+        Assert.Equal(new object[] { fa, cb }, ctx.SelectedState.SelectedNodes);
+
+        window.Close();
+    }
 }
