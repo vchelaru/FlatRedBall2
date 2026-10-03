@@ -1752,10 +1752,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
-                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked, IsHovered: pinned && ReferenceEquals(r, _hoverShape)));
+                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked, IsHovered: pinned && IsHoverTarget(r)));
         foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
-                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked, IsHovered: pinned && ReferenceEquals(c, _hoverShape)));
+                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked, IsHovered: pinned && IsHoverTarget(c)));
         foreach (var p in frame.ShapesSave!.PolygonSaves)
         {
             int n = PolygonVertices.Count(p);
@@ -1767,7 +1767,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f,
-                pinned && ReferenceEquals(p, _hoverShape)));
+                pinned && IsHoverTarget(p)));
         }
         return list.ToArray();
     }
@@ -2006,6 +2006,25 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     // The shape the hover preview outlines; set from pointer moves, cleared on exit/drag.
     private object? _hoverShape;
+
+    // The shape whose tree row the pointer is over (#1297); drawn like _hoverShape.
+    private object? _treeHoverShape;
+
+    /// <summary>
+    /// Outlines <paramref name="data"/> when it is a shape (tree row hover, #1297); any other row
+    /// data or null clears it. Already-selected shapes get no extra outline, as with pointer hover.
+    /// </summary>
+    public void SetTreeHoverShape(object? data)
+    {
+        object? shape = data is ShapeSave ? data : null;
+        if (ReferenceEquals(shape, _treeHoverShape)) return;
+        _treeHoverShape = shape;
+        InvalidateVisual();
+    }
+
+    private bool IsHoverTarget(object shape) =>
+        ReferenceEquals(shape, _hoverShape)
+        || (ReferenceEquals(shape, _treeHoverShape) && !ReferenceEquals(shape, _selectedState!.SelectedShape));
 
     private void UpdateHoverShape(Point pos)
     {

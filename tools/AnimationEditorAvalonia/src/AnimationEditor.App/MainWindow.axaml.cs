@@ -3440,8 +3440,12 @@ public partial class MainWindow : Window
             (_, _) => ClearShapeDragCandidate(),
             RoutingStrategies.Bubble);
 
-        // Hovering a chain/frame row highlights it on the wireframe (#1216).
-        TreeHoverTracker.Attach(AnimTree, WireframeCtrl.SetTreeHover);
+        // Hovering a chain/frame row highlights it on the wireframe (#1216); a shape row, in the preview.
+        TreeHoverTracker.Attach(AnimTree, data =>
+        {
+            WireframeCtrl.SetTreeHover(data);
+            PreviewCtrl.SetTreeHoverShape(data); // shape rows outline in the preview (#1297)
+        });
 
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) => AddAnimationChainAndBeginInlineRename();
