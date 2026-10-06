@@ -2,6 +2,7 @@ using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -404,7 +405,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
 
-        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength);
+        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, NumericEdit newLength);
 
         /// <summary>
         /// Sets RelativeX/Y on every frame in <paramref name="frames"/>. Either axis may be
@@ -413,7 +414,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// color channels, there is no legitimate "clear to null" target for this field, so <c>null</c>
         /// unambiguously means "don't touch".
         /// </summary>
-        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY);
+        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? newRelX, NumericEdit? newRelY);
         void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
         void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
         void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
@@ -424,7 +425,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// inspector field is showing "(mixed)" and the user only edited one of the four. See
         /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
-        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 
@@ -486,7 +487,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="HasSameFrameNameCollision"/> before passing a non-null name for a multi-selection.
         /// See <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
-        void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, float? x, float? y, float? scaleX, float? scaleY);
+        void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, NumericEdit? x, NumericEdit? y, NumericEdit? scaleX, NumericEdit? scaleY);
 
         /// <summary>
         /// Sets Name/X/Y/Radius on every circle in <paramref name="circles"/> as a single undoable
@@ -494,7 +495,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="SetRectPropsBulk"/> for the null-means-"don't touch" semantics and the
         /// same-frame name-collision caveat.
         /// </summary>
-        void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, float? x, float? y, float? radius);
+        void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, NumericEdit? x, NumericEdit? y, NumericEdit? radius);
 
         /// <summary>
         /// Sets Name/X/Y on every polygon in <paramref name="polygons"/> as one undoable operation —
@@ -502,7 +503,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="MovePolygonVertex"/> for the vertex fan-out). See <see cref="SetRectPropsBulk"/>
         /// for the null-means-"don't touch" semantics and the same-frame name-collision caveat.
         /// </summary>
-        void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons, string? name, float? x, float? y);
+        void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons, string? name, NumericEdit? x, NumericEdit? y);
 
         /// <summary>
         /// Ends the current edit session for the coalescing NumericUpDown fields (rect/circle

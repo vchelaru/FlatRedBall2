@@ -144,6 +144,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        NumericExpressionInput.Install();
         if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
             singleView.MainView = BuildView();
 

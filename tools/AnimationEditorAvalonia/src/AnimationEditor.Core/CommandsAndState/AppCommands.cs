@@ -2048,17 +2048,17 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }
 
-        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength)
+        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, NumericEdit newLength)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
-            var desc = $"Set Length: {newLength:0.###}s";
+            var desc = newLength.IsRelative ? "Set Length" : $"Set Length: {newLength.Apply(0m):0.###}s";
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength; },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength.Apply(f.FrameLength); },
                 this, _events, false, desc, coalesceKind: "Length"));
         }
 
-        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
+        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? newRelX, NumericEdit? newRelY)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
@@ -2068,8 +2068,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     foreach (var f in unlockedFrames)
                     {
-                        if (newRelX.HasValue) f.RelativeX = newRelX.Value;
-                        if (newRelY.HasValue) f.RelativeY = newRelY.Value;
+                        if (newRelX.HasValue) f.RelativeX = newRelX.Value.Apply(f.RelativeX);
+                        if (newRelY.HasValue) f.RelativeY = newRelY.Value.Apply(f.RelativeY);
                     }
                 },
                 this, _events, true, "Set Offset", coalesceKind: "Relative"));
@@ -2112,7 +2112,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
-            int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
+            NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
@@ -2142,15 +2142,15 @@ namespace AnimationEditor.Core.CommandsAndState
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
                         // (possibly just-moved) Left/Top.
-                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
-                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f, bmpW)), bmpW);
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f, bmpH)), bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
                     }
                     foreach (var f in siblings)
                     {
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
                     }
                 },
                 this, _events, true, "Set Region", coalesceKind: "PixelRegion"));
@@ -2171,7 +2171,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         public void SetRectPropsBulk(IReadOnlyList<AARectSave> rects,
-            string? name, float? x, float? y, float? scaleX, float? scaleY)
+            string? name, NumericEdit? x, NumericEdit? y, NumericEdit? scaleX, NumericEdit? scaleY)
         {
             rects = rects.Where(r => !IsShapeLocked(null, r)).ToList();
             if (rects.Count == 0) return;
@@ -2182,17 +2182,17 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var r in rects)
                     {
                         if (name != null) r.Name = name;
-                        if (x.HasValue) r.X = x.Value;
-                        if (y.HasValue) r.Y = y.Value;
-                        if (scaleX.HasValue) r.ScaleX = scaleX.Value;
-                        if (scaleY.HasValue) r.ScaleY = scaleY.Value;
+                        if (x.HasValue) r.X = x.Value.Apply(r.X);
+                        if (y.HasValue) r.Y = y.Value.Apply(r.Y);
+                        if (scaleX.HasValue) r.ScaleX = scaleX.Value.Apply(r.ScaleX);
+                        if (scaleY.HasValue) r.ScaleY = scaleY.Value.Apply(r.ScaleY);
                     }
                 },
                 this, _events, _objectFinder, "Edit Rectangles"));
         }
 
         public void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles,
-            string? name, float? x, float? y, float? radius)
+            string? name, NumericEdit? x, NumericEdit? y, NumericEdit? radius)
         {
             circles = circles.Where(c => !IsShapeLocked(null, c)).ToList();
             if (circles.Count == 0) return;
@@ -2203,16 +2203,16 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var c in circles)
                     {
                         if (name != null) c.Name = name;
-                        if (x.HasValue) c.X = x.Value;
-                        if (y.HasValue) c.Y = y.Value;
-                        if (radius.HasValue) c.Radius = radius.Value;
+                        if (x.HasValue) c.X = x.Value.Apply(c.X);
+                        if (y.HasValue) c.Y = y.Value.Apply(c.Y);
+                        if (radius.HasValue) c.Radius = radius.Value.Apply(c.Radius);
                     }
                 },
                 this, _events, _objectFinder, "Edit Circles"));
         }
 
         public void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons,
-            string? name, float? x, float? y)
+            string? name, NumericEdit? x, NumericEdit? y)
         {
             polygons = polygons.Where(p => !IsShapeLocked(null, p)).ToList();
             if (polygons.Count == 0) return;
@@ -2223,8 +2223,8 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var p in polygons)
                     {
                         if (name != null) p.Name = name;
-                        if (x.HasValue) p.X = x.Value;
-                        if (y.HasValue) p.Y = y.Value;
+                        if (x.HasValue) p.X = x.Value.Apply(p.X);
+                        if (y.HasValue) p.Y = y.Value.Apply(p.Y);
                     }
                 },
                 this, _events, _objectFinder, "Edit Polygons"));

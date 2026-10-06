@@ -158,7 +158,30 @@ public partial class FlankerNumericField : UserControl
 
     private void Commit()
     {
-        decimal fallback = Value ?? Minimum;
+        if (Value is null)
+        {
+            // Mixed multi-selection (#1325): a relative edit goes to the owner to apply per item;
+            // an absolute one sets the value; anything else leaves the field mixed.
+            if (NumericEdit.TryParse(ValueBox.Text, out NumericEdit edit))
+            {
+                if (edit.IsRelative)
+                {
+                    ValueBox.Text = string.Empty;
+                    RaiseEvent(new NumericEditCommittedEventArgs(edit));
+                }
+                else
+                {
+                    Value = Math.Clamp(edit.Apply(0m), Minimum, Maximum);
+                }
+            }
+            else
+            {
+                ValueBox.Text = string.Empty;
+            }
+            return;
+        }
+
+        decimal fallback = Value.Value;
         decimal parsed = NumericToolbarInput.ParseClamp(ValueBox.Text, Minimum, Maximum, fallback);
 
         // Value's setter only raises OnValueChanged (which reformats ValueBox.Text) when the

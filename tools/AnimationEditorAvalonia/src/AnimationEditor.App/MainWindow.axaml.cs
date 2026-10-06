@@ -274,6 +274,7 @@ public partial class MainWindow : Window
         _tabController = new TabController(_undoManager, _appCommands,
             () => TreeBuilder.CaptureExpandState(_treeRoots), _tabManager);
 
+        NumericExpressionInput.Install();
         InitializeComponent();
 
         if (_useMacOSChrome)
@@ -5392,7 +5393,42 @@ public partial class MainWindow : Window
         SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
             PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
             PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY);
+
+        // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
+        ApplyRelativeEditsWith(ApplyFrameLen, PropFrameLen);
+        ApplyRelativeEditsWith(ApplyFrameRelative, PropRelX, PropRelY);
+        ApplyRelativeEditsWith(ApplyFramePixelCoords, PropPixelX, PropPixelY, PropPixelW, PropPixelH);
+        ApplyRelativeEditsWith(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
+        ApplyRelativeEditsWith(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
+        ApplyRelativeEditsWith(ApplyPolygonProps, PropPolygonX, PropPolygonY);
     }
+
+    // The relative edit being applied, visible to the field's Apply method through EditOf.
+    private (Control Field, NumericEdit Edit)? _relativeEdit;
+
+    private void ApplyRelativeEditsWith(Action apply, params Control[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.AddHandler(NumericExpressionInput.RelativeEditCommittedEvent, (_, e) =>
+            {
+                e.Handled = true;
+                _relativeEdit = (field, e.Edit);
+                try { apply(); }
+                finally { _relativeEdit = null; }
+                _appCommands.SealPendingEdits();
+            });
+        }
+    }
+
+    /// <summary>The edit a field asks for: the relative edit being applied to it, else its value,
+    /// else null ("(mixed)" and untouched, so leave each item alone).</summary>
+    private NumericEdit? EditOf(Control field, decimal? value) =>
+        _relativeEdit is { } r && ReferenceEquals(r.Field, field) ? r.Edit
+        : value is { } v ? v
+        : null;
+
+    private NumericEdit? EditOf(NumericUpDown field) => EditOf(field, field.Value);
 
     private void SealOnCommit(params InputElement[] inputs)
     {
@@ -5990,8 +6026,8 @@ public partial class MainWindow : Window
         if (polygons.Count > 1)
         {
             // A null component means "showing (mixed)/disabled, not edited" -- see ApplyRectProps.
-            float? bx = PropPolygonX.Value.HasValue ? (float)PropPolygonX.Value.Value : null;
-            float? by = PropPolygonY.Value.HasValue ? (float)PropPolygonY.Value.Value : null;
+            NumericEdit? bx = EditOf(PropPolygonX);
+            NumericEdit? by = EditOf(PropPolygonY);
             string? bname = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? null : PropPolygonName.Text.Trim();
             _appCommands.SetPolygonPropsBulk(polygons, bname, bx, by);
             return;
@@ -6090,8 +6126,8 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
-        if (frames.Count == 0 || !PropFrameLen.Value.HasValue) return;
-        _appCommands.SetFrameLength(frames, (float)PropFrameLen.Value.Value);
+        if (frames.Count == 0 || EditOf(PropFrameLen, PropFrameLen.Value) is not { } length) return;
+        _appCommands.SetFrameLength(frames, length);
     }
 
     private void ApplyFrameRelative()
@@ -6102,8 +6138,8 @@ public partial class MainWindow : Window
         // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
         // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
         // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
-        float? relX = PropRelX.Value.HasValue ? (float)PropRelX.Value.Value : null;
-        float? relY = PropRelY.Value.HasValue ? (float)PropRelY.Value.Value : null;
+        NumericEdit? relX = EditOf(PropRelX);
+        NumericEdit? relY = EditOf(PropRelY);
         if (relX is null && relY is null) return;
         _appCommands.SetFrameRelative(frames, relX, relY);
     }
@@ -6173,10 +6209,10 @@ public partial class MainWindow : Window
         // A null component here only ever means "still showing (mixed), not edited" — the pixel
         // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
         // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
-        int? x = PropPixelX.Value.HasValue ? (int)PropPixelX.Value.Value : null;
-        int? y = PropPixelY.Value.HasValue ? (int)PropPixelY.Value.Value : null;
-        int? w = PropPixelW.Value.HasValue ? (int)PropPixelW.Value.Value : null;
-        int? h = PropPixelH.Value.HasValue ? (int)PropPixelH.Value.Value : null;
+        NumericEdit? x = EditOf(PropPixelX);
+        NumericEdit? y = EditOf(PropPixelY);
+        NumericEdit? w = EditOf(PropPixelW);
+        NumericEdit? h = EditOf(PropPixelH);
         if (x is null && y is null && w is null && h is null) return;
         _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
@@ -6194,10 +6230,10 @@ public partial class MainWindow : Window
         // showed "(mixed)" or disabled the field for a same-frame collision (SetNameOrMixed); once
         // the user types, Text becomes non-null and applies to every selected rect (safe as long as
         // no two share a frame — SetNameOrMixed disables the field for that case).
-        float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
-        float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
-        float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
-        float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
+        NumericEdit? x = EditOf(PropRectX);
+        NumericEdit? y = EditOf(PropRectY);
+        NumericEdit? scaleX = EditOf(PropRectScaleX);
+        NumericEdit? scaleY = EditOf(PropRectScaleY);
         string? name = PropRectName.Text;
 
         _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
@@ -6210,9 +6246,9 @@ public partial class MainWindow : Window
         if (circles.Count == 0) return;
 
         // See ApplyRectProps for the null-means-"don't touch" / same-frame-collision semantics.
-        float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
-        float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
-        float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
+        NumericEdit? x = EditOf(PropCircleX);
+        NumericEdit? y = EditOf(PropCircleY);
+        NumericEdit? radius = EditOf(PropCircleRadius);
         string? name = PropCircleName.Text;
 
         _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
