@@ -56,6 +56,33 @@ public class MultiCopyPasteTests
     }
 
     [Fact]
+    public void PasteShapes_CopiedInReverseSelectionOrder_KeepsSourceOrder()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var source = chain.Frames[0];
+        var target = chain.Frames[1];
+        var shapes = new object[]
+        {
+            new AARectSave { Name = "R1" }, new AARectSave { Name = "R2" },
+            new PolygonSave { Name = "P1" }, new PolygonSave { Name = "P2" },
+            new CircleSave { Name = "C1" }, new CircleSave { Name = "C2" },
+        };
+        foreach (var shape in shapes)
+            source.ShapesSave!.Add(shape);
+        // Selected bottom-up, so selection order is the reverse of the frame's order.
+        ctx.SelectedState.SelectShape(shapes[0]);
+        ctx.SelectedState.SelectedNodes = shapes.Reverse().ToList();
+
+        Assert.True(SelectionCopyContext.TryGet(
+            ctx.SelectedState, ctx.ObjectFinder, ctx.Acls, out var payload, out _));
+        ctx.AppCommands.PasteShapes(target, payload.Shapes);
+
+        Assert.Equal(new[] { "R1", "R2", "P1", "P2", "C1", "C2" },
+            target.ShapesSave!.Shapes.Cast<ShapeSave>().Select(s => s.Name));
+    }
+
+    [Fact]
     public void PasteShapes_NameCollision_UniquifiesEach()
     {
         var ctx = TestHelpers.SetupFreshAcls();
