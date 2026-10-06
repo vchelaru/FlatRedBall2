@@ -1,7 +1,11 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.VisualTree;
+using AnimationEditor.Views.Controls;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -123,6 +127,92 @@ public class NumericMathScenarioTests
 
             walk.Frames[0].FrameLength.ShouldBe(0.2f);
             walk.Frames[1].FrameLength.ShouldBe(0.5f);
+        }
+    }
+
+    public enum Leave { Enter, Tab, ShiftTab, FocusElsewhere, EnterThenFocusElsewhere }
+
+    // Every way an edit leaves a numeric box must commit it once.
+    private static void TypeAndLeave(AnimationEditorHarness editor, string field, string text, Leave how)
+    {
+        bool flanker = field == "PropFrameLen";
+        Key key = how is Leave.Tab or Leave.ShiftTab ? Key.Tab : Key.Enter;
+        RawInputModifiers modifiers = how == Leave.ShiftTab ? RawInputModifiers.Shift : RawInputModifiers.None;
+        if (how == Leave.FocusElsewhere)
+        {
+            // Type without committing, then move focus away.
+            Control box = flanker ? editor.Control<FlankerNumericField>(field) : editor.Control<NumericUpDown>(field);
+            TextBox text_ = box.GetVisualDescendants().OfType<TextBox>().First();
+            text_.Focus();
+            editor.Layout();
+            text_.SelectAll();
+            editor.Type(text);
+        }
+        else if (flanker)
+        {
+            editor.TypeFlanker(field, text, key, modifiers);
+        }
+        else
+        {
+            editor.TypeNumber(field, text, key, modifiers);
+        }
+
+        if (how is Leave.FocusElsewhere or Leave.EnterThenFocusElsewhere)
+        {
+            // Another field takes focus, as a click on it would.
+            editor.Control<NumericUpDown>(flanker ? "PropRelX" : "PropRectY").GetVisualDescendants().OfType<TextBox>().First().Focus().ShouldBeTrue();
+            editor.Layout();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Leave.Enter)]
+    [InlineData(Leave.Tab)]
+    [InlineData(Leave.ShiftTab)]
+    [InlineData(Leave.FocusElsewhere)]
+    [InlineData(Leave.EnterThenFocusElsewhere)]
+    public async Task RectX_EveryWayOut_CommitsRelativeEditOnce(Leave how)
+    {
+        var (editor, first, second) = await OpenTwoRects(firstX: 10, secondX: 20);
+        using (editor)
+        {
+            editor.ClickRow(first);
+            TypeAndLeave(editor, "PropRectX", "+ .5", how);
+            first.X.ShouldBe(10.5f, "single select");
+
+            editor.ClickRow(second, RawInputModifiers.Control);
+            TypeAndLeave(editor, "PropRectX", "+ .5", how);
+            first.X.ShouldBe(11f, "mixed multi-select, first");
+            second.X.ShouldBe(20.5f, "mixed multi-select, second");
+
+            TypeAndLeave(editor, "PropRectX", "3 + 4", how);
+            first.X.ShouldBe(7f, "absolute over mixed");
+            second.X.ShouldBe(7f, "absolute over mixed");
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Leave.Enter)]
+    [InlineData(Leave.Tab)]
+    [InlineData(Leave.ShiftTab)]
+    [InlineData(Leave.FocusElsewhere)]
+    [InlineData(Leave.EnterThenFocusElsewhere)]
+    public async Task FrameLength_EveryWayOut_CommitsRelativeEditOnce(Leave how)
+    {
+        var (editor, _, _) = await OpenTwoRects(firstX: 10, secondX: 20);
+        using (editor)
+        {
+            AnimationChainSave walk = editor.ChainNamed("Walk");
+            walk.Frames[0].FrameLength = 0.1f;
+            walk.Frames[1].FrameLength = 0.25f;
+            editor.ClickRow(walk.Frames[0]);
+            TypeAndLeave(editor, "PropFrameLen", "+ .5", how);
+            walk.Frames[0].FrameLength.ShouldBe(0.6f, 0.0001f, "single select");
+
+            editor.ClickRow(walk.Frames[1], RawInputModifiers.Control);
+            TypeAndLeave(editor, "PropFrameLen", "+ .5", how);
+            walk.Frames[0].FrameLength.ShouldBe(1.1f, 0.0001f, "mixed multi-select, first");
+            walk.Frames[1].FrameLength.ShouldBe(0.75f, 0.0001f, "mixed multi-select, second");
         }
     }
 }

@@ -691,14 +691,15 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
-    /// <summary>Focuses <paramref name="box"/>, replaces its text by typing, and presses Enter.</summary>
-    public void TypeAndEnter(TextBox box, string text)
+    /// <summary>Focuses <paramref name="box"/>, replaces its text by typing, and presses
+    /// <paramref name="commitKey"/> (Enter, or Tab to leave the box).</summary>
+    public void TypeAndEnter(TextBox box, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         box.Focus();
         Layout();
         box.SelectAll();
         Window.KeyTextInput(text);
-        Press(Key.Enter);
+        Press(commitKey, modifiers);
     }
 
     /// <summary>
@@ -706,7 +707,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// ("PropPixelX") and commits with Enter, which also seals the coalesced undo entry so the next
     /// value typed is its own step. Focus stays in the box, as it does for a user.
     /// </summary>
-    public void TypeNumber(string name, string text)
+    public void TypeNumber(string name, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         NumericUpDown input = Control<NumericUpDown>(name);
         if (!input.IsEffectivelyVisible)
@@ -714,7 +715,7 @@ internal sealed class AnimationEditorHarness : IDisposable
             throw new InvalidOperationException($"{name} is not visible; the inspector shows another kind of item.");
         }
         TextBox box = input.GetVisualDescendants().OfType<TextBox>().First();
-        TypeAndEnter(box, text);
+        TypeAndEnter(box, text, commitKey, modifiers);
     }
 
     /// <summary>
@@ -753,7 +754,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     }
 
     /// <summary>Types into the flanker numeric field named <paramref name="name"/> ("PropFrameLen", "SpeedInput") and presses Enter.</summary>
-    public void TypeFlanker(string name, string text)
+    public void TypeFlanker(string name, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         FlankerNumericField field = Control<FlankerNumericField>(name);
         if (!field.IsEffectivelyVisible)
@@ -761,7 +762,7 @@ internal sealed class AnimationEditorHarness : IDisposable
             throw new InvalidOperationException($"{name} is not visible; another sidebar tab or item kind is showing.");
         }
         TextBox box = field.GetVisualDescendants().OfType<TextBox>().First();
-        TypeAndEnter(box, text);
+        TypeAndEnter(box, text, commitKey, modifiers);
     }
 
     #endregion

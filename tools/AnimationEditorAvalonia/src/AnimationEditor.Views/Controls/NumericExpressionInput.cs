@@ -39,21 +39,30 @@ public static class NumericExpressionInput
     {
         if (_installed) return;
         _installed = true;
-        TemplatedControl.TemplateAppliedEvent.AddClassHandler<NumericUpDown>((box, _) => Attach(box));
+        TemplatedControl.TemplateAppliedEvent.AddClassHandler<NumericUpDown>(Attach);
     }
 
-    private static void Attach(NumericUpDown box)
+    private static void Attach(NumericUpDown box, TemplateAppliedEventArgs e)
     {
-        if (States.TryGetValue(box, out _)) return;
-        var state = new EditState(box);
-        States.Add(box, state);
-        box.TextConverter = state;
-        box.ValueChanged += (_, e) => state.OnValueChanged(e.NewValue);
-        box.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        if (!States.TryGetValue(box, out EditState? state))
         {
-            if (e.Key == Key.Enter) state.Commit();
-        }, RoutingStrategies.Bubble, handledEventsToo: true);
-        box.LostFocus += (_, _) => state.Commit();
+            state = new EditState(box);
+            States.Add(box, state);
+            box.TextConverter = state;
+            box.ValueChanged += (_, args) => state.OnValueChanged(args.NewValue);
+            box.AddHandler(InputElement.KeyDownEvent, (_, args) =>
+            {
+                if (args.Key == Key.Enter) state.Commit();
+            }, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
+        // Every way out of the box (Tab, Shift+Tab, a click elsewhere) commits here, on the inner
+        // TextBox. By the time LostFocus bubbles up to the NumericUpDown, its own OnLostFocus has
+        // already reset the text to the old value, discarding a relative edit typed over "(mixed)".
+        if (e.NameScope.Find<TextBox>("PART_TextBox") is { } textBox)
+        {
+            textBox.LostFocus += (_, _) => state.Commit();
+        }
     }
 
     /// <summary>Per-box converter plus the value a relative edit is measured from.</summary>
