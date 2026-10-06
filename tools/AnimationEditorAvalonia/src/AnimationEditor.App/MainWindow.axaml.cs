@@ -5343,13 +5343,12 @@ public partial class MainWindow : Window
         PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
-        PropRed.LostFocus          += (_, _) => ApplyFrameColor();
-        PropGreen.LostFocus        += (_, _) => ApplyFrameColor();
-        PropBlue.LostFocus         += (_, _) => ApplyFrameColor();
+        foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
+        {
+            channel.LostFocus += (_, _) => ApplyFrameColor(channel);
+            channel.KeyDown   += (_, e) => { if (e.Key == Key.Enter) ApplyFrameColor(channel); };
+        }
         PropAlpha.LostFocus        += (_, _) => ApplyFrameAlpha();
-        PropRed.KeyDown            += (_, e) => CommitColorChannelOnEnter(e);
-        PropGreen.KeyDown          += (_, e) => CommitColorChannelOnEnter(e);
-        PropBlue.KeyDown           += (_, e) => CommitColorChannelOnEnter(e);
         PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
         // Delete/Backspace clears the mode back to inherited, as deleting a color channel's text does.
@@ -5401,6 +5400,10 @@ public partial class MainWindow : Window
         ApplyRelativeEditsWith(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
         ApplyRelativeEditsWith(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
         ApplyRelativeEditsWith(ApplyPolygonProps, PropPolygonX, PropPolygonY);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropRed), PropRed);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropGreen), PropGreen);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropBlue), PropBlue);
+        ApplyRelativeEditsWith(ApplyFrameAlpha, PropAlpha);
     }
 
     // The relative edit being applied, visible to the field's Apply method through EditOf.
@@ -6144,24 +6147,16 @@ public partial class MainWindow : Window
         _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
-    private void ApplyFrameColor()
+    /// <summary>Commits one color field. Only that channel changes, so committing Red never
+    /// touches a Green that is showing "(mixed)".</summary>
+    private void ApplyFrameColor(NumericUpDown field)
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
-        // Note: with a multi-selection, a channel that is still showing its "(mixed)" placeholder
-        // also reads as null here, so it gets applied (cleared) to every selected frame just like an
-        // explicit clear would — there's no way to tell "never touched" apart from "cleared on purpose"
-        // from the control's Value alone. Prefer not leaving a mixed color panel blank across an edit
-        // if that distinction matters; see PR notes for the known limitation.
-        static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
-        _appCommands.SetFrameColor(frames, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
-    }
-
-    private void CommitColorChannelOnEnter(KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) ApplyFrameColor();
+        ChannelEdit Edit(NumericUpDown channel, Func<AnimationFrameSave, int?> value) =>
+            ReferenceEquals(field, channel) ? ChannelEditOf(channel, frames.Select(value)) : ChannelEdit.Keep;
+        _appCommands.SetFrameColor(frames, Edit(PropRed, f => f.Red), Edit(PropGreen, f => f.Green), Edit(PropBlue, f => f.Blue));
     }
 
     private void ApplyFrameAlpha()
@@ -6169,9 +6164,16 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // A blank NumericUpDown (null Value) means alpha is unset and is omitted from the .achx.
-        _appCommands.SetFrameAlpha(frames, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
+        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, frames.Select(f => f.Alpha)));
     }
+
+    /// <summary>A blank color field clears the channel (omitted from the .achx, so it inherits),
+    /// except when it is blank because the selection is "(mixed)": that leaves each frame alone, so
+    /// moving focus through a mixed field changes nothing (#1330).</summary>
+    private ChannelEdit ChannelEditOf(NumericUpDown field, IEnumerable<int?> selectedValues) =>
+        EditOf(field) is NumericEdit edit ? ChannelEdit.Edit(edit)
+        : selectedValues.Distinct().Count() > 1 ? ChannelEdit.Keep
+        : ChannelEdit.Clear;
 
     private void ApplyFrameColorOperation()
     {

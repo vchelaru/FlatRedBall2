@@ -415,9 +415,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// unambiguously means "don't touch".
         /// </summary>
         void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? newRelX, NumericEdit? newRelY);
-        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
+        /// <summary>Edits R/G/B on every frame. Results clamp to -255..255; a relative edit on an
+        /// unset channel starts from the value it inherits.</summary>
+        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit red, ChannelEdit green, ChannelEdit blue);
         void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
-        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
+        /// <summary>Edits alpha on every frame. Results clamp to 0..255; a relative edit on an unset
+        /// alpha starts from the value it inherits (255 if none).</summary>
+        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha);
 
         /// <summary>
         /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the

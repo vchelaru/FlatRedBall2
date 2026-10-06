@@ -160,8 +160,72 @@ public class NumericMathScenarioTests
         if (how is Leave.FocusElsewhere or Leave.EnterThenFocusElsewhere)
         {
             // Another field takes focus, as a click on it would.
-            editor.Control<NumericUpDown>(flanker ? "PropRelX" : "PropRectY").GetVisualDescendants().OfType<TextBox>().First().Focus().ShouldBeTrue();
-            editor.Layout();
+            FocusField(editor, field.StartsWith("PropRect") ? "PropRectY" : "PropRelX");
+        }
+    }
+
+    private static void FocusField(AnimationEditorHarness editor, string field)
+    {
+        editor.Control<NumericUpDown>(field).GetVisualDescendants().OfType<TextBox>().First().Focus().ShouldBeTrue();
+        editor.Layout();
+    }
+
+    // Two frames whose red, green and alpha all differ, both selected, so every color field is mixed.
+    private static async Task<(AnimationEditorHarness Editor, AnimationFrameSave First, AnimationFrameSave Second)> OpenTwoMixedColorFrames()
+    {
+        var (editor, _, _) = await OpenTwoRects(firstX: 10, secondX: 20);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        AnimationFrameSave first = walk.Frames[0];
+        AnimationFrameSave second = walk.Frames[1];
+        first.Red = 100;
+        second.Red = 200;
+        first.Green = 10;
+        second.Green = 20;
+        first.Alpha = 30;
+        second.Alpha = 100;
+        editor.ClickRow(first);
+        editor.ClickRow(second, RawInputModifiers.Control);
+        return (editor, first, second);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Leave.Enter)]
+    [InlineData(Leave.Tab)]
+    [InlineData(Leave.ShiftTab)]
+    [InlineData(Leave.FocusElsewhere)]
+    public async Task ColorChannel_MixedMultiSelect_RelativeEdit_AppliesToEachClampedAsOneUndoStep(Leave how)
+    {
+        var (editor, first, second) = await OpenTwoMixedColorFrames();
+        using (editor)
+        {
+            TypeAndLeave(editor, "PropRed", "+ 100", how);
+
+            first.Red.ShouldBe(200);
+            second.Red.ShouldBe(255, "clamped to the channel maximum");
+            first.Green.ShouldBe(10, "an untouched mixed channel survives");
+            second.Green.ShouldBe(20, "an untouched mixed channel survives");
+            editor.UndoLabels.Count.ShouldBe(1);
+
+            TypeAndLeave(editor, "PropAlpha", "- 50", how);
+
+            first.Alpha.ShouldBe(0, "clamped to the channel minimum");
+            second.Alpha.ShouldBe(50);
+            editor.UndoLabels.Count.ShouldBe(2);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ColorChannel_MixedField_FocusLeavesWithoutTyping_LeavesChannelAlone()
+    {
+        var (editor, first, second) = await OpenTwoMixedColorFrames();
+        using (editor)
+        {
+            FocusField(editor, "PropGreen");
+            FocusField(editor, "PropRelX");
+
+            first.Green.ShouldBe(10);
+            second.Green.ShouldBe(20);
+            editor.UndoLabels.ShouldBeEmpty();
         }
     }
 

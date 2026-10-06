@@ -2075,16 +2075,34 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, true, "Set Offset", coalesceKind: "Relative"));
         }
 
-        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
+        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit red, ChannelEdit green, ChannelEdit blue)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
+            // Resolve every target before mutating: a relative edit on an unset channel starts from
+            // the inherited value, which an earlier selected frame's edit would otherwise change.
+            var targets = unlockedFrames.Select(f =>
+            {
+                var inherited = ResolveEffectiveColor(f);
+                int channelDefault = EffectiveFrameColor.ChannelDefault(inherited.Operation);
+                return (Frame: f,
+                    Red: red.Apply(f.Red, inherited.Red ?? channelDefault, -255, 255),
+                    Green: green.Apply(f.Green, inherited.Green ?? channelDefault, -255, 255),
+                    Blue: blue.Apply(f.Blue, inherited.Blue ?? channelDefault, -255, 255));
+            }).ToList();
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
             // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) { f.Red = red; f.Green = green; f.Blue = blue; } },
+                unlockedFrames, () => { foreach (var t in targets) { t.Frame.Red = t.Red; t.Frame.Green = t.Green; t.Frame.Blue = t.Blue; } },
                 this, _events, false, "Set Frame Color", coalesceKind: "Color"));
+        }
+
+        private ResolvedFrameColor ResolveEffectiveColor(AnimationFrameSave frame)
+        {
+            var chain = _objectFinder.GetAnimationChainContaining(frame);
+            int index = chain?.Frames.IndexOf(frame) ?? -1;
+            return index >= 0 ? EffectiveFrameColor.Resolve(chain!.Frames, index) : default;
         }
 
         public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
@@ -2099,15 +2117,18 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, "Set Frame Color Mode"));
         }
 
-        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
+        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
+            var targets = unlockedFrames
+                .Select(f => (Frame: f, Alpha: alpha.Apply(f.Alpha, ResolveEffectiveColor(f).Alpha ?? 255, 0, 255)))
+                .ToList();
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
             // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) f.Alpha = alpha; },
+                unlockedFrames, () => { foreach (var t in targets) t.Frame.Alpha = t.Alpha; },
                 this, _events, false, "Set Frame Alpha", coalesceKind: "Alpha"));
         }
 
