@@ -156,6 +156,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private float      _shapeDragStartScaleY;  // rect ScaleY at drag start (0 for circle)
     // The other multi-selected shapes that move with _draggingShape (#1324); null for a single-shape drag.
     private (ShapeSave Shape, float StartX, float StartY)[]? _shapeDragCompanions;
+    // Screen pixels the pointer must travel from the press before a shape press counts as a drag
+    // rather than a click. Latched in _shapeDragTraveled, so dragging back to the start stays a drag.
+    private const double ShapeClickSlopPx = 4;
+    private bool _shapeDragTraveled;
 
     // -- Polygon vertex drag ----------------------------------------------------
     // The selected polygon's vertices and edge midpoints are handles: dragging a vertex moves it,
@@ -2921,10 +2925,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 _pendingCycleShape = null;
             if (!IsShapeLocked(hitShape))
             {
-                _draggingShape   = hitShape;
-                _shapeDragAnchor = pos;
-                _shapeDragStartX = ((ShapeSave)hitShape).X;
-                _shapeDragStartY = ((ShapeSave)hitShape).Y;
+                _draggingShape     = hitShape;
+                _shapeDragAnchor   = pos;
+                _shapeDragTraveled = false;
+                _shapeDragStartX   = ((ShapeSave)hitShape).X;
+                _shapeDragStartY   = ((ShapeSave)hitShape).Y;
                 e.Pointer.Capture(this);
             }
             return;
@@ -3016,6 +3021,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
+            if (Point.Distance(pos, _shapeDragAnchor) > ShapeClickSlopPx) _shapeDragTraveled = true;
             var dragged = (ShapeSave)_draggingShape;
             dragged.X = SnapToPixel(_shapeDragStartX + dx);
             dragged.Y = SnapToPixel(_shapeDragStartY + dy);
@@ -3103,7 +3109,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             var cycle = _pendingCycleShape;
             _pendingCycleShape = null;
             var pressed = (ShapeSave)_draggingShape;
-            bool moved = pressed.X != _shapeDragStartX || pressed.Y != _shapeDragStartY;
+            bool moved = _shapeDragTraveled;
             bool wasMulti = _shapeDragCompanions is not null;
             CommitShapeDrag();
             e.Pointer.Capture(null);

@@ -71,6 +71,25 @@ public class MultiShapeDragScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DragOutAndBackToTheStart_KeepsBothShapesSelected()
+    {
+        var (editor, _, _) = await OpenWithTwoSelectedShapesAsync();
+        using var _ = editor;
+        Point start = editor.PreviewPointAt(-20, 0);
+
+        // The shapes end where they started, but the pointer traveled: still a drag, not a click.
+        editor.Window.MouseMove(start, RawInputModifiers.None);
+        editor.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(new Point(start.X + 40, start.Y), RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseMove(start, RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseUp(start, MouseButton.Left, RawInputModifiers.None);
+        editor.Layout();
+
+        editor.Services.SelectedState.SelectedShapes.Count.ShouldBe(2);
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public async Task EscapeDuringAMultiShapeDrag_PutsEveryShapeBack_WithNoUndoEntry()
     {
         var (editor, rect, circle) = await OpenWithTwoSelectedShapesAsync();
