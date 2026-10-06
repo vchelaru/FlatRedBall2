@@ -154,6 +154,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private HandleKind _shapeResizeHandle  = HandleKind.None;
     private float      _shapeDragStartScaleX;  // rect ScaleX or circle Radius at drag start
     private float      _shapeDragStartScaleY;  // rect ScaleY at drag start (0 for circle)
+    // The other multi-selected shapes that move with _draggingShape (#1324); null for a single-shape drag.
+    private (ShapeSave Shape, float StartX, float StartY)[]? _shapeDragCompanions;
 
     // -- Polygon vertex drag ----------------------------------------------------
     // The selected polygon's vertices and edge midpoints are handles: dragging a vertex moves it,
@@ -2057,6 +2059,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private void CommitShapeDrag()
     {
         if (_draggingShape is null) return;
+        if (_shapeDragCompanions is not null)
+        {
+            CommitMultiShapeDrag();
+            return;
+        }
 
         var dragged = (ShapeSave)_draggingShape;
         float newX = dragged.X, newY = dragged.Y;
@@ -2080,6 +2087,47 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         _selectedState!.SelectShape(_draggingShape);
 
         _draggingShape = null;
+    }
+
+    /// <summary>
+    /// The other selected shapes that a press on <paramref name="pressed"/> drags along, with their
+    /// start positions; null unless <paramref name="pressed"/> is one of two or more selected shapes.
+    /// Locked shapes are left behind.
+    /// </summary>
+    private (ShapeSave Shape, float StartX, float StartY)[]? ResolveShapeDragCompanions(object pressed)
+    {
+        var selected = _selectedState!.SelectedShapes;
+        if (selected.Count < 2 || !selected.Contains(pressed)) return null;
+        return selected
+            .Where(s => !ReferenceEquals(s, pressed) && !IsShapeLocked(s))
+            .Cast<ShapeSave>()
+            .Select(s => (s, s.X, s.Y))
+            .ToArray();
+    }
+
+    /// <summary>Records one undo step for every shape a multi-shape drag moved; the selection is left as is.</summary>
+    private void CommitMultiShapeDrag()
+    {
+        const float eps = 1e-4f;
+        var pressed = (ShapeSave)_draggingShape!;
+        var snapshots = new List<MoveShapesCommand.ShapeSnapshot>();
+        foreach (var (shape, startX, startY) in _shapeDragCompanions!.Prepend((pressed, _shapeDragStartX, _shapeDragStartY)))
+        {
+            if (MathF.Abs(shape.X - startX) <= eps && MathF.Abs(shape.Y - startY) <= eps) continue;
+            // Defense-in-depth: see the comment in CommitShapeDrag.
+            if (FindOwningFrame(shape) is not { } frame || IsFrameLocked(frame)) continue;
+            snapshots.Add(new MoveShapesCommand.ShapeSnapshot(frame, shape, startX, startY, shape.X, shape.Y));
+        }
+
+        if (snapshots.Count > 0)
+        {
+            _undoManager!.Record(new MoveShapesCommand(snapshots, _appCommands!, _events!));
+            _events!.RaiseAnimationChainsChanged();
+            _appCommands!.SaveCurrentAnimationChainList();
+        }
+
+        _draggingShape       = null;
+        _shapeDragCompanions = null;
     }
 
     /// <summary>Screen-space positions of <paramref name="polygon"/>'s vertices (closing point excluded).</summary>
@@ -2652,9 +2700,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 if (shape is AARectSave rect) { rect.ScaleX = _shapeDragStartScaleX; rect.ScaleY = _shapeDragStartScaleY; }
                 else if (shape is CircleSave circle) circle.Radius = _shapeDragStartScaleX;
             }
-            _draggingShape     = null;
-            _shapeResizeHandle = HandleKind.None;
-            _pendingCycleShape = null;
+            if (_shapeDragCompanions is { } companions)
+            {
+                foreach (var (companion, startX, startY) in companions)
+                {
+                    companion.X = startX;
+                    companion.Y = startY;
+                }
+            }
+            _draggingShape       = null;
+            _shapeDragCompanions = null;
+            _shapeResizeHandle   = HandleKind.None;
+            _pendingCycleShape   = null;
         }
         else if (_draggingFrame is { } frame)
         {
@@ -2856,7 +2913,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             }
             _pendingCycleShape = cycleTarget;
 
-            SelectShapeFromClick(hitShape);
+            // Pressing one of several selected shapes keeps the selection and drags them all.
+            _shapeDragCompanions = IsShapeLocked(hitShape) ? null : ResolveShapeDragCompanions(hitShape);
+            if (_shapeDragCompanions is null)
+                SelectShapeFromClick(hitShape);
+            else
+                _pendingCycleShape = null;
             if (!IsShapeLocked(hitShape))
             {
                 _draggingShape   = hitShape;
@@ -2957,6 +3019,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             var dragged = (ShapeSave)_draggingShape;
             dragged.X = SnapToPixel(_shapeDragStartX + dx);
             dragged.Y = SnapToPixel(_shapeDragStartY + dy);
+            if (_shapeDragCompanions is { } companions)
+            {
+                foreach (var (shape, startX, startY) in companions)
+                {
+                    shape.X = SnapToPixel(startX + dx);
+                    shape.Y = SnapToPixel(startY + dy);
+                }
+            }
             InvalidateVisual();
             return;
         }
@@ -3034,10 +3104,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             _pendingCycleShape = null;
             var pressed = (ShapeSave)_draggingShape;
             bool moved = pressed.X != _shapeDragStartX || pressed.Y != _shapeDragStartY;
+            bool wasMulti = _shapeDragCompanions is not null;
             CommitShapeDrag();
             e.Pointer.Capture(null);
             if (cycle is not null && !moved)
                 SelectShapeFromClick(cycle);
+            // A click (no drag) on one of several selected shapes narrows the selection to it.
+            else if (wasMulti && !moved)
+                SelectShapeFromClick(pressed);
             return;
         }
 
