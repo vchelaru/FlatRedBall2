@@ -5,7 +5,7 @@ namespace AnimationEditor.Core.Utilities;
 /// <summary>
 /// Pure parse/clamp rule backing <c>AnimationEditor.Views.Controls.FlankerNumericField</c>'s
 /// commit path (the "[−][value][+]" numeric field shared by every toolbar/inspector/dialog
-/// numeric input across the desktop and browser hosts, #963).
+/// numeric input, #963).
 /// </summary>
 public static class NumericToolbarInput
 {

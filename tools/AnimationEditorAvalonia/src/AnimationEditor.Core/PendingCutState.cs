@@ -73,7 +73,7 @@ public interface IPendingCutState
 
     /// <summary>
     /// Classifies how a paste against <paramref name="activeAcls"/> should treat this pending cut.
-    /// Centralizes the decision so the desktop and browser paste handlers don't each re-derive it.
+    /// Centralizes the decision so every paste entry point uses the same rule.
     /// </summary>
     CutCompletion ResolveCompletion(AnimationChainListSave? activeAcls);
 }

@@ -248,10 +248,6 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     // ── Fields ────────────────────────────────────────────────────────────────
 
     protected SKBitmap? _bitmap;
-    // False when _bitmap came from LoadTexture's knownBitmap parameter (caller-owned, e.g.
-    // ThumbnailService's cache in the browser build) -- guards the Dispose call below so this
-    // control never frees a bitmap it doesn't own.
-    private bool _ownsBitmap = true;
     // Immutable GPU-uploadable copy of _bitmap, built on the UI thread and
     // safe to draw from the Avalonia render thread.
     private SKImage? _image;
@@ -313,11 +309,11 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
 
     /// <summary>
     /// Lowercased, slash-normalized absolute path of the currently displayed texture, or null.
-    /// This is a comparison/cache key only (see <see cref="LoadTexture(string?,SKBitmap?)"/>'s
+    /// This is a comparison/cache key only (see <see cref="LoadTexture(string?)"/>'s
     /// <c>norm</c>) -- it does NOT reflect the real on-disk case. Callers that persist the path
     /// (saving a frame's TextureName, displaying it to the user) must use
     /// <see cref="LoadedTexturePathCasePreserved"/> instead, or a case-sensitive filesystem
-    /// (Linux/web) will fail to find the file later (#941).
+    /// (Linux) will fail to find the file later (#941).
     /// </summary>
     public string? LoadedTexturePath => _loadedTexturePath;
 
@@ -547,18 +543,8 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     /// <see cref="OnTextureLoaded"/> at the end of every path so subclasses can rebuild their
     /// editing state.
     /// </para>
-    /// <para>
-    /// <paramref name="knownBitmap"/>, when supplied, is used directly instead of reading
-    /// <paramref name="filePath"/> from disk — the browser-wasm build has no filesystem, but
-    /// already has every dropped/picked texture decoded via ThumbnailService (mirrors
-    /// ProjectManager.LoadAnimationChain's knownTextureSizes fix for the same constraint, #535).
-    /// <paramref name="filePath"/> is still used as the logical identity (camera-per-texture
-    /// cache key, <see cref="LoadedTexturePath"/>) even though nothing is read from it. The
-    /// bitmap is treated as caller-owned (e.g. ThumbnailService's cache) and is never disposed
-    /// by this control, unlike a bitmap this method decodes itself from disk.
-    /// </para>
     /// </summary>
-    public bool LoadTexture(string? filePath, SKBitmap? knownBitmap = null)
+    public bool LoadTexture(string? filePath)
     {
         // Lowercased + slash-normalized form used only for cache-key comparison and the
         // _loadedTexturePath identity that downstream filter code keys on. The case-preserving
@@ -577,28 +563,6 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         }
 
         BeginTextureSwap(norm, casePreserved);
-
-        if (knownBitmap != null)
-        {
-            _bitmap = knownBitmap;
-            _ownsBitmap = false;
-            _image = SKImage.FromBitmap(_bitmap);
-
-            if (norm != null && _cameraByTexture.TryGetValue(norm, out var knownCam))
-            {
-                (_panX, _panY, _zoom) = (knownCam.px, knownCam.py, knownCam.z);
-                ClampCamera();
-                RaiseViewChanged();
-                InvalidateVisual();
-            }
-            else
-            {
-                CenterTexture();
-            }
-
-            OnTextureLoaded(_bitmap);
-            return true;
-        }
 
         if (casePreserved != null && File.Exists(casePreserved))
             return InstallDecodedTexture(SkiaFileDecoder.DecodeFile(casePreserved), norm!);
@@ -664,11 +628,10 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
         // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
         // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
-        // copy from FromBitmap), so disposing it here stays safe -- unless it's caller-owned.
+        // copy from FromBitmap), so disposing it here stays safe.
         _image = null;
-        if (_ownsBitmap) _bitmap?.Dispose();
+        _bitmap?.Dispose();
         _bitmap = null;
-        _ownsBitmap = true;
     }
 
     // Installs an already-decoded bitmap as the current texture and restores/centers the camera for
@@ -1081,8 +1044,8 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     }
 
     /// <summary>
-    /// Ends an in-progress pan when capture is stolen (browser hosts often fire this without a
-    /// matching <c>PointerReleased</c>). Subclasses that track their own drag state should
+    /// Ends an in-progress pan when capture is stolen (another control taking capture fires this
+    /// without a matching <c>PointerReleased</c>). Subclasses that track their own drag state should
     /// override and clear that state too — see <c>WireframeControl</c>.
     /// </summary>
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)

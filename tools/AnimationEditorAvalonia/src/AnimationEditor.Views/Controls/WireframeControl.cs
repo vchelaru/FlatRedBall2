@@ -398,8 +398,8 @@ public class WireframeControl : TextureViewport
 
     /// <summary>
     /// True while a handle or chain drag is in progress. Exposed for tests and for
-    /// <see cref="OnPointerCaptureLost"/> cleanup — browser hosts often fire capture-lost
-    /// without a matching <c>PointerReleased</c>, which would otherwise leave the drag stuck.
+    /// <see cref="OnPointerCaptureLost"/> cleanup — a stolen capture arrives without a matching
+    /// <c>PointerReleased</c>, which would otherwise leave the drag stuck.
     /// </summary>
     public bool IsDragging => _draggingRect is not null || _draggingChain;
 
@@ -503,7 +503,6 @@ public class WireframeControl : TextureViewport
     private IUndoManager? _undoManager;
     private IObjectFinder? _objectFinder;
     private Action<string>? _showError;
-    private ThumbnailService? _thumbnailService;
 
     /// <summary>
     /// True when <paramref name="frame"/>'s owning chain is locked (#1032). A locked chain must
@@ -580,14 +579,6 @@ public class WireframeControl : TextureViewport
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
-    /// <param name="thumbnailService">
-    /// Optional. When supplied, <see cref="RefreshAll"/> resolves the current texture through
-    /// it (bare-name lookup against its cache first, falling back to disk) instead of always
-    /// reading straight from disk -- the seam the browser-wasm build needs (#614), since it has
-    /// no filesystem but already has every dropped/picked texture decoded via
-    /// <see cref="ThumbnailService.SeedTexture"/>. Left <c>null</c> on desktop, where reading the
-    /// resolved path from disk (the pre-#614 behavior) is unchanged.
-    /// </param>
     public void InitializeServices(
         ISelectedState selectedState,
         IAppState appState,
@@ -597,8 +588,7 @@ public class WireframeControl : TextureViewport
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
         IObjectFinder objectFinder,
-        Action<string>? showError = null,
-        ThumbnailService? thumbnailService = null)
+        Action<string>? showError = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -609,7 +599,6 @@ public class WireframeControl : TextureViewport
         _undoManager     = undoManager;
         _objectFinder    = objectFinder;
         _showError       = showError;
-        _thumbnailService = thumbnailService;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -911,16 +900,7 @@ public class WireframeControl : TextureViewport
         if (path is null && _selectedState?.SelectedFrame is null)
             path = LoadedTexturePathCasePreserved;
 
-        SKBitmap? known = null;
-        if (_thumbnailService != null)
-        {
-            var frame = _selectedState?.SelectedFrame ?? _selectedState?.SelectedChain?.Frames?.FirstOrDefault();
-            var resolvedPath = _thumbnailService.ResolveTexturePath(frame);
-            if (resolvedPath != null)
-                known = _thumbnailService.GetBitmap(resolvedPath);
-        }
-
-        LoadTexture(path, known);
+        LoadTexture(path);
     }
 
     /// <inheritdoc />
@@ -1792,7 +1772,7 @@ public class WireframeControl : TextureViewport
     /// Escape cancels an in-progress Ctrl+click/drag add, resize-handle drag or chain drag: nothing
     /// is created or moved, no undo entry is recorded, and the release that follows does nothing.
     /// Hooked on the top level (Tunnel) because the wireframe itself never takes keyboard focus,
-    /// and so every host (desktop and browser) gets it for free.
+    /// so it works without a focus round-trip.
     /// </summary>
     private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
     {
@@ -1953,8 +1933,8 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// Browser hosts (and any control that steals capture mid-drag) fire this without a
-    /// matching <c>PointerReleased</c>. Ending the drag here prevents the stuck-follow-cursor
+    /// Any control that steals capture mid-drag fires this without a matching
+    /// <c>PointerReleased</c>. Ending the drag here prevents the stuck-follow-cursor
     /// bug where the chain/handle keeps tracking until a second click.
     /// </summary>
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)

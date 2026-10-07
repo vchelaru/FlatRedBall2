@@ -8,8 +8,8 @@ namespace AnimationEditor.Core.IO;
 /// <summary>
 /// Recursively discovers every <c>.achx</c>/<c>.achj</c>/<c>.tsx</c> under an
 /// <see cref="IEditorFolder"/> (issue #770; <c>.tsx</c> added later). Operates entirely through
-/// <see cref="IEditorFolder"/>/<see cref="IEditorFile"/> so the exact same scan drives both
-/// desktop's <c>System.IO</c> adapter and the browser's native-handle adapter. Does not itself
+/// <see cref="IEditorFolder"/>/<see cref="IEditorFile"/>, so tests can drive it with in-memory
+/// fakes instead of a real folder. Does not itself
 /// exclude <c>bin</c>/<c>obj</c> — that's <see cref="BinObjPathFilter"/>, applied by the caller
 /// (e.g. at tree-build time) so toggling the exclusion checkbox doesn't require a re-scan.
 /// </summary>
@@ -86,8 +86,8 @@ public sealed record ProjectFolderScan(IReadOnlyList<AchxFileEntry> Files, IRead
 
 /// <summary>
 /// One discovered <c>.achx</c>: its file handle, the <see cref="IEditorFolder"/> it was found
-/// directly inside (needed on the web to resolve its sibling textures — see
-/// <c>BrowserProjectLoader.TryLoadAsync</c>), and its path relative to the scanned root.
+/// directly inside (used to resolve its frames' relative texture paths for thumbnails), and its
+/// path relative to the scanned root.
 /// </summary>
 public sealed record AchxFileEntry(IEditorFile File, IEditorFolder ParentFolder, string RelativePath)
 {

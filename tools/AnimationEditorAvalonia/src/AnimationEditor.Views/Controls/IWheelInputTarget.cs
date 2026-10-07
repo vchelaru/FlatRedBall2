@@ -11,7 +11,7 @@ public interface IWheelInputTarget
 {
     /// <summary>
     /// Tells a touchpad scroll from a mouse wheel. Defaults to treating every event as a mouse wheel,
-    /// which keeps the browser head and standalone controls zooming; <c>MainWindow</c> sets the
+    /// which keeps standalone controls (and tests) zooming; <c>MainWindow</c> sets the
     /// detector for the running OS.
     /// </summary>
     IWheelSourceDetector WheelSourceDetector { get; set; }

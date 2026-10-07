@@ -99,7 +99,7 @@ public sealed class GitCli
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception
             or FileNotFoundException or PlatformNotSupportedException or InvalidOperationException)
         {
-            // git not installed / not on PATH, or process launch unsupported (e.g. WASM).
+            // git not installed / not on PATH, or the process failed to launch.
             return new TextResult(true, -1, "");
         }
     }

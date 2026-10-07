@@ -3,10 +3,8 @@ using System.IO;
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
-/// Desktop-only disk cache directory for project-tree thumbnails (issue #839), mirroring
-/// <see cref="AppSettingsLocation"/>'s shape. Not used on the browser build, which has no
-/// persistent filesystem to cache to -- <c>ProjectTreeThumbnailService</c> falls back to an
-/// in-memory-only cache there.
+/// Disk cache directory for project-tree thumbnails (issue #839), mirroring
+/// <see cref="AppSettingsLocation"/>'s shape.
 /// </summary>
 public static class ProjectThumbnailCacheLocation
 {

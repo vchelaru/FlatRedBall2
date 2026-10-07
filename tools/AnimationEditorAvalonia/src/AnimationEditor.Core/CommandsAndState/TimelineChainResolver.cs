@@ -4,7 +4,7 @@ namespace AnimationEditor.Core.CommandsAndState;
 
 /// <summary>
 /// Resolves which chain and frame the timeline strip should display, given the app's
-/// selection state. Shared by desktop and browser hosts so the two don't drift.
+/// selection state. Kept in Core so it can be unit-tested without the UI.
 /// </summary>
 public static class TimelineChainResolver
 {

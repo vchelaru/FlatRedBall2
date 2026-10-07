@@ -21,10 +21,9 @@ namespace AnimationEditor.Views.Controls;
 
 /// <summary>
 /// Displays the recursively-discovered <c>.achx</c> tree for a picked project folder (#770).
-/// Platform-agnostic: everything it renders comes from <see cref="AchxFolderScanner"/> /
-/// <see cref="AchxFolderTreeBuilder"/> over <see cref="IEditorFolder"/>, so this same control is
-/// shared unmodified by desktop (real filesystem) and the browser build (native folder handle) --
-/// including first-frame thumbnails (issue #839), generated lazily via
+/// Everything it renders comes from <see cref="AchxFolderScanner"/> /
+/// <see cref="AchxFolderTreeBuilder"/> over <see cref="IEditorFolder"/>, so tests can drive it
+/// with in-memory folders -- including first-frame thumbnails (issue #839), generated lazily via
 /// <see cref="ProjectTreeThumbnailService"/> after <see cref="SetEntries"/>.
 /// </summary>
 public partial class ProjectPanelControl : UserControl
@@ -69,14 +68,6 @@ public partial class ProjectPanelControl : UserControl
     public event Action<AchxFileEntry>? FileDoubleClicked;
 
     /// <summary>
-    /// True when the host can reveal a folder in the OS shell (desktop only -- issue #654 dropped
-    /// the equivalent "Open Containing Folder" on the browser build since there's no real
-    /// filesystem to reveal). Desktop's <c>MainWindow</c> sets this after construction; left false
-    /// (the default) the tree's context menu never shows "Reveal in File Manager" for a folder row.
-    /// </summary>
-    public bool SupportsRevealInExplorer { get; set; }
-
-    /// <summary>
     /// Raised when the user picks "Reveal in File Manager" for a folder row (issue #841 follow-up).
     /// Carries the folder's <see cref="AchxTreeNodeVm.RelativePath"/> -- this control has no
     /// absolute path for a folder node, only the host (which knows the project root) can resolve
@@ -115,7 +106,7 @@ public partial class ProjectPanelControl : UserControl
     /// <summary>
     /// Raised when the user picks "New Animation" from the context menu shown on right-clicking
     /// blank space in the tree, i.e. no node under the cursor (issue #908). The host resolves what
-    /// "new" means (desktop/browser both currently reuse their existing File → New flow).
+    /// "new" means (<c>MainWindow</c> reuses its File → New flow).
     /// </summary>
     public event Action? NewAnimationRequested;
 
@@ -401,7 +392,6 @@ public partial class ProjectPanelControl : UserControl
         ProjectTree.ContextMenu.Items.Clear();
 
         // No node under the cursor -- right-clicked blank space below/between rows (issue #908).
-        // Independent of SupportsRevealInExplorer: that flag only gates filesystem-reveal items.
         if (_contextNode is null)
         {
             var newAnimationItem = new MenuItem { Header = "New Animation" };
@@ -412,21 +402,16 @@ public partial class ProjectPanelControl : UserControl
 
         if (_contextNode is { IsFolder: true } folderNode)
         {
-            // Not gated on SupportsRevealInExplorer: creating a file works on both hosts, only
-            // the OS-shell reveal below is desktop-only (issue #1018).
+            // Issue #1018: create a new animation file inline in this folder.
             var newFileItem = new MenuItem { Header = "New Animation File" };
             newFileItem.Click += (_, _) => BeginNewAnimationFile(folderNode);
             ProjectTree.ContextMenu.Items.Add(newFileItem);
-
-            if (!SupportsRevealInExplorer) return;
 
             var revealItem = new MenuItem { Header = "Reveal in File Manager" };
             revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(revealItem);
             return;
         }
-
-        if (!SupportsRevealInExplorer) return;
 
         if (_contextNode is { IsFile: true } fileNode)
         {

@@ -5,8 +5,7 @@ namespace AnimationEditor.Core.Demo;
 
 /// <summary>
 /// Named demos for visual / history verification (DocScreenshots, Core.Tests).
-/// Add new demos here — do not fork drive scripts per host, and do not call from
-/// shipping Browser/Desktop <c>App</c> entry points.
+/// Add new demos here, and do not call them from the shipping <c>App</c> entry point.
 /// </summary>
 internal static class FeatureDemos
 {
@@ -14,7 +13,7 @@ internal static class FeatureDemos
 
     /// <summary>
     /// Runs <paramref name="demoName"/> if registered. <paramref name="textureName"/> is the
-    /// relative texture used when the demo adds frames (desktop fixtures vs browser sample).
+    /// relative texture used when the demo adds frames.
     /// </summary>
     public static bool TryRun(
         string demoName,

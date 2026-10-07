@@ -30,7 +30,7 @@ public static class AchxThumbnailCacheKey
     /// <param name="sourceIdentity">
     /// A string that identifies the source <c>.achx</c>. Callers pass <c>AchxFileEntry.RelativePath</c>
     /// (relative to the scanned Open Project Folder root) rather than a real absolute path --
-    /// <c>IEditorFolder</c> has no stable absolute identity on the browser build. Two different
+    /// <c>IEditorFolder</c> exposes no absolute identity. Two different
     /// projects could theoretically share a relative path, but a collision also needs matching
     /// <paramref name="size"/>/<paramref name="modified"/> to actually serve a wrong thumbnail,
     /// and even then it self-corrects the next time either file changes.

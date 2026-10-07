@@ -23,7 +23,7 @@ public interface IWheelSourceDetector
     bool IsPinchInProgress => false;
 }
 
-/// <summary>Treats every event as a mouse wheel: the default for the browser head and for tests.</summary>
+/// <summary>Treats every event as a mouse wheel: the fallback on an OS with no touchpad detector, and the default for tests.</summary>
 public sealed class NullWheelSourceDetector : IWheelSourceDetector
 {
     public static readonly NullWheelSourceDetector Instance = new();

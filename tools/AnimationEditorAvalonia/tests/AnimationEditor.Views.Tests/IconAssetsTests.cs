@@ -5,7 +5,7 @@ using Xunit;
 
 namespace AnimationEditor.Views.Tests;
 
-// Phase 7 (#644): shared SVG icon assets — see docs/BROWSER_ICON_SYSTEM_DECISION.md.
+// #644: shared SVG icon assets.
 public class IconAssetsTests
 {
     private const string SampleIconUri =

@@ -175,17 +175,11 @@ public sealed class ThumbnailService : IDisposable
     /// <summary>
     /// Resolves a frame's <see cref="AnimationFrameSave.TextureName"/> to an absolute file
     /// path. Relative names require a saved .achx to derive the base folder. Returns
-    /// <c>null</c> when the texture cannot be located on disk -- unless it was already
-    /// registered via <see cref="SeedTexture"/>, in which case no disk check happens at all.
+    /// <c>null</c> when the texture cannot be located on disk.
     /// </summary>
     public string? ResolveTexturePath(AnimationFrameSave? frame)
     {
         if (frame is null || string.IsNullOrEmpty(frame.TextureName)) return null;
-
-        // Bundled/in-memory content (e.g. the browser build, which has no real filesystem):
-        // if the bytes were already registered under this name, trust it -- no disk check.
-        var normalizedName = frame.TextureName.Replace('\\', '/');
-        if (BitmapCache.ContainsKey(normalizedName)) return normalizedName;
 
         // Absolute path (e.g. drag-dropped textures before an ACHX file is saved).
         // Normalize to forward slashes so the returned path is a consistent cache key
@@ -203,15 +197,6 @@ public sealed class ThumbnailService : IDisposable
         string full = new FilePath(Path.Combine(achxFolder, frame.TextureName)).FullPath;
         return File.Exists(full) ? full : null;
     }
-
-    /// <summary>
-    /// Registers an already-decoded bitmap under <paramref name="textureName"/> without
-    /// touching disk, so <see cref="ResolveTexturePath"/> and <see cref="GetBitmap"/> can serve
-    /// it purely from memory. For content that only ever exists as in-memory bytes (e.g. the
-    /// browser build, which fetches textures over HTTP instead of reading a real file).
-    /// </summary>
-    public void SeedTexture(string textureName, SKBitmap bitmap) =>
-        BitmapCache[textureName.Replace('\\', '/')] = bitmap;
 
     /// <summary>
     /// Returns a downscaled Avalonia bitmap of the full PNG at <paramref name="path"/>, for the

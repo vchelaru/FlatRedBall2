@@ -62,4 +62,30 @@ internal sealed class FakeEditorFolder : IEditorFolder
             yield return folder;
         }
     }
+
+    /// <summary>Walks down through <see cref="Subfolders"/> only; a <c>..</c> segment returns null.</summary>
+    public async Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath)
+    {
+        var segments = relativePath.Replace('\\', '/')
+            .Split('/', System.StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0 || System.Array.IndexOf(segments, "..") >= 0) return null;
+
+        IEditorFolder current = this;
+        for (int i = 0; i < segments.Length - 1; i++)
+        {
+            IEditorFolder? next = null;
+            await foreach (var sub in current.GetSubfoldersAsync())
+            {
+                if (string.Equals(sub.Name, segments[i], System.StringComparison.OrdinalIgnoreCase))
+                {
+                    next = sub;
+                    break;
+                }
+            }
+            if (next is null) return null;
+            current = next;
+        }
+
+        return await current.GetFileAsync(segments[^1]);
+    }
 }

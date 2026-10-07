@@ -4,9 +4,8 @@ using System.Collections.Generic;
 namespace AnimationEditor.Core.CommandsAndState;
 
 /// <summary>
-/// One entry in a tree context-menu plan built by <see cref="TreeMenuPlanBuilder"/>. Hosts
-/// (desktop Avalonia, browser) walk the ordered list and materialize their own menu-item type
-/// from each entry — this type carries no UI-framework dependency.
+/// One entry in a tree context-menu plan built by <see cref="TreeMenuPlanBuilder"/>. The UI
+/// layer walks the ordered list and materializes a menu item from each entry — this type carries no UI-framework dependency.
 /// </summary>
 public sealed class TreeMenuItem
 {

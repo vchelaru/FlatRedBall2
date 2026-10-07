@@ -266,8 +266,7 @@ public partial class MainWindow : Window
         // Frames, Adjust Offsets, ...) go through this host; a test passes a scripted one, since a
         // real dialog window parks until a person closes it.
         _dialogHost = dialogHost ?? new WindowEditorDialogHost(this);
-        // Desktop renders the tree with its own _treeRoots collection, so the controller
-        // reads expand state from there (browser reads its AnimationTreeControl instead).
+        // The controller reads expand state from the tree's own _treeRoots collection.
         _tabController = new TabController(_undoManager, _appCommands,
             () => TreeBuilder.CaptureExpandState(_treeRoots), _tabManager);
 
@@ -314,10 +313,6 @@ public partial class MainWindow : Window
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
         ProjectPanel.Initialize(_projectTreeThumbnailService);
-        // Desktop has a real filesystem to reveal a folder in -- the browser build leaves this
-        // false (its ProjectPanel is constructed the same way, unmodified) so its tree never
-        // shows a "Reveal in File Manager" item it couldn't act on (#654's reasoning, applied here).
-        ProjectPanel.SupportsRevealInExplorer = true;
         ProjectPanel.FolderRevealRequested += relativePath => RevealProjectFolderInExplorer(relativePath);
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
         ProjectPanel.FileCopyPathRequested += relativePath => CopyProjectFilePathToClipboard(relativePath);
@@ -2173,8 +2168,8 @@ public partial class MainWindow : Window
         IBrush accentFill = ThemedBrush("Accent");
         IBrush onAccent   = ThemedBrush("OnAccent");
         // Ordering/marking (oldest-applied first, current entry, then redo entries) lives in
-        // Core's HistoryRowBuilder so desktop and browser stay in lockstep (#748); only the
-        // brush mapping below is host-specific.
+        // Core's HistoryRowBuilder (#748), where it is unit-tested; only the brush mapping below
+        // lives here.
         var items = HistoryRowBuilder.BuildRows(undoHistory, redoHistory)
             .Select(row => row.IsCurrent
                 ? new Models.HistoryEntryVm(row.Description, onAccent, accentFill, IsCurrent: true)

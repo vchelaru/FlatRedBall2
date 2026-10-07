@@ -66,7 +66,7 @@ public class TexturePathHelperTests
     [Fact]
     public void ComputeStorePath_EmptyAchxFolder_PreservesCase()
     {
-        // Lower-casing here would break on case-sensitive filesystems (Linux/web) once the
+        // Lower-casing here would break on case-sensitive filesystems (Linux) once the
         // project is later saved and the path is used to look up the actual file on disk.
         string storePath = TexturePathHelper.ComputeStorePath(
             @"C:\TestRoot\MyStuff\Hero.PNG", string.Empty);

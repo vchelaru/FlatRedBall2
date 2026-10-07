@@ -86,15 +86,6 @@ namespace AnimationEditor.Core.Models
         public object? CachedTsxState { get; set; }
 
         /// <summary>
-        /// Snapshot of this tab's known texture sizes (see
-        /// <see cref="IProjectManager.CaptureTextureSizeState"/>), captured alongside
-        /// <see cref="CachedEditorModel"/> so a cache-hit tab switch restores THIS tab's texture
-        /// sizes on the browser-wasm build instead of leaving whatever tab was loaded last. Null
-        /// when no known texture sizes were supplied for this tab.
-        /// </summary>
-        public object? CachedTextureSizeState { get; set; }
-
-        /// <summary>
         /// Snapshot of <see cref="IProjectManager.ReferencedPngs"/>, captured alongside
         /// <see cref="CachedEditorModel"/> so a cache-hit tab switch restores THIS tab's
         /// project-referenced PNGs (used by the texture-picker dropdown) instead of leaving

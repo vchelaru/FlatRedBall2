@@ -170,25 +170,19 @@ public class TabSwitchCacheTests : IDisposable
         public uint? ComputeFrameTileId(AnimationFrameSave frame) => _inner.ComputeFrameTileId(frame);
         public object? CaptureTsxState() => _inner.CaptureTsxState();
         public void RestoreTsxState(object? state) => _inner.RestoreTsxState(state);
-        public object? CaptureTextureSizeState() => _inner.CaptureTextureSizeState();
-        public void RestoreTextureSizeState(object? state) => _inner.RestoreTextureSizeState(state);
         public void ResetToBlankDocument() => _inner.ResetToBlankDocument();
 
         public void LoadAnimationChain(
             FilePath fileName,
-            AnimationChainListSave? preParsed = null,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
+            AnimationChainListSave? preParsed = null)
         {
             LoadCallCount++;
-            _inner.LoadAnimationChain(fileName, preParsed, knownTextureSizes);
+            _inner.LoadAnimationChain(fileName, preParsed);
         }
 
         public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath) =>
             _inner.SaveAnimationChainList(targetPath);
-
-        public void SaveAnimationChainList(System.IO.Stream stream) =>
-            _inner.SaveAnimationChainList(stream);
 
         public string? ResolveFilesPanelRoot() => _inner.ResolveFilesPanelRoot();
 

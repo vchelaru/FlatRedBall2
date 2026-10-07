@@ -12,7 +12,7 @@
         folder (.tsx surfaced later; OpenProjectWorkflowAsync already opens one as a native
         tsx project). Click a file row to open it, click a folder row to expand/collapse. First-frame
         thumbnails (#839) load lazily via ProjectTreeThumbnailService and need no Window,
-        so this control stays shareable, unmodified, between desktop and the browser build.
+        so this control can be tested on its own.
         Deliberately still no drag support (unlike desktop's FilesPanelControl), which does
         need a Window.
     -->

@@ -3,11 +3,9 @@ using System.Text.Json.Serialization;
 namespace AnimationEditor.Core.Data;
 
 /// <summary>
-/// Source-generated serialization context for <see cref="AETiledSyncSave"/> -- required for the
-/// browser/WASM build, which disables reflection-based System.Text.Json serialization regardless
-/// of Debug/Release or trimming settings (same reasoning as
-/// <see cref="AnimationEditor.Core.Export.PixiJsJsonContext"/> and
-/// <see cref="AnimationEditor.Core.IO.NativeFolderJsonContext"/>).
+/// Source-generated serialization context for <see cref="AETiledSyncSave"/>, so serialization
+/// stays trim- and AOT-safe instead of relying on reflection (same as
+/// <see cref="AnimationEditor.Core.Export.PixiJsJsonContext"/>).
 /// </summary>
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(AETiledSyncSave))]

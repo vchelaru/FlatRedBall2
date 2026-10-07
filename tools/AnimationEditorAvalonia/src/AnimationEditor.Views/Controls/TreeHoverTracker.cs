@@ -9,9 +9,8 @@ namespace AnimationEditor.Views.Controls;
 
 /// <summary>
 /// Reports the model object (<see cref="TreeNodeVm.Data"/>) of the tree row under the pointer,
-/// or null once the pointer is over no row or leaves the tree (#1216). Shared by the desktop
-/// tree and the browser's <see cref="AnimationTreeControl"/> so both feed the wireframe's hover
-/// highlight the same way.
+/// or null once the pointer is over no row or leaves the tree (#1216). Feeds the wireframe's
+/// hover highlight.
 /// </summary>
 public static class TreeHoverTracker
 {

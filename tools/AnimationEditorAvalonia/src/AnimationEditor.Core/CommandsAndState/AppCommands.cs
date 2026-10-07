@@ -120,7 +120,7 @@ namespace AnimationEditor.Core.CommandsAndState
         // A Tiled tile animation holds rects and durations, nothing else (see
         // Tiled.TsxLossyDataCheck, which warns on save about whatever slipped through). Every
         // command that would create shapes, flips, sprite offsets, color, or a non-looping chain
-        // no-ops in a native tsx project, so no host (tree menu, inspector, keyboard, browser)
+        // no-ops in a native tsx project, so no entry point (tree menu, inspector, keyboard)
         // can produce data the file can't keep. Same pattern as the locked-chain guards.
 
         /// <summary>True when the current project is a native tsx, i.e. the edit must not happen.</summary>

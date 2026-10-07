@@ -31,8 +31,7 @@ namespace AnimationEditor.Core
 
         void LoadAnimationChain(
             FilePath fileName,
-            AnimationChainListSave? preParsed = null,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null);
+            AnimationChainListSave? preParsed = null);
         void SaveAnimationChainList(string targetPath);
 
         /// <summary>
@@ -108,44 +107,15 @@ namespace AnimationEditor.Core
         void RestoreTsxState(object? state);
 
         /// <summary>
-        /// Captures the texture sizes supplied to the most recent <see cref="LoadAnimationChain"/>
-        /// call as an opaque snapshot, or <see langword="null"/> if none were supplied. Same
-        /// tab-switch-cache shape as <see cref="CaptureTsxState"/>: without this,
-        /// <see cref="AnimationEditor.Core.Models.TabEditorCache"/>'s cache-hit tab switch
-        /// (<c>TryActivateTabFromCache</c>) leaves this project's known texture sizes at
-        /// whichever tab was most recently loaded from disk, so <see
-        /// cref="SaveAnimationChainList(Stream)"/> on the reactivated tab converts back to Pixel
-        /// using the wrong (or missing) sizes on the browser-wasm build, which has no filesystem
-        /// to fall back to.
-        /// </summary>
-        object? CaptureTextureSizeState();
-
-        /// <summary>
-        /// Restores a snapshot previously returned by <see cref="CaptureTextureSizeState"/> on
-        /// this same instance, or clears the known texture sizes when <paramref name="state"/> is
-        /// <see langword="null"/>.
-        /// </summary>
-        void RestoreTextureSizeState(object? state);
-
-        /// <summary>
         /// Resets this instance to a brand-new, unsaved, non-tsx document: a fresh empty <see
         /// cref="AnimationChainListSave"/>, <see cref="FileName"/> cleared to <see
         /// langword="null"/>, <see cref="OnDiskCoordinateType"/> back to its Pixel default, and
-        /// every native-tsx/texture-size/<see cref="ReferencedPngs"/> tracking field cleared (the
-        /// same reset <see cref="RestoreTsxState"/>/<see cref="RestoreTextureSizeState"/> apply
-        /// individually) -- one call instead of repeating that field list at every "start a fresh
+        /// every native-tsx/<see cref="ReferencedPngs"/> tracking field cleared (the same reset
+        /// <see cref="RestoreTsxState"/> applies to the tsx fields) -- one call instead of repeating that field list at every "start a fresh
         /// document" call site (issue #1147). Leaves <see cref="ProjectFolderPath"/>, tab/undo/
         /// selection state untouched; callers own those.
         /// </summary>
         void ResetToBlankDocument();
-
-        /// <summary>
-        /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
-        /// with no filesystem path to write (the browser-wasm build). Uses the
-        /// <c>knownTextureSizes</c> from the most recent <see cref="LoadAnimationChain"/> call
-        /// instead of a disk read when converting back to Pixel coordinates.
-        /// </summary>
-        void SaveAnimationChainList(Stream stream);
 
         /// <summary>
         /// Root folder the Files panel should browse: the linked project's folder (if the

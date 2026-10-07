@@ -2041,9 +2041,8 @@
 
         </Grid>
     </DockPanel>
-        <!-- Item-deleted undo toast, generic status toast, and error banner. Shared with the
-             browser head (#695 A5) — the panels and their timer/dismiss logic live in the control,
-             so a tweak to dwell time or wording lands on both heads at once. ZIndex 60 keeps the
+        <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
+             timer/dismiss logic live in EditorNotificationOverlay. ZIndex 60 keeps the
              whole overlay above the editor content but below the drag canvas / resize grips,
              matching the per-panel ZIndex values these three used to carry individually. -->
         <viewsControls:EditorNotificationOverlay x:Name="Notifications" ZIndex="60" />

@@ -6,9 +6,8 @@ using SvgIcon = Avalonia.Svg.Skia.Svg;
 namespace AnimationEditor.Views.Controls;
 
 /// <summary>
-/// Turns a <see cref="TreeMenuPlanBuilder"/> plan into Avalonia menu items. Shared by desktop's
-/// MainWindow and the browser's <see cref="AnimationTreeControl"/>; each host supplies only the
-/// items for its own <see cref="TreeMenuHostSlot"/> placeholders.
+/// Turns a <see cref="TreeMenuPlanBuilder"/> plan into Avalonia menu items. The caller
+/// (<c>MainWindow</c>) supplies the items for the <see cref="TreeMenuHostSlot"/> placeholders.
 /// </summary>
 public static class TreeMenuRenderer
 {

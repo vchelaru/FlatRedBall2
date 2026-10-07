@@ -46,18 +46,14 @@ public class AdjustFrameTimeLiveEditTests
         public uint? ComputeFrameTileId(AnimationFrameSave frame) => null;
         public object? CaptureTsxState() => null;
         public void RestoreTsxState(object? state) { }
-        public object? CaptureTextureSizeState() => null;
-        public void RestoreTextureSizeState(object? state) { }
         public void ResetToBlankDocument() { }
 
         public void LoadAnimationChain(
             FilePath fileName,
-            AnimationChainListSave? preParsed = null,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null) { }
+            AnimationChainListSave? preParsed = null) { }
 
         public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath) { }
-        public void SaveAnimationChainList(System.IO.Stream stream) { }
         public string? ResolveFilesPanelRoot() => null;
         public (int Width, int Height)? GetTextureSizeInPixels(string textureName) => null;
 

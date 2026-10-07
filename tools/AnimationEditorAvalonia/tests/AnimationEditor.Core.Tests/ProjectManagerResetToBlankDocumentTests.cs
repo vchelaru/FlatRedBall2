@@ -53,7 +53,7 @@ public class ProjectManagerResetToBlankDocumentTests : IDisposable
     }
 
     [Fact]
-    public void ResetToBlankDocument_AfterLoadAchxWithProjectFileAndKnownTextureSizes_ClearsReferencedPngsAndTextureSizeState()
+    public void ResetToBlankDocument_AfterLoadAchxWithProjectFile_ClearsReferencedPngs()
     {
         var contentDir = Path.Combine(_dir.Path, "Content");
         Directory.CreateDirectory(contentDir);
@@ -78,15 +78,12 @@ public class ProjectManagerResetToBlankDocumentTests : IDisposable
         acls.Save(achxPath);
 
         var pm = new ProjectManager();
-        var knownTextureSizes = new Dictionary<string, (int Width, int Height)> { ["Hero.png"] = (32, 32) };
-        pm.LoadAnimationChain(new FilePath(achxPath), knownTextureSizes: knownTextureSizes);
+        pm.LoadAnimationChain(new FilePath(achxPath));
         Assert.NotEmpty(pm.ReferencedPngs);
-        Assert.NotNull(pm.CaptureTextureSizeState());
 
         pm.ResetToBlankDocument();
 
         Assert.Empty(pm.ReferencedPngs);
-        Assert.Null(pm.CaptureTextureSizeState());
         Assert.Null(pm.FileName);
         Assert.Equal(TextureCoordinateType.Pixel, pm.OnDiskCoordinateType);
     }
