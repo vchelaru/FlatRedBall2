@@ -49,9 +49,12 @@ try {
     $setup = Start-Process -FilePath (Join-Path $Folder 'Setup.exe') -ArgumentList '--silent' -Wait -PassThru
     Check 'setup-exit-code' ($setup.ExitCode -eq 0) "exit $($setup.ExitCode)"
 
-    # Setup may launch the editor after installing; it isn't needed and would hold files open.
+    # Whether a silent Setup launches the editor is logged as a fact, then the editor is closed so it
+    # doesn't hold files open during uninstall.
     Start-Sleep -Seconds 5
-    Get-Process -Name 'AnimationEditor' -ErrorAction SilentlyContinue | Stop-Process -Force
+    $launched = @(Get-Process -Name 'AnimationEditor' -ErrorAction SilentlyContinue)
+    Log "OBSERVED silent-setup-launched-editor: $($launched.Count -gt 0)"
+    $launched | Stop-Process -Force
 
     $command = RegValue "$classes\$progId\shell\open\command" ''
     $exe = if ($command -match '^"([^"]+)"') { $Matches[1] } else { $null }
