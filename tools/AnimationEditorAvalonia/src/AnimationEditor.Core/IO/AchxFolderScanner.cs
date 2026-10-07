@@ -15,11 +15,19 @@ namespace AnimationEditor.Core.IO;
 /// </summary>
 public static class AchxFolderScanner
 {
-    public static async Task<IReadOnlyList<AchxFileEntry>> ScanAsync(IEditorFolder rootFolder)
+    public static async Task<IReadOnlyList<AchxFileEntry>> ScanAsync(IEditorFolder rootFolder) =>
+        (await ScanProjectAsync(rootFolder)).Files;
+
+    /// <summary>
+    /// Same walk as <see cref="ScanAsync(IEditorFolder)"/>, also reporting every subfolder's
+    /// relative path (#1332's "Show all folders"), including ones with no animation files.
+    /// </summary>
+    public static async Task<ProjectFolderScan> ScanProjectAsync(IEditorFolder rootFolder)
     {
-        var results = new List<AchxFileEntry>();
-        await ScanAsync(rootFolder, relativePrefix: "", results);
-        return results;
+        var files = new List<AchxFileEntry>();
+        var folderPaths = new List<string>();
+        await ScanAsync(rootFolder, relativePrefix: "", files, folderPaths);
+        return new ProjectFolderScan(files, folderPaths);
     }
 
     /// <summary>
@@ -50,7 +58,7 @@ public static class AchxFolderScanner
     public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path);
 
     private static async Task ScanAsync(
-        IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results)
+        IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results, List<string> folderPaths)
     {
         await foreach (var file in folder.GetItemsAsync())
         {
@@ -63,13 +71,18 @@ public static class AchxFolderScanner
         await foreach (var subfolder in folder.GetSubfoldersAsync())
         {
             var subPrefix = CombineRelativePath(relativePrefix, subfolder.Name);
-            await ScanAsync(subfolder, subPrefix, results);
+            folderPaths.Add(subPrefix);
+            await ScanAsync(subfolder, subPrefix, results, folderPaths);
         }
     }
 
     private static string CombineRelativePath(string prefix, string name) =>
         prefix.Length == 0 ? name : prefix + "/" + name;
 }
+
+/// <summary>Result of <see cref="AchxFolderScanner.ScanProjectAsync"/>: the animation files plus
+/// every subfolder's forward-slash path relative to the scanned root.</summary>
+public sealed record ProjectFolderScan(IReadOnlyList<AchxFileEntry> Files, IReadOnlyList<string> FolderPaths);
 
 /// <summary>
 /// One discovered <c>.achx</c>: its file handle, the <see cref="IEditorFolder"/> it was found

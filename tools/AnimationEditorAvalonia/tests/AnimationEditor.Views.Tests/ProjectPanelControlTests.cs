@@ -66,6 +66,21 @@ public class ProjectPanelControlTests
     }
 
     [AvaloniaFact]
+    public void ShowAllFoldersCheck_Checked_AddsFoldersWithoutAnimationFiles()
+    {
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        var entry = new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx");
+        control.SetEntries(new[] { entry }, new[] { "Audio" });
+        Assert.Equal(new[] { "hero.achx" }, control.TreeRoots.Select(n => n.Name));
+
+        control.ShowAllFoldersCheck.IsChecked = true;
+
+        Assert.Equal(new[] { "Audio", "hero.achx" }, control.TreeRoots.Select(n => n.Name));
+        Assert.True(control.TreeRoots[0].IsFolder);
+    }
+
+    [AvaloniaFact]
     public void UncheckExcludeBinObj_ReincludesBinObjEntries()
     {
         var control = new AnimationEditor.Views.Controls.ProjectPanelControl();

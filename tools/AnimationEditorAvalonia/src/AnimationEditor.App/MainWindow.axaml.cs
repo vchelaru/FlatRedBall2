@@ -289,6 +289,8 @@ public partial class MainWindow : Window
         ApplyPersistedPreviewPaneHeight();
         ShowBoundingBoxCheck.IsChecked = _appSettings.ShowBoundingBox;
         PreviewCtrl.ShowBoundingBox = _appSettings.ShowBoundingBox;
+        ProjectPanel.ShowAllFolders = _appSettings.ShowAllProjectFolders;
+        ProjectPanel.ShowAllFoldersChanged += show => _appSettings.ShowAllProjectFolders = show;
         ApplyPersistedSidebarWidth();
         ApplyPersistedWindowState();
         WireMenuEvents();
@@ -2867,9 +2869,10 @@ public partial class MainWindow : Window
         _projectManager.ProjectFolderPath = path;
         _projectFolderWatcher.Watch(path);
         var rootFolder = new DiskEditorFolder(path);
-        var entries = await AchxFolderScanner.ScanAsync(rootFolder);
+        var scan = await AchxFolderScanner.ScanProjectAsync(rootFolder);
+        var entries = scan.Files;
         ProjectPanel.CollapsedFolders.Load(GetCollapsedFolders(_appSettings.CollapsedAnimationFolders, path));
-        ProjectPanel.SetEntries(entries);
+        ProjectPanel.SetEntries(scan);
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
             : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);

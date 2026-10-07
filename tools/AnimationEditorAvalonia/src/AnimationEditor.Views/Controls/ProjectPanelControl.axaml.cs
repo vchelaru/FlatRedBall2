@@ -32,6 +32,7 @@ public partial class ProjectPanelControl : UserControl
     private const int ThumbnailSize = 28;
 
     private IReadOnlyList<AchxFileEntry> _allEntries = Array.Empty<AchxFileEntry>();
+    private IReadOnlyList<string> _allFolderPaths = Array.Empty<string>();
     private string _searchQuery = string.Empty;
     private ProjectTreeThumbnailService? _thumbnailService;
     private CancellationTokenSource? _thumbnailLoadCts;
@@ -127,6 +128,19 @@ public partial class ProjectPanelControl : UserControl
     public event Action<NewAnimationFileRequest>? NewAnimationFileRequested;
 
     /// <summary>
+    /// True when the tree also lists folders with no animation files (#1332). The host restores
+    /// it from settings; <see cref="ShowAllFoldersChanged"/> reports the user toggling it.
+    /// </summary>
+    public bool ShowAllFolders
+    {
+        get => ShowAllFoldersCheck.IsChecked == true;
+        set => ShowAllFoldersCheck.IsChecked = value;
+    }
+
+    /// <summary>Raised when <see cref="ShowAllFolders"/> changes, with its new value.</summary>
+    public event Action<bool>? ShowAllFoldersChanged;
+
+    /// <summary>
     /// Completes once every thumbnail from the most recent <see cref="Rebuild"/> has finished
     /// loading (or been cancelled by a newer one). Test seam for awaiting the async thumbnail
     /// load -- production code never needs to await this.
@@ -138,6 +152,11 @@ public partial class ProjectPanelControl : UserControl
         InitializeComponent();
         DataContext = this;
         ExcludeBinObjCheck.IsCheckedChanged += (_, _) => Rebuild();
+        ShowAllFoldersCheck.IsCheckedChanged += (_, _) =>
+        {
+            Rebuild();
+            ShowAllFoldersChanged?.Invoke(ShowAllFolders);
+        };
         ProjectTree.SelectionChanged += OnTreeSelectionChanged;
         // Tunnel-phase, matching MainWindow.OnTreePointerPressed's ClickCount==2 pattern (#716):
         // TreeViewItem's own pointer handling toggles IsExpanded on the second click before a
@@ -163,12 +182,18 @@ public partial class ProjectPanelControl : UserControl
     /// Replaces the scanned entries (e.g. after a fresh Open Project Folder pick) and rebuilds
     /// the tree respecting the current "Exclude bin/obj" checkbox state. Pass every entry
     /// unfiltered -- toggling the checkbox re-filters this cached list rather than re-scanning.
+    /// <paramref name="folderPaths"/> is every scanned subfolder, shown only while
+    /// <see cref="ShowAllFolders"/> is on (#1332).
     /// </summary>
-    public void SetEntries(IReadOnlyList<AchxFileEntry> entries)
+    public void SetEntries(IReadOnlyList<AchxFileEntry> entries, IReadOnlyList<string>? folderPaths = null)
     {
         _allEntries = entries;
+        _allFolderPaths = folderPaths ?? Array.Empty<string>();
         Rebuild();
     }
+
+    /// <summary>Shows a <see cref="AchxFolderScanner.ScanProjectAsync"/> result.</summary>
+    public void SetEntries(ProjectFolderScan scan) => SetEntries(scan.Files, scan.FolderPaths);
 
     public void Clear() => SetEntries(Array.Empty<AchxFileEntry>());
 
@@ -183,17 +208,19 @@ public partial class ProjectPanelControl : UserControl
             ? _allEntries.Where(f => !BinObjPathFilter.IsExcluded(f.RelativePath)).ToList()
             : _allEntries.ToList();
         files = RelativePathSearchFilter.Filter(files, f => f.RelativePath, _searchQuery).ToList();
+        var extraFolders = ProjectTreeFolderFilter.Select(
+            _allFolderPaths, ShowAllFolders, excludeBinObj, _searchQuery);
 
         // ProjectTree stays visible even with zero rows (issue #916): hiding it also hid its
         // right-click "New Animation" context menu, which is exactly what an empty project needs.
-        EmptyMessage.IsVisible = files.Count == 0;
+        EmptyMessage.IsVisible = files.Count == 0 && extraFolders.Count == 0;
         EmptyMessage.Text = _allEntries.Count == 0
             ? "File → Open Project Folder… to browse its .achx files."
             : string.IsNullOrWhiteSpace(_searchQuery)
                 ? "No .achx files match the current filter."
                 : "No .achx files match your search.";
 
-        foreach (var node in AchxFolderTreeBuilder.Build(files))
+        foreach (var node in AchxFolderTreeBuilder.Build(files, extraFolders))
             TreeRoots.Add(AchxTreeNodeVm.FromNode(node));
 
         // Search results show fully expanded -- a remembered collapse would hide the matches.

@@ -1716,21 +1716,22 @@ public partial class App : Application
             LogOpenFolderStep($"PopulateProjectTreeAsync start (writeState={writeState})");
             var folder = new NativeReadWriteFolder(nativeDir);
 
-            IReadOnlyList<AchxFileEntry> entries;
+            ProjectFolderScan scan;
             try
             {
-                entries = await AchxFolderScanner.ScanAsync(folder);
-                LogOpenFolderStep($"AchxFolderScanner.ScanAsync() done ({entries.Count} .achx file(s))");
+                scan = await AchxFolderScanner.ScanProjectAsync(folder);
+                LogOpenFolderStep($"AchxFolderScanner.ScanProjectAsync() done ({scan.Files.Count} .achx file(s))");
             }
             catch (JSException ex)
             {
-                LogOpenFolderStep($"AchxFolderScanner.ScanAsync() failed ({ex.Message}) -- falling back to named .achx picker");
+                LogOpenFolderStep($"AchxFolderScanner.ScanProjectAsync() failed ({ex.Message}) -- falling back to named .achx picker");
                 var achxFile = await LoadViaNamedAchxFallbackAsync(nativeDir);
                 await FinishAchxLoadAsync(achxFile, folder, achxFile?.Name ?? folder.Name, writeState);
                 return;
             }
 
-            projectPanel.SetEntries(entries);
+            var entries = scan.Files;
+            projectPanel.SetEntries(scan);
             sidebarTabs.SelectedItem = projectTab;
             status.Text = entries.Count == 0
                 ? $"No .achx files found under \"{folder.Name}\"."
@@ -1829,8 +1830,9 @@ public partial class App : Application
                 await using (var stream = await new NativeReadWriteFile(dirHandle, request.FileName).OpenWriteAsync())
                     NewAnimationFileWriter.WriteEmpty(stream, request.FileName);
 
-                var entries = await AchxFolderScanner.ScanAsync(new NativeReadWriteFolder(lastOpenFolderNativeDir));
-                projectPanel.SetEntries(entries);
+                var scan = await AchxFolderScanner.ScanProjectAsync(new NativeReadWriteFolder(lastOpenFolderNativeDir));
+                var entries = scan.Files;
+                projectPanel.SetEntries(scan);
 
                 if (entries.FirstOrDefault(e => e.RelativePath == relativePath) is { } created)
                     await LoadAchxEntryAsync(created, lastOpenFolderWriteState);

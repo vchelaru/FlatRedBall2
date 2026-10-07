@@ -54,6 +54,12 @@ namespace AnimationEditor.Core.Models
         public bool ShowBoundingBox { get; set; } = true;
 
         /// <summary>
+        /// Whether the Project tab also lists folders with no animation files (#1332). Defaults to
+        /// <c>false</c>; the tab's "Show all folders" checkbox writes it.
+        /// </summary>
+        public bool ShowAllProjectFolders { get; set; }
+
+        /// <summary>
         /// When <c>true</c>, the editor never offers to register itself as the default
         /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
         /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear
