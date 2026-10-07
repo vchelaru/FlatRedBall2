@@ -45,7 +45,7 @@ See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct
 ## Dropped clicks and first-frame stalls
 
 - **A click that "didn't register" is usually a frame that hadn't drawn yet.** Before changing input handling, timestamp the input against the frame: a capture-phase `pointerdown` listener logging `event.timeStamp`, next to a `Console.WriteLine` from game code, shows whether the input arrived during a long frame. Remove the probe before measuring anything else.
-- **Keep temporary probes out of `index.html`.** A probe added there survives rebuilds, and `index.html` is the one boot file without a content hash, so the browser can keep serving an old copy. Old instrumentation paired with new code reads as "my fix didn't work."
+- **Keep temporary probes out of `index.html`.** The browser can serve a stale copy; see the `multiplatform-conversion` skill's WASM runtime landmines.
 - **A stall on the first frames after a screen or map load that never recurs is allocation, GC, or warm-up, not a per-frame cost.** Don't chase it with hot-loop optimization. `PerformanceMonitor` does not track allocations; compare `GC.GetTotalAllocatedBytes()` and `GC.CollectionCount(n)` across the transition frame against steady state.
 
 ## Startup timing (boot, not per-frame)

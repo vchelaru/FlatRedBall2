@@ -37,6 +37,7 @@ bool clicking       = cursor.PrimaryDown;           // left mouse button or touc
 bool justClicked    = cursor.PrimaryPressed;        // left mouse button or touch just started
 Vector2 worldPos    = cursor.WorldPosition;         // position in world space (Y+ up)
 Vector2 screenPos   = cursor.ScreenPosition;        // position in screen pixels
+int wheel           = cursor.ScrollWheelDelta;      // wheel change this frame, + is up; ~120/notch but trackpads send smaller steps, so use the sign; 0 on first frame
 
 bool overShape  = cursor.IsOver(myCircle);          // hit-test against any IShape
 bool overEntity = cursor.IsOver(this);              // hit-test against an entity's shapes
