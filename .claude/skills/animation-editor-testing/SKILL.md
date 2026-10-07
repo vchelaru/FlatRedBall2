@@ -1,8 +1,6 @@
 ---
 name: animation-editor-testing
-description: >-
-  Headless AE tests — Core first, [AvaloniaFact] only for real UI. Triggers:
-  AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui.
+description: AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui, Sandbox.Tests, Velopack install, registry.
 ---
 
 # AnimationEditor — Testing
@@ -24,8 +22,15 @@ scripts/test-ae.py --filter "FullyQualifiedName~Grid"  # same, filtered
 | **Headless control** | `AnimationEditor.Views.Tests` (`[AvaloniaFact]`) | A single `AnimationEditor.Views` control in isolation (e.g. `ProjectPanelControl`), using `FakeFolder`/`FakeFile` doubles — no `MainWindow`/DI | Cross-control wiring, `MainWindow` integration, real service graph |
 | **Headless integration** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`, `TestServices`) | Desktop visual tree *through* `MainWindow`, input routing, real DI-wired services — the bug involves wiring, not just one control | Re-proving Core math or a single control's own logic; Browser/WASM |
 | **Browser smoke** | `AnimationEditor.Browser.Ui` (Playwright) | Browser-*only* gaps (WASM boot, Browser host wiring, Debug automation bridge). See that folder’s README | Cloning Core/App/Views tests; primary label gate |
+| **Windows Sandbox** | `AnimationEditor.Sandbox.Tests` | What only a real install proves: Velopack hooks, registry, file association, uninstall. See below | Anything a headless test can reach |
 
 Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI. Reach for Browser Playwright only when Headless/desktop cannot catch it — a small smoke set, not a 1:1 port.
+
+## Windows Sandbox tests run only when asked
+
+`dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Sandbox.Tests` builds a Velopack `Setup.exe` (or uses `AE_SANDBOX_SETUP_EXE`) and runs each scenario in a fresh Windows Sandbox. The project is left out of the `.slnx`, `test-ae.py`, and CI on purpose, because a scenario takes minutes; keep it out. Tests skip on machines without Sandbox (Windows Home, or the optional feature off), and fail fast if a sandbox is already open, since Windows allows one at a time.
+
+A scenario is a PowerShell script in `Scenarios/` plus one `[Fact]` calling `WindowsSandbox.RunAsync`. Each boot costs about a minute, so one script bundles every check that can share a boot: it records each check instead of throwing, writes `results.json` last, then shuts the sandbox down. `install-uninstall-achx.ps1` is the pattern. Windows hash-protects the user's default-app choice, so clicking "Set as default" in Settings can't be automated and stays a manual check.
 
 ## Dogfooding the whole editor headlessly
 
