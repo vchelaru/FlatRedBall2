@@ -45,13 +45,15 @@ public sealed class AchxLoader : IDisposable
 
     /// <summary>
     /// Loads the .achx (XML) or .achj (JSON) at <paramref name="achxPath"/> — dialect chosen by
-    /// its extension — from the local filesystem and returns a ready-to-play
-    /// <see cref="AnimationChainList{TFrame}"/>. Textures referenced by the file are loaded relative to
-    /// the file's location and cached for reuse.
+    /// its extension — and returns a ready-to-play <see cref="AnimationChainList{TFrame}"/>.
+    /// Textures referenced by the file are loaded relative to the file's location and cached for reuse.
     /// </summary>
-    /// <param name="achxPath">Absolute or working-directory-relative path to the .achx/.achj file.</param>
+    /// <param name="achxPath">
+    /// A relative path is read through <c>TitleContainer</c> (relative to the game's content
+    /// location, not the working directory). A rooted path is read from the file system.
+    /// </param>
     public AnimationChainList<AnimationFrame> Load(string achxPath)
-        => Load(achxPath, File.OpenRead!);
+        => Load(achxPath, ContentFile.Open);
 
     /// <summary>
     /// Loads the .achx/.achj using a custom stream provider — dialect chosen by
@@ -63,8 +65,9 @@ public sealed class AchxLoader : IDisposable
     /// <param name="achxPath">Path passed to <paramref name="achxStreamProvider"/>.</param>
     /// <param name="achxStreamProvider">Returns a readable stream for the .achx/.achj file.</param>
     /// <param name="textureStreamProvider">
-    /// Optional override for texture loading. When <c>null</c>, falls back to
-    /// <see cref="File.OpenRead(string)"/>. Return <c>null</c> to produce a frame with no texture.
+    /// Optional override for texture loading. When <c>null</c>, relative paths are read through
+    /// <c>TitleContainer</c> and rooted paths from the file system; a missing file produces a frame
+    /// with no texture. Return <c>null</c> to produce a frame with no texture.
     /// </param>
     public AnimationChainList<AnimationFrame> Load(
         string achxPath,
@@ -72,15 +75,7 @@ public sealed class AchxLoader : IDisposable
         Func<string, Stream?>? textureStreamProvider = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var save = achxPath.EndsWith(".achj", StringComparison.OrdinalIgnoreCase)
-            ? AnimationChainListSave.FromJsonFile(achxPath, achxStreamProvider)
-            : AnimationChainListSave.FromFile(achxPath, achxStreamProvider);
-        // AnimationEditorCommon's FromFile/FromJsonFile store FileName verbatim (not resolved to
-        // an absolute path) -- resolve it here so ToAnimationChainList's achxDir-based texture-path
-        // resolution below produces an absolute path, matching this loader's cache-by-resolved-path
-        // contract (GetOrLoadTexture keys its cache on the resolved path).
-        save.FileName = Path.GetFullPath(achxPath);
-
+        var save = ContentFile.ReadSave(achxPath, achxStreamProvider);
         return save.ToAnimationChainList(texPath => GetOrLoadTexture(texPath, textureStreamProvider));
     }
 
@@ -95,8 +90,9 @@ public sealed class AchxLoader : IDisposable
     /// </summary>
     /// <param name="achxStream">A readable stream containing .achx or .achj data. The caller retains ownership.</param>
     /// <param name="textureStreamProvider">
-    /// Optional override for texture loading. When <c>null</c>, falls back to
-    /// <see cref="File.OpenRead(string)"/>. Return <c>null</c> to produce a frame with no texture.
+    /// Optional override for texture loading. When <c>null</c>, relative paths are read through
+    /// <c>TitleContainer</c> and rooted paths from the file system; a missing file produces a frame
+    /// with no texture. Return <c>null</c> to produce a frame with no texture.
     /// </param>
     public AnimationChainList<AnimationFrame> Load(Stream achxStream, Func<string, Stream?>? textureStreamProvider = null)
     {
@@ -122,16 +118,9 @@ public sealed class AchxLoader : IDisposable
     {
         if (_textureCache.TryGetValue(resolvedPath, out var cached)) return cached;
 
-        Stream? stream;
-        if (streamProvider != null)
-        {
-            stream = streamProvider(resolvedPath);
-        }
-        else
-        {
-            if (!File.Exists(resolvedPath)) return null;
-            stream = File.OpenRead(resolvedPath);
-        }
+        Stream? stream = streamProvider != null
+            ? streamProvider(resolvedPath)
+            : ContentFile.TryOpen(resolvedPath);
 
         if (stream == null) return null;
 

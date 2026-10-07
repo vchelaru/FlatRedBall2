@@ -188,9 +188,13 @@ public static class AnimationChainListSaveExtensions
     /// </para>
     /// </summary>
     /// <param name="list">The list to update in place.</param>
-    /// <param name="achxPath">Path to the .achx/.achj file to reload from.</param>
+    /// <param name="achxPath">
+    /// Path to the .achx/.achj file to reload from. Relative paths are read through
+    /// <c>TitleContainer</c>; rooted paths (what file watchers report) from the file system.
+    /// </param>
     /// <param name="textureLoader">
-    /// Called with the resolved absolute path of each texture file. May return <c>null</c>
+    /// Called with each texture path, resolved next to <paramref name="achxPath"/> (rooted only if
+    /// <paramref name="achxPath"/> is). May return <c>null</c>
     /// if the texture is unavailable — affected frames keep a <c>null</c> texture.
     /// Typically supplied by <see cref="AchxLoader"/>, which reuses its internal cache
     /// and only loads new textures.
@@ -200,13 +204,7 @@ public static class AnimationChainListSaveExtensions
         AnimationChainList<AnimationFrame> fresh;
         try
         {
-            var save = achxPath.EndsWith(".achj", StringComparison.OrdinalIgnoreCase)
-                ? AnimationChainListSave.FromJsonFile(achxPath)
-                : AnimationChainListSave.FromFile(achxPath);
-            // AnimationEditorCommon's FromFile/FromJsonFile store FileName verbatim (not resolved
-            // to an absolute path) -- resolve it here so ToAnimationChainList's achxDir-based
-            // texture-path resolution below produces an absolute path.
-            save.FileName = Path.GetFullPath(achxPath);
+            var save = ContentFile.ReadSave(achxPath, ContentFile.Open);
             fresh = save.ToAnimationChainList(textureLoader);
         }
         catch (IOException) { return false; }

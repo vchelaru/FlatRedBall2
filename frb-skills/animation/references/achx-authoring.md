@@ -6,7 +6,7 @@
 
 `ContentLoader.LoadAnimationChainList(path)` and `AchxLoader.Load(path)` both pick the dialect **by file extension** — `.achj` parses as JSON, anything else (including `.achx`) parses as XML. No caller branching needed; just use the right extension.
 
-For code paths with no file path to inspect (clipboard paste, an in-memory stream), `AnimationChainListSave.FromString`/`FromStream` (and `AchxLoader`'s `FromDetectedStream`) instead **content-sniff**: a leading `{` after whitespace/BOM means JSON, anything else parses as XML.
+For code paths with no file path to inspect (clipboard paste, an in-memory stream), `AnimationChainListSave.FromString`/`FromStream` (and `AchxLoader.Load(Stream)`) instead **content-sniff**: a leading `{` after whitespace/BOM means JSON, anything else parses as XML.
 
 ## .achj (JSON) shape
 
