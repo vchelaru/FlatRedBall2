@@ -24,6 +24,7 @@ The only relevant question is "is this the right design?" — never "will this b
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL, version pinned in the root `Directory.Packages.props`)
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
+- Sample catalog, by skill (with gaps): `design/SAMPLES.md`
 - Multi-phase plans: `plan/plan.md` (index) — see below
 - Test project: `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`
 
