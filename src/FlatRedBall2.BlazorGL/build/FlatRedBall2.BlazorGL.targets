@@ -6,6 +6,19 @@
 -->
 <Project>
 
+  <!--
+    KNI's Blazor.GL DynamicSoundEffectInstance loads its AudioWorklet from "js/streamProcessor2.js"
+    (relative to the page), but no KNI package ships that file. Register it as this project's own
+    static web asset at that path; Link is what places it under wwwroot/js/ without a physical copy.
+    It is deliberately not in this package's wwwroot, which would serve it under
+    _content/FlatRedBall2.BlazorGL/ where KNI never looks. A head that vendors its own copy wins.
+    The file is Ms-PL (from KNI), so its license file is served beside it.
+  -->
+  <ItemGroup Condition="!Exists('$(MSBuildProjectDirectory)\wwwroot\js\streamProcessor2.js')">
+    <Content Include="$(MSBuildThisFileDirectory)js\streamProcessor2.js" Link="wwwroot\js\streamProcessor2.js" />
+    <Content Include="$(MSBuildThisFileDirectory)js\streamProcessor2.LICENSE.txt" Link="wwwroot\js\streamProcessor2.LICENSE.txt" />
+  </ItemGroup>
+
   <Target Name="GenerateContentManifest"
           BeforeTargets="GenerateStaticWebAssetsManifest"
           Condition="'$(DesignTimeBuild)' != 'true' AND Exists('$(MSBuildProjectDirectory)\wwwroot\Content')">

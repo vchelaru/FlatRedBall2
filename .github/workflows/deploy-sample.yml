@@ -36,6 +36,13 @@ jobs:
           -c Release
           -o publish
 
+      # KNI loads its DynamicSoundEffectInstance AudioWorklet from js/streamProcessor2.js,
+      # which FlatRedBall2.BlazorGL's build targets add to every head. Fail before deploying
+      # a site where streamed audio would 404.
+      - name: Assert KNI streamProcessor2.js is published
+        shell: bash
+        run: test -f publish/wwwroot/js/streamProcessor2.js
+
       - name: Diagnose published content (TEMP)
         shell: bash
         run: |

@@ -192,7 +192,7 @@ manifest stays in sync on the next build.
 consumers — a `ProjectReference` to the host project does **not** import them. That's why
 repo samples carry an explicit
 `<Import Project="...\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />`;
-without it, no manifest is ever generated. NuGet consumers need nothing.
+without it, no manifest is generated and KNI's `js/streamProcessor2.js` (the `DynamicSoundEffectInstance` AudioWorklet) is never served. NuGet consumers need nothing.
 
 ## WASM runtime landmines
 
@@ -202,7 +202,6 @@ These compile clean, pass every desktop and xunit run, and fail only in the brow
 - **`TickDotNet` runs synchronously inside a `requestAnimationFrame` callback** (`src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js`), and the browser runtime is single-threaded. Never block on an `IJSRuntime` task (`.GetAwaiter().GetResult()`, `.Wait()`) from game code: the JS side can run while the managed wait still fails, so a write lands in storage yet reports failure. Call JS through synchronous `[JSImport]` bindings instead.
 - **`index.html` is not content-hashed** (nor are `blazor.webassembly.js` and `dotnet.js`); the assemblies and runtime are. A cached `index.html` pairs new code with an old inline script, and the fix appears not to work because the fix is in the stale file. Keep shims and diagnostics in C# or a separate JS module, and hard-reload before trusting a JS error that contradicts the page.
 - **`dotnet publish` has no `blazor.boot.json` on .NET 10.** The boot resource list is inlined into `_framework/dotnet.js`.
-- **`DynamicSoundEffectInstance` needs `streamProcessor2.js`, which nothing ships.** KNI's Blazor.GL platform loads it as an AudioWorklet module, but neither the KNI packages nor `FlatRedBall2.BlazorGL` include the file, so a head that streams audio must vendor it into its own `wwwroot` (reported at `/js/streamProcessor2.js`).
 
 ### `[JSImport]` interop
 
