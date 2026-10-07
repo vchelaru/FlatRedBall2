@@ -41,6 +41,28 @@ public class SettingsWindowBuilderTests
         Assert.Equal("File Association", fileAssocTab.Header);
     }
 
+    [AvaloniaFact]
+    public void BuildTabs_FileAssociation_InstalledBuild_ShowsSetDefaultButton()
+    {
+        var tabs = SettingsWindowBuilder.BuildTabs(
+            new SettingsWindowModel { FileAssociationSupported = true, FileAssociationCanRegister = true },
+            new SettingsWindowCallbacks());
+
+        Assert.Single(SectionOf((TabItem)tabs.Items[1]!).Children, c => c.GetType() == typeof(Button));
+    }
+
+    [AvaloniaFact]
+    public void BuildTabs_FileAssociation_PortableBuild_HidesSetDefaultButton()
+    {
+        // A portable build's exe path isn't stable and Default apps can't list it, so the tab
+        // explains Open with instead of offering a button that can't finish.
+        var tabs = SettingsWindowBuilder.BuildTabs(
+            new SettingsWindowModel { FileAssociationSupported = true, FileAssociationCanRegister = false },
+            new SettingsWindowCallbacks());
+
+        Assert.DoesNotContain(SectionOf((TabItem)tabs.Items[1]!).Children, c => c.GetType() == typeof(Button));
+    }
+
     [Fact]
     public void BuildTabs_WithoutFileAssociation_OnlyHasColorsTab()
     {

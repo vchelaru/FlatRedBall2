@@ -14,6 +14,8 @@ internal sealed class FakeNotDefaultFileAssociationService : IFileAssociationSer
 {
     public bool IsSupported => true;
 
+    public bool CanRegisterAsDefault => true;
+
     public bool IsDefault() => false;
 
     public AchxFileAssociationStatus GetStatus() => AchxFileAssociationStatus.NotAssociated;

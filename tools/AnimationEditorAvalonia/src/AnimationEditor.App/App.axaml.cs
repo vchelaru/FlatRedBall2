@@ -280,7 +280,8 @@ public partial class App : Application
         // File association is registry-based on Windows; other platforms get the no-op
         // service so the startup prompt simply never appears (IsSupported == false).
         if (OperatingSystem.IsWindows())
-            sc.AddSingleton<IFileAssociationService, WindowsFileAssociationService>();
+            sc.AddSingleton<IFileAssociationService>(
+                _ => new WindowsFileAssociationService(VelopackInstallState.IsSetupInstall()));
         else
             sc.AddSingleton<IFileAssociationService, NullFileAssociationService>();
 

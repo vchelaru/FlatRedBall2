@@ -14,7 +14,7 @@ namespace AnimationEditor.App.Services;
 ///
 /// <para>Modern Windows (8+) hash-protects <c>HKCU\…\.achx\UserChoice</c>, so an app cannot
 /// silently force itself as the default. <see cref="RegisterAsDefault"/> therefore registers
-/// the ProgId and then opens the system default-apps settings for the user to confirm.</para>
+/// (<see cref="WindowsAchxRegistration"/>) and then opens the system default-apps settings for the user to confirm.</para>
 ///
 /// <para>Pure helpers (<see cref="BuildOpenCommand"/>, <see cref="IsOurProgId"/>) are unit-tested;
 /// the registry reads/writes and the settings deep-link are the thin untested wiring.</para>
@@ -39,7 +39,16 @@ internal sealed class WindowsFileAssociationService : IFileAssociationService
 
     private const string ClassesRoot = @"HKEY_CURRENT_USER\Software\Classes";
 
+    /// <param name="isInstalled">Whether this process is a Velopack Setup install. Portable and
+    /// dev builds pass false so <see cref="RegisterAsDefault"/> never registers their path.</param>
+    public WindowsFileAssociationService(bool isInstalled)
+    {
+        CanRegisterAsDefault = isInstalled;
+    }
+
     public bool IsSupported => OperatingSystem.IsWindows();
+
+    public bool CanRegisterAsDefault { get; }
 
     public bool IsDefault() => GetStatus() == AchxFileAssociationStatus.AssociatedWithThisBuild;
 
@@ -101,30 +110,14 @@ internal sealed class WindowsFileAssociationService : IFileAssociationService
     }
 
     [SupportedOSPlatform("windows")]
-    private static void RegisterAsDefaultWindows()
+    private void RegisterAsDefaultWindows()
     {
         string? exe = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(exe))
+        if (!CanRegisterAsDefault || string.IsNullOrEmpty(exe))
             return;
 
-        try
-        {
-            string progIdKey = $@"{ClassesRoot}\{ProgId}";
-            Registry.SetValue(progIdKey, null, "FlatRedBall Animation Chain");
-            Registry.SetValue($@"{progIdKey}\DefaultIcon", null, $"\"{exe}\",0");
-            Registry.SetValue($@"{progIdKey}\shell\open\command", null, BuildOpenCommand(exe));
-
-            // Point both extensions at our ProgId. On modern Windows this is only a fallback —
-            // an existing hash-protected UserChoice still wins, which is why we open the
-            // default-apps settings below for the user to confirm.
-            Registry.SetValue($@"{ClassesRoot}\{Extension}", null, ProgId);
-            Registry.SetValue($@"{ClassesRoot}\{SecondaryExtension}", null, ProgId);
-        }
-        catch (Exception e)
-        {
-            Debug.WriteLine($"Failed to register .achx ProgId: {e}");
-        }
-
+        // The install hook already registered; rewriting repairs entries removed since.
+        WindowsAchxRegistration.Register(exe);
         OpenDefaultAppsSettings();
     }
 
@@ -132,9 +125,11 @@ internal sealed class WindowsFileAssociationService : IFileAssociationService
     {
         try
         {
-            // ms-settings: is the only reliable, version-stable deep-link; there is no
-            // per-extension page across Windows versions, so we land on Default apps.
-            Process.Start(new ProcessStartInfo("ms-settings:defaultapps") { UseShellExecute = true });
+            // registeredAppUser opens the editor's own Default apps page on Windows 11 (2023-04
+            // CU and later); older builds ignore it and show the Default apps list.
+            string uri = "ms-settings:defaultapps?registeredAppUser="
+                + Uri.EscapeDataString(WindowsAchxRegistration.RegisteredAppName);
+            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
         }
         catch (Exception e)
         {

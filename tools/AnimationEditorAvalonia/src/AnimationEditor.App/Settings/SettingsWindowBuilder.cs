@@ -16,6 +16,10 @@ public sealed class SettingsWindowModel
 
     public AchxFileAssociationStatus FileAssociationStatus { get; init; }
 
+    /// <summary>Mirrors <see cref="IFileAssociationService.CanRegisterAsDefault"/>: false shows
+    /// Open with guidance in place of the "Set as default" button.</summary>
+    public bool FileAssociationCanRegister { get; init; }
+
     public bool SuppressDefaultHandlerPrompt { get; init; }
 
     /// <summary>Current canvas-background override (packed <c>0xAARRGGBB</c>), or <c>null</c> for the theme default.</summary>
@@ -239,12 +243,27 @@ public static class SettingsWindowBuilder
             Text = AchxFileAssociationStatusFormatter.Describe(model.FileAssociationStatus),
         };
 
-        var setDefaultBtn = new Button
+        Control setDefault;
+        if (model.FileAssociationCanRegister)
         {
-            Content = "Set as default for .achx files…",
-            HorizontalAlignment = HorizontalAlignment.Left,
-        };
-        setDefaultBtn.Click += (_, _) => callbacks.OnSetDefaultAchx?.Invoke();
+            var setDefaultBtn = new Button
+            {
+                Content = "Set as default for .achx files…",
+                HorizontalAlignment = HorizontalAlignment.Left,
+            };
+            setDefaultBtn.Click += (_, _) => callbacks.OnSetDefaultAchx?.Invoke();
+            setDefault = setDefaultBtn;
+        }
+        else
+        {
+            setDefault = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                Text = "This is a portable build, which Windows can't list as a default app. "
+                    + "To open .achx files with it, right-click one, choose Open with > Choose another app, "
+                    + "and browse to this AnimationEditor.exe. Install AnimationEditor to set it as the default from here.",
+            };
+        }
 
         var suppressCheck = new CheckBox
         {
@@ -260,7 +279,7 @@ public static class SettingsWindowBuilder
         return new StackPanel
         {
             Spacing = 10,
-            Children = { statusText, setDefaultBtn, suppressCheck },
+            Children = { statusText, setDefault, suppressCheck },
         };
     }
 }

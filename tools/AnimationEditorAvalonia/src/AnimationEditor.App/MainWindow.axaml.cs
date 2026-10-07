@@ -1130,11 +1130,9 @@ public partial class MainWindow : Window
             SyncProjectPanelSelectionTo(activeTab);
 
         RefreshFilesPanel();
-        // Not auto-shown (issue #849): RegisterAsDefault() doesn't work for the current
-        // dev/portable distribution — no installer yet (#493) — so the banner would just
-        // offer a "Make default" button that does nothing useful. The manual "Set as
-        // default" / "Don't show again" controls in Settings still work for anyone who
-        // wants to try it.
+        // Not auto-shown (issue #849): RegisterAsDefault() only works for Setup installs (#493),
+        // and that flow hasn't been verified on a clean machine yet. Settings > File
+        // Association offers it on installed builds and Open with guidance on portable ones.
         _ = RunStartupUpdateDownloadAsync();
     }
 
@@ -3112,6 +3110,7 @@ public partial class MainWindow : Window
             {
                 FileAssociationSupported = _fileAssociation.IsSupported,
                 FileAssociationStatus = _fileAssociation.GetStatus(),
+                FileAssociationCanRegister = _fileAssociation.CanRegisterAsDefault,
                 SuppressDefaultHandlerPrompt = _appSettings.SuppressDefaultHandlerPrompt,
                 CanvasBackgroundArgb = _appSettings.CanvasBackgroundArgb,
                 ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),

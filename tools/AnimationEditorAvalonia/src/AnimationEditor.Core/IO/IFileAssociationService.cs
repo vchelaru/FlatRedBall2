@@ -16,6 +16,13 @@ public interface IFileAssociationService
     bool IsSupported { get; }
 
     /// <summary>
+    /// Whether <see cref="RegisterAsDefault"/> can do anything for this build. False for
+    /// portable and dev builds: their exe path isn't stable and the OS won't list them as a
+    /// default-app candidate, so the UI points those users at Open with instead.
+    /// </summary>
+    bool CanRegisterAsDefault { get; }
+
+    /// <summary>
     /// Whether this editor is the current default handler for <c>.achx</c> files — i.e. our
     /// ProgId is registered and its open command targets this build's executable. Only
     /// meaningful when <see cref="IsSupported"/> is true.
@@ -32,7 +39,7 @@ public interface IFileAssociationService
     /// Registers the editor's file-type association and surfaces the OS confirmation UI.
     /// Modern Windows blocks an app from silently forcing itself as the default, so this
     /// registers the association and then opens the system default-apps settings for the
-    /// user to confirm. No-op when <see cref="IsSupported"/> is false.
+    /// user to confirm. No-op when <see cref="CanRegisterAsDefault"/> is false.
     /// </summary>
     void RegisterAsDefault();
 }

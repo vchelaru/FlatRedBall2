@@ -9,6 +9,8 @@ public sealed class NullFileAssociationService : IFileAssociationService
 {
     public bool IsSupported => false;
 
+    public bool CanRegisterAsDefault => false;
+
     public bool IsDefault() => false;
 
     public AchxFileAssociationStatus GetStatus() => AchxFileAssociationStatus.NotSupported;
