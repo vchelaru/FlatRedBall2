@@ -76,6 +76,9 @@ internal static class EditorColors
     public static readonly SKColor PolygonVertexHighlight = SKColors.White;
     public static readonly SKColor PolygonVertexEdge = new(40, 40, 40);
     public static readonly SKColor PolygonMidpoint = Gold.WithAlpha(200);
+    /// <summary>Crosshair at a selected polygon's X/Y, the point its vertices are relative to (#1352).</summary>
+    public static readonly SKColor PolygonOrigin = Gold;
+    public static readonly SKColor PolygonOriginUnderlay = SKColors.Black.WithAlpha(160);
 
     // ── Drag and drop (tree and tab strip) ───────────────────────────────────
 
