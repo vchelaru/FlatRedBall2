@@ -5,10 +5,9 @@ namespace AnimationEditor.Sandbox.Tests;
 public class InstallerSandboxTests
 {
     /// <summary>
-    /// #493: a Setup.exe install registers .achx/.achj so Windows lists the editor in Default
-    /// apps and opens .achx with it; uninstall removes only our entries. One sandbox boot covers
-    /// install, every registry/association check, and uninstall (see the scenario script).
-    /// The Settings "Set as default" click can't be automated: Windows hash-protects UserChoice.
+    /// A Setup.exe install registers .achx and .achj so Windows lists the editor in Default apps
+    /// and Open with, and double-clicking either opens it; uninstall removes only our entries.
+    /// One sandbox boot covers install, every registry/association check, and uninstall.
     /// </summary>
     [Fact(Timeout = 30 * 60 * 1000)]
     public async Task Install_ThenUninstall_RegistersAndRemovesAchxAssociation()

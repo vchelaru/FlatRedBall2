@@ -52,7 +52,6 @@ internal sealed class TestServices
     // null diskCacheDirectory: tests never need thumbnails backed by a real per-user cache dir
     // (same rationale as SettingsRoot's isolation -- see class doc).
     public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
-    public IFileAssociationService FileAssociationService { get; set; } = new NullFileAssociationService();
     public IApplicationUpdater ApplicationUpdater { get; set; } = new FakeApplicationUpdater();
 
     /// <summary>
@@ -95,7 +94,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot,
+            ThumbnailService, ProjectTreeThumbnailService, SettingsRoot,
             ApplicationUpdater, EditorDialogHost, useMacOSChrome, commandModifier);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)

@@ -1,6 +1,6 @@
 ---
 name: docs-writing
-description: Writing FlatRedBall2 user docs in this repo's own docs/ folder (GitBook-synced). Triggers: new FlatRedBall2 tutorial/how-to pages, docs/SUMMARY.md, docs/images.
+description: Writing FlatRedBall2 user docs in this repo's own docs/ folder (GitBook-synced). Triggers: new FlatRedBall2 tutorial/how-to pages, docs/SUMMARY.md, docs/.gitbook/assets.
 ---
 
 # FlatRedBall2 Docs Writing Reference
@@ -9,13 +9,13 @@ FlatRedBall2's user docs live in **this repo's own `docs/` folder** — not the 
 
 ## Where FlatRedBall2 Docs Live
 
-- Nav: `docs/SUMMARY.md` — a flat list today (`Setup`, `AnimationEditor`, `Your First Animation`), no nesting yet. A page not listed there is unreachable even if it exists on disk.
-- Every page in `docs/` today is an **AnimationEditor tool doc** (the desktop app's UI — see `your-first-animation.md`). A runtime/code doc (loading a file format in a game, an engine API) is a different kind of page and needs its own new section in `SUMMARY.md` — mirrors Gum's own tool-docs-vs-code-docs split (`Gum/.claude/skills/gum-docs-writing/SKILL.md`, "Tool Docs vs Code Docs"). Don't fold a code doc into the AnimationEditor section.
-- Images live in a flat `docs/images/`, referenced with a plain relative path (`images/foo.png`). There is no `.gitbook/assets/` folder or path convention here — that's specific to Gum/FlatRedBallDocs' GitBook setup; don't port it.
+- Nav: `docs/SUMMARY.md`, grouped under `##` section headings with nested bullets. A page not listed there is unreachable even if it exists on disk.
+- AnimationEditor tool docs (the desktop app's UI) live in `docs/animationeditor/` and `docs/animationeditor/how-to/`. Code docs (loading the file format in a game) live in `docs/animationeditor/api/` under the **Code** entry. Keep the two kinds apart, as Gum does (`Gum/.claude/skills/gum-docs-writing/SKILL.md`, "Tool Docs vs Code Docs").
+- Images live in `docs/.gitbook/assets/`, referenced relatively (`../.gitbook/assets/foo.png`).
 
-## Match the Plain-Markdown Style Already In Use
+## Match the Style Already In Use
 
-`docs/` uses plain GitHub-flavored markdown — no `{% hint %}`, `{% tabs %}`, or `<figure>` GitBook syntax appears anywhere in it yet. Don't introduce those unless the user asks for them. Heading levels nest normally (`#` → `##` → `###`, no skipped levels). For procedure style, match `your-first-animation.md`'s "Steps" section: numbered steps, bold UI element names, one action per step.
+Images use GitBook's `<figure><img src="..." alt="..."><figcaption></figcaption></figure>` block, as in `docs/animationeditor/quick-start.md`. No page uses `{% hint %}` or `{% tabs %}`; don't introduce them unless the user asks. Heading levels nest normally (`#` → `##` → `###`, no skipped levels). Procedures follow `quick-start.md`: bold UI element names, one action per step.
 
 ## No Claudese
 

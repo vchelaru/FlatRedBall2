@@ -12,16 +12,21 @@ internal readonly record struct RegistryValueWrite(string SubKey, string? Name, 
 
 /// <summary>
 /// The per-user registry entries that make Windows treat the editor as a handler for
-/// <c>.achx</c>/<c>.achj</c>: the ProgId, the extension mappings, and the
-/// <c>Capabilities</c> + <c>RegisteredApplications</c> entries that list the editor on the
-/// Default apps page. Written by the Velopack install/update hooks and by "Set as default";
-/// removed by the uninstall hook. Only installed builds call this, since a portable exe's
-/// path isn't stable enough to register.
+/// <c>.achx</c> and <c>.achj</c>: the ProgId, the extension mappings, and the
+/// <c>Capabilities</c> + <c>RegisteredApplications</c> entries that list the editor in Default
+/// apps and Open with. Written by the Velopack install/update hooks and removed by the uninstall
+/// hook. Portable and dev builds never register, because their exe path isn't stable.
+///
+/// <para>Windows hash-protects the user's own choice of default app, so this never overrides an
+/// app the user picked; they switch with Open with &gt; Always or Settings &gt; Default apps.</para>
 /// </summary>
 internal static class WindowsAchxRegistration
 {
-    /// <summary>The value name under <c>HKCU\Software\RegisteredApplications</c>, and the
-    /// <c>registeredAppUser</c> argument for the Default apps deep-link.</summary>
+    /// <summary>The per-user ProgId both extensions map to. Namespaced to avoid colliding with
+    /// any other handler for the same extensions.</summary>
+    internal const string ProgId = "FlatRedBall.AnimationEditor.achx";
+
+    /// <summary>The value name under <c>HKCU\Software\RegisteredApplications</c>.</summary>
     internal const string RegisteredAppName = "FlatRedBall AnimationEditor";
 
     private const string AppKey = @"Software\FlatRedBall\AnimationEditor";
@@ -29,20 +34,20 @@ internal static class WindowsAchxRegistration
     private const string RegisteredApplicationsKey = @"Software\RegisteredApplications";
     private const string ClassesKey = @"Software\Classes";
 
-    private static readonly string[] Extensions =
-        { WindowsFileAssociationService.Extension, WindowsFileAssociationService.SecondaryExtension };
+    private static readonly string[] Extensions = { ".achx", ".achj" };
 
     /// <summary>Every value <see cref="Register"/> writes for <paramref name="exePath"/>.</summary>
     internal static IReadOnlyList<RegistryValueWrite> BuildWrites(string exePath)
     {
-        const string progId = WindowsFileAssociationService.ProgId;
+        const string progId = ProgId;
         string progIdKey = $@"{ClassesKey}\{progId}";
 
         var writes = new List<RegistryValueWrite>
         {
             new(progIdKey, null, "FlatRedBall Animation Chain"),
             new($@"{progIdKey}\DefaultIcon", null, $"\"{exePath}\",0"),
-            new($@"{progIdKey}\shell\open\command", null, WindowsFileAssociationService.BuildOpenCommand(exePath)),
+            // Windows substitutes the double-clicked file's path for %1.
+            new($@"{progIdKey}\shell\open\command", null, $"\"{exePath}\" \"%1\""),
             new(CapabilitiesKey, "ApplicationName", "AnimationEditor"),
             new(CapabilitiesKey, "ApplicationDescription", "Edits FlatRedBall animation chain files."),
             new(RegisteredApplicationsKey, RegisteredAppName, CapabilitiesKey),
@@ -84,7 +89,7 @@ internal static class WindowsAchxRegistration
     [SupportedOSPlatform("windows")]
     internal static void Unregister()
     {
-        const string progId = WindowsFileAssociationService.ProgId;
+        const string progId = ProgId;
         try
         {
             Registry.CurrentUser.DeleteSubKeyTree($@"{ClassesKey}\{progId}", throwOnMissingSubKey: false);
@@ -99,7 +104,7 @@ internal static class WindowsAchxRegistration
                 if (extensionKey is null)
                     continue;
 
-                if (WindowsFileAssociationService.IsOurProgId(extensionKey.GetValue(null) as string))
+                if (string.Equals(extensionKey.GetValue(null) as string, progId, StringComparison.OrdinalIgnoreCase))
                     extensionKey.DeleteValue(string.Empty, throwOnMissingValue: false);
 
                 using var openWith = extensionKey.OpenSubKey("OpenWithProgids", writable: true);

@@ -16,6 +16,14 @@ The AnimationEditor also works with [Tiled's](https://www.mapeditor.org/) .tsx f
 
 <figure><img src="../.gitbook/assets/animationeditor-tsx-animations.png" alt="AnimationEditor displaying animations in a .tsx file"><figcaption><p>AnimationEditor displaying animations in a .tsx file</p></figcaption></figure>
 
+## Opening Files from Windows
+
+The Windows installer registers the AnimationEditor for .achj and .achx files, so double-clicking either type opens it. Uninstalling removes that registration and leaves other apps' associations alone.
+
+If you previously chose another app for these files, Windows keeps that choice. To switch, right-click a file, select **Open with ▸ Choose another app**, pick **AnimationEditor**, and check **Always**.
+
+The portable build doesn't register anything. To open files with it, use **Open with ▸ Choose another app**, then browse to `AnimationEditor.exe`.
+
 ## Where to Go Next
 
 If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the [How-To Guides](how-to/README.md).

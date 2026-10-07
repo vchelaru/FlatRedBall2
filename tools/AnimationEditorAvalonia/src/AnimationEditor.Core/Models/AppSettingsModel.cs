@@ -60,14 +60,6 @@ namespace AnimationEditor.Core.Models
         public bool ShowAllProjectFolders { get; set; }
 
         /// <summary>
-        /// When <c>true</c>, the editor never offers to register itself as the default
-        /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
-        /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear
-        /// once on a fresh install.
-        /// </summary>
-        public bool SuppressDefaultHandlerPrompt { get; set; }
-
-        /// <summary>
         /// The folder last picked via File → Open Project Folder (#770). Rescanned on the next
         /// launch to repopulate the Project tab without requiring a re-pick. Left stale (not
         /// cleared) if the folder no longer exists -- the startup check just skips it, same as

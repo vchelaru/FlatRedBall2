@@ -420,7 +420,7 @@ These are **functional** gaps, not visual-parity gaps — track separately if ne
 | IndexedDB recovery files | Explicitly skipped in Phase 2 (#610) |
 | Tree context menus / drag-reorder | Desktop has rich TV06/TV07; browser tree is simpler |
 | PNG git-diff tab (#606) | Desktop-only workflow |
-| File association / default-handler banner | Desktop OS integration |
+| File association | Desktop installer registers it; no in-app UI on either host |
 | Deploy / GitHub Pages go-live | #535 M4 workflow exists; not a UI parity concern |
 | Cross-browser (Firefox/Safari) verification | This session's tooling only drives Chrome live; same residual gap already documented for Phase 1's "Open Folder needs a human" |
 

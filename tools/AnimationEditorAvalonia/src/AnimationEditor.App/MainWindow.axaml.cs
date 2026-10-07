@@ -57,7 +57,6 @@ public partial class MainWindow : Window
     private readonly IPendingCutState _pendingCutState;
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
-    private readonly IFileAssociationService _fileAssociation;
     private readonly IApplicationUpdater _applicationUpdater;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
@@ -240,7 +239,6 @@ public partial class MainWindow : Window
         IPendingCutState pendingCutState,
         Services.ThumbnailService thumbnailService,
         ProjectTreeThumbnailService projectTreeThumbnailService,
-        IFileAssociationService fileAssociation,
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null,
         IEditorDialogHost? dialogHost = null,
@@ -263,7 +261,6 @@ public partial class MainWindow : Window
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
         _projectTreeThumbnailService = projectTreeThumbnailService;
-        _fileAssociation = fileAssociation;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
         // The dialogs that open straight through EditorDialogs (Adjust Frame Time, Add Multiple
         // Frames, Adjust Offsets, ...) go through this host; a test passes a scripted one, since a
@@ -308,7 +305,6 @@ public partial class MainWindow : Window
         WireTimelineTransport();
         WireKeyboard();
         WireTabBar();
-        WireDefaultHandlerBanner();
         WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
 
@@ -1130,9 +1126,6 @@ public partial class MainWindow : Window
             SyncProjectPanelSelectionTo(activeTab);
 
         RefreshFilesPanel();
-        // Not auto-shown (issue #849): RegisterAsDefault() only works for Setup installs (#493),
-        // and that flow hasn't been verified on a clean machine yet. Settings > File
-        // Association offers it on installed builds and Open with guidance on portable ones.
         _ = RunStartupUpdateDownloadAsync();
     }
 
@@ -1172,39 +1165,6 @@ public partial class MainWindow : Window
 
     private void UpdateRecoveredDocumentBanner() =>
         RecoveredDocumentBanner.IsVisible = _tabManager.ActiveTab?.IsRecoveredDocument == true;
-
-    // ── Default-handler prompt banner ─────────────────────────────────────────
-
-    private void WireDefaultHandlerBanner()
-    {
-
-        MakeDefaultBtn.Click += (_, _) => RegisterAsDefaultAchxHandler(hideBanner: true);
-
-        DismissDefaultHandlerBtn.Click += (_, _) =>
-        {
-            _appSettings.SuppressDefaultHandlerPrompt = true;
-            SaveSettingsFile();
-            DefaultHandlerBanner.IsVisible = false;
-        };
-    }
-
-    private void RegisterAsDefaultAchxHandler(bool hideBanner)
-    {
-        _fileAssociation.RegisterAsDefault();
-        if (hideBanner)
-            DefaultHandlerBanner.IsVisible = false;
-        ShowStatusMessage("Opened Windows settings — choose AnimationEditor for .achx files.");
-    }
-
-    private void ShowDefaultHandlerBannerIfAppropriate()
-    {
-        bool isDefault = _fileAssociation.IsSupported && _fileAssociation.IsDefault();
-        if (DefaultHandlerPromptDecider.ShouldPrompt(
-                _fileAssociation.IsSupported, isDefault, _appSettings.SuppressDefaultHandlerPrompt))
-        {
-            DefaultHandlerBanner.IsVisible = true;
-        }
-    }
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────
 
@@ -3108,10 +3068,6 @@ public partial class MainWindow : Window
         var dialog = Settings.SettingsWindowBuilder.Build(
             new Settings.SettingsWindowModel
             {
-                FileAssociationSupported = _fileAssociation.IsSupported,
-                FileAssociationStatus = _fileAssociation.GetStatus(),
-                FileAssociationCanRegister = _fileAssociation.CanRegisterAsDefault,
-                SuppressDefaultHandlerPrompt = _appSettings.SuppressDefaultHandlerPrompt,
                 CanvasBackgroundArgb = _appSettings.CanvasBackgroundArgb,
                 ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),
                 GuideLineArgb = _appSettings.GuideLineArgb,
@@ -3120,13 +3076,6 @@ public partial class MainWindow : Window
             },
             new Settings.SettingsWindowCallbacks
             {
-                OnSetDefaultAchx = () => RegisterAsDefaultAchxHandler(hideBanner: false),
-                OnSuppressDefaultHandlerPromptChanged = suppressed =>
-                {
-                    _appSettings.SuppressDefaultHandlerPrompt = suppressed;
-                    SaveSettingsFile();
-                    ShowDefaultHandlerBannerIfAppropriate();
-                },
                 OnCanvasBackgroundChanged = SetCanvasBackground,
                 OnPickCustomCanvasBackground = PickCustomCanvasBackgroundAsync,
                 OnGuideLineChanged = SetGuideLineColor,

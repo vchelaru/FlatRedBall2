@@ -188,25 +188,6 @@ public class AppSettingsModelTests
     }
 
     [Fact]
-    public void SuppressDefaultHandlerPrompt_DefaultsToFalse()
-    {
-        var model = new AppSettingsModel();
-
-        Assert.False(model.SuppressDefaultHandlerPrompt);
-    }
-
-    [Fact]
-    public void SuppressDefaultHandlerPrompt_SurvivesJsonRoundTrip()
-    {
-        var model = new AppSettingsModel { SuppressDefaultHandlerPrompt = true };
-
-        var json = JsonSerializer.Serialize(model);
-        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
-
-        Assert.True(restored!.SuppressDefaultHandlerPrompt);
-    }
-
-    [Fact]
     public void WindowMaximized_DefaultsToFalse()
     {
         var model = new AppSettingsModel();
