@@ -60,7 +60,7 @@ Skills live in two locations, by audience:
 - **`/frb-skills/`** — 3rd-party skills for game developers using FlatRedBall2 (entities, collision, physics, animation, etc.). These are the public, distributable skill set.
 - **`/.claude/skills/`** — 1st-party skills for engine contributors only (TDD discipline, skill authoring, sample-project bootstrap, content-boundary philosophy, orchestrator).
 
-The 3rd-party skills are also surfaced under `/.claude/skills/<name>` via local symlinks (gitignored) so Claude Code's auto-discovery picks them up while working on the engine. Edit the canonical copy under `/frb-skills/`.
+The 3rd-party skills are also surfaced under `/.claude/skills/<name>` via local symlinks (gitignored) so Claude Code's auto-discovery picks them up while working on the engine. Edit the canonical copy under `/frb-skills/`. Run `tools/link-skills.ps1` after cloning and after adding, renaming, or removing an `frb-skills/` folder; it creates the links and regenerates their `.gitignore` block.
 
 Invoke these with the Skill tool when working on specific topics:
 - `entities-and-factories` — Entity lifecycle, Add (shapes/Gum), Factory<T>, spawning
