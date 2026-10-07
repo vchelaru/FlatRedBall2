@@ -20,10 +20,6 @@ namespace AnimationEditor.App.Controls;
 /// </summary>
 internal sealed class PanZoomWheelInput
 {
-    // A scroll pan raises PanChanged once the fingers stop, so the companion file isn't rewritten
-    // on every one of a touchpad's 60+ events per second.
-    private static readonly TimeSpan PanSettleDelay = TimeSpan.FromMilliseconds(250);
-
     private readonly Action<float, float> _panBy;
     private readonly Action<float, float, double> _zoomByNotches;
     private readonly Action _panSettled;
@@ -41,6 +37,22 @@ internal sealed class PanZoomWheelInput
 
     /// <summary>Classifies wheel events; set by the host from the running OS.</summary>
     public IWheelSourceDetector Detector { get; set; } = NullWheelSourceDetector.Instance;
+
+    /// <summary>
+    /// Quiet time after the last pan event before <c>panSettled</c> runs, so the companion file isn't
+    /// rewritten on every one of a touchpad's 60+ events per second. Settable so a test can widen it
+    /// past a slow machine's gap between simulated events.
+    /// </summary>
+    public TimeSpan SettleDelay
+    {
+        get => _settleDelay;
+        set
+        {
+            _settleDelay = value;
+            if (_settleTimer != null) _settleTimer.Interval = value;
+        }
+    }
+    private TimeSpan _settleDelay = TimeSpan.FromMilliseconds(250);
 
     /// <summary>Routes one wheel event to <paramref name="panBy"/> or the zoom; call from <c>OnPointerWheelChanged</c>.</summary>
     public void HandleWheel(PointerWheelEventArgs e, Visual relativeTo)
@@ -85,7 +97,7 @@ internal sealed class PanZoomWheelInput
 
     private DispatcherTimer CreateSettleTimer()
     {
-        var timer = new DispatcherTimer { Interval = PanSettleDelay };
+        var timer = new DispatcherTimer { Interval = _settleDelay };
         timer.Tick += (_, _) =>
         {
             timer.Stop();

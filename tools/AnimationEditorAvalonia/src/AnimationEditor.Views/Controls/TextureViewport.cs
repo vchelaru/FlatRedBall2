@@ -997,6 +997,13 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         set => _wheelInput.Detector = value;
     }
 
+    /// <summary>How long a scroll pan must be quiet before <see cref="PanChanged"/> fires.</summary>
+    internal TimeSpan PanSettleDelay
+    {
+        get => _wheelInput.SettleDelay;
+        set => _wheelInput.SettleDelay = value;
+    }
+
     /// <summary>Moves the content by (<paramref name="dx"/>, <paramref name="dy"/>) viewport pixels,
     /// clamped to the pan band, as a touchpad scroll does.</summary>
     public void PanBy(float dx, float dy)

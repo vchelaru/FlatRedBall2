@@ -135,16 +135,20 @@ public class TouchpadScrollScenarioTests
     {
         using AnimationEditorHarness editor = await OpenWalkAsync();
         editor.Wireframe.WheelSourceDetector = new FixedDetector(WheelSource.LinuxTouchpad);
+        // The settle timer runs on wall-clock time, so the default 250 ms can elapse between two
+        // simulated events on a slow CI runner and end the gesture early.
+        editor.Wireframe.PanSettleDelay = TimeSpan.FromSeconds(2);
         int raised = 0;
         editor.Wireframe.PanChanged += (_, _) => raised++;
 
+        var scrolling = System.Diagnostics.Stopwatch.StartNew();
         for (int i = 0; i < 5; i++)
         {
             editor.Scroll(editor.WireframePointAt(64, 64), new Vector(0.1, 0.1));
         }
-        raised.ShouldBe(0);
+        raised.ShouldBe(0, $"5 scroll events took {scrolling.ElapsedMilliseconds} ms against a 2000 ms settle delay");
 
-        (await editor.WaitUntilAsync(() => raised > 0, TimeSpan.FromSeconds(2))).ShouldBeTrue("the pan settles and is saved");
+        (await editor.WaitUntilAsync(() => raised > 0, TimeSpan.FromSeconds(10))).ShouldBeTrue("the pan settles and is saved");
         raised.ShouldBe(1);
     }
 }
