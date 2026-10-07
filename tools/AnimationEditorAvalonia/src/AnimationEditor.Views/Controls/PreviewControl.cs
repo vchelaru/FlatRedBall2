@@ -3267,6 +3267,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         return path;
     }
 
+    // Normal shapes first, then selected, then hovered, so the shape being edited isn't buried
+    // under its neighbors' outlines. Stable within a tier.
+    internal static PreviewShapeInfo[] ShapeDrawOrder(PreviewShapeInfo[] shapes) =>
+        shapes.OrderBy(sh => sh.IsHovered ? 2 : sh.IsSelected ? 1 : 0).ToArray();
+
     // Small "+" at the polygon's X/Y, which its vertices are relative to (#1352). A fixed screen
     // size and a dark underlay so it reads at any zoom and over any texture.
     private static void DrawPolygonOrigin(SKCanvas canvas, float x, float y)
@@ -3405,7 +3410,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             using var shapePaint   = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
             using var selectedPaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2f,   IsAntialias = true };
 
-            foreach (var sh in s.Shapes)
+            foreach (var sh in ShapeDrawOrder(s.Shapes))
             {
                 var paint = sh.IsSelected || sh.IsHovered ? selectedPaint : shapePaint;
                 paint.Color = sh.IsSelected
