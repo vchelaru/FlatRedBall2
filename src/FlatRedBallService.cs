@@ -84,7 +84,7 @@ public class FlatRedBallService
     public FlatRedBallService()
     {
         SourceContentRoots = new List<string>(DetectSourceContentRoots(AppContext.BaseDirectory));
-        OutputContentRoot = AppContext.BaseDirectory;
+        OutputContentRoot = IO.TitleLocation.Default;
     }
 
     /// <summary>
@@ -108,10 +108,11 @@ public class FlatRedBallService
 
     /// <summary>
     /// Absolute path to the build-output folder where copied content lives at runtime. Defaults
-    /// to <see cref="AppContext.BaseDirectory"/>. Override only if your build pipeline writes
-    /// content to a directory other than the executable's folder.
+    /// to where MonoGame's <c>TitleContainer</c> reads from: <see cref="AppContext.BaseDirectory"/>,
+    /// except inside a macOS <c>.app</c> with a <c>Contents/Resources</c> folder, where it is that
+    /// folder. Override only if your build pipeline writes content somewhere else.
     /// </summary>
-    public string OutputContentRoot { get; set; } = AppContext.BaseDirectory;
+    public string OutputContentRoot { get; set; }
 
     /// <summary>
     /// Walks up from <paramref name="startDirectory"/> looking for a solution file
@@ -292,7 +293,7 @@ public class FlatRedBallService
         // has a game, which is the headless case the source already handles.
         GlueProject = Glue.GlueProject.Load(
             glueProjectFile,
-            new Glue.GlueContentSource(Content, projectDirectory, _game?.GraphicsDevice),
+            new Glue.GlueContentSource(Content, projectDirectory, _game?.GraphicsDevice, OutputContentRoot),
             OutputRootedLoadOptions());
     }
 

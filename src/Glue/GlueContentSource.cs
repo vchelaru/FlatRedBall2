@@ -33,6 +33,7 @@ public sealed class GlueContentSource
     private readonly HashSet<GlueElement> _loaded = new();
     private readonly Dictionary<string, Tiled.TileMap> _maps = new(StringComparer.OrdinalIgnoreCase);
     private readonly GraphicsDevice? _graphicsDevice;
+    private readonly string _outputContentRoot;
 
     /// <summary>
     /// Creates a source that resolves paths under <paramref name="contentRoot"/>.
@@ -41,18 +42,25 @@ public sealed class GlueContentSource
     /// <paramref name="contentRoot"/> is the directory holding the <c>.gluj</c>, and Glue's file names
     /// are relative to it directly. The editor keeps a project and everything it references in one
     /// self-contained folder, so there is no <c>Content</c> folder in between.
-    /// <para><b>It must be relative, and relative to the title location — the executable's folder,
-    /// not the working directory.</b> That is what <c>TitleContainer</c> resolves against on every
-    /// backend, and it is the same rule the browser target needs. An absolute path throws rather
-    /// than resolving; the failure is caught and reported per file, so the symptom is every asset
-    /// warning "could not be loaded" rather than an exception.</para>
+    /// <para><b>It must be relative, and relative to the title location (the executable's folder, or
+    /// <c>Contents/Resources</c> in a macOS <c>.app</c>), not the working directory.</b> That is what
+    /// <c>TitleContainer</c> resolves against on every backend, and it is the same rule the browser
+    /// target needs. An absolute path throws rather than resolving; the failure is caught and
+    /// reported per file, so the symptom is every asset warning "could not be loaded" rather than an
+    /// exception.</para>
+    /// <para><paramref name="outputContentRoot"/> is the absolute folder <paramref name="contentRoot"/>
+    /// is relative to, used by the few reads that bypass <c>TitleContainer</c> (wildcard expansion,
+    /// <c>.ogg</c>). It defaults to where <c>TitleContainer</c> reads from, which is
+    /// <c>Contents/Resources</c> inside a macOS <c>.app</c>.</para>
     /// </remarks>
     public GlueContentSource(
-        ContentLoader content, string contentRoot, GraphicsDevice? graphicsDevice = null)
+        ContentLoader content, string contentRoot, GraphicsDevice? graphicsDevice = null,
+        string? outputContentRoot = null)
     {
         _content = content;
         ContentRoot = contentRoot;
         _graphicsDevice = graphicsDevice;
+        _outputContentRoot = outputContentRoot ?? IO.TitleLocation.Default;
     }
 
     /// <summary>The directory holding the project file.</summary>
@@ -214,7 +222,7 @@ public sealed class GlueContentSource
     /// </remarks>
     private void LoadWildcard(string pattern, string? elementName, List<GlueLoadDiagnostic> diagnostics)
     {
-        string absoluteRoot = Path.Combine(AppContext.BaseDirectory, ContentRoot);
+        string absoluteRoot = Path.Combine(_outputContentRoot, ContentRoot);
 
         if (!Directory.Exists(absoluteRoot))
         {
@@ -342,10 +350,10 @@ public sealed class GlueContentSource
                 case ".ogg":
                     // Song.FromUri is OGG-only on DesktopGL and needs a real file:// URI rather than
                     // a stream, so — unlike every other case here — it bypasses StreamProvider and
-                    // resolves straight against the title location. Desktop-only for the same reason
-                    // wildcard expansion is: no browser equivalent exists.
+                    // resolves straight against the output content root. Desktop-only for the same
+                    // reason wildcard expansion is: no browser equivalent exists.
                     _assets[instanceName] = Song.FromUri(
-                        instanceName, new Uri(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path))));
+                        instanceName, new Uri(Path.GetFullPath(Path.Combine(_outputContentRoot, path))));
                     break;
 
                 default:
