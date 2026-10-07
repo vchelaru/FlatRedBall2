@@ -105,6 +105,7 @@ Each `<AnimationChain>` is a named sequence of frames.
 | `FlipHorizontal` | No | `false` | Mirror the frame horizontally — used for left-facing variants |
 | `RelativeX` | No | `0` | Horizontal offset from entity origin — sprites already draw X-centered, so this is usually `0`. See Ground-Contact Point below |
 | `RelativeY` | No | `0` | Marks the frame's ground-contact point above the entity origin — set by eye to match the art, not computed from sprite height. See Ground-Contact Point below |
+| `Red`/`Green`/`Blue`/`Alpha`/`ColorOperation` | No | unset | Per-frame color; `ColorOperation` is `Multiply` or `Add`. Unset values inherit from the previous frame in the chain. See the color gotchas in `SKILL.md` |
 | `ShapesSave` | No | — | Per-frame collision shapes (`AARectSaves`/`CircleSaves`/`PolygonSaves`) — see `per-frame-shapes.md` |
 | `Events` | No | — | `<Event><Name>Footstep</Name><Data>optional</Data></Event>` entries, last in the frame (`.achj`: `"events": [{"name", "data"}]`). FRB2-only: Gum/FRB1 drop them if they re-save the file |
 
