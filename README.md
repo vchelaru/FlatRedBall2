@@ -67,6 +67,8 @@ dotnet run
 
 A window opens showing "Hello from FlatRedBall 2" — if you see that, everything works.
 
+`dotnet new` uses whichever template version is installed locally and never updates it on its own. Re-run `dotnet new install FlatRedBall2.Templates` before each new project to pick up the latest version.
+
 See the **[full setup guide](https://docs.flatredball.com/flatredball2/setup)** for prerequisites, multi-platform (desktop + web) projects, manually wiring FlatRedBall2 into an existing project, and troubleshooting.
 
 ## Working with AI Assistants
@@ -76,7 +78,7 @@ FlatRedBall2 ships with skill files in [`/frb-skills/`](frb-skills/) — plain M
 Add the skill files to your project. Run these from your project's root folder (e.g. `YourGameName/`):
 
 ```
-dotnet new install FlatRedBall2.Templates   # skip if already installed
+dotnet new install FlatRedBall2.Templates   # also updates an older install
 dotnet new frb2-skills
 ```
 
