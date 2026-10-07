@@ -434,7 +434,26 @@ public class TileMapCreateEntitiesTests
     {
         public int Worth { get; set; }
         public string? Label { get; set; }
+        public float Speed { get; set; }
         public int TiledGid { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_TiledTypeDiffersFromEntityPropertyType_ConvertsWithoutThrowing()
+    {
+        // An int Tiled value used to throw when the entity property was string or float (#1272).
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Label", 7);
+        tileData.Properties.SetInt("Speed", 3);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData }, new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Label.ShouldBe("7");
+        created[0].Speed.ShouldBe(3f);
     }
 
     [Fact]

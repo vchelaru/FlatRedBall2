@@ -24,7 +24,9 @@ namespace FlatRedBall2.Tiled;
 /// zero for objects not tied to a tile.
 /// </param>
 /// <param name="Properties">
-/// Custom properties as strings, keyed by name. Lookups are case-insensitive, because Tiled
+/// Custom properties as strings, keyed by name. Non-string Tiled types use the text Tiled
+/// writes in the TMX: <c>32</c>, <c>1.5</c>, <c>true</c>, <c>#aarrggbb</c> for colors, the
+/// path for files, and the referenced object's ID for objects. Lookups are case-insensitive, because Tiled
 /// authors mix casing freely and nothing validates it — a case-sensitive miss here would be
 /// silent. For the same reason keys that differ only by case collapse into one entry, so this
 /// can hold fewer keys than the TMX declares. For tile-insert objects this merges the tile's
