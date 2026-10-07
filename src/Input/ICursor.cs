@@ -36,6 +36,14 @@ public interface ICursor
     /// </summary>
     bool IsInWindow { get; }
 
+    /// <summary>
+    /// Mouse wheel change since the previous frame. Positive is scrolling up/away from the user,
+    /// negative is down. One wheel notch is typically 120, but high-resolution wheels and trackpads
+    /// report smaller steps, so use the sign (or scale by <c>/ 120f</c>) rather than expecting
+    /// exact multiples of 120. Zero on the first frame.
+    /// </summary>
+    int ScrollWheelDelta { get; }
+
     /// <summary>True every frame the primary button (left mouse / first touch) is held down.</summary>
     bool PrimaryDown { get; }
 

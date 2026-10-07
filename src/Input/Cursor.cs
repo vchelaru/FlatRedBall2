@@ -30,6 +30,8 @@ public class Cursor : ICursor
     private IReadOnlyList<Camera>? _cameras;
     private Camera? _activeCamera;
     private bool _isInWindow;
+    private bool _hasUpdated;
+    private int _scrollWheelDelta;
 
     private bool _touchActive;
     private bool _touchActivePrev;
@@ -98,7 +100,8 @@ public class Cursor : ICursor
     internal void Update(TimeSpan realTimeSinceStart)
     {
         var state = _hasInjection
-            ? new MouseState(_injectedX, _injectedY, 0,
+            // Hold the wheel at its last real value so injection never reports a spurious scroll.
+            ? new MouseState(_injectedX, _injectedY, _currentMouse.ScrollWheelValue,
                 _injectedPrimary, ButtonState.Released, _injectedSecondary,
                 ButtonState.Released, ButtonState.Released)
             : Mouse.GetState();
@@ -110,6 +113,12 @@ public class Cursor : ICursor
     {
         _previousMouse = _currentMouse;
         _currentMouse = mouseState;
+
+        // ScrollWheelValue is cumulative since startup, so the first frame has no baseline.
+        _scrollWheelDelta = _hasUpdated
+            ? _currentMouse.ScrollWheelValue - _previousMouse.ScrollWheelValue
+            : 0;
+        _hasUpdated = true;
 
         _touchActivePrev = _touchActive;
         _touchActive = false;
@@ -256,6 +265,9 @@ public class Cursor : ICursor
 
     /// <inheritdoc/>
     public bool IsInWindow => _isInWindow;
+
+    /// <inheritdoc/>
+    public int ScrollWheelDelta => _scrollWheelDelta;
 
     /// <inheritdoc/>
     /// <remarks>

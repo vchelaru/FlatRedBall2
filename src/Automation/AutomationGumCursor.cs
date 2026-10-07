@@ -31,7 +31,7 @@ namespace FlatRedBall2.Automation;
 /// those stamps against each other.
 /// </para>
 /// <para>
-/// <b>What is deliberately inert.</b> The FRB2 cursor has no wheel or middle button, so those read
+/// <b>What is deliberately inert.</b> Cursor injection carries no wheel or middle button, so those read
 /// zero/false. <see cref="LastInputDevice"/> is always the mouse: Gum's touch branch would treat a
 /// stationary released cursor as over nothing. <see cref="CustomCursor"/> is stored but never
 /// forwarded to the window — Gum's cursor calls <c>Mouse.SetCursor</c> there, and automation has no
