@@ -43,8 +43,7 @@ public static class WindowsSandbox
     public static async Task<IReadOnlyList<SandboxCheck>> RunAsync(
         string hostFolder, string scriptFileName, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        if (Process.GetProcessesByName("WindowsSandboxRemoteSession").Length > 0
-            || Process.GetProcessesByName("WindowsSandboxClient").Length > 0)
+        if (SandboxSessions().Length > 0)
         {
             throw new InvalidOperationException(
                 "A Windows Sandbox is already running. Close it first; Windows allows only one at a time.");
@@ -57,20 +56,32 @@ public static class WindowsSandbox
         File.WriteAllText(wsbPath, BuildWsb(hostFolder, scriptFileName));
 
         Process.Start(new ProcessStartInfo(SandboxExe, $"\"{wsbPath}\"") { UseShellExecute = false });
-
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
+        try
         {
-            if (TryReadResults(resultsPath, out var checks))
-                return checks;
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-        }
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (TryReadResults(resultsPath, out var checks))
+                    return checks;
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            }
 
-        string logPath = Path.Combine(hostFolder, "scenario.log");
-        string log = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no scenario.log was written)";
-        throw new TimeoutException(
-            $"No results.json from the sandbox after {timeout}. The sandbox window may still be open.\n{log}");
+            string logPath = Path.Combine(hostFolder, "scenario.log");
+            string log = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no scenario.log was written)";
+            throw new TimeoutException($"No results.json from the sandbox after {timeout}.\n{log}");
+        }
+        finally
+        {
+            // The script shuts the sandbox down itself, but a script that fails before that would
+            // leave it open and block the next run. Any session here is ours: we refused to start
+            // while one existed.
+            foreach (var session in SandboxSessions())
+                session.Kill();
+        }
     }
+
+    private static Process[] SandboxSessions() =>
+        [.. Process.GetProcessesByName("WindowsSandboxRemoteSession"), .. Process.GetProcessesByName("WindowsSandboxClient")];
 
     /// <summary>The <c>.wsb</c> configuration: no network or GPU (scenarios run offline), one
     /// writable mapped folder, and the scenario script as the logon command.</summary>

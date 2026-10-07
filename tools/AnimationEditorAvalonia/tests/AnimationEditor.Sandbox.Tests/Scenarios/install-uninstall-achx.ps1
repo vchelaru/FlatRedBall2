@@ -95,10 +95,17 @@ catch {
     Check 'scenario-script' $false $_
 }
 finally {
-    # Written last: the host treats the file's appearance as "done".
-    $json = ConvertTo-Json -InputObject @($results) -Depth 3
-    Set-Content -Path (Join-Path $Folder 'results.tmp') -Value $json -Encoding UTF8
-    Move-Item -Path (Join-Path $Folder 'results.tmp') -Destination (Join-Path $Folder 'results.json') -Force
-    Log 'Done; shutting down'
+    # Written last: the host treats the file's appearance as "done". Any failure here is logged
+    # (the host shows scenario.log on timeout) and never skips the shutdown.
+    try {
+        Log "Writing $($results.Count) results"
+        $json = ConvertTo-Json -InputObject $results.ToArray() -Depth 3
+        [System.IO.File]::WriteAllText((Join-Path $Folder 'results.tmp'), $json)
+        Move-Item -Path (Join-Path $Folder 'results.tmp') -Destination (Join-Path $Folder 'results.json') -Force
+        Log 'Done; shutting down'
+    }
+    catch {
+        Log "Failed writing results: $_"
+    }
     shutdown.exe /s /t 0
 }
