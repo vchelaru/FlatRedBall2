@@ -1,11 +1,11 @@
 ---
 name: animation-editor-testing
-description: AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui, Sandbox.Tests, Velopack install, registry.
+description: AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Sandbox.Tests, Velopack install, registry.
 ---
 
 # AnimationEditor — Testing
 
-Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
+Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill.
 
 ```
 scripts/test-ae.py                                     # build, then every AE test (~1 min)
@@ -20,11 +20,10 @@ scripts/test-ae.py --filter "FullyQualifiedName~Grid"  # same, filtered
 |---|---|---|---|
 | **Core** | `AnimationEditor.Core.Tests` | Commands, undo `Description`s, selection/state, pure logic | Layout, pointer routing, pixels |
 | **Headless control** | `AnimationEditor.Views.Tests` (`[AvaloniaFact]`) | A single `AnimationEditor.Views` control in isolation (e.g. `ProjectPanelControl`), using `FakeFolder`/`FakeFile` doubles — no `MainWindow`/DI | Cross-control wiring, `MainWindow` integration, real service graph |
-| **Headless integration** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`, `TestServices`) | Desktop visual tree *through* `MainWindow`, input routing, real DI-wired services — the bug involves wiring, not just one control | Re-proving Core math or a single control's own logic; Browser/WASM |
-| **Browser smoke** | `AnimationEditor.Browser.Ui` (Playwright) | Browser-*only* gaps (WASM boot, Browser host wiring, Debug automation bridge). See that folder’s README | Cloning Core/App/Views tests; primary label gate |
+| **Headless integration** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`, `TestServices`) | Desktop visual tree *through* `MainWindow`, input routing, real DI-wired services — the bug involves wiring, not just one control | Re-proving Core math or a single control's own logic |
 | **Windows Sandbox** | `AnimationEditor.Sandbox.Tests` | What only a real install proves: Velopack hooks, registry, file association, uninstall. See below | Anything a headless test can reach |
 
-Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI. Reach for Browser Playwright only when Headless/desktop cannot catch it — a small smoke set, not a 1:1 port.
+Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI.
 
 ## Windows Sandbox tests run only when asked
 
@@ -74,9 +73,8 @@ A fifth: a `TreeViewItem`'s `Bounds` spans its own header row *plus* the rendere
 
 ## Undo labels vs screenshots
 
-- **Correctness of a command's `Description`:** Core.Tests (`CommandDescriptionTests` / `FeatureDemosTests` / `BrowserUiDriveLabelTests`).
+- **Correctness of a command's `Description`:** Core.Tests (`CommandDescriptionTests` / `FeatureDemosTests`).
 - **"Show me the History panel" (desktop):** DocScreenshots + `FeatureDemos` — **`animation-editor-screenshots`**.
-- **Browser/WASM smoke only:** Playwright — **`animation-editor-browser-verify`** + `tests/AnimationEditor.Browser.Ui/README.md`. Not a substitute for Core asserts.
 
 Never seed History UI models with hand-written strings to "prove" a label.
 

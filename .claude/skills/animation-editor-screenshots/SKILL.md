@@ -5,7 +5,7 @@ description: Headless screenshots of the AnimationEditor UI, for doc pages and f
 
 # AnimationEditor — Screenshots
 
-Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change's PR must carry. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. For WASM browser smoke (not a Core/App mirror), see **`animation-editor-browser-verify`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
+Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change's PR must carry. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
 
 ## Where, and why it's a separate project
 
@@ -61,4 +61,3 @@ When the ask is "prove the panel shows X" — not a unit assert:
 1. Put the drive script in **`AnimationEditor.Core.Demo.FeatureDemos`** (internal, test/DocScreenshots only). Call `FeatureDemos.TryRun(...)` from `_ScratchCapture` — do **not** hand-build history rows or fork a second script, and do **not** wire demos into shipping `App`/`MainWindow`.
 2. Drive real **`AppCommands` / `UndoManager.Execute`**. Never assign fake `HistoryEntryVm` text.
 3. Select **History** (`SidebarTabs` → `HistoryTab`), optionally enlarge `LeftPanelGrid` row 2 so more labels fit, capture `window` + `HistoryScrollViewer`, write `labels.txt` from `UndoManager.UndoHistory`.
-4. Optional browser PNG: **`animation-editor-browser-verify`** (temporary local hook only — revert before merge).

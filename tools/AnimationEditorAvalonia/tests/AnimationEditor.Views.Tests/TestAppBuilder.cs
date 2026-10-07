@@ -14,8 +14,7 @@ namespace AnimationEditor.Views.Tests;
 /// <summary>
 /// Factory consumed by [AvaloniaTestApplication] to build the headless app. AnimationEditor.Views
 /// is a library with no Application of its own (unlike AnimationEditor.App, which App.Tests reuses
-/// directly) -- <see cref="TestApp"/> is a minimal stand-in that just registers FluentTheme, since
-/// that's what AnimationEditor.Browser's own App.axaml does for these controls at runtime.
+/// directly) -- <see cref="TestApp"/> is a minimal stand-in that just registers FluentTheme.
 /// </summary>
 public class TestAppBuilder
 {

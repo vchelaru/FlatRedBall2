@@ -1136,18 +1136,6 @@ namespace AnimationEditor.Core.CommandsAndState
             return TextureListBuilder.FindFirstTexturedFrame(chainList);
         }
 
-        /// <summary>
-        /// Resolves the texture name a create-frame-from-region frame should use when no real
-        /// on-disk path is available to derive one from (the browser build's
-        /// <c>FrameCreatedFromRegion</c> handler -- see <c>AnimationEditor.Browser/App.axaml.cs</c>).
-        /// Prefers the currently selected frame's texture; falls back to the chain's first frame.
-        /// Extracted so this stays testable in <c>AnimationEditor.Core.Tests</c> without a WASM
-        /// host (issue #941).
-        /// </summary>
-        public static string? ResolveRegionFrameTextureName(
-            AnimationFrameSave? selectedFrame, AnimationChainSave chain)
-            => selectedFrame?.TextureName ?? chain.Frames.FirstOrDefault()?.TextureName;
-
         public void MoveChain(AnimationChainSave chain, int delta)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;

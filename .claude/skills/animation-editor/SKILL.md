@@ -15,7 +15,7 @@ tools/AnimationEditorAvalonia/
 
 > The legacy WinForms version (`FlatRedBall.AnimationEditorForms`) lives in the separate `FlatRedBall` (FRB1) repo at `FRBDK/FlatRedBall.AnimationEditorForms/`. Do **not** edit it for FRB2 issues — that codebase is being replaced. Issues filed in `vchelaru/FlatRedBall2` always refer to the Avalonia version.
 
-For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. Before changing editor behaviour, dogfood it headlessly through the harness in `tests/AnimationEditor.App.Tests/Dogfood/` (README there); it drives the real window with simulated input and never touches the desktop. Any visual change needs before/after screenshots in its PR; the **`animation-editor-screenshots`** skill covers that and doc-page screenshots. For WASM/`?demo=` visual proof in the browser host, see **`animation-editor-browser-verify`**. For SkiaSharp rendering internals and performance debugging, see **`animation-editor-rendering`**. For Tiled `.tsx` support, see **`animation-editor-tiled`**.
+For writing tests against the editor — headless Avalonia, service wiring, the `[AvaloniaFact]` deadlock pitfall — see the **`animation-editor-testing`** skill. Before changing editor behaviour, dogfood it headlessly through the harness in `tests/AnimationEditor.App.Tests/Dogfood/` (README there); it drives the real window with simulated input and never touches the desktop. Any visual change needs before/after screenshots in its PR; the **`animation-editor-screenshots`** skill covers that and doc-page screenshots. For SkiaSharp rendering internals and performance debugging, see **`animation-editor-rendering`**. For Tiled `.tsx` support, see **`animation-editor-tiled`**.
 
 ## `.achx` is a general-purpose format — the editor authors, runtimes interpret
 
@@ -38,16 +38,15 @@ tools/AnimationEditorAvalonia/
 │   └── FEATURE_COVERAGE_REPORT.md
 ├── src/
 │   ├── AnimationEditor.App/      ← Avalonia host: MainWindow.axaml(.cs), Models/, Services/, Settings/, and App-only Controls/ (e.g. FilesPanelControl)
-│   ├── AnimationEditor.Views/    ← the SkiaSharp controls (App and Browser both consume it)
+│   ├── AnimationEditor.Views/    ← the SkiaSharp controls, consumed by App
 │   │   └── Controls/
 │   │       ├── WireframeControl.cs, TextureViewport.cs    ← top panel (texture + frame regions)
 │   │       ├── PreviewControl.cs, PngPreviewControl.cs    ← bottom panel (playback) + PNG diff viewer
 │   │       └── ZoomControl.axaml(.cs), IZoomTarget.cs     ← reusable zoom widget (see "Two-panel mental model")
-│   ├── AnimationEditor.Core/     ← UI-independent logic (no SkiaSharp)
-│   │   ├── CommandsAndState/     ← AppState, AppCommands, ApplicationEvents
-│   │   ├── Data/, IO/, Rendering/, ViewModels/
-│   │   └── ProjectManager.cs, SelectedState.cs
-│   └── AnimationEditor.Browser/  ← WASM (BlazorGL/KNI) head
+│   └── AnimationEditor.Core/     ← UI-independent logic (no SkiaSharp)
+│       ├── CommandsAndState/     ← AppState, AppCommands, ApplicationEvents
+│       ├── Data/, IO/, Rendering/, ViewModels/
+│       └── ProjectManager.cs, SelectedState.cs
 └── tests/
     ├── AnimationEditor.App.Tests/    ← headless Avalonia; covers App + Views
     └── AnimationEditor.Core.Tests/   ← pure logic

@@ -8,9 +8,8 @@ namespace AnimationEditor.Core.IO;
 /// Builds the disk cache file name for a project-tree thumbnail (issue #839). <paramref
 /// name="sourceIdentity"/> is hashed only to keep the file name filesystem-safe; the invalidation
 /// key is <paramref name="size"/>/<paramref name="modified"/> plus <see cref="RenderVersion"/>,
-/// plainly embedded in the name. Size/Modified are the same <see cref="FolderEntrySnapshot"/> pair
-/// <c>FolderSnapshotDiff</c> and the hot-reload watcher already use elsewhere in this codebase, and
-/// cover a changed source; <see cref="RenderVersion"/> covers a changed renderer. A cache lookup is
+/// plainly embedded in the name. Size/Modified (a <see cref="FolderEntrySnapshot"/> pair) cover a
+/// changed source; <see cref="RenderVersion"/> covers a changed renderer. A cache lookup is
 /// a filename match, so drift in any of the three produces a different name, i.e. a cache miss that
 /// regenerates the thumbnail.
 /// </summary>

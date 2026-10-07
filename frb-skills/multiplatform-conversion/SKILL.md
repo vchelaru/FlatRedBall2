@@ -198,14 +198,14 @@ without it, no manifest is generated and KNI's `js/streamProcessor2.js` (the `Dy
 
 These compile clean, pass every desktop and xunit run, and fail only in the browser.
 
-- **`System.Text.Json` reflection serialization is off on WebAssembly**, in Debug and Release alike, and throws `JsonSerializerIsReflectionDisabled`. Serialize through a source-generated `JsonSerializerContext` (`[JsonSerializable(typeof(T))]`), the same way the engine's own `*JsonContext` classes do. Write-up: `tools/AnimationEditorAvalonia/docs/BROWSER_EXPORT_POLISH_DECISION.md`.
+- **`System.Text.Json` reflection serialization is off on WebAssembly**, in Debug and Release alike, and throws `JsonSerializerIsReflectionDisabled`. Serialize through a source-generated `JsonSerializerContext` (`[JsonSerializable(typeof(T))]`), the same way the engine's own `*JsonContext` classes do.
 - **`TickDotNet` runs synchronously inside a `requestAnimationFrame` callback** (`src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js`), and the browser runtime is single-threaded. Never block on an `IJSRuntime` task (`.GetAwaiter().GetResult()`, `.Wait()`) from game code: the JS side can run while the managed wait still fails, so a write lands in storage yet reports failure. Call JS through synchronous `[JSImport]` bindings instead.
 - **`index.html` is never content-hashed, and neither is a plain `wwwroot/*.js` file.** The template's `index.html` references `_framework/blazor.webassembly.js` without the `#[.{fingerprint}]` placeholder, so that file and `dotnet.js` stay unhashed too; the assemblies and runtime are hashed. A cached copy pairs an old script with new code, and the fix appears not to work because the fix is in the stale file. Keep shims and diagnostics in C#, or fingerprint the JS file with a `<StaticWebAssetFingerprintPattern>` item, `<OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>`, and a `name#[.{fingerprint}].js` reference. Otherwise hard-reload before trusting a JS error that contradicts the page.
 - **`dotnet publish` has no `blazor.boot.json` on .NET 10.** The boot resource list is inlined into `_framework/dotnet.js`, so a missing `blazor.boot.json` says nothing about whether AOT ran.
 
 ### `[JSImport]` interop
 
-Reference: `tools/AnimationEditorAvalonia/src/AnimationEditor.Browser/LocalStorageInterop.cs` + `wwwroot/localStorage.js`. A head that adds `[JSImport]` needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (SYSLIB1074); the BlazorGL heads in this repo do not set it.
+A head that adds `[JSImport]` needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (SYSLIB1074); the BlazorGL heads in this repo do not set it.
 
 - **Default to a module bridge:** a thin ES module in `wwwroot` loaded once with `JSHost.ImportAsync`, then `[JSImport("getItem", ModuleName)]`. The generator checks signatures only, never paths.
 - **`JSHost.ImportAsync` resolves relative to `_framework/`**, not the `wwwroot` root. Use `"../localStorage.js"`; `"./localStorage.js"` fails at runtime with `Failed to fetch dynamically imported module: .../_framework/localStorage.js`.
