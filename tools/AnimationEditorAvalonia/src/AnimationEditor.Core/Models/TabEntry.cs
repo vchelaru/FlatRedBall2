@@ -45,6 +45,15 @@ namespace AnimationEditor.Core.Models
         public bool IsRecoveredDocument { get; set; }
 
         /// <summary>
+        /// True when this tab's file lives under <paramref name="folder"/> (any depth). An Untitled
+        /// tab has no on-disk file, so it is never inside a folder.
+        /// </summary>
+        public bool IsInsideFolder(FilePath folder) =>
+            !string.IsNullOrEmpty(Path.Original)
+            && !TabManager.IsUntitledSentinel(Path.Original)
+            && Path.IsRelativeTo(folder);
+
+        /// <summary>
         /// Determines the <see cref="TabKind"/> for <paramref name="path"/> by extension.
         /// A <c>.png</c> (any case) is <see cref="TabKind.Png"/>; everything else — including
         /// untitled sentinels and empty paths — is <see cref="TabKind.Achx"/>.

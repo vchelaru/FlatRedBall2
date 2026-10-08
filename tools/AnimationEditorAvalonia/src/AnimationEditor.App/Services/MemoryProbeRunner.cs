@@ -57,7 +57,7 @@ internal sealed class MemoryProbeRunner
             Record(MemoryProbePhase.Loaded, cycle);
 
             if (!_options.KeepOpen)
-                await _window.CloseProjectAsync();
+                _window.CloseProjectAndAllTabs();
             await SettleAsync();
             Record(MemoryProbePhase.Closed, cycle);
 

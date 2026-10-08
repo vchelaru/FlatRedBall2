@@ -207,6 +207,25 @@ namespace AnimationEditor.Core.Models
         }
 
         /// <summary>
+        /// Closes every tab whose file lives under <paramref name="folder"/> (issue #1360) and
+        /// returns them. Tabs for files elsewhere, and Untitled tabs, stay open. When the active tab
+        /// was among those closed, a surviving tab becomes active (or none, if nothing survives).
+        /// </summary>
+        public IReadOnlyList<TabEntry> CloseTabsInFolder(FilePath folder)
+        {
+            var closing = _tabs.Where(t => t.IsInsideFolder(folder)).ToList();
+
+            // Background tabs first, the active one last: closing the active tab re-picks through
+            // the MRU back-stack, which must only ever see tabs that are staying open.
+            foreach (var tab in closing.Where(t => t != ActiveTab))
+                Close(tab.Path);
+            if (ActiveTab != null && closing.Contains(ActiveTab))
+                Close(ActiveTab.Path);
+
+            return closing;
+        }
+
+        /// <summary>
         /// Pops <see cref="_activationHistory"/> until it finds an entry still present in
         /// <see cref="_tabs"/>, discarding stale entries for tabs closed in the background
         /// along the way. Returns <c>null</c> if the history holds no still-open tab.

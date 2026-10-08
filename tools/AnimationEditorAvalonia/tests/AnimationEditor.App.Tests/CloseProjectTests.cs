@@ -45,20 +45,36 @@ public class CloseProjectTests
             .GetField("_tabManager", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(window)!;
 
+    // Opens a project folder holding hero.achx and opens that file as a tab, so the tab is
+    // "in the project" the way a file clicked from the Project panel is.
+    private static async Task<string> OpenProjectFolderWithOpenTabAsync(MainWindow window, string dir)
+    {
+        var heroPath = Path.Combine(dir, "hero.achx");
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        list.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+        list.Save(heroPath);
+
+        await window.OpenProjectFolderForTestAsync(dir);
+        await window.OpenFileAsTab(heroPath);
+        Dispatcher.UIThread.RunJobs();
+        return heroPath;
+    }
+
+    private static string NewTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     [AvaloniaFact]
-    public void MenuCloseProject_Click_ClearsTreeTabsAndProjectState()
+    public async Task MenuCloseProject_Click_ClearsTreeTabsAndProjectState()
     {
         var (window, ctx) = CreateWindow();
+        var dir = NewTempDir();
         try
         {
-            // Add a chain to the currently-open (untitled) document and register it as a tab,
-            // matching how a real "New" document with content becomes a tab.
-            ctx.AppCommands.AddAnimationChainWithName("Walk");
-            typeof(MainWindow)
-                .GetMethod("EnsureCurrentEditorContentHasTab", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .Invoke(window, null);
-            Dispatcher.UIThread.RunJobs();
-
+            await OpenProjectFolderWithOpenTabAsync(window, dir);
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
@@ -74,21 +90,21 @@ public class CloseProjectTests
             var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
             Assert.Empty(roots);
         }
-        finally { window.Close(); }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
     }
 
     [AvaloniaFact]
-    public void NativeMenuCloseProjectFolder_ClearsTabsAndProjectState()
+    public async Task NativeMenuCloseProjectFolder_ClearsTabsAndProjectState()
     {
         var (window, ctx) = CreateWindow();
+        var dir = NewTempDir();
         try
         {
-            ctx.AppCommands.AddAnimationChainWithName("Walk");
-            typeof(MainWindow)
-                .GetMethod("EnsureCurrentEditorContentHasTab", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .Invoke(window, null);
-            Dispatcher.UIThread.RunJobs();
-
+            await OpenProjectFolderWithOpenTabAsync(window, dir);
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
@@ -98,11 +114,15 @@ public class CloseProjectTests
             Assert.Empty(tabManager.Tabs);
             Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
         }
-        finally { window.Close(); }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
     }
 
     [AvaloniaFact]
-    public async Task CloseProjectAsync_ProjectFolderOpen_ClearsProjectPanelTree()
+    public async Task CloseProjectFolder_ProjectFolderOpen_ClearsProjectPanelTree()
     {
         var (window, ctx) = CreateWindow();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -115,7 +135,7 @@ public class CloseProjectTests
             Dispatcher.UIThread.RunJobs();
             Assert.NotEmpty(window.ProjectPanel.TreeRoots);
 
-            await window.CloseProjectAsync();
+            window.CloseProjectFolder();
             Dispatcher.UIThread.RunJobs();
 
             Assert.Empty(window.ProjectPanel.TreeRoots);
@@ -127,14 +147,15 @@ public class CloseProjectTests
         }
     }
 
+    // Issue #1360: Untitled tabs are not part of any project folder, so closing the project
+    // neither closes them nor asks about discarding them.
     [AvaloniaFact]
-    public async Task CloseProjectAsync_UnsavedUntitledTabDeclined_LeavesProjectUntouched()
+    public void CloseProjectFolder_UntitledTabWithContent_SurvivesWithoutPrompt()
     {
         var (window, ctx) = CreateWindow();
         try
         {
-            // File > New opens a genuine, active Untitled tab (unlike EnsureCurrentEditorContentHasTab,
-            // which only registers a background tab); give it content so it is at risk of being discarded.
+            // File > New opens a genuine, active Untitled tab; give it content.
             window.FindControl<MenuItem>("MenuNew")!
                   .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Dispatcher.UIThread.RunJobs();
@@ -144,11 +165,13 @@ public class CloseProjectTests
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(false);
+            int prompts = 0;
+            ctx.AppCommands.ConfirmAsync = (_, _) => { prompts++; return Task.FromResult(false); };
 
-            await window.CloseProjectAsync();
+            window.CloseProjectFolder();
             Dispatcher.UIThread.RunJobs();
 
+            Assert.Equal(0, prompts);
             Assert.NotEmpty(tabManager.Tabs);
             Assert.NotEmpty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
         }

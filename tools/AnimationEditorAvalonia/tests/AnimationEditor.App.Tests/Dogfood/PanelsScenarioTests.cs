@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Paths;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -6,6 +7,7 @@ using Avalonia.Styling;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -28,7 +30,6 @@ public class PanelsScenarioTests
         editor.Tabs.Tabs.Count.ShouldBe(1);
         editor.Wireframe.BitmapSize.ShouldBe((64, 64));
 
-        editor.Dialogs.AnswerNextConfirm(true);
         editor.ClickMenu("MenuCloseProject");
         editor.Wait(TimeSpan.FromMilliseconds(200));
 
@@ -36,6 +37,48 @@ public class PanelsScenarioTests
         editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.ShouldBeEmpty();
         editor.Wireframe.BitmapSize.ShouldBe((0, 0), "no document open, so no texture on the canvas");
         editor.ThrowIfErrorShown();
+    }
+
+    // Issue #1360: a file opened from outside the project folder is not part of the project.
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CloseProject_KeepsTheTabForAFileOutsideTheFolder(bool outsideTabIsActive)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string inside = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string outsideFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideFolder);
+        try
+        {
+            File.Copy(Path.Combine(editor.ProjectFolder, "sheet.png"), Path.Combine(outsideFolder, "sheet.png"));
+            string outside = Path.Combine(outsideFolder, "villain.achx");
+            File.Move(editor.WriteAchx("villain.achx", AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16))), outside);
+
+            await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+            editor.Layout();
+            await editor.OpenAsync(outsideTabIsActive ? inside : outside);
+            await editor.OpenAsync(outsideTabIsActive ? outside : inside);
+            editor.Tabs.Tabs.Count.ShouldBe(2);
+
+            editor.ClickMenu("MenuCloseProject");
+            editor.Wait(TimeSpan.FromMilliseconds(200));
+
+            editor.TabLabels.ShouldBe(new[] { "villain.achx" });
+            editor.Tabs.ActiveTab!.Path.FullPath.ShouldBe(new FilePath(outside).FullPath);
+            editor.WaitUntil(() => editor.Services.ProjectManager.FileName is not null
+                && new FilePath(editor.Services.ProjectManager.FileName) == new FilePath(outside), TimeSpan.FromSeconds(5))
+                .ShouldBeTrue("the surviving tab's file is the live document");
+            editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Run" });
+            editor.Services.ProjectManager.ProjectFolderPath.ShouldBeNull();
+            editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.ShouldBeEmpty();
+            editor.ThrowIfErrorShown();
+        }
+        finally
+        {
+            Directory.Delete(outsideFolder, true);
+        }
     }
 
     [AvaloniaFact]

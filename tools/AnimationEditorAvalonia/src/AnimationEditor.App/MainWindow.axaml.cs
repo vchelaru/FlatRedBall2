@@ -939,6 +939,15 @@ public partial class MainWindow : Window
             _ioManager.DeleteRecoveryFile();
 
         _tabManager.Close(tab.Path);
+        ShowActiveTabAfterClose();
+    }
+
+    /// <summary>
+    /// Brings the editor in line with <see cref="TabManager.ActiveTab"/> after tabs were closed:
+    /// loads whichever tab the manager fell back to, or resets to the no-tabs state when none are left.
+    /// </summary>
+    private void ShowActiveTabAfterClose()
+    {
         var next = _tabManager.ActiveTab;
         if (next != null)
         {
@@ -2630,7 +2639,7 @@ public partial class MainWindow : Window
                                     .Select(f => (System.IO.Path.GetFileName(f), (Action)(() => _ = LoadAnimationFileAsync(f))))
                                     .ToList(),
         OpenProjectFolder:  () => _ = OpenProjectFolderAsync(),
-        CloseProjectFolder: () => _ = CloseProjectAsync(),
+        CloseProjectFolder: CloseProjectFolder,
         Save:            () => OnSaveClick(null, null!),
         SaveAs:          () => _ = _appCommands.SaveCurrentAnimationChainListAsync(),
         Undo:            () => _undoManager.Undo(),
@@ -2725,36 +2734,48 @@ public partial class MainWindow : Window
 
     private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
 
-    private void OnCloseProjectClick(object? sender, RoutedEventArgs e) => _ = CloseProjectAsync();
+    private void OnCloseProjectClick(object? sender, RoutedEventArgs e) => CloseProjectFolder();
 
     /// <summary>
-    /// Closes the current project (issue #948): resets <see cref="ProjectManager"/>,
-    /// <see cref="SelectedState"/>, and the undo stack (<see cref="IAppCommands.CloseProject"/>),
-    /// and clears every open tab and the Open Project Folder scope -- the same blank state as a
-    /// fresh app launch. Prompts once via <see cref="IAppCommands.ConfirmAsync"/> when any open
-    /// tab is Untitled with actual content: a named/saved tab is already persisted to disk by
-    /// the autosave-on-edit path (see the <see cref="AppCommands"/> constructor comment), so only
-    /// unsaved Untitled content is actually at risk of being discarded here -- same risk model
-    /// <see cref="CloseTabAsync"/> already uses per-tab.
+    /// Closes the Open Project Folder (issues #948, #1360): closes the tabs whose file lives under
+    /// the folder, clears the folder scope, and, when no tab is left, resets the editor to the same
+    /// blank state as a fresh app launch (<see cref="IAppCommands.CloseProject"/>). Tabs for files
+    /// opened from elsewhere and Untitled tabs are not part of the project and stay open, so nothing
+    /// prompts: a saved tab is already persisted by the autosave-on-edit path (see the
+    /// <see cref="AppCommands"/> constructor comment) and an Untitled tab is never closed here.
     /// </summary>
-    internal async Task CloseProjectAsync()
+    internal void CloseProjectFolder() => CloseProject(closeAllTabs: false);
+
+    /// <summary>
+    /// Like <see cref="CloseProjectFolder"/> but also closes every other tab, with no prompt. For
+    /// <see cref="MemoryProbeRunner"/>, which needs a blank baseline between cycles.
+    /// </summary>
+    internal void CloseProjectAndAllTabs() => CloseProject(closeAllTabs: true);
+
+    private void CloseProject(bool closeAllTabs)
     {
-        int atRiskCount = _tabManager.Tabs.Count(t => IsUntitledTab(t) && UntitledTabHasContent(t));
-        if (atRiskCount > 0)
+        var activeBefore = _tabManager.ActiveTab;
+        if (closeAllTabs)
+            _tabManager.RestoreFrom(Array.Empty<string>(), null);
+        else if (_projectManager.ProjectFolderPath is { } folder)
+            _tabManager.CloseTabsInFolder(new FilePath(folder));
+
+        _projectFolderWatcher.Watch(null);
+        if (_tabManager.ActiveTab is null)
         {
-            string noun = atRiskCount == 1 ? "tab has" : "tabs have";
-            bool confirmed = await _appCommands.ConfirmAsync(
-                $"{atRiskCount} untitled {noun} unsaved content that will be discarded. Close the project anyway?",
-                "Close Project Folder");
-            if (!confirmed) return;
+            _appCommands.CloseProject();
+            ShowAchxPane();
+            ClearWireframeTexture();
+        }
+        else
+        {
+            _projectManager.ProjectFolderPath = null;
+            // The active tab was in the folder: load the one the manager fell back to. An
+            // untouched active tab is the live document and must not be reset or reloaded.
+            if (_tabManager.ActiveTab != activeBefore)
+                ShowActiveTabAfterClose();
         }
 
-        _tabManager.RestoreFrom(Array.Empty<string>(), null);
-        _projectFolderWatcher.Watch(null);
-        _appCommands.CloseProject();
-
-        ShowAchxPane();
-        ClearWireframeTexture();
         RebuildTabStrip();
         ProjectPanel.SyncSelectionToActiveFile(null);
         ProjectPanel.Clear();
@@ -2765,9 +2786,8 @@ public partial class MainWindow : Window
         _appCommands.SyncHotReloadWatcher();
 
         // "Close" is an explicit action, unlike a normal exit -- don't let the next launch
-        // silently reopen what was just closed (mirrors clearing the in-memory state above).
-        _appSettings.OpenTabPaths = new List<string>();
-        _appSettings.ActiveTabPath = null;
+        // silently reopen the folder that was just closed. The remaining tabs are persisted by
+        // TabsChanged (SaveTabsToSettings) as each one closes.
         _appSettings.LastProjectFolderPath = null;
         SaveSettingsFile();
     }
