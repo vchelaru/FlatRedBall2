@@ -1,6 +1,6 @@
 ---
 name: docs-writing
-description: Writing FlatRedBall2 user docs in this repo's own docs/ folder (GitBook-synced). Triggers: new FlatRedBall2 tutorial/how-to pages, docs/SUMMARY.md, docs/.gitbook/assets.
+description: "Writing FlatRedBall2 user docs in this repo's own docs/ folder (GitBook-synced). Triggers: new FlatRedBall2 tutorial/how-to pages, docs/SUMMARY.md, docs/.gitbook/assets."
 ---
 
 # FlatRedBall2 Docs Writing Reference

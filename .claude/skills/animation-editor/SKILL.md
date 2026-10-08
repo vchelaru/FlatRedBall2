@@ -1,6 +1,6 @@
 ---
 name: animation-editor
-description: FlatRedBall2 AnimationEditor (Avalonia) — where the source lives, project layout, and the two-panel model. Triggers: AnimationEditor, AnimationEditorAvalonia, .achx editing, wireframe/preview panels, animationeditor label.
+description: "FlatRedBall2 AnimationEditor (Avalonia) — where the source lives, project layout, and the two-panel model. Triggers: AnimationEditor, AnimationEditorAvalonia, .achx editing, wireframe/preview panels, animationeditor label."
 ---
 
 # AnimationEditor — Location & Layout

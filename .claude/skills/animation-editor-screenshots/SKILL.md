@@ -1,6 +1,6 @@
 ---
 name: animation-editor-screenshots
-description: Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change's PR needs. Triggers: "take a screenshot", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest.
+description: "Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change's PR needs. Triggers: \"take a screenshot\", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest."
 ---
 
 # AnimationEditor — Screenshots

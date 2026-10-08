@@ -1,6 +1,6 @@
 ---
 name: skills-writer
-description: Creates and updates skill files (.claude/skills/*/SKILL.md). Triggers: creating/updating a skill, documenting a subsystem for agent context.
+description: "Creates and updates skill files (.claude/skills/*/SKILL.md). Triggers: creating/updating a skill, documenting a subsystem for agent context."
 ---
 
 # Skills Writer
@@ -97,7 +97,7 @@ Minimum skill is a single `SKILL.md` with YAML frontmatter:
 ```markdown
 ---
 name: my-skill
-description: <Topic> — <one-line hook>. Triggers: <distinctive identifiers, file paths, or scenarios>.
+description: "<Topic> — <one-line hook>. Triggers: <distinctive identifiers, file paths, or scenarios>."
 ---
 
 # My Skill
@@ -120,6 +120,7 @@ The description is loaded into every session's skill listing — it pays for its
 - **Lead with the topic, then triggers.** Format: `<Topic> — <hook>. Triggers: <3–8 distinctive identifiers, file paths, or scenarios>.`
 - **Pick distinctive triggers.** Class names, file paths, method names — not generic words ("system", "behavior").
 - **No multi-line YAML (`description: >`).** Keep it on one line.
+- **Always wrap the description in double quotes.** An unquoted `: ` such as `Triggers:` is invalid YAML, and strict loaders like Pi reject the skill. Escape inner double quotes as `\"`.
 
 ❌ "Reference guide for FlatRedBall2's shader compilation system. Load this when working on .fx files or the render loop."
 

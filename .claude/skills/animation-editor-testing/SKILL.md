@@ -1,6 +1,6 @@
 ---
 name: animation-editor-testing
-description: AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Sandbox.Tests, Velopack install, registry.
+description: "AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Sandbox.Tests, Velopack install, registry."
 ---
 
 # AnimationEditor — Testing

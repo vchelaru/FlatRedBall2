@@ -1,6 +1,6 @@
 ---
 name: animation-editor-rendering
-description: SkiaSharp rendering & performance in the AnimationEditor — GPU vs CPU draw paths, SKImage/SKBitmap gotchas, diagnosing slow frames. Triggers: ICustomDrawOperation, DrawFrameCore, WireframeControl.DrawOp, GrContext, SKImage, F3 diagnostics overlay, ThumbnailService.
+description: "SkiaSharp rendering & performance in the AnimationEditor — GPU vs CPU draw paths, SKImage/SKBitmap gotchas, diagnosing slow frames. Triggers: ICustomDrawOperation, DrawFrameCore, WireframeControl.DrawOp, GrContext, SKImage, F3 diagnostics overlay, ThumbnailService."
 ---
 
 # AnimationEditor — Rendering & Performance

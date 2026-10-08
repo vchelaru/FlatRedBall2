@@ -1,6 +1,6 @@
 ---
 name: skill-change-logging
-description: Log every FlatRedBall2 skill modification to .claude/skill_change_log.jsonl with exact added/removed line counts, motivating sample project, and concise reason. Use whenever creating, editing, deleting, or restructuring any skill.
+description: "Log every FlatRedBall2 skill modification to .claude/skill_change_log.jsonl with exact added/removed line counts, motivating sample project, and concise reason. Use whenever creating, editing, deleting, or restructuring any skill."
 ---
 
 # Skill Change Logging
