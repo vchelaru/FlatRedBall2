@@ -45,8 +45,8 @@ public class TsxLossyDataCheckTests
         { "red", f => f.Red = 255, "color" },
         { "alpha", f => f.Alpha = 128, "color" },
         { "color operation", f => f.ColorOperation = FlatRedBall2.Animation.ColorOperation.Add, "color" },
-        { "rectangle shape", f => { f.ShapesSave = new ShapesSave(); f.ShapesSave.Shapes.Add(new AARectSave { Name = "Hit" }); }, "shape" },
-        { "circle shape", f => { f.ShapesSave = new ShapesSave(); f.ShapesSave.Shapes.Add(new CircleSave { Name = "Hurt" }); }, "shape" },
+        { "rectangle shape", f => { f.ShapesSave = new ShapesSave(); f.ShapesSave.Add(new AARectSave { Name = "Hit" }); }, "shape" },
+        { "circle shape", f => { f.ShapesSave = new ShapesSave(); f.ShapesSave.Add(new CircleSave { Name = "Hurt" }); }, "shape" },
     };
 
     [Theory]

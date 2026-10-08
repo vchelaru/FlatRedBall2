@@ -34,7 +34,7 @@ public class FrameCopyWithShapeTests
         var frame = new AnimationFrameSave { TextureName = "lava.png", FrameLength = 0.1f };
         var rect = new AARectSave { Name = "BulletOrigin", X = 1f, Y = 2f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 

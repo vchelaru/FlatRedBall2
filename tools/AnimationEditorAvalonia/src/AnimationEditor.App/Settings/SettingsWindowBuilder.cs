@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -12,12 +11,6 @@ namespace AnimationEditor.App.Settings;
 /// <summary>Snapshot of editor settings shown in <see cref="SettingsWindowBuilder"/>.</summary>
 public sealed class SettingsWindowModel
 {
-    public bool FileAssociationSupported { get; init; }
-
-    public AchxFileAssociationStatus FileAssociationStatus { get; init; }
-
-    public bool SuppressDefaultHandlerPrompt { get; init; }
-
     /// <summary>Current canvas-background override (packed <c>0xAARRGGBB</c>), or <c>null</c> for the theme default.</summary>
     public uint? CanvasBackgroundArgb { get; init; }
 
@@ -37,10 +30,6 @@ public sealed class SettingsWindowModel
 /// <summary>Callbacks from the settings dialog back to <see cref="MainWindow"/>.</summary>
 public sealed class SettingsWindowCallbacks
 {
-    public Action? OnSetDefaultAchx { get; init; }
-
-    public Action<bool>? OnSuppressDefaultHandlerPromptChanged { get; init; }
-
     /// <summary>Invoked with the new packed <c>0xAARRGGBB</c> value (<c>null</c> = theme default) when the canvas background changes.</summary>
     public Action<uint?>? OnCanvasBackgroundChanged { get; init; }
 
@@ -91,7 +80,7 @@ public static class SettingsWindowBuilder
 
     /// <summary>
     /// Tab strip for the settings dialog. Extracted so layout can be unit-tested without a
-    /// <see cref="Window"/>. Each category (colors, file association, ...) is its own tab rather
+    /// <see cref="Window"/>. Each category is its own tab rather
     /// than a flat scrolling list of sections, so the dialog can keep growing (grid, rulers, etc.)
     /// without becoming an ever-taller scroll.
     /// </summary>
@@ -104,15 +93,6 @@ public static class SettingsWindowBuilder
                 new TabItem { Header = "Colors", Content = InTab(BuildCanvasColorsSection(model, callbacks)) },
             },
         };
-
-        if (model.FileAssociationSupported)
-        {
-            tabs.Items.Add(new TabItem
-            {
-                Header = "File Association",
-                Content = InTab(BuildFileAssociationSection(model, callbacks)),
-            });
-        }
 
         return tabs;
     }
@@ -226,41 +206,6 @@ public static class SettingsWindowBuilder
         {
             Spacing = 4,
             Children = { new TextBlock { Text = label }, buttons },
-        };
-    }
-
-    private static Control BuildFileAssociationSection(
-        SettingsWindowModel model,
-        SettingsWindowCallbacks callbacks)
-    {
-        var statusText = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Text = AchxFileAssociationStatusFormatter.Describe(model.FileAssociationStatus),
-        };
-
-        var setDefaultBtn = new Button
-        {
-            Content = "Set as default for .achx files…",
-            HorizontalAlignment = HorizontalAlignment.Left,
-        };
-        setDefaultBtn.Click += (_, _) => callbacks.OnSetDefaultAchx?.Invoke();
-
-        var suppressCheck = new CheckBox
-        {
-            Content = "Don't show startup prompt for .achx association",
-            IsChecked = model.SuppressDefaultHandlerPrompt,
-        };
-        suppressCheck.IsCheckedChanged += (_, _) =>
-        {
-            if (suppressCheck.IsChecked is bool value)
-                callbacks.OnSuppressDefaultHandlerPromptChanged?.Invoke(value);
-        };
-
-        return new StackPanel
-        {
-            Spacing = 10,
-            Children = { statusText, setDefaultBtn, suppressCheck },
         };
     }
 }

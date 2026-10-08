@@ -54,7 +54,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.SaveDocument)]                       = Category.MutatingNotUndoable, // writes another document's file; no model change
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change
-        [nameof(IAppCommands.ExportToPixiJsAsync)]                = Category.MutatingNotUndoable, // writes a PixiJS json; no model change
+        [nameof(IAppCommands.ExportAsync)]                        = Category.MutatingNotUndoable, // writes an export file (PixiJS json, Godot tres); no model change
         [nameof(IAppCommands.HandleApplicationClosing)]           = Category.MutatingNotUndoable, // deletes a recovery file; no model change
         [nameof(IAppCommands.AddAssociatedTiledTileset)]          = Category.MutatingNotUndoable, // writes a companion .tiledsync file; no project model change
         [nameof(IAppCommands.AddAssociatedTiledTilesetViaDialogAsync)] = Category.MutatingNotUndoable, // dialog + writes a companion .tiledsync file; no project model change
@@ -75,6 +75,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.InsertPolygonVertex)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.DeletePolygonVertex)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.CommitPolygonPoints)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.FlipPolygonHorizontally)]      = Category.MutatingUndoable,
+        [nameof(IAppCommands.FlipPolygonVertically)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectangleToFrame)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchCircleToFrame)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectanglesToFrames)]      = Category.MutatingUndoable,
@@ -101,6 +103,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveShapeToIndex)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameFlip)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainHorizontally)]        = Category.MutatingUndoable,
@@ -131,6 +134,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectPropsBulk)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCirclePropsBulk)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetPolygonPropsBulk)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SealPendingEdits)]             = Category.NonMutating, // resets undo-coalescing state only
         [nameof(IAppCommands.DiscardPendingEdits)]          = Category.MutatingNotUndoable, // reverts via Undo(); not itself a new undo entry
         [nameof(IAppCommands.HasSameFrameNameCollision)]    = Category.NonMutating,
@@ -143,6 +147,9 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.DuplicateSelection)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLocked)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLoop)]                 = Category.MutatingUndoable,
+        [nameof(IAppCommands.AddFrameEvent)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameEvent)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.RemoveFrameEvent)]             = Category.MutatingUndoable,
         // Undoable (see AppCommandsSetChainTsxOwnerTileIdTests), but excluded from
         // UndoableInvocations() -- see RoundTripVerifiedElsewhere's doc comment.
         [nameof(IAppCommands.SetChainTsxOwnerTileId)]       = Category.MutatingUndoable,
@@ -253,13 +260,17 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.InsertPolygonVertex(Polygon(ctx), 1, 0f, -6f)));
         yield return Row(nameof(IAppCommands.DeletePolygonVertex),
             ctx => Sync(() => ctx.AppCommands.DeletePolygonVertex(Polygon(ctx), 1)));
+        yield return Row(nameof(IAppCommands.FlipPolygonHorizontally),
+            ctx => Sync(() => ctx.AppCommands.FlipPolygonHorizontally(Polygon(ctx))));
+        yield return Row(nameof(IAppCommands.FlipPolygonVertically),
+            ctx => Sync(() => ctx.AppCommands.FlipPolygonVertically(Polygon(ctx))));
         yield return Row(nameof(IAppCommands.CommitPolygonPoints),
             ctx => Sync(() =>
             {
                 var polygon = Polygon(ctx);
                 var before = AnimationEditor.Core.Utilities.PolygonVertices.CopyPoints(polygon);
                 AnimationEditor.Core.Utilities.PolygonVertices.Set(polygon, 2, 7f, 7f);
-                ctx.AppCommands.CommitPolygonPoints(polygon, before, "Move Vertex");
+                ctx.AppCommands.CommitPolygonPoints(polygon, before, PolygonVertexEdit.Move(2));
             }));
         yield return Row(nameof(IAppCommands.MatchRectangleToFrame),
             ctx => Sync(() => ctx.AppCommands.MatchRectangleToFrame(Rect(ctx), Zebra(ctx).Frames[0])));
@@ -324,6 +335,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveShapeToTop(SecondCircle(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.MoveShapeToBottom),
             ctx => Sync(() => ctx.AppCommands.MoveShapeToBottom(Rect(ctx), Zebra(ctx).Frames[0]))); // Rect is not already last
+        yield return Row(nameof(IAppCommands.MoveShapeToIndex),
+            // Second circle to the first circle's slot, so the circles list actually reorders.
+            ctx => Sync(() => ctx.AppCommands.MoveShapeToIndex(SecondCircle(ctx), Zebra(ctx).Frames[0],
+                Zebra(ctx).Frames[0].ShapesSave!.IndexOf(Circle(ctx)))));
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
         yield return Row(nameof(IAppCommands.SetFrameFlip),
@@ -383,6 +398,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetCircleProps(Zebra(ctx).Frames[0], Circle(ctx), "Renamed", 5f, 6f, 9f)));
         yield return Row(nameof(IAppCommands.SetRectPropsBulk),
             ctx => Sync(() => ctx.AppCommands.SetRectPropsBulk(new[] { Rect(ctx), SecondRect(ctx) }, null, null, null, 20f, 20f)));
+        yield return Row(nameof(IAppCommands.SetPolygonPropsBulk),
+            ctx => Sync(() => ctx.AppCommands.SetPolygonPropsBulk(new[] { Polygon(ctx) }, null, 9f, null)));
         yield return Row(nameof(IAppCommands.SetCirclePropsBulk),
             ctx => Sync(() => ctx.AppCommands.SetCirclePropsBulk(new[] { Circle(ctx), SecondCircle(ctx) }, null, null, null, 20f)));
         yield return Row(nameof(IAppCommands.PasteChains),
@@ -435,6 +452,12 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetChainLocked(Zebra(ctx), true)));
         yield return Row(nameof(IAppCommands.SetChainLoop),
             ctx => Sync(() => ctx.AppCommands.SetChainLoop(Zebra(ctx), false)));
+        yield return Row(nameof(IAppCommands.AddFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.AddFrameEvent(Zebra(ctx).Frames[0], "Added")));
+        yield return Row(nameof(IAppCommands.SetFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.SetFrameEvent(Zebra(ctx).Frames[1], 0, "Renamed", "payload")));
+        yield return Row(nameof(IAppCommands.RemoveFrameEvent),
+            ctx => Sync(() => ctx.AppCommands.RemoveFrameEvent(Zebra(ctx).Frames[1], 0)));
     }
 
     // ── Fixture ───────────────────────────────────────────────────────────────
@@ -463,18 +486,19 @@ public class UndoCoverageRosterTests
                 ShapesSave       = new ShapesSave(),
             });
         }
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "Rect", X = 0f, Y = 0f, ScaleX = 4f, ScaleY = 4f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "Rect2", X = 8f, Y = 8f, ScaleX = 2f, ScaleY = 2f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new CircleSave { Name = "Circle", X = 0f, Y = 0f, Radius = 4f });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(
+        zebra.Frames[0].ShapesSave!.Add(
             new CircleSave { Name = "Circle2", X = 8f, Y = 8f, Radius = 2f });
         var polygon = new PolygonSave { Name = "Polygon", X = 1f, Y = 2f };
         foreach (var (x, y) in new[] { (-4f, -4f), (4f, -4f), (4f, 4f), (-4f, 4f), (-4f, -4f) })
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
-        zebra.Frames[0].ShapesSave!.Shapes.Add(polygon);
+        zebra.Frames[0].ShapesSave!.Add(polygon);
+        zebra.Frames[1].Events.Add(new AnimationFrameEvent { Name = "Step" });
 
         var alpha = new AnimationChainSave { Name = "Alpha" };
         alpha.Frames.Add(new AnimationFrameSave

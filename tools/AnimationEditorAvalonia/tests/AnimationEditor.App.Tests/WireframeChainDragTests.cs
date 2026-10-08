@@ -184,7 +184,7 @@ public class WireframeChainDragTests
     }
 
     /// <summary>
-    /// Browser (and any host that steals pointer capture mid-drag) fires
+    /// Any control that steals pointer capture mid-drag fires
     /// <see cref="InputElement.PointerCaptureLostEvent"/> without a matching
     /// <c>PointerReleased</c>. Without ending the drag there, the chain keeps
     /// tracking the cursor until a second click — the History-tab repro.

@@ -10,7 +10,7 @@ using Xunit;
 namespace FlatRedBall2.Tests.Glue;
 
 /// <summary>
-/// One engine booted from a Glue project, shared by the tests in the class that owns this fixture.
+/// One engine booted from a Glue project on the run's shared <see cref="SharedGame"/>. Each test builds its own.
 /// </summary>
 /// <remarks>
 /// Gum keeps its project and managers in process-wide statics, so only one engine may hold them at
@@ -20,35 +20,17 @@ namespace FlatRedBall2.Tests.Glue;
 /// </remarks>
 public sealed class GlueGumFixture : IDisposable
 {
-    public GlueGumFixture()
+    public GlueGumFixture(Game? game)
     {
         StageFixtureContent();
 
-        try
-        {
-            _game = new Game();
-            _ = new GraphicsDeviceManager(_game)
-            {
-                PreferredBackBufferWidth = 64,
-                PreferredBackBufferHeight = 64,
-            };
-            _game.RunOneFrame();
-        }
-        catch (Exception e)
-        {
-            // No display, no driver, or a headless agent — same contract as GraphicsDeviceFixture.
-            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
-            _game?.Dispose();
-            _game = null;
+        if (game is null)
             return;
-        }
 
         // The whole-project overload — the one games are told to use.
         Service = new FlatRedBallService();
-        Service.Initialize(_game, Path.Combine("Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj"));
+        Service.Initialize(game, Path.Combine("Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj"));
     }
-
-    private Game? _game;
 
     /// <summary>The engine, or null when this machine cannot provide a device.</summary>
     public FlatRedBallService? Service { get; }
@@ -85,7 +67,6 @@ public sealed class GlueGumFixture : IDisposable
     {
         // Releases Gum's process-wide statics, so the next class to want an engine can have one.
         Service?.Shutdown();
-        _game?.Dispose();
     }
 }
 
@@ -93,11 +74,14 @@ public sealed class GlueGumFixture : IDisposable
 // In GraphicsDeviceCollection so this does not run in parallel with anything else that builds a
 // Game — that combination fails intermittently.
 [Collection(GraphicsDeviceCollection.Name)]
-public class GlueGumInstantiationTests : IClassFixture<GlueGumFixture>
+public class GlueGumInstantiationTests : IDisposable
 {
     private readonly GlueGumFixture _fixture;
 
-    public GlueGumInstantiationTests(GlueGumFixture fixture) => _fixture = fixture;
+    public GlueGumInstantiationTests(GraphicsDeviceFixture graphics) =>
+        _fixture = new GlueGumFixture(graphics.Game);
+
+    public void Dispose() => _fixture.Dispose();
 
     [Fact]
     public void Initialize_WithAGlueProject_LoadsTheGumProjectItReferences()

@@ -1,6 +1,6 @@
 ---
 name: content-hot-reload
-description: Content hot-reload in FlatRedBall2. Use when watching content files (JSON configs, PNGs, TMX maps, etc.) for changes during development and reloading them without killing the game. Covers Screen.WatchContentDirectory, source/output mapping, debouncing, and the in-place vs screen-restart decision.
+description: "Content hot-reload in FlatRedBall2. Use when watching content files (JSON configs, PNGs, TMX maps, etc.) for changes during development and reloading them without killing the game. Covers Screen.WatchContentDirectory, source/output mapping, debouncing, and the in-place vs screen-restart decision."
 ---
 
 # Content Hot-Reload in FlatRedBall2

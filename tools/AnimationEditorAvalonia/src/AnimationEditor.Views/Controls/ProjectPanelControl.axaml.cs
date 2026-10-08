@@ -21,10 +21,9 @@ namespace AnimationEditor.Views.Controls;
 
 /// <summary>
 /// Displays the recursively-discovered <c>.achx</c> tree for a picked project folder (#770).
-/// Platform-agnostic: everything it renders comes from <see cref="AchxFolderScanner"/> /
-/// <see cref="AchxFolderTreeBuilder"/> over <see cref="IEditorFolder"/>, so this same control is
-/// shared unmodified by desktop (real filesystem) and the browser build (native folder handle) --
-/// including first-frame thumbnails (issue #839), generated lazily via
+/// Everything it renders comes from <see cref="AchxFolderScanner"/> /
+/// <see cref="AchxFolderTreeBuilder"/> over <see cref="IEditorFolder"/>, so tests can drive it
+/// with in-memory folders -- including first-frame thumbnails (issue #839), generated lazily via
 /// <see cref="ProjectTreeThumbnailService"/> after <see cref="SetEntries"/>.
 /// </summary>
 public partial class ProjectPanelControl : UserControl
@@ -32,6 +31,7 @@ public partial class ProjectPanelControl : UserControl
     private const int ThumbnailSize = 28;
 
     private IReadOnlyList<AchxFileEntry> _allEntries = Array.Empty<AchxFileEntry>();
+    private IReadOnlyList<string> _allFolderPaths = Array.Empty<string>();
     private string _searchQuery = string.Empty;
     private ProjectTreeThumbnailService? _thumbnailService;
     private CancellationTokenSource? _thumbnailLoadCts;
@@ -66,14 +66,6 @@ public partial class ProjectPanelControl : UserControl
     /// preview tab for that file to a permanent one.
     /// </summary>
     public event Action<AchxFileEntry>? FileDoubleClicked;
-
-    /// <summary>
-    /// True when the host can reveal a folder in the OS shell (desktop only -- issue #654 dropped
-    /// the equivalent "Open Containing Folder" on the browser build since there's no real
-    /// filesystem to reveal). Desktop's <c>MainWindow</c> sets this after construction; left false
-    /// (the default) the tree's context menu never shows "Reveal in File Manager" for a folder row.
-    /// </summary>
-    public bool SupportsRevealInExplorer { get; set; }
 
     /// <summary>
     /// Raised when the user picks "Reveal in File Manager" for a folder row (issue #841 follow-up).
@@ -114,7 +106,7 @@ public partial class ProjectPanelControl : UserControl
     /// <summary>
     /// Raised when the user picks "New Animation" from the context menu shown on right-clicking
     /// blank space in the tree, i.e. no node under the cursor (issue #908). The host resolves what
-    /// "new" means (desktop/browser both currently reuse their existing File → New flow).
+    /// "new" means (<c>MainWindow</c> reuses its File → New flow).
     /// </summary>
     public event Action? NewAnimationRequested;
 
@@ -125,6 +117,19 @@ public partial class ProjectPanelControl : UserControl
     /// with a sibling: the inline editor stays open showing the error instead.
     /// </summary>
     public event Action<NewAnimationFileRequest>? NewAnimationFileRequested;
+
+    /// <summary>
+    /// True when the tree also lists folders with no animation files (#1332). The host restores
+    /// it from settings; <see cref="ShowAllFoldersChanged"/> reports the user toggling it.
+    /// </summary>
+    public bool ShowAllFolders
+    {
+        get => ShowAllFoldersCheck.IsChecked == true;
+        set => ShowAllFoldersCheck.IsChecked = value;
+    }
+
+    /// <summary>Raised when <see cref="ShowAllFolders"/> changes, with its new value.</summary>
+    public event Action<bool>? ShowAllFoldersChanged;
 
     /// <summary>
     /// Completes once every thumbnail from the most recent <see cref="Rebuild"/> has finished
@@ -138,6 +143,11 @@ public partial class ProjectPanelControl : UserControl
         InitializeComponent();
         DataContext = this;
         ExcludeBinObjCheck.IsCheckedChanged += (_, _) => Rebuild();
+        ShowAllFoldersCheck.IsCheckedChanged += (_, _) =>
+        {
+            Rebuild();
+            ShowAllFoldersChanged?.Invoke(ShowAllFolders);
+        };
         ProjectTree.SelectionChanged += OnTreeSelectionChanged;
         // Tunnel-phase, matching MainWindow.OnTreePointerPressed's ClickCount==2 pattern (#716):
         // TreeViewItem's own pointer handling toggles IsExpanded on the second click before a
@@ -163,12 +173,18 @@ public partial class ProjectPanelControl : UserControl
     /// Replaces the scanned entries (e.g. after a fresh Open Project Folder pick) and rebuilds
     /// the tree respecting the current "Exclude bin/obj" checkbox state. Pass every entry
     /// unfiltered -- toggling the checkbox re-filters this cached list rather than re-scanning.
+    /// <paramref name="folderPaths"/> is every scanned subfolder, shown only while
+    /// <see cref="ShowAllFolders"/> is on (#1332).
     /// </summary>
-    public void SetEntries(IReadOnlyList<AchxFileEntry> entries)
+    public void SetEntries(IReadOnlyList<AchxFileEntry> entries, IReadOnlyList<string>? folderPaths = null)
     {
         _allEntries = entries;
+        _allFolderPaths = folderPaths ?? Array.Empty<string>();
         Rebuild();
     }
+
+    /// <summary>Shows a <see cref="AchxFolderScanner.ScanProjectAsync"/> result.</summary>
+    public void SetEntries(ProjectFolderScan scan) => SetEntries(scan.Files, scan.FolderPaths);
 
     public void Clear() => SetEntries(Array.Empty<AchxFileEntry>());
 
@@ -183,17 +199,19 @@ public partial class ProjectPanelControl : UserControl
             ? _allEntries.Where(f => !BinObjPathFilter.IsExcluded(f.RelativePath)).ToList()
             : _allEntries.ToList();
         files = RelativePathSearchFilter.Filter(files, f => f.RelativePath, _searchQuery).ToList();
+        var extraFolders = ProjectTreeFolderFilter.Select(
+            _allFolderPaths, ShowAllFolders, excludeBinObj, _searchQuery);
 
         // ProjectTree stays visible even with zero rows (issue #916): hiding it also hid its
         // right-click "New Animation" context menu, which is exactly what an empty project needs.
-        EmptyMessage.IsVisible = files.Count == 0;
+        EmptyMessage.IsVisible = files.Count == 0 && extraFolders.Count == 0;
         EmptyMessage.Text = _allEntries.Count == 0
             ? "File → Open Project Folder… to browse its .achx files."
             : string.IsNullOrWhiteSpace(_searchQuery)
                 ? "No .achx files match the current filter."
                 : "No .achx files match your search.";
 
-        foreach (var node in AchxFolderTreeBuilder.Build(files))
+        foreach (var node in AchxFolderTreeBuilder.Build(files, extraFolders))
             TreeRoots.Add(AchxTreeNodeVm.FromNode(node));
 
         // Search results show fully expanded -- a remembered collapse would hide the matches.
@@ -374,7 +392,6 @@ public partial class ProjectPanelControl : UserControl
         ProjectTree.ContextMenu.Items.Clear();
 
         // No node under the cursor -- right-clicked blank space below/between rows (issue #908).
-        // Independent of SupportsRevealInExplorer: that flag only gates filesystem-reveal items.
         if (_contextNode is null)
         {
             var newAnimationItem = new MenuItem { Header = "New Animation" };
@@ -385,21 +402,16 @@ public partial class ProjectPanelControl : UserControl
 
         if (_contextNode is { IsFolder: true } folderNode)
         {
-            // Not gated on SupportsRevealInExplorer: creating a file works on both hosts, only
-            // the OS-shell reveal below is desktop-only (issue #1018).
+            // Issue #1018: create a new animation file inline in this folder.
             var newFileItem = new MenuItem { Header = "New Animation File" };
             newFileItem.Click += (_, _) => BeginNewAnimationFile(folderNode);
             ProjectTree.ContextMenu.Items.Add(newFileItem);
-
-            if (!SupportsRevealInExplorer) return;
 
             var revealItem = new MenuItem { Header = "Reveal in File Manager" };
             revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(revealItem);
             return;
         }
-
-        if (!SupportsRevealInExplorer) return;
 
         if (_contextNode is { IsFile: true } fileNode)
         {

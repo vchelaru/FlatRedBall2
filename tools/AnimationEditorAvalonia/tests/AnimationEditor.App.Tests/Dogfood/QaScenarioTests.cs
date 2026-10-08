@@ -145,7 +145,7 @@ public class QaScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task EscapeDuringAHandleDrag_LeavesTheFrameWhereItWas()
+    public async Task EscapeDuringAHandleDrag_LeavesTheFrameWhereItWas_WithNoUndoEntry()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 128, 128);
@@ -166,15 +166,35 @@ public class QaScenarioTests
         editor.Window.MouseUp(target, MouseButton.Left, RawInputModifiers.None);
         editor.Layout();
 
-        // Either the drag was cancelled (frame back where it started, nothing to undo) or it
-        // completed as one undoable step; a half-applied edit with no undo entry is the failure.
-        (int x, int y, int width, int height) = editor.PixelRectOf(frame);
-        if ((x, y, width, height) != (16, 16, 32, 32))
-        {
-            editor.UndoManager.CanUndo.ShouldBeTrue("a drag that changed the frame must be undoable");
-            editor.Press(Key.Z, RawInputModifiers.Control);
-            editor.PixelRectOf(frame).ShouldBe((16, 16, 32, 32));
-        }
+        editor.PixelRectOf(frame).ShouldBe((16, 16, 32, 32), "Escape puts the frame back");
+        editor.UndoManager.CanUndo.ShouldBeFalse("a cancelled drag leaves no undo entry");
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
+    public async Task EscapeDuringAChainDrag_PutsEveryFrameBack_WithNoUndoEntry()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 128, 128);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (16, 16, 32, 32), (64, 16, 32, 32)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk);
+        Avalonia.Rect box = editor.WireframeRectOf(walk.Frames[0]);
+        Avalonia.Point start = new Avalonia.Point(box.X + box.Width / 2, box.Y + box.Height / 2);
+        Avalonia.Point target = new Avalonia.Point(start.X + 20, start.Y + 20);
+
+        editor.Window.MouseMove(start, RawInputModifiers.None);
+        editor.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(target, RawInputModifiers.LeftMouseButton);
+        editor.PixelRectOf(walk.Frames[0]).ShouldNotBe((16, 16, 32, 32), "the drag moved the chain before Escape");
+        editor.Press(Key.Escape);
+        editor.Window.MouseUp(target, MouseButton.Left, RawInputModifiers.None);
+        editor.Layout();
+
+        editor.PixelRectOf(walk.Frames[0]).ShouldBe((16, 16, 32, 32));
+        editor.PixelRectOf(walk.Frames[1]).ShouldBe((64, 16, 32, 32));
+        editor.UndoManager.CanUndo.ShouldBeFalse("a cancelled drag leaves no undo entry");
         editor.ThrowIfErrorShown();
     }
 

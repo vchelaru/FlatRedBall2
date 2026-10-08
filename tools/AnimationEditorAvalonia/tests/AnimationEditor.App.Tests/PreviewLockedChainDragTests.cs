@@ -70,7 +70,7 @@ public class PreviewLockedChainDragTests
         var ctx    = TestHelpers.BuildServices();
         var circle = new CircleSave { X = 0f, Y = 0f, Radius = 10f };
         var frame  = MakeFrame(relativeX: 0f, relativeY: 0f);
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
         var chain  = new AnimationChainSave { Name = "Locked", IsLocked = true };
         chain.Frames.Add(frame);
         // See the comment in SimulateFrameDrag_ChainLocked_IsNoOp: SelectedFrame re-derives

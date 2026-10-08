@@ -33,9 +33,8 @@ Each sample is a complete runnable game built on the engine — open the source 
 | macOS (Apple Silicon) | [AnimationEditor-osx-arm64.zip](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-osx-arm64.zip) |
 | macOS (Intel) | [AnimationEditor-osx-x64.zip](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-osx-x64.zip) |
 | Linux (x64) | [AnimationEditor-linux-x64.tar.gz](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-linux-x64.tar.gz) |
-| Web (browser, no install) | [Try it online](https://vchelaru.github.io/FlatRedBall2/AnimationEditor/) |
 
-The downloads above always resolve to the latest published release. The web version is deployed manually and may lag behind; older release downloads are on the [Releases page](https://github.com/vchelaru/FlatRedBall2/releases).
+The downloads above always resolve to the latest published release; older release downloads are on the [Releases page](https://github.com/vchelaru/FlatRedBall2/releases).
 
 Binaries are unsigned. Windows SmartScreen will warn on first run ("More info" → "Run anyway"); macOS Gatekeeper will refuse to open directly — right-click the executable, choose Open, then confirm.
 
@@ -67,6 +66,8 @@ dotnet run
 
 A window opens showing "Hello from FlatRedBall 2" — if you see that, everything works.
 
+`dotnet new` uses whichever template version is installed locally and never updates it on its own. Re-run `dotnet new install FlatRedBall2.Templates` before each new project to pick up the latest version.
+
 See the **[full setup guide](https://docs.flatredball.com/flatredball2/setup)** for prerequisites, multi-platform (desktop + web) projects, manually wiring FlatRedBall2 into an existing project, and troubleshooting.
 
 ## Working with AI Assistants
@@ -76,7 +77,7 @@ FlatRedBall2 ships with skill files in [`/frb-skills/`](frb-skills/) — plain M
 Add the skill files to your project. Run these from your project's root folder (e.g. `YourGameName/`):
 
 ```
-dotnet new install FlatRedBall2.Templates   # skip if already installed
+dotnet new install FlatRedBall2.Templates   # also updates an older install
 dotnet new frb2-skills
 ```
 

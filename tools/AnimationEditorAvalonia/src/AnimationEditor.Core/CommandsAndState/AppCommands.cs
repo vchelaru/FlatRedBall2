@@ -1,5 +1,6 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -119,7 +120,7 @@ namespace AnimationEditor.Core.CommandsAndState
         // A Tiled tile animation holds rects and durations, nothing else (see
         // Tiled.TsxLossyDataCheck, which warns on save about whatever slipped through). Every
         // command that would create shapes, flips, sprite offsets, color, or a non-looping chain
-        // no-ops in a native tsx project, so no host (tree menu, inspector, keyboard, browser)
+        // no-ops in a native tsx project, so no entry point (tree menu, inspector, keyboard)
         // can produce data the file can't keep. Same pattern as the locked-chain guards.
 
         /// <summary>True when the current project is a native tsx, i.e. the edit must not happen.</summary>
@@ -197,8 +198,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public event Action<string>? SaveAsCompleted;
 
-        /// <inheritdoc cref="IAppCommands.PixiJsExportCompleted"/>
-        public event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+        /// <inheritdoc cref="IAppCommands.ExportCompleted"/>
+        public event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <inheritdoc cref="IAppCommands.TsxSaveCompletedWithWarnings"/>
         public event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
@@ -704,33 +705,33 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <summary>
-        /// Show a file picker and export the current animation chain list as a PixiJS spritesheet
-        /// JSON (<c>SpriteSheetJson</c>). Does nothing if there is no project or the user cancels.
-        /// Fires <see cref="PixiJsExportCompleted"/> with the path and any non-fatal warnings
-        /// (dropped per-frame duration, multiple source textures) on success.
+        /// Show a file picker and export the current animation chain list in <paramref name="format"/>.
+        /// Does nothing if there is no project or the user cancels. Copies the referenced textures
+        /// next to the export and fires <see cref="ExportCompleted"/> with the path and any
+        /// non-fatal warnings (data the format can't carry, textures that couldn't be copied).
         /// </summary>
-        public async Task ExportToPixiJsAsync()
+        public async Task ExportAsync(Export.ExportFormat format)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
             var path = await FileDialogService.PickSaveFileAsync(
-                "Export to PixiJS", "json", new[] { new FileTypeChoice("json", "PixiJS Spritesheet (*.json)") });
+                format.DialogTitle, format.Extension, new[] { new FileTypeChoice(format.Extension, format.FileTypeDescription) });
             if (string.IsNullOrEmpty(path)) return;
 
-            var result = Export.PixiJsSpriteSheetExporter.Export(acls, _pm.GetTextureSizeInPixels);
-            System.IO.File.WriteAllText(path, result.Json);
+            var result = format.Export(acls, _pm.GetTextureSizeInPixels);
+            System.IO.File.WriteAllText(path, result.Text);
 
-            // PixiJS resolves meta.image relative to the JSON, so when exporting elsewhere the
-            // referenced textures must travel with it. Copy each relative texture (preserving any
-            // subdirectory) from the .achx's directory into the export directory.
+            // Every format references textures relative to the exported file, so when exporting
+            // elsewhere the textures must travel with it. Copy each relative texture (preserving
+            // any subdirectory) from the .achx's directory into the export directory.
             var exportDir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
             var sourceDir = string.IsNullOrEmpty(_pm.FileName)
                 ? string.Empty
                 : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
             var copyWarnings = CopyReferencedTextures(result.ReferencedTextures, sourceDir, exportDir);
 
-            PixiJsExportCompleted?.Invoke(path, result.Warnings.Concat(copyWarnings).ToList());
+            ExportCompleted?.Invoke(path, result.Warnings.Concat(copyWarnings).ToList());
         }
 
         /// <summary>
@@ -1135,18 +1136,6 @@ namespace AnimationEditor.Core.CommandsAndState
             return TextureListBuilder.FindFirstTexturedFrame(chainList);
         }
 
-        /// <summary>
-        /// Resolves the texture name a create-frame-from-region frame should use when no real
-        /// on-disk path is available to derive one from (the browser build's
-        /// <c>FrameCreatedFromRegion</c> handler -- see <c>AnimationEditor.Browser/App.axaml.cs</c>).
-        /// Prefers the currently selected frame's texture; falls back to the chain's first frame.
-        /// Extracted so this stays testable in <c>AnimationEditor.Core.Tests</c> without a WASM
-        /// host (issue #941).
-        /// </summary>
-        public static string? ResolveRegionFrameTextureName(
-            AnimationFrameSave? selectedFrame, AnimationChainSave chain)
-            => selectedFrame?.TextureName ?? chain.Frames.FirstOrDefault()?.TextureName;
-
         public void MoveChain(AnimationChainSave chain, int delta)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
@@ -1402,43 +1391,46 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null) return;
-            int idx    = shapes.IndexOf(shape);
-            if (idx < 0) return;
-            int newIdx = Math.Clamp(idx + delta, 0, shapes.Count - 1);
-            if (newIdx == idx) return;
-            _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
-                this, _events, () => RefreshTreeNode(frame),
+            if (frame.ShapesSave is not { } shapes) return;
+            // Shapes only reorder within their own type: the file groups them by type, so a cross-type move would be lost on save.
+            ExecuteShapeReorder(shapes, frame, () => shapes.Move(shape, delta),
                 delta > 0
                     ? $"Move {ShapeReorderLabel(shape)} Down"
-                    : $"Move {ShapeReorderLabel(shape)} Up"));
+                    : $"Move {ShapeReorderLabel(shape)} Up");
         }
 
         public void MoveShapeToTop(object shape, AnimationFrameSave frame)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null || !shapes.Contains(shape)) return;
-            _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.Remove(shape); shapes.Insert(0, shape); },
-                this, _events, () => RefreshTreeNode(frame),
-                $"Move {ShapeReorderLabel(shape)} to Top"));
+            if (frame.ShapesSave is not { } shapes) return;
+            ExecuteShapeReorder(shapes, frame, () => shapes.MoveToEdge(shape, toStart: true),
+                $"Move {ShapeReorderLabel(shape)} to Top");
         }
 
         public void MoveShapeToBottom(object shape, AnimationFrameSave frame)
         {
             if (IsFrameLocked(frame)) return;
-            var shapes = frame.ShapesSave?.Shapes;
-            if (shapes is null || !shapes.Contains(shape)) return;
+            if (frame.ShapesSave is not { } shapes) return;
+            ExecuteShapeReorder(shapes, frame, () => shapes.MoveToEdge(shape, toStart: false),
+                $"Move {ShapeReorderLabel(shape)} to Bottom");
+        }
+
+        public void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex)
+        {
+            if (IsFrameLocked(frame)) return;
+            if (frame.ShapesSave is not { } shapes) return;
+            var order = ShapeDropResolver.ApplyDrop(shapes, shape, insertIndex);
+            ExecuteShapeReorder(shapes, frame, () => shapes.SetOrder(order), $"Move {ShapeReorderLabel(shape)}");
+        }
+
+        private void ExecuteShapeReorder(ShapesSave shapes, AnimationFrameSave frame, Action reorder, string description)
+        {
             _undoManager.Execute(new ReorderCommand<object>(
-                shapes,
-                () => { shapes.Remove(shape); shapes.Add(shape); },
+                () => shapes.Shapes.ToArray(),
+                order => shapes.SetOrder(order),
+                reorder,
                 this, _events, () => RefreshTreeNode(frame),
-                $"Move {ShapeReorderLabel(shape)} to Bottom"));
+                description));
         }
 
         private static string ShapeReorderLabel(object shape) => ShapeUndoLabel.Format(shape);
@@ -1577,10 +1569,11 @@ namespace AnimationEditor.Core.CommandsAndState
         // behave identically whether one or many chains are selected.
         private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, bool flipH, bool flipV)
         {
-            var copy = new AnimationChainSave { Name = source.Name };
-            foreach (var frame in source.Frames)
+            var copy = AnimationCloneHelper.CloneChain(source);
+            for (int i = 0; i < copy.Frames.Count; i++)
             {
-                var fCopy = AnimationCloneHelper.CloneFrame(frame);
+                var frame = source.Frames[i];
+                var fCopy = copy.Frames[i];
                 fCopy.FlipHorizontal = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal;
                 fCopy.FlipVertical   = flipV ? !frame.FlipVertical   : frame.FlipVertical;
                 // Mirror the sprite offset about the entity origin so an off-center frame stays
@@ -1590,7 +1583,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 if (fCopy.ShapesSave is not null)
                     foreach (var shape in fCopy.ShapesSave.Shapes)
                         ShapeFlip.Mirror(shape, flipH, flipV);
-                copy.Frames.Add(fCopy);
             }
             return copy;
         }
@@ -1995,6 +1987,36 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
         }
 
+        public void AddFrameEvent(AnimationFrameSave frame, string name)
+        {
+            if (!CanEditFrameEvents(frame)) return;
+            var after = frame.Events.Append(new AnimationFrameEvent { Name = name });
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Add Event '{name}'", this, _events));
+        }
+
+        public void SetFrameEvent(AnimationFrameSave frame, int index, string name, string? data)
+        {
+            if (!CanEditFrameEvents(frame) || (uint)index >= (uint)frame.Events.Count) return;
+            var after = frame.Events.Select(e => e.Clone()).ToList();
+            after[index] = new AnimationFrameEvent
+            {
+                Name = name,
+                Data = string.IsNullOrWhiteSpace(data) ? null : data,
+            };
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Edit Event '{name}'", this, _events));
+        }
+
+        public void RemoveFrameEvent(AnimationFrameSave frame, int index)
+        {
+            if (!CanEditFrameEvents(frame) || (uint)index >= (uint)frame.Events.Count) return;
+            var removedName = frame.Events[index].Name;
+            var after = frame.Events.Where((_, i) => i != index);
+            _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Remove Event '{removedName}'", this, _events));
+        }
+
+        private bool CanEditFrameEvents(AnimationFrameSave? frame) =>
+            frame != null && !IsFrameLocked(frame) && !IsAchxOnlyEditBlocked();
+
         public void SetFrameTextureName(IReadOnlyList<AnimationFrameSave> frames, string? textureName)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();
@@ -2014,17 +2036,17 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }
 
-        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength)
+        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, NumericEdit newLength)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
-            var desc = $"Set Length: {newLength:0.###}s";
+            var desc = newLength.IsRelative ? "Set Length" : $"Set Length: {newLength.Apply(0m):0.###}s";
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength; },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength.Apply(f.FrameLength); },
                 this, _events, false, desc, coalesceKind: "Length"));
         }
 
-        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
+        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? newRelX, NumericEdit? newRelY)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
@@ -2034,23 +2056,41 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     foreach (var f in unlockedFrames)
                     {
-                        if (newRelX.HasValue) f.RelativeX = newRelX.Value;
-                        if (newRelY.HasValue) f.RelativeY = newRelY.Value;
+                        if (newRelX.HasValue) f.RelativeX = newRelX.Value.Apply(f.RelativeX);
+                        if (newRelY.HasValue) f.RelativeY = newRelY.Value.Apply(f.RelativeY);
                     }
                 },
                 this, _events, true, "Set Offset", coalesceKind: "Relative"));
         }
 
-        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
+        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit red, ChannelEdit green, ChannelEdit blue)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
+            // Resolve every target before mutating: a relative edit on an unset channel starts from
+            // the inherited value, which an earlier selected frame's edit would otherwise change.
+            var targets = unlockedFrames.Select(f =>
+            {
+                var inherited = ResolveEffectiveColor(f);
+                int channelDefault = EffectiveFrameColor.ChannelDefault(inherited.Operation);
+                return (Frame: f,
+                    Red: red.Apply(f.Red, inherited.Red ?? channelDefault, -255, 255),
+                    Green: green.Apply(f.Green, inherited.Green ?? channelDefault, -255, 255),
+                    Blue: blue.Apply(f.Blue, inherited.Blue ?? channelDefault, -255, 255));
+            }).ToList();
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
             // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) { f.Red = red; f.Green = green; f.Blue = blue; } },
+                unlockedFrames, () => { foreach (var t in targets) { t.Frame.Red = t.Red; t.Frame.Green = t.Green; t.Frame.Blue = t.Blue; } },
                 this, _events, false, "Set Frame Color", coalesceKind: "Color"));
+        }
+
+        private ResolvedFrameColor ResolveEffectiveColor(AnimationFrameSave frame)
+        {
+            var chain = _objectFinder.GetAnimationChainContaining(frame);
+            int index = chain?.Frames.IndexOf(frame) ?? -1;
+            return index >= 0 ? EffectiveFrameColor.Resolve(chain!.Frames, index) : default;
         }
 
         public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
@@ -2065,20 +2105,23 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, "Set Frame Color Mode"));
         }
 
-        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
+        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha)
         {
             if (IsAchxOnlyEditBlocked()) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
+            var targets = unlockedFrames
+                .Select(f => (Frame: f, Alpha: alpha.Apply(f.Alpha, ResolveEffectiveColor(f).Alpha ?? 255, 0, 255)))
+                .ToList();
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
             // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                unlockedFrames, () => { foreach (var f in unlockedFrames) f.Alpha = alpha; },
+                unlockedFrames, () => { foreach (var t in targets) t.Frame.Alpha = t.Alpha; },
                 this, _events, false, "Set Frame Alpha", coalesceKind: "Alpha"));
         }
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
-            int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
+            NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
@@ -2108,15 +2151,15 @@ namespace AnimationEditor.Core.CommandsAndState
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
                         // (possibly just-moved) Left/Top.
-                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
-                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f, bmpW)), bmpW);
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f, bmpH)), bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
                     }
                     foreach (var f in siblings)
                     {
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
                     }
                 },
                 this, _events, true, "Set Region", coalesceKind: "PixelRegion"));
@@ -2137,7 +2180,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         public void SetRectPropsBulk(IReadOnlyList<AARectSave> rects,
-            string? name, float? x, float? y, float? scaleX, float? scaleY)
+            string? name, NumericEdit? x, NumericEdit? y, NumericEdit? scaleX, NumericEdit? scaleY)
         {
             rects = rects.Where(r => !IsShapeLocked(null, r)).ToList();
             if (rects.Count == 0) return;
@@ -2148,17 +2191,17 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var r in rects)
                     {
                         if (name != null) r.Name = name;
-                        if (x.HasValue) r.X = x.Value;
-                        if (y.HasValue) r.Y = y.Value;
-                        if (scaleX.HasValue) r.ScaleX = scaleX.Value;
-                        if (scaleY.HasValue) r.ScaleY = scaleY.Value;
+                        if (x.HasValue) r.X = x.Value.Apply(r.X);
+                        if (y.HasValue) r.Y = y.Value.Apply(r.Y);
+                        if (scaleX.HasValue) r.ScaleX = scaleX.Value.Apply(r.ScaleX);
+                        if (scaleY.HasValue) r.ScaleY = scaleY.Value.Apply(r.ScaleY);
                     }
                 },
                 this, _events, _objectFinder, "Edit Rectangles"));
         }
 
         public void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles,
-            string? name, float? x, float? y, float? radius)
+            string? name, NumericEdit? x, NumericEdit? y, NumericEdit? radius)
         {
             circles = circles.Where(c => !IsShapeLocked(null, c)).ToList();
             if (circles.Count == 0) return;
@@ -2169,12 +2212,31 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var c in circles)
                     {
                         if (name != null) c.Name = name;
-                        if (x.HasValue) c.X = x.Value;
-                        if (y.HasValue) c.Y = y.Value;
-                        if (radius.HasValue) c.Radius = radius.Value;
+                        if (x.HasValue) c.X = x.Value.Apply(c.X);
+                        if (y.HasValue) c.Y = y.Value.Apply(c.Y);
+                        if (radius.HasValue) c.Radius = radius.Value.Apply(c.Radius);
                     }
                 },
                 this, _events, _objectFinder, "Edit Circles"));
+        }
+
+        public void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons,
+            string? name, NumericEdit? x, NumericEdit? y)
+        {
+            polygons = polygons.Where(p => !IsShapeLocked(null, p)).ToList();
+            if (polygons.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                polygons.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var p in polygons)
+                    {
+                        if (name != null) p.Name = name;
+                        if (x.HasValue) p.X = x.Value.Apply(p.X);
+                        if (y.HasValue) p.Y = y.Value.Apply(p.Y);
+                    }
+                },
+                this, _events, _objectFinder, "Edit Polygons"));
         }
 
         public void SetPolygonProps(AnimationFrameSave? frame, PolygonSave polygon, string name, float x, float y)
@@ -2184,51 +2246,166 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.MovePolygonVertex"/>
-        public void MovePolygonVertex(PolygonSave polygon, int index, float x, float y) =>
-            EditPolygonPoints(polygon, $"Move Vertex {index + 1} of {ShapeUndoLabel.Format(polygon)}",
+        public void MovePolygonVertex(PolygonSave polygon, int index, float x, float y)
+        {
+            var (oldX, oldY) = PolygonVertices.Get(polygon, index);
+            EditPolygonPoints(polygon, VertexOp.Move, index,
                 p => PolygonVertices.Set(p, index, x, y),
+                p => OffsetVertex(p, index, x - oldX, y - oldY),
                 coalesceGroup: $"PolygonVertex:{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(polygon)}:{index}");
+        }
 
         /// <inheritdoc cref="IAppCommands.InsertPolygonVertex"/>
-        public void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y) =>
-            EditPolygonPoints(polygon, $"Add Vertex to {ShapeUndoLabel.Format(polygon)}",
-                p => PolygonVertices.Insert(p, index, x, y));
+        public void InsertPolygonVertex(PolygonSave polygon, int index, float x, float y)
+        {
+            var (mx, my) = InsertionMidpoint(polygon, index);
+            EditPolygonPoints(polygon, VertexOp.Insert, index,
+                p => PolygonVertices.Insert(p, index, x, y),
+                p => InsertAtMidpoint(p, index, x - mx, y - my));
+        }
 
         /// <inheritdoc cref="IAppCommands.DeletePolygonVertex"/>
         public bool DeletePolygonVertex(PolygonSave polygon, int index)
         {
             if (PolygonVertices.Count(polygon) <= 3) return false;
-            return EditPolygonPoints(polygon, $"Delete Vertex from {ShapeUndoLabel.Format(polygon)}",
+            return EditPolygonPoints(polygon, VertexOp.Delete, index,
+                p => PolygonVertices.RemoveAt(p, index),
                 p => PolygonVertices.RemoveAt(p, index));
         }
 
         /// <inheritdoc cref="IAppCommands.CommitPolygonPoints"/>
-        public void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description)
+        public void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit)
         {
-            var frame = _objectFinder.GetAnimationFrameContaining(polygon);
-            var before = pointsBefore.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList();
-            if (frame is not null && IsFrameLocked(frame))
+            var before = new PolygonSave { Points = pointsBefore.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList() };
+            var after = PolygonVertices.CopyPoints(polygon);
+            // The live drag already moved the points. Put them back so the edit replays through one
+            // command from the "before" snapshot; a locked chain simply keeps its original outline.
+            polygon.Points.Clear();
+            polygon.Points.AddRange(PolygonVertices.CopyPoints(before));
+
+            int i = edit.Index;
+            var (ax, ay) = PolygonVertices.Get(new PolygonSave { Points = after }, i);
+            Action<PolygonSave> replay = p => { p.Points.Clear(); p.Points.AddRange(after); };
+            if (edit.Inserted)
             {
-                // The live drag already moved the points; a locked chain keeps its original outline.
-                polygon.Points.Clear();
-                polygon.Points.AddRange(before);
-                return;
+                var (mx, my) = InsertionMidpoint(before, i);
+                EditPolygonPoints(polygon, VertexOp.Insert, i, replay, p => InsertAtMidpoint(p, i, ax - mx, ay - my));
             }
-            _undoManager.Execute(new SetPolygonPointsCommand(
-                frame, polygon, before, PolygonVertices.CopyPoints(polygon), this, _events, description));
+            else
+            {
+                var (bx, by) = PolygonVertices.Get(before, i);
+                EditPolygonPoints(polygon, VertexOp.Move, i, replay, p => OffsetVertex(p, i, ax - bx, ay - by));
+            }
         }
 
-        // Applies the edit to a scratch copy so the command owns both snapshots, then runs it.
-        private bool EditPolygonPoints(PolygonSave polygon, string description,
-            Action<PolygonSave> edit, string? coalesceGroup = null)
+        /// <inheritdoc cref="IAppCommands.FlipPolygonHorizontally"/>
+        public void FlipPolygonHorizontally(PolygonSave polygon) => FlipPolygons(polygon, horizontal: true);
+
+        /// <inheritdoc cref="IAppCommands.FlipPolygonVertically"/>
+        public void FlipPolygonVertically(PolygonSave polygon) => FlipPolygons(polygon, horizontal: false);
+
+        // Mirrors `polygon` and, when it is part of a polygon multi-selection, every other selected
+        // unlocked polygon, each about its own bounds center. Unlike a vertex edit this needs no
+        // matching vertex count, so nothing is skipped.
+        private void FlipPolygons(PolygonSave polygon, bool horizontal)
+        {
+            var selected = _selectedState.SelectedPolygons;
+            var targets = selected.Contains(polygon) ? selected.ToList() : new List<PolygonSave> { polygon };
+            var entries = targets
+                .Where(p => !IsShapeLocked(null, p) && p.Points.Count > 0)
+                .Select(p => Edited(_objectFinder.GetAnimationFrameContaining(p), p, scratch => MirrorPoints(scratch, horizontal)))
+                .ToList();
+            if (entries.Count == 0) return;
+
+            string target = entries.Count == 1 ? ShapeUndoLabel.Format(entries[0].Polygon) : $"{entries.Count} Polygons";
+            _undoManager.Execute(new SetPolygonPointsCommand(
+                entries, this, _events, $"Flip {(horizontal ? "Horizontal" : "Vertical")} {target}"));
+        }
+
+        private static void MirrorPoints(PolygonSave polygon, bool horizontal)
+        {
+            var points = polygon.Points;
+            if (horizontal)
+            {
+                float sum = points.Min(p => p.X) + points.Max(p => p.X);
+                foreach (var p in points) p.X = sum - p.X;
+            }
+            else
+            {
+                float sum = points.Min(p => p.Y) + points.Max(p => p.Y);
+                foreach (var p in points) p.Y = sum - p.Y;
+            }
+        }
+
+        /// <inheritdoc cref="IAppCommands.Notified"/>
+        public event Action<string>? Notified;
+
+        private enum VertexOp { Move, Insert, Delete }
+
+        private static void OffsetVertex(PolygonSave polygon, int index, float dx, float dy)
+        {
+            var (x, y) = PolygonVertices.Get(polygon, index);
+            PolygonVertices.Set(polygon, index, x + dx, y + dy);
+        }
+
+        // Midpoint of the edge a vertex inserted at `index` splits: from the vertex before it to the
+        // one it pushes along, wrapping to the first vertex when appending.
+        private static (float X, float Y) InsertionMidpoint(PolygonSave polygon, int index)
+        {
+            int count = PolygonVertices.Count(polygon);
+            var (ax, ay) = PolygonVertices.Get(polygon, (index - 1 + count) % count);
+            var (bx, by) = PolygonVertices.Get(polygon, index % count);
+            return ((ax + bx) / 2f, (ay + by) / 2f);
+        }
+
+        private static void InsertAtMidpoint(PolygonSave polygon, int index, float dx, float dy)
+        {
+            var (mx, my) = InsertionMidpoint(polygon, index);
+            PolygonVertices.Insert(polygon, index, mx + dx, my + dy);
+        }
+
+        // Applies `edit` to `polygon` and, when it is part of a polygon multi-selection, `peerEdit` to
+        // every other selected, unlocked polygon with the same vertex count (issue #1255). Edits run
+        // on scratch copies so one command owns every snapshot and undoes them together.
+        private bool EditPolygonPoints(PolygonSave polygon, VertexOp op, int index,
+            Action<PolygonSave> edit, Action<PolygonSave> peerEdit, string? coalesceGroup = null)
         {
             var frame = _objectFinder.GetAnimationFrameContaining(polygon);
             if (frame is not null && IsFrameLocked(frame)) return false;
+
+            var entries = new List<SetPolygonPointsCommand.Entry> { Edited(frame, polygon, edit) };
+            var selected = _selectedState.SelectedPolygons;
+            var peers = selected.Contains(polygon)
+                ? selected.Where(p => !ReferenceEquals(p, polygon) && !IsShapeLocked(null, p)).ToList()
+                : new List<PolygonSave>();
+            int count = PolygonVertices.Count(polygon);
+            foreach (var peer in peers.Where(p => PolygonVertices.Count(p) == count))
+                entries.Add(Edited(_objectFinder.GetAnimationFrameContaining(peer), peer, peerEdit));
+
+            string target = entries.Count == 1 ? ShapeUndoLabel.Format(polygon) : $"{entries.Count} Polygons";
+            string description = op switch
+            {
+                VertexOp.Insert => $"Add Vertex to {target}",
+                VertexOp.Delete => $"Delete Vertex from {target}",
+                _ => $"Move Vertex {index + 1} of {target}",
+            };
+            _undoManager.Execute(new SetPolygonPointsCommand(entries, this, _events, description, coalesceGroup));
+
+            int skipped = peers.Count + 1 - entries.Count;
+            if (skipped > 0)
+            {
+                string verb = op switch { VertexOp.Insert => "Added", VertexOp.Delete => "Deleted", _ => "Moved" };
+                Notified?.Invoke($"{verb} vertex on {entries.Count} of {peers.Count + 1} polygons, " +
+                    $"{skipped} skipped: different vertex count");
+            }
+            return true;
+        }
+
+        private static SetPolygonPointsCommand.Entry Edited(AnimationFrameSave? frame, PolygonSave polygon, Action<PolygonSave> edit)
+        {
             var scratch = new PolygonSave { Points = PolygonVertices.CopyPoints(polygon) };
             edit(scratch);
-            _undoManager.Execute(new SetPolygonPointsCommand(frame, polygon,
-                PolygonVertices.CopyPoints(polygon), scratch.Points, this, _events, description, coalesceGroup));
-            return true;
+            return new(frame, polygon, PolygonVertices.CopyPoints(polygon), scratch.Points);
         }
 
         /// <inheritdoc cref="IAppCommands.SealPendingEdits"/>
@@ -2283,20 +2460,22 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            var cmds = new List<IUndoableCommand>();
+            // One command across all frames (not a composite of per-frame commands) so the
+            // selection ends up as every pasted shape, not just the last frame's.
+            var groups = new List<(AnimationFrameSave Frame, IReadOnlyList<object> Shapes)>();
             foreach (var frame in frames)
             {
                 var clones = BuildShapeClones(frame, shapes);
                 if (clones.Count > 0)
-                    cmds.Add(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+                    groups.Add((frame, clones));
             }
-            if (cmds.Count == 0) return;
+            if (groups.Count == 0) return;
 
             int shapeCount = shapes.Count;
             string desc = shapeCount == 1
-                ? $"Paste {ShapeUndoLabel.Format(shapes[0])} into {cmds.Count} Frames"
-                : $"Paste {shapeCount} Shapes into {cmds.Count} Frames";
-            _undoManager.Execute(new CompositeCommand(cmds, desc));
+                ? $"Paste {ShapeUndoLabel.Format(shapes[0])} into {groups.Count} Frames"
+                : $"Paste {shapeCount} Shapes into {groups.Count} Frames";
+            _undoManager.Execute(new PasteShapesCommand(groups, desc, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteChainsCut"/>

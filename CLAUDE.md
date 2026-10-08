@@ -24,6 +24,7 @@ The only relevant question is "is this the right design?" — never "will this b
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL, version pinned in the root `Directory.Packages.props`)
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
+- Sample catalog, by skill (with gaps): `design/SAMPLES.md`
 - Multi-phase plans: `plan/plan.md` (index) — see below
 - Test project: `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`
 
@@ -59,7 +60,7 @@ Skills live in two locations, by audience:
 - **`/frb-skills/`** — 3rd-party skills for game developers using FlatRedBall2 (entities, collision, physics, animation, etc.). These are the public, distributable skill set.
 - **`/.claude/skills/`** — 1st-party skills for engine contributors only (TDD discipline, skill authoring, sample-project bootstrap, content-boundary philosophy, orchestrator).
 
-The 3rd-party skills are also surfaced under `/.claude/skills/<name>` via local symlinks (gitignored) so Claude Code's auto-discovery picks them up while working on the engine. Edit the canonical copy under `/frb-skills/`.
+The 3rd-party skills are also surfaced under `/.claude/skills/<name>` via local symlinks (gitignored) so Claude Code's auto-discovery picks them up while working on the engine. Edit the canonical copy under `/frb-skills/`. Run `tools/link-skills.ps1` after cloning and after adding, renaming, or removing an `frb-skills/` folder; it creates the links and regenerates their `.gitignore` block.
 
 Invoke these with the Skill tool when working on specific topics:
 - `entities-and-factories` — Entity lifecycle, Add (shapes/Gum), Factory<T>, spawning
@@ -109,7 +110,7 @@ Invoke these with the Skill tool when working on specific topics:
 
 **Every code change that alters behavior must either (a) start with a failing test that the change makes pass, or (b) include an explicit, written explanation of why a test was not feasible.** This applies to the entire repository — engine (`src/`), tools (`tools/`), samples, anything. There is no third option. Silently skipping tests is not allowed.
 
-The `engine-tdd` skill spells out the discipline for `src/`; the same rule applies everywhere else. Hard-to-test surfaces (UI cursor changes, render output, third-party-library wiring) are not exemptions — they are a prompt to **extract the testable core** (a pure mapping function, a state computation, a hit-test) and test that, then leave a thin untested wiring layer.
+The `engine-tdd` skill spells out the discipline for `src/`; the same rule applies everywhere else. Hard-to-test surfaces (UI cursor changes, render output, third-party-library wiring) are not exemptions — they are a prompt to **extract the testable core** (a pure mapping function, a state computation, a hit-test) and test that, then leave a thin untested wiring layer. Installer and OS-integration behavior (registry, file association, uninstall) can be tested for real in Windows Sandbox; see the `animation-editor-testing` skill.
 
 When (b) applies, the explanation must be in the PR/commit body and must say:
 1. What specifically blocked a test (e.g., "Avalonia `Cursor` exposes no equality on `StandardCursorType`").

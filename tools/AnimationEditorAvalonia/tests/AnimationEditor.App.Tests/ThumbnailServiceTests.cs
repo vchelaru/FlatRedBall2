@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
@@ -597,38 +596,5 @@ public class ThumbnailServiceTests
         var bottomPx = thumb.GetPixel(4, thumb.Height - 1);
         Assert.True(bottomPx.Red > bottomPx.Blue,
             $"Bottom edge pixel {bottomPx} should be red after vertical flip.");
-    }
-
-    // -- SeedTexture (#535 M2: browser has no filesystem) ---------------------
-    //
-    // ResolveTexturePath normally requires the resolved path to exist on disk. A bundled
-    // browser sample's texture only ever exists as in-memory bytes fetched over HTTP, so
-    // SeedTexture lets a caller register an already-decoded bitmap under a texture name and
-    // have ResolveTexturePath/GetBitmap trust it without ever touching disk.
-
-    [Fact]
-    public void ResolveTexturePath_TextureNameSeededAndNoFileOnDisk_ReturnsNormalizedTextureName()
-    {
-        var svc = MakeSvc();
-        using var bitmap = new SKBitmap(4, 4);
-        svc.SeedTexture(@"sample\player.png", bitmap);
-        var frame = Frame();
-        frame.TextureName = @"sample\player.png";
-
-        var resolved = svc.ResolveTexturePath(frame);
-
-        Assert.Equal("sample/player.png", resolved);
-    }
-
-    [Fact]
-    public void GetBitmap_PathPreviouslySeeded_ReturnsTheSeededInstance()
-    {
-        var svc = MakeSvc();
-        using var bitmap = new SKBitmap(4, 4);
-        svc.SeedTexture("sample/player.png", bitmap);
-
-        var got = svc.GetBitmap("sample/player.png");
-
-        Assert.Same(bitmap, got);
     }
 }

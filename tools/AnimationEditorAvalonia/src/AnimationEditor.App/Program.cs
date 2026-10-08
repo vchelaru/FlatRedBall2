@@ -2,6 +2,7 @@
 using Avalonia;
 using System;
 using System.IO;
+using System.Runtime.Versioning;
 using Velopack;
 
 namespace AnimationEditor.App;
@@ -17,7 +18,10 @@ class Program
         // Managed installs must initialize Velopack before any app code so an already-applied
         // update can complete its bootstrap work. Local builds and legacy archive downloads
         // pass through without changing their launch behavior.
-        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        var velopack = VelopackApp.Build().SetAutoApplyOnStartup(false);
+        if (OperatingSystem.IsWindows())
+            AddAchxAssociationHooks(velopack);
+        velopack.Run();
 
         // Install crash logging first so even a failure during startup gets recorded.
         CrashLogging.Install(AppContext.BaseDirectory,
@@ -73,6 +77,24 @@ class Program
             // is current, not the local var captured before that could have happened.
             App.SingleInstance?.Dispose();
         }
+    }
+
+    // Registers .achx/.achj against the installed exe so the editor shows up in Default apps
+    // and Open with; uninstall removes only our entries.
+    [SupportedOSPlatform("windows")]
+    private static void AddAchxAssociationHooks(VelopackApp velopack) =>
+        velopack
+            .OnAfterInstallFastCallback(_ => RegisterAchxAssociation())
+            .OnAfterUpdateFastCallback(_ => RegisterAchxAssociation())
+            .OnBeforeUninstallFastCallback(_ => WindowsAchxRegistration.Unregister());
+
+    [SupportedOSPlatform("windows")]
+    private static void RegisterAchxAssociation()
+    {
+        // The update hook also runs for a self-updating portable build; skip that one, same
+        // gate as Settings' "Set as default".
+        if (Environment.ProcessPath is { } exe && VelopackInstallState.IsSetupInstall())
+            WindowsAchxRegistration.Register(exe);
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.

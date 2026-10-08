@@ -64,7 +64,7 @@
     The .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave, ColorOperation,
     etc.) has no MonoGame dependency, so it lives in its own project. This lets tooling like the
     AnimationEditor (Avalonia, not MonoGame) reference the .achx format without pulling in
-    MonoGame.Framework.DesktopGL at all; see tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md.
+    MonoGame.Framework.DesktopGL at all.
   -->
   <ItemGroup>
     <ProjectReference Include="AnimationChain.Common/AnimationChain.Common.csproj" />

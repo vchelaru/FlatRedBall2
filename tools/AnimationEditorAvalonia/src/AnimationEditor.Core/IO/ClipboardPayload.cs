@@ -41,7 +41,7 @@ public static class ClipboardPayload
     {
         var frame = new AnimationFrameSave { TextureName = "_", ShapesSave = new ShapesSave() };
         foreach (var shape in shapes)
-            frame.ShapesSave!.Shapes.Add(shape);
+            frame.ShapesSave!.Add(shape);
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave();
         chain.Frames.Add(frame);

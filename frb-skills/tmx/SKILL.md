@@ -27,9 +27,11 @@ When a game needs a TMX level, copy these three files into the game's content di
 
 The `.tmx` references the `.tsx` by relative path (`source="StandardTileset.tsx"`), so they must be in the same directory.
 
+**Referenced paths are case-sensitive once deployed.** The `.tmx`'s `<tileset source>` and the `.tsx`'s `<image source>` reach `TitleContainer.OpenStream` with their casing unchanged (`TileMap.DefaultTmxLoader`). A casing mismatch loads fine on Windows and on macOS's default filesystem, then fails on Linux and on case-sensitive web hosts, so match each path's casing to the file on disk.
+
 ## .csproj — Copy Tiled Files to Output
 
-TMX files are loaded at runtime via `ParseFromFile`, not the content pipeline. All Tiled files must be copied to the output directory. Add this to the `.csproj`:
+TMX files are loaded at runtime by `TileMap` (through `TitleContainer`), not the content pipeline. All Tiled files must be copied to the output directory. Add this to the `.csproj`:
 
 ```xml
 <ItemGroup>
@@ -159,7 +161,7 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 
 ### Add an object layer for entity spawns
 
-Object layers hold spawn markers. A tile object references a tile from the tileset via its GID and inherits that tile's Class; any other shape (`<point>`, `<ellipse>`, a bare rectangle, a `<polygon>`) needs the `class` attribute set on the `<object>` itself. Add an `<objectgroup>` after the tile layers:
+Object layers hold spawn markers. A tile object references a tile from the tileset via its GID and inherits that tile's Class; any other shape (`<point>`, `<ellipse>`, a bare rectangle, a `<polygon>`) needs the `class` attribute set on the `<object>` itself. Tiled before 1.9 spelled this attribute `type`; the loader reads `type=` and `class=` into the same Class (the StandardTileset still uses `type=`), so neither spelling needs migrating. Add an `<objectgroup>` after the tile layers:
 
 ```xml
 <objectgroup id="2" name="Entities">

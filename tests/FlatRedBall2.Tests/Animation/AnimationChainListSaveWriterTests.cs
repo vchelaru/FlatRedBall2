@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -34,7 +35,7 @@ public class AnimationChainListSaveWriterTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Hit", X = 1, Y = 2, ScaleX = 3, ScaleY = 4 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Hit", X = 1, Y = 2, ScaleX = 3, ScaleY = 4 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -52,7 +53,7 @@ public class AnimationChainListSaveWriterTests
         var chain = new AnimationChainSave { Name = "C" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new CircleSave { Name = "Origin", X = 5, Y = 6, Radius = 7 });
+        frame.ShapesSave.Add(new CircleSave { Name = "Origin", X = 5, Y = 6, Radius = 7 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -114,8 +115,24 @@ public class AnimationChainListSaveWriterTests
         doc.Descendants("FlipHorizontal").Single().Value.ShouldBe("true");
     }
 
+    // Shape of FRB1's FlatRedBall.Content.Polygon.PolygonSave, which FRB1 reads with XmlSerializer:
+    // Points is FlatRedBall.Math.Geometry.Point[] (a struct of double X/Y). Unrecognized point
+    // elements are skipped silently, so a name mismatch loads a polygon with zero points.
+    [System.Xml.Serialization.XmlType("Point")]
+    public struct Frb1Point { public double X; public double Y; }
+
+    [System.Xml.Serialization.XmlRoot("PolygonSave")]
+    public class Frb1PolygonSave
+    {
+        public float X;
+        public float Y;
+        public float Z;
+        public Frb1Point[] Points = [];
+        public string Name = string.Empty;
+    }
+
     [Fact]
-    public void Save_Polygon_EmitsPointsWithVector2Save()
+    public void Save_Polygon_PointsAreReadableByFrb1PolygonSave()
     {
         var save = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "P" };
@@ -124,16 +141,18 @@ public class AnimationChainListSaveWriterTests
         var poly = new PolygonSave { Name = "Shape", X = 0, Y = 0 };
         poly.Points.Add(new Vector2Save { X = 1, Y = 2 });
         poly.Points.Add(new Vector2Save { X = 3, Y = 4 });
-        frame.ShapesSave.Shapes.Add(poly);
+        frame.ShapesSave.Add(poly);
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
-        var doc = SaveAndParse(save);
+        var polyEl = SaveAndParse(save).Descendants("PolygonSave").Single();
+        var frb1 = (Frb1PolygonSave)new System.Xml.Serialization.XmlSerializer(typeof(Frb1PolygonSave))
+            .Deserialize(polyEl.CreateReader())!;
 
-        var points = doc.Descendants("PolygonSave").Single().Element("Points")!.Elements("Vector2Save").ToList();
-        points.Count.ShouldBe(2);
-        points[0].Element("X")!.Value.ShouldBe("1");
-        points[1].Element("Y")!.Value.ShouldBe("4");
+        frb1.Name.ShouldBe("Shape");
+        frb1.Points.Length.ShouldBe(2);
+        frb1.Points[0].X.ShouldBe(1);
+        frb1.Points[1].Y.ShouldBe(4);
     }
 
     [Fact]
@@ -190,5 +209,41 @@ public class AnimationChainListSaveWriterTests
         var first = doc.Root!.Elements().Take(3).Select(e => e.Name.LocalName).ToList();
         first.ShouldBe(new[] { "FileRelativeTextures", "TimeMeasurementUnit", "CoordinateType" });
         doc.Root.Element("CoordinateType")!.Value.ShouldBe("Pixel");
+    }
+    [Fact]
+    public void Save_FrameWithoutEvents_OmitsEventsElement()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { new AnimationFrameSave() } });
+
+        var doc = SaveAndParse(save);
+
+        doc.Descendants("Events").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Save_FrameWithEvents_RoundTripsNameAndOptionalData()
+    {
+        var frame = new AnimationFrameSave();
+        frame.Events.Add(new AnimationFrameEvent { Name = "Footstep" });
+        frame.Events.Add(new AnimationFrameEvent { Name = "Spawn", Data = "{\"count\":3}" });
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
+
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".achx");
+        try
+        {
+            save.Save(tempPath);
+            var events = AnimationChainListSave.FromFile(tempPath).AnimationChains[0].Frames[0].Events;
+
+            events.Select(e => e.Name).ShouldBe(new[] { "Footstep", "Spawn" });
+            events[0].Data.ShouldBeNull();
+            events[1].Data.ShouldBe("{\"count\":3}");
+            XDocument.Load(tempPath).Descendants("Event").First().Element("Data").ShouldBeNull();
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
     }
 }

@@ -1,6 +1,6 @@
 ---
 name: animation-editor-tiled
-description: AnimationEditor Tiled .tsx support — opening a tileset as a native project. Triggers: .tsx, TsxWriter, NativeTsxAnimationSync, IsNativeTsxProject, ParentId, multi-tile animation.
+description: "AnimationEditor Tiled .tsx support — opening a tileset as a native project. Triggers: .tsx, TsxWriter, NativeTsxAnimationSync, IsNativeTsxProject, ParentId, multi-tile animation."
 ---
 
 # AnimationEditor — Tiled Tilesets

@@ -17,7 +17,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "HitBox" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -46,7 +46,7 @@ public class ObjectFinderTests
         var chain2 = TestHelpers.MakeChain(acls, "Chain2", 3);
         var targetFrame = chain2.Frames[2];
         var rect = new AARectSave { Name = "DeepBox" };
-        targetFrame.ShapesSave!.Shapes.Add(rect);
+        targetFrame.ShapesSave!.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -61,7 +61,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frameWithRect = chain.Frames[0];
         var rect = new AARectSave { Name = "Box" };
-        frameWithRect.ShapesSave!.Shapes.Add(rect);
+        frameWithRect.ShapesSave!.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -78,7 +78,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Halo", Radius = 12 };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(circle);
 
@@ -106,7 +106,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Attack", 4);
         var targetFrame = chain.Frames[3];
         var circle = new CircleSave { Name = "DeepCircle", Radius = 8 };
-        targetFrame.ShapesSave!.Shapes.Add(circle);
+        targetFrame.ShapesSave!.Add(circle);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(circle);
 

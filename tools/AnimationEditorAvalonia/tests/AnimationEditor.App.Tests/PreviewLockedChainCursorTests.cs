@@ -59,7 +59,7 @@ public class PreviewLockedChainCursorTests
     {
         rect = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         var chain = new AnimationChainSave { Name = "Test", IsLocked = locked };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

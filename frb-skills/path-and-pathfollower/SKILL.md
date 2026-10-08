@@ -1,3 +1,8 @@
+---
+name: path-and-pathfollower
+description: "Use when working with Path, PathFollower, patrol routes, scripted movement, arc geometry, or trajectory rendering in FlatRedBall2."
+---
+
 # Path and PathFollower in FlatRedBall2
 
 Use when working with `Path`, `PathFollower`, patrol routes, scripted movement, arc geometry, or trajectory rendering.

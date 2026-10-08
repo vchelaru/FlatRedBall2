@@ -265,5 +265,6 @@ public class ProjectTreeThumbnailServiceTests
 
         public Task<IEditorFile?> GetFileAsync(string name) =>
             Task.FromResult(FilesByName.TryGetValue(name, out var f) ? (IEditorFile?)f : null);
+        public Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath) => GetFileAsync(relativePath);
     }
 }

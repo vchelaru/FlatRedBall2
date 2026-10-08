@@ -8,6 +8,20 @@ namespace AnimationEditor.Core.Tests;
 public class AnimationCloneHelperTests
 {
     [Fact]
+    public void CloneFrame_WithEvents_DeepCopiesEvents()
+    {
+        var source = new AnimationFrameSave();
+        source.Events.Add(new AnimationFrameEvent { Name = "Footstep", Data = "left" });
+
+        var copy = AnimationCloneHelper.CloneFrame(source);
+
+        var copied = Assert.Single(copy.Events);
+        Assert.Equal("Footstep", copied.Name);
+        Assert.Equal("left", copied.Data);
+        Assert.NotSame(source.Events[0], copied);
+    }
+
+    [Fact]
     public void CloneFrame_AllFieldsSetToNonDefaultValues_CopiesEveryField()
     {
         var source = new AnimationFrameSave
@@ -80,12 +94,60 @@ public class AnimationCloneHelperTests
     {
         var source = new AnimationFrameSave { TextureName = "walk.png" };
         source.ShapesSave = new ShapesSave();
-        source.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+        source.ShapesSave.Add(new AARectSave { Name = "HitBox" });
 
         var copy = AnimationCloneHelper.CloneFrame(source);
 
         Assert.NotNull(copy.ShapesSave);
         Assert.Single(copy.ShapesSave!.Shapes);
         Assert.NotSame(source.ShapesSave.Shapes[0], copy.ShapesSave.Shapes[0]);
+    }
+
+    // Guards against a field added to the save model later but never cloned: every scalar field is
+    // set to a non-default value by reflection, so the test fails as soon as a clone misses one.
+    [Fact]
+    public void CloneChain_EveryScalarFieldNonDefault_CopiesEveryScalarField()
+    {
+        var source = new AnimationChainSave();
+        SetEveryScalarFieldNonDefault(source);
+
+        var copy = AnimationCloneHelper.CloneChain(source);
+
+        AssertScalarFieldsEqual(source, copy);
+    }
+
+    [Fact]
+    public void CloneFrame_EveryScalarFieldNonDefault_CopiesEveryScalarField()
+    {
+        var source = new AnimationFrameSave();
+        SetEveryScalarFieldNonDefault(source);
+
+        var copy = AnimationCloneHelper.CloneFrame(source);
+
+        AssertScalarFieldsEqual(source, copy);
+    }
+
+    private static IEnumerable<System.Reflection.FieldInfo> ScalarFields(Type type) =>
+        type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(f => f.FieldType == typeof(string) || f.FieldType.IsValueType);
+
+    private static void SetEveryScalarFieldNonDefault(object target)
+    {
+        foreach (var field in ScalarFields(target.GetType()))
+        {
+            var type = Nullable.GetUnderlyingType(field.FieldType) ?? field.FieldType;
+            object value =
+                type == typeof(string) ? "set" :
+                type == typeof(bool) ? !(bool)(field.GetValue(target) ?? false) :
+                type.IsEnum ? Enum.GetValues(type).Cast<object>().Last() :
+                Convert.ChangeType(7, type);
+            field.SetValue(target, value);
+        }
+    }
+
+    private static void AssertScalarFieldsEqual(object expected, object actual)
+    {
+        foreach (var field in ScalarFields(expected.GetType()))
+            Assert.True(Equals(field.GetValue(expected), field.GetValue(actual)), $"{field.Name} was not cloned");
     }
 }

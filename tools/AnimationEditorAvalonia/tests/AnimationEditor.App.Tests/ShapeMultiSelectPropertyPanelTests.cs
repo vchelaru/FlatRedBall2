@@ -55,8 +55,8 @@ public class ShapeMultiSelectPropertyPanelTests
             var f1 = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
             var rect0 = new AARectSave { Name = "Box0", ScaleX = 8f, ScaleY = 8f };
             var rect1 = new AARectSave { Name = "Box1", ScaleX = 8f, ScaleY = 8f };
-            f0.ShapesSave!.Shapes.Add(rect0);
-            f1.ShapesSave!.Shapes.Add(rect1);
+            f0.ShapesSave!.Add(rect0);
+            f1.ShapesSave!.Add(rect1);
             chain.Frames.AddRange(new[] { f0, f1 });
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
@@ -108,8 +108,8 @@ public class ShapeMultiSelectPropertyPanelTests
             var f1 = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
             var rect0 = new AARectSave { Name = "Box0" };
             var rect1 = new AARectSave { Name = "Box1" };
-            f0.ShapesSave!.Shapes.Add(rect0);
-            f1.ShapesSave!.Shapes.Add(rect1);
+            f0.ShapesSave!.Add(rect0);
+            f1.ShapesSave!.Add(rect1);
             chain.Frames.AddRange(new[] { f0, f1 });
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
@@ -163,8 +163,8 @@ public class ShapeMultiSelectPropertyPanelTests
             var f0 = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
             var rect0 = new AARectSave { Name = "Box0" };
             var rect1 = new AARectSave { Name = "Box1" };
-            f0.ShapesSave!.Shapes.Add(rect0);
-            f0.ShapesSave!.Shapes.Add(rect1);
+            f0.ShapesSave!.Add(rect0);
+            f0.ShapesSave!.Add(rect1);
             chain.Frames.Add(f0);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 

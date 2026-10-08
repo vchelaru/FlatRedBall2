@@ -30,7 +30,7 @@ public class ClipboardPayloadShapeTests
     {
         var frame = new AnimationFrameSave { TextureName = "lava.png" };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "BulletOrigin", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f });
+        frame.ShapesSave.Add(new AARectSave { Name = "BulletOrigin", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f });
 
         var rt = RoundTripFrame(frame).ShapesSave!.AARectSaves.Single();
 
@@ -46,7 +46,7 @@ public class ClipboardPayloadShapeTests
     {
         var frame = new AnimationFrameSave { TextureName = "lava.png" };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new CircleSave { Name = "Hit", X = 5f, Y = 6f, Radius = 7f });
+        frame.ShapesSave.Add(new CircleSave { Name = "Hit", X = 5f, Y = 6f, Radius = 7f });
 
         var rt = RoundTripFrame(frame).ShapesSave!.CircleSaves.Single();
 
@@ -65,7 +65,7 @@ public class ClipboardPayloadShapeTests
         poly.Points.Add(new Vector2Save { X = 10f, Y = 0f });
         poly.Points.Add(new Vector2Save { X = 10f, Y = 8f });
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(poly);
+        frame.ShapesSave.Add(poly);
 
         var rt = RoundTripFrame(frame).ShapesSave!.PolygonSaves.Single();
 
@@ -82,9 +82,9 @@ public class ClipboardPayloadShapeTests
     {
         var frame = new AnimationFrameSave { TextureName = "lava.png" };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "A" });
-        frame.ShapesSave.Shapes.Add(new CircleSave { Name = "B" });
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "C" });
+        frame.ShapesSave.Add(new AARectSave { Name = "A" });
+        frame.ShapesSave.Add(new CircleSave { Name = "B" });
+        frame.ShapesSave.Add(new AARectSave { Name = "C" });
 
         var rt = RoundTripFrame(frame).ShapesSave!.Shapes;
 
@@ -121,7 +121,7 @@ public class ClipboardPayloadShapeTests
             ColorOperation  = ColorOperation.Add,
         };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "BulletOrigin" });
+        frame.ShapesSave.Add(new AARectSave { Name = "BulletOrigin" });
 
         var rt = RoundTripFrame(frame);
 
@@ -161,7 +161,7 @@ public class ClipboardPayloadShapeTests
         var chain = new AnimationChainSave { Name = "IdleDown" };
         var frame = new AnimationFrameSave { TextureName = "lava.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "BulletOrigin" });
+        frame.ShapesSave.Add(new AARectSave { Name = "BulletOrigin" });
         chain.Frames.Add(frame);
 
         var xml = ClipboardPayload.Serialize(new List<AnimationChainSave> { chain });

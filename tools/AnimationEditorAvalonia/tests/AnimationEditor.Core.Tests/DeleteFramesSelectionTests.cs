@@ -46,7 +46,7 @@ public class DeleteFramesSelectionTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 2);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedRectangle = rect;
 

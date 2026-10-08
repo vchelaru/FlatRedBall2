@@ -56,12 +56,39 @@ public class MultiCopyPasteTests
     }
 
     [Fact]
+    public void PasteShapes_CopiedInReverseSelectionOrder_KeepsSourceOrder()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var source = chain.Frames[0];
+        var target = chain.Frames[1];
+        var shapes = new object[]
+        {
+            new AARectSave { Name = "R1" }, new AARectSave { Name = "R2" },
+            new PolygonSave { Name = "P1" }, new PolygonSave { Name = "P2" },
+            new CircleSave { Name = "C1" }, new CircleSave { Name = "C2" },
+        };
+        foreach (var shape in shapes)
+            source.ShapesSave!.Add(shape);
+        // Selected bottom-up, so selection order is the reverse of the frame's order.
+        ctx.SelectedState.SelectShape(shapes[0]);
+        ctx.SelectedState.SelectedNodes = shapes.Reverse().ToList();
+
+        Assert.True(SelectionCopyContext.TryGet(
+            ctx.SelectedState, ctx.ObjectFinder, ctx.Acls, out var payload, out _));
+        ctx.AppCommands.PasteShapes(target, payload.Shapes);
+
+        Assert.Equal(new[] { "R1", "R2", "P1", "P2", "C1", "C2" },
+            target.ShapesSave!.Shapes.Cast<ShapeSave>().Select(s => s.Name));
+    }
+
+    [Fact]
     public void PasteShapes_NameCollision_UniquifiesEach()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "Hit" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "Hit" });
 
         ctx.AppCommands.PasteShapes(frame, new object[] { new AARectSave { Name = "Hit" } });
 
@@ -95,6 +122,26 @@ public class MultiCopyPasteTests
         Assert.Empty(f0.ShapesSave!.Shapes);
         Assert.Empty(f1.ShapesSave!.Shapes);
         Assert.Empty(f2.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void PasteShapes_MultiFrame_SelectsEveryPastedShape_UndoRestoresSelection()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        var frames = chain.Frames.ToList();
+        ctx.SelectedState.SelectedNodes = frames.Cast<object>().ToList();
+
+        ctx.AppCommands.PasteShapes(frames, new object[] { new AARectSave { Name = "Hit" } });
+
+        var pasted = frames.Select(f => f.ShapesSave!.Shapes.Single()).ToList();
+        Assert.Equal(pasted, ctx.SelectedState.SelectedShapes);
+
+        ctx.UndoManager.Undo();
+        Assert.Equal(frames.Cast<object>(), ctx.SelectedState.SelectedNodes);
+
+        ctx.UndoManager.Redo();
+        Assert.Equal(pasted, ctx.SelectedState.SelectedShapes);
     }
 
     [Fact]
@@ -312,8 +359,8 @@ public class MultiCopyPasteTests
         var frame = chain.Frames[0];
         var r = new AARectSave { Name = "R" };
         var c = new CircleSave { Name = "C", Radius = 1 };
-        frame.ShapesSave!.Shapes.Add(r);
-        frame.ShapesSave.Shapes.Add(c);
+        frame.ShapesSave!.Add(r);
+        frame.ShapesSave.Add(c);
 
         ctx.AppCommands.DuplicateSelection(new CopySelectionPayload
         {

@@ -48,12 +48,16 @@ namespace AnimationEditor.Core.Models
         public bool FillFrameRectangles { get; set; } = true;
 
         /// <summary>
-        /// When <c>true</c>, the editor never offers to register itself as the default
-        /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
-        /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear
-        /// once on a fresh install.
+        /// Whether the frame preview draws the frame's bounding box (#1282). Defaults to <c>true</c>;
+        /// the Bounding Box toggle in the preview toolbar writes it.
         /// </summary>
-        public bool SuppressDefaultHandlerPrompt { get; set; }
+        public bool ShowBoundingBox { get; set; } = true;
+
+        /// <summary>
+        /// Whether the Project tab also lists folders with no animation files (#1332). Defaults to
+        /// <c>false</c>; the tab's "Show all folders" checkbox writes it.
+        /// </summary>
+        public bool ShowAllProjectFolders { get; set; }
 
         /// <summary>
         /// The folder last picked via File → Open Project Folder (#770). Rescanned on the next

@@ -687,11 +687,34 @@ public class TileMap
         var result = new Dictionary<string, string>(merged.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in merged)
         {
-            var s = value.AsString();
+            var s = ToTiledString(value);
             if (s != null)
                 result[key] = s;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Formats a property value the way Tiled writes it in the TMX (<c>true</c>, <c>1.5</c>,
+    /// <c>#aarrggbb</c>, object ID). <see cref="TilemapPropertyValue.AsString"/> throws for every
+    /// type except <see cref="TilemapPropertyType.String"/>, so never call it without a type check.
+    /// </summary>
+    private static string? ToTiledString(TilemapPropertyValue value)
+    {
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        switch (value.Type)
+        {
+            case TilemapPropertyType.String: return value.AsString();
+            case TilemapPropertyType.Int: return value.AsInt().ToString(invariant);
+            case TilemapPropertyType.Float: return value.AsFloat().ToString(invariant);
+            case TilemapPropertyType.Bool: return value.AsBool() ? "true" : "false";
+            case TilemapPropertyType.File: return value.AsFile();
+            case TilemapPropertyType.Object: return value.AsObject().ToString(invariant);
+            case TilemapPropertyType.Color:
+                var c = value.AsColor();
+                return $"#{c.A:x2}{c.R:x2}{c.G:x2}{c.B:x2}";
+            default: return null;
+        }
     }
 
     /// <summary>
@@ -800,8 +823,13 @@ public class TileMap
     /// <para>
     /// Tiled custom properties are automatically applied to matching public instance properties
     /// on the entity via reflection (case-insensitive name match). Supported property types:
-    /// <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>. Two Tiled property sources are
-    /// merged: class-level properties (defined once on the tile's type in the tileset, apply to
+    /// <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>. A <c>string</c> property accepts any
+    /// Tiled type in its TMX text form, and a <c>float</c> accepts a Tiled <c>int</c>. A Tiled
+    /// property whose name matches an entity property that can't take its value — any other type
+    /// mismatch, or an entity property of an unsupported type — throws
+    /// <see cref="InvalidOperationException"/> naming the Tiled source, the property, and both
+    /// types. Tiled properties with no matching entity property are ignored. Two Tiled property
+    /// sources are merged: class-level properties (defined once on the tile's type in the tileset, apply to
     /// every tile of that type) and instance-level properties (set on an individual object-layer
     /// tile-object). When both set the same key, the instance-level value wins. Painted tile-layer
     /// cells only have class-level properties — Tiled has no per-cell instance property mechanism
@@ -811,6 +839,7 @@ public class TileMap
     /// If the entity declares a public settable <c>TiledGid</c> property of type <c>int</c>,
     /// <c>uint</c>, <c>long</c>, or <c>ulong</c>, it is populated with the spawning tile's Tiled
     /// global ID (GID). This is opt-in — entities that don't declare the property are unaffected.
+    /// A <c>TiledGid</c> property of any other type throws <see cref="InvalidOperationException"/>.
     /// </para>
     /// <para>
     /// If the factory has <see cref="Factory{T}.IsSolidGrid"/> set, the whole scan is wrapped
@@ -906,11 +935,13 @@ public class TileMap
                     out var worldX, out var worldY, out var mergedProps, out var gid))
                 continue;
 
+            var source = new SpawnSource(className, objectLayer.Name, obj, Col: 0, Row: 0);
+
             if (lazy)
             {
                 LazySpawner.Add(factory, worldX, worldY, applyAfterInit: e =>
                 {
-                    ApplyProperties(e, mergedProps, gid, entityProps);
+                    ApplyProperties(e, mergedProps, gid, entityProps, source);
                     configure?.Invoke(e);
                 });
             }
@@ -919,7 +950,7 @@ public class TileMap
                 var entity = factory.Create();
                 entity.X = worldX;
                 entity.Y = worldY;
-                ApplyProperties(entity, mergedProps, gid, entityProps);
+                ApplyProperties(entity, mergedProps, gid, entityProps, source);
                 configure?.Invoke(entity);
                 created.Add(entity);
             }
@@ -1077,12 +1108,13 @@ public class TileMap
                 // so only the tile's class-level properties are in play here.
                 var mergedProps = BuildMergedPropertySnapshot(tileData.Properties, instanceProps: null);
                 int gid = tileNullable.Value.GlobalId;
+                var source = new SpawnSource(className, tileLayer.Name, Object: null, col, row);
 
                 if (lazy)
                 {
                     LazySpawner.Add(factory, worldX, worldY, applyAfterInit: e =>
                     {
-                        ApplyProperties(e, mergedProps, gid, entityProps);
+                        ApplyProperties(e, mergedProps, gid, entityProps, source);
                         configure?.Invoke(e);
                     });
                 }
@@ -1091,7 +1123,7 @@ public class TileMap
                     var entity = factory.Create();
                     entity.X = worldX;
                     entity.Y = worldY;
-                    ApplyProperties(entity, mergedProps, gid, entityProps);
+                    ApplyProperties(entity, mergedProps, gid, entityProps, source);
                     configure?.Invoke(entity);
                     created.Add(entity);
                 }
@@ -1123,45 +1155,100 @@ public class TileMap
         return merged;
     }
 
+    /// <summary>
+    /// Where a spawn came from, kept only so a property-conversion error can name the Tiled source.
+    /// <see cref="Object"/> is null for a painted tile-layer cell, which is identified by
+    /// <see cref="Col"/>/<see cref="Row"/> instead.
+    /// </summary>
+    private readonly record struct SpawnSource(
+        string ClassName, string LayerName, TilemapObject? Object, int Col, int Row)
+    {
+        public string Describe()
+        {
+            if (Object == null)
+                return $"Painted tile at column {Col}, row {Row} on layer '{LayerName}' (class '{ClassName}')";
+            var name = string.IsNullOrEmpty(Object.Name) ? "<unnamed>" : $"'{Object.Name}'";
+            return $"Tiled object {name} (id {Object.Id}, class '{ClassName}') on layer '{LayerName}'";
+        }
+    }
+
     private static void ApplyProperties<T>(
         T entity,
         Dictionary<string, TilemapPropertyValue> mergedProps,
         int gid,
-        Dictionary<string, PropertyInfo> entityProps) where T : Entity
+        Dictionary<string, PropertyInfo> entityProps,
+        SpawnSource source) where T : Entity
     {
         foreach (var (name, propInfo) in entityProps)
         {
+            var memberType = propInfo.PropertyType;
+
             // TiledGid is a synthetic entry, not a real Tiled property — opt-in purely by
             // declaring a public settable TiledGid property on the entity. GID is always a
             // non-negative Int32, so int/uint/long/ulong are all safe widening conversions.
             // short/ushort/byte are deliberately not supported — they can silently truncate.
             if (string.Equals(name, "TiledGid", StringComparison.OrdinalIgnoreCase))
             {
-                if (propInfo.PropertyType == typeof(int))
+                if (memberType == typeof(int))
                     propInfo.SetValue(entity, gid);
-                else if (propInfo.PropertyType == typeof(uint))
+                else if (memberType == typeof(uint))
                     propInfo.SetValue(entity, (uint)gid);
-                else if (propInfo.PropertyType == typeof(long))
+                else if (memberType == typeof(long))
                     propInfo.SetValue(entity, (long)gid);
-                else if (propInfo.PropertyType == typeof(ulong))
+                else if (memberType == typeof(ulong))
                     propInfo.SetValue(entity, (ulong)gid);
+                else
+                    throw new InvalidOperationException(
+                        $"{typeof(T).Name}.{propInfo.Name} is {memberType.Name}, but a TiledGid property " +
+                        "must be int, uint, long, or ulong. Change its type, or rename it if it isn't " +
+                        "meant to receive the spawning tile's GID.");
                 continue;
             }
 
             if (!mergedProps.TryGetValue(name, out var tiledValue))
                 continue;
 
-            object? converted = propInfo.PropertyType switch
+            // Each As*() accessor throws unless the Tiled type matches exactly, so dispatch on
+            // both types. A string property takes any Tiled value; float widens from int; any
+            // other combination throws rather than silently leaving the entity at its default.
+            var tiledType = tiledValue.Type;
+            object? converted = memberType switch
             {
-                Type t when t == typeof(string) => tiledValue.AsString(),
-                Type t when t == typeof(int) => tiledValue.AsInt(),
-                Type t when t == typeof(float) => tiledValue.AsFloat(),
-                Type t when t == typeof(bool) => tiledValue.AsBool(),
+                Type t when t == typeof(string) => ToTiledString(tiledValue),
+                Type t when t == typeof(int) && tiledType == TilemapPropertyType.Int => tiledValue.AsInt(),
+                Type t when t == typeof(float) && tiledType == TilemapPropertyType.Float => tiledValue.AsFloat(),
+                Type t when t == typeof(float) && tiledType == TilemapPropertyType.Int => (float)tiledValue.AsInt(),
+                Type t when t == typeof(bool) && tiledType == TilemapPropertyType.Bool => tiledValue.AsBool(),
                 _ => null,
             };
-            if (converted != null)
-                propInfo.SetValue(entity, converted);
+            if (converted == null)
+                throw new InvalidOperationException(
+                    BuildPropertyMismatchMessage(source, name, tiledType, typeof(T), propInfo));
+            propInfo.SetValue(entity, converted);
         }
+    }
+
+    private static string BuildPropertyMismatchMessage(
+        SpawnSource source, string tiledName, TilemapPropertyType tiledType, Type entityType, PropertyInfo member)
+    {
+        var tiledTypeName = tiledType.ToString().ToLowerInvariant();
+        var memberType = member.PropertyType;
+        // The Tiled types each supported member accepts; null means the member type isn't supported.
+        string? acceptedTiledTypes =
+            memberType == typeof(int) ? "int" :
+            memberType == typeof(float) ? "float or int" :
+            memberType == typeof(bool) ? "bool" :
+            null;
+
+        var fix = acceptedTiledTypes != null
+            ? $"Change the property's type in Tiled to {acceptedTiledTypes}, or change " +
+              $"{entityType.Name}.{member.Name} to a type that accepts a Tiled {tiledTypeName} " +
+              "(string accepts any Tiled type)."
+            : $"{memberType.Name} is not a supported property type; change {entityType.Name}.{member.Name} " +
+              "to string, int, float, or bool, or rename the member or the Tiled property so they no longer match.";
+
+        return $"{source.Describe()} has custom property '{tiledName}' of Tiled type {tiledTypeName}, " +
+               $"which cannot be assigned to {entityType.Name}.{member.Name} ({memberType.Name}). {fix}";
     }
 
     private static (float x, float y) OriginOffsetFromCenter(float cx, float cy, float w, float h, Origin origin)
@@ -1216,10 +1303,9 @@ public class TileMap
     /// before indexing the raw layer.
     /// <para>
     /// Values keep their native CLR type (<c>string</c>/<c>int</c>/<c>float</c>/<c>bool</c>) rather
-    /// than being stringified — unlike <see cref="GetObjectLayerData"/>'s <c>Properties</c>, whose
-    /// <c>AsString()</c>-based conversion throws for a non-string-typed property. Color, file, and
-    /// object-reference properties are omitted; nothing in this codebase applies them to a
-    /// spawned entity.
+    /// than being stringified as <see cref="GetObjectLayerData"/>'s <c>Properties</c> are. Color,
+    /// file, and object-reference properties are omitted; nothing in this codebase applies them to
+    /// a spawned entity.
     /// </para>
     /// </remarks>
     internal IReadOnlyDictionary<string, object>? GetPaintedTileClassProperties(

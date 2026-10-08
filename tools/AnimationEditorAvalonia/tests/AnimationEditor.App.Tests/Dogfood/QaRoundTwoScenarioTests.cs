@@ -71,12 +71,8 @@ public class QaRoundTwoScenarioTests
         AnimationChainSave walk = editor.ChainNamed("Walk");
         editor.Expand(walk);
         editor.ClickRow(walk.Frames[0]);
-        ComboBox mode = editor.Control<ComboBox>("PropColorMode");
-        mode.Focus();
-        editor.Layout();
 
-        editor.Press(Key.Down);
-        editor.Press(Key.Down);
+        editor.PickComboItem("PropColorMode", "Add");
         editor.TypeNumber("PropRed", "128");
 
         walk.Frames[0].ColorOperation.ShouldBe(ColorOperation.Add);

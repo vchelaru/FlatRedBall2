@@ -42,7 +42,7 @@ internal sealed class DuplicateShapesCommand : IUndoableCommand
         if (_copies.Length == 0) return false;
         _frame.ShapesSave ??= new ShapesSave();
         foreach (var copy in _copies)
-            _frame.ShapesSave.Shapes.Add(copy);
+            _frame.ShapesSave.Add(copy);
         RaiseSideEffects();
         _selectedState.SelectedNodes = _copies.ToList();
         SelectPrimaryShape(_copies[^1]);
@@ -52,7 +52,7 @@ internal sealed class DuplicateShapesCommand : IUndoableCommand
     public void Undo()
     {
         foreach (var copy in _copies)
-            _frame.ShapesSave!.Shapes.Remove(copy);
+            _frame.ShapesSave!.Remove(copy);
         RaiseSideEffects();
         _selectedState.SelectedNodes = _preSelection;
         RestorePrimarySelection(_preSelection);

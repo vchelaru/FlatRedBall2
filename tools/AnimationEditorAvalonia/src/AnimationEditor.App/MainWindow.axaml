@@ -99,6 +99,7 @@
                         <MenuItem Header="Save _As…"      x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
                             <MenuItem Header="_PixiJS…" x:Name="MenuExportPixiJs" />
+                            <MenuItem Header="_Godot SpriteFrames…" x:Name="MenuExportGodot" />
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">
@@ -220,57 +221,6 @@
                 <StackPanel x:Name="TabStrip"
                             Orientation="Horizontal" />
             </ScrollViewer>
-        </Border>
-
-        <!-- ── Default-handler prompt: offers to register the editor for .achx files.
-             Shown on startup only when not already the default and not dismissed.
-             Tier-2 "actionable info" styling — cool-tinted background, a left accent
-             stripe, and a leading info icon — so it reads as a prompt the user can act
-             on, distinct from passive chrome (title bar) and from the loud red error
-             banner below. ── -->
-        <Border x:Name="DefaultHandlerBanner"
-                DockPanel.Dock="Top"
-                IsVisible="False"
-                Background="{DynamicResource InfoBannerBg}"
-                BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="0,0,0,1">
-            <DockPanel>
-                <!-- Accent stripe: signals "actionable" without borrowing the error red. -->
-                <Border DockPanel.Dock="Left"
-                        Width="3"
-                        Background="{DynamicResource AccentCool}" />
-                <DockPanel Margin="12,6">
-                    <StackPanel DockPanel.Dock="Right"
-                                Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
-                        <Button x:Name="MakeDefaultBtn"
-                                Content="Make default"
-                                Padding="10,3"
-                                FontSize="12" />
-                        <Button x:Name="DismissDefaultHandlerBtn"
-                                Content="Don't show again"
-                                Padding="10,3"
-                                FontSize="12"
-                                Background="Transparent"
-                                Foreground="{DynamicResource InkMid}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
-                        <Path Width="16"
-                              Height="16"
-                              VerticalAlignment="Center"
-                              Stretch="Uniform"
-                              Fill="{DynamicResource AccentCool}"
-                              Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-                        <TextBlock Text="Make the AnimationEditor the default app for .achx files?"
-                                   VerticalAlignment="Center"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource Ink}" />
-                    </StackPanel>
-                </DockPanel>
-            </DockPanel>
         </Border>
 
         <!-- ── Recovered-document banner (issue #1020): a crash-recovery file is restored into
@@ -643,30 +593,27 @@
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
                         </Style>
+                        <!-- Unlocked, the lock sits left of add-frame (30). Locked hides add-frame
+                             (CanAddFrame), so the lock takes its slot at the edge (4) instead of leaving a gap. -->
+                        <Style Selector="Button.lock-btn">
+                            <Setter Property="Margin" Value="0,0,30,0" />
+                        </Style>
                         <Style Selector="Button.lock-btn.locked">
+                            <Setter Property="Margin" Value="0,0,4,0" />
                             <Setter Property="Opacity" Value="1" />
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
                         </Style>
-                        <!-- #1035: the meta text's right margin must clear whichever icon lane(s)
-                             are actually visible, not always assume one. Locking a chain hides
-                             the add-frame button (CanAddFrame) and always shows the lock icon, so
-                             only two cases exist: no icon lane visible (tight), or the lock
-                             icon's lane visible (locked, or hovered while unlocked, since hover
-                             reveals both add-frame and lock together). The lock lane sits further
-                             from the edge than add-frame's, so clearing it clears both. The
-                             ":not(.locked)" on the hover rule keeps a locked+hovered row on the
-                             locked margin rather than depending on style declaration order.
-                             The hover rule is also scoped to TextBlock.meta.chain (bound to
-                             IsChainNode, #1173): only the chain's own meta text may ever grow a
-                             lane (frames never show add-frame/lock icons), so without the
-                             ".chain" class this rule would widen a frame's own meta text on
-                             hover of that same frame, for no reason. -->
+                        <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are visible:
+                             none (8), locked (30, one lane, since the lock takes add-frame's slot), or hovered
+                             while unlocked (56, both lanes). ":not(.locked)" on the hover rule keeps a
+                             locked+hovered row on the locked margin regardless of declaration order. The hover
+                             rule is scoped to TextBlock.meta.chain (#1173) since frames never show these icons. -->
                         <Style Selector="TextBlock.meta">
                             <Setter Property="Margin" Value="8,0,8,0" />
                         </Style>
                         <Style Selector="TextBlock.meta.locked">
-                            <Setter Property="Margin" Value="8,0,56,0" />
+                            <Setter Property="Margin" Value="8,0,30,0" />
                         </Style>
                         <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
                             <Setter Property="Margin" Value="8,0,56,0" />
@@ -814,7 +761,6 @@
                                         VerticalAlignment="Center"
                                         Width="22" Height="22"
                                         Padding="0"
-                                        Margin="0,0,30,0"
                                         HorizontalContentAlignment="Center"
                                         VerticalContentAlignment="Center"
                                         ToolTip.Tip="Lock Animation"
@@ -1084,7 +1030,7 @@
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <viewsControls:FlankerNumericField x:Name="PropFrameLen" Grid.Column="1"
                                                                    Minimum="0.001" Maximum="60"
-                                                                   Increment="0.05" FormatString="0.000" />
+                                                                   Increment="0.05" FormatString="0.###" />
                                                     <TextBlock Text="s" Grid.Column="2"
                                                                VerticalAlignment="Center" Margin="4,0,0,0"
                                                                Foreground="{DynamicResource InkDim}" FontSize="11" />
@@ -1204,8 +1150,16 @@
                                                     <TextBlock Text="Mode" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <ComboBox x:Name="PropColorMode" Grid.Column="1"
-                                                              HorizontalAlignment="Stretch">
-                                                        <ComboBoxItem>None</ComboBoxItem>
+                                                              HorizontalAlignment="Stretch"
+                                                              PlaceholderForeground="{DynamicResource TextControlPlaceholderForeground}"
+                                                              ToolTip.Tip="Blank shows the mode inherited from an earlier frame. Pick Inherit (or press Delete) to clear an explicit mode.">
+                                                        <!-- Grey the inherited-mode placeholder like the channel fields' (TextBox dims its placeholder to 0.5). -->
+                                                        <ComboBox.Styles>
+                                                            <Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
+                                                                <Setter Property="Opacity" Value="0.5" />
+                                                            </Style>
+                                                        </ComboBox.Styles>
+                                                        <ComboBoxItem>Inherit</ComboBoxItem>
                                                         <ComboBoxItem>Multiply</ComboBoxItem>
                                                         <ComboBoxItem>Add</ComboBoxItem>
                                                     </ComboBox>
@@ -1240,6 +1194,14 @@
                                                     </Grid>
                                                 </WrapPanel>
                                             </StackPanel>
+                                        </Border>
+
+                                        <!-- EVENTS section (#1121): named events raised when playback enters the frame. -->
+                                        <Border x:Name="PropEventsSection"
+                                                BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <viewsControls:FrameEventsEditor x:Name="PropFrameEvents" />
                                         </Border>
                                     </StackPanel>
 
@@ -1556,8 +1518,7 @@
                                 <ToggleButton x:Name="MagicWandToggle"
                                               Classes="toolbarToggle"
                                               Foreground="{DynamicResource Ink}"
-                                              CornerRadius="0,3,3,0"
-                                              ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">
+                                              CornerRadius="0,3,3,0">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <svg:Svg Width="16" Height="16"
                                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconMagicWand.svg"
@@ -1811,7 +1772,7 @@
                                 <viewsControls:FlankerNumericField x:Name="SpeedInput"
                                                                     Width="92" VerticalAlignment="Center"
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"
-                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.0#" />
+                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                             </StackPanel>
                         </Border>
 
@@ -1903,17 +1864,32 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="models:ChainTimelineTrackVm">
-                                                <Grid ColumnDefinitions="70,*" Height="40">
+                                                <Grid ColumnDefinitions="96,*" Height="40">
                                                     <Border Grid.Column="0"
                                                             Background="{DynamicResource BgRail}"
                                                             BorderBrush="{DynamicResource LineBrush}"
                                                             BorderThickness="0,0,1,1"
                                                             Padding="6,0">
-                                                        <TextBlock Text="{Binding ChainName}"
-                                                                   FontSize="9" FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource InkDim}"
-                                                                   VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Grid ColumnDefinitions="Auto,*">
+                                                            <Button Grid.Column="0"
+                                                                    Width="22" Height="22" Padding="0"
+                                                                    Margin="0,0,4,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{DynamicResource Ink}"
+                                                                    ToolTip.Tip="{Binding PlayPauseTip}"
+                                                                    Click="OnGroupTrackPlayPauseClick">
+                                                                <svg:Svg Width="11" Height="11"
+                                                                         Path="{Binding PlayPauseIconPath}"
+                                                                         CurrentColor="{DynamicResource IconInk}"
+                                                                         VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                            </Button>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding ChainName}"
+                                                                       FontSize="9" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource InkDim}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
                                                     </Border>
                                                     <Border Grid.Column="1"
                                                             Background="{DynamicResource BgCanvas}"
@@ -2065,9 +2041,8 @@
 
         </Grid>
     </DockPanel>
-        <!-- Item-deleted undo toast, generic status toast, and error banner. Shared with the
-             browser head (#695 A5) — the panels and their timer/dismiss logic live in the control,
-             so a tweak to dwell time or wording lands on both heads at once. ZIndex 60 keeps the
+        <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
+             timer/dismiss logic live in EditorNotificationOverlay. ZIndex 60 keeps the
              whole overlay above the editor content but below the drag canvas / resize grips,
              matching the per-panel ZIndex values these three used to carry individually. -->
         <viewsControls:EditorNotificationOverlay x:Name="Notifications" ZIndex="60" />

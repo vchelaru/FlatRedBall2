@@ -103,7 +103,7 @@ _animations = _loader.Load(
 
 ## Key types
 
-- **`AchxLoader`** — loads `.achx` files from disk or a stream; caches textures by path; `IDisposable`.
+- **`AchxLoader`** — loads `.achx` files (relative paths through `TitleContainer`, rooted paths from disk) or a stream; caches textures by path; `IDisposable`.
 - **`AnimationPlayer<AnimationFrame>`** — drives playback. Call `Play(name)`, `Update(elapsed)`, read `CurrentFrame`.
 - **`SpriteBatchExtensions`** — `spriteBatch.DrawAnimation(player, position, color)` extension method.
 

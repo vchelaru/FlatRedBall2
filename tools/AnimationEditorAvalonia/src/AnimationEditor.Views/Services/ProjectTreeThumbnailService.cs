@@ -31,8 +31,8 @@ public sealed class ProjectTreeThumbnailService
     private readonly Dictionary<(AchxFileEntry Entry, int MaxWidth, int MaxHeight), Bitmap?> _memoryCache = new();
 
     /// <param name="diskCacheDirectory">
-    /// Desktop-only persistent cache directory. Pass <see langword="null"/> to disable disk
-    /// caching (the browser build, or tests) -- generation still happens, just re-runs every
+    /// Persistent cache directory. Pass <see langword="null"/> to disable disk caching (tests)
+    /// -- generation still happens, just re-runs every
     /// session instead of being backed by disk.
     /// </param>
     public ProjectTreeThumbnailService(string? diskCacheDirectory) =>

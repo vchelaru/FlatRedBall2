@@ -41,6 +41,8 @@ public class Sprite : IRenderable, IAttachable
     private int _currentChainIndex = -1;
     private int _currentFrameIndex;
     private double _timeIntoAnimation;
+    // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
+    private int _playbackVersion;
 
     /// <summary>The entity this sprite is attached to, or <c>null</c> if unattached. Set by <see cref="Entity.Add(IAttachable, Layer?)"/>.</summary>
     public Entity? Parent { get; set; }
@@ -280,6 +282,7 @@ public class Sprite : IRenderable, IAttachable
         {
             _animationChains = value;
             _currentChainIndex = -1;
+            _playbackVersion++;
             CurrentFrame = null;
         }
     }
@@ -325,6 +328,24 @@ public class Sprite : IRenderable, IAttachable
     public event Action? AnimationFinished;
 
     /// <summary>
+    /// Raised for each <see cref="AnimationFrame.Events"/> entry when playback enters its frame, so
+    /// game code reacts by event name instead of by frame index. Frame entry is defined as:
+    /// <list type="bullet">
+    /// <item><see cref="PlayAnimation(string)"/> switching to a chain enters frame 0 and raises its
+    /// events immediately, before returning. Re-playing the chain that is already playing raises nothing.</item>
+    /// <item>A large delta (low FPS, a hitch, high <see cref="AnimationSpeed"/>) still raises the events
+    /// of every frame it skipped over, in playback order, ending with the frame it lands on.</item>
+    /// <item>A looping chain re-enters frame 0 on each wrap. A delta spanning more than one full loop
+    /// raises each frame's events once, not once per loop.</item>
+    /// <item>On a non-looping chain, the last frame's events are raised before <see cref="AnimationFinished"/>.</item>
+    /// </list>
+    /// During the handler, <see cref="CurrentFrame"/> is the frame playback landed on, which may be
+    /// later than the frame that owns the event. A handler that switches animation stops the rest of
+    /// the old chain's events for that tick (and its <see cref="AnimationFinished"/>).
+    /// </summary>
+    public event Action<AnimationFrameEvent>? FrameEventRaised;
+
+    /// <summary>
     /// Starts playing the named animation. If the named animation is already playing, this is a no-op —
     /// the current frame and time are preserved so calling this every frame does not restart the animation.
     /// The name must match a chain in <see cref="AnimationChains"/>.
@@ -344,6 +365,7 @@ public class Sprite : IRenderable, IAttachable
                 Animate = true;
                 IsLooping = _animationChains[i].Loop;
                 ApplyCurrentFrame();
+                RaiseFrameZeroEvents();
                 return;
             }
         }
@@ -370,6 +392,7 @@ public class Sprite : IRenderable, IAttachable
                     Animate = true;
                     IsLooping = chain.Loop;
                     ApplyCurrentFrame();
+                    RaiseFrameZeroEvents();
                     return;
                 }
             }
@@ -385,6 +408,7 @@ public class Sprite : IRenderable, IAttachable
         Animate = true;
         IsLooping = chain.Loop;
         ApplyCurrentFrame();
+        RaiseFrameZeroEvents();
     }
 
     internal void AnimateSelf(double deltaSeconds)
@@ -400,10 +424,16 @@ public class Sprite : IRenderable, IAttachable
         double totalLength = chain.TotalLength.TotalSeconds;
         if (totalLength <= 0) return;
 
+        int previousFrameIndex = _currentFrameIndex;
+        int wraps = 0;
+        bool finished = false;
         if (IsLooping)
         {
             while (_timeIntoAnimation >= totalLength)
+            {
                 _timeIntoAnimation -= totalLength;
+                wraps++;
+            }
         }
         else
         {
@@ -411,7 +441,7 @@ public class Sprite : IRenderable, IAttachable
             {
                 _timeIntoAnimation = totalLength;
                 Animate = false;
-                AnimationFinished?.Invoke();
+                finished = true;
             }
         }
 
@@ -429,6 +459,41 @@ public class Sprite : IRenderable, IAttachable
         }
 
         ApplyCurrentFrame();
+
+        int playbackVersion = _playbackVersion;
+        RaiseEnteredFrameEvents(chain, previousFrameIndex, wraps);
+        if (finished && playbackVersion == _playbackVersion)
+            AnimationFinished?.Invoke();
+    }
+
+    private void RaiseFrameZeroEvents()
+    {
+        _playbackVersion++;
+        var chain = _animationChains![_currentChainIndex];
+        if (chain.Count > 0)
+            RaiseEvents(chain[0], _playbackVersion);
+    }
+
+    private void RaiseEnteredFrameEvents(AnimationChain chain, int previousFrameIndex, int wraps)
+    {
+        if (FrameEventRaised == null) return;
+        var (start, length) = FlatRedBall2.AnimationEditorCommon.FrameEventRange.Get(previousFrameIndex, _currentFrameIndex, wraps, chain.Count);
+        int playbackVersion = _playbackVersion;
+        for (int j = 0; j < length; j++)
+            if (!RaiseEvents(chain[(start + j) % chain.Count], playbackVersion))
+                return;
+    }
+
+    // Returns false once a handler has switched animation, so the caller stops raising the old chain's events.
+    private bool RaiseEvents(AnimationFrame frame, int playbackVersion)
+    {
+        var events = frame.Events;
+        for (int k = 0; k < events.Count; k++)
+        {
+            FrameEventRaised?.Invoke(events[k]);
+            if (playbackVersion != _playbackVersion) return false;
+        }
+        return true;
     }
 
     private void ApplyCurrentFrame()

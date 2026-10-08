@@ -65,13 +65,20 @@ internal static class EditorColors
 
     public static readonly SKColor Shape = new(0, 230, 80, 200);
     public static readonly SKColor SelectedShape = Gold.WithAlpha(230);
+    /// <summary>Outline of the shape a click would select (hover preview).</summary>
+    public static readonly SKColor HoveredShape = new(80, 200, 255, 255);
     /// <summary>Dashed bounding square around a selected circle.</summary>
     public static readonly SKColor SelectedShapeBounds = Gold.WithAlpha(120);
     /// <summary>A shape the runtime cannot collide with correctly (self-intersecting polygon).</summary>
     public static readonly SKColor InvalidShape = new(255, 60, 60, 230);
     public static readonly SKColor PolygonVertex = Gold;
+    /// <summary>The vertex under the pointer or focused in the inspector (#1258).</summary>
+    public static readonly SKColor PolygonVertexHighlight = SKColors.White;
     public static readonly SKColor PolygonVertexEdge = new(40, 40, 40);
     public static readonly SKColor PolygonMidpoint = Gold.WithAlpha(200);
+    /// <summary>Crosshair at a selected polygon's X/Y, the point its vertices are relative to (#1352).</summary>
+    public static readonly SKColor PolygonOrigin = Gold;
+    public static readonly SKColor PolygonOriginUnderlay = SKColors.Black.WithAlpha(160);
 
     // ── Drag and drop (tree and tab strip) ───────────────────────────────────
 

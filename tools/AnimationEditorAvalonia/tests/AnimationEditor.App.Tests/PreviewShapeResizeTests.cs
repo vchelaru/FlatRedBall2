@@ -29,8 +29,8 @@ public class PreviewShapeResizeTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        if (rect   is not null) frame.ShapesSave.Shapes.Add(rect);
-        if (circle is not null) frame.ShapesSave.Shapes.Add(circle);
+        if (rect   is not null) frame.ShapesSave.Add(rect);
+        if (circle is not null) frame.ShapesSave.Add(circle);
         return frame;
     }
 

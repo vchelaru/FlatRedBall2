@@ -34,15 +34,18 @@ public static class AnimationCloneHelper
             copy.ShapesSave = new ShapesSave();
             foreach (var shape in source.ShapesSave.Shapes)
                 if (CloneShape(shape) is { } shapeCopy)
-                    copy.ShapesSave.Shapes.Add(shapeCopy);
+                    copy.ShapesSave.Add(shapeCopy);
         }
+
+        foreach (var frameEvent in source.Events)
+            copy.Events.Add(frameEvent.Clone());
 
         return copy;
     }
 
     public static AnimationChainSave CloneChain(AnimationChainSave source)
     {
-        var copy = new AnimationChainSave { Name = source.Name };
+        var copy = new AnimationChainSave { Name = source.Name, Loop = source.Loop, IsLocked = source.IsLocked };
         foreach (var frame in source.Frames)
             copy.Frames.Add(CloneFrame(frame));
         return copy;

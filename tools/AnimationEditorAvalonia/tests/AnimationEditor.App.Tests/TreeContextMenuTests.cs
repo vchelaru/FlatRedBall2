@@ -128,8 +128,8 @@ public class TreeContextMenuTests
         var frame = new AnimationFrameSave { TextureName = "run.png", ShapesSave = new ShapesSave() };
         var rect   = new AARectSave { Name = "Rect" };
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave.Shapes.Add(rect);    // index 0 → "first"
-        frame.ShapesSave.Shapes.Add(circle);  // index 1 → "last"
+        frame.ShapesSave.Add(rect);    // index 0 → "first"
+        frame.ShapesSave.Add(circle);  // index 1 → "last"
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
         return (frame, rect, circle);
@@ -157,19 +157,19 @@ public class TreeContextMenuTests
     }
 
     [AvaloniaFact]
-    public void RectMenu_FirstOfTwoShapes_ShowsMoveDownButNotMoveUp()
+    public void RectMenu_OnlyRectAlongsideCircle_ShowsNoMoveItems()
     {
         var (window, ctx) = CreateWindow();
         try
         {
-            // Rect is at index 0 → only the "move toward the end" items make sense.
+            // Shapes reorder only within their own type, and the rect is the only rect.
             var (_, rect, _) = SetupFrameWithTwoShapes(ctx);
             var items = OpenMenuFor(window, rect, "Rect");
 
-            Assert.True(IndexOfItem(items, "v  Move Down")      >= 0);
-            Assert.True(IndexOfItem(items, "vv Move To Bottom") >= 0);
-            Assert.Equal(-1, IndexOfItem(items, "^  Move Up"));
-            Assert.Equal(-1, IndexOfItem(items, "^^ Move To Top"));
+            Assert.Equal(-1, IndexOfItem(items, "Move Down"));
+            Assert.Equal(-1, IndexOfItem(items, "Move To Bottom"));
+            Assert.Equal(-1, IndexOfItem(items, "Move Up"));
+            Assert.Equal(-1, IndexOfItem(items, "Move To Top"));
         }
         finally { window.Close(); }
     }

@@ -66,6 +66,21 @@ public class ProjectPanelControlTests
     }
 
     [AvaloniaFact]
+    public void ShowAllFoldersCheck_Checked_AddsFoldersWithoutAnimationFiles()
+    {
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        var entry = new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx");
+        control.SetEntries(new[] { entry }, new[] { "Audio" });
+        Assert.Equal(new[] { "hero.achx" }, control.TreeRoots.Select(n => n.Name));
+
+        control.ShowAllFoldersCheck.IsChecked = true;
+
+        Assert.Equal(new[] { "Audio", "hero.achx" }, control.TreeRoots.Select(n => n.Name));
+        Assert.True(control.TreeRoots[0].IsFolder);
+    }
+
+    [AvaloniaFact]
     public void UncheckExcludeBinObj_ReincludesBinObjEntries()
     {
         var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
@@ -191,7 +206,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void RightClickingFolderRow_WithRevealSupported_ShowsViewInExplorerItem()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
 
@@ -210,7 +225,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void ClickingViewInExplorer_RaisesFolderRevealRequestedWithRelativePath()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/Enemies/hero.achx") });
 
@@ -236,7 +251,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void RightClickingFileRow_WithRevealSupported_ShowsOpenFolderAndCopyPathItems()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx") });
 
@@ -255,7 +270,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void ClickingDuplicate_RaisesFileDuplicateRequestedWithRelativePath()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
 
@@ -278,7 +293,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void ClickingDelete_RaisesFileDeleteRequestedWithRelativePath()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
 
@@ -301,7 +316,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void ClickingOpenContainingFolder_RaisesFileRevealRequestedWithRelativePath()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
 
@@ -324,7 +339,7 @@ public class ProjectPanelControlTests
     [AvaloniaFact]
     public void ClickingCopyFullPath_RaisesFileCopyPathRequestedWithRelativePath()
     {
-        var control = new Controls.ProjectPanelControl { SupportsRevealInExplorer = true };
+        var control = new Controls.ProjectPanelControl();
         var root = new FakeFolder("Content");
         control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
 
@@ -344,26 +359,8 @@ public class ProjectPanelControlTests
         finally { window.Close(); }
     }
 
-    [AvaloniaFact]
-    public void RightClickingFileRow_WithRevealNotSupported_ShowsNoItems()
-    {
-        var control = new Controls.ProjectPanelControl(); // SupportsRevealInExplorer defaults false
-        var root = new FakeFolder("Content");
-        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx") });
-
-        var window = ShowInWindow(control);
-        try
-        {
-            RightClick(window, control, control.TreeRoots[0]); // "hero.achx" file
-
-            Assert.Empty(control.ProjectTree.ContextMenu!.Items);
-        }
-        finally { window.Close(); }
-    }
-
     // Issue #908: right-clicking blank space below the tree rows (no node under the cursor) used
-    // to open a context menu with zero items. It should offer "New Animation" instead, regardless
-    // of SupportsRevealInExplorer (that flag only gates filesystem-reveal items, not this).
+    // to open a context menu with zero items. It should offer "New Animation" instead.
     [AvaloniaFact]
     public void RightClickingEmptySpace_ShowsNewAnimationItem()
     {
@@ -505,8 +502,6 @@ public class ProjectPanelControlTests
     }
 
     // Issue #1018: right-click a folder row -> "New Animation File", named inline in the tree.
-    // Shown regardless of SupportsRevealInExplorer -- the browser build has real folder access
-    // via NativeReadWriteFolder, it just can't reveal in an OS shell.
     [AvaloniaFact]
     public void ClickingNewAnimationFile_AddsPendingRowInEditModeWithSuggestedName()
     {
@@ -601,25 +596,6 @@ public class ProjectPanelControlTests
         finally { window.Close(); }
     }
 
-    [AvaloniaFact]
-    public void RightClickingFolderRow_WithRevealNotSupported_StillShowsNewAnimationFileItem()
-    {
-        var control = new Controls.ProjectPanelControl(); // browser build leaves this false
-        var root = new FakeFolder("Content");
-        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
-
-        var window = ShowInWindow(control);
-        try
-        {
-            RightClick(window, control, control.TreeRoots[0]); // "Sprites" folder
-
-            var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
-                .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "New Animation File" }, headers);
-        }
-        finally { window.Close(); }
-    }
-
     // The inline editor must fit the 24px tree row (see the TreeViewItem MinHeight setter in the
     // XAML). Fluent's default TextBox is far taller than that, which left the box overflowing the
     // row with its text stranded at the top.
@@ -705,5 +681,6 @@ public class ProjectPanelControlTests
 #pragma warning restore CS1998
         public Task<IEditorFile?> GetFileAsync(string name) =>
             Task.FromResult(Files.TryGetValue(name, out var f) ? (IEditorFile?)f : null);
+        public Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath) => GetFileAsync(relativePath);
     }
 }

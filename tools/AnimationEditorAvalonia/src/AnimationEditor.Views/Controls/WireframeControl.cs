@@ -9,6 +9,7 @@ using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
@@ -397,8 +398,8 @@ public class WireframeControl : TextureViewport
 
     /// <summary>
     /// True while a handle or chain drag is in progress. Exposed for tests and for
-    /// <see cref="OnPointerCaptureLost"/> cleanup — browser hosts often fire capture-lost
-    /// without a matching <c>PointerReleased</c>, which would otherwise leave the drag stuck.
+    /// <see cref="OnPointerCaptureLost"/> cleanup — a stolen capture arrives without a matching
+    /// <c>PointerReleased</c>, which would otherwise leave the drag stuck.
     /// </summary>
     public bool IsDragging => _draggingRect is not null || _draggingChain;
 
@@ -502,7 +503,6 @@ public class WireframeControl : TextureViewport
     private IUndoManager? _undoManager;
     private IObjectFinder? _objectFinder;
     private Action<string>? _showError;
-    private ThumbnailService? _thumbnailService;
 
     /// <summary>
     /// True when <paramref name="frame"/>'s owning chain is locked (#1032). A locked chain must
@@ -579,14 +579,6 @@ public class WireframeControl : TextureViewport
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
-    /// <param name="thumbnailService">
-    /// Optional. When supplied, <see cref="RefreshAll"/> resolves the current texture through
-    /// it (bare-name lookup against its cache first, falling back to disk) instead of always
-    /// reading straight from disk -- the seam the browser-wasm build needs (#614), since it has
-    /// no filesystem but already has every dropped/picked texture decoded via
-    /// <see cref="ThumbnailService.SeedTexture"/>. Left <c>null</c> on desktop, where reading the
-    /// resolved path from disk (the pre-#614 behavior) is unchanged.
-    /// </param>
     public void InitializeServices(
         ISelectedState selectedState,
         IAppState appState,
@@ -596,8 +588,7 @@ public class WireframeControl : TextureViewport
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
         IObjectFinder objectFinder,
-        Action<string>? showError = null,
-        ThumbnailService? thumbnailService = null)
+        Action<string>? showError = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -608,7 +599,6 @@ public class WireframeControl : TextureViewport
         _undoManager     = undoManager;
         _objectFinder    = objectFinder;
         _showError       = showError;
-        _thumbnailService = thumbnailService;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -910,16 +900,7 @@ public class WireframeControl : TextureViewport
         if (path is null && _selectedState?.SelectedFrame is null)
             path = LoadedTexturePathCasePreserved;
 
-        SKBitmap? known = null;
-        if (_thumbnailService != null)
-        {
-            var frame = _selectedState?.SelectedFrame ?? _selectedState?.SelectedChain?.Frames?.FirstOrDefault();
-            var resolvedPath = _thumbnailService.ResolveTexturePath(frame);
-            if (resolvedPath != null)
-                known = _thumbnailService.GetBitmap(resolvedPath);
-        }
-
-        LoadTexture(path, known);
+        LoadTexture(path);
     }
 
     /// <inheritdoc />
@@ -1444,7 +1425,7 @@ public class WireframeControl : TextureViewport
     {
         var props = e.GetCurrentPoint(this).Properties;
         var pos = e.GetPosition(this);
-        bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
+        bool isCtrl = CommandModifier.IsHeld(e.KeyModifiers);
 
         if (!props.IsLeftButtonPressed) return;
 
@@ -1529,6 +1510,7 @@ public class WireframeControl : TextureViewport
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 _lastPointerPos = pos;
+                _dragPointer = e.Pointer;
                 StartAutoPanTimer();
                 e.Pointer.Capture(this);
                 return;
@@ -1540,10 +1522,15 @@ public class WireframeControl : TextureViewport
         var world = ScreenToTexture((float)pos.X, (float)pos.Y);
 
         // Ctrl+click in any mode creates a new frame from the region the add-frame ghost shows.
+        // The frame is created on release so a grid-mode Ctrl+drag can span several cells (#1275);
+        // a click without a drag creates the same single-cell frame as before.
         if (isCtrl)
         {
-            if (ComputeAddFrameRegion(world) is { } region)
-                FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
+            _addFrameDragAnchor = world;
+            _addFrameDragCurrent = world;
+            _addFrameDragPointer = e.Pointer;
+            SetAddFrameGhost(ComputeAddFrameRegion(world, world));
+            e.Pointer.Capture(this);
             return;
         }
 
@@ -1574,26 +1561,28 @@ public class WireframeControl : TextureViewport
     /// flood-fill bounds in magic-wand mode, the cell under the point in grid mode, otherwise a
     /// frame sized like the selected chain's last frame centered on the point. Null when there
     /// is no bitmap or the wand finds no opaque pixel. Shared by the click and the add-frame
-    /// ghost (#1241) so the outline always matches what the click produces.
+    /// ghost (#1241) so the outline always matches what the click produces. In grid mode a
+    /// Ctrl+drag from <paramref name="anchor"/> to <paramref name="world"/> spans every cell
+    /// between them (#1275); the other modes use <paramref name="anchor"/> alone.
     /// </summary>
-    private (int minX, int minY, int maxX, int maxY)? ComputeAddFrameRegion(SKPoint world)
+    private (int minX, int minY, int maxX, int maxY)? ComputeAddFrameRegion(SKPoint anchor, SKPoint world)
     {
         if (_bitmap is null) return null;
 
         if (_isMagicWandMode && _inspectableImage != null)
         {
             _inspectableImage.GetOpaqueWandBounds(
-                (int)world.X, (int)world.Y,
+                (int)anchor.X, (int)anchor.Y,
                 out int minX, out int minY, out int maxX, out int maxY);
             return maxX >= minX && maxY >= minY ? (minX, minY, maxX, maxY) : null;
         }
 
         if (_showGrid && _grid.IsValid)
-            return GridPlacementCalculator.SnapToCell(world.X, world.Y, _grid);
+            return GridPlacementCalculator.SpanCells(anchor.X, anchor.Y, world.X, world.Y, _grid);
 
         var (lastW, lastH) = GetLastFramePixelSize();
         return PlainClickFrameRegionCalculator.Compute(
-            world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
+            anchor.X, anchor.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
     }
 
     /// <inheritdoc />
@@ -1615,8 +1604,15 @@ public class WireframeControl : TextureViewport
             return;
         }
 
+        if (_addFrameDragAnchor is { } anchor)
+        {
+            _addFrameDragCurrent = ScreenToTexture((float)pos.X, (float)pos.Y);
+            SetAddFrameGhost(ComputeAddFrameRegion(anchor, _addFrameDragCurrent));
+            return;
+        }
+
         _hoverPointerPos = pos;
-        UpdateHoverCursor(pos, isCtrl: (e.KeyModifiers & KeyModifiers.Control) != 0);
+        UpdateHoverCursor(pos, isCtrl: CommandModifier.IsHeld(e.KeyModifiers));
 
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
@@ -1741,11 +1737,17 @@ public class WireframeControl : TextureViewport
 
     /// <summary>
     /// Re-evaluates the cursor at the last known pointer position without requiring pointer
-    /// movement -- called by <c>MainWindow</c> when Ctrl is pressed or released while the
-    /// pointer sits still over this control, so the add-frame cursor toggles immediately (#882)
-    /// instead of waiting for the next pointer move.
+    /// movement -- called by <c>MainWindow</c> when the <see cref="CommandModifier"/> key is
+    /// pressed or released while the pointer sits still over this control, so the add-frame
+    /// cursor toggles immediately (#882) instead of waiting for the next pointer move.
     /// </summary>
-    public void RefreshCursorForCtrlChange(bool isCtrl) => UpdateHoverCursor(_lastPointerPos, isCtrl);
+    public void RefreshCursorForCommandModifierChange(bool isHeld) => UpdateHoverCursor(_lastPointerPos, isHeld);
+
+    /// <summary>
+    /// The modifier that turns a click into add-frame and shows the add-frame ghost: ⌘ on macOS,
+    /// Ctrl elsewhere. Set by the host, which knows the OS; defaults to Ctrl.
+    /// </summary>
+    public CommandModifier CommandModifier { get; set; } = CommandModifier.Control;
 
     /// <summary>
     /// Pointer position while it hovers this control; null once it leaves. Separate from
@@ -1756,6 +1758,120 @@ public class WireframeControl : TextureViewport
 
     private SKRect? _addFrameGhost;
 
+    /// <summary>Texture point where a Ctrl+press started an add-frame gesture; null when none is in
+    /// progress. The frame is created on release from this and <see cref="_addFrameDragCurrent"/>.</summary>
+    private SKPoint? _addFrameDragAnchor;
+    private SKPoint _addFrameDragCurrent;
+    private IPointer? _addFrameDragPointer;
+    private TopLevel? _escapeKeyHost;
+
+    /// <summary>Pointer that started the in-progress handle or chain drag; released on cancel.</summary>
+    private IPointer? _dragPointer;
+
+    /// <summary>
+    /// Escape cancels an in-progress Ctrl+click/drag add, resize-handle drag or chain drag: nothing
+    /// is created or moved, no undo entry is recorded, and the release that follows does nothing.
+    /// Hooked on the top level (Tunnel) because the wireframe itself never takes keyboard focus,
+    /// so it works without a focus round-trip.
+    /// </summary>
+    private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape) return;
+        if (_addFrameDragAnchor is not null)
+        {
+            _addFrameDragAnchor = null;
+            var pointer = _addFrameDragPointer;
+            _addFrameDragPointer = null;
+            // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
+            pointer?.Capture(null);
+            SetAddFrameGhost(null);
+            e.Handled = true;
+        }
+        else if (IsDragging)
+        {
+            CancelActiveDrag();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Puts every frame of the in-progress handle or chain drag back to its start-of-drag region,
+    /// ends the drag without recording undo or saving, and releases pointer capture.
+    /// </summary>
+    private void CancelActiveDrag()
+    {
+        if (_bitmap is not null)
+        {
+            if (_draggingRect is not null)
+            {
+                if (_bulkHandleDragStarts.Count > 0)
+                    RestoreStarts(_bulkHandleDragStarts);
+                else
+                {
+                    _draggingRect.Bounds = _dragStartBounds;
+                    var f = _draggingRect.Frame;
+                    f.LeftCoordinate = _dragBeforeL;
+                    f.TopCoordinate = _dragBeforeT;
+                    f.RightCoordinate = _dragBeforeR;
+                    f.BottomCoordinate = _dragBeforeB;
+                }
+                FrameLiveUpdated?.Invoke(_draggingRect.Frame);
+            }
+            if (_draggingChain) RestoreStarts(_chainDragStarts);
+        }
+
+        _draggingRect = null;
+        _draggingHandle = HandleKind.None;
+        _bulkHandleDragStarts.Clear();
+        _draggingChain = false;
+        _chainDragStarts.Clear();
+        StopAutoPanTimer();
+        var pointer = _dragPointer;
+        _dragPointer = null;
+        // Drag state is cleared first, so the capture-lost this raises cannot commit anything.
+        pointer?.Capture(null);
+        InvalidateVisual();
+
+        static void RestoreStarts(List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> starts)
+        {
+            foreach (var (fr, startBounds, bl, bt, br, bb) in starts)
+            {
+                fr.Bounds = startBounds;
+                fr.Frame.LeftCoordinate = bl;
+                fr.Frame.TopCoordinate = bt;
+                fr.Frame.RightCoordinate = br;
+                fr.Frame.BottomCoordinate = bb;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _escapeKeyHost = TopLevel.GetTopLevel(this);
+        _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel, RoutingStrategies.Tunnel);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel);
+        _escapeKeyHost = null;
+    }
+
+    /// <summary>Ends the Ctrl+click/drag add-frame gesture, creating the frame the ghost shows.</summary>
+    private void CommitAddFrameDrag()
+    {
+        if (_addFrameDragAnchor is not { } anchor) return;
+        _addFrameDragAnchor = null;
+        _addFrameDragPointer = null;
+        if (ComputeAddFrameRegion(anchor, _addFrameDragCurrent) is { } region)
+            FrameCreatedFromRegion?.Invoke(region.minX, region.minY, region.maxX, region.maxY);
+        UpdateAddFrameGhost();
+    }
+
     /// <summary>
     /// Texture-pixel region a Ctrl+click at the hovered point would create (#1241), outlined
     /// on the canvas while Ctrl is held. Null when the add-frame cursor is not showing or the
@@ -1765,13 +1881,19 @@ public class WireframeControl : TextureViewport
 
     private void UpdateAddFrameGhost()
     {
-        SKRect? ghost = null;
-        if (IsShowingAddFrameCursor && _hoverPointerPos is { } pos &&
-            ComputeAddFrameRegion(ScreenToTexture((float)pos.X, (float)pos.Y)) is { } r)
+        if (_addFrameDragAnchor != null) return;
+        (int minX, int minY, int maxX, int maxY)? region = null;
+        if (IsShowingAddFrameCursor && _hoverPointerPos is { } pos)
         {
-            ghost = new SKRect(r.minX, r.minY, r.maxX, r.maxY);
+            var world = ScreenToTexture((float)pos.X, (float)pos.Y);
+            region = ComputeAddFrameRegion(world, world);
         }
+        SetAddFrameGhost(region);
+    }
 
+    private void SetAddFrameGhost((int minX, int minY, int maxX, int maxY)? region)
+    {
+        SKRect? ghost = region is { } r ? new SKRect(r.minX, r.minY, r.maxX, r.maxY) : null;
         if (ghost != _addFrameGhost)
         {
             _addFrameGhost = ghost;
@@ -1794,6 +1916,15 @@ public class WireframeControl : TextureViewport
     /// <inheritdoc />
     protected override void OnEditPointerReleased(PointerReleasedEventArgs e)
     {
+        if (_addFrameDragAnchor != null)
+        {
+            var pos = e.GetPosition(this);
+            _addFrameDragCurrent = ScreenToTexture((float)pos.X, (float)pos.Y);
+            CommitAddFrameDrag();
+            e.Pointer.Capture(null);
+            return;
+        }
+
         if (IsDragging)
         {
             CommitActiveDrag();
@@ -1802,13 +1933,14 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// Browser hosts (and any control that steals capture mid-drag) fire this without a
-    /// matching <c>PointerReleased</c>. Ending the drag here prevents the stuck-follow-cursor
+    /// Any control that steals capture mid-drag fires this without a matching
+    /// <c>PointerReleased</c>. Ending the drag here prevents the stuck-follow-cursor
     /// bug where the chain/handle keeps tracking until a second click.
     /// </summary>
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        CommitAddFrameDrag();
         if (IsDragging)
             CommitActiveDrag();
     }
@@ -2361,7 +2493,8 @@ public class WireframeControl : TextureViewport
 
     private void SimulateCtrlClick(float screenX, float screenY)
     {
-        if (ComputeAddFrameRegion(ScreenToTexture(screenX, screenY)) is { } r)
+        var world = ScreenToTexture(screenX, screenY);
+        if (ComputeAddFrameRegion(world, world) is { } r)
             FrameCreatedFromRegion?.Invoke(r.minX, r.minY, r.maxX, r.maxY);
     }
 

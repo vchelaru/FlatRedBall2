@@ -434,7 +434,98 @@ public class TileMapCreateEntitiesTests
     {
         public int Worth { get; set; }
         public string? Label { get; set; }
+        public float Speed { get; set; }
         public int TiledGid { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_TiledTypeDiffersFromEntityPropertyType_ConvertsWithoutThrowing()
+    {
+        // An int Tiled value used to throw when the entity property was string or float (#1272).
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Label", 7);
+        tileData.Properties.SetInt("Speed", 3);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData }, new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Label.ShouldBe("7");
+        created[0].Speed.ShouldBe(3f);
+    }
+
+    private class DoubleSpeedEntity : Entity
+    {
+        public double Speed { get; set; }
+    }
+
+    private class ShortGidEntity : Entity
+    {
+        public short TiledGid { get; set; }
+    }
+
+    private static TileMap BuildPointObjectMap(TilemapPointObject pointObj)
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(pointObj);
+        tilemap.Layers.Add(objLayer);
+        return new TileMap(tilemap);
+    }
+
+    [Fact]
+    public void CreateEntities_TiledFloatOnIntProperty_ThrowsNamingObjectPropertyAndTypes()
+    {
+        // A Tiled float can't safely become an int, so it must fail loudly rather than
+        // leave Worth at its default.
+        var pointObj = new TilemapPointObject(id: 5, position: new XnaVec2(32f, 48f))
+        {
+            Name = "GoldCoin",
+            Class = "Coin",
+        };
+        pointObj.Properties.SetFloat("Worth", 2.5f);
+        var tileMap = BuildPointObjectMap(pointObj);
+        var factory = new Factory<PropertyEntity>(new TestScreen { Engine = new FlatRedBallService() });
+
+        var ex = Should.Throw<System.InvalidOperationException>(() => tileMap.CreateEntities("Coin", factory));
+
+        ex.Message.ShouldContain("'GoldCoin'");
+        ex.Message.ShouldContain("id 5");
+        ex.Message.ShouldContain("class 'Coin'");
+        ex.Message.ShouldContain("'Worth'");
+        ex.Message.ShouldContain("Tiled type float");
+        ex.Message.ShouldContain("PropertyEntity.Worth");
+        ex.Message.ShouldContain("Int32");
+    }
+
+    [Fact]
+    public void CreateEntities_NameMatchedMemberOfUnsupportedType_Throws()
+    {
+        var pointObj = new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f)) { Class = "Coin" };
+        pointObj.Properties.SetFloat("Speed", 2.5f);
+        var tileMap = BuildPointObjectMap(pointObj);
+        var factory = new Factory<DoubleSpeedEntity>(new TestScreen { Engine = new FlatRedBallService() });
+
+        var ex = Should.Throw<System.InvalidOperationException>(() => tileMap.CreateEntities("Coin", factory));
+
+        ex.Message.ShouldContain("DoubleSpeedEntity.Speed");
+        ex.Message.ShouldContain("Double");
+    }
+
+    [Fact]
+    public void CreateEntities_TiledGidOfUnsupportedType_Throws()
+    {
+        var pointObj = new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f)) { Class = "Coin" };
+        var tileMap = BuildPointObjectMap(pointObj);
+        var factory = new Factory<ShortGidEntity>(new TestScreen { Engine = new FlatRedBallService() });
+
+        var ex = Should.Throw<System.InvalidOperationException>(() => tileMap.CreateEntities("Coin", factory));
+
+        ex.Message.ShouldContain("ShortGidEntity.TiledGid");
     }
 
     [Fact]

@@ -12,7 +12,7 @@
         folder (.tsx surfaced later; OpenProjectWorkflowAsync already opens one as a native
         tsx project). Click a file row to open it, click a folder row to expand/collapse. First-frame
         thumbnails (#839) load lazily via ProjectTreeThumbnailService and need no Window,
-        so this control stays shareable, unmodified, between desktop and the browser build.
+        so this control can be tested on its own.
         Deliberately still no drag support (unlike desktop's FilesPanelControl), which does
         need a Window.
     -->
@@ -27,10 +27,18 @@
                                            Placeholder="Filter .achx…"
                                            KeepOpenWhenFocusMovesInto="{Binding #ProjectTree}"
                                            QueryChanged="OnSearchQueryChanged" />
-                <CheckBox x:Name="ExcludeBinObjCheck" x:FieldModifier="Public"
-                          Content="Exclude bin/obj folders"
-                          FontSize="11"
-                          IsChecked="True" />
+                <WrapPanel Orientation="Horizontal">
+                    <CheckBox x:Name="ExcludeBinObjCheck" x:FieldModifier="Public"
+                              Content="Exclude bin/obj folders"
+                              FontSize="11"
+                              Margin="0,0,10,0"
+                              IsChecked="True" />
+                    <!-- #1332: off lists only folders holding animation files. -->
+                    <CheckBox x:Name="ShowAllFoldersCheck" x:FieldModifier="Public"
+                              Content="Show all folders"
+                              FontSize="11"
+                              ToolTip.Tip="Also list folders that contain no animation files" />
+                </WrapPanel>
             </DockPanel>
         </Border>
 

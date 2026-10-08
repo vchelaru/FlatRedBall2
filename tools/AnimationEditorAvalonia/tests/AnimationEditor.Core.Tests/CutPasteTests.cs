@@ -119,7 +119,7 @@ public class CutPasteTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hit" };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
 
         var pastedRect = (AARectSave)AnimationCloneHelper.CloneShape(rect)!;
         ctx.AppCommands.PasteShapesCut(frame, new object[] { pastedRect }, new[] { rect }, frame);

@@ -1,6 +1,6 @@
 ---
 name: glue-project-loading
-description: Run an FRB1/Glue project's .gluj/.glsj/.glej data directly in FRB2, with no Glue codegen. Triggers: GlueProject, GlueScreen, GlueEntity, EngineInitSettings.GlueProjectFile, GlueTypeMap, .gluj, CustomVariables by name.
+description: "Run an FRB1/Glue project's .gluj/.glsj/.glej data directly in FRB2, with no Glue codegen. Triggers: GlueProject, GlueScreen, GlueEntity, EngineInitSettings.GlueProjectFile, GlueTypeMap, .gluj, CustomVariables by name."
 ---
 
 # Loading Glue Projects

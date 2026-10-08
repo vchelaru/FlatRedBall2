@@ -26,7 +26,7 @@ public class PropertyPanelLockTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave(),
         };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 

@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
+description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished and named frame events (FrameEventRaised), and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -18,7 +18,7 @@ Sprites animate via `AnimationChain` / `AnimationChainList`, driven automaticall
 
 ## Runtime Types
 
-- `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection
+- `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection + optional `Events` (`AnimationFrameEvent`: `Name`, free-form `Data`)
 - `AnimationChain : List<AnimationFrame>` — named sequence; `TotalLength` = sum of `FrameLength`s
 - `AnimationChainList : List<AnimationChain>` — string indexer for lookup by name; the unit of "ownership" for per-frame shapes (see Topics)
 
@@ -43,6 +43,7 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends |
+| `FrameEventRaised` | — | Fires per `AnimationFrameEvent` when its frame is entered. Branch on `e.Name`, never on a frame index, so reordering frames in the AnimationEditor can't break it. Skipped frames still fire; the XML doc has the loop/frame-0 rules |
 
 `PlayAnimation` resets time to frame 0 and sets `Animate = true`. Calling it every frame with the same chain restarts on frame 0 every tick — guard with `CurrentAnimation?.Name != "Run"`.
 
@@ -79,5 +80,7 @@ When you want an AI assistant to wire animation selection to gameplay state, des
 - **Non-looping animation stops on the last frame** — `Animate` flips false; call `PlayAnimation` again to restart.
 - **Animation is paused when the screen is paused** — `AnimateSelf` runs inside the `!IsPaused` block in `Screen.Update`.
 - **`Sprite.X` and `Sprite.Y` are overwritten on every frame switch.** Each `AnimationFrame` carries `RelativeX`/`RelativeY` (default `0`), and advancing assigns those unconditionally. Code like `_booster.Y = -10` in `CustomInitialize` works for exactly one frame, then snaps to `0`. To offset an animated sprite relative to its parent entity, bake the offset into each frame's `RelativeX`/`RelativeY` (in the `.achx` or in code), or attach the sprite to a child entity whose own `X`/`Y` carries the offset.
+- **Per-frame `Red`/`Green`/`Blue` do nothing without a `ColorOperation`; `Alpha` never needs one.** `AnimationFrame` has no single color property. `ColorOperation.Multiply` scales `Sprite.Color` by the channels (unset = 255), `ColorOperation.Add` offsets the texture's RGB through a pixel shader (unset = 0, negative darkens), and `Alpha` always multiplies in on its own. See `SpriteFrameColor.Apply`.
+- **A `null` color channel or `ColorOperation` inherits from the previous frame, but only when loaded from `.achx`/`.achj`.** `EffectiveFrameColor.ResolveAll` fills nulls from the latest earlier frame in the same chain at load time. Frames built in code draw exactly as set.
 - **`TextureScale` recalculates `Width`/`Height` per frame** — when `TextureScale` is non-null, frame switches recompute dimensions from the source rect. Don't manually assign `Width`/`Height` if `TextureScale` is in play.
 - **`.achx` isn't only for motion.** A chain can have a single frame and still be the right tool — it pairs a sprite's texture/offset with its collision box for a static object (a tree, a sign) that never animates. Going from that single frame to a real multi-frame animation later needs no code change; `PlayAnimation` and shape reconciliation behave the same either way.

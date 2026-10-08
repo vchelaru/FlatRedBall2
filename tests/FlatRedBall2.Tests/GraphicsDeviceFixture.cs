@@ -8,6 +8,22 @@ using Xunit;
 namespace FlatRedBall2.Tests;
 
 /// <summary>
+/// A <see cref="Game"/> whose Update/Draw call through to <see cref="Engine"/>, matching how a real
+/// Game1 wires <see cref="FlatRedBallService"/>. Engine is null until a test attaches one.
+/// </summary>
+/// <remarks>
+/// Disposing a Game tears down process-wide GL/SDL state that every other test's device depends on,
+/// and repeatedly creating and disposing Games has been a suspect in intermittent native crashes of
+/// the Linux test host (#1300). So the run owns exactly one, and tests attach and detach an engine.
+/// </remarks>
+public sealed class SharedGame : Game
+{
+    public FlatRedBallService? Engine;
+    protected override void Update(GameTime gameTime) => Engine?.Update(gameTime);
+    protected override void Draw(GameTime gameTime) => Engine?.Draw();
+}
+
+/// <summary>
 /// A real <see cref="GraphicsDevice"/> for tests that genuinely need one — loading a texture, or
 /// anything else that cannot be faked.
 /// </summary>
@@ -20,13 +36,13 @@ namespace FlatRedBall2.Tests;
 /// </remarks>
 public sealed class GraphicsDeviceFixture : IDisposable
 {
-    private readonly Game? _game;
+    private readonly SharedGame? _game;
 
     public GraphicsDeviceFixture()
     {
         try
         {
-            _game = new Game();
+            _game = new SharedGame();
 
             // The manager has to exist before RunOneFrame, which is what actually creates the
             // device — without entering a message loop, which a test host cannot pump.
@@ -51,6 +67,12 @@ public sealed class GraphicsDeviceFixture : IDisposable
             _game = null;
         }
     }
+
+    /// <summary>
+    /// The one <see cref="Game"/> for the whole run, or null when this machine cannot provide one.
+    /// Tests that need a running game borrow this instead of building their own; never dispose it.
+    /// </summary>
+    public SharedGame? Game => _game;
 
     /// <summary>The device, or null when this machine cannot provide one.</summary>
     public GraphicsDevice? GraphicsDevice { get; }

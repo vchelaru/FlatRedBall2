@@ -2,6 +2,7 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
+using AnimationEditor.Core.Export;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
@@ -56,7 +57,6 @@ public partial class MainWindow : Window
     private readonly IPendingCutState _pendingCutState;
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
-    private readonly IFileAssociationService _fileAssociation;
     private readonly IApplicationUpdater _applicationUpdater;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
@@ -132,6 +132,18 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
 
+    // ── Shape drag-and-drop reorder (issue #1285): a shape moves only among shapes of its own
+    // type in its frame, since the file format saves shapes grouped by type. The dragged shape
+    // lives in _pendingShapeDrag because the drag is always same-process.
+    private static readonly DataFormat<string> ShapeDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("animationeditor-shape-drag");
+    private const string ShapeDragToken = "shape";
+    private (object Shape, AnimationFrameSave Frame)? _pendingShapeDrag;
+    private object? _shapeDragCandidate;
+    private Avalonia.Point? _shapeDragPressPoint;
+    private PointerPressedEventArgs? _shapeDragPressArgs;
+    private bool _shapeDragInProgress;
+
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
     // Pixel-diff tolerance = 0: any inequality is a change. PNG is lossless, so a differing pixel
@@ -203,6 +215,15 @@ public partial class MainWindow : Window
     // Shared per-user config dir, NOT the build output — so recent files / tabs / theme survive
     // rebuilds, dotnet clean, and switching git worktrees (see issue #424). AppContext.BaseDirectory
     // resolves to bin/<Config>/<TFM>/, which is per-build / per-checkout.
+    // Native title bar and system menu bar instead of the in-window ones. Production passes
+    // OperatingSystem.IsMacOS(); tests leave it off so headless runs get the same window on every OS
+    // (the headless platform has no native menu bar to click).
+    private readonly bool _useMacOSChrome;
+
+    // ⌘ on macOS, Ctrl elsewhere, for Ctrl-modified mouse gestures and their user-facing text.
+    // Production passes CommandModifier.ForHost(OperatingSystem.IsMacOS()); tests pick either.
+    private readonly CommandModifier _commandModifier;
+
     private FilePath SettingsFilePath =>
         AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
 
@@ -218,12 +239,16 @@ public partial class MainWindow : Window
         IPendingCutState pendingCutState,
         Services.ThumbnailService thumbnailService,
         ProjectTreeThumbnailService projectTreeThumbnailService,
-        IFileAssociationService fileAssociation,
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null,
-        IEditorDialogHost? dialogHost = null)
+        IEditorDialogHost? dialogHost = null,
+        bool useMacOSChrome = false,
+        CommandModifier? commandModifier = null,
+        PlatformWheelInput? wheelInput = null)
     {
         _applicationDataRoot = applicationDataRoot;
+        _useMacOSChrome = useMacOSChrome;
+        _commandModifier = commandModifier ?? CommandModifier.Control;
 
         _projectManager = projectManager;
         _selectedState = selectedState;
@@ -236,20 +261,19 @@ public partial class MainWindow : Window
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
         _projectTreeThumbnailService = projectTreeThumbnailService;
-        _fileAssociation = fileAssociation;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
         // The dialogs that open straight through EditorDialogs (Adjust Frame Time, Add Multiple
         // Frames, Adjust Offsets, ...) go through this host; a test passes a scripted one, since a
         // real dialog window parks until a person closes it.
         _dialogHost = dialogHost ?? new WindowEditorDialogHost(this);
-        // Desktop renders the tree with its own _treeRoots collection, so the controller
-        // reads expand state from there (browser reads its AnimationTreeControl instead).
+        // The controller reads expand state from the tree's own _treeRoots collection.
         _tabController = new TabController(_undoManager, _appCommands,
             () => TreeBuilder.CaptureExpandState(_treeRoots), _tabManager);
 
+        NumericExpressionInput.Install();
         InitializeComponent();
 
-        if (OperatingSystem.IsMacOS())
+        if (_useMacOSChrome)
             ApplyMacOSWindowChrome();
 
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
@@ -259,6 +283,10 @@ public partial class MainWindow : Window
         ApplyPersistedTheme();
         ApplyPersistedCanvasColors();
         ApplyPersistedPreviewPaneHeight();
+        ShowBoundingBoxCheck.IsChecked = _appSettings.ShowBoundingBox;
+        PreviewCtrl.ShowBoundingBox = _appSettings.ShowBoundingBox;
+        ProjectPanel.ShowAllFolders = _appSettings.ShowAllProjectFolders;
+        ProjectPanel.ShowAllFoldersChanged += show => _appSettings.ShowAllProjectFolders = show;
         ApplyPersistedSidebarWidth();
         ApplyPersistedWindowState();
         WireMenuEvents();
@@ -271,23 +299,20 @@ public partial class MainWindow : Window
         WireTreeView();
         WireWindowFileDrop();
         WirePropertyPanel();
+        WireFrameEventsSection();
         WirePlaybackControls();
         WireTimelineTransport();
         WireKeyboard();
         WireTabBar();
-        WireDefaultHandlerBanner();
         WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
 
+        WireframeCtrl.CommandModifier = _commandModifier;
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
         ProjectPanel.Initialize(_projectTreeThumbnailService);
-        // Desktop has a real filesystem to reveal a folder in -- the browser build leaves this
-        // false (its ProjectPanel is constructed the same way, unmodified) so its tree never
-        // shows a "Reveal in File Manager" item it couldn't act on (#654's reasoning, applied here).
-        ProjectPanel.SupportsRevealInExplorer = true;
         ProjectPanel.FolderRevealRequested += relativePath => RevealProjectFolderInExplorer(relativePath);
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
         ProjectPanel.FileCopyPathRequested += relativePath => CopyProjectFilePathToClipboard(relativePath);
@@ -336,6 +361,17 @@ public partial class MainWindow : Window
         _projectFolderWatcher.Overflowed += () =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 LastProjectFolderWatcherHandledTask = HandleProjectFolderChangesAsync(null));
+
+        // Touchpad scroll pans, pinch zooms, mouse wheel zooms (#1237, #1238); every canvas shares
+        // the one OS-specific detector.
+        if (wheelInput is not null)
+        {
+            foreach (IWheelInputTarget canvas in new IWheelInputTarget[] { WireframeCtrl, PreviewCtrl, PngPane })
+            {
+                canvas.WheelSourceDetector = wheelInput.Detector;
+            }
+            Activated += (_, _) => wheelInput.Attach(this);
+        }
 
         Opened += OnOpened;
         Closed += (_, _) =>
@@ -1085,11 +1121,6 @@ public partial class MainWindow : Window
             SyncProjectPanelSelectionTo(activeTab);
 
         RefreshFilesPanel();
-        // Not auto-shown (issue #849): RegisterAsDefault() doesn't work for the current
-        // dev/portable distribution — no installer yet (#493) — so the banner would just
-        // offer a "Make default" button that does nothing useful. The manual "Set as
-        // default" / "Don't show again" controls in Settings still work for anyone who
-        // wants to try it.
         _ = RunStartupUpdateDownloadAsync();
     }
 
@@ -1129,39 +1160,6 @@ public partial class MainWindow : Window
 
     private void UpdateRecoveredDocumentBanner() =>
         RecoveredDocumentBanner.IsVisible = _tabManager.ActiveTab?.IsRecoveredDocument == true;
-
-    // ── Default-handler prompt banner ─────────────────────────────────────────
-
-    private void WireDefaultHandlerBanner()
-    {
-
-        MakeDefaultBtn.Click += (_, _) => RegisterAsDefaultAchxHandler(hideBanner: true);
-
-        DismissDefaultHandlerBtn.Click += (_, _) =>
-        {
-            _appSettings.SuppressDefaultHandlerPrompt = true;
-            SaveSettingsFile();
-            DefaultHandlerBanner.IsVisible = false;
-        };
-    }
-
-    private void RegisterAsDefaultAchxHandler(bool hideBanner)
-    {
-        _fileAssociation.RegisterAsDefault();
-        if (hideBanner)
-            DefaultHandlerBanner.IsVisible = false;
-        ShowStatusMessage("Opened Windows settings — choose AnimationEditor for .achx files.");
-    }
-
-    private void ShowDefaultHandlerBannerIfAppropriate()
-    {
-        bool isDefault = _fileAssociation.IsSupported && _fileAssociation.IsDefault();
-        if (DefaultHandlerPromptDecider.ShouldPrompt(
-                _fileAssociation.IsSupported, isDefault, _appSettings.SuppressDefaultHandlerPrompt))
-        {
-            DefaultHandlerBanner.IsVisible = true;
-        }
-    }
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────
 
@@ -1318,7 +1316,7 @@ public partial class MainWindow : Window
         _appCommands.ItemsDeleted += label =>
             Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
 
-        _appCommands.PixiJsExportCompleted += (path, warnings) =>
+        _appCommands.ExportCompleted += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var name = System.IO.Path.GetFileName(path);
@@ -1332,6 +1330,7 @@ public partial class MainWindow : Window
                 ShowToast($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowToast($"Auto save failed — {message}"));
+        _appCommands.Notified += message => Dispatcher.UIThread.InvokeAsync(() => ShowToast(message));
 
         Notifications.WireUndo(() => _undoManager.Undo());
 
@@ -1360,6 +1359,8 @@ public partial class MainWindow : Window
         TextureCombo.SelectionChanged += OnTextureComboChanged;
         MoveModeToggle.IsCheckedChanged += OnMoveModeToggled;
         MagicWandToggle.IsCheckedChanged += OnMagicWandToggled;
+        ToolTip.SetTip(MagicWandToggle,
+            $"Magic Wand mode — hover to preview region; double-click to apply; {_commandModifier.DisplayName}+click to add new frame");
         SnapToGridCheck.IsCheckedChanged += OnSnapToGridChanged;
         GridSizeInput.Value = 16m;
         GridSizeInput.ValueChanged += (_, _) => ApplyGridSize();
@@ -2006,6 +2007,7 @@ public partial class MainWindow : Window
         PreviewPanY          = PreviewCtrl.PanOffset.Y,
         OffsetMultiplier     = _appState.OffsetMultiplier,
         ExpandedNodes        = TreeBuilder.GetExpandedChainNames(_treeRoots).ToList(),
+        ExpandedFrames       = TreeBuilder.GetExpandedFrames(_treeRoots).ToList(),
         HorizontalGuides     = PreviewCtrl.HGuides.ToList(),
         VerticalGuides       = PreviewCtrl.VGuides.ToList(),
     };
@@ -2038,6 +2040,7 @@ public partial class MainWindow : Window
                 if (node.Data is AnimationChainSave chain)
                     node.IsExpanded = expandedSet.Contains(chain.Name);
             }
+            TreeBuilder.ApplyExpandedFrames(_treeRoots, settings.ExpandedFrames);
 
             PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
         }
@@ -2053,11 +2056,39 @@ public partial class MainWindow : Window
         {
             if (args.NewItems != null)
                 foreach (TreeNodeVm vm in args.NewItems)
-                    vm.PropertyChanged += OnTreeNodeIsExpandedChanged;
+                    HookExpandedChanged(vm);
             if (args.OldItems != null)
                 foreach (TreeNodeVm vm in args.OldItems)
-                    vm.PropertyChanged -= OnTreeNodeIsExpandedChanged;
+                    UnhookExpandedChanged(vm);
         };
+    }
+
+    // Chain nodes and their frame children both persist IsExpanded, and frames are added and
+    // removed under a live chain node, so each node also watches its own Children.
+    private void HookExpandedChanged(TreeNodeVm vm)
+    {
+        vm.PropertyChanged += OnTreeNodeIsExpandedChanged;
+        vm.Children.CollectionChanged += OnTreeNodeChildrenChanged;
+        foreach (var child in vm.Children)
+            HookExpandedChanged(child);
+    }
+
+    private void UnhookExpandedChanged(TreeNodeVm vm)
+    {
+        vm.PropertyChanged -= OnTreeNodeIsExpandedChanged;
+        vm.Children.CollectionChanged -= OnTreeNodeChildrenChanged;
+        foreach (var child in vm.Children)
+            UnhookExpandedChanged(child);
+    }
+
+    private void OnTreeNodeChildrenChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+    {
+        if (args.NewItems != null)
+            foreach (TreeNodeVm vm in args.NewItems)
+                HookExpandedChanged(vm);
+        if (args.OldItems != null)
+            foreach (TreeNodeVm vm in args.OldItems)
+                UnhookExpandedChanged(vm);
     }
 
     private void OnTreeNodeIsExpandedChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -2137,8 +2168,8 @@ public partial class MainWindow : Window
         IBrush accentFill = ThemedBrush("Accent");
         IBrush onAccent   = ThemedBrush("OnAccent");
         // Ordering/marking (oldest-applied first, current entry, then redo entries) lives in
-        // Core's HistoryRowBuilder so desktop and browser stay in lockstep (#748); only the
-        // brush mapping below is host-specific.
+        // Core's HistoryRowBuilder (#748), where it is unit-tested; only the brush mapping below
+        // lives here.
         var items = HistoryRowBuilder.BuildRows(undoHistory, redoHistory)
             .Select(row => row.IsCurrent
                 ? new Models.HistoryEntryVm(row.Description, onAccent, accentFill, IsCurrent: true)
@@ -2517,6 +2548,7 @@ public partial class MainWindow : Window
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
+        MenuExportGodot.Click += OnExportGodotClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
@@ -2582,7 +2614,7 @@ public partial class MainWindow : Window
         RefreshRecentFiles();
 
         // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
-        if (OperatingSystem.IsMacOS())
+        if (_useMacOSChrome)
             MainMenu.IsVisible = false;
     }
 
@@ -2790,9 +2822,10 @@ public partial class MainWindow : Window
         _projectManager.ProjectFolderPath = path;
         _projectFolderWatcher.Watch(path);
         var rootFolder = new DiskEditorFolder(path);
-        var entries = await AchxFolderScanner.ScanAsync(rootFolder);
+        var scan = await AchxFolderScanner.ScanProjectAsync(rootFolder);
+        var entries = scan.Files;
         ProjectPanel.CollapsedFolders.Load(GetCollapsedFolders(_appSettings.CollapsedAnimationFolders, path));
-        ProjectPanel.SetEntries(entries);
+        ProjectPanel.SetEntries(scan);
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
             : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
@@ -2905,7 +2938,10 @@ public partial class MainWindow : Window
         _ = _appCommands.AddAssociatedTiledTilesetViaDialogAsync();
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.ExportToPixiJsAsync();
+        _ = _appCommands.ExportAsync(ExportFormat.PixiJs);
+
+    private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
+        _ = _appCommands.ExportAsync(ExportFormat.Godot);
 
     internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 
@@ -3027,9 +3063,6 @@ public partial class MainWindow : Window
         var dialog = Settings.SettingsWindowBuilder.Build(
             new Settings.SettingsWindowModel
             {
-                FileAssociationSupported = _fileAssociation.IsSupported,
-                FileAssociationStatus = _fileAssociation.GetStatus(),
-                SuppressDefaultHandlerPrompt = _appSettings.SuppressDefaultHandlerPrompt,
                 CanvasBackgroundArgb = _appSettings.CanvasBackgroundArgb,
                 ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),
                 GuideLineArgb = _appSettings.GuideLineArgb,
@@ -3038,13 +3071,6 @@ public partial class MainWindow : Window
             },
             new Settings.SettingsWindowCallbacks
             {
-                OnSetDefaultAchx = () => RegisterAsDefaultAchxHandler(hideBanner: false),
-                OnSuppressDefaultHandlerPromptChanged = suppressed =>
-                {
-                    _appSettings.SuppressDefaultHandlerPrompt = suppressed;
-                    SaveSettingsFile();
-                    ShowDefaultHandlerBannerIfAppropriate();
-                },
                 OnCanvasBackgroundChanged = SetCanvasBackground,
                 OnPickCustomCanvasBackground = PickCustomCanvasBackgroundAsync,
                 OnGuideLineChanged = SetGuideLineColor,
@@ -3197,7 +3223,11 @@ public partial class MainWindow : Window
             PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
 
         ShowBoundingBoxCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowBoundingBox = ShowBoundingBoxCheck.IsChecked == true;
+        {
+            var show = ShowBoundingBoxCheck.IsChecked == true;
+            PreviewCtrl.ShowBoundingBox = show;
+            _appSettings.ShowBoundingBox = show;
+        };
 
         ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
         {
@@ -3250,6 +3280,7 @@ public partial class MainWindow : Window
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
         PreviewCtrl.GroupTracksChanged += RefreshGroupTimelineTracks;
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
+        PreviewCtrl.ActiveVertexChanged += HighlightVertexRow;
         // Same "no save, just a live refresh" handler the WireframeControl frame-region drag uses,
         // so dragging a frame's offset in the Preview panel tracks in the property panel too (#900 follow-up).
         PreviewCtrl.FrameLiveUpdated += OnFrameLiveUpdated;
@@ -3366,8 +3397,22 @@ public partial class MainWindow : Window
             OnTreeChainDragPointerReleased,
             RoutingStrategies.Bubble);
 
-        // Hovering a chain/frame row highlights it on the wireframe (#1216).
-        TreeHoverTracker.Attach(AnimTree, WireframeCtrl.SetTreeHover);
+        // Shape drag-and-drop reorder within a frame (#1285).
+        AnimTree.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeShapeDragPointerMoved,
+            RoutingStrategies.Bubble);
+        AnimTree.AddHandler(
+            InputElement.PointerReleasedEvent,
+            (_, _) => ClearShapeDragCandidate(),
+            RoutingStrategies.Bubble);
+
+        // Hovering a chain/frame row highlights it on the wireframe (#1216); a shape row, in the preview.
+        TreeHoverTracker.Attach(AnimTree, data =>
+        {
+            WireframeCtrl.SetTreeHover(data);
+            PreviewCtrl.SetTreeHoverShape(data); // shape rows outline in the preview (#1297)
+        });
 
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) => AddAnimationChainAndBeginInlineRename();
@@ -3504,6 +3549,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Internal shape reorder drag: only a same-type landing shows a line; a different type
+        // stays droppable so the drop can explain why it is refused.
+        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
+        {
+            var target = ResolveShapeDrop(e, shapeDrag);
+            e.DragEffects = target.Outcome == ShapeDropOutcome.None ? DragDropEffects.None : DragDropEffects.Move;
+            if (target.IsValid) ShowShapeDropIndicator(e);
+            else RemoveFrameDropIndicators();
+            e.Handled = true;
+            return;
+        }
+
         // Internal chain reorder drag.
         if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
@@ -3559,6 +3616,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Internal shape reorder drop.
+        if (e.DataTransfer.Contains(ShapeDragDataFormat) && _pendingShapeDrag is { } shapeDrag)
+        {
+            RemoveFrameDropIndicators();
+            var target = ResolveShapeDrop(e, shapeDrag);
+            if (target.IsValid)
+                _appCommands.MoveShapeToIndex(shapeDrag.Shape, shapeDrag.Frame, target.InsertIndex);
+            else if (target.Outcome == ShapeDropOutcome.CrossType)
+                ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
+            e.Handled = true;
+            return;
+        }
+
         // Internal chain reorder drop.
         if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
@@ -3603,32 +3673,16 @@ public partial class MainWindow : Window
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        string resolvedFilePath = droppedFilePath;
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+        string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath,
+            retried => ApplyResolvedPngDrop(targetChain, targetFrame, retried, createFrameOnCtrl));
+        return resolvedFilePath is not null
+            && ApplyResolvedPngDrop(targetChain, targetFrame, resolvedFilePath, createFrameOnCtrl);
+    }
 
-        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, droppedFilePath))
-        {
-            var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
-            if (choice == TextureCopyChoice.Cancel) return false;
-
-            if (choice == TextureCopyChoice.Copy)
-            {
-                string destination = Path.Combine(achxFolder, Path.GetFileName(droppedFilePath));
-                try
-                {
-                    File.Copy(droppedFilePath, destination, overwrite: true);
-                    resolvedFilePath = destination;
-                }
-                catch (Exception ex)
-                {
-                    ShowToast($"Could not copy: {ex.Message}");
-                    return false;
-                }
-            }
-        }
-
+    private bool ApplyResolvedPngDrop(
+        AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
+        string resolvedFilePath, bool createFrameOnCtrl)
+    {
         var (result, relPath) = TextureDropProcessor.ComputePngDrop(
             targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
@@ -3927,6 +3981,82 @@ public partial class MainWindow : Window
     {
         RemoveDropLine();
         RemoveDropBox();
+    }
+
+    // ── Shape drag attempt (issue #1285) ───────────────────────────────────────
+
+    private void ClearShapeDragCandidate()
+    {
+        _shapeDragCandidate = null;
+        _shapeDragPressPoint = null;
+        _shapeDragPressArgs = null;
+    }
+
+    private async void OnTreeShapeDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_shapeDragInProgress || _shapeDragCandidate is not { } shape ||
+            _shapeDragPressPoint is not { } pressPoint || _shapeDragPressArgs is null)
+            return;
+
+        if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
+        {
+            ClearShapeDragCandidate();
+            return;
+        }
+
+        var pos = e.GetPosition(AnimTree);
+        if (Math.Abs(pos.X - pressPoint.X) <= 4 && Math.Abs(pos.Y - pressPoint.Y) <= 4)
+            return;
+
+        var frame = shape is ShapeSave shapeSave ? _objectFinder.GetAnimationFrameContaining(shapeSave) : null;
+        if (frame is null)
+        {
+            ClearShapeDragCandidate();
+            return;
+        }
+
+        e.Pointer.Capture(null); // release press-capture so the drag system can take over
+        _pendingShapeDrag = (shape, frame);
+        _shapeDragInProgress = true;
+
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ShapeDragDataFormat, ShapeDragToken));
+        try
+        {
+            await DragDrop.DoDragDropAsync(_shapeDragPressArgs, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _pendingShapeDrag = null;
+            _shapeDragInProgress = false;
+            RemoveFrameDropIndicators();
+            ClearShapeDragCandidate();
+        }
+    }
+
+    private ShapeDropTarget ResolveShapeDrop(DragEventArgs e, (object Shape, AnimationFrameSave Frame) drag)
+    {
+        if (drag.Frame.ShapesSave is not { } shapes) return ShapeDropTarget.None;
+        var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
+        return ShapeDropResolver.Resolve(nodeData, half, drag.Shape, shapes);
+    }
+
+    /// <summary>Draws the insert line at the hovered same-type shape row's upper or lower edge.</summary>
+    private void ShowShapeDropIndicator(DragEventArgs e)
+    {
+        var (_, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
+        var topLeft = tvi is null ? null : Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        if (tvi is null || topLeft is null || treeOrigin is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
+        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        RemoveDropBox();
+        ShowDropLine(HeaderContentLeft(tvi), treeRight, y);
     }
 
     // ── Internal chain drag-and-drop reorder ───────────────────────────────────
@@ -4607,7 +4737,8 @@ public partial class MainWindow : Window
         // sharing a row with it, so growing it never resizes/shifts the canvas (reported: selecting
         // a 2nd animation visibly shifted the centered preview). PreviewVScroll/PreviewHScroll's
         // Margin is kept in sync so their trough ends above the dock instead of running under it.
-        bool groupActive = _selectedState.SelectedChains.Count >= 2;
+        bool groupActive = _selectedState.PreviewChains.Count >= 2;
+        PlayPauseBtn.IsVisible = !groupActive; // group rows carry their own play/pause buttons
         TimelineScrubSurface.IsVisible = !groupActive;
         GroupTimelineScrubHost.IsVisible = groupActive;
         double dockHeight = groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight;
@@ -4773,6 +4904,7 @@ public partial class MainWindow : Window
             var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
             if (track is null || track.Frames.Count == 0) continue;
 
+            track.IsPlaying = PreviewCtrl.IsTrackPlaying(chain);
             int idx = Math.Clamp(playback.CurrentFrameIndex, 0, track.Frames.Count - 1);
             for (int i = 0; i < track.Frames.Count; i++)
                 track.Frames[i].IsCurrent = i == idx;
@@ -4782,6 +4914,12 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private void OnGroupTrackPlayPauseClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: ChainTimelineTrackVm track })
+            PreviewCtrl.ToggleTrackPlayPause(track.Chain);
+    }
     private (ChainTimelineTrackVm Track, ItemsControl FramesList)? FindGroupTrackAndFramesList(PointerEventArgs e)
     {
         if (e.Source is not Avalonia.Visual source) return null;
@@ -4900,6 +5038,8 @@ public partial class MainWindow : Window
             if (e.Source is Control btnSrc && btnSrc.FindAncestorOfType<Button>(includeSelf: true) is not null)
                 return;
 
+            ClearShapeDragCandidate();
+
             // Arm a frame-drag candidate. Snapshot the selection BEFORE the TreeView mutates
             // it on press, so dragging a frame that is part of a multi-selection can move the
             // whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -4918,7 +5058,7 @@ public partial class MainWindow : Window
                 // the press handled to suppress the TreeView's select-on-press, capture so the
                 // move/release still arrive here, and defer the single-select to release if no
                 // drag happens. Ctrl/Shift presses fall through to normal selection editing.
-                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                bool noModifiers = !_commandModifier.IsHeld(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift);
                 if (noModifiers &&
                     FrameDropResolver.IsFrameMultiSelectionContaining(_frameDragSelectionSnapshot, frame))
                 {
@@ -4949,7 +5089,7 @@ public partial class MainWindow : Window
                 // the press handled to suppress the TreeView's select-on-press, capture so the
                 // move/release still arrive here, and defer the single-select to release if no
                 // drag happens. Ctrl/Shift presses fall through to normal selection editing.
-                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                bool noModifiers = !_commandModifier.IsHeld(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift);
                 if (noModifiers &&
                     ChainDropResolver.IsChainMultiSelectionContaining(_chainDragSelectionSnapshot, chain))
                 {
@@ -4962,10 +5102,21 @@ public partial class MainWindow : Window
                     _pendingSingleSelectChain = null;
                 }
             }
+            else if (e.Source is Control shapeSrc &&
+                shapeSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
+                    is TreeNodeVm { Data: AARectSave or CircleSave or PolygonSave } shapeVm)
+            {
+                ClearFrameDragCandidate();
+                ClearChainDragCandidate();
+                _shapeDragCandidate = shapeVm.Data;
+                _shapeDragPressPoint = e.GetPosition(AnimTree);
+                _shapeDragPressArgs = e;
+            }
             else
             {
                 ClearFrameDragCandidate();
                 ClearChainDragCandidate();
+                ClearShapeDragCandidate();
             }
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 2)
@@ -5062,26 +5213,9 @@ public partial class MainWindow : Window
             DuplicateChainFlip: duplicateChainFlip);
 
         var plan = TreeMenuPlanBuilder.Build(data, _appCommands, _selectedState, _objectFinder, _projectManager, actions);
-        RenderMenuPlan(plan, data);
-    }
-
-    // Thin walk over the shared plan built by TreeMenuPlanBuilder: adds each entry via the
-    // existing Avalonia-building helpers below, substituting the real dialog/filesystem menu
-    // item at each host-slot placeholder (see TreeMenuHostSlot — these four stay desktop-only
-    // until issue #756).
-    private void RenderMenuPlan(IReadOnlyList<TreeMenuItem> plan, object? nodeData)
-    {
-        foreach (var entry in plan)
-        {
-            if (entry.IsSeparator)
-                AddSeparator();
-            else if (entry.HostSlot is { } slot)
-                AddHostSlotItem(slot, nodeData);
-            else if (entry.Children is { } children)
-                AddSubMenu(entry.Header!, children.Select(c => (c.Header!, c.OnClick!)).ToArray());
-            else
-                AddMenuItem(entry.Header!, entry.OnClick!);
-        }
+        // Host slots get the real dialog/filesystem menu item (see TreeMenuHostSlot — these
+        // four stay desktop-only until issue #756).
+        TreeMenuRenderer.Render(plan, AnimTree.ContextMenu!.Items, slot => AddHostSlotItem(slot, data));
     }
 
     private void AddHostSlotItem(TreeMenuHostSlot slot, object? nodeData)
@@ -5089,45 +5223,52 @@ public partial class MainWindow : Window
         switch (slot)
         {
             case TreeMenuHostSlot.AdjustFrameTime when nodeData is AnimationChainSave chain:
-                AddMenuItem("Adjust Frame Time…", () => AskAdjustFrameTime(chain));
+                AddMenuItem("Adjust Frame Time…", TreeMenuIcon.FrameTime, () => AskAdjustFrameTime(chain));
                 break;
             case TreeMenuHostSlot.AddMultipleFrames when nodeData is AnimationChainSave chain:
-                AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
+                AddMenuItem("Add Multiple Frames…", TreeMenuIcon.Frame, () => _ = AskAddMultipleFramesAsync(chain));
                 break;
             case TreeMenuHostSlot.AdjustOffsets when nodeData is AnimationChainSave chain:
-                AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
+                AddMenuItem("Adjust Offsets…", TreeMenuIcon.Offsets, () => _ = AskAdjustOffsetsAsync(chain));
                 break;
             case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
-                AddMenuItem("Reveal Texture in File Manager", () => ViewTextureInExplorer(frame));
+                AddMenuItem("Reveal Texture in File Manager", TreeMenuIcon.RevealFile, () => ViewTextureInExplorer(frame));
                 break;
         }
     }
 
-    private void AddMenuItem(string header, Action onClick)
-    {
-        var item = new MenuItem { Header = header };
-        item.Click += (_, _) => onClick();
-        AnimTree.ContextMenu!.Items.Add(item);
-    }
-
-    private void AddSeparator() =>
-        AnimTree.ContextMenu!.Items.Add(new Separator());
-
-    private void AddSubMenu(string header, params (string Header, Action OnClick)[] children)
-    {
-        var parent = new MenuItem { Header = header };
-        foreach (var (childHeader, onClick) in children)
-        {
-            var child = new MenuItem { Header = childHeader };
-            child.Click += (_, _) => onClick();
-            parent.Items.Add(child);
-        }
-        AnimTree.ContextMenu!.Items.Add(parent);
-    }
+    private void AddMenuItem(string header, TreeMenuIcon icon, Action onClick) =>
+        AnimTree.ContextMenu!.Items.Add(TreeMenuRenderer.CreateMenuItem(header, onClick, icon));
 
     private void AskAdjustFrameTime(AnimationChainSave chain)
     {
         _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain);
+    }
+
+    // ── Frame events (#1121) ──────────────────────────────────────────────────
+
+    private void WireFrameEventsSection()
+    {
+        PropFrameEvents.AddRequested += () =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.AddFrameEvent(frame, "Event");
+        };
+        PropFrameEvents.EditCommitted += (index, name, data) =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.SetFrameEvent(frame, index, name, data);
+        };
+        PropFrameEvents.RemoveRequested += index =>
+        {
+            if (_selectedState.SelectedFrame is { } frame) _appCommands.RemoveFrameEvent(frame, index);
+        };
+    }
+
+    // Events are per frame, so a multi-frame selection shows a hint instead of one frame's list.
+    // Hidden for a native tsx project, which can't store events (see AppCommands.IsAchxOnlyEditBlocked).
+    private void RefreshFrameEventsSection(AnimationFrameSave? frame)
+    {
+        PropEventsSection.IsVisible = !_projectManager.IsNativeTsxProject;
+        PropFrameEvents.ShowEvents(frame is not null && _selectedState.SelectedFrames.Count <= 1 ? frame.Events : null);
     }
 
     // ── Property panel wiring ─────────────────────────────────────────────────
@@ -5148,15 +5289,21 @@ public partial class MainWindow : Window
         PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
-        PropRed.LostFocus          += (_, _) => ApplyFrameColor();
-        PropGreen.LostFocus        += (_, _) => ApplyFrameColor();
-        PropBlue.LostFocus         += (_, _) => ApplyFrameColor();
+        foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
+        {
+            channel.LostFocus += (_, _) => ApplyFrameColor(channel);
+            channel.KeyDown   += (_, e) => { if (e.Key == Key.Enter) ApplyFrameColor(channel); };
+        }
         PropAlpha.LostFocus        += (_, _) => ApplyFrameAlpha();
-        PropRed.KeyDown            += (_, e) => CommitColorChannelOnEnter(e);
-        PropGreen.KeyDown          += (_, e) => CommitColorChannelOnEnter(e);
-        PropBlue.KeyDown           += (_, e) => CommitColorChannelOnEnter(e);
         PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
+        // Delete/Backspace clears the mode back to inherited, as deleting a color channel's text does.
+        PropColorMode.KeyDown += (_, e) =>
+        {
+            if (e.Key is not (Key.Delete or Key.Back)) return;
+            ApplyFrameColorOperation(null);
+            e.Handled = true;
+        };
         PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
@@ -5191,7 +5338,46 @@ public partial class MainWindow : Window
         SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
             PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
             PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY);
+
+        // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
+        ApplyRelativeEditsWith(ApplyFrameLen, PropFrameLen);
+        ApplyRelativeEditsWith(ApplyFrameRelative, PropRelX, PropRelY);
+        ApplyRelativeEditsWith(ApplyFramePixelCoords, PropPixelX, PropPixelY, PropPixelW, PropPixelH);
+        ApplyRelativeEditsWith(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
+        ApplyRelativeEditsWith(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
+        ApplyRelativeEditsWith(ApplyPolygonProps, PropPolygonX, PropPolygonY);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropRed), PropRed);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropGreen), PropGreen);
+        ApplyRelativeEditsWith(() => ApplyFrameColor(PropBlue), PropBlue);
+        ApplyRelativeEditsWith(ApplyFrameAlpha, PropAlpha);
     }
+
+    // The relative edit being applied, visible to the field's Apply method through EditOf.
+    private (Control Field, NumericEdit Edit)? _relativeEdit;
+
+    private void ApplyRelativeEditsWith(Action apply, params Control[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.AddHandler(NumericExpressionInput.RelativeEditCommittedEvent, (_, e) =>
+            {
+                e.Handled = true;
+                _relativeEdit = (field, e.Edit);
+                try { apply(); }
+                finally { _relativeEdit = null; }
+                _appCommands.SealPendingEdits();
+            });
+        }
+    }
+
+    /// <summary>The edit a field asks for: the relative edit being applied to it, else its value,
+    /// else null ("(mixed)" and untouched, so leave each item alone).</summary>
+    private NumericEdit? EditOf(Control field, decimal? value) =>
+        _relativeEdit is { } r && ReferenceEquals(r.Field, field) ? r.Edit
+        : value is { } v ? v
+        : null;
+
+    private NumericEdit? EditOf(NumericUpDown field) => EditOf(field, field.Value);
 
     private void SealOnCommit(params InputElement[] inputs)
     {
@@ -5300,97 +5486,60 @@ public partial class MainWindow : Window
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
 
+        string? resolvedAbsPath = await ResolveTextureForProjectAsync(pickedPath,
+            retried => CommitPickedTexture(frames, retried));
+        if (resolvedAbsPath is not null)
+            CommitPickedTexture(frames, resolvedAbsPath);
+    }
+
+    private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath)
+    {
+        // Store relative path when possible; ../relative paths are allowed for textures
+        // outside the .achx folder so they round-trip correctly.
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-
-        // resolvedAbsPath tracks the actual file we will use (may change if user copies it)
-        string resolvedAbsPath = pickedPath;
-
-        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, pickedPath))
-        {
-            var choice = await ShowTextureCopyDialogAsync(pickedPath);
-            if (choice == TextureCopyChoice.Cancel) return;
-
-            if (choice == TextureCopyChoice.Copy)
-            {
-                string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
-                try
-                {
-                    File.Copy(pickedPath, destination, overwrite: true);
-                    resolvedAbsPath = destination;
-                }
-                catch (Exception ex)
-                {
-                    var capturedSource = pickedPath;
-                    var capturedDest   = destination;
-                    ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
-                    {
-                        try
-                        {
-                            File.Copy(capturedSource, capturedDest, overwrite: true);
-                            CommitFrameTexture(frames, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
-                        }
-                        catch (Exception retryEx)
-                        {
-                            ShowToast($"Retry failed: {retryEx.Message}");
-                        }
-                    });
-                }
-            }
-        }
-
-        // Store relative path when possible; ../relative paths are allowed for textures
-        // outside the .achx folder so they round-trip correctly.
         string storePath = string.IsNullOrEmpty(achxFolder)
-            ? resolvedAbsPath
-            : TexturePathHelper.ComputeStorePath(resolvedAbsPath, achxFolder);
+            ? absolutePath
+            : TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
 
-        CommitFrameTexture(frames, storePath, resolvedAbsPath);
+        CommitFrameTexture(frames, storePath, absolutePath);
     }
 
-    private enum TextureCopyChoice { Copy, Keep, Cancel }
-
-    private async Task<TextureCopyChoice> ShowTextureCopyDialogAsync(string absoluteTexturePath)
+    /// <summary>
+    /// The one "bring a user's texture into the project" step shared by Browse… and every PNG drop.
+    /// When <paramref name="texturePath"/> is outside the .achx's folder (<see cref="TextureCopyDecider"/>),
+    /// asks whether to copy it, keep it, or (when a different same-named file is already there)
+    /// overwrite or use that file, and carries the answer out. Returns the absolute path to
+    /// reference, or null when cancelled or the copy failed; a failed copy shows a toast whose
+    /// Retry re-runs the same choice and hands the result to <paramref name="applyAfterRetry"/>.
+    /// </summary>
+    private async Task<string?> ResolveTextureForProjectAsync(string texturePath, Action<string> applyAfterRetry)
     {
-        var tcs = new TaskCompletionSource<TextureCopyChoice>();
+        var plan = TextureCopyDecider.PlanCopyForProject(_projectManager, texturePath);
+        if (plan is null) return texturePath;
 
-        var dialog = new Window
+        var choice = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
+        try
         {
-            Title = "This frame does not share a folder",
-            Width = 560,
-            Height = 220,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 10 };
-        panel.Children.Add(new TextBlock
+            return TextureCopyDecider.Apply(plan, choice);
+        }
+        catch (Exception ex)
         {
-            Text = $"The selected file:\n\n{absoluteTexturePath}\n\nis not relative to the Animation file.  What would you like to do?",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-        });
-
-        var copyBtn = new Button
-        {
-            Content = "Copy the file to the same folder as the Animation",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
-        };
-        var keepBtn = new Button
-        {
-            Content = "Keep the file where it is (this may limit the portability of the Animation file)",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
-        };
-
-        copyBtn.Click += (_, _) => { tcs.TrySetResult(TextureCopyChoice.Copy);   dialog.Close(); };
-        keepBtn.Click += (_, _) => { tcs.TrySetResult(TextureCopyChoice.Keep);   dialog.Close(); };
-        panel.Children.Add(copyBtn);
-        panel.Children.Add(keepBtn);
-
-        dialog.Content = panel;
-        dialog.Closed += (_, _) => tcs.TrySetResult(TextureCopyChoice.Cancel);
-
-        await dialog.ShowDialog(this);
-        return await tcs.Task;
+            ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+            {
+                try
+                {
+                    if (TextureCopyDecider.Apply(plan, choice) is { } retried)
+                        applyAfterRetry(retried);
+                }
+                catch (Exception retryEx)
+                {
+                    ShowToast($"Retry failed: {retryEx.Message}");
+                }
+            });
+            return null;
+        }
     }
 
     /// <summary>
@@ -5550,6 +5699,7 @@ public partial class MainWindow : Window
             // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
             // only way to unlock a chain from the inspector.
             PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
+            RefreshFrameEventsSection(frame);
             PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
             PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
             PropPolygonPanel.IsEnabled = !IsShapeLocked(poly);
@@ -5609,16 +5759,12 @@ public partial class MainWindow : Window
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
-                else if (effective.Operation is ColorOperation inherited)
-                {
-                    // Unset here but inherited from an earlier frame — ghost it as a combo placeholder
-                    // (SelectedIndex -1 shows PlaceholderText) so the combo matches the sticky preview.
-                    PropColorMode.SelectedIndex = -1;
-                    PropColorMode.PlaceholderText = $"{inherited} (inherited)";
-                }
                 else
                 {
-                    PropColorMode.SelectedIndex = 0; // None
+                    // Unset: ghost the effective mode as a placeholder, like the channel fields above.
+                    // "None" means nothing earlier sets a mode, so no tint applies.
+                    PropColorMode.SelectedIndex = -1;
+                    PropColorMode.PlaceholderText = effective.Operation?.ToString() ?? "None";
                 }
                 SetNameOrMixed(PropTextureName,
                     frames.Select(f => TexturePathHelper.ComputeDisplayPath(f.TextureName, _projectManager.FileName)).ToList(),
@@ -5687,12 +5833,19 @@ public partial class MainWindow : Window
     // rebuilt only when the polygon or its vertex count changes, so a row being typed into keeps focus.
     private PolygonSave? _polygonRowsFor;
     private readonly List<(NumericUpDown X, NumericUpDown Y)> _polygonVertexRows = new();
+    private readonly List<(Border X, Border Y)> _polygonVertexCells = new();
+    private int _activeVertexRow = -1;
 
     private void RefreshPolygonPanel(PolygonSave polygon)
     {
-        PropPolygonName.Text = polygon.Name;
-        PropPolygonX.Value = (decimal)polygon.X;
-        PropPolygonY.Value = (decimal)polygon.Y;
+        // Name/X/Y apply to every selected polygon, so they show "(mixed)" when the selection
+        // disagrees, exactly like multi-selected rects and circles (see ApplyRectProps).
+        var polygons = _selectedState.SelectedPolygons;
+        bool namesCollide = polygons.Count > 1 &&
+            _appCommands.HasSameFrameNameCollision(polygons.Cast<object>().ToList());
+        SetNameOrMixed(PropPolygonName, polygons.Select(p => p.Name ?? "").ToList(), namesCollide);
+        SetValueOrMixed(PropPolygonX, polygons.Select(p => (decimal)p.X).ToList());
+        SetValueOrMixed(PropPolygonY, polygons.Select(p => (decimal)p.Y).ToList());
         PropPolygonWarning.IsVisible = PolygonVertices.IsSelfIntersecting(polygon);
 
         int count = PolygonVertices.Count(polygon);
@@ -5710,6 +5863,8 @@ public partial class MainWindow : Window
     {
         _polygonRowsFor = polygon;
         _polygonVertexRows.Clear();
+        _polygonVertexCells.Clear();
+        PreviewCtrl.InspectorVertexIndex = -1;
         PropPolygonVertices.Children.Clear();
         for (int i = 0; i < count; i++)
         {
@@ -5721,10 +5876,12 @@ public partial class MainWindow : Window
             });
             var x = NewVertexInput($"PropPolygonVertex{i}X", "X");
             var y = NewVertexInput($"PropPolygonVertex{i}Y", "Y");
-            Grid.SetColumn(x, 1);
-            Grid.SetColumn(y, 3);
-            row.Children.Add(x);
-            row.Children.Add(y);
+            var xCell = NewVertexCell(x);
+            var yCell = NewVertexCell(y);
+            Grid.SetColumn(xCell, 1);
+            Grid.SetColumn(yCell, 3);
+            row.Children.Add(xCell);
+            row.Children.Add(yCell);
             var remove = new Button
             {
                 Name = $"PropPolygonVertex{i}Delete", Content = "✕", FontSize = 10, Padding = new Avalonia.Thickness(4, 0),
@@ -5737,9 +5894,52 @@ public partial class MainWindow : Window
 
             x.ValueChanged += (_, _) => ApplyPolygonVertex(index);
             y.ValueChanged += (_, _) => ApplyPolygonVertex(index);
+            foreach (var input in new[] { x, y })
+            {
+                input.GotFocus += (_, _) => PreviewCtrl.InspectorVertexIndex = index;
+                // Deferred so tabbing X -> Y in the same row keeps the index instead of
+                // clearing and resetting it, which would replay the reveal.
+                input.LostFocus += (_, _) => Dispatcher.UIThread.Post(() =>
+                {
+                    if (!x.IsKeyboardFocusWithin && !y.IsKeyboardFocusWithin && PreviewCtrl.InspectorVertexIndex == index)
+                        PreviewCtrl.InspectorVertexIndex = -1;
+                });
+            }
             SealOnCommit(x, y);
             _polygonVertexRows.Add((x, y));
+            _polygonVertexCells.Add((xCell, yCell));
             PropPolygonVertices.Children.Add(row);
+        }
+        ApplyVertexRowHighlight(); // the rows were just rebuilt; keep the highlight on the hovered vertex
+    }
+
+    // A vertex box inside a bordered cell. The border stays 2px (transparent when idle) so
+    // highlighting a row never shifts the layout.
+    private static Border NewVertexCell(NumericUpDown input) => new()
+    {
+        Child = input, BorderThickness = new Avalonia.Thickness(2), CornerRadius = new Avalonia.CornerRadius(4),
+        BorderBrush = Avalonia.Media.Brushes.Transparent,
+    };
+
+    /// <summary>Highlights the X/Y boxes of vertex <paramref name="index"/> (-1 clears), as the pointer hovers or drags it in the preview.</summary>
+    private void HighlightVertexRow(int index)
+    {
+        _activeVertexRow = index;
+        ApplyVertexRowHighlight();
+    }
+
+    private void ApplyVertexRowHighlight()
+    {
+        var accent = this.TryFindResource("AccentSoft", ActualThemeVariant, out var found) && found is Avalonia.Media.IBrush brush
+            ? brush : Avalonia.Media.Brushes.Gold;
+        for (int i = 0; i < _polygonVertexCells.Count; i++)
+        {
+            bool active = i == _activeVertexRow;
+            foreach (var cell in new[] { _polygonVertexCells[i].X, _polygonVertexCells[i].Y })
+            {
+                cell.Classes.Set("vertexActive", active);
+                cell.BorderBrush = active ? accent : Avalonia.Media.Brushes.Transparent;
+            }
         }
     }
 
@@ -5770,6 +5970,18 @@ public partial class MainWindow : Window
     private void ApplyPolygonProps()
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
+        var polygons = _selectedState.SelectedPolygons;
+
+        if (polygons.Count > 1)
+        {
+            // A null component means "showing (mixed)/disabled, not edited" -- see ApplyRectProps.
+            NumericEdit? bx = EditOf(PropPolygonX);
+            NumericEdit? by = EditOf(PropPolygonY);
+            string? bname = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? null : PropPolygonName.Text.Trim();
+            _appCommands.SetPolygonPropsBulk(polygons, bname, bx, by);
+            return;
+        }
+
         if (PropPolygonX.Value is not { } x || PropPolygonY.Value is not { } y) return;
         var name = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? polygon.Name : PropPolygonName.Text.Trim();
         _appCommands.SetPolygonProps(_objectFinder.GetAnimationFrameContaining(polygon), polygon, name, (float)x, (float)y);
@@ -5863,8 +6075,8 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
-        if (frames.Count == 0 || !PropFrameLen.Value.HasValue) return;
-        _appCommands.SetFrameLength(frames, (float)PropFrameLen.Value.Value);
+        if (frames.Count == 0 || EditOf(PropFrameLen, PropFrameLen.Value) is not { } length) return;
+        _appCommands.SetFrameLength(frames, length);
     }
 
     private void ApplyFrameRelative()
@@ -5875,30 +6087,22 @@ public partial class MainWindow : Window
         // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
         // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
         // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
-        float? relX = PropRelX.Value.HasValue ? (float)PropRelX.Value.Value : null;
-        float? relY = PropRelY.Value.HasValue ? (float)PropRelY.Value.Value : null;
+        NumericEdit? relX = EditOf(PropRelX);
+        NumericEdit? relY = EditOf(PropRelY);
         if (relX is null && relY is null) return;
         _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
-    private void ApplyFrameColor()
+    /// <summary>Commits one color field. Only that channel changes, so committing Red never
+    /// touches a Green that is showing "(mixed)".</summary>
+    private void ApplyFrameColor(NumericUpDown field)
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
-        // Note: with a multi-selection, a channel that is still showing its "(mixed)" placeholder
-        // also reads as null here, so it gets applied (cleared) to every selected frame just like an
-        // explicit clear would — there's no way to tell "never touched" apart from "cleared on purpose"
-        // from the control's Value alone. Prefer not leaving a mixed color panel blank across an edit
-        // if that distinction matters; see PR notes for the known limitation.
-        static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
-        _appCommands.SetFrameColor(frames, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
-    }
-
-    private void CommitColorChannelOnEnter(KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) ApplyFrameColor();
+        ChannelEdit Edit(NumericUpDown channel, Func<AnimationFrameSave, int?> value) =>
+            ReferenceEquals(field, channel) ? ChannelEditOf(channel, frames.Select(value)) : ChannelEdit.Keep;
+        _appCommands.SetFrameColor(frames, Edit(PropRed, f => f.Red), Edit(PropGreen, f => f.Green), Edit(PropBlue, f => f.Blue));
     }
 
     private void ApplyFrameAlpha()
@@ -5906,23 +6110,41 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // A blank NumericUpDown (null Value) means alpha is unset and is omitted from the .achx.
-        _appCommands.SetFrameAlpha(frames, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
+        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, frames.Select(f => f.Alpha)));
     }
 
+    /// <summary>A blank color field clears the channel (omitted from the .achx, so it inherits),
+    /// except when it is blank because the selection is "(mixed)": that leaves each frame alone, so
+    /// moving focus through a mixed field changes nothing (#1330).</summary>
+    private ChannelEdit ChannelEditOf(NumericUpDown field, IEnumerable<int?> selectedValues) =>
+        EditOf(field) is NumericEdit edit ? ChannelEdit.Edit(edit)
+        : selectedValues.Distinct().Count() > 1 ? ChannelEdit.Keep
+        : ChannelEdit.Clear;
+
     private void ApplyFrameColorOperation()
+    {
+        // ComboBox order: 0 = Inherit (null), 1 = Multiply, 2 = Add. -1 is the blank placeholder
+        // state RefreshPropertyPanel sets, not a user pick.
+        switch (PropColorMode.SelectedIndex)
+        {
+            case 0: ApplyFrameColorOperation(null); break;
+            case 1: ApplyFrameColorOperation(ColorOperation.Multiply); break;
+            case 2: ApplyFrameColorOperation(ColorOperation.Add); break;
+        }
+    }
+
+    private void ApplyFrameColorOperation(ColorOperation? operation)
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
         if (frames.Count == 0) return;
-        // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
-        ColorOperation? operation = PropColorMode.SelectedIndex switch
+        if (frames.Any(f => f.ColorOperation != operation))
         {
-            1 => ColorOperation.Multiply,
-            2 => ColorOperation.Add,
-            _ => null,
-        };
-        _appCommands.SetFrameColorOperation(frames, operation);
+            _appCommands.SetFrameColorOperation(frames, operation);
+        }
+        // Inherit is an action, not a value to display: once applied, the combo goes back to blank
+        // with the inherited placeholder. Posted because the combo is still mid-SelectionChanged.
+        if (operation is null) Dispatcher.UIThread.Post(RefreshPropertyPanel);
     }
 
     private void ApplyFramePixelCoords()
@@ -5935,10 +6157,10 @@ public partial class MainWindow : Window
         // A null component here only ever means "still showing (mixed), not edited" — the pixel
         // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
         // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
-        int? x = PropPixelX.Value.HasValue ? (int)PropPixelX.Value.Value : null;
-        int? y = PropPixelY.Value.HasValue ? (int)PropPixelY.Value.Value : null;
-        int? w = PropPixelW.Value.HasValue ? (int)PropPixelW.Value.Value : null;
-        int? h = PropPixelH.Value.HasValue ? (int)PropPixelH.Value.Value : null;
+        NumericEdit? x = EditOf(PropPixelX);
+        NumericEdit? y = EditOf(PropPixelY);
+        NumericEdit? w = EditOf(PropPixelW);
+        NumericEdit? h = EditOf(PropPixelH);
         if (x is null && y is null && w is null && h is null) return;
         _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
@@ -5956,10 +6178,10 @@ public partial class MainWindow : Window
         // showed "(mixed)" or disabled the field for a same-frame collision (SetNameOrMixed); once
         // the user types, Text becomes non-null and applies to every selected rect (safe as long as
         // no two share a frame — SetNameOrMixed disables the field for that case).
-        float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
-        float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
-        float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
-        float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
+        NumericEdit? x = EditOf(PropRectX);
+        NumericEdit? y = EditOf(PropRectY);
+        NumericEdit? scaleX = EditOf(PropRectScaleX);
+        NumericEdit? scaleY = EditOf(PropRectScaleY);
         string? name = PropRectName.Text;
 
         _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
@@ -5972,9 +6194,9 @@ public partial class MainWindow : Window
         if (circles.Count == 0) return;
 
         // See ApplyRectProps for the null-means-"don't touch" / same-frame-collision semantics.
-        float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
-        float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
-        float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
+        NumericEdit? x = EditOf(PropCircleX);
+        NumericEdit? y = EditOf(PropCircleY);
+        NumericEdit? radius = EditOf(PropCircleRadius);
         string? name = PropCircleName.Text;
 
         _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
@@ -6637,7 +6859,8 @@ public partial class MainWindow : Window
             {
                 Id = "delete", Description = "Delete", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Delete") },
-                ShouldSkip = IsTextInputFocused,
+                // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
                 Action = HandleDelete,
             },
             new()
@@ -6673,19 +6896,22 @@ public partial class MainWindow : Window
                 Id = "toggle-play-pause", Description = "Play / Pause Preview", Category = "Playback",
                 Gestures = new[] { new HotkeyGesture("Space") },
                 // Let a focused button receive Space to activate itself rather than hijacking it.
-                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is Button,
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused() || FocusManager?.GetFocusedElement() is Button,
                 Action = () => PreviewCtrl.TogglePlayPause(),
             },
             new()
             {
                 Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Up", Alt) },
+                // Alt+Up/Down opens a focused Inspector combo; don't reorder the selection instead.
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(-1),
             },
             new()
             {
                 Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
+                ShouldSkip = IsInspectorFocused,
                 Action = () => HandleReorderHotkey(+1),
             },
             new()
@@ -6819,8 +7045,10 @@ public partial class MainWindow : Window
     // HotkeyDefinition.DisplayText must keep Avalonia's Key enum names verbatim (e.g. "OemPlus")
     // since SetMenuGesture feeds it to KeyGesture.Parse, which only recognizes real Key names.
     // This panel has no such constraint, so swap in words a user would actually recognize.
-    private static string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
-        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus");
+    // DisplayText always spells the command modifier "Ctrl"; swap in ⌘ on macOS.
+    private string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
+        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus")
+            .Replace("Ctrl", _commandModifier.DisplayName);
 
     private void WireKeyboard()
     {
@@ -6835,10 +7063,11 @@ public partial class MainWindow : Window
         {
             if (e.Handled) return;
 
-            // Ctrl+hover over the wireframe shows the add-frame cursor; refresh it immediately
-            // on press so it doesn't wait for the next pointer move (#882).
-            if (e.Key is Key.LeftCtrl or Key.RightCtrl)
-                WireframeCtrl.RefreshCursorForCtrlChange(isCtrl: true);
+            // Command-modifier hover (Ctrl, or ⌘ on macOS) over the wireframe shows the add-frame
+            // cursor; refresh it immediately on press so it doesn't wait for the next pointer move (#882).
+            // Windows presses Ctrl itself for a touchpad pinch, which isn't the user holding it.
+            if (_commandModifier.IsModifierKey(e.Key) && !WireframeCtrl.WheelSourceDetector.IsPinchInProgress)
+                WireframeCtrl.RefreshCursorForCommandModifierChange(isHeld: true);
 
             var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
             if (match is null) return;
@@ -6855,9 +7084,9 @@ public partial class MainWindow : Window
             if (e.Handled) return;
 
             // Mirror image of the KeyDown branch above: drop the add-frame cursor the instant
-            // Ctrl is released, without requiring a pointer move (#882).
-            if (e.Key is Key.LeftCtrl or Key.RightCtrl)
-                WireframeCtrl.RefreshCursorForCtrlChange(isCtrl: false);
+            // the command modifier is released, without requiring a pointer move (#882).
+            if (_commandModifier.IsModifierKey(e.Key))
+                WireframeCtrl.RefreshCursorForCommandModifierChange(isHeld: false);
 
             if (e.Key is Key.LeftAlt or Key.RightAlt &&
                 _altMenuActivationSuppressor.TryConsumeIfArmed())
@@ -6872,6 +7101,12 @@ public partial class MainWindow : Window
     // the text control instead of being swallowed by the window-level handler.
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
+
+    // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
+    // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.
+    private bool IsInspectorFocused()
+        => FocusManager?.GetFocusedElement() is Control focused
+           && (focused == InspectorTabContent || InspectorTabContent.IsVisualAncestorOf(focused));
 
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
@@ -7209,6 +7444,9 @@ public partial class MainWindow : Window
         // so the wireframe draws their frames again. See issue #1172.
         FlushPendingTreeSelectionBurst();
 
+        // Pointer over a polygon vertex: Delete removes that point, not the shape.
+        if (PreviewCtrl.TryDeleteHoveredVertex()) return;
+
         // Delete the whole multi-selection of the focused node's kind, not just the
         // focused node — the delete commands batch them into a single undo step.
         // All kinds are fully undoable, so they delete immediately and surface an
@@ -7423,12 +7661,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Routes a double-tap on a tree node's text <em>label</em>. A chain inline-renames
-    /// (its name is meaningful and used to look the chain up); every other node type —
-    /// frame, rect, circle — routes to <see cref="HandleAnimTreeNodeDoubleTap"/>, so a
-    /// frame centers the wireframe on itself. <see cref="AnimationFrameSave.Name"/> is
-    /// only a tree display label and is not referenced anywhere else, so the more useful
-    /// center-on-frame gesture wins the text-label real estate over an inline rename.
+    /// Routes a double-tap on a tree node's text <em>label</em>. Chains and shapes inline-rename
+    /// (their names are meaningful); a frame centers the wireframe on itself instead.
+    /// <see cref="AnimationFrameSave.Name"/> is only a tree display label and is not referenced
+    /// anywhere else, so the more useful center-on-frame gesture wins the text-label real estate.
     /// </summary>
     internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
         => HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: true);
@@ -7463,8 +7699,9 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Routes a double-tap on a tree node to the appropriate action.
-    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain → inline
-    /// rename) from every other double-tap on the row (chain → focus/fit its frames, #716).
+    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain/shape →
+    /// inline rename) from every other double-tap on the row (chain → focus/fit its frames, #716;
+    /// shape → center the preview on it).
     /// Returns <c>true</c> when a recognised action was performed.
     /// </summary>
     internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm, bool isLabelDoubleTap = false)
@@ -7487,6 +7724,9 @@ public partial class MainWindow : Window
                 // Bring the sprite into view in the preview too — center on the frame's
                 // offset, not the entity origin, or a large-offset frame stays off-screen.
                 PreviewCtrl.CenterOnEntityPoint(frame.RelativeX, frame.RelativeY);
+                return true;
+            case ShapeSave shape when isLabelDoubleTap:
+                BeginInlineRename(vm, shape.Name);
                 return true;
             case ShapeSave shape:
                 PreviewCtrl.CenterOnEntityPoint(shape.X, shape.Y);

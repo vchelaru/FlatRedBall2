@@ -22,10 +22,10 @@ public class PreviewPlaybackShapesTests
         var rect1 = new AARectSave { X = 20f, Y = 0f, ScaleX = 5f, ScaleY = 5f };
 
         var frame0 = new AnimationFrameSave { FrameLength = frame0Length, ShapesSave = new ShapesSave() };
-        frame0.ShapesSave.Shapes.Add(rect0);
+        frame0.ShapesSave.Add(rect0);
 
         var frame1 = new AnimationFrameSave { FrameLength = frame1Length, ShapesSave = new ShapesSave() };
-        frame1.ShapesSave.Shapes.Add(rect1);
+        frame1.ShapesSave.Add(rect1);
 
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame0);

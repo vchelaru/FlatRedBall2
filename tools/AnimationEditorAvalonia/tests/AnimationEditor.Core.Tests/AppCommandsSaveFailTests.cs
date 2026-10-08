@@ -85,22 +85,16 @@ public class AppCommandsSaveFailTests
         public uint? ComputeFrameTileId(AnimationFrameSave frame) => null;
         public object? CaptureTsxState() => null;
         public void RestoreTsxState(object? state) { }
-        public object? CaptureTextureSizeState() => null;
-        public void RestoreTextureSizeState(object? state) { }
         public void ResetToBlankDocument() { }
 
         public void LoadAnimationChain(
             FilePath fileName,
-            AnimationChainListSave? preParsed = null,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null) { }
+            AnimationChainListSave? preParsed = null) { }
 
         public string? ResolveFilesPanelRoot() => null;
 
         public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
         public void SaveAnimationChainList(string targetPath)
-            => throw new InvalidOperationException("Simulated save failure");
-
-        public void SaveAnimationChainList(System.IO.Stream stream)
             => throw new InvalidOperationException("Simulated save failure");
 
         public IReadOnlyList<string> FindMissingTextures(AnimationChainListSave acls, string achxDirectory)

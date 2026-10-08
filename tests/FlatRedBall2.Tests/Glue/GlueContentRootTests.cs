@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using FlatRedBall2.Content;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
+using FlatRedBall2.IO;
 using Shouldly;
 using Xunit;
 
@@ -123,5 +124,53 @@ public class GlueContentRootTests : IDisposable
         {
             try { Directory.Delete(absoluteRoot, recursive: true); } catch (IOException) { }
         }
+    }
+
+    [Fact]
+    public void OutputContentRoot_Default_IsTheTitleLocation()
+    {
+        // On macOS that is Contents/Resources inside a .app, where TitleContainer reads from too.
+        new FlatRedBallService().OutputContentRoot.ShouldBe(TitleLocation.Default);
+    }
+
+    private const string GlujWithWildcard = @"{
+        ""FileVersion"": 68,
+        ""GlobalFiles"": [ { ""Name"": ""Data/**/*.csv"" } ]
+    }";
+
+    [Fact]
+    public void LoadGlueProject_WildcardGlobalFile_ExpandsUnderOutputContentRoot()
+    {
+        // A wildcard lists real directories, so it must look where the content actually is rather
+        // than beside the executable.
+        var service = new FlatRedBallService { OutputContentRoot = _output };
+        service.Content.StreamProvider = path => File.OpenRead(Path.Combine(_output, path));
+        File.WriteAllText(Path.Combine(_output, "MyGame.gluj"), GlujWithWildcard);
+        Directory.CreateDirectory(Path.Combine(_output, "Data", "Sub"));
+        File.WriteAllText(Path.Combine(_output, "Data", "a.csv"), "Name\nRow1");
+        File.WriteAllText(Path.Combine(_output, "Data", "Sub", "b.csv"), "Name\nRow1");
+
+        service.LoadGlueProject("MyGame.gluj");
+
+        service.GlueProject!.Content!.GetText("a").ShouldNotBeNull();
+        service.GlueProject!.Content!.GetText("b").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Load_OggReferencedFile_OpensTheFileUnderTheOutputContentRoot()
+    {
+        // Song.FromUri takes a real file:// URI rather than a stream, so it bypasses StreamProvider and
+        // must be rooted explicitly. The placeholder is not valid Vorbis: reaching it means a decode
+        // error, while looking in the wrong folder means a file or directory not-found exception.
+        Directory.CreateDirectory(Path.Combine(_output, "Music"));
+        File.WriteAllText(Path.Combine(_output, "Music", "Theme.ogg"), "not vorbis");
+        var save = new EntitySave { Name = @"Entities\Thing" };
+        save.ReferencedFiles.Add(new ReferencedFileSave { Name = "Music/Theme.ogg", LoadedAtRuntime = true });
+        var diagnostics = new List<GlueLoadDiagnostic>();
+
+        new GlueContentSource(new ContentLoader(), string.Empty, outputContentRoot: _output)
+            .Load(save, diagnostics);
+
+        diagnostics.ShouldHaveSingleItem().Message.ShouldNotContain("NotFoundException");
     }
 }

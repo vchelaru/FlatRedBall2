@@ -15,40 +15,12 @@ public class SettingsWindowBuilderTests
     public void BuildTabs_AlwaysIncludesColorsTab()
     {
         var tabs = SettingsWindowBuilder.BuildTabs(
-            new SettingsWindowModel { FileAssociationSupported = false },
+            new SettingsWindowModel(),
             new SettingsWindowCallbacks());
 
         var colorsTab = Assert.IsType<TabItem>(tabs.Items[0]);
 
         Assert.Equal("Colors", colorsTab.Header);
-    }
-
-    [Fact]
-    public void BuildTabs_WithFileAssociation_IncludesFileAssociationTab()
-    {
-        var tabs = SettingsWindowBuilder.BuildTabs(
-            new SettingsWindowModel
-            {
-                FileAssociationSupported = true,
-                FileAssociationStatus = AchxFileAssociationStatus.Stale,
-                SuppressDefaultHandlerPrompt = false,
-            },
-            new SettingsWindowCallbacks());
-
-        // Colors is always first; File Association follows when supported.
-        var fileAssocTab = Assert.IsType<TabItem>(tabs.Items[1]);
-
-        Assert.Equal("File Association", fileAssocTab.Header);
-    }
-
-    [Fact]
-    public void BuildTabs_WithoutFileAssociation_OnlyHasColorsTab()
-    {
-        var tabs = SettingsWindowBuilder.BuildTabs(
-            new SettingsWindowModel { FileAssociationSupported = false },
-            new SettingsWindowCallbacks());
-
-        Assert.Single(tabs.Items);
     }
 
     [AvaloniaFact]

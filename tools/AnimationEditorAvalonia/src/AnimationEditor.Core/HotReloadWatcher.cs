@@ -41,6 +41,12 @@ namespace AnimationEditor.Core.HotReload
         private readonly Dictionary<string, byte[]?> _ownSaveHashes =
             new(StringComparer.OrdinalIgnoreCase);
 
+        // seenHashes[canonical path] = SHA-256 of the watched file as the editor last loaded, saved
+        // or reported it. An event on a file still holding that content is dropped: copying a
+        // texture (an APFS clone on macOS) or touching its timestamp raises one on an unchanged file.
+        private readonly Dictionary<string, byte[]> _seenHashes =
+            new(StringComparer.OrdinalIgnoreCase);
+
         public HotReloadWatcher()
         {
             _coalescer = new FileChangeCoalescer { IsStillOwnContent = IsStillOwnContent };
@@ -73,6 +79,11 @@ namespace AnimationEditor.Core.HotReload
 
                 foreach (var dir in dirs)
                     AddWatcher(dir);
+
+                _seenHashes.Clear();
+                RememberContent(_achxPath);
+                foreach (var png in _watchedPngPaths)
+                    RememberContent(png);
             }
 
             _flushTimer.Change(100, 100);
@@ -87,8 +98,8 @@ namespace AnimationEditor.Core.HotReload
                     StringComparer.OrdinalIgnoreCase);
                 var (added, removed) = ReferencedFileDiff.Diff(_watchedPngPaths, newSet);
 
-                foreach (var p in added)   _watchedPngPaths.Add(p);
-                foreach (var p in removed) _watchedPngPaths.Remove(p);
+                foreach (var p in added)   { _watchedPngPaths.Add(p); RememberContent(p); }
+                foreach (var p in removed) { _watchedPngPaths.Remove(p); _seenHashes.Remove(p); }
 
                 // Add watchers for newly-referenced directories
                 foreach (var png in added)
@@ -141,7 +152,11 @@ namespace AnimationEditor.Core.HotReload
                 // write; IsStillOwnContent then takes the first readable content as ours.
                 var hash = TryHash(canonical);
                 lock (_lock)
+                {
                     _ownSaveHashes[canonical] = hash;
+                    if (hash is null) _seenHashes.Remove(canonical);
+                    else _seenHashes[canonical] = hash;
+                }
                 _coalescer.RecordOwnSave(canonical, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             }
         }
@@ -167,6 +182,35 @@ namespace AnimationEditor.Core.HotReload
                     return true;
                 }
                 return current.AsSpan().SequenceEqual(recorded);
+            }
+        }
+
+        // Caller holds _lock.
+        private void RememberContent(string canonicalPath)
+        {
+            var hash = TryHash(canonicalPath);
+            if (hash is null) _seenHashes.Remove(canonicalPath);
+            else _seenHashes[canonicalPath] = hash;
+        }
+
+        /// <summary>False when <paramref name="path"/> still holds the content last seen, so the
+        /// event is noise; otherwise records the new content and returns true.</summary>
+        private bool ContentChangedSinceSeen(string path, WatcherChangeType type)
+        {
+            lock (_lock)
+            {
+                if (type == WatcherChangeType.Deleted)
+                {
+                    _seenHashes.Remove(path);
+                    return true;
+                }
+                var current = TryHash(path);
+                if (current != null && _seenHashes.TryGetValue(path, out var seen) &&
+                    current.AsSpan().SequenceEqual(seen))
+                    return false;
+                if (current is null) _seenHashes.Remove(path);
+                else _seenHashes[path] = current;
+                return true;
             }
         }
 
@@ -261,6 +305,7 @@ namespace AnimationEditor.Core.HotReload
                 bool isPng = pngPaths.Contains(normalizedPath);
 
                 if (!isAchx && !isPng) continue;
+                if (!ContentChangedSinceSeen(normalizedPath, type)) continue;
 
                 if (isAchx)
                 {

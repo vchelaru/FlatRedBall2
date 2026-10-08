@@ -387,6 +387,20 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_NonLoopingLockedChain_CopyKeepsLoopAndLock()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Die", 2);
+        source.Loop = false;
+        source.IsLocked = true;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+
+        Assert.False(copy!.Loop);
+        Assert.True(copy.IsLocked);
+    }
+
+    [Fact]
     public void DuplicateChain_CreatesDeepCopyWithAllFrames()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -450,7 +464,7 @@ public class AppCommandsChainTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
-        source.Frames[0].ShapesSave!.Shapes.Add(
+        source.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "HitBox", ScaleX = 5, ScaleY = 5 });
 
         var copy = ctx.AppCommands.DuplicateChain(source);
@@ -465,8 +479,8 @@ public class AppCommandsChainTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
-        source.Frames[0].ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
-        source.Frames[0].ShapesSave!.Shapes.Add(new CircleSave { Name = "Hurt", X = -6, Y = 3 });
+        source.Frames[0].ShapesSave!.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
+        source.Frames[0].ShapesSave!.Add(new CircleSave { Name = "Hurt", X = -6, Y = 3 });
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
 
@@ -486,7 +500,7 @@ public class AppCommandsChainTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
-        source.Frames[0].ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
+        source.Frames[0].ShapesSave!.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
 
         var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
 
@@ -840,7 +854,7 @@ public class AppCommandsChainTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.AnimationEditorCommon.ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
 
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
 
@@ -893,7 +907,7 @@ public class AppCommandsChainTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.AnimationEditorCommon.ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
 
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null, flipDiagonal: null);
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
@@ -954,7 +968,7 @@ public class AppCommandsChainTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.AnimationEditorCommon.ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
 
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
 

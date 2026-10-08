@@ -31,9 +31,10 @@
     <ProjectReference Include="..\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
 
-  <!-- Ship the targets file so consuming projects auto-import the content manifest target -->
+  <!-- Ship the targets file (auto-imported by consumers) and the KNI streamProcessor2.js it serves -->
   <ItemGroup>
     <None Include="build\FlatRedBall2.BlazorGL.targets" Pack="true" PackagePath="build\" />
+    <None Include="build\js\*" Pack="true" PackagePath="build\js\" />
   </ItemGroup>
 
 </Project>

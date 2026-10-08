@@ -8,8 +8,7 @@ namespace AnimationEditor.App.Services;
 
 /// <summary>
 /// <c>System.IO</c>-backed <see cref="IEditorFolder"/> for desktop's Open Project Folder (#770) --
-/// a real filesystem, so (unlike the browser's native-handle adapter) there's no permission or
-/// enumeration failure to guard against.
+/// a real filesystem, so there's no permission or enumeration failure to guard against.
 /// </summary>
 public sealed class DiskEditorFolder : IEditorFolder
 {

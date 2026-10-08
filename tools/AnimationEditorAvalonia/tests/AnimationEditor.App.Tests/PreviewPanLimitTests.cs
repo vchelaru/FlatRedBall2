@@ -89,7 +89,7 @@ public class PreviewPanLimitTests
         // A collision shape 100 world-units above the origin, shown as the selected
         // frame's content so the content-aware clamp has a non-trivial extent.
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new CircleSave { X = 0f, Y = 100f, Radius = 10f });
+        frame.ShapesSave.Add(new CircleSave { X = 0f, Y = 100f, Radius = 10f });
         ctx.SelectedState.SelectedFrame = frame;
 
         var ctrl = ctx.CreatePreviewControl();

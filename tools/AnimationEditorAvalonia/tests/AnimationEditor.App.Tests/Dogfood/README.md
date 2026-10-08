@@ -14,10 +14,11 @@ strip are all part of what is tested.
 ## Run it
 
 ```
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
+scripts/test-ae.py --filter "FullyQualifiedName~Dogfood"
 ```
 
-About 212 scenarios, roughly 90 seconds. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
+About 230 scenarios. The runner splits them across processes, so this takes under a minute
+instead of the ~100 seconds a single `dotnet test` process needs. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
 
 ## The pieces
 
@@ -145,7 +146,7 @@ tiny window, Tab-key traversal, ten tab switches in a row.
 Confirmed correct: two Ctrl+N give distinct untitled names, undo/redo with nothing to do is
 silent, Delete inside an inspector box edits text not the frame, Delete twice deletes two chains
 and two undos restore both, deleting the playing chain stops the preview, three duplicates get
-three names, Escape during a handle drag leaves either the original or an undoable edit, junk in
+three names, Escape during a handle or chain drag restores the frames with no undo entry, junk in
 the frame-length box changes nothing and records no undo, a grid size of 0 does not break the
 wireframe, re-opening the open file focuses its tab and keeps the edit and its undo history, an
 empty clipboard pastes nothing quietly, a name with a trailing space is not a rename, renaming
@@ -395,6 +396,9 @@ knows where to look. Add to it whenever a scenario has to route around something
   label's coordinates lands on nothing. `RowFor` calls `BringIntoView` on the row and
   `RowHeaderPoint` throws when the point is still outside the tree, so a scenario never silently
   clicks past a row.
+- **A wrapping `TextBlock` whose text holds a blank line (`"a\n\nb"`) never finishes layout** under
+  the headless text shaper, so a dialog built that way hangs the scenario inside
+  `ScriptedDialogs.ShowAsync`. Put each paragraph in its own `TextBlock` instead.
 - **The preview auto-plays once a chain is selected**, and the Play button toggles. A scenario
   that wants playback running checks `Preview.IsPlaying` first and only clicks when stopped;
   clicking blindly pauses it and every later assertion reads as "playback stopped".

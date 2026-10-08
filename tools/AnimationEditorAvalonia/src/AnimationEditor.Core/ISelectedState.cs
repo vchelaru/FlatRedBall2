@@ -25,6 +25,13 @@ namespace AnimationEditor.Core
         void SelectShape(object? shape);
         List<AnimationChainSave> SelectedChains { get; }
         List<AnimationFrameSave> SelectedFrames { get; }
+
+        /// <summary>
+        /// The distinct chains the preview should show, in multi-selection order: every selected
+        /// chain plus the owner of every selected frame. A frame selected in each of two chains
+        /// therefore previews both chains, each pinned to its frame.
+        /// </summary>
+        List<AnimationChainSave> PreviewChains { get; }
         List<AARectSave> SelectedRectangles { get; }
         List<CircleSave> SelectedCircles { get; }
         List<PolygonSave> SelectedPolygons { get; }

@@ -217,9 +217,9 @@ public class TreeBuilderPureTests
             TextureName = "Tex.png",
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave!.Shapes.Add(
+        frame.ShapesSave!.Add(
             new AARectSave { Name = "HitBox" });
-        frame.ShapesSave!.Shapes.Add(
+        frame.ShapesSave!.Add(
             new CircleSave { Name = "HurtCircle" });
 
         var node = TreeBuilder.BuildFrameNode(frame);
@@ -237,8 +237,8 @@ public class TreeBuilderPureTests
             TextureName = "",
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "Rect1" });
-        frame.ShapesSave!.Shapes.Add(new CircleSave { Name = "Circle1" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "Rect1" });
+        frame.ShapesSave!.Add(new CircleSave { Name = "Circle1" });
 
         var node = TreeBuilder.BuildFrameNode(frame, index: 1);
 
@@ -282,6 +282,68 @@ public class TreeBuilderPureTests
         var names = TreeBuilder.GetExpandedChainNames(nodes).ToList();
 
         Assert.Empty(names);
+    }
+
+    // ── Expanded frame persistence (#1290) ────────────────────────────────────
+
+    private static AnimationChainListSave ChainsWithShapedFrames()
+    {
+        var acls = new AnimationChainListSave();
+        foreach (var name in new[] { "Walk", "Run" })
+        {
+            var chain = new AnimationChainSave { Name = name };
+            for (int i = 0; i < 2; i++)
+            {
+                var frame = new AnimationFrameSave();
+                frame.ShapesSave = new ShapesSave();
+                frame.ShapesSave.Add(new AARectSave { Name = "Rect" });
+                chain.Frames.Add(frame);
+            }
+            acls.AnimationChains.Add(chain);
+        }
+        return acls;
+    }
+
+    [Fact]
+    public void GetExpandedFrames_ReturnsChainNameAndIndexOfExpandedFrames()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+        roots[1].Children[1].IsExpanded = true;
+
+        var expanded = TreeBuilder.GetExpandedFrames(roots).ToList();
+
+        var entry = Assert.Single(expanded);
+        Assert.Equal("Run", entry.ChainName);
+        Assert.Equal(1, entry.FrameIndex);
+    }
+
+    [Fact]
+    public void ApplyExpandedFrames_ExpandsMatchingFramesOnly()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+
+        TreeBuilder.ApplyExpandedFrames(roots, new[]
+        {
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Walk", FrameIndex = 0 },
+        });
+
+        Assert.True(roots[0].Children[0].IsExpanded);
+        Assert.False(roots[0].Children[1].IsExpanded);
+        Assert.False(roots[1].Children[0].IsExpanded);
+    }
+
+    [Fact]
+    public void ApplyExpandedFrames_IgnoresUnknownChainAndOutOfRangeIndex()
+    {
+        var roots = TreeBuilder.BuildTree(ChainsWithShapedFrames());
+
+        TreeBuilder.ApplyExpandedFrames(roots, new[]
+        {
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Gone", FrameIndex = 0 },
+            new AnimationEditor.Core.Data.ExpandedFrameSave { ChainName = "Walk", FrameIndex = 99 },
+        });
+
+        Assert.DoesNotContain(roots.SelectMany(r => r.Children), f => f.IsExpanded);
     }
 
     // ── FindNodeForData ───────────────────────────────────────────────────────
@@ -619,7 +681,7 @@ public class TreeBuilderPureTests
         var chain = new AnimationChainSave { Name = "Run" };
         var circle = new CircleSave { Radius = 4 };
         var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(circle);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
@@ -697,7 +759,7 @@ public class TreeBuilderSyncShapesTests
     {
         rect = new AARectSave { Name = "HitBox" };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         return TreeBuilder.BuildFrameNode(frame);
     }
 
@@ -705,7 +767,7 @@ public class TreeBuilderSyncShapesTests
     {
         circle = new CircleSave { Name = "Hurt" };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(circle);
         return TreeBuilder.BuildFrameNode(frame);
     }
 
@@ -715,7 +777,7 @@ public class TreeBuilderSyncShapesTests
         var frameNode = FrameNodeWithRect(out var rect);
         var originalVm = frameNode.Children[0];
         var ss = new ShapesSave();
-        ss.Shapes.Add(rect);
+        ss.Add(rect);
 
         TreeBuilder.SyncShapesInto(frameNode, ss);
 
@@ -728,7 +790,7 @@ public class TreeBuilderSyncShapesTests
         var frameNode = FrameNodeWithCircle(out var circle);
         var originalVm = frameNode.Children[0];
         var ss = new ShapesSave();
-        ss.Shapes.Add(circle);
+        ss.Add(circle);
 
         TreeBuilder.SyncShapesInto(frameNode, ss);
 
@@ -741,7 +803,7 @@ public class TreeBuilderSyncShapesTests
         var frameNode = FrameNodeWithRect(out var rect);
         rect.Name = "NewName";
         var ss = new ShapesSave();
-        ss.Shapes.Add(rect);
+        ss.Add(rect);
 
         TreeBuilder.SyncShapesInto(frameNode, ss);
 
@@ -754,7 +816,7 @@ public class TreeBuilderSyncShapesTests
         var frameNode = FrameNodeWithCircle(out var circle);
         circle.Name = "NewCircle";
         var ss = new ShapesSave();
-        ss.Shapes.Add(circle);
+        ss.Add(circle);
 
         TreeBuilder.SyncShapesInto(frameNode, ss);
 
@@ -767,7 +829,7 @@ public class TreeBuilderSyncShapesTests
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
         var frameNode = TreeBuilder.BuildFrameNode(frame);
         var newRect = new AARectSave { Name = "New" };
-        frame.ShapesSave.Shapes.Add(newRect);
+        frame.ShapesSave.Add(newRect);
 
         TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
 
@@ -803,8 +865,8 @@ public class TreeBuilderSyncShapesTests
         var rect   = new AARectSave  { Name = "R" };
         var circle = new CircleSave  { Name = "C" };
         var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave.Add(rect);
+        frame.ShapesSave.Add(circle);
         var frameNode  = TreeBuilder.BuildFrameNode(frame);
         var originalRectVm   = frameNode.Children[0];
         var originalCircleVm = frameNode.Children[1];
@@ -912,7 +974,7 @@ public class TreeBuilderSyncFramesTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var rect  = new AARectSave { Name = "Hit" };
         var frame = new AnimationFrameSave { TextureName = "w1.png", ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(rect);
+        frame.ShapesSave.Add(rect);
         chain.Frames.Add(frame);
         var chainNode     = TreeBuilder.BuildChainNode(chain);
         var frameVm       = chainNode.Children[0];
@@ -957,7 +1019,7 @@ public class TreeBuilderStripeTests
     {
         var chain = new AnimationChainSave { Name = name };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "HitBox" });
         chain.Frames.Add(frame);
         return chain;
     }
@@ -1081,7 +1143,7 @@ public class TreeBuilderExpandStateTests
     {
         var chain = new AnimationChainSave { Name = chainName };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "HitBox" });
         chain.Frames.Add(frame);
         return chain;
     }
@@ -1185,7 +1247,7 @@ public class TreeBuilderSingletonTests
         var acls = ctx.Acls;
         var rect  = new AARectSave { Name = "HitBox" };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         var chain = new AnimationChainSave { Name = "Idle" };
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
@@ -1204,7 +1266,7 @@ public class TreeBuilderSingletonTests
         var acls = ctx.Acls;
         var circle = new CircleSave { Name = "HurtCircle" };
         var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
         var chain = new AnimationChainSave { Name = "Idle" };
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);

@@ -346,4 +346,67 @@ public class AnimationPlayerTests
 
         player.Update(Sec(0.1));
     }
+
+    [Fact]
+    public void Update_DeltaSkipsFramesAndWraps_RaisesEachEnteredFrameEventInOrder()
+    {
+        var list = MakeList(("Walk", new[] { 0.1, 0.1, 0.1 }));
+        for (int i = 0; i < 3; i++)
+            list["Walk"]![i].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "F" + i });
+        var player = new AnimationPlayer<TestFrame>(list);
+        var raised = new System.Collections.Generic.List<string>();
+        player.FrameEventRaised += e => raised.Add(e.Name);
+
+        player.Play("Walk"); // enters frame 0
+        player.Update(TimeSpan.FromSeconds(0.25)); // skips frame 1, lands on 2
+        player.Update(TimeSpan.FromSeconds(0.1)); // wraps to frame 0
+
+        raised.ShouldBe(new[] { "F0", "F1", "F2", "F0" });
+    }
+
+    private static (AnimationPlayer<TestFrame> player, System.Collections.Generic.List<string> log) MakeDieThenIdle()
+    {
+        var list = MakeList(("Die", new[] { 0.1, 0.1 }), ("Idle", new[] { 0.1 }));
+        list["Die"]![1].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Last" });
+        list["Idle"]![0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "IdleStart" });
+        var player = new AnimationPlayer<TestFrame>(list);
+        var log = new System.Collections.Generic.List<string>();
+        player.FrameEventRaised += e => log.Add(e.Name);
+        player.AnimationFinished += () => log.Add("Finished");
+        player.Play("Die");
+        player.IsLooping = false;
+        return (player, log);
+    }
+
+    [Fact]
+    public void Update_NonLoopingReachesEnd_RaisesLastFrameEventBeforeAnimationFinished()
+    {
+        var (player, log) = MakeDieThenIdle();
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "Finished" });
+    }
+
+    [Fact]
+    public void Update_FinishedHandlerSwitchesAnimation_LastFrameEventAlreadyRaised()
+    {
+        var (player, log) = MakeDieThenIdle();
+        player.AnimationFinished += () => player.Play("Idle");
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "Finished", "IdleStart" });
+    }
+
+    [Fact]
+    public void Update_EventHandlerSwitchesAnimation_SkipsOldChainAnimationFinished()
+    {
+        var (player, log) = MakeDieThenIdle();
+        player.FrameEventRaised += e => { if (e.Name == "Last") player.Play("Idle"); };
+
+        player.Update(Sec(1.0));
+
+        log.ShouldBe(new[] { "Last", "IdleStart" });
+    }
 }

@@ -30,6 +30,36 @@ public class TreeMenuPlanBuilderTests
     }
 
     [Fact]
+    public void Build_FrameNode_AddShapeItemsCarryMatchingIcons()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1).Frames[0];
+
+        var items = TreeMenuPlanBuilder.Build(
+            frame, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.Equal(TreeMenuIcon.Rectangle, items.Single(i => i.Header == "Add AxisAlignedRectangle").Icon);
+        Assert.Equal(TreeMenuIcon.Circle, items.Single(i => i.Header == "Add Circle").Icon);
+        Assert.Equal(TreeMenuIcon.Polygon, items.Single(i => i.Header == "Add Polygon").Icon);
+    }
+
+    [Fact]
+    public void Build_ChainNode_CommonItemsCarryIcons()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        TestHelpers.MakeChain(ctx.Acls, "Run");
+
+        var items = TreeMenuPlanBuilder.Build(
+            chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.Equal(TreeMenuIcon.MoveDown, items.Single(i => i.Header == "Move Down").Icon);
+        Assert.Equal(TreeMenuIcon.Frame, items.Single(i => i.Header == "Add Frame").Icon);
+        Assert.Equal(TreeMenuIcon.Copy, items.Single(i => i.Header == "Copy").Icon);
+        Assert.Equal(TreeMenuIcon.Delete, items.Single(i => i.Header == "Delete Animation").Icon);
+    }
+
+    [Fact]
     public void Build_ChainNode_DuplicateIsSubmenuWithThreeChildren()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -52,10 +82,10 @@ public class TreeMenuPlanBuilderTests
         var items = TreeMenuPlanBuilder.Build(
             chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
 
-        Assert.True(IndexOf(items, "v  Move Down") >= 0);
-        Assert.True(IndexOf(items, "vv Move To Bottom") >= 0);
-        Assert.Equal(-1, IndexOf(items, "^  Move Up"));
-        Assert.Equal(-1, IndexOf(items, "^^ Move To Top"));
+        Assert.True(IndexOf(items, "Move Down") >= 0);
+        Assert.True(IndexOf(items, "Move To Bottom") >= 0);
+        Assert.Equal(-1, IndexOf(items, "Move Up"));
+        Assert.Equal(-1, IndexOf(items, "Move To Top"));
     }
 
     [Fact]
@@ -67,7 +97,7 @@ public class TreeMenuPlanBuilderTests
         var items = TreeMenuPlanBuilder.Build(
             chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
 
-        Assert.Equal(-1, IndexOf(items, "^  Move Up")); // single chain: no reorder items
+        Assert.Equal(-1, IndexOf(items, "Move Up")); // single chain: no reorder items
         Assert.Equal(TreeMenuHostSlot.AdjustFrameTime, items[0].HostSlot);
         int copy = IndexOf(items, "Copy");
         Assert.True(copy >= 0);
@@ -88,7 +118,7 @@ public class TreeMenuPlanBuilderTests
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             circle, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
@@ -145,8 +175,26 @@ public class TreeMenuPlanBuilderTests
         var items = TreeMenuPlanBuilder.Build(
             frame, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
 
-        Assert.Equal(-1, IndexOf(items, "^  Move Up"));
-        Assert.Equal(-1, IndexOf(items, "v  Move Down"));
+        Assert.Equal(-1, IndexOf(items, "Move Up"));
+        Assert.Equal(-1, IndexOf(items, "Move Down"));
+    }
+
+    [Fact]
+    public void Build_RectNode_OnlyRectAmongOtherTypes_ShowsNoMoveItems()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var frame = TestHelpers.MakeFrame();
+        chain.Frames.Add(frame);
+        var rect = new AARectSave { Name = "Rect" };
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(new CircleSave { Name = "Circle" });
+
+        var items = TreeMenuPlanBuilder.Build(
+            rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.Equal(-1, IndexOf(items, "Move Down"));
+        Assert.Equal(-1, IndexOf(items, "Move Up"));
     }
 
     [Fact]
@@ -157,17 +205,17 @@ public class TreeMenuPlanBuilderTests
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
         var rect = new AARectSave { Name = "Rect" };
-        var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        var circle = new AARectSave { Name = "Rect2" };
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
 
-        Assert.True(IndexOf(items, "v  Move Down") >= 0);
-        Assert.True(IndexOf(items, "vv Move To Bottom") >= 0);
-        Assert.Equal(-1, IndexOf(items, "^  Move Up"));
-        Assert.Equal(-1, IndexOf(items, "^^ Move To Top"));
+        Assert.True(IndexOf(items, "Move Down") >= 0);
+        Assert.True(IndexOf(items, "Move To Bottom") >= 0);
+        Assert.Equal(-1, IndexOf(items, "Move Up"));
+        Assert.Equal(-1, IndexOf(items, "Move To Top"));
     }
 
     [Fact]
@@ -179,8 +227,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frame);
         var rect = new AARectSave { Name = "Rect" };
         var circle = new CircleSave { Name = "Circle" };
-        frame.ShapesSave!.Shapes.Add(rect);
-        frame.ShapesSave.Shapes.Add(circle);
+        frame.ShapesSave!.Add(rect);
+        frame.ShapesSave.Add(circle);
 
         var items = TreeMenuPlanBuilder.Build(
             rect, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
@@ -208,8 +256,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frame);
         var r0 = new AARectSave { Name = "R0", X = 1f, Y = 1f };
         var r1 = new AARectSave { Name = "R1", X = 2f, Y = 2f };
-        frame.ShapesSave!.Shapes.Add(r0);
-        frame.ShapesSave.Shapes.Add(r1);
+        frame.ShapesSave!.Add(r0);
+        frame.ShapesSave.Add(r1);
         ctx.SelectedState.SelectedNodes = new List<object> { r0, r1 };
 
         // Menu built for r0 (the right-clicked node) — Click must still act on the whole
@@ -237,8 +285,8 @@ public class TreeMenuPlanBuilderTests
         chain.Frames.Add(frameB);
         var rectInA = new AARectSave { Name = "InA", X = 1f, Y = 1f };
         var rectInB = new AARectSave { Name = "InB", X = 2f, Y = 2f };
-        frameA.ShapesSave!.Shapes.Add(rectInA);
-        frameB.ShapesSave!.Shapes.Add(rectInB);
+        frameA.ShapesSave!.Add(rectInA);
+        frameB.ShapesSave!.Add(rectInB);
         ctx.SelectedState.SelectedNodes = new List<object> { rectInA, rectInB };
 
         var items = TreeMenuPlanBuilder.Build(

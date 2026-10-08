@@ -316,4 +316,29 @@ public class TileMapGetObjectLayerDataTests
         entries[0].Properties.Count.ShouldBe(1);
         entries[0].Properties["Terrain"].ShouldBe("sand");
     }
+
+    [Fact]
+    public void GetObjectLayerData_NonStringPropertyTypes_StringifiedInTiledFormat()
+    {
+        // Every non-string Tiled property type used to throw from AsString() (#1272).
+        var rectObj = new TilemapRectangleObject(id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16));
+        rectObj.Properties.SetInt("Elevation", 32);
+        rectObj.Properties.SetFloat("Speed", 1.5f);
+        rectObj.Properties.SetBool("Deep", true);
+        rectObj.Properties.SetColor("Tint", new Microsoft.Xna.Framework.Color(0x11, 0x22, 0x33, 0xff));
+        rectObj.Properties["Script"] = TilemapPropertyValue.CreateFile("scripts/water.lua");
+        rectObj.Properties["Target"] = TilemapPropertyValue.CreateObject(7);
+        var layer = new TilemapObjectLayer("Water");
+        layer.AddObject(rectObj);
+        var tileMap = new TileMap(BuildObjectOnlyTilemap(2, 2, 16, layer));
+
+        var props = tileMap.GetObjectLayerData("Water")[0].Properties;
+
+        props["Elevation"].ShouldBe("32");
+        props["Speed"].ShouldBe("1.5");
+        props["Deep"].ShouldBe("true");
+        props["Tint"].ShouldBe("#ff112233");
+        props["Script"].ShouldBe("scripts/water.lua");
+        props["Target"].ShouldBe("7");
+    }
 }

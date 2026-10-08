@@ -280,7 +280,13 @@ public class GlueHotReloadTests : IDisposable
         watcher.MarkChangedAt(Path.Combine("Screens", "Level2.glsj"), t0);
         UpdateTwice(engine);
 
-        engine.GlueProject!.FindScreen(@"Screens\Level2").ShouldNotBeNull();
+        // Failed once on Linux CI with no local repro; the message says which half of the batch went missing.
+        var gluj = Path.Combine(_destRoot, ProjectFileName);
+        var glsj = Path.Combine(_destRoot, "Screens", "Level2.glsj");
+        engine.GlueProject!.FindScreen(@"Screens\Level2").ShouldNotBeNull(
+            $"dest .gluj exists={File.Exists(gluj)} (mentions Level2={File.Exists(gluj) && File.ReadAllText(gluj).Contains("Level2")}), "
+            + $"dest Level2.glsj exists={File.Exists(glsj)}, current screen={engine.CurrentScreen?.GetType().Name}, "
+            + $"screen project is engine project={ReferenceEquals(((GlueScreen)engine.CurrentScreen!).Project, engine.GlueProject)}");
     }
 
     [Fact]

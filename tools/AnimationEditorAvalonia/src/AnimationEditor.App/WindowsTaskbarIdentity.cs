@@ -16,7 +16,7 @@ namespace AnimationEditor.App;
 /// unpinning reverts it. Setting an explicit, stable id here gives every launch the same
 /// shell identity the taskbar can hang the <c>.exe</c>'s icon on, pinned or not.</para>
 ///
-/// <para>The id is namespaced to match <c>WindowsFileAssociationService.ProgId</c>'s root
+/// <para>The id is namespaced to match <c>WindowsAchxRegistration.ProgId</c>'s root
 /// so the taskbar identity and the <c>.achx</c> file-association identity stay consistent.
 /// It must be stable across launches and contain no spaces.</para>
 ///
@@ -34,7 +34,7 @@ namespace AnimationEditor.App;
 internal static class WindowsTaskbarIdentity
 {
     /// <summary>Stable AppUserModelID for the editor. Shares the <c>FlatRedBall.AnimationEditor</c>
-    /// root with <see cref="Services.WindowsFileAssociationService.ProgId"/>.</summary>
+    /// root with <see cref="Services.WindowsAchxRegistration.ProgId"/>.</summary>
     private const string AppUserModelId = "FlatRedBall.AnimationEditor";
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]

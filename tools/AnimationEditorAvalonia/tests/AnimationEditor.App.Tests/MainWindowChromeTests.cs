@@ -10,13 +10,11 @@ namespace AnimationEditor.App.Tests;
 
 public class MainWindowChromeTests
 {
-    // ── Non-macOS: custom chrome ──────────────────────────────────────────────
+    // ── Default (Windows/Linux): custom chrome ────────────────────────────────
 
     [AvaloniaFact]
-    public void OnNonMacOS_WindowDecorations_IsNone()
+    public void DefaultChrome_WindowDecorations_IsNone()
     {
-        if (OperatingSystem.IsMacOS()) return; // macOS uses system decorations — tested separately
-
         var ctx = TestHelpers.BuildServices();
         var window = ctx.CreateMainWindow();
         window.Show();
@@ -102,12 +100,10 @@ public class MainWindowChromeTests
     // ── macOS: native traffic-light chrome ────────────────────────────────────
 
     [AvaloniaFact]
-    public void OnMacOS_WindowDecorations_IsFull()
+    public void MacOSChrome_WindowDecorations_IsFull()
     {
-        if (!OperatingSystem.IsMacOS()) return; // Windows/Linux use custom chrome — tested separately
-
         var ctx = TestHelpers.BuildServices();
-        var window = ctx.CreateMainWindow();
+        var window = ctx.CreateMainWindow(useMacOSChrome: true);
         window.Show();
         try
         {
@@ -120,12 +116,10 @@ public class MainWindowChromeTests
     }
 
     [AvaloniaFact]
-    public void OnMacOS_TitleBarBorder_IsHidden()
+    public void MacOSChrome_TitleBarBorder_IsHidden()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-
         var ctx = TestHelpers.BuildServices();
-        var window = ctx.CreateMainWindow();
+        var window = ctx.CreateMainWindow(useMacOSChrome: true);
         window.Show();
         try
         {
@@ -140,12 +134,10 @@ public class MainWindowChromeTests
     }
 
     [AvaloniaFact]
-    public void OnMacOS_ResizeGrips_AreHidden()
+    public void MacOSChrome_ResizeGrips_AreHidden()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-
         var ctx = TestHelpers.BuildServices();
-        var window = ctx.CreateMainWindow();
+        var window = ctx.CreateMainWindow(useMacOSChrome: true);
         window.Show();
         try
         {
@@ -154,7 +146,7 @@ public class MainWindowChromeTests
             {
                 var grip = window.FindControl<Border>(name);
                 Assert.NotNull(grip);
-                Assert.False(grip!.IsVisible, $"{name} should be hidden on macOS");
+                Assert.False(grip!.IsVisible, $"{name} should be hidden with macOS chrome");
             }
         }
         finally

@@ -12,8 +12,8 @@ namespace AnimationEditor.Core.Tests;
 /// <summary>
 /// #1147 pass #22: a native tsx project can't store shapes, flips, sprite offsets, color, or a
 /// non-looping chain (<see cref="Tiled.TsxLossyDataCheck"/> warns on save). Pass #17 added the
-/// warning; this closes the entry points, at the command level so every host (tree menu, inspector,
-/// keyboard, browser) is covered, and in the shared tree-menu plan so the items aren't offered.
+/// warning; this closes the entry points, at the command level so every entry point (tree menu,
+/// inspector, keyboard) is covered, and in the shared tree-menu plan so the items aren't offered.
 /// </summary>
 [Collection("SequentialSingletons")]
 public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
@@ -67,6 +67,17 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
 
         Assert.True(chain.Loop);
         Assert.All(chain.Frames, f => Assert.False(f.FlipHorizontal));
+        Assert.False(_ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void AddFrameEvent_InNativeTsxProject_DoesNothing()
+    {
+        var chain = OpenTsx();
+
+        _ctx.AppCommands.AddFrameEvent(chain.Frames[0], "Footstep");
+
+        Assert.Empty(chain.Frames[0].Events);
         Assert.False(_ctx.UndoManager.CanUndo);
     }
 

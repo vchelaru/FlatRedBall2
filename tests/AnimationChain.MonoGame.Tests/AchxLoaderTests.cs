@@ -119,7 +119,7 @@ public class AchxLoaderTests
     public void FromFile_SetsFileName()
     {
         // AnimationEditorCommon's FromFile stores FileName verbatim (not resolved to an absolute
-        // path) -- AchxLoader.Load resolves it separately where absolute-path resolution matters.
+        // path) -- AchxLoader.Load resolves only rooted paths, see ContentFile.ReadSave.
         var save = AnimationChainListSave.FromFile("my/path/anim.achx", XmlStream(SimpleAchx));
         Assert.Equal("my/path/anim.achx", save.FileName);
     }
@@ -499,5 +499,66 @@ public class AchxLoaderTests
         {
             if (File.Exists(tmpPath)) File.Delete(tmpPath);
         }
+    }
+
+    // ─── ContentFile (title-relative vs. rooted path routing, #1227) ──────────────
+
+    [Fact]
+    public void ReadSave_RelativeAchxPath_TexturePathStaysRelative()
+    {
+        // A cwd-based absolute path here would make TitleContainer.OpenStream throw.
+        var requested = new List<string>();
+
+        ContentFile.ReadSave("Content/anim.achx", XmlStream(SimpleAchx))
+            .ToAnimationChainList(p => { requested.Add(p); return null; });
+
+        Assert.Equal(Path.Combine("Content", "player.png"), requested[0]);
+    }
+
+    [Fact]
+    public void ReadSave_RootedAchxPath_TexturePathIsRootedNextToAchx()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "game");
+        var requested = new List<string>();
+
+        ContentFile.ReadSave(Path.Combine(dir, "anim.achx"), XmlStream(SimpleAchx))
+            .ToAnimationChainList(p => { requested.Add(p); return null; });
+
+        Assert.Equal(Path.Combine(dir, "player.png"), requested[0]);
+    }
+
+    [Fact]
+    public void TryOpen_RelativePath_ReadsThroughTitleContainer()
+    {
+        string? titlePath = null;
+
+        using var stream = ContentFile.TryOpen("Content/player.png",
+            openTitle: p => { titlePath = p; return new MemoryStream(); },
+            openFile: _ => throw new InvalidOperationException("file system must not be used"));
+
+        Assert.Equal("Content/player.png", titlePath);
+    }
+
+    [Fact]
+    public void TryOpen_RootedPath_ReadsFromFileSystem()
+    {
+        string rooted = Path.Combine(Path.GetTempPath(), "player.png");
+        string? filePath = null;
+
+        using var stream = ContentFile.TryOpen(rooted,
+            openTitle: _ => throw new InvalidOperationException("TitleContainer rejects rooted paths"),
+            openFile: p => { filePath = p; return new MemoryStream(); });
+
+        Assert.Equal(rooted, filePath);
+    }
+
+    [Fact]
+    public void TryOpen_MissingTitleFile_ReturnsNull()
+    {
+        var stream = ContentFile.TryOpen("Content/missing.png",
+            openTitle: _ => throw new FileNotFoundException(),
+            openFile: _ => throw new InvalidOperationException());
+
+        Assert.Null(stream);
     }
 }

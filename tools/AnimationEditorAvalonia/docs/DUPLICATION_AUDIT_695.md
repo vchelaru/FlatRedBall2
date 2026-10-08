@@ -428,15 +428,6 @@ equally testable.
    a stringly-typed replacement would be strictly worse. The issue already calls this out; this
    audit agrees. Dedupe the *drivers behind* them, not the seam.
 
-5. **`MainWindow.axaml.cs` (300 KB) ↔ `AnimationEditor.Browser/App.axaml.cs` (103 KB) broad
-   parity.** Toolbars, tree context menus, hotkey tables, guide-toggle visibility
-   (`MainWindow.axaml.cs:2349` vs `App.axaml.cs:840`) — dozens of deliberate near-copies, each
-   annotated "mirrors desktop…". This is a large, tracked, intentional program
-   (`docs/BROWSER_UI_PARITY_ROADMAP.md`, and the shared-control extractions
-   `AnimationTreeControl` / `InspectorControl` / `ZoomControl` / `EditorNotificationOverlay` are
-   how it is being retired). Out of scope for #695 except where a shared control **already
-   exists** and only one host adopted it — which is A5, and A5 alone.
-
 6. **`CanvasTransform.CenterFit` vs `CanvasTransform.FitRect`.** Both compute a fit-and-center
    camera. Different inputs (whole bitmap at a fixed 85 % vs an arbitrary rect with caller-supplied
    fraction and max zoom) and different call sites; already pure, already tested, already in Core.

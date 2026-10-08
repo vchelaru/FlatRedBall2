@@ -31,7 +31,7 @@ public class TreeFilterTests
     private static TreeNodeVm ChainWithShapeNode(string chainName, string shapeName)
     {
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = shapeName });
+        frame.ShapesSave.Add(new AARectSave { Name = shapeName });
         var chain = new AnimationChainSave { Name = chainName };
         chain.Frames.Add(frame);
         return TreeBuilder.BuildChainNode(chain);

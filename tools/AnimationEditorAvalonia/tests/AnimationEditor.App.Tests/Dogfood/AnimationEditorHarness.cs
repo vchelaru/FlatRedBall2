@@ -38,7 +38,11 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// file a first one left behind to start the way the editor does after a crash. Defaults to
     /// a fresh temp file.
     /// </param>
-    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null)
+    /// <param name="commandModifier">
+    /// The platform command modifier the window is built with; <see cref="CommandModifier.Meta"/>
+    /// runs the scenario as macOS would. Defaults to Ctrl.
+    /// </param>
+    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null, CommandModifier? commandModifier = null)
     {
         Services = settingsRoot is null ? new TestServices() : new TestServices { SettingsRoot = settingsRoot };
         if (recoveryFilePath != null)
@@ -52,7 +56,7 @@ internal sealed class AnimationEditorHarness : IDisposable
 
         Dialogs = new ScriptedDialogs();
         Services.EditorDialogHost = Dialogs;
-        Window = Services.CreateMainWindow();
+        Window = Services.CreateMainWindow(commandModifier: commandModifier);
         Window.Width = 1280;
         Window.Height = 800;
         Window.Show();
@@ -665,6 +669,14 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
+    /// <summary>A wheel event with a horizontal component too, as a touchpad's two-finger scroll sends.</summary>
+    public void Scroll(Point point, Vector delta, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        Window.MouseMove(point, modifiers);
+        Window.MouseWheel(point, delta, modifiers);
+        Layout();
+    }
+
     public void Press(Key key, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         Window.KeyPress(key, modifiers, PhysicalKey.None, null);
@@ -679,14 +691,15 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
-    /// <summary>Focuses <paramref name="box"/>, replaces its text by typing, and presses Enter.</summary>
-    public void TypeAndEnter(TextBox box, string text)
+    /// <summary>Focuses <paramref name="box"/>, replaces its text by typing, and presses
+    /// <paramref name="commitKey"/> (Enter, or Tab to leave the box).</summary>
+    public void TypeAndEnter(TextBox box, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         box.Focus();
         Layout();
         box.SelectAll();
         Window.KeyTextInput(text);
-        Press(Key.Enter);
+        Press(commitKey, modifiers);
     }
 
     /// <summary>
@@ -694,7 +707,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// ("PropPixelX") and commits with Enter, which also seals the coalesced undo entry so the next
     /// value typed is its own step. Focus stays in the box, as it does for a user.
     /// </summary>
-    public void TypeNumber(string name, string text)
+    public void TypeNumber(string name, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         NumericUpDown input = Control<NumericUpDown>(name);
         if (!input.IsEffectivelyVisible)
@@ -702,7 +715,36 @@ internal sealed class AnimationEditorHarness : IDisposable
             throw new InvalidOperationException($"{name} is not visible; the inspector shows another kind of item.");
         }
         TextBox box = input.GetVisualDescendants().OfType<TextBox>().First();
-        TypeAndEnter(box, text);
+        TypeAndEnter(box, text, commitKey, modifiers);
+    }
+
+    /// <summary>
+    /// Scrolls the combo box named <paramref name="name"/> into view, opens it with a click, and clicks its item whose
+    /// content is <paramref name="item"/>. The dropdown is its own popup top level, so the item
+    /// click goes to that popup rather than the window.
+    /// </summary>
+    public void PickComboItem(string name, string item)
+    {
+        ComboBox combo = Control<ComboBox>(name);
+        // The inspector scrolls; a user scrolls a field into view before clicking it.
+        combo.BringIntoView();
+        Layout();
+        Click(combo);
+        if (!combo.IsDropDownOpen)
+        {
+            throw new InvalidOperationException($"Clicking {name} did not open its dropdown.");
+        }
+        ComboBoxItem container = combo.GetRealizedContainers().OfType<ComboBoxItem>()
+            .FirstOrDefault(candidate => candidate.Content as string == item)
+            ?? throw new InvalidOperationException($"{name} has no item \"{item}\"; it shows [{string.Join(", ", combo.Items.OfType<ComboBoxItem>().Select(candidate => candidate.Content))}].");
+        TopLevel popup = TopLevel.GetTopLevel(container)
+            ?? throw new InvalidOperationException($"The \"{item}\" item is not in a top level.");
+        Point point = container.TranslatePoint(new Point(container.Bounds.Width / 2, container.Bounds.Height / 2), popup)
+            ?? throw new InvalidOperationException($"The \"{item}\" item is not in its popup.");
+        popup.MouseMove(point, RawInputModifiers.None);
+        popup.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        popup.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Layout();
     }
 
     /// <summary>Types into the text box named <paramref name="name"/> ("PropTextureName") and presses Enter.</summary>
@@ -712,7 +754,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     }
 
     /// <summary>Types into the flanker numeric field named <paramref name="name"/> ("PropFrameLen", "SpeedInput") and presses Enter.</summary>
-    public void TypeFlanker(string name, string text)
+    public void TypeFlanker(string name, string text, Key commitKey = Key.Enter, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         FlankerNumericField field = Control<FlankerNumericField>(name);
         if (!field.IsEffectivelyVisible)
@@ -720,7 +762,7 @@ internal sealed class AnimationEditorHarness : IDisposable
             throw new InvalidOperationException($"{name} is not visible; another sidebar tab or item kind is showing.");
         }
         TextBox box = field.GetVisualDescendants().OfType<TextBox>().First();
-        TypeAndEnter(box, text);
+        TypeAndEnter(box, text, commitKey, modifiers);
     }
 
     #endregion

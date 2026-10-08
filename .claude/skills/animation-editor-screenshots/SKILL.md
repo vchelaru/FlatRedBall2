@@ -1,11 +1,11 @@
 ---
 name: animation-editor-screenshots
-description: Generating headless documentation screenshots of the AnimationEditor UI — not correctness tests. Triggers: "take a screenshot", DocScreenshots, ScreenshotCapture, DocScreenshotManifest, illustrating a doc page.
+description: "Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change's PR needs. Triggers: \"take a screenshot\", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest."
 ---
 
-# AnimationEditor — Documentation Screenshots
+# AnimationEditor — Screenshots
 
-Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) — not for verifying behavior. For correctness tests, use **`animation-editor-testing`**. For WASM browser smoke (not a Core/App mirror), see **`animation-editor-browser-verify`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
+Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change's PR must carry. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
 
 ## Where, and why it's a separate project
 
@@ -18,6 +18,19 @@ Headless PNG capture of the AnimationEditor's UI, for illustrating documentation
 `ScreenshotCapture.Capture(visual, outputPath)` — pass a `Window`/dialog (`TopLevel`) for full chrome, or any `Control` (e.g. `window.FindControl<Control>("AnimTree")`) to crop to just that control's bounds. Built on `TopLevel.CaptureRenderedFrame()`, not a hand-rolled `RenderTargetBitmap.Render(visual)` — the latter silently writes an empty PNG under headless (see the decision doc).
 
 **Default to capturing the whole `window`, not a cropped control.** A screenshot showing only one panel strips the viewer's frame of reference for where that panel sits in the app. Crop to a specific control only when the user explicitly asks to see just that panel.
+
+**Landmine — context menus.** `ContextMenu.Open()` skips the tree's `Opening` handler, so the menu opens empty. Open it with a real right-click on the row (`window.MouseDown(point, MouseButton.Right)`). The menu draws in the window's overlay layer, so capture `window`.
+
+## Every visual change ships before/after screenshots in its PR
+
+Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional.
+
+```
+scripts/ae-before-after.py <capture.cs>
+scripts/push-pr-screenshots.py <pr#> <folder ae-before-after.py printed>
+```
+
+`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png` to this worktree's `tests/_out/before-after/`, emptied each run so no other run's shots ride along. It works after the code is already edited. `gh` can't upload images, so `push-pr-screenshots.py` puts them on the orphan `pr-assets` branch and prints ready-to-paste markdown (each before/after pair as a side-by-side table, before on the left); it exits nonzero unless every URL serves, and is safe to run while other agents upload.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 
@@ -35,11 +48,11 @@ This only covers *creation*. Once a chain/frame exists with real defaults, hand-
 
 ## Ad hoc "take a screenshot of X" requests
 
-For a one-off request (not a permanent doc-page scenario), hand-edit a scratch file like `_ScratchCapture.cs` in this project — a single `[AvaloniaFact]` test that builds the scenario and calls `ScreenshotCapture.Capture`. Don't add one-off requests to `DocScreenshotManifest` (`DocScreenshotGeneratorTests.cs`) — that manifest is for scenarios a real doc page will regenerate repeatedly. "Ad hoc" relaxes *where the test lives*, not *how the scenario is built* — the `AppCommands`/`FileName` landmines above still apply in full.
+For a one-off request (not a permanent doc-page scenario), write a scratch capture class modeled on `_ScratchCapture.cs`: a single `[AvaloniaFact]` test with a unique class name that builds the scenario and calls `ScreenshotCapture.Capture`. Keep it out of the commit: pass it to `ae-before-after.py` from a scratch folder, or put it in this project's gitignored `_Local/` folder. Don't add one-off requests to `DocScreenshotManifest` (`DocScreenshotGeneratorTests.cs`) — that manifest is for scenarios a real doc page will regenerate repeatedly. "Ad hoc" relaxes *where the test lives*, not *how the scenario is built* — the `AppCommands`/`FileName` landmines above still apply in full.
 
-Iterate fast: `dotnet build tests/AnimationEditor.DocScreenshots/...csproj`, then run the built `.exe -method "AnimationEditor.DocScreenshots._ScratchCapture.Capture"` directly — faster than `dotnet test` for one scenario, and its `Console.WriteLine` output is visible, unlike `dotnet test`'s VSTest adapter which swallows it on failure.
+Iterate fast: `dotnet build` the DocScreenshots project, then run the built test runner directly, `tests/AnimationEditor.DocScreenshots/bin/Debug/net10.0/AnimationEditor.DocScreenshots -method "AnimationEditor.DocScreenshots.<Class>.<Method>"` (`.exe` on Windows). It is faster than `dotnet test` for one scenario, and its `Console.WriteLine` output is visible, unlike `dotnet test`'s VSTest adapter which swallows it on failure.
 
-Write output via **`ScreenshotOutput.ResolveFeatureDir("<feature>")`** → `tools/AnimationEditorAvalonia/tests/_out/<feature>/` (not a temp dir you delete). Open with `Invoke-Item`, then `Read` the PNG yourself before showing the user.
+Write output via **`ScreenshotOutput.ResolveFeatureDir("<feature>")`** → `tools/AnimationEditorAvalonia/tests/_out/<feature>/` (not a temp dir you delete). `Read` the PNG yourself before showing the user.
 
 ## Feature proof (History / undo labels / similar)
 
@@ -48,4 +61,3 @@ When the ask is "prove the panel shows X" — not a unit assert:
 1. Put the drive script in **`AnimationEditor.Core.Demo.FeatureDemos`** (internal, test/DocScreenshots only). Call `FeatureDemos.TryRun(...)` from `_ScratchCapture` — do **not** hand-build history rows or fork a second script, and do **not** wire demos into shipping `App`/`MainWindow`.
 2. Drive real **`AppCommands` / `UndoManager.Execute`**. Never assign fake `HistoryEntryVm` text.
 3. Select **History** (`SidebarTabs` → `HistoryTab`), optionally enlarge `LeftPanelGrid` row 2 so more labels fit, capture `window` + `HistoryScrollViewer`, write `labels.txt` from `UndoManager.UndoHistory`.
-4. Optional browser PNG: **`animation-editor-browser-verify`** (temporary local hook only — revert before merge).

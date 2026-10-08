@@ -21,7 +21,6 @@ namespace AnimationEditor.Core.Models
             tab.CachedOnDiskCoordinateType = pm.OnDiskCoordinateType;
             tab.CachedDiskWriteTimeUtc = TryReadDiskWriteTimeUtc(tab.Path);
             tab.CachedTsxState = pm.CaptureTsxState();
-            tab.CachedTextureSizeState = pm.CaptureTextureSizeState();
             tab.CachedReferencedPngs = pm.ReferencedPngs;
         }
 
@@ -64,7 +63,6 @@ namespace AnimationEditor.Core.Models
             pm.OnDiskCoordinateType = tab.CachedOnDiskCoordinateType;
             pm.FileName = string.IsNullOrEmpty(tab.Path.Original) ? null : tab.Path.FullPath;
             pm.RestoreTsxState(tab.CachedTsxState);
-            pm.RestoreTextureSizeState(tab.CachedTextureSizeState);
             pm.ReferencedPngs = tab.CachedReferencedPngs;
         }
 

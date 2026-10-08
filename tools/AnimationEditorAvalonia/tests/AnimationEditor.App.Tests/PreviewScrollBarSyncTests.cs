@@ -86,7 +86,7 @@ public class PreviewScrollBarSyncTests
 
         // A shape 100 world-units above the origin gives the extent something to scale.
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new CircleSave { X = 0f, Y = 100f, Radius = 50f });
+        frame.ShapesSave.Add(new CircleSave { X = 0f, Y = 100f, Radius = 50f });
         ctx.SelectedState.SelectedFrame = frame;
 
         var window = ctx.CreateMainWindow();

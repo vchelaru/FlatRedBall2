@@ -91,6 +91,11 @@ public partial class FlankerNumericField : UserControl
         // handler per instance created and fire N times once N instances exist.
         ValueProperty.Changed.AddClassHandler<FlankerNumericField>((c, _) => c.OnValueChanged());
 
+        // #1274: an initializer that sets Value before FormatString would otherwise keep showing
+        // the default format until the first +/- step.
+        FormatStringProperty.Changed.AddClassHandler<FlankerNumericField>(
+            (c, _) => c.ValueBox.Text = c.Format(c.Value));
+
         // #1114: dims the whole field as one unit on disable, in code rather than a
         // Selector="UserControl:disabled" style -- Avalonia type selectors match the exact type,
         // not subclasses, so that selector never matches a UserControl subclass like this one.
@@ -153,7 +158,30 @@ public partial class FlankerNumericField : UserControl
 
     private void Commit()
     {
-        decimal fallback = Value ?? Minimum;
+        if (Value is null)
+        {
+            // Mixed multi-selection (#1325): a relative edit goes to the owner to apply per item;
+            // an absolute one sets the value; anything else leaves the field mixed.
+            if (NumericEdit.TryParse(ValueBox.Text, out NumericEdit edit))
+            {
+                if (edit.IsRelative)
+                {
+                    ValueBox.Text = string.Empty;
+                    RaiseEvent(new NumericEditCommittedEventArgs(edit));
+                }
+                else
+                {
+                    Value = Math.Clamp(edit.Apply(0m), Minimum, Maximum);
+                }
+            }
+            else
+            {
+                ValueBox.Text = string.Empty;
+            }
+            return;
+        }
+
+        decimal fallback = Value.Value;
         decimal parsed = NumericToolbarInput.ParseClamp(ValueBox.Text, Minimum, Maximum, fallback);
 
         // Value's setter only raises OnValueChanged (which reformats ValueBox.Text) when the

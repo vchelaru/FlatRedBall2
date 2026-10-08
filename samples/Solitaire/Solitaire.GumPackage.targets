@@ -54,8 +54,10 @@
     BeforeTargets="AssignTargetPaths" hook ensures the .gumpkg exists
     before Content items are resolved into the build. Inputs/Outputs
     keep the target incremental — pack only re-runs when something in
-    the Gum project changed. Desktop and BlazorGL pick up the .gumpkg
-    via their ProjectReference chain (Common builds first).
+    the Gum project changed. Every other importer (Common.Kni, Desktop,
+    BlazorGL) gets the .gumpkg through EnsureGumPackage below, not through
+    its ProjectReference chain: BlazorGL's chain is Common.Kni only and
+    never builds Common.
   -->
   <ItemGroup Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' == 'Solitaire.Common'">
     <GumPackInputs Include="$(GumProjectDir)**\*.*" Exclude="$(GumPackageFile)" />
@@ -76,5 +78,19 @@
     <Exec Command="dotnet tool restore" WorkingDirectory="$(SolitaireCommonDir)" />
     <Exec Command="dotnet gumcli pack &quot;$(GumProjectFile)&quot; -o &quot;$(GumPackageFile)&quot;"
           WorkingDirectory="$(SolitaireCommonDir)" />
+  </Target>
+
+  <!--
+    Non-owner importers ask Common to pack instead of packing themselves. Calling
+    Common's target through the MSBuild task keeps a single owner: MSBuild runs a
+    target once per project instance, so a parallel solution build that reaches
+    this from several projects never runs two packs writing the same file.
+  -->
+  <Target Name="EnsureGumPackage"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' != 'Solitaire.Common'">
+    <MSBuild Projects="$(SolitaireCommonDir)Solitaire.Common.csproj"
+             Targets="PackGumProject"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained" />
   </Target>
 </Project>

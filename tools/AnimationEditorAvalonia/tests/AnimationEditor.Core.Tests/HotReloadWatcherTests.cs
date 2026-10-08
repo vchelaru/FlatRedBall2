@@ -132,4 +132,37 @@ public class HotReloadWatcherTests
         }
         finally { Directory.Delete(root, true); }
     }
+
+    // Copying a texture (APFS clones on macOS) or touching its timestamp raises a change event on
+    // the unchanged file; only a content change should reload it.
+    [Fact]
+    public async Task PngChangedOnDisk_ContentUnchanged_NotRaised_AndRaisedOnceContentChanges()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var achx = Path.Combine(root, "hero.achx");
+            var png = Path.Combine(root, "sheet.png");
+            File.WriteAllText(achx, "<AnimationChainArraySave/>");
+            File.WriteAllBytes(png, new byte[] { 1, 2, 3 });
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.PngChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(achx, new[] { png });
+
+            Directory.CreateDirectory(Path.Combine(root, "export"));
+            File.Copy(png, Path.Combine(root, "export", "sheet.png"));
+            File.SetLastWriteTimeUtc(png, DateTime.UtcNow.AddMinutes(1));
+            await Task.Delay(1000);
+
+            Assert.Empty(changed);
+
+            File.WriteAllBytes(png, new byte[] { 4, 5, 6 });
+            for (int i = 0; i < 50 && changed.IsEmpty; i++)
+                await Task.Delay(100);
+
+            Assert.Single(changed);
+        }
+        finally { Directory.Delete(root, true); }
+    }
 }

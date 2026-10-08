@@ -1,19 +1,18 @@
 ---
 name: animation-editor-testing
-description: >-
-  Headless AE tests — Core first, [AvaloniaFact] only for real UI. Triggers:
-  AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui.
+description: "AE tests — Core first, [AvaloniaFact] only for real UI, Windows Sandbox for installer/OS integration. Triggers: AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Sandbox.Tests, Velopack install, registry."
 ---
 
 # AnimationEditor — Testing
 
-Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
+Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill.
 
 ```
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
+scripts/test-ae.py                                     # build, then every AE test (~1 min)
+scripts/test-ae.py --filter "FullyQualifiedName~Grid"  # same, filtered
 ```
+
+`test-ae.py` builds once, runs every test project in parallel with App.Tests split into shards, prints only failures, and exits nonzero on any. It works from any worktree and can run in several worktrees at once: build outputs, temp folders and settings roots are all per worktree or per test.
 
 ## Pick the right layer (do not duplicate)
 
@@ -21,10 +20,16 @@ dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 |---|---|---|---|
 | **Core** | `AnimationEditor.Core.Tests` | Commands, undo `Description`s, selection/state, pure logic | Layout, pointer routing, pixels |
 | **Headless control** | `AnimationEditor.Views.Tests` (`[AvaloniaFact]`) | A single `AnimationEditor.Views` control in isolation (e.g. `ProjectPanelControl`), using `FakeFolder`/`FakeFile` doubles — no `MainWindow`/DI | Cross-control wiring, `MainWindow` integration, real service graph |
-| **Headless integration** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`, `TestServices`) | Desktop visual tree *through* `MainWindow`, input routing, real DI-wired services — the bug involves wiring, not just one control | Re-proving Core math or a single control's own logic; Browser/WASM |
-| **Browser smoke** | `AnimationEditor.Browser.Ui` (Playwright) | Browser-*only* gaps (WASM boot, Browser host wiring, Debug automation bridge). See that folder’s README | Cloning Core/App/Views tests; primary label gate |
+| **Headless integration** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`, `TestServices`) | Desktop visual tree *through* `MainWindow`, input routing, real DI-wired services — the bug involves wiring, not just one control | Re-proving Core math or a single control's own logic |
+| **Windows Sandbox** | `AnimationEditor.Sandbox.Tests` | What only a real install proves: Velopack hooks, registry, file association, uninstall. See below | Anything a headless test can reach |
 
-Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI. Reach for Browser Playwright only when Headless/desktop cannot catch it — a small smoke set, not a 1:1 port.
+Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI.
+
+## Windows Sandbox tests run only when asked
+
+`dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Sandbox.Tests` builds a Velopack `Setup.exe` (or uses `AE_SANDBOX_SETUP_EXE`) and runs each scenario in a fresh Windows Sandbox. The project is left out of the `.slnx`, `test-ae.py`, and CI on purpose, because a scenario takes minutes; keep it out. Tests skip on machines without Sandbox (Windows Home, or the optional feature off), and fail fast if a sandbox is already open, since Windows allows one at a time.
+
+A scenario is a PowerShell script in `Scenarios/` plus one `[Fact]` calling `WindowsSandbox.RunAsync`. Each boot costs about a minute, so one script bundles every check that can share a boot: it records each check instead of throwing, writes `results.json` last, then shuts the sandbox down. `install-uninstall-achx.ps1` is the pattern. When a scenario hits behavior nobody has confirmed (for example, whether a silent Setup launches the app), it logs an `OBSERVED` line in `scenario.log` rather than quietly working around it, so the run settles the question. A scenario can't change the user's own default-app choice, because Windows hash-protects it.
 
 ## Dogfooding the whole editor headlessly
 
@@ -68,9 +73,8 @@ A fifth: a `TreeViewItem`'s `Bounds` spans its own header row *plus* the rendere
 
 ## Undo labels vs screenshots
 
-- **Correctness of a command's `Description`:** Core.Tests (`CommandDescriptionTests` / `FeatureDemosTests` / `BrowserUiDriveLabelTests`).
+- **Correctness of a command's `Description`:** Core.Tests (`CommandDescriptionTests` / `FeatureDemosTests`).
 - **"Show me the History panel" (desktop):** DocScreenshots + `FeatureDemos` — **`animation-editor-screenshots`**.
-- **Browser/WASM smoke only:** Playwright — **`animation-editor-browser-verify`** + `tests/AnimationEditor.Browser.Ui/README.md`. Not a substitute for Core asserts.
 
 Never seed History UI models with hand-written strings to "prove" a label.
 
@@ -100,4 +104,8 @@ For an unexplained hang, `dotnet test ... --blame-hang-timeout 45s` kills and re
 
 ## Tests must never write the developer's real settings
 
-`MainWindow` persists app settings (recent files, open tabs, theme) to `%APPDATA%\AnimationEditor\AESettings.json` in its `Closed` handler. A headless test that constructs and closes a window would otherwise overwrite the developer's real settings with test fixtures. The application-data root is a `MainWindow` constructor parameter precisely so tests can redirect it: `ctx.CreateMainWindow()` passes `ctx.SettingsRoot` (a unique temp dir), while production (`App.axaml.cs`) passes `Environment.GetFolderPath(SpecialFolder.ApplicationData)`. Build the window through `ctx.CreateMainWindow()` — never reconstruct one with the production root in a test. General rule: any component that reads or writes a real per-user location (config, registry, recent-files) takes its root as an injected dependency, so tests land in temp and never on real user data.
+`MainWindow` persists app settings (recent files, open tabs, theme) to `AnimationEditor/AESettings.json` under the per-user application-data folder in its `Closed` handler. A headless test that constructs and closes a window would otherwise overwrite the developer's real settings with test fixtures. The application-data root is a `MainWindow` constructor parameter precisely so tests can redirect it: `ctx.CreateMainWindow()` passes `ctx.SettingsRoot` (a unique temp dir), while production (`App.axaml.cs`) passes `Environment.GetFolderPath(SpecialFolder.ApplicationData)`. Build the window through `ctx.CreateMainWindow()` — never reconstruct one with the production root in a test. General rule: any component that reads or writes a real per-user location (config, registry, recent-files) takes its root as an injected dependency, so tests land in temp and never on real user data.
+
+## Host-OS branches go through the constructor
+
+A `MainWindow` branch on `OperatingSystem.IsMacOS()` makes every test depend on the machine running it. Platform presentation is a constructor parameter instead (`useMacOSChrome`, which production sets from the host and `ctx.CreateMainWindow()` leaves off), so headless runs get the same in-window title bar and menu on every OS and a test can opt into the other mode.

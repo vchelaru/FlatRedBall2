@@ -17,6 +17,8 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private int _currentChainIndex = -1;
     private int _currentFrameIndex;
     private double _timeIntoAnimation;
+    // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
+    private int _playbackVersion;
 
     /// <summary>
     /// The frame currently being displayed, or <c>null</c> if no animation is playing.
@@ -94,6 +96,17 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <summary>Raised once when a non-looping animation reaches its last frame.</summary>
     public event Action? AnimationFinished;
 
+    /// <summary>
+    /// Raised for each <see cref="AnimationFrameBase.Events"/> entry when playback enters its frame:
+    /// <see cref="Play(string)"/> switching chains enters frame 0 immediately; a large
+    /// <see cref="Update"/> delta raises every skipped frame's events in order, ending with the frame
+    /// it lands on; a loop wrap re-enters frame 0, and a delta spanning more than one loop raises
+    /// each frame once; a non-looping chain's last-frame events are raised before
+    /// <see cref="AnimationFinished"/>. A handler that switches chain stops the rest of the old
+    /// chain's events for that update. <see cref="Reset"/>, <see cref="Stop"/>, and seeking raise nothing.
+    /// </summary>
+    public event Action<FlatRedBall2.Animation.AnimationFrameEvent>? FrameEventRaised;
+
     /// <param name="chains">The animation list to play from. May be empty; <see cref="Play(string)"/> will no-op.</param>
     public AnimationPlayer(AnimationChainList<TFrame> chains)
     {
@@ -116,6 +129,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 ResetPlaybackPosition();
                 Animate = true;
                 IsLooping = _chains[i].Loop;
+                RaiseFrameZeroEvents();
                 return;
             }
         }
@@ -138,6 +152,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 ResetPlaybackPosition();
                 Animate = true;
                 IsLooping = chain.Loop;
+                RaiseFrameZeroEvents();
                 return;
             }
         }
@@ -179,10 +194,16 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         double totalLength = chain.TotalLength.TotalSeconds;
         if (totalLength <= 0) return;
 
+        int previousFrameIndex = _currentFrameIndex;
+        int wraps = 0;
+        bool finished = false;
         if (IsLooping)
         {
             while (_timeIntoAnimation >= totalLength)
+            {
                 _timeIntoAnimation -= totalLength;
+                wraps++;
+            }
         }
         else
         {
@@ -190,11 +211,42 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             {
                 _timeIntoAnimation = totalLength;
                 Animate = false;
-                AnimationFinished?.Invoke();
+                finished = true;
             }
         }
 
         UpdateFrameIndexFromTime(chain);
+
+        int playbackVersion = _playbackVersion;
+        if (FrameEventRaised != null)
+        {
+            var (start, length) = FrameEventRange.Get(previousFrameIndex, _currentFrameIndex, wraps, chain.Count);
+            for (int j = 0; j < length; j++)
+                if (!RaiseEvents(chain[(start + j) % chain.Count], playbackVersion))
+                    break;
+        }
+        if (finished && playbackVersion == _playbackVersion)
+            AnimationFinished?.Invoke();
+    }
+
+    private void RaiseFrameZeroEvents()
+    {
+        _playbackVersion++;
+        var chain = _chains[_currentChainIndex];
+        if (chain.Count > 0)
+            RaiseEvents(chain[0], _playbackVersion);
+    }
+
+    // Returns false once a handler has switched chain, so the caller stops raising the old chain's events.
+    private bool RaiseEvents(TFrame frame, int playbackVersion)
+    {
+        var events = frame.Events;
+        for (int k = 0; k < events.Count; k++)
+        {
+            FrameEventRaised?.Invoke(events[k]);
+            if (playbackVersion != _playbackVersion) return false;
+        }
+        return true;
     }
 
     private void ResetPlaybackPosition()

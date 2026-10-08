@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
@@ -85,14 +86,91 @@ public class PolygonScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DoubleClickingAVertex_DeletesIt_ButNeverBelowThree()
+    public async Task FlipHorizontal_FromThePolygonMenu_MirrorsTheOutlineInPlace_SavesIt_AndUndoRestores()
+    {
+        var (editor, path, _, polygon) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14)); // x now spans -8..20
+
+        editor.RightClickRow(polygon);
+        editor.PickTreeMenuItem("Flip Horizontal");
+
+        PolygonVertices.Get(polygon, 0).ShouldBe((20f, -8f));
+        PolygonVertices.Get(polygon, 2).ShouldBe((-8f, 14f));
+        editor.UndoLabels[^1].ShouldBe("Flip Horizontal Polygon 'PolygonInstance'");
+        var saved = AnimationEditorHarness.ReadSaved(path).AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.Single();
+        (saved.Points[0].X, saved.Points[^1].X).ShouldBe((20f, 20f));
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        PolygonVertices.Get(polygon, 0).ShouldBe((-8f, -8f));
+        editor.ThrowIfErrorShown();
+    }
+
+    // Two frames with a polygon each, both Ctrl-selected in the tree. Returns the one the preview
+    // shows (the one a drag edits) first.
+    private static async Task<(AnimationEditorHarness Editor, PolygonSave First, PolygonSave Second)> OpenWithTwoSelectedPolygonsAsync()
+    {
+        var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        var polygons = new List<PolygonSave>();
+        foreach (var frame in walk.Frames)
+        {
+            editor.RightClickRow(frame);
+            editor.PickTreeMenuItem("Add Polygon");
+            polygons.Add(frame.ShapesSave!.PolygonSaves.Single());
+        }
+        editor.ClickRow(polygons[1]);
+        editor.ClickRow(polygons[0], RawInputModifiers.Control);
+        editor.Services.SelectedState.SelectedPolygons.Count.ShouldBe(2);
+        var shown = editor.Services.SelectedState.SelectedPolygon.ShouldNotBeNull();
+        return (editor, shown, polygons.Single(p => !ReferenceEquals(p, shown)));
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAVertex_WithTwoPolygonsSelected_MovesTheSameVertexOnBoth_InOneUndo()
+    {
+        var (editor, first, second) = await OpenWithTwoSelectedPolygonsAsync();
+        using var _ = editor;
+
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14));
+
+        PolygonVertices.Get(first, 2).ShouldBe((20f, 14f));
+        PolygonVertices.Get(second, 2).ShouldBe((20f, 14f));
+        editor.UndoLabels[^1].ShouldBe("Move Vertex 3 of 2 Polygons");
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        PolygonVertices.Get(second, 2).ShouldBe((8f, 8f));
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAVertex_SkipsASelectedPolygonWithADifferentVertexCount_AndSaysSo()
+    {
+        var (editor, first, second) = await OpenWithTwoSelectedPolygonsAsync();
+        using var _ = editor;
+        PolygonVertices.Insert(second, 1, 0, -10);
+
+        editor.Drag(editor.PreviewPointAt(8, 8), editor.PreviewPointAt(20, 14));
+
+        PolygonVertices.Get(first, 2).ShouldBe((20f, 14f));
+        PolygonVertices.Get(second, 3).ShouldBe((8f, 8f));
+        editor.ToastText.ShouldBe("Moved vertex on 1 of 2 polygons, 1 skipped: different vertex count");
+    }
+
+    [AvaloniaFact]
+    public async Task HoveringAVertexAndPressingDelete_RemovesIt_ButNeverBelowThree()
     {
         var (editor, _, _, polygon) = await OpenWithNewPolygonAsync();
         using var _ = editor;
 
-        editor.DoubleClickAt(editor.PreviewPointAt(8, 8));
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        editor.Press(Key.Delete);
         PolygonVertices.Count(polygon).ShouldBe(3);
-        editor.DoubleClickAt(editor.PreviewPointAt(8, -8));
+        editor.Hover(editor.PreviewPointAt(8, -8));
+        editor.Press(Key.Delete);
 
         PolygonVertices.Count(polygon).ShouldBe(3, "a triangle keeps its last three vertices");
     }
@@ -107,6 +185,66 @@ public class PolygonScenarioTests
 
         PolygonVertices.Get(polygon, 1).ShouldBe((12f, -8f));
     }
+
+    [AvaloniaFact]
+    public async Task HoveringAVertexInThePreview_HighlightsIt_UntilThePointerLeavesIt()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        HighlightedVertex(editor).ShouldBe(2);
+
+        editor.Hover(editor.PreviewPointAt(0, 0));
+        HighlightedVertex(editor).ShouldBe(-1);
+    }
+
+    [AvaloniaFact]
+    public async Task FocusingAVertexRowInTheInspector_HighlightsThatVertex()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.TypeNumber("PropPolygonVertex1Y", "-8");
+
+        HighlightedVertex(editor).ShouldBe(1);
+    }
+
+    [AvaloniaFact]
+    public async Task FocusingAVertexRow_StartsItsHighlightEnlarged_ThenSettles_ButHoverDoesNot()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+
+        editor.TypeNumber("PropPolygonVertex1Y", "-8");
+        PolygonShape(editor).HighlightInflation.ShouldBeGreaterThan(0f);
+
+        editor.Preview.SettleVertexReveal();
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+
+        editor.Hover(editor.PreviewPointAt(8, 8));
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+    }
+
+    [AvaloniaFact]
+    public async Task TabbingFromAVertexXToItsY_DoesNotReplayTheReveal()
+    {
+        var (editor, _, _, _) = await OpenWithNewPolygonAsync();
+        using var _ = editor;
+        editor.TypeNumber("PropPolygonVertex1X", "8");
+        editor.Preview.SettleVertexReveal();
+
+        editor.Press(Key.Tab);
+
+        editor.Control<NumericUpDown>("PropPolygonVertex1Y").IsKeyboardFocusWithin.ShouldBeTrue();
+        HighlightedVertex(editor).ShouldBe(1);
+        PolygonShape(editor).HighlightInflation.ShouldBe(0f);
+    }
+
+    private static PreviewControl.PreviewShapeInfo PolygonShape(AnimationEditorHarness editor) =>
+        editor.Preview.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon);
+
+    private static int HighlightedVertex(AnimationEditorHarness editor) => PolygonShape(editor).HighlightedVertex;
 
     [AvaloniaFact]
     public async Task DraggingAVertexAcrossTheOutline_ShowsTheSelfIntersectionWarning()

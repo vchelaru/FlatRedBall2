@@ -1,9 +1,8 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia">
-    <!-- Phase 6 (#630) + Phase 7 (#644): style classes shared by AnimationEditor.App and
-         AnimationEditor.Browser. Icon-dependent .plus/.minus moved here in Phase 7; ButtonSpinner
-         ControlTheme lives in ThemeIconResources.axaml (ResourceDictionary, not Styles root). -->
+    <!-- Shared style classes. The ButtonSpinner ControlTheme lives in ThemeIconResources.axaml
+         (ResourceDictionary, not Styles root). -->
 
     <!-- Folder-style TreeViews (#770 follow-up): FilesPanelControl and ProjectPanelControl both
          browse a folder tree and both hide the default chevron in favor of a click-to-toggle

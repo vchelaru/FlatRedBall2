@@ -5,7 +5,7 @@ using Xunit;
 
 namespace AnimationEditor.Views.Tests;
 
-// Phase 15: portable toast/banner overlay -- visibility before browser wiring.
+// Toast/banner overlay visibility, tested on the control alone.
 public class EditorNotificationOverlayTests
 {
     [AvaloniaFact]

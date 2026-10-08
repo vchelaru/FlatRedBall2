@@ -1,11 +1,11 @@
 ---
 name: multiplatform-conversion
-description: "Converting a single-target FlatRedBall2 desktop sample into a dual-target desktop + KNI BlazorGL (Blazor WebAssembly / browser) project. Use when the user mentions web deployment, browser/WASM/itch.io targets, KNI, or asks to add web support to an existing game. Assumes you already have a working desktop sample — see sample-project-setup for the desktop bootstrap."
+description: "Converting a single-target FlatRedBall2 desktop sample into a dual-target desktop + KNI BlazorGL (Blazor WebAssembly / browser) project. Use when the user mentions web deployment, browser/WASM/itch.io targets, KNI, or asks to add web support to an existing game, or hits a browser-only failure (JSImport, user activation, AOT publish). Assumes you already have a working desktop sample — see sample-project-setup for the desktop bootstrap."
 ---
 
 # Multi-Platform Conversion (Desktop + KNI BlazorGL)
 
-> Reference samples: `samples/auto/AutoEvalKniBlazorSample/` (minimal — one XNB, no real content) and `samples/PlatformKing/` (content-rich — TMX, JSON, PNG animations). Read PlatformKing first when porting any non-trivial game; AutoEval only proves the wiring, not the content story.
+> References: `templates/frb2-multiplatform/` (minimal — proves the wiring, not the content story) and `samples/PlatformKing/` (content-rich — TMX, JSON, PNG animations). Read PlatformKing first when porting any non-trivial game.
 
 ## Backend selection is by which project file you reference
 
@@ -15,7 +15,7 @@ The KNI file lives in its own `Kni\` subfolder, not next to the MonoGame one: tw
 
 ## Project layout
 
-Three projects, mirroring `AutoEvalKniBlazorSample`:
+Projects, mirroring `templates/frb2-multiplatform/`:
 
 ```
 GameName/
@@ -151,7 +151,7 @@ Same pattern as the `RedirectKniContentToWwwroot` target, which writes XNBs to t
 
 ## BlazorGL head — minimum setup
 
-Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head owns only:
+Reference: `templates/frb2-multiplatform/MyGame.BlazorGL`. Each sample's `.BlazorGL` head owns only:
 
 - **`.csproj`** — SDK = `Microsoft.NET.Sdk.BlazorWebAssembly`, `<KniPlatform>BlazorGL</KniPlatform>`, the nkast.Xna / nkast.Kni.Platform.Blazor.GL package list, the `RedirectKniContentToWwwroot` target. **`<ProjectReference>` to `src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj`** (the host package, not the engine itself).
 - **`Program.cs`** — standard Blazor WASM bootstrap. Two FRB-specific lines:
@@ -167,7 +167,7 @@ Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head ow
   The package's `frb-host.js` defines `tickJS`, `initRenderJS`, optional hooks
   (`window.frbBeforeTick`, `window.frbAfterInit`), content prefetching via
   `content-manifest.json`, and keyboard/mouse scroll prevention for itch.io iframes.
-- **`Properties/launchSettings.json`** — pick a unique launch port. AutoEvalKniBlazorSample uses 50470/50471; pick something else. Concurrent debugging across samples breaks if ports collide.
+- **`Properties/launchSettings.json`** — pick a unique launch port (check the other samples' `launchSettings.json`). Concurrent debugging across samples breaks if ports collide.
 
 **Do not duplicate** `App.razor`, `MainLayout.razor`, `_Imports.razor`, `Pages/Index.razor`, or the `tickJS`/`initRenderJS` JS block. They ship from `FlatRedBall2.BlazorGL` and are wired by the `RootComponents.Add<App>` and `frb-host.js` reference above. The package's Index resolves `Func<Game>` from DI on the first tick — that's why `Program.cs` must register it.
 
@@ -192,7 +192,52 @@ manifest stays in sync on the next build.
 consumers — a `ProjectReference` to the host project does **not** import them. That's why
 repo samples carry an explicit
 `<Import Project="...\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />`;
-without it, no manifest is ever generated. NuGet consumers need nothing.
+without it, no manifest is generated and KNI's `js/streamProcessor2.js` (the `DynamicSoundEffectInstance` AudioWorklet) is never served. NuGet consumers need nothing.
+
+## WASM runtime landmines
+
+These compile clean, pass every desktop and xunit run, and fail only in the browser.
+
+- **`System.Text.Json` reflection serialization is off on WebAssembly**, in Debug and Release alike, and throws `JsonSerializerIsReflectionDisabled`. Serialize through a source-generated `JsonSerializerContext` (`[JsonSerializable(typeof(T))]`), the same way the engine's own `*JsonContext` classes do.
+- **`TickDotNet` runs synchronously inside a `requestAnimationFrame` callback** (`src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js`), and the browser runtime is single-threaded. Never block on an `IJSRuntime` task (`.GetAwaiter().GetResult()`, `.Wait()`) from game code: the JS side can run while the managed wait still fails, so a write lands in storage yet reports failure. Call JS through synchronous `[JSImport]` bindings instead.
+- **`index.html` is never content-hashed, and neither is a plain `wwwroot/*.js` file.** The template's `index.html` references `_framework/blazor.webassembly.js` without the `#[.{fingerprint}]` placeholder, so that file and `dotnet.js` stay unhashed too; the assemblies and runtime are hashed. A cached copy pairs an old script with new code, and the fix appears not to work because the fix is in the stale file. Keep shims and diagnostics in C#, or fingerprint the JS file with a `<StaticWebAssetFingerprintPattern>` item, `<OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>`, and a `name#[.{fingerprint}].js` reference. Otherwise hard-reload before trusting a JS error that contradicts the page.
+- **`dotnet publish` has no `blazor.boot.json` on .NET 10.** The boot resource list is inlined into `_framework/dotnet.js`, so a missing `blazor.boot.json` says nothing about whether AOT ran.
+
+### `[JSImport]` interop
+
+A head that adds `[JSImport]` needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` (SYSLIB1074); the BlazorGL heads in this repo do not set it.
+
+- **Default to a module bridge:** a thin ES module in `wwwroot` loaded once with `JSHost.ImportAsync`, then `[JSImport("getItem", ModuleName)]`. The generator checks signatures only, never paths.
+- **`JSHost.ImportAsync` resolves relative to `_framework/`**, not the `wwwroot` root. Use `"../localStorage.js"`; `"./localStorage.js"` fails at runtime with `Failed to fetch dynamically imported module: .../_framework/localStorage.js`.
+- **Module-less names start from an empty object, not `window`.** Only a literal `globalThis.` prefix re-roots onto the real global, so `[JSImport("globalThis.localStorage.setItem")]` works and `[JSImport("localStorage.setItem")]` throws. A bare name like `[JSImport("myFn")]` throws `must be a Function but was undefined` even when the console shows `typeof myFn === 'function'`; trust the console, the error is the resolver. The function is bound to its parent object (`localStorage` above). Use this form only when you want no shim file.
+- **`IJSRuntime.InvokeAsync` resolves the same dotted string from `window`**, so a name that works there can fail under `[JSImport]`.
+- **The argument order is `[JSImport(functionName, moduleName)]`.** Swapped, it throws `ES6 module ... was not imported yet`.
+- **Strings cross cheaply; byte arrays don't.** A `Task<byte[]>` return fails with SYSLIB1072. Pass bytes as base64 and decode with `Convert.FromBase64String`.
+
+## Browser input and user activation
+
+- **Audio, fullscreen, file pickers, and permission prompts need a real user gesture.** Autoplay at startup is blocked, and a click your own JS dispatches is untrusted, so it does not count. Start audio or open a picker from a genuine `pointerdown`/`keydown`/`touchend`, and have a "click to start" affordance if music plays on screen entry.
+- **Input the game reads during a frame is not a DOM user activation.** KNI polls input inside `TickDotNet`, after the DOM event has returned, so a Gum button that opens a file picker or requests fullscreen can run its handler and still be refused, often silently. If that happens, wire the action to a DOM event listener in JS.
+- **The browser keeps some shortcuts.** `frb-host.js` only suppresses arrows, space, and wheel scrolling. Ctrl+S, F5, and similar keys reach the game but also trigger the browser action unless the head calls `preventDefault` on that `keydown`. Ctrl+W, Ctrl+T, and Ctrl+N are reserved by the browser and never reach the page, so don't bind game actions to them.
+- **"The click didn't register" is usually a stalled frame, not lost input.** The first frames after a screen transition can stall for hundreds of milliseconds with nothing drawn. Attribute it before touching input code: a capture-phase JS `pointerdown` timestamp plus a managed `Console.WriteLine` (which shows up in the browser console) tells you whether the press reached the game in the same frame.
+- **Frame timings are not comparable across browsers.** Firefox's clock is coarser and its WebAssembly is often slower on the same frames. See the `performance` skill for measurement discipline.
+
+## Publishing: AOT vs the interpreter
+
+Without AOT, a published head runs .NET IL through an interpreter in WebAssembly (often called "JIT"). AOT compiles to native WebAssembly: much faster per frame, but a far larger download, a multi-minute publish, and it needs the `wasm-tools` workload. Neither is a default to copy blindly: AOT suits a build shipped to players with CPU-heavy frames, and the interpreter suits day-to-day iteration. Nothing in this repo publishes AOT. Comparing frame timings between the two belongs in the `performance` skill.
+
+```xml
+<PropertyGroup>
+  <RunAOTCompilation>true</RunAOTCompilation>
+  <!-- Must stay false: stripping IL removes code the interpreter still needs for
+       engine reflection paths (screen creation via Activator.CreateInstance, Gum runtime
+       registration), which reportedly fails as a per-frame NullReferenceException flood. -->
+  <WasmStripILAfterAOT>false</WasmStripILAfterAOT>
+</PropertyGroup>
+```
+
+- **AOT runs at `dotnet publish -c Release` only.** `dotnet run` and the dev server always use the interpreter, so a dev-server number is never an AOT baseline. Pass `-p:RunAOTCompilation=false` on the publish command to skip AOT without editing the csproj.
+- **Delete the publish directory before publishing or measuring payload size.** A publish into an existing folder leaves the previous build's content-hashed files behind; the loader ignores them, but they inflate any size total and a stale `wwwroot` can mask edits.
 
 ## Verification
 
@@ -204,6 +249,5 @@ without it, no manifest is ever generated. NuGet consumers need nothing.
 ## Known limitations (as of 2026-08-20)
 
 - **No gamepad polling guarantee on web.** Browser gamepad APIs require a connected-device gesture before reporting state.
-- **Audio gated by user gesture.** Browsers block audio playback until the user interacts with the page once. Have a "click to start" affordance if music plays on screen entry.
 - **`DynamicSoundEffectInstance` sample rate must match the browser's `AudioContext` rate on Blazor.GL, or `SubmitBuffer` throws** (`Sample rate 44100 does not match AudioContext sample rate 48000`). Desktop OpenAL resamples any source rate for free; Blazor.GL does not, and Kni exposes no public way to read the actual `AudioContext` rate (feature-requested: kniEngine/kni#2690). Until that lands, fall back to a couple of common candidate rates (48000, then 44100) and retry on failure.
-- **`Pitch` on `SoundEffectInstance`/`DynamicSoundEffectInstance` throws on Blazor.GL** with the currently-published Kni NuGet packages. Fixed upstream (kniEngine/kni#2614, #2615) but not yet released — confirmed via `diagnostics/MusicPitchWebSpike`. Re-check once Kni cuts a release containing both.
+- **`Pitch` on `SoundEffectInstance`/`DynamicSoundEffectInstance`** no longer throws as of `nkast.Kni.Platform.Blazor.GL` 4.3.9001, but nobody has yet confirmed it is audible in a browser. `diagnostics/MusicPitchWebSpike` is the check.

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
-    /// One row's worth of History-panel ordering/marking metadata. Hosts map this into their
-    /// own themed row view model (desktop uses brushes, browser uses opacity/font weight).
+    /// One row's worth of History-panel ordering/marking metadata. <c>MainWindow</c> maps this
+    /// into its themed row view model.
     /// </summary>
     /// <param name="IsCurrent">True for the most-recently-applied undo entry ("you are here").</param>
     /// <param name="IsRedo">True for entries that have been undone and are pending redo.</param>

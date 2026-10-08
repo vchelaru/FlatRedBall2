@@ -133,7 +133,7 @@ public class AnimationChainListSaveJsonTests
         var chain = new AnimationChainSave { Name = "Attack" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Sword", X = 5, Y = 1, ScaleX = 15, ScaleY = 5 });
+        frame.ShapesSave.Add(new AARectSave { Name = "Sword", X = 5, Y = 1, ScaleX = 15, ScaleY = 5 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -167,5 +167,31 @@ public class AnimationChainListSaveJsonTests
         {
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
+    }
+    [Fact]
+    public void ToJsonString_FrameWithoutEvents_OmitsEventsKey()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { new AnimationFrameSave() } });
+
+        save.ToJsonString().ShouldNotContain("events");
+    }
+
+    [Fact]
+    public void ToJsonString_FromJsonString_FrameEvents_RoundTripNameAndOptionalData()
+    {
+        var frame = new AnimationFrameSave();
+        frame.Events.Add(new AnimationFrameEvent { Name = "Footstep" });
+        frame.Events.Add(new AnimationFrameEvent { Name = "Spawn", Data = "3" });
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
+
+        var json = save.ToJsonString();
+        var events = AnimationChainListSave.FromJsonString(json).AnimationChains[0].Frames[0].Events;
+
+        events.Select(e => e.Name).ShouldBe(new[] { "Footstep", "Spawn" });
+        events[0].Data.ShouldBeNull();
+        events[1].Data.ShouldBe("3");
+        json.ShouldNotContain("\"data\": null");
     }
 }

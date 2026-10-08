@@ -142,7 +142,7 @@ public class PreviewFrameDragTests
             var circle  = new CircleSave { X = 0f, Y = 0f, Radius = 10f };
             var frame   = MakeFrame();
             frame.TextureName = texPath;
-            frame.ShapesSave!.Shapes.Add(circle);
+            frame.ShapesSave!.Add(circle);
 
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(frame);

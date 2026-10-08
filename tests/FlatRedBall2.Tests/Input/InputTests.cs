@@ -49,6 +49,30 @@ public class CursorTests
 
     private static TimeSpan Sec(double s) => TimeSpan.FromSeconds(s);
 
+    private static MouseState Wheel(int scrollWheel) =>
+        new MouseState(0, 0, scrollWheel, ButtonState.Released, ButtonState.Released,
+            ButtonState.Released, ButtonState.Released, ButtonState.Released);
+
+    [Fact]
+    public void ScrollWheelDelta_FirstUpdate_ReturnsZero()
+    {
+        // MonoGame's wheel value is cumulative since startup, so the first frame has no baseline.
+        var cursor = new Cursor();
+        cursor.Update(Wheel(480), Sec(0));
+
+        cursor.ScrollWheelDelta.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ScrollWheelDelta_WheelMovedBetweenFrames_ReturnsChange()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Wheel(480), Sec(0));
+        cursor.Update(Wheel(360), Sec(0.01));
+
+        cursor.ScrollWheelDelta.ShouldBe(-120);
+    }
+
     [Fact]
     public void PrimaryClick_TransitionDownToUp_ReturnsTrue()
     {

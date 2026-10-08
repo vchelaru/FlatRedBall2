@@ -103,7 +103,7 @@ public class AnimationChainListSaveLoadingTests
         var chain = new AnimationChainSave { Name = "Attack" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Sword", X = 5f, Y = 0f, ScaleX = 15f, ScaleY = 5f });
+        frame.ShapesSave.Add(new AARectSave { Name = "Sword", X = 5f, Y = 0f, ScaleX = 15f, ScaleY = 5f });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -248,9 +248,9 @@ public class AnimationChainListSaveLoadingTests
             "        <PolygonSaves>" +
             "          <PolygonSave><Name>Arc</Name><X>1</X><Y>2</Y>" +
             "            <Points>" +
-            "              <Vector2Save><X>0</X><Y>0</Y></Vector2Save>" +
-            "              <Vector2Save><X>10</X><Y>5</Y></Vector2Save>" +
-            "              <Vector2Save><X>0</X><Y>10</Y></Vector2Save>" +
+            "              <Point><X>0</X><Y>0</Y></Point>" +
+            "              <Point><X>10</X><Y>5</Y></Point>" +
+            "              <Point><X>0</X><Y>10</Y></Point>" +
             "            </Points>" +
             "          </PolygonSave>" +
             "        </PolygonSaves>" +

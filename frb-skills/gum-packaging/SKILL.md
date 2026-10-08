@@ -60,6 +60,8 @@ Define `GUM_BUNDLE` from the same MSBuild property that flips deployment (see th
 
 **Web must bundle.** Loose `.ganx` animation files can't be enumerated over HTTP, so in loose mode on WASM animations silently don't load. Ship web as `.gumpkg`.
 
+**A font left out of the `.gumpkg` becomes a loose-file request.** In bundle mode Gum serves every file it finds in the `.gumpkg` and falls back to FRB2's loose-file hook only on a miss. When `--include` omits `fontcache`, each `FontCache/*.fnt` read 404s on web and the text loses its intended font without an exception. Keep `fontcache` in `--include`, or copy `FontCache/` loose yourself.
+
 ## .NET version requirement
 
 The bundle loader requires **.NET 7+** (pure-managed brotli + tar). FRB2 targets net10.0+, so this is always satisfied.
@@ -118,6 +120,8 @@ dotnet build -p:UseGumPackage=false   # back to loose
 ```
 
 Always `.gitignore` the generated `.gumpkg` — it's a build output, not source.
+
+`.gumfcs` in the project folder is the Gum tool's font character set file. No runtime reads it, so it never needs to ship.
 
 ## Verification
 

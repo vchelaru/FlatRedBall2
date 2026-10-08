@@ -8,8 +8,9 @@ namespace FlatRedBall.AnimationChain;
 /// with the AnimationEditor and the main FlatRedBall2 engine via <c>AnimationEditorCommon</c>)
 /// into this package's own <see cref="AnimationChain{TFrame}"/>/<see cref="AnimationChainList{TFrame}"/>
 /// runtime closed over <see cref="AnimationFrame"/>. Lives in this package (not
-/// <c>AnimationEditorCommon</c> itself) because it needs <see cref="Texture2D"/> and this package's
-/// own "sticky" per-frame color semantics (see <see cref="ToAnimationChainList"/>).
+/// <c>AnimationEditorCommon</c> itself) because it needs <see cref="Texture2D"/>. A frame's null
+/// color channel or operation inherits the most recent earlier frame in the same chain that sets it
+/// (see <see cref="EffectiveFrameColor"/>), matching the main engine and the AnimationEditor.
 /// </summary>
 public static class AnimationChainListSaveExtensions
 {
@@ -53,21 +54,12 @@ public static class AnimationChainListSaveExtensions
         {
             var chain = new AnimationChain<AnimationFrame> { Name = chainSave.Name, Loop = chainSave.Loop };
 
-            // Sticky color resolution: a frame that omits a channel inherits the most recent
-            // explicitly-set value from an earlier frame in this chain, rather than resetting to
-            // null. Mirrors the AnimationEditor's EffectiveFrameColor.ResolveAll. This is specific
-            // to this package's runtime -- AnimationEditorCommon's own conversion (used by the
-            // main engine's Sprite animation) does not apply it.
-            int? stickyRed = null, stickyGreen = null, stickyBlue = null, stickyAlpha = null;
-            FlatRedBall2.Animation.ColorOperation? stickyOperation = null;
+            var colors = EffectiveFrameColor.ResolveAll(chainSave.Frames);
 
-            foreach (var frameSave in chainSave.Frames)
+            for (int i = 0; i < chainSave.Frames.Count; i++)
             {
-                stickyRed       = frameSave.Red           ?? stickyRed;
-                stickyGreen     = frameSave.Green         ?? stickyGreen;
-                stickyBlue      = frameSave.Blue          ?? stickyBlue;
-                stickyAlpha     = frameSave.Alpha         ?? stickyAlpha;
-                stickyOperation = frameSave.ColorOperation ?? stickyOperation;
+                var frameSave = chainSave.Frames[i];
+                var color = colors[i];
 
                 var frame = new AnimationFrame
                 {
@@ -78,11 +70,11 @@ public static class AnimationChainListSaveExtensions
                     FlipDiagonal = frameSave.FlipDiagonal,
                     RelativeX = frameSave.RelativeX,
                     RelativeY = frameSave.RelativeY,
-                    Red = stickyRed,
-                    Green = stickyGreen,
-                    Blue = stickyBlue,
-                    Alpha = stickyAlpha,
-                    ColorOperation = stickyOperation,
+                    Red = color.Red,
+                    Green = color.Green,
+                    Blue = color.Blue,
+                    Alpha = color.Alpha,
+                    ColorOperation = color.Operation,
                 };
 
                 frame.Texture = loadTexture(frameSave);
@@ -110,6 +102,8 @@ public static class AnimationChainListSaveExtensions
                 }
 
                 AppendShapes(frame, frameSave.ShapesSave);
+                foreach (var frameEvent in frameSave.Events)
+                    frame.Events.Add(frameEvent.Clone());
                 chain.Add(frame);
             }
 
@@ -194,9 +188,13 @@ public static class AnimationChainListSaveExtensions
     /// </para>
     /// </summary>
     /// <param name="list">The list to update in place.</param>
-    /// <param name="achxPath">Path to the .achx/.achj file to reload from.</param>
+    /// <param name="achxPath">
+    /// Path to the .achx/.achj file to reload from. Relative paths are read through
+    /// <c>TitleContainer</c>; rooted paths (what file watchers report) from the file system.
+    /// </param>
     /// <param name="textureLoader">
-    /// Called with the resolved absolute path of each texture file. May return <c>null</c>
+    /// Called with each texture path, resolved next to <paramref name="achxPath"/> (rooted only if
+    /// <paramref name="achxPath"/> is). May return <c>null</c>
     /// if the texture is unavailable — affected frames keep a <c>null</c> texture.
     /// Typically supplied by <see cref="AchxLoader"/>, which reuses its internal cache
     /// and only loads new textures.
@@ -206,13 +204,7 @@ public static class AnimationChainListSaveExtensions
         AnimationChainList<AnimationFrame> fresh;
         try
         {
-            var save = achxPath.EndsWith(".achj", StringComparison.OrdinalIgnoreCase)
-                ? AnimationChainListSave.FromJsonFile(achxPath)
-                : AnimationChainListSave.FromFile(achxPath);
-            // AnimationEditorCommon's FromFile/FromJsonFile store FileName verbatim (not resolved
-            // to an absolute path) -- resolve it here so ToAnimationChainList's achxDir-based
-            // texture-path resolution below produces an absolute path.
-            save.FileName = Path.GetFullPath(achxPath);
+            var save = ContentFile.ReadSave(achxPath, ContentFile.Open);
             fresh = save.ToAnimationChainList(textureLoader);
         }
         catch (IOException) { return false; }

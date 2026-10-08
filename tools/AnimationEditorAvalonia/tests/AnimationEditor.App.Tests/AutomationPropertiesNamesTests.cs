@@ -7,7 +7,7 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// #690 Phase 0/1: named automation peers so Browser Playwright (and desktop a11y) can find
+/// #690 Phase 0/1: named automation peers so UI automation and screen readers can find
 /// History / Animations without coordinate clicking. Names must stay stable — UI drive scripts
 /// and screen readers both depend on them.
 /// </summary>

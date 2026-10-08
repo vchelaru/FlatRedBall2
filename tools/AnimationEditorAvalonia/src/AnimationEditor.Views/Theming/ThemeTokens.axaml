@@ -1,8 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Phase 6 (#630): design tokens shared by AnimationEditor.App and AnimationEditor.Browser, moved
-         out of AnimationEditor.App/App.axaml verbatim (values unchanged) so the browser build can
-         DynamicResource the same brushes/colors desktop does. Consumers MUST use DynamicResource, never
+    <!-- Design tokens. Consumers MUST use DynamicResource, never
          StaticResource; these live in ThemeDictionaries so they switch with the active ThemeVariant.
 
          Icon-dependent ButtonSpinner / .plus / .minus moved to ThemeIconResources.axaml and

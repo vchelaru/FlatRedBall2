@@ -82,7 +82,10 @@ public class FolderWatcherTests
 
             var changes = await WaitForChangeAsync(watcher);
             Assert.NotNull(changes);
-            Assert.Contains(changes!, c => PathsEqual(c.Path, file) && c.Type == WatcherChangeType.Modified);
+            // macOS FSEvents keeps a file's recent "created" flag on its next event, so a write
+            // right after creating the file arrives as Created there. Consumers rescan either way.
+            Assert.Contains(changes!, c => PathsEqual(c.Path, file) &&
+                (c.Type == WatcherChangeType.Modified || (OperatingSystem.IsMacOS() && c.Type == WatcherChangeType.Created)));
         }
         finally { Directory.Delete(root, true); }
     }

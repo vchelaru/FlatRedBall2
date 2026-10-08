@@ -37,7 +37,7 @@ public sealed class GitCli
             return GitBlameHistory.Failed(GitHistoryStatus.NotARepository);
 
         string repoRoot = top.StdOut.Trim();
-        string relPath = ToRepoRelative(repoRoot, absoluteFilePath);
+        string relPath = ToRepoRelative(dir, absoluteFilePath);
 
         // Tracked? An untracked file has no committed revision to diff against.
         var tracked = RunText(repoRoot, "ls-files", "--error-unmatch", "--", relPath);
@@ -69,14 +69,16 @@ public sealed class GitCli
     /// <summary>True when <paramref name="absoluteFilePath"/> has uncommitted changes (or is staged) relative to HEAD.</summary>
     public bool HasUncommittedChanges(string repoRoot, string absoluteFilePath)
     {
-        string relPath = ToRepoRelative(repoRoot, absoluteFilePath);
+        string relPath = ToRepoRelative(Path.GetDirectoryName(absoluteFilePath)!, absoluteFilePath);
         var status = RunText(repoRoot, "status", "--porcelain", "--", relPath);
         return status.ExitCode == 0 && !string.IsNullOrWhiteSpace(status.StdOut);
     }
 
-    // git uses forward-slash, repo-root-relative paths for `show <rev>:<path>` and pathspecs.
-    private static string ToRepoRelative(string repoRoot, string absoluteFilePath) =>
-        Path.GetRelativePath(repoRoot, absoluteFilePath).Replace('\\', '/');
+    // git uses forward-slash, repo-root-relative paths for `show <rev>:<path>` and pathspecs. Ask git
+    // for the folder's prefix instead of doing path math against --show-toplevel: toplevel is the
+    // symlink-resolved real path (macOS /var -> /private/var), so GetRelativePath would climb out.
+    private string ToRepoRelative(string fileDir, string absoluteFilePath) =>
+        RunText(fileDir, "rev-parse", "--show-prefix").StdOut.Trim() + Path.GetFileName(absoluteFilePath);
 
     // ── Process runners ───────────────────────────────────────────────────────
 
@@ -97,7 +99,7 @@ public sealed class GitCli
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception
             or FileNotFoundException or PlatformNotSupportedException or InvalidOperationException)
         {
-            // git not installed / not on PATH, or process launch unsupported (e.g. WASM).
+            // git not installed / not on PATH, or the process failed to launch.
             return new TextResult(true, -1, "");
         }
     }

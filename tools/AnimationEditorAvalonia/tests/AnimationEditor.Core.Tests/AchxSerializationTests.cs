@@ -161,7 +161,7 @@ public class AchxSerializationTests
         var chain = new AnimationChainSave { Name = "WithRect" };
         var frame = TestHelpers.MakeFrame();
         var rect = new AARectSave { Name = "HitBox", ScaleX = 8, ScaleY = 8, X = 2, Y = -1 };
-        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Add(rect);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
@@ -186,7 +186,7 @@ public class AchxSerializationTests
         var chain = new AnimationChainSave { Name = "WithCircle" };
         var frame = TestHelpers.MakeFrame();
         var circle = new CircleSave { Name = "AttackRange", Radius = 20, X = 1, Y = 2 };
-        frame.ShapesSave!.Shapes.Add(circle);
+        frame.ShapesSave!.Add(circle);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 

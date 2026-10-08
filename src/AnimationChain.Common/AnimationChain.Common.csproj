@@ -2,9 +2,7 @@
   <!--
     Pure C#, zero MonoGame/KNI dependency by design. Split out of the main FlatRedBall2 engine
     assembly so tooling that only needs the animation data (the AnimationEditor, an Avalonia app,
-    not a MonoGame one) can reference just this project instead of the whole engine. See
-    tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md for the motivating #535
-    investigation.
+    not a MonoGame one) can reference just this project instead of the whole engine.
 
     Two layers live here:
       - The .achx data model (AnimationChainListSave, AnimationChainSave, AnimationFrameSave,
@@ -69,6 +67,13 @@
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>AnimationChain.Common.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <!-- FrameEventRange: the engine's Sprite shares AnimationPlayer's frame-event semantics. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Kni</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 </Project>

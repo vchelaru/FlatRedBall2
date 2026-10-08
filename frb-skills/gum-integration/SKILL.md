@@ -92,7 +92,9 @@ Remove(button);
 Remove(textRuntime);
 ```
 
-**Do not call `button.AddToRoot()`** — this bypasses the FRB2 render-order system.
+FRB2 draws only Gum elements parented under one of its roots: `Camera.UiRoot` (`Add`), `Camera.ScreenSpaceRoot` (`Add` with a screen-space layer), or `Screen.OverlayRoot` (`AddOverlay`). `element.AddToRoot()` lands in `OverlayRoot` too, because FRB2 makes it Gum's `Root`, but `AddOverlay` says so explicitly.
+
+**`AddToManagers(SystemManagers.Default, null)` renders nothing.** It registers the element with Gum's own renderer layers, which FRB2 never draws, so the element stays invisible with no error.
 
 ## Displaying Text (HUD, Score, Labels)
 
@@ -292,7 +294,7 @@ The API differs by type:
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Projected world coordinates under zoom** — `Camera.WorldToScreen` gives viewport pixels, but Gum applies zoom scaling during render. For projected Gum overlays (selection rectangles, tile highlights), convert viewport-pixel coordinates into Gum canvas units using zoom compensation (`1 / Camera.Zoom`) to avoid double-scaling drift.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
-- **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.
+- **Gate per-frame writes to `Text`, `SourceFile`, and font properties (`Font`, `FontSize`, `IsItalic`) on an actual change.** These setters have no same-value check: `Text` re-runs localization and BBCode parsing, font properties re-resolve the font, and `SourceFile` re-resolves the texture through the content loader and runs a full `UpdateLayout()` on every assignment. Position, size, and `Visible` setters already skip equal values, and `Color`/`Alpha` are plain field writes, so those are safe to assign every frame.
 - **No persistence across screen transitions** — Gum elements are fully cleaned up. Add them fresh in each screen's `CustomInitialize`.
 - **World-space Gum**: Do not manually set `Visual.X/Y` on an entity-attached Gum element — it will be overwritten each frame.
 - **For Gum behavior/API questions, check `Gum/docs/` in the sibling `Gum` repo checkout before grepping Gum source.** `Gum.MonoGame` ships as a compiled NuGet package with no source; the sibling repo (usually cloned alongside `FlatRedBall2` under the same GitHub root) has both `docs/` and source, and the docs usually answer it faster. Fall back to source only when the docs don't cover the specific mechanism.

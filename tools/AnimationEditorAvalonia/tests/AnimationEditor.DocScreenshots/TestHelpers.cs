@@ -26,7 +26,6 @@ internal sealed class TestServices
     public PendingCutState PendingCutState { get; }
     public ThumbnailService ThumbnailService { get; }
     public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
-    public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
 
     public string SettingsRoot { get; } =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditorDocScreenshots", System.Guid.NewGuid().ToString("N"));
@@ -51,7 +50,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot);
+            ThumbnailService, ProjectTreeThumbnailService, SettingsRoot);
 }
 
 internal static class TestHelpers

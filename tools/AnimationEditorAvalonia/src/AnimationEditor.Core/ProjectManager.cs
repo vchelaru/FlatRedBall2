@@ -95,9 +95,8 @@ namespace AnimationEditor.Core
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsxTileset != null;
 
-        /// <summary>Guards every achx/achj-format save method (<see
-        /// cref="SaveAnimationChainList(string)"/>, its <see cref="Stream"/> overload, and <see
-        /// cref="SaveAnimationChainListAsync"/>) against being called on a native tsx project --
+        /// <summary>Guards the achx/achj-format save (<see cref="SaveAnimationChainList(string)"/>)
+        /// against being called on a native tsx project --
         /// defense-in-depth alongside <c>AppCommands.SaveCurrentAnimationChainList</c>'s own branch
         /// on <see cref="IsNativeTsxProject"/>, for any caller that reaches <see
         /// cref="ProjectManager"/> directly instead.</summary>
@@ -132,35 +131,17 @@ namespace AnimationEditor.Core
         /// </summary>
         public TextureCoordinateType OnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
-        /// <summary>
-        /// Texture sizes supplied to the most recent <see cref="LoadAnimationChain"/> call, kept
-        /// around so <see cref="SaveAnimationChainList(Stream)"/> can convert back to Pixel
-        /// coordinates without a filesystem to re-read PNG headers from (the browser-wasm build
-        /// has no disk at all, unlike <see cref="SaveAnimationChainList(string)"/>'s directory).
-        /// Plain per-load instance state with no public getter, same shape as the tsx fields
-        /// below -- see <see cref="CaptureTextureSizeState"/>/<see cref="RestoreTextureSizeState"/>
-        /// for why a tab-switch cache also needs to round-trip this.
-        /// </summary>
-        private IReadOnlyDictionary<string, (int Width, int Height)>? _knownTextureSizes;
-
         /// <param name="fileName">The .achx path. Only read from disk when <paramref name="preParsed"/> is null.</param>
-        /// <param name="preParsed">Already-parsed content (e.g. fetched over HTTP on the browser-wasm build), skipping the disk read.</param>
-        /// <param name="knownTextureSizes">
-        /// Pixel dimensions for textures the caller has already decoded (keyed by <see cref="AnimationFrameSave.TextureName"/>),
-        /// used instead of reading a PNG header from disk when converting Pixel coordinates to UV. Needed on the
-        /// browser-wasm build, which has no filesystem to read texture headers from but already decodes every
-        /// dropped/picked PNG into memory. Sizes not present here still fall back to a disk read.
-        /// </param>
+        /// <param name="preParsed">Already-parsed content (e.g. a file the caller already read to check
+        /// for a UV-to-Pixel conversion), skipping the disk read.</param>
         public void LoadAnimationChain(
             FilePath fileName,
-            AnimationChainListSave? preParsed = null,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
+            AnimationChainListSave? preParsed = null)
         {
             AnimationChainListSave acls;
             if (preParsed != null)
             {
-                // Caller already has the parsed content (e.g. fetched over HTTP with no local
-                // filesystem, as on the browser-wasm build) — nothing to read from disk, so the
+                // Caller already has the parsed content -- nothing to read from disk, so the
                 // existence check below only applies to the "read fileName ourselves" path.
                 acls = preParsed;
             }
@@ -178,8 +159,7 @@ namespace AnimationEditor.Core
             }
 
             OnDiskCoordinateType = acls.CoordinateType;
-            _knownTextureSizes = knownTextureSizes;
-            NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath, knownTextureSizes);
+            ConvertCoordinates(acls, fileName.GetDirectoryContainingThis().FullPath, TextureCoordinateType.UV);
 
             AnimationChainListSave = acls;
             FileName = fileName.FullPath;
@@ -205,29 +185,10 @@ namespace AnimationEditor.Core
                 ReferencedPngs = new FilePath[0];
         }
 
-        /// <summary>
-        /// The editor's rendering and inspector code assumes UV (0–1) frame coordinates
-        /// throughout. .achx files saved with <c>CoordinateType=Pixel</c> store raw pixel
-        /// coordinates instead, so we read the texture dimensions for each unique
-        /// <see cref="AnimationFrameSave.TextureName"/> and divide. PNG headers are
-        /// parsed directly to avoid pulling an image-decode dependency into Core, except
-        /// for sizes already supplied via <paramref name="knownTextureSizes"/>.
-        /// </summary>
-        private static void NormalizeCoordinatesToUv(
-            AnimationChainListSave acls,
-            string achxDirectory,
-            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
-        {
-            Dictionary<string, (int W, int H)>? seedCache = null;
-            if (knownTextureSizes != null)
-            {
-                seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
-                foreach (var entry in knownTextureSizes)
-                    seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
-            }
-
-            ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV, seedCache);
-        }
+        // The editor's rendering and inspector code assumes UV (0–1) frame coordinates throughout.
+        // .achx files saved with CoordinateType=Pixel store raw pixel coordinates instead, so load
+        // converts them via ConvertCoordinates, which reads each texture's PNG header directly to
+        // avoid pulling an image-decode dependency into Core.
 
         /// <summary>
         /// Save the current animation chain list to <paramref name="targetPath"/>, as .achj
@@ -276,113 +237,9 @@ namespace AnimationEditor.Core
             }
         }
 
-        /// <summary>
-        /// Save the current animation chain list to <paramref name="stream"/> -- the seam the
-        /// browser-wasm build needs, since it has no filesystem to write a path to. Written as
-        /// .achj (JSON) when <see cref="FileName"/> ends in .achj, otherwise .achx (XML), in the
-        /// coordinate format specified by <see cref="OnDiskCoordinateType"/>. When converting UV
-        /// back to Pixel, texture sizes come from the <c>knownTextureSizes</c> supplied to the
-        /// most recent <see cref="LoadAnimationChain"/> call rather than a disk read: there is no
-        /// directory to resolve a relative <see cref="AnimationFrameSave.TextureName"/> against
-        /// on this overload. A texture missing from that dictionary is left in UV coordinates,
-        /// same as the path-based overload's behavior when a PNG can't be read.
-        /// </summary>
-        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
-        /// see <see cref="SaveAnimationChainList(string)"/>'s matching exception doc.</exception>
-        public void SaveAnimationChainList(Stream stream)
-        {
-            ThrowIfNativeTsxProject();
-
-            var acls = AnimationChainListSave;
-            if (acls == null) return;
-
-            RunWithDiskCoordinateConversion(acls, () =>
-            {
-                if (IsJsonPath(FileName)) acls.SaveJson(stream); else acls.Save(stream);
-            });
-        }
-
-        /// <summary>
-        /// Async counterpart to <see cref="SaveAnimationChainList(Stream)"/> for destination
-        /// streams that only support async writes -- the browser-wasm build's
-        /// <c>IStorageFile.OpenWriteAsync()</c> stream throws on a synchronous write, which
-        /// <see cref="AnimationChainListSave.Save(Stream)"/> would otherwise trigger from inside
-        /// <c>XmlWriter.Dispose()</c>. See <see cref="AnimationChainListSave.SaveAsync"/>.
-        /// </summary>
-        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
-        /// see <see cref="SaveAnimationChainList(string)"/>'s matching exception doc.</exception>
-        public async Task SaveAnimationChainListAsync(Stream stream)
-        {
-            ThrowIfNativeTsxProject();
-
-            var acls = AnimationChainListSave;
-            if (acls == null) return;
-
-            await RunWithDiskCoordinateConversionAsync(acls,
-                () => IsJsonPath(FileName) ? acls.SaveJsonAsync(stream) : acls.SaveAsync(stream));
-        }
-
         /// <summary>True when <paramref name="path"/> has a .achj (JSON) extension; false for .achx or anything else.</summary>
         internal static bool IsJsonPath(string? path) =>
             !string.IsNullOrEmpty(path) && new FilePath(path).Extension == "achj";
-
-        /// <summary>
-        /// Converts <paramref name="acls"/> to <see cref="OnDiskCoordinateType"/> (using
-        /// <see cref="_knownTextureSizes"/> in place of a directory read), runs
-        /// <paramref name="save"/>, then converts back to UV so the in-memory model is
-        /// unaffected. Skips the conversion round-trip entirely when the disk format is already
-        /// UV. Shared by the sync and async stream-save overloads.
-        /// </summary>
-        private void RunWithDiskCoordinateConversion(AnimationChainListSave acls, Action save)
-        {
-            var diskFormat = OnDiskCoordinateType;
-            if (diskFormat == TextureCoordinateType.UV)
-            {
-                save();
-                return;
-            }
-
-            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, BuildSeedCache());
-            try
-            {
-                save();
-            }
-            finally
-            {
-                ConvertCoordinates(acls, achxDirectory: string.Empty, TextureCoordinateType.UV, sizes);
-            }
-        }
-
-        /// <summary>Async twin of <see cref="RunWithDiskCoordinateConversion"/>.</summary>
-        private async Task RunWithDiskCoordinateConversionAsync(AnimationChainListSave acls, Func<Task> save)
-        {
-            var diskFormat = OnDiskCoordinateType;
-            if (diskFormat == TextureCoordinateType.UV)
-            {
-                await save();
-                return;
-            }
-
-            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, BuildSeedCache());
-            try
-            {
-                await save();
-            }
-            finally
-            {
-                ConvertCoordinates(acls, achxDirectory: string.Empty, TextureCoordinateType.UV, sizes);
-            }
-        }
-
-        private Dictionary<string, (int W, int H)>? BuildSeedCache()
-        {
-            if (_knownTextureSizes == null) return null;
-
-            var seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in _knownTextureSizes)
-                seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
-            return seedCache;
-        }
 
         /// <summary>
         /// Convert <paramref name="acls"/> to <paramref name="target"/> coordinate space
@@ -476,10 +333,8 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
-        /// Resolves <paramref name="textureName"/> to a pixel size via <paramref name="sizeCache"/>
-        /// (including the bare-filename fallback for callers -- e.g. #768's browser path -- that key
-        /// the cache by leaf name instead of the frame's own <c>TextureName</c>), falling back to a
-        /// PNG header read under <paramref name="achxDirectory"/>. Returns <see langword="false"/>
+        /// Resolves <paramref name="textureName"/> to a pixel size via <paramref name="sizeCache"/>,
+        /// falling back to a PNG header read under <paramref name="achxDirectory"/>. Returns <see langword="false"/>
         /// without touching <paramref name="sizeCache"/> when neither resolves.
         /// </summary>
         private static bool TryResolveTextureSize(
@@ -489,9 +344,6 @@ namespace AnimationEditor.Core
             out (int W, int H) size)
         {
             if (sizeCache.TryGetValue(textureName, out size)) return true;
-
-            var bareName = System.IO.Path.GetFileName(textureName);
-            if (bareName != textureName && sizeCache.TryGetValue(bareName, out size)) return true;
 
             var path = System.IO.Path.IsPathRooted(textureName)
                 ? textureName
@@ -1127,20 +979,12 @@ namespace AnimationEditor.Core
         }
 
         /// <inheritdoc/>
-        public object? CaptureTextureSizeState() => _knownTextureSizes;
-
-        /// <inheritdoc/>
-        public void RestoreTextureSizeState(object? state) =>
-            _knownTextureSizes = state as IReadOnlyDictionary<string, (int Width, int Height)>;
-
-        /// <inheritdoc/>
         public void ResetToBlankDocument()
         {
             AnimationChainListSave = new AnimationChainListSave();
             FileName = null;
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
             RestoreTsxState(null);
-            RestoreTextureSizeState(null);
             ReferencedPngs = new FilePath[0];
         }
 

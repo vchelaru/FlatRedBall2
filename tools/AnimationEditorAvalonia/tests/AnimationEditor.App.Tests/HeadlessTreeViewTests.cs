@@ -316,8 +316,8 @@ public class HeadlessTreeViewTests
             var headers = ContextMenuHeaders(window);
             Assert.Contains("Flip Horizontally", headers);
             Assert.Contains("Flip Vertically",   headers);
-            Assert.Contains("^  Move Up",         headers);
-            Assert.Contains("v  Move Down",        headers);
+            Assert.Contains("Move Up",         headers);
+            Assert.Contains("Move Down",        headers);
         }
         finally { window.Close(); }
     }
@@ -341,10 +341,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -370,10 +370,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",            headers);
-            Assert.Contains("vv Move To Bottom",       headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.Contains("Move Down",            headers);
+            Assert.Contains("Move To Bottom",       headers);
         }
         finally { window.Close(); }
     }
@@ -399,10 +399,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",          headers);
-            Assert.Contains("^  Move Up",              headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",          headers);
+            Assert.Contains("Move Up",              headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -449,10 +449,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -482,10 +482,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.DoesNotContain("^^ Move To Top",   headers);
-            Assert.DoesNotContain("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",            headers);
-            Assert.Contains("vv Move To Bottom",       headers);
+            Assert.DoesNotContain("Move To Top",   headers);
+            Assert.DoesNotContain("Move Up",        headers);
+            Assert.Contains("Move Down",            headers);
+            Assert.Contains("Move To Bottom",       headers);
         }
         finally { window.Close(); }
     }
@@ -515,10 +515,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",          headers);
-            Assert.Contains("^  Move Up",              headers);
-            Assert.DoesNotContain("v  Move Down",      headers);
-            Assert.DoesNotContain("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",          headers);
+            Assert.Contains("Move Up",              headers);
+            Assert.DoesNotContain("Move Down",      headers);
+            Assert.DoesNotContain("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -548,10 +548,10 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("^^ Move To Top",   headers);
-            Assert.Contains("^  Move Up",        headers);
-            Assert.Contains("v  Move Down",      headers);
-            Assert.Contains("vv Move To Bottom", headers);
+            Assert.Contains("Move To Top",   headers);
+            Assert.Contains("Move Up",        headers);
+            Assert.Contains("Move Down",      headers);
+            Assert.Contains("Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
@@ -709,7 +709,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.Shapes.Add(circle);
+            frame.ShapesSave.Add(circle);
             var chain  = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -751,7 +751,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.Shapes.Add(rect);
+            frame.ShapesSave.Add(rect);
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -1214,7 +1214,7 @@ public class HeadlessTreeViewTests
 
             var walk = new AnimationChainSave { Name = "walkLeft" };
             var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-            frame.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+            frame.ShapesSave.Add(new AARectSave { Name = "HitBox" });
             walk.Frames.Add(frame);
             var idle = new AnimationChainSave { Name = "Idle" };
 
@@ -1234,6 +1234,41 @@ public class HeadlessTreeViewTests
             Assert.False(idleNode.PinnedVisible);
         }
         finally { window.Close(); }
+    }
+
+    // #1290: a frame node's expand toggle must reach the companion file, like a chain's does.
+    [AvaloniaFact]
+    public void ExpandingFrameNode_SavesFrameToCompanionFile()
+    {
+        var (window, ctx) = CreateWindow();
+        var tempFile = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), $"AE1290_{Guid.NewGuid():N}.achx");
+        try
+        {
+            ctx.ProjectManager.FileName = tempFile;
+
+            var walk = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+            frame.ShapesSave.Add(new AARectSave { Name = "HitBox" });
+            walk.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            GetRoots(GetTree(window))[0].Children[0].IsExpanded = true;
+
+            var saved = ctx.IoManager.TryLoadCompanionSettings(tempFile);
+            var entry = Assert.Single(saved!.ExpandedFrames);
+            Assert.Equal("Walk", entry.ChainName);
+            Assert.Equal(0, entry.FrameIndex);
+        }
+        finally
+        {
+            window.Close();
+            foreach (var f in System.IO.Directory.GetFiles(System.IO.Path.GetTempPath(), System.IO.Path.GetFileNameWithoutExtension(tempFile) + "*"))
+                System.IO.File.Delete(f);
+        }
     }
 
     [AvaloniaFact]

@@ -243,6 +243,9 @@ public class AnimationChainListSave
     /// The <c>&lt;ShapeCollectionSave&gt;</c> wrapper is written only when a frame's
     /// <see cref="AnimationFrameSave.ShapesSave"/> is non-null, mirroring whether the source frame
     /// had one (some FRB1 files omit it for shapeless frames, others write an empty one).
+    /// Frame <see cref="AnimationFrameSave.Events"/> (an FRB2 extension) are written last in the frame as
+    /// <c>&lt;Events&gt;&lt;Event&gt;&lt;Name/&gt;&lt;Data/&gt;&lt;/Event&gt;&lt;/Events&gt;</c>, only when the frame has any;
+    /// <c>Data</c> is omitted when <c>null</c>.
     /// AxisAlignedCubeSaves and SphereSaves are FRB1 3D placeholders FRB2 does not model — always
     /// emitted empty for dialect parity.
     /// </remarks>
@@ -393,6 +396,17 @@ public class AnimationChainListSave
         if (frame.Alpha.HasValue) obj["alpha"] = frame.Alpha.Value;
         if (frame.ColorOperation.HasValue) obj["colorOperation"] = frame.ColorOperation.Value.ToString();
         if (frame.ShapesSave is { } shapes) obj["shapes"] = WriteShapesJson(shapes);
+        if (frame.Events.Count > 0)
+        {
+            var eventsArray = new JsonArray();
+            foreach (var frameEvent in frame.Events)
+            {
+                var eventObj = new JsonObject { ["name"] = frameEvent.Name };
+                if (frameEvent.Data != null) eventObj["data"] = frameEvent.Data;
+                eventsArray.Add((JsonNode)eventObj);
+            }
+            obj["events"] = eventsArray;
+        }
         return obj;
     }
 
@@ -501,6 +515,20 @@ public class AnimationChainListSave
         // zero shapes). Mirror whichever the source used instead of injecting or dropping it.
         if (frame.ShapesSave is { } shapes)
             el.Add(WriteShapes(shapes));
+
+        // FRB2 extension with no FRB1 precedent: written last, and only when present, so frames
+        // without events stay byte-identical and FRB1's XmlSerializer skips it as an unknown element.
+        if (frame.Events.Count > 0)
+        {
+            var eventsEl = new XElement("Events");
+            foreach (var frameEvent in frame.Events)
+            {
+                var eventEl = new XElement("Event", new XElement("Name", frameEvent.Name));
+                if (frameEvent.Data != null) eventEl.Add(new XElement("Data", frameEvent.Data));
+                eventsEl.Add(eventEl);
+            }
+            el.Add(eventsEl);
+        }
         return el;
     }
 
@@ -525,7 +553,7 @@ public class AnimationChainListSave
         {
             var pointsEl = new XElement("Points");
             foreach (var v in p.Points)
-                pointsEl.Add(new XElement("Vector2Save",
+                pointsEl.Add(new XElement("Point",
                     new XElement("X", FloatStr(v.X)),
                     new XElement("Y", FloatStr(v.Y))));
             polysEl.Add(new XElement("PolygonSave",
@@ -601,6 +629,15 @@ public class AnimationChainListSave
         if (shapesEl != null)
             frame.ShapesSave = ParseShapes(shapesEl);
 
+        var eventsEl = el.Element("Events");
+        if (eventsEl != null)
+            foreach (var eventEl in eventsEl.Elements("Event"))
+                frame.Events.Add(new AnimationFrameEvent
+                {
+                    Name = (string?)eventEl.Element("Name") ?? string.Empty,
+                    Data = (string?)eventEl.Element("Data"),
+                });
+
         return frame;
     }
 
@@ -632,7 +669,7 @@ public class AnimationChainListSave
                     ScaleY = FloatEl(r, "ScaleY", 16f),
                 };
                 ReadColor(r, rect);
-                shapes.Shapes.Add(rect);
+                shapes.Add(rect);
             }
         }
 
@@ -650,11 +687,11 @@ public class AnimationChainListSave
                 var pointsEl = p.Element("Points");
                 if (pointsEl != null)
                 {
-                    foreach (var v in pointsEl.Elements("Vector2Save"))
+                    foreach (var v in pointsEl.Elements("Point"))
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
-                shapes.Shapes.Add(poly);
+                shapes.Add(poly);
             }
         }
 
@@ -671,7 +708,7 @@ public class AnimationChainListSave
                     Radius = FloatEl(c, "Radius", 16f),
                 };
                 ReadColor(c, circle);
-                shapes.Shapes.Add(circle);
+                shapes.Add(circle);
             }
         }
 
@@ -700,7 +737,7 @@ public class AnimationChainListSave
                         ScaleY = FloatEl(child, "ScaleY", 16f),
                     };
                     ReadColor(child, rect);
-                    shapes.Shapes.Add(rect);
+                    shapes.Add(rect);
                     break;
                 case "CircleSave":
                     var circle = new CircleSave
@@ -711,7 +748,7 @@ public class AnimationChainListSave
                         Radius = FloatEl(child, "Radius", 16f),
                     };
                     ReadColor(child, circle);
-                    shapes.Shapes.Add(circle);
+                    shapes.Add(circle);
                     break;
                 case "PolygonSave":
                     var poly = new PolygonSave
@@ -725,7 +762,7 @@ public class AnimationChainListSave
                         foreach (var v in pointsEl.Elements("Vector2Save"))
                             poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                     ReadColor(child, poly);
-                    shapes.Shapes.Add(poly);
+                    shapes.Add(poly);
                     break;
             }
         }
@@ -831,6 +868,15 @@ public class AnimationChainListSave
         if (el["shapes"] is JsonObject shapesObj)
             frame.ShapesSave = ParseShapesJson(shapesObj);
 
+        if (el["events"] is JsonArray eventsArray)
+            foreach (var eventNode in eventsArray)
+                if (eventNode is JsonObject eventObj)
+                    frame.Events.Add(new AnimationFrameEvent
+                    {
+                        Name = eventObj["name"]?.GetValue<string>() ?? string.Empty,
+                        Data = eventObj["data"]?.GetValue<string>(),
+                    });
+
         return frame;
     }
 
@@ -852,7 +898,7 @@ public class AnimationChainListSave
                     ScaleY = FloatProp(r, "scaleY", 16f),
                 };
                 ReadColorJson(r, rect);
-                shapes.Shapes.Add(rect);
+                shapes.Add(rect);
             }
         }
 
@@ -869,7 +915,7 @@ public class AnimationChainListSave
                     Radius = FloatProp(c, "radius", 16f),
                 };
                 ReadColorJson(c, circle);
-                shapes.Shapes.Add(circle);
+                shapes.Add(circle);
             }
         }
 
@@ -891,7 +937,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
                     }
                 ReadColorJson(p, poly);
-                shapes.Shapes.Add(poly);
+                shapes.Add(poly);
             }
         }
 

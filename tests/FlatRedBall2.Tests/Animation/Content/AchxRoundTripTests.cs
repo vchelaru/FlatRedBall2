@@ -164,7 +164,7 @@ public class AchxRoundTripTests
         frame.ShapesSave = new ShapesSave();
         var poly = new PolygonSave { Name = "Dot", X = 0, Y = 0 };
         poly.Points.Add(new Vector2Save { X = 5, Y = 7 });
-        frame.ShapesSave.Shapes.Add(poly);
+        frame.ShapesSave.Add(poly);
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 

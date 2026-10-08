@@ -35,4 +35,8 @@
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 
+  <!-- ProjectReference does not auto-import build/*.targets; this one serves KNI's
+       js/streamProcessor2.js, without which DynamicSoundEffectInstance 404s in the browser. -->
+  <Import Project="..\..\..\src\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />
+
 </Project>

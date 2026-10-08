@@ -21,8 +21,8 @@ namespace AnimationEditor.Core.Models
     }
 
     /// <summary>
-    /// Host-agnostic orchestration of the AnimationEditor's open tabs, shared by the desktop
-    /// and browser hosts. Owns the "leaving tab" capture couplet and "ensure a tab exists for
+    /// UI-free orchestration of the AnimationEditor's open tabs, kept in Core so it can be
+    /// unit-tested. Owns the "leaving tab" capture couplet and "ensure a tab exists for
     /// the current document" logic; broader tab-switch/close sequencing migrates here
     /// incrementally (issue #714).
     /// </summary>
@@ -34,9 +34,8 @@ namespace AnimationEditor.Core.Models
         private readonly TabManager _tabManager;
 
         /// <param name="captureTreeExpandState">
-        /// Host callback returning the live tree's current expand state. Kept as a callback
-        /// because the two hosts render the tree with different controls (desktop reads its
-        /// <c>_treeRoots</c>; browser reads its <c>AnimationTreeControl</c>).
+        /// Callback returning the live tree's current expand state (<c>MainWindow</c> reads its
+        /// <c>_treeRoots</c>). A callback so Core stays free of the UI's tree types.
         /// </param>
         public TabController(
             IUndoManager undoManager,

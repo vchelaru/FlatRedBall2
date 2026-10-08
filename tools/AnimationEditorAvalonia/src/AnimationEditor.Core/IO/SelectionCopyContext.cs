@@ -170,7 +170,10 @@ public static class SelectionCopyContext
             }
         }
 
-        payload = new CopySelectionPayload { Kind = CopySelectionKind.Shape, Shapes = shapes };
+        // Selection order follows click order; the payload follows the frame's order so
+        // paste and duplicate keep the source order (#1323).
+        var ordered = shapes.OrderBy(s => parent!.ShapesSave!.IndexOf(s)).ToList();
+        payload = new CopySelectionPayload { Kind = CopySelectionKind.Shape, Shapes = ordered };
         return true;
     }
 

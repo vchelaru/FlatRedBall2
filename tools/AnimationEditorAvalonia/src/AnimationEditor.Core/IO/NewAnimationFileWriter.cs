@@ -6,9 +6,8 @@ using System.IO;
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
-/// Writes the empty animation chain list that "New Animation File" creates (issue #1018). Stream-
-/// based so desktop and the browser share it -- one writes a <c>FileStream</c>, the other an
-/// <see cref="IEditorFile"/> stream.
+/// Writes the empty animation chain list that "New Animation File" creates (issue #1018).
+/// Stream-based so tests can write to memory instead of disk.
 /// </summary>
 public static class NewAnimationFileWriter
 {

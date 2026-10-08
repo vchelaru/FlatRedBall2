@@ -62,7 +62,7 @@ public class AppCommandsPolygonTests
     {
         var (ctx, frame) = FrameWithNoShapes();
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "PolygonInstance" });
+        frame.ShapesSave.Add(new AARectSave { Name = "PolygonInstance" });
 
         var polygon = AddPolygon(ctx, frame);
 
@@ -81,7 +81,7 @@ public class AppCommandsPolygonTests
         frame.ShapesSave!.Shapes.ShouldBeEmpty();
         ctx.UndoManager.Undo();
 
-        frame.ShapesSave!.Shapes.ShouldBe(new object[] { circle, polygon });
+        frame.ShapesSave!.Shapes.ShouldBe(new object[] { polygon, circle });
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class AppCommandsPolygonTests
         var before = PolygonVertices.CopyPoints(polygon);
         PolygonVertices.Set(polygon, 2, 30, 30); // the preview mutates live while dragging
 
-        ctx.AppCommands.CommitPolygonPoints(polygon, before, "Move Vertex");
+        ctx.AppCommands.CommitPolygonPoints(polygon, before, PolygonVertexEdit.Move(2));
         ctx.UndoManager.Undo();
 
         PolygonVertices.Get(polygon, 2).ShouldBe((8f, 8f));

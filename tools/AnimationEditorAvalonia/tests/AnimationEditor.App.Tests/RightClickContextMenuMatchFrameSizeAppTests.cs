@@ -92,8 +92,8 @@ public class RightClickContextMenuMatchFrameSizeAppTests
             };
             var r0 = new AARectSave { Name = "R0", X = 1f, Y = 1f };
             var r1 = new AARectSave { Name = "R1", X = 2f, Y = 2f };
-            frame.ShapesSave.Shapes.Add(r0);
-            frame.ShapesSave.Shapes.Add(r1);
+            frame.ShapesSave.Add(r0);
+            frame.ShapesSave.Add(r1);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
@@ -149,8 +149,8 @@ public class RightClickContextMenuMatchFrameSizeAppTests
             };
             var rectInA = new AARectSave { Name = "InA", X = 1f, Y = 1f };
             var rectInB = new AARectSave { Name = "InB", X = 2f, Y = 2f };
-            frameA.ShapesSave.Shapes.Add(rectInA);
-            frameB.ShapesSave.Shapes.Add(rectInB);
+            frameA.ShapesSave.Add(rectInA);
+            frameB.ShapesSave.Add(rectInB);
             chain.Frames.Add(frameA);
             chain.Frames.Add(frameB);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

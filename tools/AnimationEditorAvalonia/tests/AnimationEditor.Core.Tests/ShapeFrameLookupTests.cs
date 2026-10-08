@@ -13,7 +13,7 @@ public class ShapeFrameLookupTests
         var acls = new AnimationChainListSave();
         var chain = TestHelpers.MakeChain(acls, "Walk", 2);
         var rect = new AARectSave { Name = "A" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rect);
+        chain.Frames[0].ShapesSave!.Add(rect);
 
         var found = ShapeFrameLookup.FindFrameForShape(acls, rect);
 
@@ -39,8 +39,8 @@ public class ShapeFrameLookupTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 2);
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[1].ShapesSave!.Add(rectB);
 
         var collision = ShapeFrameLookup.HasSameFrameCollision(acls, new List<object> { rectA, rectB });
 
@@ -54,8 +54,8 @@ public class ShapeFrameLookupTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectB);
+        chain.Frames[0].ShapesSave!.Add(rectA);
+        chain.Frames[0].ShapesSave!.Add(rectB);
 
         var collision = ShapeFrameLookup.HasSameFrameCollision(acls, new List<object> { rectA, rectB });
 
@@ -68,7 +68,7 @@ public class ShapeFrameLookupTests
         var acls = new AnimationChainListSave();
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var rectA = new AARectSave { Name = "A" };
-        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
+        chain.Frames[0].ShapesSave!.Add(rectA);
 
         var collision = ShapeFrameLookup.HasSameFrameCollision(acls, new List<object> { rectA });
 

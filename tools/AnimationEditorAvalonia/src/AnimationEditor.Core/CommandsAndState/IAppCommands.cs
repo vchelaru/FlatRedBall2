@@ -2,6 +2,7 @@ using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -42,11 +43,11 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? SaveAsCompleted;
 
         /// <summary>
-        /// Raised after <see cref="ExportToPixiJsAsync"/> writes a PixiJS spritesheet JSON. The first
-        /// argument is the export path; the second is a (possibly empty) list of non-fatal warnings
-        /// (e.g. dropped per-frame duration, multiple source textures) for the app layer to surface.
+        /// Raised after <see cref="ExportAsync"/> writes an export file. The first argument is the
+        /// export path; the second is a (possibly empty) list of non-fatal warnings (e.g. data the
+        /// format can't carry, textures that couldn't be copied) for the app layer to surface.
         /// </summary>
-        event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+        event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <summary>
         /// Raised after <see cref="SaveCurrentAnimationChainList"/> saves a native tsx project
@@ -181,7 +182,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// A failure is reported through <see cref="SaveFailed"/>.
         /// </summary>
         void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
-        Task ExportToPixiJsAsync();
+        Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);
@@ -298,6 +299,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
+        /// <summary>Moves <paramref name="shape"/> to <paramref name="insertIndex"/> (a position in the current shape list, clamped to its type group). No-op when the order is unchanged.</summary>
+        void MoveShapeToIndex(object shape, AnimationFrameSave frame, int insertIndex);
         void HandleReorder(int delta);
         /// <summary>
         /// Sets the horizontal/vertical/diagonal flip flags on every frame in <paramref name="frames"/>
@@ -372,6 +375,23 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
         /// <summary>
+        /// Appends an event named <paramref name="name"/> to <paramref name="frame"/>'s
+        /// <see cref="AnimationFrameSave.Events"/>. Undoable. No-op on a locked frame or in a native
+        /// tsx project (a Tiled tile animation can't hold events).
+        /// </summary>
+        void AddFrameEvent(AnimationFrameSave frame, string name);
+
+        /// <summary>
+        /// Replaces the name and data of the event at <paramref name="index"/>. Blank
+        /// <paramref name="data"/> is stored as <c>null</c> so it is omitted from the file. Undoable;
+        /// records nothing when both values are unchanged. Same no-op guards as <see cref="AddFrameEvent"/>.
+        /// </summary>
+        void SetFrameEvent(AnimationFrameSave frame, int index, string name, string? data);
+
+        /// <summary>Removes the event at <paramref name="index"/>. Undoable. Same no-op guards as <see cref="AddFrameEvent"/>.</summary>
+        void RemoveFrameEvent(AnimationFrameSave frame, int index);
+
+        /// <summary>
         /// Assigns <paramref name="textureName"/> to every frame in <paramref name="frames"/>
         /// as a single undoable operation — the multi-select counterpart to the single-frame
         /// overload, mirroring <see cref="SetFrameLength"/> and friends. No-op when
@@ -385,7 +405,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
 
-        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength);
+        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, NumericEdit newLength);
 
         /// <summary>
         /// Sets RelativeX/Y on every frame in <paramref name="frames"/>. Either axis may be
@@ -394,10 +414,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// color channels, there is no legitimate "clear to null" target for this field, so <c>null</c>
         /// unambiguously means "don't touch".
         /// </summary>
-        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY);
-        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
+        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? newRelX, NumericEdit? newRelY);
+        /// <summary>Edits R/G/B on every frame. Results clamp to -255..255; a relative edit on an
+        /// unset channel starts from the value it inherits.</summary>
+        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit red, ChannelEdit green, ChannelEdit blue);
         void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
-        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
+        /// <summary>Edits alpha on every frame. Results clamp to 0..255; a relative edit on an unset
+        /// alpha starts from the value it inherits (255 if none).</summary>
+        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha);
 
         /// <summary>
         /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the
@@ -405,7 +429,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// inspector field is showing "(mixed)" and the user only edited one of the four. See
         /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
-        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 
@@ -428,10 +452,33 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Records an edit the caller already applied to <paramref name="polygon"/>'s points (a live
-        /// vertex drag) as one undo entry whose undo restores <paramref name="pointsBefore"/>. In a
-        /// locked chain the points are put back and nothing is recorded.
+        /// vertex drag, described by <paramref name="edit"/>) as one undo entry whose undo restores
+        /// <paramref name="pointsBefore"/>. In a locked chain the points are put back and nothing is
+        /// recorded.
         /// </summary>
-        void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, string description);
+        /// <remarks>
+        /// This and the other vertex edits (<see cref="MovePolygonVertex"/>,
+        /// <see cref="InsertPolygonVertex"/>, <see cref="DeletePolygonVertex"/>) repeat on every other
+        /// selected polygon with the same vertex count, in that polygon's local space: a move adds the
+        /// same delta to the same vertex index, an insert lands at that polygon's own edge midpoint
+        /// plus the same offset. Different vertex counts are skipped and reported through
+        /// <see cref="Notified"/>. The whole batch is one undo entry.
+        /// </remarks>
+        void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit);
+
+        /// <summary>
+        /// Mirrors <paramref name="polygon"/>'s points left-to-right about the center of their
+        /// bounds, so the shape stays in place and its origin is untouched. When the polygon is part
+        /// of a polygon multi-selection the whole selection flips, each about its own center, in one
+        /// undo entry. Locked polygons are skipped.
+        /// </summary>
+        void FlipPolygonHorizontally(PolygonSave polygon);
+
+        /// <summary>The top-to-bottom counterpart of <see cref="FlipPolygonHorizontally"/>.</summary>
+        void FlipPolygonVertically(PolygonSave polygon);
+
+        /// <summary>A one-line message for the user about an edit that only partly applied.</summary>
+        event Action<string>? Notified;
 
         /// <summary>
         /// Sets Name/X/Y/ScaleX/ScaleY on every rectangle in <paramref name="rects"/> as a single
@@ -444,7 +491,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="HasSameFrameNameCollision"/> before passing a non-null name for a multi-selection.
         /// See <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
-        void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, float? x, float? y, float? scaleX, float? scaleY);
+        void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, NumericEdit? x, NumericEdit? y, NumericEdit? scaleX, NumericEdit? scaleY);
 
         /// <summary>
         /// Sets Name/X/Y/Radius on every circle in <paramref name="circles"/> as a single undoable
@@ -452,7 +499,15 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="SetRectPropsBulk"/> for the null-means-"don't touch" semantics and the
         /// same-frame name-collision caveat.
         /// </summary>
-        void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, float? x, float? y, float? radius);
+        void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, NumericEdit? x, NumericEdit? y, NumericEdit? radius);
+
+        /// <summary>
+        /// Sets Name/X/Y on every polygon in <paramref name="polygons"/> as one undoable operation —
+        /// the multi-select counterpart to <see cref="SetPolygonProps"/>. Points are untouched (see
+        /// <see cref="MovePolygonVertex"/> for the vertex fan-out). See <see cref="SetRectPropsBulk"/>
+        /// for the null-means-"don't touch" semantics and the same-frame name-collision caveat.
+        /// </summary>
+        void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons, string? name, NumericEdit? x, NumericEdit? y);
 
         /// <summary>
         /// Ends the current edit session for the coalescing NumericUpDown fields (rect/circle

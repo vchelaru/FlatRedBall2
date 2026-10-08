@@ -8,9 +8,8 @@ namespace AnimationEditor.Core.IO;
 /// Builds the disk cache file name for a project-tree thumbnail (issue #839). <paramref
 /// name="sourceIdentity"/> is hashed only to keep the file name filesystem-safe; the invalidation
 /// key is <paramref name="size"/>/<paramref name="modified"/> plus <see cref="RenderVersion"/>,
-/// plainly embedded in the name. Size/Modified are the same <see cref="FolderEntrySnapshot"/> pair
-/// <c>FolderSnapshotDiff</c> and the hot-reload watcher already use elsewhere in this codebase, and
-/// cover a changed source; <see cref="RenderVersion"/> covers a changed renderer. A cache lookup is
+/// plainly embedded in the name. Size/Modified (a <see cref="FolderEntrySnapshot"/> pair) cover a
+/// changed source; <see cref="RenderVersion"/> covers a changed renderer. A cache lookup is
 /// a filename match, so drift in any of the three produces a different name, i.e. a cache miss that
 /// regenerates the thumbnail.
 /// </summary>
@@ -31,7 +30,7 @@ public static class AchxThumbnailCacheKey
     /// <param name="sourceIdentity">
     /// A string that identifies the source <c>.achx</c>. Callers pass <c>AchxFileEntry.RelativePath</c>
     /// (relative to the scanned Open Project Folder root) rather than a real absolute path --
-    /// <c>IEditorFolder</c> has no stable absolute identity on the browser build. Two different
+    /// <c>IEditorFolder</c> exposes no absolute identity. Two different
     /// projects could theoretically share a relative path, but a collision also needs matching
     /// <paramref name="size"/>/<paramref name="modified"/> to actually serve a wrong thumbnail,
     /// and even then it self-corrects the next time either file changes.

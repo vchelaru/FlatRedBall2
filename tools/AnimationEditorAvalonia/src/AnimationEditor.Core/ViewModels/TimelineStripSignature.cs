@@ -1,5 +1,4 @@
 using System;
-using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.ViewModels;

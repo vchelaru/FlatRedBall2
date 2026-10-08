@@ -31,7 +31,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             _createdShapesSave = _frame.ShapesSave is null;
             _frame.ShapesSave ??= new ShapesSave();
-            _frame.ShapesSave.Shapes.Add(_shape);
+            _frame.ShapesSave.Add(_shape);
             Refresh();
             _selectedState.SelectShape(_shape);
             return true;
@@ -39,7 +39,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            _frame.ShapesSave!.Shapes.Remove(_shape);
+            _frame.ShapesSave!.Remove(_shape);
             // A frame that had no shapes before goes back to none: an empty collection still
             // serializes as a <ShapeCollectionSave> block, which would make the undo change the file.
             if (_createdShapesSave)

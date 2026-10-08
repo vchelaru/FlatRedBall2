@@ -66,6 +66,12 @@ public abstract class AnimationFrameBase
     /// </summary>
     public List<AnimationShapeFrame> Shapes { get; } = new();
 
+    /// <summary>
+    /// Named events raised through <see cref="AnimationPlayer{TFrame}.FrameEventRaised"/> when playback
+    /// enters this frame. See that event for skipped-frame, loop, and frame-0 semantics.
+    /// </summary>
+    public List<AnimationFrameEvent> Events { get; } = new();
+
     /// <summary>The pixel-coordinate region of the texture to render. <c>null</c> means the entire texture.</summary>
     public PixelRectangle? SourceRectangle;
 }

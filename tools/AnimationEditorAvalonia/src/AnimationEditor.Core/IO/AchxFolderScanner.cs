@@ -8,18 +8,26 @@ namespace AnimationEditor.Core.IO;
 /// <summary>
 /// Recursively discovers every <c>.achx</c>/<c>.achj</c>/<c>.tsx</c> under an
 /// <see cref="IEditorFolder"/> (issue #770; <c>.tsx</c> added later). Operates entirely through
-/// <see cref="IEditorFolder"/>/<see cref="IEditorFile"/> so the exact same scan drives both
-/// desktop's <c>System.IO</c> adapter and the browser's native-handle adapter. Does not itself
+/// <see cref="IEditorFolder"/>/<see cref="IEditorFile"/>, so tests can drive it with in-memory
+/// fakes instead of a real folder. Does not itself
 /// exclude <c>bin</c>/<c>obj</c> — that's <see cref="BinObjPathFilter"/>, applied by the caller
 /// (e.g. at tree-build time) so toggling the exclusion checkbox doesn't require a re-scan.
 /// </summary>
 public static class AchxFolderScanner
 {
-    public static async Task<IReadOnlyList<AchxFileEntry>> ScanAsync(IEditorFolder rootFolder)
+    public static async Task<IReadOnlyList<AchxFileEntry>> ScanAsync(IEditorFolder rootFolder) =>
+        (await ScanProjectAsync(rootFolder)).Files;
+
+    /// <summary>
+    /// Same walk as <see cref="ScanAsync(IEditorFolder)"/>, also reporting every subfolder's
+    /// relative path (#1332's "Show all folders"), including ones with no animation files.
+    /// </summary>
+    public static async Task<ProjectFolderScan> ScanProjectAsync(IEditorFolder rootFolder)
     {
-        var results = new List<AchxFileEntry>();
-        await ScanAsync(rootFolder, relativePrefix: "", results);
-        return results;
+        var files = new List<AchxFileEntry>();
+        var folderPaths = new List<string>();
+        await ScanAsync(rootFolder, relativePrefix: "", files, folderPaths);
+        return new ProjectFolderScan(files, folderPaths);
     }
 
     /// <summary>
@@ -50,7 +58,7 @@ public static class AchxFolderScanner
     public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path);
 
     private static async Task ScanAsync(
-        IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results)
+        IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results, List<string> folderPaths)
     {
         await foreach (var file in folder.GetItemsAsync())
         {
@@ -63,7 +71,8 @@ public static class AchxFolderScanner
         await foreach (var subfolder in folder.GetSubfoldersAsync())
         {
             var subPrefix = CombineRelativePath(relativePrefix, subfolder.Name);
-            await ScanAsync(subfolder, subPrefix, results);
+            folderPaths.Add(subPrefix);
+            await ScanAsync(subfolder, subPrefix, results, folderPaths);
         }
     }
 
@@ -71,10 +80,14 @@ public static class AchxFolderScanner
         prefix.Length == 0 ? name : prefix + "/" + name;
 }
 
+/// <summary>Result of <see cref="AchxFolderScanner.ScanProjectAsync"/>: the animation files plus
+/// every subfolder's forward-slash path relative to the scanned root.</summary>
+public sealed record ProjectFolderScan(IReadOnlyList<AchxFileEntry> Files, IReadOnlyList<string> FolderPaths);
+
 /// <summary>
 /// One discovered <c>.achx</c>: its file handle, the <see cref="IEditorFolder"/> it was found
-/// directly inside (needed on the web to resolve its sibling textures — see
-/// <c>BrowserProjectLoader.TryLoadAsync</c>), and its path relative to the scanned root.
+/// directly inside (used to resolve its frames' relative texture paths for thumbnails), and its
+/// path relative to the scanned root.
 /// </summary>
 public sealed record AchxFileEntry(IEditorFile File, IEditorFolder ParentFolder, string RelativePath)
 {

@@ -17,8 +17,7 @@
     Only the .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave,
     ColorOperation, etc.) is referenced, not the full FlatRedBall2.csproj engine. That project
     pulls in MonoGame.Framework.DesktopGL (net10.0) or KNI (net8.0), neither of which this editor
-    (Avalonia, not MonoGame) needs or can build against on every target (e.g. browser-wasm). See
-    tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md.
+    (Avalonia, not MonoGame) needs.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\AnimationChain.Common\AnimationChain.Common.csproj" />

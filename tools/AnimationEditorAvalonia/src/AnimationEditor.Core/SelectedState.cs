@@ -40,6 +40,10 @@ namespace AnimationEditor.Core
             set
             {
                 _selectedChain = value;
+                // A chain picked outside the tree (e.g. a texture dropped onto it) replaces the
+                // multi-select bag; commands that set SelectedNodes first keep theirs.
+                if (value != null && !_selectedNodes.Contains(value))
+                    _selectedNodes = new List<object>();
                 _selectedFrame = null;
                 _selectedRectangle = null;
                 _selectedCircle = null;
@@ -138,6 +142,23 @@ namespace AnimationEditor.Core
             }
         }
 
+        public List<AnimationChainSave> PreviewChains
+        {
+            get
+            {
+                var chains = new List<AnimationChainSave>();
+                foreach (var node in _selectedNodes)
+                {
+                    var chain = node as AnimationChainSave
+                        ?? (node is AnimationFrameSave frame ? FindChainForFrame(frame) : null)
+                        ?? (node is ShapeSave shape ? FindChainForShape(shape) : null);
+                    if (chain is not null && !chains.Contains(chain))
+                        chains.Add(chain);
+                }
+                return chains;
+            }
+        }
+
         public List<AARectSave> SelectedRectangles
         {
             get
@@ -230,6 +251,16 @@ namespace AnimationEditor.Core
         {
             get => mSnapshot;
             set => mSnapshot = value;
+        }
+
+        private AnimationChainSave? FindChainForShape(ShapeSave shape)
+        {
+            if (AnimationChainListSave == null) return null;
+            foreach (var chain in AnimationChainListSave.AnimationChains)
+                foreach (var frame in chain.Frames)
+                    if (frame.ShapesSave?.Shapes.Contains(shape) == true)
+                        return chain;
+            return null;
         }
 
         private AnimationChainSave? FindChainForFrame(AnimationFrameSave frame)

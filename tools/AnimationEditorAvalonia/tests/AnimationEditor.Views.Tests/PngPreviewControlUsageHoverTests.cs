@@ -115,5 +115,6 @@ public class PngPreviewControlUsageHoverTests
         public async IAsyncEnumerable<IEditorFolder> GetSubfoldersAsync() { yield break; }
 #pragma warning restore CS1998
         public Task<IEditorFile?> GetFileAsync(string name) => Task.FromResult<IEditorFile?>(null);
+        public Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath) => GetFileAsync(relativePath);
     }
 }

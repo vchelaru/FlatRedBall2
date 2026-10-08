@@ -235,7 +235,7 @@ public class GroupTimelineUiTests
     /// pauses every track, without touching the singular SelectedFrame (#576 scope item 6).
     /// </summary>
     [AvaloniaFact]
-    public void ClickingSecondTrackFrameCell_ScrubsOnlyThatChainAndPausesAll()
+    public void ClickingSecondTrackFrameCell_ScrubsAndPinsOnlyThatChain()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 2);
@@ -278,8 +278,82 @@ public class GroupTimelineUiTests
             var trackB = window.FindControl<AnimationEditor.App.Controls.PreviewControl>("PreviewCtrl")!.GroupTracks.First(t => t.Chain == b);
             Assert.Equal(2, trackB.Playback.CurrentFrameIndex);
             Assert.False(trackB.Playback.IsPlaying);
-            Assert.False(trackA.Playback.IsPlaying); // scrubbing pauses every track
+            Assert.True(trackA.Playback.IsPlaying); // scrubbing pins only the scrubbed track
             Assert.Null(ctx.SelectedState.SelectedFrame); // singular selection untouched
+        }
+        finally { window.Close(); }
+    }
+
+    private static (TestServices Ctx, MainWindow Window, AnimationChainSave A, AnimationChainSave B) GroupWindow()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 3);
+        var b = MakeChain("B", 3);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(a);
+        acls.AnimationChains.Add(b);
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        LoadProjectIntoWindow(ctx, window, acls);
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+        Dispatcher.UIThread.RunJobs();
+        return (ctx, window, a, b);
+    }
+
+    private static void ClickRowButton(MainWindow window, AnimationChainSave chain)
+    {
+        var button = window.FindControl<ItemsControl>("GroupTimelineTracks")!
+            .GetVisualDescendants().OfType<Button>()
+            .First(b => b.DataContext is ChainTimelineTrackVm t && ReferenceEquals(t.Chain, chain));
+        var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void GroupRowPlayButton_PinsThatTrackOnly_AndFlipsItsIcon()
+    {
+        var (ctx, window, a, b) = GroupWindow();
+        try
+        {
+            var preview = window.FindControl<AnimationEditor.App.Controls.PreviewControl>("PreviewCtrl")!;
+            var items = (ObservableCollection<ChainTimelineTrackVm>)window.FindControl<ItemsControl>("GroupTimelineTracks")!.ItemsSource!;
+            Assert.All(items, t => Assert.True(t.IsPlaying));
+
+            ClickRowButton(window, a);
+
+            Assert.False(preview.IsTrackPlaying(a));
+            Assert.True(preview.IsTrackPlaying(b));
+            Assert.False(items.First(t => t.Chain == a).IsPlaying);
+            Assert.True(items.First(t => t.Chain == b).IsPlaying);
+            Assert.EndsWith("IconPlay.svg", items.First(t => t.Chain == a).PlayPauseIconPath);
+
+            ClickRowButton(window, a); // resume
+
+            Assert.True(preview.IsTrackPlaying(a));
+            Assert.True(items.First(t => t.Chain == a).IsPlaying);
+            Assert.EndsWith("IconPause.svg", items.First(t => t.Chain == a).PlayPauseIconPath);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void GlobalPlayPauseButton_HiddenWhileGroupShown_VisibleOtherwise()
+    {
+        var (ctx, window, a, b) = GroupWindow();
+        try
+        {
+            var button = window.FindControl<Button>("PlayPauseBtn")!;
+            Assert.False(button.IsVisible);
+
+            ctx.SelectedState.SelectedNodes = new List<object> { a };
+            Dispatcher.UIThread.RunJobs();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(button.IsVisible);
         }
         finally { window.Close(); }
     }

@@ -131,8 +131,8 @@ public class AppCommandsChainLockTests
         var unlockedFrame = unlockedChain.Frames[0];
         var lockedRect = new AARectSave { Name = "LockedRect" };
         var unlockedCircle = new CircleSave { Name = "UnlockedCircle", Radius = 10 };
-        lockedFrame.ShapesSave!.Shapes.Add(lockedRect);
-        unlockedFrame.ShapesSave!.Shapes.Add(unlockedCircle);
+        lockedFrame.ShapesSave!.Add(lockedRect);
+        unlockedFrame.ShapesSave!.Add(unlockedCircle);
 
         ctx.AppCommands.DeleteShapes(new object[] { lockedRect, unlockedCircle });
 
@@ -163,7 +163,7 @@ public class AppCommandsChainLockTests
         var sourceChain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 1);
         var sourceFrame = sourceChain.Frames[0];
         var rect = new AARectSave { Name = "Original" };
-        sourceFrame.ShapesSave!.Shapes.Add(rect);
+        sourceFrame.ShapesSave!.Add(rect);
 
         var targetChain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1);
         targetChain.IsLocked = true;
@@ -185,7 +185,7 @@ public class AppCommandsChainLockTests
         sourceChain.IsLocked = true;
         var sourceFrame = sourceChain.Frames[0];
         var rect = new AARectSave { Name = "Original" };
-        sourceFrame.ShapesSave!.Shapes.Add(rect);
+        sourceFrame.ShapesSave!.Add(rect);
 
         var targetChain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1);
         var targetFrame = targetChain.Frames[0];
@@ -206,8 +206,8 @@ public class AppCommandsChainLockTests
         frame.ShapesSave = new ShapesSave();
         var rectA = new AARectSave { Name = "A" };
         var rectB = new AARectSave { Name = "B" };
-        frame.ShapesSave.Shapes.Add(rectA);
-        frame.ShapesSave.Shapes.Add(rectB);
+        frame.ShapesSave.Add(rectA);
+        frame.ShapesSave.Add(rectB);
 
         ctx.AppCommands.MoveShape(rectA, frame, delta: 1);
 

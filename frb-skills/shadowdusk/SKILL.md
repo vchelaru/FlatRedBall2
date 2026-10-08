@@ -1,6 +1,6 @@
 ---
 name: shadowdusk
-description: Cross-platform HLSL shader compiler for MonoGame/KNI/FNA — avoids the Windows/Wine requirement. Triggers: ShadowDusk, mgfxc replacement, compiling .fx on macOS/Linux, ShadowDusk.Compiler, ShadowDuskCLI.
+description: "Cross-platform HLSL shader compiler for MonoGame/KNI/FNA — avoids the Windows/Wine requirement. Triggers: ShadowDusk, mgfxc replacement, compiling .fx on macOS/Linux, ShadowDusk.Compiler, ShadowDuskCLI."
 ---
 
 # ShadowDusk

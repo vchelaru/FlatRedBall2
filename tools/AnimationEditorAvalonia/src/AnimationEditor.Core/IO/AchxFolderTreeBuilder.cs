@@ -10,9 +10,16 @@ namespace AnimationEditor.Core.IO;
 /// </summary>
 public static class AchxFolderTreeBuilder
 {
-    public static IReadOnlyList<AchxTreeNode> Build(IReadOnlyList<AchxFileEntry> files)
+    /// <param name="files">The animation files to show.</param>
+    /// <param name="folderPaths">Extra forward-slash folder paths to show even when they contain
+    /// no files (#1332's "Show all folders"). Folders that hold a file appear regardless.</param>
+    public static IReadOnlyList<AchxTreeNode> Build(
+        IReadOnlyList<AchxFileEntry> files, IEnumerable<string>? folderPaths = null)
     {
         var root = new BuilderNode();
+        foreach (var folderPath in folderPaths ?? Array.Empty<string>())
+            root.InsertFolder(folderPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries));
+
         foreach (var file in files)
         {
             var parts = file.RelativePath.Replace('\\', '/').Split('/');
@@ -27,6 +34,17 @@ public static class AchxFolderTreeBuilder
         private readonly Dictionary<string, BuilderNode> _folders =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly List<AchxFileEntry> _files = new();
+
+        public void InsertFolder(string[] pathParts)
+        {
+            var node = this;
+            foreach (var part in pathParts)
+            {
+                if (!node._folders.TryGetValue(part, out var child))
+                    node._folders[part] = child = new BuilderNode();
+                node = child;
+            }
+        }
 
         public void Insert(string[] pathParts, AchxFileEntry file)
         {

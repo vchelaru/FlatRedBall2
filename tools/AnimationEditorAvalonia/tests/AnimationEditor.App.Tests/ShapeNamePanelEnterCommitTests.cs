@@ -36,7 +36,7 @@ public class ShapeNamePanelEnterCommitTests
             var chain = new AnimationChainSave { Name = "Walk" };
             var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
             var rect = new AARectSave { Name = "Box0" };
-            frame.ShapesSave!.Shapes.Add(rect);
+            frame.ShapesSave!.Add(rect);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
@@ -61,7 +61,7 @@ public class ShapeNamePanelEnterCommitTests
             var chain = new AnimationChainSave { Name = "Walk" };
             var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
             var circle = new CircleSave { Name = "Circ0" };
-            frame.ShapesSave!.Shapes.Add(circle);
+            frame.ShapesSave!.Add(circle);
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 

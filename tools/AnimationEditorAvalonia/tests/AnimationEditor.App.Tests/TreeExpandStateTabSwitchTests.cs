@@ -26,7 +26,7 @@ public class TreeExpandStateTabSwitchTests
         var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         var chain = new AnimationChainSave { Name = chainName };
         var frame = new AnimationFrameSave { TextureName = chainName + ".png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox" });
+        frame.ShapesSave!.Add(new AARectSave { Name = "HitBox" });
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
         acls.Save(path);

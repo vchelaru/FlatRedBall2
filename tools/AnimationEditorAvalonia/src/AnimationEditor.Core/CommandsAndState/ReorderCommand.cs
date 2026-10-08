@@ -14,7 +14,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// </summary>
     internal sealed class ReorderCommand<T> : IUndoableCommand
     {
-        private readonly IList<T> _list;
+        private readonly Func<T[]> _snapshot;
+        private readonly Action<T[]> _restore;
         private readonly Action _reorder;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
@@ -30,7 +31,28 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             IAppCommands commands, IApplicationEvents events, Action refresh,
             string description = "Reorder")
         {
-            _list = list;
+            _snapshot = list.ToArray;
+            _restore = order =>
+            {
+                list.Clear();
+                foreach (var item in order)
+                    list.Add(item);
+            };
+            _reorder = reorder;
+            _commands = commands;
+            _events = events;
+            _refresh = refresh;
+            Description = description;
+        }
+
+        /// <summary>For lists that cannot be mutated directly: <paramref name="snapshot"/> reads the order, <paramref name="restore"/> writes one back.</summary>
+        public ReorderCommand(
+            Func<T[]> snapshot, Action<T[]> restore, Action reorder,
+            IAppCommands commands, IApplicationEvents events, Action refresh,
+            string description = "Reorder")
+        {
+            _snapshot = snapshot;
+            _restore = restore;
             _reorder = reorder;
             _commands = commands;
             _events = events;
@@ -40,9 +62,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _before = _list.ToArray();
+            _before = _snapshot();
             _reorder();
-            _after = _list.ToArray();
+            _after = _snapshot();
 
             if (_before.SequenceEqual(_after)) return false;
 
@@ -55,9 +77,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private void Apply(T[] order)
         {
-            _list.Clear();
-            foreach (var item in order)
-                _list.Add(item);
+            _restore(order);
             RaiseSideEffects();
         }
 
