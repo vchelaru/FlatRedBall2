@@ -51,6 +51,8 @@ tar -xzf AnimationEditor-linux-x64.tar.gz -C AnimationEditor
 
 The **About** dialog has a **Check for Updates** button. You can also download the latest release and replace the old files.
 
+<figure><img src="../.gitbook/assets/install-about-check-for-updates.png" alt="About dialog showing the version and the Check for Updates button"><figcaption></figcaption></figure>
+
 ## Where to Go Next
 
 Once the editor is running, follow the [Quick Start](quick-start.md).
