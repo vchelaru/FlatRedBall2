@@ -211,6 +211,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetChainLocked(AnimationChainSave chain, bool locked);
 
         /// <summary>
+        /// Locks or unlocks every chain in <paramref name="chains"/> as a single undo step. Chains
+        /// already in the requested state are left out of the step.
+        /// </summary>
+        void SetChainsLocked(IReadOnlyList<AnimationChainSave> chains, bool locked);
+
+        /// <summary>
         /// Sets whether <paramref name="chain"/> loops at runtime (issue #1120). Undoable, same
         /// as <see cref="SetChainLocked"/>.
         /// </summary>

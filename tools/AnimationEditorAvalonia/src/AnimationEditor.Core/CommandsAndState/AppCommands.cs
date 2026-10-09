@@ -103,6 +103,16 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetChainLocked(AnimationChainSave chain, bool locked) =>
             _undoManager.Execute(new SetChainLockedCommand(chain, locked, this, _events));
 
+        public void SetChainsLocked(IReadOnlyList<AnimationChainSave> chains, bool locked)
+        {
+            var commands = chains
+                .Where(c => c.IsLocked != locked)
+                .Select(c => (IUndoableCommand)new SetChainLockedCommand(c, locked, this, _events))
+                .ToArray();
+            if (commands.Length == 0) return;
+            _undoManager.Execute(new CompositeCommand(commands, locked ? "Lock Animations" : "Unlock Animations"));
+        }
+
         public void SetChainLoop(AnimationChainSave chain, bool loop)
         {
             if (IsAchxOnlyEditBlocked()) return;
