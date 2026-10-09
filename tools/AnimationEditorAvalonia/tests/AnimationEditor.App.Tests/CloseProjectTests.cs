@@ -97,6 +97,37 @@ public class CloseProjectTests
         }
     }
 
+    private static bool IsCloseProjectEnabledAfterOpeningFileMenu(MainWindow window)
+    {
+        window.FindControl<MenuItem>("MenuFile")!
+              .RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent));
+        Dispatcher.UIThread.RunJobs();
+        return window.FindControl<MenuItem>("MenuCloseProject")!.IsEnabled;
+    }
+
+    // Close Project Folder does nothing without an open folder, so the menu item is disabled then.
+    [AvaloniaFact]
+    public async Task MenuCloseProject_EnabledOnlyWhileProjectFolderIsOpen()
+    {
+        var (window, ctx) = CreateWindow();
+        var dir = NewTempDir();
+        try
+        {
+            Assert.False(IsCloseProjectEnabledAfterOpeningFileMenu(window));
+
+            await window.OpenProjectFolderForTestAsync(dir);
+            Assert.True(IsCloseProjectEnabledAfterOpeningFileMenu(window));
+
+            window.CloseProjectFolder();
+            Assert.False(IsCloseProjectEnabledAfterOpeningFileMenu(window));
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
     [AvaloniaFact]
     public async Task NativeMenuCloseProjectFolder_ClearsTabsAndProjectState()
     {
