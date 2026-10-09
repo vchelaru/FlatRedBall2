@@ -2721,11 +2721,9 @@ public partial class MainWindow : Window
         {
             Title = "Open Animation Chain",
             AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("Animation Chain") { Patterns = new[] { "*.achx", "*.achj" } },
-                new FilePickerFileType("Tiled Tileset") { Patterns = new[] { "*.tsx" } },
-            }
+            FileTypeFilter = OpenFileFilters.AnimationFiles
+                .Select(f => new FilePickerFileType(f.Description) { Patterns = f.Patterns.ToArray() })
+                .ToArray()
         });
 
         if (files.Count > 0)
