@@ -411,15 +411,15 @@ public class SweepScenarioTests
         string settingsRoot = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
         using (AnimationEditorHarness editor = new AnimationEditorHarness(settingsRoot))
         {
-            editor.ClickMenu("MenuThemeDark");
-            editor.ClickMenu("MenuThemeSystem");
-            editor.Control<MenuItem>("MenuThemeSystem").IsChecked.ShouldBeTrue();
-            editor.Control<MenuItem>("MenuThemeDark").IsChecked.ShouldBeFalse();
+            editor.PickSettingsTheme("Dark");
+            editor.PickSettingsTheme("Follow System");
+            editor.IsSettingsThemeChecked("Follow System").ShouldBeTrue();
+            editor.IsSettingsThemeChecked("Dark").ShouldBeFalse();
         }
 
         using AnimationEditorHarness restarted = new AnimationEditorHarness(settingsRoot);
 
-        restarted.Control<MenuItem>("MenuThemeSystem").IsChecked.ShouldBeTrue("Follow System is remembered like the other themes");
+        restarted.IsSettingsThemeChecked("Follow System").ShouldBeTrue("Follow System is remembered like the other themes");
     }
 
     [AvaloniaFact]

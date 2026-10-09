@@ -239,17 +239,18 @@ public class PanelsScenarioTests
             first.WritePng("sheet.png", 64, 64);
             await first.OpenAsync(first.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16))));
 
-            first.ClickMenu("MenuThemeDark");
+            first.PickSettingsTheme("Light");
+            first.PickSettingsTheme("Dark");
 
             Avalonia.Application.Current!.RequestedThemeVariant.ShouldBe(ThemeVariant.Dark);
-            first.Control<MenuItem>("MenuThemeDark").IsChecked.ShouldBeTrue();
+            first.IsSettingsThemeChecked("Dark").ShouldBeTrue();
         }
 
         using AnimationEditorHarness second = new AnimationEditorHarness(settingsRoot);
         second.Wait(TimeSpan.FromMilliseconds(100));
         Avalonia.Application.Current!.RequestedThemeVariant.ShouldBe(ThemeVariant.Dark);
-        second.Control<MenuItem>("MenuThemeDark").IsChecked.ShouldBeTrue();
-        second.ClickMenu("MenuThemeLight");
+        second.IsSettingsThemeChecked("Dark").ShouldBeTrue();
+        second.PickSettingsTheme("Light");
         Avalonia.Application.Current!.RequestedThemeVariant.ShouldBe(ThemeVariant.Light);
     }
 
