@@ -891,6 +891,16 @@
                                                TextAlignment="Center"
                                                Margin="0,12,0,0" />
 
+                                    <!-- Shown when every selected frame/shape is in a locked chain,
+                                         so a disabled inspector says why. -->
+                                    <TextBlock x:Name="PropLockedNotice"
+                                               IsVisible="False"
+                                               Text="Locked. Unlock the animation to edit."
+                                               Foreground="{DynamicResource InkDim}"
+                                               FontStyle="Italic"
+                                               TextWrapping="Wrap"
+                                               Margin="12,8,12,0" />
+
                                     <!-- ── Chain properties (#1032) ── shown when a chain is
                                          selected but no frame/shape is (replacing PropNoneLabel's
                                          "Select a frame or shape..." placeholder). -->

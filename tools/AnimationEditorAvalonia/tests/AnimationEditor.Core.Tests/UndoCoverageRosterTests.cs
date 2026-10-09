@@ -146,6 +146,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.PasteShapesCut)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateSelection)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLocked)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetChainsLocked)]              = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLoop)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrameEvent)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameEvent)]                = Category.MutatingUndoable,
@@ -450,6 +451,8 @@ public class UndoCoverageRosterTests
             })));
         yield return Row(nameof(IAppCommands.SetChainLocked),
             ctx => Sync(() => ctx.AppCommands.SetChainLocked(Zebra(ctx), true)));
+        yield return Row(nameof(IAppCommands.SetChainsLocked),
+            ctx => Sync(() => ctx.AppCommands.SetChainsLocked(new[] { Zebra(ctx) }, true)));
         yield return Row(nameof(IAppCommands.SetChainLoop),
             ctx => Sync(() => ctx.AppCommands.SetChainLoop(Zebra(ctx), false)));
         yield return Row(nameof(IAppCommands.AddFrameEvent),

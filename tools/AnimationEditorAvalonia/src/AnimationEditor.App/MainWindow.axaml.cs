@@ -5687,7 +5687,9 @@ public partial class MainWindow : Window
             PropChainPanel.IsVisible = chainOnly;
             if (chainOnly)
             {
-                PropChainLocked.IsChecked = selectedChain!.IsLocked;
+                // Checked only when every selected chain is locked; indeterminate when they disagree.
+                var lockStates = _selectedState.SelectedChains.Select(c => c.IsLocked).Append(selectedChain!.IsLocked).Distinct().ToList();
+                PropChainLocked.IsChecked = lockStates.Count > 1 ? null : lockStates[0];
                 RefreshChainNameBox(selectedChain);
                 PropChainLoop.IsChecked = selectedChain.Loop;
             }
@@ -5759,6 +5761,10 @@ public partial class MainWindow : Window
             PropCirclePanel.IsEnabled = !IsShapeLocked(circles.FirstOrDefault() ?? circ);
             PropPolygonPanel.IsEnabled = !IsShapeLocked(polygons.FirstOrDefault() ?? poly);
             // Vertex rows edit the primary polygon only, so they follow its lock, not the selection's.
+            PropLockedNotice.IsVisible = (PropFramePanel.IsVisible && !PropFramePanel.IsEnabled)
+                || (PropRectPanel.IsVisible && !PropRectPanel.IsEnabled)
+                || (PropCirclePanel.IsVisible && !PropCirclePanel.IsEnabled)
+                || (PropPolygonPanel.IsVisible && !PropPolygonPanel.IsEnabled);
             PropPolygonVertices.IsEnabled = !IsShapeLocked(poly);
             PropPolygonAddVertex.IsEnabled = !IsShapeLocked(poly);
 
@@ -6073,9 +6079,10 @@ public partial class MainWindow : Window
     private void ApplyChainLocked()
     {
         if (_suppressPropRefresh) return;
-        var chain = _selectedState.SelectedChain;
-        if (chain is null || PropChainLocked.IsChecked is not { } locked) return;
-        _appCommands.SetChainLocked(chain, locked);
+        var chains = _selectedState.SelectedChains;
+        if (chains.Count == 0 && _selectedState.SelectedChain is { } single) chains.Add(single);
+        if (chains.Count == 0 || PropChainLocked.IsChecked is not { } locked) return;
+        _appCommands.SetChainsLocked(chains, locked);
     }
 
     private void ApplyChainLoop()
