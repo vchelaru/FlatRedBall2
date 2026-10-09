@@ -17,6 +17,10 @@ To add a frame by clicking the image, hold down **Ctrl** (**⌘** on macOS) and 
 
 <figure><img src="../../.gitbook/assets/edit-frames-ctrl-click-grid.gif" alt="Ctrl+clicking grid cells to add frames"><figcaption></figcaption></figure>
 
+If Grid is enabled, a **Ctrl** (**⌘** on macOS) and push+drag can be used to add new frames of different sizes.
+
+<figure><img src="../../.gitbook/assets/09_08_17_21.gif" alt=""><figcaption><p>Dragging can be used to add new frames of larger sizes</p></figcaption></figure>
+
 Existing frames can also be copied and pasted with **Ctrl+C** and **Ctrl+V** (**⌘C** and **⌘V** on macOS), or the right-click **Copy** and **Paste** menu items.
 
 Frames can also be duplicated with **Ctrl+D** (**⌘D** on macOS), or the right-click **Duplicate** menu item.
@@ -33,7 +37,7 @@ Alternatively, press **Delete** (**Fn+Delete** on Mac laptops) to delete the sel
 
 To change the part of an image that is displayed, select a frame then drag its region around in the editor window. If **Grid** is enabled, movement snaps to the grid.
 
-<figure><img src="../../.gitbook/assets/edit-frames-drag-region.gif" alt="Dragging a frame's region in the editor window"><figcaption></figcaption></figure>
+<figure><img src="../../.gitbook/assets/edit-frames-drag-region.gif" alt="Dragging a frame&#x27;s region in the editor window"><figcaption></figcaption></figure>
 
 If **Grid** is enabled, you can also double-click a cell to change coordinates. This works even when clicking inside the current bounds of a frame. This is especially useful when an entire image is selected.
 
@@ -117,7 +121,7 @@ Alpha can be modified in the **Inspector** tab.
 
 ### Multiply
 
-Multiply, also sometimes called `modulate`, darkens the color of a frame. These values are *normalized* to 0-1 values, and then multiplied to the color of a frame. Values of 255 do not affect the color of the frame. Values of 0 completely remove the color from the frame.
+Multiply, also sometimes called `modulate`, darkens the color of a frame. These values are _normalized_ to 0-1 values, and then multiplied to the color of a frame. Values of 255 do not affect the color of the frame. Values of 0 completely remove the color from the frame.
 
 For example, if Multiply with (R, G, B) values of (255, 0, 0) are set, then the red channel is still fully drawn, but the green and blue channels are completely removed from the frame.
 
