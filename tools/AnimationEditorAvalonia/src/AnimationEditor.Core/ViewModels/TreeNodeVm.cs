@@ -132,6 +132,19 @@ public class TreeNodeVm : INotifyPropertyChanged
         set { if (_hasValidationIssue != value) { _hasValidationIssue = value; Notify(); } }
     }
 
+    private bool _hasEmptyAnimationWarning;
+    /// <summary>
+    /// True when this chain node has no frames in a native tsx project -- a tsx stores an
+    /// animation only on the tiles it uses, so a frameless one is dropped on save and gone after
+    /// reopening. Drives the warning icon in the tree item template. Always <c>false</c> for an
+    /// achx/achj project or a non-chain node.
+    /// </summary>
+    public bool HasEmptyAnimationWarning
+    {
+        get => _hasEmptyAnimationWarning;
+        set { if (_hasEmptyAnimationWarning != value) { _hasEmptyAnimationWarning = value; Notify(); } }
+    }
+
     /// <summary>True when this node represents an animation frame. Set once at construction time.</summary>
     public bool IsFrameNode  { get; set; }
     /// <summary>True when this node represents an AxisAlignedRectangleSave shape. Set once at construction time.</summary>
