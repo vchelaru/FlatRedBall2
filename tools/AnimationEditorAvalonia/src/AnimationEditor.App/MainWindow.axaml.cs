@@ -3284,9 +3284,9 @@ public partial class MainWindow : Window
         LoopToggle.IsCheckedChanged += (_, _) =>
         {
             if (_suppressPropRefresh) return;
-            var chain = _selectedState.SelectedChain;
-            if (chain is null || LoopToggle.IsChecked is not { } loop) return;
-            _appCommands.SetChainLoop(chain, loop);
+            var chains = ChainsForChainProperties();
+            if (chains.Count == 0 || LoopToggle.IsChecked is not { } loop) return;
+            _appCommands.SetChainsLoop(chains, loop);
         };
 
         TimelineStrip.ItemsSource = _timelineFrames;
@@ -5690,7 +5690,9 @@ public partial class MainWindow : Window
                 var lockStates = _selectedState.SelectedChains.Select(c => c.IsLocked).Append(selectedChain!.IsLocked).Distinct().ToList();
                 PropChainLocked.IsChecked = lockStates.Count > 1 ? null : lockStates[0];
                 RefreshChainNameBox(selectedChain);
-                PropChainLoop.IsChecked = selectedChain.Loop;
+                // Checked only when every selected chain loops; indeterminate when they disagree.
+                var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
+                PropChainLoop.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
             }
             // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
             // tile to own. Re-reads on every refresh (not just selection change) so an edit made
@@ -5725,7 +5727,10 @@ public partial class MainWindow : Window
             // within it is also selected (#1120) -- it reflects "the chain currently playing",
             // not just the chain-only inspector view PropChainLoop above is scoped to.
             if (selectedChain is not null)
-                LoopToggle.IsChecked = selectedChain.Loop;
+            {
+                var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
+                LoopToggle.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
+            }
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
             PropCirclePanel.IsVisible = circ  is not null && !_projectManager.IsNativeTsxProject;
@@ -6087,9 +6092,20 @@ public partial class MainWindow : Window
     private void ApplyChainLoop()
     {
         if (_suppressPropRefresh) return;
-        var chain = _selectedState.SelectedChain;
-        if (chain is null || PropChainLoop.IsChecked is not { } loop) return;
-        _appCommands.SetChainLoop(chain, loop);
+        var chains = ChainsForChainProperties();
+        if (chains.Count == 0 || PropChainLoop.IsChecked is not { } loop) return;
+        _appCommands.SetChainsLoop(chains, loop);
+    }
+
+    /// <summary>
+    /// The animations a chain-level inspector field (Locked, Loop) applies to: every selected
+    /// animation, or the primary one when nothing is multi-selected.
+    /// </summary>
+    private List<AnimationChainSave> ChainsForChainProperties()
+    {
+        var chains = _selectedState.SelectedChains;
+        if (chains.Count == 0 && _selectedState.SelectedChain is { } single) chains.Add(single);
+        return chains;
     }
 
     /// <summary>Commits <see cref="PropChainTsxOwnerInput"/>'s value via <see
@@ -7501,10 +7517,20 @@ public partial class MainWindow : Window
         // Pointer over a polygon vertex: Delete removes that point, not the shape.
         if (PreviewCtrl.TryDeleteHoveredVertex()) return;
 
-        // Delete the whole multi-selection of the focused node's kind, not just the
-        // focused node — the delete commands batch them into a single undo step.
-        // All kinds are fully undoable, so they delete immediately and surface an
-        // undo toast rather than a confirmation dialog.
+        // Delete every selected item, whatever the mix of animations, frames and shapes, as a
+        // single undo step. All kinds are fully undoable, so they delete immediately and surface
+        // an undo toast rather than a confirmation dialog.
+        var bag = _selectedState.SelectedNodes;
+        if (bag.Count > 1 && bag.Select(n => n switch { AnimationChainSave => 0, AnimationFrameSave => 1, ShapeSave => 2, _ => -1 })
+                .Where(kind => kind >= 0).Distinct().Count() > 1)
+        {
+            _appCommands.DeleteSelection(
+                bag.OfType<AnimationChainSave>().ToList(),
+                bag.OfType<AnimationFrameSave>().ToList(),
+                bag.OfType<ShapeSave>().Cast<object>().ToList());
+            return;
+        }
+
         switch (SelectedData)
         {
             case AnimationChainSave chainToDel:

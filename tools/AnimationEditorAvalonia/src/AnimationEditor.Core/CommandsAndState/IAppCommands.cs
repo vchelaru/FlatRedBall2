@@ -198,6 +198,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void DeleteShapes(IReadOnlyList<object> shapes);
         void DeleteFrames(List<AnimationFrameSave> frames);
+        /// <summary>
+        /// Deletes every selected item, whatever the mix of animations, frames and shapes, as one
+        /// undo step. A locked animation can be deleted itself, but frames and shapes inside a
+        /// locked animation are skipped. Frames and shapes of an animation that is also being
+        /// deleted go with it, not separately.
+        /// </summary>
+        void DeleteSelection(IReadOnlyList<AnimationChainSave> chains, IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
         AnimationChainSave? AddNewAnimationChain();
@@ -221,6 +228,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// as <see cref="SetChainLocked"/>.
         /// </summary>
         void SetChainLoop(AnimationChainSave chain, bool loop);
+        /// <summary>Sets Loop on every chain whose value differs, as one undo step.</summary>
+        void SetChainsLoop(IReadOnlyList<AnimationChainSave> chains, bool loop);
 
         /// <summary>
         /// Explicitly overrides which Tiled tile id <paramref name="chain"/>'s <c>&lt;animation&gt;</c>
