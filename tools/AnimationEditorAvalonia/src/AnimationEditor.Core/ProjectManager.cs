@@ -640,10 +640,30 @@ namespace AnimationEditor.Core
             // Same reused-instance hazard LoadAnimationChain resets its own achx-side fields for:
             // this ProjectManager instance is reused across File > Open calls, so a prior achx's
             // ReferencedPngs/OnDiskCoordinateType must not leak into a now-open tsx project. A tsx
-            // has no ProjectFile/CoordinateType concept of its own, so these just go back to their
-            // no-project defaults rather than being recomputed from the tsx.
-            ReferencedPngs = new FilePath[0];
+            // has no ProjectFile/CoordinateType concept of its own, so CoordinateType goes back to
+            // its no-project default. ReferencedPngs is the tileset's single <image> (#1365), so
+            // the wireframe shows it on open even when no animation (and so no frame) references it.
+            ReferencedPngs = ResolveTsxImagePath(tileset, fileName) is { } imagePath
+                ? [imagePath]
+                : new FilePath[0];
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
+        }
+
+        /// <summary>The tileset's single <c>&lt;image source&gt;</c> resolved against the tsx's own
+        /// folder (how Tiled resolves it), or <see langword="null"/> when the tileset has no image
+        /// source. Not checked for existence: a missing file is reported by the texture load.</summary>
+        internal static FilePath? ResolveTsxImagePath(DotTiled.Tileset tileset, FilePath tsxPath)
+        {
+            if (!tileset.Image.HasValue || !tileset.Image.Value.Source.HasValue) return null;
+            var source = tileset.Image.Value.Source.Value;
+            if (string.IsNullOrEmpty(source)) return null;
+
+            // Hand-rolled instead of Path.IsPathRooted, which on Linux misses a Windows-authored "C:\..." path.
+            bool isRooted = source.StartsWith('/') || source.StartsWith('\\')
+                || (source.Length >= 2 && source[1] == ':');
+            return isRooted
+                ? new FilePath(source)
+                : new FilePath(tsxPath.GetDirectoryContainingThis().FullPath + source);
         }
 
         /// <summary>

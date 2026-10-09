@@ -146,8 +146,92 @@ public class ProjectManagerTsxProjectTests : IDisposable
 
         pm.LoadTsxProject(new FilePath(path));
 
-        Assert.Empty(pm.ReferencedPngs);
+        Assert.DoesNotContain(pm.ReferencedPngs, p => p.NoPath == "StaleFromAchx.png");
         Assert.Equal(TextureCoordinateType.Pixel, pm.OnDiskCoordinateType);
+    }
+
+    // #1365: a tsx has exactly one <image>, so opening it shows that image even when no animation
+    // (and so no frame TextureName) references it.
+    [Fact]
+    public void LoadTsxProject_TilesetWithImage_ReferencedPngsIsTheTilesetImageNextToTheTsx()
+    {
+        var pm = new ProjectManager();
+        var path = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+
+        pm.LoadTsxProject(new FilePath(path));
+
+        var png = Assert.Single(pm.ReferencedPngs);
+        Assert.Equal(new FilePath(Path.Combine(_dir.Path, "Heroes.png")), png);
+    }
+
+    [Fact]
+    public void LoadTsxProject_TilesetWithNoAnimations_StillReferencesTheTilesetImage()
+    {
+        const string noAnimationsXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Plain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="Plain.png" width="64" height="64"/>
+            </tileset>
+            """;
+        var pm = new ProjectManager();
+        var path = WriteFixture(noAnimationsXml, "Plain.tsx");
+
+        pm.LoadTsxProject(new FilePath(path));
+
+        Assert.Empty(pm.AnimationChainListSave!.AnimationChains);
+        Assert.Equal(new FilePath(Path.Combine(_dir.Path, "Plain.png")), Assert.Single(pm.ReferencedPngs));
+    }
+
+    [Fact]
+    public void LoadTsxProject_ImageSourceInParentFolder_ResolvesRelativeToTheTsx()
+    {
+        const string xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Sub" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="..\art\Sub.png" width="64" height="64"/>
+            </tileset>
+            """;
+        var pm = new ProjectManager();
+        var path = WriteFixture(xml, "Sub.tsx");
+
+        pm.LoadTsxProject(new FilePath(path));
+
+        var expected = new FilePath(Path.Combine(Path.GetDirectoryName(_dir.Path)!, "art", "Sub.png"));
+        Assert.Equal(expected, Assert.Single(pm.ReferencedPngs));
+    }
+
+    [Fact]
+    public void ResolveTsxImagePath_AbsoluteSource_IsKeptAsIs()
+    {
+        var tileset = new TestTileset(@"C:\art\Abs.png").Value;
+
+        var resolved = ProjectManager.ResolveTsxImagePath(tileset, new FilePath(@"C:\proj\Abs.tsx"));
+
+        Assert.Equal(new FilePath(@"C:\art\Abs.png"), resolved);
+    }
+
+    [Fact]
+    public void ResolveTsxImagePath_NoImage_ReturnsNull()
+    {
+        var tileset = new TestTileset(null).Value;
+
+        Assert.Null(ProjectManager.ResolveTsxImagePath(tileset, new FilePath(@"C:\proj\None.tsx")));
+    }
+
+    private sealed class TestTileset
+    {
+        public Tileset Value { get; }
+
+        public TestTileset(string? imageSource)
+        {
+            var path = Path.Combine(Path.GetTempPath(), "AnimationEditorCoreTests", Guid.NewGuid().ToString("N") + ".tsx");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var imageXml = imageSource is null ? "" : $"<image source=\"{imageSource}\" width=\"64\" height=\"64\"/>";
+            File.WriteAllText(path,
+                $"""<?xml version="1.0" encoding="UTF-8"?><tileset version="1.10" name="T" tilewidth="16" tileheight="16" tilecount="16" columns="4">{imageXml}</tileset>""");
+            try { Value = AnimationEditor.Core.Tiled.TsxLoader.LoadTileset(path); }
+            finally { File.Delete(path); }
+        }
     }
 
     [Fact]
