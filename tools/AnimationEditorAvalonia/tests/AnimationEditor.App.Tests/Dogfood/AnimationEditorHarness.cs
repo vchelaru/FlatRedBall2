@@ -465,6 +465,32 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// </summary>
     public void ClickMenu(string name) => ClickMenu(Control<MenuItem>(name));
 
+    /// <summary>
+    /// Opens File &gt; Settings… and picks the Appearance-tab theme radio labeled <paramref name="label"/>
+    /// ("Light", "Dark" or "Follow System"), then closes the dialog. Settings builds its own window
+    /// rather than going through <see cref="IEditorDialogHost"/>, so it is found among the owned windows.
+    /// </summary>
+    public void PickSettingsTheme(string label)
+    {
+        ClickMenu("MenuSettings");
+        Window settings = Window.OwnedWindows.Single();
+        settings.GetVisualDescendants().OfType<RadioButton>().Single(radio => (string?)radio.Content == label).IsChecked = true;
+        Layout();
+        settings.Close();
+        Layout();
+    }
+
+    /// <summary>Opens File &gt; Settings… and returns whether the theme radio labeled <paramref name="label"/> is checked, then closes the dialog.</summary>
+    public bool IsSettingsThemeChecked(string label)
+    {
+        ClickMenu("MenuSettings");
+        Window settings = Window.OwnedWindows.Single();
+        bool isChecked = settings.GetVisualDescendants().OfType<RadioButton>().Single(radio => (string?)radio.Content == label).IsChecked == true;
+        settings.Close();
+        Layout();
+        return isChecked;
+    }
+
     /// <summary>Clicks <paramref name="item"/> the same way, for menu items built in code (recent files).</summary>
     public void ClickMenu(MenuItem item)
     {

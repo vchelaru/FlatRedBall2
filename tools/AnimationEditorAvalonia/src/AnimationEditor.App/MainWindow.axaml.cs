@@ -2619,9 +2619,6 @@ public partial class MainWindow : Window
         MenuPreviewZoomIn.Click    += (_, _) => PreviewZoom.StepUp();
         MenuPreviewZoomOut.Click   += (_, _) => PreviewZoom.StepDown();
 
-        MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
-        MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
-        MenuThemeSystem.Click += (_, _) => SetTheme(AppTheme.System);
         // C#-built surfaces (tab strip, history rows) hold static brush snapshots, so
         // rebuild them when the variant changes. XAML surfaces follow via DynamicResource.
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
@@ -3090,6 +3087,7 @@ public partial class MainWindow : Window
         var dialog = Settings.SettingsWindowBuilder.Build(
             new Settings.SettingsWindowModel
             {
+                Theme = _appSettings.Theme,
                 CanvasBackgroundArgb = _appSettings.CanvasBackgroundArgb,
                 ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),
                 GuideLineArgb = _appSettings.GuideLineArgb,
@@ -3098,6 +3096,7 @@ public partial class MainWindow : Window
             },
             new Settings.SettingsWindowCallbacks
             {
+                OnThemeChanged = SetTheme,
                 OnCanvasBackgroundChanged = SetCanvasBackground,
                 OnPickCustomCanvasBackground = PickCustomCanvasBackgroundAsync,
                 OnGuideLineChanged = SetGuideLineColor,
@@ -6526,32 +6525,25 @@ public partial class MainWindow : Window
 
     // ── Theme ─────────────────────────────────────────────────────────────────
 
-    /// <summary>Applies the persisted theme to the application and syncs the menu checkmarks.</summary>
+    /// <summary>Applies the persisted theme to the application.</summary>
     private void ApplyPersistedTheme()
     {
         if (Avalonia.Application.Current is { } app)
             app.RequestedThemeVariant = ThemeManager.ToVariant(_appSettings.Theme);
-        SyncThemeMenuChecks();
     }
 
-    private void SetTheme(AppTheme theme)
+    /// <summary>Applies and persists <paramref name="theme"/>; returns the new theme's default canvas colors for the Settings swatches.</summary>
+    private (uint Background, uint GuideLine) SetTheme(AppTheme theme)
     {
         _appSettings.Theme = theme;
-        if (Avalonia.Application.Current is { } app)
-            app.RequestedThemeVariant = ThemeManager.ToVariant(theme);
-        SyncThemeMenuChecks();
+        ApplyPersistedTheme();
         SaveSettingsFile();
-    }
-
-    private void SyncThemeMenuChecks()
-    {
-        MenuThemeLight.IsChecked  = _appSettings.Theme == AppTheme.Light;
-        MenuThemeDark.IsChecked   = _appSettings.Theme == AppTheme.Dark;
-        MenuThemeSystem.IsChecked = _appSettings.Theme == AppTheme.System;
+        var palette = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light);
+        return (ToArgb(palette.Background), ToArgb(palette.GuideLine));
     }
 
     // ── Canvas colors (background + guide line + frame fill) ───────────────────
-    // All three live in the Settings → Colors section; see SettingsWindowBuilder.
+    // All three live in the Settings → Appearance tab, next to the theme; see SettingsWindowBuilder.
 
     /// <summary>Pushes the persisted canvas-color overrides onto the canvases affected by each.</summary>
     private void ApplyPersistedCanvasColors()

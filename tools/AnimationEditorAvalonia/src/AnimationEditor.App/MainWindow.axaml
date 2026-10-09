@@ -140,12 +140,6 @@
                         <MenuItem Header="Show _History" x:Name="MenuShowHistory"
                                   AutomationProperties.Name="Show History"
                                   AutomationProperties.AutomationId="show-history" />
-                        <Separator />
-                        <MenuItem Header="_Theme">
-                            <MenuItem Header="_Light"         x:Name="MenuThemeLight"  ToggleType="Radio" />
-                            <MenuItem Header="_Dark"          x:Name="MenuThemeDark"   ToggleType="Radio" />
-                            <MenuItem Header="Follow _System" x:Name="MenuThemeSystem" ToggleType="Radio" />
-                        </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <!-- InputGesture set in code from the hotkey registry — see note above. -->

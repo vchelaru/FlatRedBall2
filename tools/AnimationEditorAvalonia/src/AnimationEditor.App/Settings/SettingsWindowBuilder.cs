@@ -1,16 +1,22 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using AnimationEditor.Core.Models;
 
 namespace AnimationEditor.App.Settings;
 
 /// <summary>Snapshot of editor settings shown in <see cref="SettingsWindowBuilder"/>.</summary>
 public sealed class SettingsWindowModel
 {
+    /// <summary>The current editor theme.</summary>
+    public AppTheme Theme { get; init; }
+
     /// <summary>Current canvas-background override (packed <c>0xAARRGGBB</c>), or <c>null</c> for the theme default.</summary>
     public uint? CanvasBackgroundArgb { get; init; }
 
@@ -30,6 +36,12 @@ public sealed class SettingsWindowModel
 /// <summary>Callbacks from the settings dialog back to <see cref="MainWindow"/>.</summary>
 public sealed class SettingsWindowCallbacks
 {
+    /// <summary>
+    /// Invoked when a theme radio is chosen. Applies the theme and returns the new theme's default
+    /// background and guide-line colors (packed <c>0xAARRGGBB</c>) so swatches showing "Theme Default" can refresh.
+    /// </summary>
+    public Func<AppTheme, (uint Background, uint GuideLine)>? OnThemeChanged { get; init; }
+
     /// <summary>Invoked with the new packed <c>0xAARRGGBB</c> value (<c>null</c> = theme default) when the canvas background changes.</summary>
     public Action<uint?>? OnCanvasBackgroundChanged { get; init; }
 
@@ -90,7 +102,7 @@ public static class SettingsWindowBuilder
         {
             Items =
             {
-                new TabItem { Header = "Colors", Content = InTab(BuildCanvasColorsSection(model, callbacks)) },
+                new TabItem { Header = "Appearance", Content = InTab(BuildAppearanceSection(model, callbacks)) },
             },
         };
 
@@ -114,8 +126,23 @@ public static class SettingsWindowBuilder
         ("Mid Gray", 0xFF808080),
     };
 
-    private static Control BuildCanvasColorsSection(SettingsWindowModel model, SettingsWindowCallbacks callbacks)
+    private static Control BuildAppearanceSection(SettingsWindowModel model, SettingsWindowCallbacks callbacks)
     {
+        var backgroundRow = BuildColorRow(
+            "Background",
+            model.CanvasBackgroundArgb,
+            model.ThemeDefaultBackgroundArgb,
+            _backgroundPresets,
+            callbacks.OnCanvasBackgroundChanged,
+            callbacks.OnPickCustomCanvasBackground);
+        var guideLineRow = BuildColorRow(
+            "Guide line",
+            model.GuideLineArgb,
+            model.ThemeDefaultGuideLineArgb,
+            Array.Empty<(string, uint)>(),
+            callbacks.OnGuideLineChanged,
+            callbacks.OnPickCustomGuideLine);
+
         var fillCheck = new CheckBox
         {
             Content = "Fill Selection",
@@ -132,39 +159,30 @@ public static class SettingsWindowBuilder
             Spacing = 14,
             Children =
             {
-                BuildColorRow(
-                    "Background",
-                    model.CanvasBackgroundArgb,
-                    model.ThemeDefaultBackgroundArgb,
-                    _backgroundPresets,
-                    callbacks.OnCanvasBackgroundChanged,
-                    callbacks.OnPickCustomCanvasBackground),
-                BuildColorRow(
-                    "Guide line",
-                    model.GuideLineArgb,
-                    model.ThemeDefaultGuideLineArgb,
-                    Array.Empty<(string, uint)>(),
-                    callbacks.OnGuideLineChanged,
-                    callbacks.OnPickCustomGuideLine),
+                BuildThemeRow(model.Theme, callbacks.OnThemeChanged, backgroundRow, guideLineRow),
+                backgroundRow.Control,
+                guideLineRow.Control,
                 fillCheck,
             },
         };
     }
 
     /// <summary>
-    /// One labeled color row: a swatch reflecting the current color, a "Theme Default" button,
-    /// a button per named preset, and a "Custom…" button that defers to <paramref name="onPickCustom"/>.
-    /// Buttons (not checkable toggles) so re-picking "Custom…" always re-opens the picker even
-    /// when it's already the active color — there is no "checked" state to keep in sync.
+    /// One labeled color row: a swatch reflecting the current color and a dropdown of "Theme Default",
+    /// the named presets, and "Custom…" (which defers to <paramref name="onPickCustom"/>; a cancelled
+    /// picker restores the previous choice). The swatch is also a button that opens the picker, since
+    /// re-selecting an already-selected "Custom…" raises no event.
     /// </summary>
-    private static Control BuildColorRow(
+    private static ColorRow BuildColorRow(
         string label,
         uint? currentArgb,
-        uint themeDefaultArgb,
+        uint initialThemeDefaultArgb,
         (string Name, uint Argb)[] presets,
         Action<uint?>? onChanged,
         Func<Task<uint?>>? onPickCustom)
     {
+        var themeDefaultArgb = initialThemeDefaultArgb;
+        var overrideArgb = currentArgb;
         var swatch = new Border
         {
             Width = 20,
@@ -175,37 +193,113 @@ public static class SettingsWindowBuilder
             Background = new SolidColorBrush(Color.FromUInt32(currentArgb ?? themeDefaultArgb)),
         };
 
+        const string themeDefaultItem = "Theme Default";
+        const string customItem = "Custom…";
+        var items = new List<string> { themeDefaultItem };
+        items.AddRange(presets.Select(p => p.Name));
+        items.Add(customItem);
+
+        var combo = new ComboBox { ItemsSource = items, MinWidth = 140 };
+        var suppressSelection = false;
+
+        void Select(string item)
+        {
+            suppressSelection = true;
+            combo.SelectedItem = item;
+            suppressSelection = false;
+        }
+
+        string ItemFor(uint? argb) =>
+            argb is null ? themeDefaultItem
+            : presets.Any(p => p.Argb == argb) ? presets.First(p => p.Argb == argb).Name
+            : customItem;
+
         void SetColor(uint? argb)
         {
+            overrideArgb = argb;
             swatch.Background = new SolidColorBrush(Color.FromUInt32(argb ?? themeDefaultArgb));
             onChanged?.Invoke(argb);
         }
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { swatch } };
-
-        var themeBtn = new Button { Content = "Theme Default" };
-        themeBtn.Click += (_, _) => SetColor(null);
-        buttons.Children.Add(themeBtn);
-
-        foreach (var (name, argb) in presets)
+        // Returns false when the picker was cancelled (or there is none), so callers can restore the old choice.
+        async Task<bool> PickCustomAsync()
         {
-            var presetBtn = new Button { Content = name };
-            presetBtn.Click += (_, _) => SetColor(argb);
-            buttons.Children.Add(presetBtn);
+            if (onPickCustom is null || await onPickCustom() is not uint picked) return false;
+            SetColor(picked);
+            return true;
         }
 
-        var customBtn = new Button { Content = "Custom…" };
-        customBtn.Click += async (_, _) =>
+        Select(ItemFor(currentArgb));
+        combo.SelectionChanged += async (_, _) =>
         {
-            if (onPickCustom is null) return;
-            if (await onPickCustom() is uint picked) SetColor(picked);
+            if (suppressSelection || combo.SelectedItem is not string choice) return;
+            if (choice == themeDefaultItem)
+                SetColor(null);
+            else if (choice == customItem)
+            {
+                if (!await PickCustomAsync()) Select(ItemFor(overrideArgb));
+            }
+            else
+                SetColor(presets.First(p => p.Name == choice).Argb);
         };
-        buttons.Children.Add(customBtn);
+
+        // Re-selecting "Custom…" while it is already chosen raises no event, so the swatch also opens the picker.
+        var swatchButton = new Button { Content = swatch, Padding = new Thickness(4) };
+        ToolTip.SetTip(swatchButton, "Choose a custom color");
+        swatchButton.Click += async (_, _) =>
+        {
+            if (await PickCustomAsync()) Select(customItem);
+        };
+
+        var control = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock { Text = label },
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { swatchButton, combo } },
+            },
+        };
+
+        return new ColorRow(control, newThemeDefault =>
+        {
+            themeDefaultArgb = newThemeDefault;
+            if (overrideArgb is null)
+                swatch.Background = new SolidColorBrush(Color.FromUInt32(themeDefaultArgb));
+        });
+    }
+
+    /// <summary>A color row plus a hook that re-points its "Theme Default" color after the theme changes.</summary>
+    private sealed record ColorRow(Control Control, Action<uint> SetThemeDefault);
+
+    /// <summary>
+    /// Light / Dark / Follow System radios. Changing the theme re-points the color rows' "Theme Default"
+    /// swatches, since those depend on the active theme.
+    /// </summary>
+    private static Control BuildThemeRow(
+        AppTheme current,
+        Func<AppTheme, (uint Background, uint GuideLine)>? onChanged,
+        ColorRow backgroundRow,
+        ColorRow guideLineRow)
+    {
+        var radios = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        foreach (var (name, theme) in new[] { ("Light", AppTheme.Light), ("Dark", AppTheme.Dark), ("Follow System", AppTheme.System) })
+        {
+            var radio = new RadioButton { Content = name, GroupName = "Theme", IsChecked = theme == current };
+            radio.IsCheckedChanged += (_, _) =>
+            {
+                if (radio.IsChecked != true || onChanged is null) return;
+                var (background, guideLine) = onChanged(theme);
+                backgroundRow.SetThemeDefault(background);
+                guideLineRow.SetThemeDefault(guideLine);
+            };
+            radios.Children.Add(radio);
+        }
 
         return new StackPanel
         {
             Spacing = 4,
-            Children = { new TextBlock { Text = label }, buttons },
+            Children = { new TextBlock { Text = "Theme" }, radios },
         };
     }
 }
