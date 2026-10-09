@@ -2666,6 +2666,13 @@ namespace AnimationEditor.Core.CommandsAndState
             if (acls == null) yield break;
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // A tsx's single <image> is shown on open even when no frame references it, so it
+            // must be watched independent of frames (#1365).
+            if (_pm.IsNativeTsxProject)
+                foreach (var png in _pm.ReferencedPngs)
+                    if (seen.Add(png.FullPath)) yield return png.FullPath;
+
             foreach (var chain in acls.AnimationChains)
             foreach (var frame in chain.Frames)
             {

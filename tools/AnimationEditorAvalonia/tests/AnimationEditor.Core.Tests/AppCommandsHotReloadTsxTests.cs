@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -68,6 +69,38 @@ public class AppCommandsHotReloadTsxTests : IDisposable
         // not the raw tsxPath string -- the watcher is started via SyncHotReloadWatcher, which
         // reads the normalized FileName rather than passing the caller's literal path through.
         Assert.Equal(_ctx.ProjectManager.FileName, spy.LastStartAchxPath);
+    }
+
+    // The tileset's image is what the wireframe shows, so an external edit to it must reload even
+    // when no animation (and so no frame TextureName) references it.
+    [Fact]
+    public async Task OpenTsxWorkflowAsync_TilesetWithNoAnimations_WatchesTheTilesetImage()
+    {
+        const string noAnimationsXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Plain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="Plain.png" width="64" height="64"/>
+            </tileset>
+            """;
+        var spy = new AppCommandsHotReloadTests.SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(WriteTsx("Plain.tsx", noAnimationsXml));
+
+        var watched = Assert.Single(spy.LastStartPngPaths!);
+        Assert.Equal(new AnimationEditor.Core.Paths.FilePath(Path.Combine(_dir.Path, "Plain.png")),
+            new AnimationEditor.Core.Paths.FilePath(watched));
+    }
+
+    [Fact]
+    public async Task OpenTsxWorkflowAsync_TilesetWithAnimations_WatchesTheTilesetImageOnce()
+    {
+        var spy = new AppCommandsHotReloadTests.SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(WriteTsx("Heroes.tsx", TsxFixtureXml));
+
+        Assert.Single(spy.LastStartPngPaths!.Select(p => new AnimationEditor.Core.Paths.FilePath(p)).Distinct());
     }
 
     [Fact]
