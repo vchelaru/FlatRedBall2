@@ -663,18 +663,35 @@ public class WireframeControl : TextureViewport
     /// pulse a frame selection gets. Matches <see cref="RefreshFramesInternal"/>'s framesToShow,
     /// which already draws this same union for a multi-chain selection.
     /// </summary>
-    private List<AnimationFrameSave> ComputeHighlightedFrames()
-    {
-        var selectedFrame  = _selectedState?.SelectedFrame;
-        var selectedFrames = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
-        var selectedChain  = _selectedState?.SelectedChain;
-        var selectedChains = _selectedState?.SelectedChains;
+    private List<AnimationFrameSave> ComputeHighlightedFrames() => FramesCoveredBySelection();
 
-        if (selectedFrames.Count > 1) return selectedFrames;
-        if (selectedFrame != null) return new List<AnimationFrameSave> { selectedFrame };
-        if (selectedChains?.Count > 1) return selectedChains.SelectMany(c => c.Frames).ToList();
-        if (selectedChain?.Frames != null) return new List<AnimationFrameSave>(selectedChain.Frames);
-        return new List<AnimationFrameSave>();
+    /// <summary>
+    /// Every frame the selection covers, whatever its mix: each selected animation's frames
+    /// (just the pinned frame when <see cref="ISelectedState.SelectedFrame"/> is one of them),
+    /// plus each individually selected frame. Falls back to the singular pinned frame or chain
+    /// when nothing is multi-selected.
+    /// </summary>
+    private List<AnimationFrameSave> FramesCoveredBySelection()
+    {
+        var result = new List<AnimationFrameSave>();
+        if (_selectedState is null) return result;
+
+        void Add(AnimationFrameSave frame)
+        {
+            if (!result.Contains(frame)) result.Add(frame);
+        }
+
+        var pinned = _selectedState.SelectedFrame;
+        foreach (var chain in _selectedState.SelectedChains)
+        {
+            if (pinned is not null && chain.Frames.Contains(pinned)) Add(pinned);
+            else foreach (var frame in chain.Frames) Add(frame);
+        }
+        foreach (var frame in _selectedState.SelectedFrames) Add(frame);
+
+        if (result.Count == 0 && _selectedState.SelectedChain?.Frames is { } singleChainFrames)
+            foreach (var frame in singleChainFrames) Add(frame);
+        return result;
     }
 
     /// <summary>Returns <paramref name="frame"/>'s reveal host, creating one (at rest) if absent.</summary>
@@ -1492,14 +1509,14 @@ public class WireframeControl : TextureViewport
                 }
                 else
                 {
-                    // Chain drag: move all chain frames together. A locked selected chain is
-                    // inert to the drag: refuse to start it.
-                    if (_selectedState?.SelectedChain?.IsLocked == true) return;
+                    // Chain drag: move all selected frames together. A locked chain among the
+                    // visible frames keeps its own frames still (bulk skip-locked-entries
+                    // pattern, matching the resize-handle branch above); when every visible
+                    // frame is locked there is nothing to move, so refuse to start.
+                    if (!HasUnlockedFrameRect()) return;
 
                     _draggingChain = true;
                     _chainDragStarts.Clear();
-                    // A locked chain among the visible frames keeps its own frames still (bulk
-                    // skip-locked-entries pattern, matching the resize-handle branch above).
                     foreach (var fr in _frameRects)
                     {
                         if (IsFrameLocked(fr.Frame)) continue;
@@ -1693,6 +1710,9 @@ public class WireframeControl : TextureViewport
             : new Cursor(cursorType.Value);
     }
 
+    /// <summary>True when at least one visible frame is outside a locked chain, i.e. a whole-selection drag would move something.</summary>
+    private bool HasUnlockedFrameRect() => _frameRects.Any(fr => !IsFrameLocked(fr.Frame));
+
     /// <summary>
     /// Pure cursor-type decision behind <see cref="UpdateHoverCursor"/>'s handle branch --
     /// extracted so tests can assert the plain <see cref="StandardCursorType"/> instead of the
@@ -1706,7 +1726,7 @@ public class WireframeControl : TextureViewport
         var (hitFrame, hitHandle) = HitTestHandle(pos);
         bool isLockedHit = hitFrame != null
             ? IsFrameLocked(hitFrame.Frame)
-            : hitHandle != HandleKind.None && _selectedState?.SelectedChain?.IsLocked == true;
+            : hitHandle != HandleKind.None && !HasUnlockedFrameRect();
         return isLockedHit ? null : HandleCursorMapper.CursorTypeFor(hitHandle);
     }
 
@@ -2334,11 +2354,6 @@ public class WireframeControl : TextureViewport
 
         if (_bitmap is null) { InvalidateVisual(); return; }
 
-        var selectedFrame  = _selectedState!.SelectedFrame;
-        var selectedFrames = _selectedState!.SelectedFrames;
-        var selectedChain  = _selectedState!.SelectedChain;
-        var selectedChains = _selectedState!.SelectedChains;
-
         string? achxFolder = string.IsNullOrEmpty(_projectManager!.FileName)
             ? null
             : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
@@ -2346,17 +2361,7 @@ public class WireframeControl : TextureViewport
         // A tree multi-select of individual frames (issue #582) must show every selected
         // frame's region, not just the primary one — SelectedFrames already carries the full
         // multi-select bag (falling back to just [SelectedFrame] when nothing is multi-selected).
-        IEnumerable<AnimationFrameSave> framesToShow;
-        if (selectedFrames.Count > 1)
-            framesToShow = selectedFrames;
-        else if (selectedFrame != null)
-            framesToShow = new[] { selectedFrame };
-        else if (selectedChains?.Count > 0)
-            framesToShow = selectedChains.SelectMany(c => c.Frames);
-        else if (selectedChain?.Frames != null)
-            framesToShow = selectedChain.Frames;
-        else
-            framesToShow = Array.Empty<AnimationFrameSave>();
+        IEnumerable<AnimationFrameSave> framesToShow = FramesCoveredBySelection();
 
         var highlightedFrames = ComputeHighlightedFrames();
 

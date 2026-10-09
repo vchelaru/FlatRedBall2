@@ -119,6 +119,20 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetChainLoopCommand(chain, loop, this, _events));
         }
 
+        public void SetChainsLoop(IReadOnlyList<AnimationChainSave> chains, bool loop)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var commands = chains
+                .Distinct()
+                .Where(c => c.Loop != loop)
+                .Select(c => (IUndoableCommand)new SetChainLoopCommand(c, loop, this, _events))
+                .ToArray();
+            if (commands.Length == 0) return;
+            _undoManager.Execute(commands.Length == 1
+                ? commands[0]
+                : new CompositeCommand(commands, loop ? $"Enable loop on {commands.Length} animations" : $"Disable loop on {commands.Length} animations"));
+        }
+
         public string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId)
         {
             var command = new SetChainTsxOwnerTileIdCommand(chain, tileId, _pm, this, _events);
@@ -969,6 +983,57 @@ namespace AnimationEditor.Core.CommandsAndState
             ItemsDeleted?.Invoke(total == 1 ? deleted[0].Name : $"{total} shapes");
         }
 
+        public void DeleteSelection(
+            IReadOnlyList<AnimationChainSave> chains, IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null) return;
+
+            // A locked animation can itself be deleted (container operation); frames and shapes
+            // inside one are modifications and stay. Children of an animation that is also being
+            // deleted go with it, so they are not deleted separately.
+            var chainList = chains.Where(acls.AnimationChains.Contains).Distinct().ToList();
+            bool InDeletedChain(AnimationFrameSave f) => chainList.Any(c => c.Frames.Contains(f));
+
+            var frameList = frames.Distinct()
+                .Where(f => !InDeletedChain(f)
+                    && _objectFinder.GetAnimationChainContaining(f) is { } owner
+                    && owner.Frames.Contains(f) && !IsChainLocked(owner))
+                .ToList();
+            var shapeList = shapes.OfType<ShapeSave>().Distinct()
+                .Where(s => _objectFinder.GetAnimationFrameContaining(s) is { } owner
+                    && !IsFrameLocked(owner) && !InDeletedChain(owner) && !frameList.Contains(owner))
+                .ToList();
+
+            int kinds = (chainList.Count > 0 ? 1 : 0) + (frameList.Count > 0 ? 1 : 0) + (shapeList.Count > 0 ? 1 : 0);
+            if (kinds == 0) return;
+            if (kinds == 1)
+            {
+                // One kind keeps its own history text and toast ("Delete Animation 'Walk'").
+                if (chainList.Count > 0) DeleteAnimationChains(chainList);
+                else if (frameList.Count > 0) DeleteFrames(frameList);
+                else DeleteShapes(shapeList.Cast<object>().ToList());
+                return;
+            }
+
+            // Children first: undo runs in reverse, so the animations come back before their frames.
+            var commands = new List<IUndoableCommand>();
+            foreach (var shape in shapeList)
+                commands.Add(new DeleteShapeCommand(
+                    shape, _objectFinder.GetAnimationFrameContaining(shape)!, this, _events, _selectedState));
+            foreach (var group in frameList.GroupBy(f => _objectFinder.GetAnimationChainContaining(f)!))
+                commands.Add(new DeleteFramesCommand(group.ToList(), group.Key, this, _events, _selectedState));
+            if (chainList.Count > 0)
+                commands.Add(new DeleteChainsCommand(chainList, acls, this, _events, _selectedState));
+
+            int total = chainList.Count + frameList.Count + shapeList.Count;
+            _undoManager.Execute(new CompositeCommand(commands, $"Delete {total} Items"));
+
+            ItemsDeleted?.Invoke($"{total} items");
+            RefreshWireframeRequested?.Invoke();
+            _events.RaiseAnimationChainsChanged();
+        }
+
         public void DeleteFrames(List<AnimationFrameSave> frames)
         {
             // The incoming frames can span multiple chains (a cross-chain tree multi-select,
@@ -1291,7 +1356,14 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFramesRelative(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave chain, int delta)
         {
-            if (delta == 0 || frames.Count == 0 || IsChainLocked(chain)) return;
+            if (BuildMoveFramesRelative(frames, chain, delta) is { } command)
+                _undoManager.Execute(command);
+        }
+
+        private IUndoableCommand? BuildMoveFramesRelative(IReadOnlyList<AnimationFrameSave> frames,
+            AnimationChainSave chain, int delta)
+        {
+            if (delta == 0 || frames.Count == 0 || IsChainLocked(chain)) return null;
 
             var indices = frames
                 .Select(f => chain.Frames.IndexOf(f))
@@ -1299,15 +1371,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Distinct()
                 .OrderBy(i => i)
                 .ToList();
-            if (indices.Count == 0) return;
+            if (indices.Count == 0) return null;
 
             // Rigid group: if shifting either edge by delta would cross a boundary, no-op.
-            if (indices[0] + delta < 0) return;
-            if (indices[^1] + delta > chain.Frames.Count - 1) return;
+            if (indices[0] + delta < 0) return null;
+            if (indices[^1] + delta > chain.Frames.Count - 1) return null;
 
             var selected = new HashSet<int>(indices);
 
-            _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
+            return new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () =>
                 {
@@ -1329,14 +1401,20 @@ namespace AnimationEditor.Core.CommandsAndState
                 },
                 this, _events, () => RefreshTreeNode(chain),
                 CountAwareMoveDescription(indices.Count, "Frame", "Frames",
-                    delta > 0 ? "Down" : "Up", frameContextName: chain.Name)));
+                    delta > 0 ? "Down" : "Up", frameContextName: chain.Name));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveChainsRelative"/>
         public void MoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta)
         {
+            if (BuildMoveChainsRelative(chains, delta) is { } command)
+                _undoManager.Execute(command);
+        }
+
+        private IUndoableCommand? BuildMoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta)
+        {
             var list = _pm.AnimationChainListSave?.AnimationChains;
-            if (list is null || delta == 0 || chains.Count == 0) return;
+            if (list is null || delta == 0 || chains.Count == 0) return null;
 
             var indices = chains
                 .Select(c => list.IndexOf(c))
@@ -1344,15 +1422,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Distinct()
                 .OrderBy(i => i)
                 .ToList();
-            if (indices.Count == 0) return;
+            if (indices.Count == 0) return null;
 
             // Rigid group: if shifting either edge by delta would cross a boundary, no-op.
-            if (indices[0] + delta < 0) return;
-            if (indices[^1] + delta > list.Count - 1) return;
+            if (indices[0] + delta < 0) return null;
+            if (indices[^1] + delta > list.Count - 1) return null;
 
             var selected = new HashSet<int>(indices);
 
-            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+            return new ReorderCommand<AnimationChainSave>(
                 list,
                 () =>
                 {
@@ -1375,7 +1453,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, RefreshTreeView,
                 CountAwareMoveDescription(indices.Count, "Animation", "Animations",
                     delta > 0 ? "Down" : "Up",
-                    itemName: indices.Count == 1 ? list[indices[0]].Name : null)));
+                    itemName: indices.Count == 1 ? list[indices[0]].Name : null));
         }
 
         /// <summary>
@@ -1465,6 +1543,10 @@ namespace AnimationEditor.Core.CommandsAndState
                 var ownerFrame = _objectFinder.GetAnimationFrameContaining(shape);
                 if (ownerFrame is not null) MoveShape(shape, ownerFrame, delta);
             }
+            else if (SelectionSpansSeveralContainers())
+            {
+                ReorderMixedSelection(delta);
+            }
             else if (frame is not null && chain is not null)
             {
                 // Reorder the whole multi-selection together (gaps preserved); fall back to
@@ -1487,6 +1569,46 @@ namespace AnimationEditor.Core.CommandsAndState
                 else
                     MoveChain(chain, delta);
             }
+        }
+
+        /// <summary>
+        /// True when a reorder has to move things in more than one container: whole animations
+        /// together with frames, or frames spread over several animations.
+        /// </summary>
+        private bool SelectionSpansSeveralContainers()
+        {
+            var nodes = _selectedState.SelectedNodes;
+            if (nodes.Any(n => n is AnimationChainSave) && nodes.Any(n => n is AnimationFrameSave))
+                return true;
+            return _selectedState.SelectedFrames
+                .Select(f => _objectFinder.GetAnimationChainContaining(f))
+                .Distinct()
+                .Count() > 1;
+        }
+
+        /// <summary>
+        /// Reorders animations and frames from several containers in one undo step: the
+        /// animations move as a block in the list, and each animation's selected frames move as a
+        /// block within it. Frames of a locked animation stay put; a locked animation itself still moves.
+        /// </summary>
+        private void ReorderMixedSelection(int delta)
+        {
+            var commands = new List<IUndoableCommand>();
+            if (BuildMoveChainsRelative(_selectedState.SelectedChains, delta) is { } chainMove)
+                commands.Add(chainMove);
+            foreach (var group in _selectedState.SelectedFrames
+                .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
+                .Where(x => x.Chain is not null)
+                .GroupBy(x => x.Chain!))
+            {
+                if (BuildMoveFramesRelative(group.Select(x => x.Frame).ToList(), group.Key, delta) is { } frameMove)
+                    commands.Add(frameMove);
+            }
+
+            if (commands.Count == 1)
+                _undoManager.Execute(commands[0]);
+            else if (commands.Count > 1)
+                _undoManager.Execute(new CompositeCommand(commands, delta > 0 ? "Move Selection Down" : "Move Selection Up"));
         }
 
         public void SetFrameFlip(
