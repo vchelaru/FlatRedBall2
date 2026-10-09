@@ -26,4 +26,4 @@ The portable build doesn't register anything. To open files with it, use **Open 
 
 ## Where to Go Next
 
-If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the [How-To Guides](how-to/README.md).
+To get the editor running, see [Install](install.md). If you'd like to jump in, check out the [Quick Start](quick-start.md) guide, or the [How-To Guides](how-to/README.md).

@@ -7,6 +7,7 @@
 ## AnimationEditor
 
 * [AnimationEditor](animationeditor/readme.md)
+* [Install](animationeditor/install.md)
 * [Quick Start](animationeditor/quick-start.md)
 * [How-To Guides](animationeditor/how-to/README.md)
   * [Edit Animations](animationeditor/how-to/edit-animations.md)
@@ -16,6 +17,7 @@
   * [Add Shapes to Frames](animationeditor/how-to/add-shapes-to-frames.md)
   * [Use Lock and Multi-Select](animationeditor/how-to/use-lock-and-multi-select.md)
   * [Work with Project Folders](animationeditor/how-to/work-with-project-folders.md)
+* [Build from Source](animationeditor/build-from-source.md)
 * [Code](animationeditor/api/README.md)
   * [Animations in MonoGame](animationeditor/api/loading-and-drawing-achx-animations.md)
   * [Reading Raw Animation Data](animationeditor/api/reading-raw-animation-data.md)
