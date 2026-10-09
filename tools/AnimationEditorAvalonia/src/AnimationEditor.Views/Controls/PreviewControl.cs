@@ -187,17 +187,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private float _frameDragStartY;
     private Point _frameDragAnchor;
 
-    // -- Whole-animation (chain) drag, and multi-frame drag ----------------------
-    // Same gesture as the single-frame drag above, but shared by two bulk scopes that both
-    // record one MoveFrameOffsetBulkCommand:
-    //  - Whole chain (issue #912): a chain is selected with no single frame pinned and
-    //    nothing multi-selected (IsWholeChainDragTarget) — dragging the currently-playing
-    //    frame's sprite shifts every frame in the chain.
-    //  - Multi-frame (issue #917): 2+ individual frames are multi-selected
-    //    (IsMultiFrameDragTarget) — dragging the displayed frame's sprite shifts only
-    //    SelectedFrames. Each frame keeps its own starting RelativeX/Y either way. Mutually
-    //    exclusive with _draggingFrame; reuses _frameDragAnchor for the shared world-space
-    //    delta math.
+    // -- Bulk sprite drag --------------------------------------------------------
+    // Same gesture as the single-frame drag above, for any grab that moves more than one frame:
+    // whole animations (#912), multi-selected frames (#917), or a mix of both. What moves is
+    // decided per selected item by ResolveSpriteDragScope; locked items are skipped. Each frame
+    // keeps its own starting RelativeX/Y and one MoveFrameOffsetBulkCommand is recorded. Mutually
+    // exclusive with _draggingFrame; reuses _frameDragAnchor for the shared world-space delta math.
     private AnimationFrameSave[]? _draggingChainFrames;
     private float[]? _chainFrameStartX;
     private float[]? _chainFrameStartY;
@@ -1240,26 +1235,21 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     }
 
     /// <summary>
-    /// Test-only: applies a world-space drag delta to every frame in the selected chain's
-    /// <see cref="AnimationFrameSave.RelativeX"/>/<see cref="AnimationFrameSave.RelativeY"/>,
-    /// each frame keeping its own starting offset, and commits as one undo step. When 2+ chains
-    /// are selected (<see cref="ISelectedState.SelectedChains"/>), every unlocked one moves
-    /// together — see <see cref="ResolveWholeChainDragFrames"/> (issue #1052). Bypasses coordinate
-    /// conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op unless
-    /// <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate <see cref="OnPointerPressed"/>
-    /// applies before starting a live whole-animation drag. <paramref name="shiftHeld"/> mirrors the
-    /// live Shift-axis-lock (#1022) applied in <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
+    /// Test-only: applies a world-space drag delta to everything <see cref="ResolveSpriteDragScope"/>
+    /// would move for a sprite grab (every unlocked selected animation's frames plus every unlocked
+    /// selected frame), each frame keeping its own starting offset, and commits as one undo step.
+    /// No-op when the selection is a single frame (see <see cref="SimulateFrameDrag"/>) or nothing
+    /// unlocked is selected. Bypasses coordinate conversion and the sprite hit-test, so results are
+    /// independent of zoom/pan/OffsetMultiplier. <paramref name="shiftHeld"/> mirrors the live
+    /// Shift-axis-lock (#1022) applied in <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
     internal void SimulateChainDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
-        if (!IsWholeChainDragTarget) return;
+        if (ResolveSpriteDragScope(0, 0, requireHit: false) is not { IsSingleFrame: false } scope) return;
 
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
-        var chain = _selectedState!.SelectedChain!;
-        if (chain.IsLocked) return;
-
-        _draggingChainFrames = ResolveWholeChainDragFrames(chain);
+        _draggingChainFrames = scope.Frames;
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
@@ -1269,38 +1259,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         }
         CommitChainDrag();
     }
+
+    /// <summary>Test-only: same drag as <see cref="SimulateChainDrag"/>; kept as a second name for tests of the multi-frame scope.</summary>
+    internal void SimulateMultiFrameDrag(float worldDx, float worldDy, bool shiftHeld = false) =>
+        SimulateChainDrag(worldDx, worldDy, shiftHeld);
+
 
     /// <summary>
-    /// Test-only: applies a world-space drag delta to every frame in
-    /// <see cref="ISelectedState.SelectedFrames"/> (2+ individually multi-selected frames, not a
-    /// whole chain), each frame keeping its own starting offset, and commits as one undo step.
-    /// Bypasses coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier.
-    /// No-op unless <see cref="IsMultiFrameDragTarget"/> holds, mirroring the gate
-    /// <see cref="OnPointerPressed"/> applies before starting a live multi-frame drag. Mirrors
-    /// <see cref="SimulateChainDrag"/>, scoped to the multi-selection instead of the whole chain.
-    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
-    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
-    /// </summary>
-    internal void SimulateMultiFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
-    {
-        if (!IsMultiFrameDragTarget) return;
-
-        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
-
-        // A locked chain in the selection keeps its frames still: drag only the unlocked
-        // subset rather than aborting the whole gesture (mirrors the bulk skip-locked-entries
-        // pattern used elsewhere for a selection spanning multiple chains).
-        _draggingChainFrames = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
-        if (_draggingChainFrames.Length == 0) { _draggingChainFrames = null; return; }
-        _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
-        _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
-        for (int i = 0; i < _draggingChainFrames.Length; i++)
-        {
-            _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX[i] + worldDx);
-            _draggingChainFrames[i].RelativeY = SnapToPixel(_chainFrameStartY[i] + worldDy);
-        }
-        CommitChainDrag();
-    }
+    /// Test-only: simulates a wheel-zoom notch at the given
     /// control-space point and runs the resulting smooth-zoom animation to completion
     /// synchronously, so the camera lands on its settled state. Mirrors
     /// <see cref="OnPointerWheelChanged"/>. Use <see cref="SimulateWheelZoomBegin"/> instead to
@@ -1685,26 +1651,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         var hitShape = HitTestShape((float)pos.X, (float)pos.Y);
         if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
             cursorType = StandardCursorType.SizeAll;
-        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y) && !IsHoverFrameSpriteFullyLocked())
+        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
             cursorType = StandardCursorType.SizeAll;
         return cursorType;
-    }
-
-    /// <summary>
-    /// True when the frame-sprite drag <see cref="HitTestFrameSprite"/> resolved to would be a
-    /// complete no-op due to locking -- mirrors <see cref="OnPointerPressed"/>'s frame-sprite
-    /// branch exactly, so the hover cursor and the real drag-start guard agree on what's
-    /// draggable. A multi-frame selection with at least one unlocked frame still drags (the
-    /// unlocked subset), so only "every candidate frame is locked" suppresses the cursor. The
-    /// whole-chain case needs no branch here: <see cref="ResolveWholeChainDragTarget"/> already
-    /// only lets <see cref="HitTestFrameSprite"/> hit on an unlocked chain, so by the time this
-    /// runs it can never be "fully locked" (#1032 follow-up).
-    /// </summary>
-    private bool IsHoverFrameSpriteFullyLocked()
-    {
-        if (IsMultiFrameDragTarget)
-            return _selectedState!.SelectedFrames.All(IsFrameLocked);
-        return IsFrameLocked(_selectedState!.SelectedFrame);
     }
 
     /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/> would apply at the
@@ -2502,115 +2451,71 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         return false;
     }
 
-    /// <summary>
-    /// <c>true</c> when the target frame <see cref="HitTestFrameSprite"/> would hit is the whole
-    /// selected chain rather than a single pinned frame — i.e. a chain is selected but
-    /// <see cref="ISelectedState.SelectedFrame"/> is null and nothing more specific is
-    /// multi-selected. Mirrors <see cref="AnimationEditor.App.Controls.WireframeControl"/>'s
-    /// <c>PrimaryFrameRect</c>-returns-null fallback into "drag the whole chain" (issue #912).
-    /// When <see cref="ISelectedState.SelectedChains"/> holds 2+ chains (group preview, #576),
-    /// <see cref="ResolveWholeChainDragFrames"/> extends this into a bulk drag of every unlocked
-    /// selected chain together (issue #1052 follow-up to #917) — not just the one under the cursor.
-    /// </summary>
-    private bool IsWholeChainDragTarget =>
-        _selectedState!.SelectedFrame is null &&
-        _selectedState!.SelectedFrames.Count == 0 &&
-        _selectedState!.SelectedChain is not null;
+    /// <summary>What a sprite grab moves: <see cref="Frames"/>, and whether it is the lone-selected-frame case.</summary>
+    private readonly record struct SpriteDragScope(AnimationFrameSave[] Frames, bool IsSingleFrame);
 
     /// <summary>
-    /// Frames to move for a whole-chain drag once <paramref name="hitChain"/> — the chain actually
-    /// under the cursor, from <see cref="ResolveWholeChainDragTarget"/> or the pinned
-    /// <see cref="ISelectedState.SelectedChain"/> — is known. A single selected chain keeps the
-    /// original single-chain behavior; 2+ selected chains (<see cref="ISelectedState.SelectedChains"/>)
-    /// drag every unlocked one together, mirroring how <see cref="IsMultiFrameDragTarget"/> drags
-    /// the whole multi-selection when the user grabs any one of its members (issue #1052).
+    /// Resolves a sprite grab at (<paramref name="px"/>, <paramref name="py"/>), item by item rather
+    /// than by the overall shape of the selection, so any mix of whole animations and individual
+    /// frames (a group preview with one track playing and another pinned to a frame) is handled the
+    /// same way. Every unlocked selected animation contributes all its frames and every unlocked
+    /// selected frame contributes itself; locked ones contribute nothing, so they neither move nor
+    /// block the rest. The grab hits when the cursor is over the sprite currently shown for any
+    /// contributing animation or frame. Returns null when nothing unlocked is grabbed.
+    /// <paramref name="requireHit"/> false skips the cursor test (test helpers).
     /// </summary>
-    private AnimationFrameSave[] ResolveWholeChainDragFrames(AnimationChainSave hitChain)
+    private SpriteDragScope? ResolveSpriteDragScope(float px, float py, bool requireHit = true)
     {
-        if (_selectedState!.SelectedChains.Count <= 1) return hitChain.Frames.ToArray();
-        return _selectedState!.SelectedChains.Where(c => !c.IsLocked).SelectMany(c => c.Frames).ToArray();
+        var moves = new List<AnimationFrameSave>();
+        bool hit = !requireHit;
+
+        var chains = SelectedChainsForSpriteDrag();
+        foreach (var chain in chains)
+        {
+            if (chain.IsLocked) continue;
+            moves.AddRange(chain.Frames);
+            if (!hit && GetCurrentPlaybackFrame(chain) is { } shown && HitTestFrameFootprint(shown, px, py))
+                hit = true;
+        }
+
+        var selectedFrames = _selectedState!.SelectedFrames;
+        foreach (var frame in selectedFrames)
+        {
+            if (IsFrameLocked(frame)) continue;
+            moves.Add(frame);
+            if (!hit && IsFrameShown(frame) && HitTestFrameFootprint(frame, px, py))
+                hit = true;
+        }
+
+        if (!hit || moves.Count == 0) return null;
+        return new SpriteDragScope(moves.Distinct().ToArray(), chains.Count == 0 && selectedFrames.Count == 1);
     }
 
     /// <summary>
-    /// <c>true</c> when 2+ individual frames are multi-selected via
-    /// <see cref="ISelectedState.SelectedFrames"/> — the third drag scope alongside
-    /// <see cref="IsWholeChainDragTarget"/> (issue #917). Unlike <see cref="IsWholeChainDragTarget"/>,
-    /// this does not require <see cref="ISelectedState.SelectedFrame"/> to be null: ctrl/shift-clicking
-    /// frames in the tree pins the last-clicked one as <c>SelectedFrame</c> (so its sprite is what
-    /// actually renders in Preview — see <see cref="BuildRenderSnapshot"/>'s <c>selectedFrame</c> use),
-    /// and dragging that pinned sprite is how the user grabs the multi-selection in practice.
+    /// The animations a sprite grab treats as wholly selected: those in the multi-selection, or the
+    /// singular <see cref="ISelectedState.SelectedChain"/> when nothing finer is selected
+    /// (mirrors <see cref="WireframeControl"/>'s fall back to "drag the whole chain", issue #912).
     /// </summary>
-    private bool IsMultiFrameDragTarget =>
-        _selectedState!.SelectedFrames.Count > 1;
-
-    /// <summary>
-    /// Returns <c>true</c> if (<paramref name="px"/>, <paramref name="py"/>) lands on the rendered
-    /// footprint of the drag target's sprite, in screen space. Gates the frame-offset drag
-    /// fallback in <see cref="OnPointerPressed"/>. The target is the pinned <see cref="ISelectedState.SelectedFrame"/>
-    /// when one is set (whether alone or as part of a multi-selection — see
-    /// <see cref="IsMultiFrameDragTarget"/>); when none is pinned, it falls back to
-    /// <see cref="ResolveWholeChainDragTarget"/> (drag the whole chain — only an unlocked
-    /// candidate counts as a hit) or the currently-playing frame gated by
-    /// <see cref="IsMultiFrameDragTarget"/> (drag just the multi-selection — only if the playing
-    /// frame is actually one of <see cref="ISelectedState.SelectedFrames"/>). Requires the target
-    /// frame's texture to already be decoded (mirrors <see cref="ComputeContentExtentScreenPx"/>'s
-    /// own frame-footprint math).
-    /// </summary>
-    private bool HitTestFrameSprite(float px, float py)
+    private List<AnimationChainSave> SelectedChainsForSpriteDrag()
     {
-        var frame = _selectedState!.SelectedFrame;
-        if (frame is null)
-        {
-            if (IsWholeChainDragTarget)
-            {
-                return ResolveWholeChainDragTarget(px, py) is not null;
-            }
-            else if (IsMultiFrameDragTarget)
-            {
-                frame = GetCurrentPlaybackFrame();
-                if (frame is null || !_selectedState!.SelectedFrames.Contains(frame)) return false;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else if (_selectedState!.SelectedFrames.Count > 1 && !_selectedState!.SelectedFrames.Contains(frame))
-        {
-            return false;
-        }
-        return HitTestFrameFootprint(frame, px, py);
+        var chains = _selectedState!.SelectedChains;
+        if (chains.Count == 0 && _selectedState.SelectedFrame is null
+            && _selectedState.SelectedFrames.Count == 0 && _selectedState.SelectedChain is { } single)
+            return new List<AnimationChainSave> { single };
+        return chains;
     }
 
-    /// <summary>
-    /// Resolves which whole selected-and-shown chain a hover/drag at (<paramref name="px"/>,
-    /// <paramref name="py"/>) should target: the pinned <see cref="ISelectedState.SelectedChain"/>
-    /// when it is unlocked and its current-playback frame's sprite is under the cursor, else the
-    /// first other chain in <see cref="ISelectedState.SelectedChains"/> (e.g. a group-preview
-    /// multi-selection, see <see cref="IsGroupPreviewActive"/>) that is unlocked and hits. A locked
-    /// chain shown alongside an unlocked one at the same screen position must never swallow the
-    /// unlocked chain's hit (#1032 follow-up). Only meaningful when
-    /// <see cref="IsWholeChainDragTarget"/> holds; returns null when nothing unlocked is under the
-    /// cursor.
-    /// </summary>
-    private AnimationChainSave? ResolveWholeChainDragTarget(float px, float py)
-    {
-        var pinned = _selectedState!.SelectedChain;
-        if (pinned is not null && !pinned.IsLocked &&
-            GetCurrentPlaybackFrame(pinned) is { } pinnedFrame &&
-            HitTestFrameFootprint(pinnedFrame, px, py))
-        {
-            return pinned;
-        }
+    /// <summary>True when <paramref name="frame"/> is the sprite the preview currently draws for its animation.</summary>
+    private bool IsFrameShown(AnimationFrameSave frame) =>
+        ReferenceEquals(_selectedState!.SelectedFrame, frame)
+        || (FindOwningChain(frame) is { } owner && ReferenceEquals(GetCurrentPlaybackFrame(owner), frame));
 
-        foreach (var chain in _selectedState!.SelectedChains)
-        {
-            if (ReferenceEquals(chain, pinned) || chain.IsLocked) continue;
-            if (GetCurrentPlaybackFrame(chain) is { } frame && HitTestFrameFootprint(frame, px, py))
-                return chain;
-        }
-        return null;
-    }
+    /// <summary>
+    /// <c>true</c> when (<paramref name="px"/>, <paramref name="py"/>) grabs something draggable;
+    /// gates the sprite drag in <see cref="OnPointerPressed"/> and the move cursor on hover. See
+    /// <see cref="ResolveSpriteDragScope"/>.
+    /// </summary>
+    private bool HitTestFrameSprite(float px, float py) => ResolveSpriteDragScope(px, py) is not null;
 
     /// <summary>
     /// Returns <c>true</c> if (<paramref name="px"/>, <paramref name="py"/>) lands on
@@ -2941,40 +2846,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // Nothing above matched — try to drag the selected frame's sprite, or (when no single
         // frame is pinned) the whole selected chain together, or (when 2+ frames are
         // multi-selected) just that subset together.
-        if (HitTestFrameSprite(px, py))
+        if (ResolveSpriteDragScope(px, py) is { } scope)
         {
-            if (IsWholeChainDragTarget)
+            if (scope.IsSingleFrame)
             {
-                // ResolveWholeChainDragTarget considers every chain in SelectedChains, not just
-                // the pinned SelectedChain, so a locked chain shown alongside an unlocked one at
-                // this same screen position doesn't swallow the unlocked chain's drag (#1032
-                // follow-up). HitTestFrameSprite above already required a non-null result.
-                var chain = ResolveWholeChainDragTarget(px, py);
-                if (chain is null) return;
-                _draggingChainFrames = ResolveWholeChainDragFrames(chain);
-                _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
-                _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
-                _frameDragAnchor     = pos;
-            }
-            else if (IsMultiFrameDragTarget)
-            {
-                // A locked chain in the selection keeps its frames still: drag only the
-                // unlocked subset rather than aborting the whole gesture.
-                var draggable = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
-                if (draggable.Length == 0) return;
-                _draggingChainFrames = draggable;
-                _chainFrameStartX    = draggable.Select(f => f.RelativeX).ToArray();
-                _chainFrameStartY    = draggable.Select(f => f.RelativeY).ToArray();
-                _frameDragAnchor     = pos;
-            }
-            else
-            {
-                var frame = _selectedState!.SelectedFrame!;
-                if (IsFrameLocked(frame)) return;
+                var frame = scope.Frames[0];
                 _draggingFrame   = frame;
                 _frameDragAnchor = pos;
                 _frameDragStartX = frame.RelativeX;
                 _frameDragStartY = frame.RelativeY;
+            }
+            else
+            {
+                _draggingChainFrames = scope.Frames;
+                _chainFrameStartX    = scope.Frames.Select(f => f.RelativeX).ToArray();
+                _chainFrameStartY    = scope.Frames.Select(f => f.RelativeY).ToArray();
+                _frameDragAnchor     = pos;
             }
             e.Pointer.Capture(this);
         }
