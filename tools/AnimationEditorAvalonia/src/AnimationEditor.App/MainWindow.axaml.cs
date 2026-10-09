@@ -1390,7 +1390,7 @@ public partial class MainWindow : Window
 
         WireframeCtrl.LoadTexture(absolutePath);
 
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
 
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
@@ -5426,7 +5426,7 @@ public partial class MainWindow : Window
     private void ApplyTextureName()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
 
         var inputText = PropTextureName.Text?.Trim() ?? string.Empty;
@@ -5512,7 +5512,7 @@ public partial class MainWindow : Window
     /// </summary>
     internal async Task ApplyPickedTextureAsync(string pickedPath)
     {
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
 
         string? resolvedAbsPath = await ResolveTextureForProjectAsync(pickedPath,
@@ -5643,6 +5643,25 @@ public partial class MainWindow : Window
     private bool IsShapeLocked(object? shape) =>
         shape is ShapeSave s && IsFrameLocked(_objectFinder.GetAnimationFrameContaining(s));
 
+    /// <summary>
+    /// The selected frames the inspector shows and edits: those in unlocked chains, so a locked
+    /// frame neither forces "(mixed)" nor disables the panel. When every selected frame is locked
+    /// they are all returned, so the (disabled) panel still shows their values.
+    /// </summary>
+    private List<AnimationFrameSave> InspectorFrames()
+    {
+        var all = _selectedState.SelectedFrames;
+        var unlocked = all.Where(f => !IsFrameLocked(f)).ToList();
+        return unlocked.Count > 0 ? unlocked : all;
+    }
+
+    /// <summary>Shape counterpart of <see cref="InspectorFrames"/>.</summary>
+    private List<T> InspectorShapes<T>(List<T> all) where T : ShapeSave
+    {
+        var unlocked = all.Where(s => !IsShapeLocked(s)).ToList();
+        return unlocked.Count > 0 ? unlocked : all;
+    }
+
     private void RefreshPropertyPanel()
     {
         // Deliberately does NOT call SealPendingEdits here -- this method also runs after every
@@ -5727,26 +5746,35 @@ public partial class MainWindow : Window
             // panel would silently discard input with no indication why (#1032 follow-up).
             // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
             // only way to unlock a chain from the inspector.
-            PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
-            RefreshFrameEventsSection(frame);
-            PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
-            PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
-            PropPolygonPanel.IsEnabled = !IsShapeLocked(poly);
+            // With a mixed selection the panel stays enabled while any selected item is editable;
+            // the locked ones are skipped when showing values and when applying edits.
+            var frames = InspectorFrames();
+            var panelFrame = frames.FirstOrDefault() ?? frame;
+            var rects = InspectorShapes(_selectedState.SelectedRectangles);
+            var circles = InspectorShapes(_selectedState.SelectedCircles);
+            var polygons = InspectorShapes(_selectedState.SelectedPolygons);
+            PropFramePanel.IsEnabled  = !IsFrameLocked(panelFrame);
+            RefreshFrameEventsSection(panelFrame);
+            PropRectPanel.IsEnabled   = !IsShapeLocked(rects.FirstOrDefault() ?? rect);
+            PropCirclePanel.IsEnabled = !IsShapeLocked(circles.FirstOrDefault() ?? circ);
+            PropPolygonPanel.IsEnabled = !IsShapeLocked(polygons.FirstOrDefault() ?? poly);
+            // Vertex rows edit the primary polygon only, so they follow its lock, not the selection's.
+            PropPolygonVertices.IsEnabled = !IsShapeLocked(poly);
+            PropPolygonAddVertex.IsEnabled = !IsShapeLocked(poly);
 
             if (frame is not null && !hasShapeSelection)
             {
+                var shownFrame = panelFrame!;
                 // When multiple frames are selected and disagree on a property, show that field
                 // blank with a "(mixed)" placeholder instead of one frame's value (issue #571) —
                 // editing it then applies the new value to every selected frame; leaving it blank
                 // applies nothing (see the `!PropXxx.Value.HasValue` guards in the Apply* methods).
-                var frames = _selectedState.SelectedFrames;
-
                 bool flipHMixed = frames.Select(f => f.FlipHorizontal).Distinct().Count() > 1;
                 bool flipVMixed = frames.Select(f => f.FlipVertical).Distinct().Count() > 1;
                 bool flipDMixed = frames.Select(f => f.FlipDiagonal).Distinct().Count() > 1;
-                PropFlipH.IsChecked = flipHMixed ? null : frame.FlipHorizontal;
-                PropFlipV.IsChecked = flipVMixed ? null : frame.FlipVertical;
-                PropFlipD.IsChecked = flipDMixed ? null : frame.FlipDiagonal;
+                PropFlipH.IsChecked = flipHMixed ? null : shownFrame.FlipHorizontal;
+                PropFlipV.IsChecked = flipVMixed ? null : shownFrame.FlipVertical;
+                PropFlipD.IsChecked = flipDMixed ? null : shownFrame.FlipDiagonal;
 
                 SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
                 SetValueOrMixed(PropRelX, frames.Select(f => (decimal)f.RelativeX).ToList());
@@ -5758,18 +5786,18 @@ public partial class MainWindow : Window
                 bool alphaMixed = frames.Select(f => f.Alpha).Distinct().Count() > 1;
                 bool opMixed    = frames.Select(f => f.ColorOperation).Distinct().Count() > 1;
 
-                PropRed.Value   = redMixed   ? null : (frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null);
-                PropGreen.Value = greenMixed ? null : (frame.Green.HasValue ? frame.Green.Value : (decimal?)null);
-                PropBlue.Value  = blueMixed  ? null : (frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null);
-                PropAlpha.Value = alphaMixed ? null : (frame.Alpha.HasValue ? frame.Alpha.Value : (decimal?)null);
+                PropRed.Value   = redMixed   ? null : (shownFrame.Red.HasValue   ? shownFrame.Red.Value   : (decimal?)null);
+                PropGreen.Value = greenMixed ? null : (shownFrame.Green.HasValue ? shownFrame.Green.Value : (decimal?)null);
+                PropBlue.Value  = blueMixed  ? null : (shownFrame.Blue.HasValue  ? shownFrame.Blue.Value  : (decimal?)null);
+                PropAlpha.Value = alphaMixed ? null : (shownFrame.Alpha.HasValue ? shownFrame.Alpha.Value : (decimal?)null);
 
                 // Ghost the sticky effective value in each blank field: an omitted channel holds
                 // whatever an earlier frame last set (climbing back), or the operation's identity
                 // (Add → 0, else 255) when nothing ever set it. This makes a blank field read as the
                 // value a runtime actually applies, instead of implying "reset to default". Mixed
                 // takes priority — it means the selection disagrees, not that a value is inherited.
-                var chain = _selectedState.SelectedChain;
-                int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
+                var chain = _objectFinder.GetAnimationChainContaining(shownFrame) ?? _selectedState.SelectedChain;
+                int frameIndex = chain?.Frames.IndexOf(shownFrame) ?? -1;
                 var effective = frameIndex >= 0
                     ? EffectiveFrameColor.Resolve(chain!.Frames, frameIndex)
                     : default;
@@ -5784,7 +5812,7 @@ public partial class MainWindow : Window
                     PropColorMode.SelectedIndex = -1;
                     PropColorMode.PlaceholderText = "(mixed)";
                 }
-                else if (frame.ColorOperation is ColorOperation op)
+                else if (shownFrame.ColorOperation is ColorOperation op)
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
@@ -5814,7 +5842,7 @@ public partial class MainWindow : Window
                 PropFrameTsxTileText.IsVisible = _projectManager.IsNativeTsxProject;
                 if (_projectManager.IsNativeTsxProject)
                 {
-                    PropFrameTsxTileText.Text = _projectManager.ComputeFrameTileId(frame) is { } tileId
+                    PropFrameTsxTileText.Text = _projectManager.ComputeFrameTileId(shownFrame) is { } tileId
                         ? $"Tile: {tileId}"
                         : "Tile: (doesn't map to a whole tile)";
                 }
@@ -5828,7 +5856,6 @@ public partial class MainWindow : Window
                 // the same pattern: shape names only need to be unique within a frame (not across
                 // frames), so batch-renaming is safe unless two selected rects share a frame — see
                 // SetNameOrMixed and ApplyRectProps.
-                var rects = _selectedState.SelectedRectangles;
                 bool rectsCollide = rects.Count > 1 &&
                     _appCommands.HasSameFrameNameCollision(rects.Cast<object>().ToList());
                 SetNameOrMixed(PropRectName, rects.Select(r => r.Name ?? "").ToList(), rectsCollide);
@@ -5840,7 +5867,6 @@ public partial class MainWindow : Window
 
             if (circ is not null)
             {
-                var circles = _selectedState.SelectedCircles;
                 bool circlesCollide = circles.Count > 1 &&
                     _appCommands.HasSameFrameNameCollision(circles.Cast<object>().ToList());
                 SetNameOrMixed(PropCircleName, circles.Select(c => c.Name ?? "").ToList(), circlesCollide);
@@ -5869,7 +5895,7 @@ public partial class MainWindow : Window
     {
         // Name/X/Y apply to every selected polygon, so they show "(mixed)" when the selection
         // disagrees, exactly like multi-selected rects and circles (see ApplyRectProps).
-        var polygons = _selectedState.SelectedPolygons;
+        var polygons = InspectorShapes(_selectedState.SelectedPolygons);
         bool namesCollide = polygons.Count > 1 &&
             _appCommands.HasSameFrameNameCollision(polygons.Cast<object>().ToList());
         SetNameOrMixed(PropPolygonName, polygons.Select(p => p.Name ?? "").ToList(), namesCollide);
@@ -5999,9 +6025,9 @@ public partial class MainWindow : Window
     private void ApplyPolygonProps()
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
-        var polygons = _selectedState.SelectedPolygons;
+        var polygons = InspectorShapes(_selectedState.SelectedPolygons);
 
-        if (polygons.Count > 1)
+        if (_selectedState.SelectedPolygons.Count > 1)
         {
             // A null component means "showing (mixed)/disabled, not edited" -- see ApplyRectProps.
             NumericEdit? bx = EditOf(PropPolygonX);
@@ -6092,7 +6118,7 @@ public partial class MainWindow : Window
     private void ApplyFrameFlip()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         // ToggleButton.IsChecked is already nullable: null means the checkbox is showing the
         // mixed/indeterminate state (the selection disagrees and the user didn't touch it), so
@@ -6103,7 +6129,7 @@ public partial class MainWindow : Window
     private void ApplyFrameLen()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0 || EditOf(PropFrameLen, PropFrameLen.Value) is not { } length) return;
         _appCommands.SetFrameLength(frames, length);
     }
@@ -6111,7 +6137,7 @@ public partial class MainWindow : Window
     private void ApplyFrameRelative()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
         // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
@@ -6127,7 +6153,7 @@ public partial class MainWindow : Window
     private void ApplyFrameColor(NumericUpDown field)
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         ChannelEdit Edit(NumericUpDown channel, Func<AnimationFrameSave, int?> value) =>
             ReferenceEquals(field, channel) ? ChannelEditOf(channel, frames.Select(value)) : ChannelEdit.Keep;
@@ -6137,7 +6163,7 @@ public partial class MainWindow : Window
     private void ApplyFrameAlpha()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, frames.Select(f => f.Alpha)));
     }
@@ -6165,7 +6191,7 @@ public partial class MainWindow : Window
     private void ApplyFrameColorOperation(ColorOperation? operation)
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         if (frames.Any(f => f.ColorOperation != operation))
         {
@@ -6179,7 +6205,7 @@ public partial class MainWindow : Window
     private void ApplyFramePixelCoords()
     {
         if (_suppressPropRefresh) return;
-        var frames = _selectedState.SelectedFrames;
+        var frames = InspectorFrames();
         if (frames.Count == 0) return;
         var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
         if (bmpW <= 0 || bmpH <= 0) return;
@@ -6199,7 +6225,7 @@ public partial class MainWindow : Window
     private void ApplyRectProps()
     {
         if (_suppressPropRefresh) return;
-        var rects = _selectedState.SelectedRectangles;
+        var rects = InspectorShapes(_selectedState.SelectedRectangles);
         if (rects.Count == 0) return;
 
         // A null component here means "still showing (mixed)/disabled, not edited" — leave that
@@ -6219,7 +6245,7 @@ public partial class MainWindow : Window
     private void ApplyCircleProps()
     {
         if (_suppressPropRefresh) return;
-        var circles = _selectedState.SelectedCircles;
+        var circles = InspectorShapes(_selectedState.SelectedCircles);
         if (circles.Count == 0) return;
 
         // See ApplyRectProps for the null-means-"don't touch" / same-frame-collision semantics.
