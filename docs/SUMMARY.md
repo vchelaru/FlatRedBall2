@@ -14,6 +14,7 @@
   * [Preview an Animation](animationeditor/how-to/preview-an-animation.md)
   * [Work with Tiled TileSets (.tsx)](animationeditor/how-to/work-with-tiled-tilesets-.tsx.md)
   * [Add Shapes to Frames](animationeditor/how-to/add-shapes-to-frames.md)
+  * [Use Lock and Multi-Select](animationeditor/how-to/use-lock-and-multi-select.md)
   * [Work with Project Folders](animationeditor/how-to/work-with-project-folders.md)
 * [Code](animationeditor/api/README.md)
   * [Animations in MonoGame](animationeditor/api/loading-and-drawing-achx-animations.md)
