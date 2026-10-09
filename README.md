@@ -36,7 +36,7 @@ Each sample is a complete runnable game built on the engine — open the source 
 
 The downloads above always resolve to the latest published release; older release downloads are on the [Releases page](https://github.com/vchelaru/FlatRedBall2/releases).
 
-Binaries are unsigned. Windows SmartScreen will warn on first run ("More info" → "Run anyway"); macOS Gatekeeper will refuse to open directly — right-click the executable, choose Open, then confirm.
+Binaries are unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first run. See the [install guide](docs/animationeditor/install.md) for the steps for each platform.
 
 ## Features
 
