@@ -56,6 +56,18 @@ public static class TreeBuilder
                 node.HasValidationIssue = chainNamesWithIssues.Contains(chain.Name);
     }
 
+    /// <summary>
+    /// Sets <see cref="TreeNodeVm.HasEmptyAnimationWarning"/> on each frameless chain (root) node
+    /// when <paramref name="isNativeTsxProject"/>, clearing it everywhere else. A tsx can't store
+    /// an animation with no tile to live on, so it would be dropped on save.
+    /// </summary>
+    public static void ApplyEmptyAnimationWarnings(IEnumerable<TreeNodeVm> roots, bool isNativeTsxProject)
+    {
+        foreach (var node in roots)
+            if (node.Data is AnimationChainSave chain)
+                node.HasEmptyAnimationWarning = isNativeTsxProject && chain.Frames.Count == 0;
+    }
+
     /// <summary>Sets <see cref="TreeNodeVm.IsAutoName"/> on each chain (root) node from <paramref
     /// name="isChainNameAuto"/> (<see cref="IProjectManager.IsChainNameAuto"/>).</summary>
     public static void ApplyAutoNames(IEnumerable<TreeNodeVm> roots, Func<AnimationChainSave, bool> isChainNameAuto)

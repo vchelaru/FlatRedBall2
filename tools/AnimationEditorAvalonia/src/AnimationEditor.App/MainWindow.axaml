@@ -694,6 +694,15 @@
                                              VerticalAlignment="Center"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconWarning.svg"
                                              CurrentColor="{DynamicResource IconWarning}" />
+                                    <!-- Frameless chain in a native tsx project (#1367): a tsx keeps an
+                                         animation only on its tiles, so this one is dropped on save. -->
+                                    <svg:Svg IsVisible="{Binding HasEmptyAnimationWarning}"
+                                             ToolTip.Tip="This animation has no frames, so it won't be saved in the tsx. Add a frame to keep it."
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconWarning.svg"
+                                             CurrentColor="{DynamicResource IconWarning}" />
                                 </StackPanel>
                                 <!-- Header lives in the star column so it ellipsizes when the panel is
                                      narrowed instead of forcing a horizontal scrollbar (#623). -->

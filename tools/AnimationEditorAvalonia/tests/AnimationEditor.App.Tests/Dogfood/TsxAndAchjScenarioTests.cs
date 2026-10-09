@@ -132,6 +132,41 @@ public class TsxAndAchjScenarioTests
         chain.Frames.Count.ShouldBe(2);
     }
 
+    private static AnimationChainSave AddAnimationFromButton(AnimationEditorHarness editor)
+    {
+        editor.Click(editor.Control<Button>("AddChainBtn"));
+        editor.Press(Key.Enter);
+        return editor.Project.AnimationChains.Last();
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_EmptyAnimation_ShowsUnsavedWarning_UntilItGetsAFrame()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave existing = await OpenTsxAsync(editor);
+        editor.NodeFor(existing).HasEmptyAnimationWarning.ShouldBeFalse();
+
+        AnimationChainSave empty = AddAnimationFromButton(editor);
+        editor.NodeFor(empty).HasEmptyAnimationWarning.ShouldBeTrue("a tsx stores an animation on a tile, so a frameless one is lost on reopen");
+        editor.NodeFor(existing).HasEmptyAnimationWarning.ShouldBeFalse();
+
+        editor.Click(editor.RowButton(empty, "Add Frame"));
+        editor.NodeFor(empty).HasEmptyAnimationWarning.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
+    public async Task Achx_EmptyAnimation_ShowsNoUnsavedWarning()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+
+        AnimationChainSave empty = AddAnimationFromButton(editor);
+
+        editor.NodeFor(empty).HasEmptyAnimationWarning.ShouldBeFalse("an achx saves frameless chains fine");
+    }
+
     [AvaloniaFact]
     public async Task Tsx_DeletingTheChain_ThenUndo_RoundTripsThroughTheTileset()
     {

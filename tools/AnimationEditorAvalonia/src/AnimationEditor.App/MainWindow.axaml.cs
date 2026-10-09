@@ -1975,6 +1975,10 @@ public partial class MainWindow : Window
 
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
         Dispatcher.UIThread.InvokeAsync(RefreshTreeThumbnails);
+        // Cheap per-chain check, so it runs on every edit; the full tsx validation in
+        // SyncTsxDecorationsIntoTree re-validates the whole tileset and does not.
+        Dispatcher.UIThread.InvokeAsync(() =>
+            TreeBuilder.ApplyEmptyAnimationWarnings(_treeRoots, _projectManager.IsNativeTsxProject));
         // Re-sync the property inspector so its values (flip toggles, frame length,
         // offsets, …) reflect the model after any mutation — including undo/redo.
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
@@ -4478,12 +4482,14 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Refreshes the tsx-only chain decorations: the exclamation icon from <see
-    /// cref="IProjectManager.GetChainNamesWithTsxIssues"/> (issue #1140) and the auto-name header
-    /// style from <see cref="IProjectManager.IsChainNameAuto"/>. A no-op for an achx/achj project.
+    /// cref="IProjectManager.GetChainNamesWithTsxIssues"/> (issue #1140), the empty-animation
+    /// warning (issue #1367) and the auto-name header style from <see
+    /// cref="IProjectManager.IsChainNameAuto"/>. A no-op for an achx/achj project.
     /// </summary>
     private void SyncTsxDecorationsIntoTree()
     {
         TreeBuilder.ApplyValidationIssues(_treeRoots, _projectManager.GetChainNamesWithTsxIssues());
+        TreeBuilder.ApplyEmptyAnimationWarnings(_treeRoots, _projectManager.IsNativeTsxProject);
         TreeBuilder.ApplyAutoNames(_treeRoots, _projectManager.IsChainNameAuto);
     }
 
