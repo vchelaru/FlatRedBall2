@@ -1,11 +1,11 @@
 ---
 name: animation-editor-screenshots
-description: "Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change's PR needs. Triggers: \"take a screenshot\", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest."
+description: "Headless screenshots of the AnimationEditor UI, for doc pages and for the before/after shots every visual change must show in chat. Triggers: \"take a screenshot\", before/after, visual change, DocScreenshots, ScreenshotCapture, DocScreenshotManifest."
 ---
 
 # AnimationEditor — Screenshots
 
-Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change's PR must carry. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
+Headless PNG capture of the AnimationEditor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) and for the before/after shots a visual change must show in chat. Screenshots show what changed; they don't replace tests. For correctness tests, use **`animation-editor-testing`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
 
 ## Where, and why it's a separate project
 
@@ -21,16 +21,15 @@ Headless PNG capture of the AnimationEditor's UI, for illustrating documentation
 
 **Landmine — context menus.** `ContextMenu.Open()` skips the tree's `Opening` handler, so the menu opens empty. Open it with a real right-click on the row (`window.MouseDown(point, MouseButton.Right)`). The menu draws in the window's overlay layer, so capture `window`.
 
-## Every visual change ships before/after screenshots in its PR
+## Every visual change shows before/after screenshots in the chat
 
-Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it, both embedded in the PR body. This is required, not optional.
+Any change to what the editor looks like (an icon, layout, color, a new control) needs a shot of the affected UI before the change and after it. This is required, not optional. Show them to the user in the chat with `SendUserFile` (`display: "render"`, a caption naming which is before and which is after), not in the PR body. Do not push images to git (no `push-pr-screenshots.py`, no `pr-assets` branch) unless the user asks.
 
 ```
 scripts/ae-before-after.py <capture.cs>
-scripts/push-pr-screenshots.py <pr#> <folder ae-before-after.py printed>
 ```
 
-`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png` to this worktree's `tests/_out/before-after/`, emptied each run so no other run's shots ride along. It works after the code is already edited. `gh` can't upload images, so `push-pr-screenshots.py` puts them on the orphan `pr-assets` branch and prints ready-to-paste markdown (each before/after pair as a side-by-side table, before on the left); it exits nonzero unless every URL serves, and is safe to run while other agents upload.
+`ae-before-after.py` runs one capture class (see "Ad hoc" below) on a reusable detached `origin/main` worktree and on the current one at once, writing `before-*.png` and `after-*.png` to this worktree's `tests/_out/before-after/`, emptied each run so no other run's shots ride along. It works after the code is already edited. Send those PNGs from that folder.
 
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 
