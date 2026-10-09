@@ -2554,6 +2554,8 @@ public partial class MainWindow : Window
         MenuLoad.Click   += OnLoadClick;
         MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuCloseProject.Click += OnCloseProjectClick;
+        // ProjectFolderPath has several setters, so refresh when the menu opens rather than on each.
+        MenuFile.SubmenuOpened += (_, _) => MenuCloseProject.IsEnabled = HasProjectFolderOpen;
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
@@ -2640,6 +2642,7 @@ public partial class MainWindow : Window
                                     .ToList(),
         OpenProjectFolder:  () => _ = OpenProjectFolderAsync(),
         CloseProjectFolder: CloseProjectFolder,
+        HasProjectFolder: () => HasProjectFolderOpen,
         Save:            () => OnSaveClick(null, null!),
         SaveAs:          () => _ = _appCommands.SaveCurrentAnimationChainListAsync(),
         Undo:            () => _undoManager.Undo(),
@@ -2733,6 +2736,8 @@ public partial class MainWindow : Window
     private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
 
     private void OnCloseProjectClick(object? sender, RoutedEventArgs e) => CloseProjectFolder();
+
+    private bool HasProjectFolderOpen => _projectManager.ProjectFolderPath is not null;
 
     /// <summary>
     /// Closes the Open Project Folder (issues #948, #1360): closes the tabs whose file lives under

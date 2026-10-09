@@ -84,7 +84,7 @@
                       BorderThickness="0"
                       VerticalAlignment="Center"
                       Margin="4,0">
-                    <MenuItem Header="_File">
+                    <MenuItem Header="_File" x:Name="MenuFile">
                         <!-- InputGesture text for New/Load/Save is set in code from the hotkey
                              registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
                              can never drift from what the KeyDown handler actually does. -->

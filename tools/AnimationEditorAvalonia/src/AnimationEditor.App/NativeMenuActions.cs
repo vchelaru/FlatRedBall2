@@ -13,6 +13,7 @@ internal sealed record NativeMenuActions(
     Func<IReadOnlyList<(string Header, Action Execute)>> RecentFiles,
     Action OpenProjectFolder,
     Action CloseProjectFolder,
+    Func<bool> HasProjectFolder,
     Action Save,
     Action SaveAs,
     Action Undo,

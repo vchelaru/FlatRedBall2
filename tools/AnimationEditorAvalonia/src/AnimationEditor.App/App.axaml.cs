@@ -180,7 +180,9 @@ public partial class App : Application
         fileMenu.Add(new NativeMenuItem("Open Project Folder…") { Command = Cmd(a.OpenProjectFolder) });
 
         fileMenu.Add(new NativeMenuItemSeparator());
-        fileMenu.Add(new NativeMenuItem("Close Project Folder") { Command = Cmd(a.CloseProjectFolder) });
+        var closeProjectItem = new NativeMenuItem("Close Project Folder") { Command = Cmd(a.CloseProjectFolder) };
+        fileMenu.Add(closeProjectItem);
+        fileMenu.Opening += (_, _) => closeProjectItem.IsEnabled = a.HasProjectFolder();
 
         fileMenu.Add(new NativeMenuItemSeparator());
         fileMenu.Add(new NativeMenuItem("Save")     { Command = Cmd(a.Save),   Gesture = new KeyGesture(Key.S, KeyModifiers.Meta) });
