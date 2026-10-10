@@ -12,6 +12,7 @@ namespace AnimationEditor.Core.CommandsAndState;
 /// <param name="Rename">Only invoked for rectangle/circle/chain nodes.</param>
 /// <param name="AddAnimation">Only invoked for the chain and empty-selection nodes.</param>
 /// <param name="DuplicateChainFlip">Only invoked from the chain node's Duplicate submenu (flipH, flipV).</param>
+/// <param name="CopyText">Writes text to the clipboard; the chain node's Copy Qualified Name item is omitted without it.</param>
 public sealed record TreeMenuActions(
     Action Copy,
     Action Cut,
@@ -20,4 +21,5 @@ public sealed record TreeMenuActions(
     Action Delete,
     Action? Rename = null,
     Action? AddAnimation = null,
-    Action<bool, bool>? DuplicateChainFlip = null);
+    Action<bool, bool>? DuplicateChainFlip = null,
+    Action<string>? CopyText = null);

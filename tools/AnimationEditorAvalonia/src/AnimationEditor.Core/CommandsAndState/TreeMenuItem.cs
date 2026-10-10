@@ -55,6 +55,7 @@ public enum TreeMenuIcon
     Frame,
     Animation,
     Copy,
+    CopyName,
     Cut,
     Paste,
     Duplicate,

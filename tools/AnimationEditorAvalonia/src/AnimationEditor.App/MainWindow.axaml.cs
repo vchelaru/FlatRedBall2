@@ -5325,7 +5325,8 @@ public partial class MainWindow : Window
             Delete: HandleDelete,
             Rename: rename,
             AddAnimation: AddAnimationChainAndBeginInlineRename,
-            DuplicateChainFlip: duplicateChainFlip);
+            DuplicateChainFlip: duplicateChainFlip,
+            CopyText: text => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text));
 
         var plan = TreeMenuPlanBuilder.Build(data, _appCommands, _selectedState, _objectFinder, _projectManager, actions);
         // Host slots get the real dialog/filesystem menu item (see TreeMenuHostSlot — these

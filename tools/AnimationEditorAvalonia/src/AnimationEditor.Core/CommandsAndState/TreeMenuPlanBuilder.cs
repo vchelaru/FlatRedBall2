@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
 using System.Linq;
@@ -123,6 +124,9 @@ public static class TreeMenuPlanBuilder
                 if (!isNativeTsx)
                     items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustOffsets));
                 items.Add(TreeMenuItem.Item("Rename…", actions.Rename!, TreeMenuIcon.Rename));
+                var fileName = projectManager.FileName;
+                if (actions.CopyText is not null && !string.IsNullOrEmpty(fileName))
+                    items.Add(TreeMenuItem.Item("Copy Qualified Name", () => actions.CopyText(QualifiedName.Format(fileName, chain2.Name)), TreeMenuIcon.CopyName));
                 items.Add(TreeMenuItem.Separator());
                 items.Add(TreeMenuItem.Item("Delete Animation", actions.Delete, TreeMenuIcon.Delete));
                 break;
