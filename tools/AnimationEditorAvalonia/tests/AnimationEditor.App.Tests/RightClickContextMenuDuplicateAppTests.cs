@@ -122,7 +122,7 @@ public class RightClickContextMenuDuplicateAppTests
             Assert.Equal(3, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextMenuItem(tree, "Duplicate");
+            ClickContextMenuItem(tree, "Duplicate 3 Frames");
 
             Assert.Equal(6, chain.Frames.Count);
         }
@@ -165,7 +165,7 @@ public class RightClickContextMenuDuplicateAppTests
             Assert.Equal(2, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextMenuItem(tree, "Duplicate");
+            ClickContextMenuItem(tree, "Duplicate 2 Rectangles");
 
             Assert.Equal(4, frame.ShapesSave.AARectSaves.Count());
         }
@@ -198,7 +198,7 @@ public class RightClickContextMenuDuplicateAppTests
             Assert.Equal(2, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextSubMenuItem(tree, "Duplicate", "Original");
+            ClickContextSubMenuItem(tree, "Duplicate 2 Animations", "Original");
 
             Assert.Equal(4, ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Count);
         }
@@ -233,7 +233,7 @@ public class RightClickContextMenuDuplicateAppTests
             Assert.Equal(2, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextSubMenuItem(tree, "Duplicate", "Flip Horizontal");
+            ClickContextSubMenuItem(tree, "Duplicate 2 Animations", "Flip Horizontal");
 
             var acls = ctx.ProjectManager.AnimationChainListSave!;
             Assert.Equal(4, acls.AnimationChains.Count);

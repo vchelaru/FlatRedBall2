@@ -142,7 +142,7 @@ public class MultiTileToTiledAnimationMapperTests
         var results = MultiTileToTiledAnimationMapper.Map(achj, TilesetInfo);
 
         Assert.Empty(results[0].AnchorFrames);
-        Assert.Contains("tile(s)", results[0].Warnings[0]);
+        Assert.Matches(@"\d+ tiles?\b", results[0].Warnings[0]);
     }
 
     [Fact]

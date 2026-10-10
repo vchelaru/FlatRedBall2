@@ -174,7 +174,7 @@ public class StatusBarTests
 
             // Both frames have the default FrameLength (0), so the total time is 0.00s (#623).
             var counts = window.FindControl<TextBlock>("StatusCounts")!;
-            Assert.Equal("1 chains · 2 frames · 0.00s", counts.Text);
+            Assert.Equal("1 chain · 2 frames · 0.00s", counts.Text);
         }
         finally { window.Close(); }
     }
@@ -247,6 +247,28 @@ public class StatusBarTests
 
             var counts = window.FindControl<TextBlock>("StatusCounts")!;
             Assert.Equal("2 chains selected", counts.Text);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void StatusBar_ShowsSelectedCount_WhenMultipleFramesSelected()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var f1 = new AnimationFrameSave { TextureName = "a.png" };
+            var f2 = new AnimationFrameSave { TextureName = "b.png" };
+            chain.Frames.Add(f1);
+            chain.Frames.Add(f2);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            ctx.SelectedState.SelectedNodes = new() { f1, f2 };
+            Dispatcher.UIThread.RunJobs();
+
+            var counts = window.FindControl<TextBlock>("StatusCounts")!;
+            Assert.Equal("2 frames selected", counts.Text);
         }
         finally { window.Close(); }
     }

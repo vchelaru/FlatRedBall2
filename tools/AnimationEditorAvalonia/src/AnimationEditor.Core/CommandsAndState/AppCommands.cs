@@ -270,7 +270,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 var names = string.Join(", ", missing);
                 LoadFailed?.Invoke(path,
                     new InvalidOperationException(
-                        $"Cannot open '{System.IO.Path.GetFileName(path)}' — the following texture(s) could not be found or decoded: {names}. " +
+                        $"Cannot open '{System.IO.Path.GetFileName(path)}' — the following {Plural.Noun(missing.Count, "texture")} could not be found or decoded: {names}. " +
                         "All textures must be present to convert UV coordinates to pixel coordinates."));
                 return false;
             }

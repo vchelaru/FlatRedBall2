@@ -299,4 +299,108 @@ public class TreeMenuPlanBuilderTests
         Assert.Equal(50f, rectInB.X);
         Assert.Equal(60f, rectInB.Y);
     }
+
+    private static IReadOnlyList<TreeMenuItem> BuildFor(
+        TestServices ctx, object node, params object[] selection)
+    {
+        ctx.SelectedState.SelectedNodes = selection.ToList();
+        return TreeMenuPlanBuilder.Build(
+            node, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+    }
+
+    [Fact]
+    public void Build_FrameNode_SingleSelection_KeepsSingularLabels()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 2).Frames[0];
+
+        var items = BuildFor(ctx, frame, frame);
+
+        Assert.Contains(items, i => i.Header == "Delete Frame");
+        Assert.Contains(items, i => i.Header == "Copy");
+        Assert.Contains(items, i => i.Header == "Duplicate");
+    }
+
+    [Fact]
+    public void Build_FrameNode_MultiSelection_LabelsCarryCount()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frames = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 3).Frames;
+
+        var items = BuildFor(ctx, frames[0], frames[0], frames[1], frames[2]);
+
+        Assert.Contains(items, i => i.Header == "Delete 3 Frames");
+        Assert.Contains(items, i => i.Header == "Copy 3 Frames");
+        Assert.Contains(items, i => i.Header == "Cut 3 Frames");
+        Assert.Contains(items, i => i.Header == "Duplicate 3 Frames");
+        Assert.Contains(items, i => i.Header == "Paste");
+    }
+
+    [Fact]
+    public void Build_ChainNode_MultiSelection_CountsAnimationsAndHidesSingleNodeTransforms()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var run = TestHelpers.MakeChain(ctx.Acls, "Run");
+
+        var items = BuildFor(ctx, walk, walk, run);
+
+        Assert.Contains(items, i => i.Header == "Delete 2 Animations");
+        Assert.Contains(items, i => i.Header == "Copy 2 Animations");
+        Assert.Contains(items, i => i.Header == "Duplicate 2 Animations" && i.Children is not null);
+        // These only touch the right-clicked chain, so a multi-selection must not offer them.
+        Assert.DoesNotContain(items, i => i.Header is "Flip Horizontally" or "Flip Vertically" or "Invert Frame Order");
+        Assert.DoesNotContain(items, i => i.Header == "Copy Qualified Name");
+    }
+
+    [Fact]
+    public void Build_ChainNode_SingleSelection_KeepsSingleNodeTransforms()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk");
+
+        var items = BuildFor(ctx, walk, walk);
+
+        Assert.Contains(items, i => i.Header == "Delete Animation");
+        Assert.Contains(items, i => i.Header == "Flip Horizontally");
+        Assert.Contains(items, i => i.Header == "Invert Frame Order");
+    }
+
+    [Fact]
+    public void Build_ShapeNode_MultiSelection_NamesTypeWhenUniformAndShapesWhenMixed()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1).Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        var circle = new CircleSave { Name = "C" };
+        frame.ShapesSave!.Add(rectA);
+        frame.ShapesSave.Add(rectB);
+        frame.ShapesSave.Add(circle);
+
+        var uniform = BuildFor(ctx, rectA, rectA, rectB);
+        var mixed = BuildFor(ctx, rectA, rectA, circle);
+
+        Assert.Contains(uniform, i => i.Header == "Delete 2 Rectangles");
+        Assert.Contains(mixed, i => i.Header == "Delete 2 Shapes");
+        Assert.Contains(mixed, i => i.Header == "Copy 2 Shapes");
+        Assert.Contains(uniform, i => i.Header == "Match Frame Size");
+    }
+
+    [Fact]
+    public void Build_MixedKindSelection_DeleteSaysItems_AndCopyStaysBare()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 2);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "R" };
+        frame.ShapesSave!.Add(rect);
+
+        var items = BuildFor(ctx, frame, frame, rect, chain.Frames[1]);
+
+        Assert.Contains(items, i => i.Header == "Delete 3 Items");
+        // A mixed selection can't be copied (SelectionCopyContext refuses), so no count is promised.
+        Assert.Contains(items, i => i.Header == "Copy");
+        Assert.Contains(items, i => i.Header == "Duplicate");
+    }
 }

@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -290,7 +291,7 @@ namespace AnimationEditor.Core
                     throw new InvalidOperationException(
                         "Cannot save with CoordinateType=Pixel: texture size could not be resolved " +
                         $"for: {string.Join(", ", unresolved.Distinct())}. Fix or rebuild the missing " +
-                        "texture(s), or switch the on-disk coordinate format to UV.");
+                        $"{Plural.Noun(unresolved.Distinct().Count(), "texture")}, or switch the on-disk coordinate format to UV.");
                 }
             }
 
@@ -1056,7 +1057,7 @@ namespace AnimationEditor.Core
             if (!AnimationChainListSave.AnimationChains.Contains(chain))
                 return "Can't set an owner tile: this chain isn't part of the current project.";
             if (tileId >= (uint)_tsxTileset.TileCount)
-                return $"Tile {tileId} is past this tileset's {_tsxTileset.TileCount} tile(s).";
+                return $"Tile {tileId} is past this tileset's {Plural.Format(_tsxTileset.TileCount, "tile")}.";
 
             foreach (var other in AnimationChainListSave.AnimationChains)
             {
