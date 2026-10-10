@@ -96,6 +96,19 @@ public partial class ProjectPanelControl : UserControl
     public event Action<string>? FileDuplicateRequested;
 
     /// <summary>
+    /// Raised when the user picks "Convert to .achj" on an <c>.achx</c> file row (issue #1376).
+    /// Carries the file's <see cref="AchxTreeNodeVm.RelativePath"/>; the host confirms and converts.
+    /// </summary>
+    public event Action<string>? FileConvertToAchjRequested;
+
+    /// <summary>
+    /// Raised when the user picks "Convert Animations to .achj" on a folder row (issue #1376).
+    /// Carries the folder's <see cref="AchxTreeNodeVm.RelativePath"/>; the host converts every
+    /// <c>.achx</c> under it.
+    /// </summary>
+    public event Action<string>? FolderConvertToAchjRequested;
+
+    /// <summary>
     /// Raised when the user picks "Delete" for a file row (issue #919). Carries the file's
     /// <see cref="AchxTreeNodeVm.RelativePath"/> for the host to resolve, same as
     /// <see cref="FolderRevealRequested"/>. The host owns confirming and the actual
@@ -407,6 +420,10 @@ public partial class ProjectPanelControl : UserControl
             newFileItem.Click += (_, _) => BeginNewAnimationFile(folderNode);
             ProjectTree.ContextMenu.Items.Add(newFileItem);
 
+            var convertFolderItem = new MenuItem { Header = "Convert Animations to .achj" };
+            convertFolderItem.Click += (_, _) => FolderConvertToAchjRequested?.Invoke(folderNode.RelativePath);
+            ProjectTree.ContextMenu.Items.Add(convertFolderItem);
+
             var revealItem = new MenuItem { Header = "Reveal in File Manager" };
             revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(revealItem);
@@ -430,6 +447,13 @@ public partial class ProjectPanelControl : UserControl
             var duplicateItem = new MenuItem { Header = "Duplicate" };
             duplicateItem.Click += (_, _) => FileDuplicateRequested?.Invoke(fileNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(duplicateItem);
+
+            if (fileNode.RelativePath.EndsWith(".achx", StringComparison.OrdinalIgnoreCase))
+            {
+                var convertItem = new MenuItem { Header = "Convert to .achj" };
+                convertItem.Click += (_, _) => FileConvertToAchjRequested?.Invoke(fileNode.RelativePath);
+                ProjectTree.ContextMenu.Items.Add(convertItem);
+            }
 
             var deleteItem = new MenuItem { Header = "Delete" };
             deleteItem.Click += (_, _) => FileDeleteRequested?.Invoke(fileNode.RelativePath);
