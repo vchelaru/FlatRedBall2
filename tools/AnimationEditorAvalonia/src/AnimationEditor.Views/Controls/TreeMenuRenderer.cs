@@ -46,6 +46,7 @@ public static class TreeMenuRenderer
         TreeMenuIcon.Frame          => "IconFrame",
         TreeMenuIcon.Animation      => "IconChain",
         TreeMenuIcon.Copy           => "IconCopy",
+        TreeMenuIcon.CopyName       => "IconCopyName",
         TreeMenuIcon.Cut            => "IconCut",
         TreeMenuIcon.Paste          => "IconPaste",
         TreeMenuIcon.Duplicate      => "IconDuplicate",

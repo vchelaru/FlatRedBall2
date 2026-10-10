@@ -31,8 +31,10 @@ public class QualifiedNameTests
 
         var items = TreeMenuPlanBuilder.Build(
             chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, Actions(t => copied = t));
-        items.Single(i => i.Header == "Copy Qualified Name").OnClick!();
+        var item = items.Single(i => i.Header == "Copy Qualified Name");
+        item.OnClick!();
 
+        item.Icon.ShouldBe(TreeMenuIcon.CopyName);
         copied.ShouldBe("Walk in C:/game/Player.achj");
     }
 
