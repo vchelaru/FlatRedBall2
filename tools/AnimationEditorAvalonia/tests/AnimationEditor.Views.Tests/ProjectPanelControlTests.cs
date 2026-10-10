@@ -217,7 +217,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "New Animation File", "Reveal in File Manager" }, headers);
+            Assert.Equal(new object?[] { "New Animation File", "Convert Animations to .achj", "Reveal in File Manager" }, headers);
         }
         finally { window.Close(); }
     }
@@ -247,7 +247,8 @@ public class ProjectPanelControlTests
 
     // Issue #886: right-click a file row -> "Open Containing Folder" + "Copy Full Path", same
     // headers as the document tab strip's context menu (#881/#884) for the equivalent open file.
-    // Issue #919 added "Delete" after a separator; #1208 added "Duplicate" beside it.
+    // Issue #919 added "Delete" after a separator; #1208 added "Duplicate" beside it; #1376 added
+    // "Convert to .achj" (achx rows only).
     [AvaloniaFact]
     public void RightClickingFileRow_WithRevealSupported_ShowsOpenFolderAndCopyPathItems()
     {
@@ -262,7 +263,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "Open Containing Folder", "Copy Full Path", "Duplicate", "Delete" }, headers);
+            Assert.Equal(new object?[] { "Open Containing Folder", "Copy Full Path", "Duplicate", "Convert to .achj", "Delete" }, headers);
         }
         finally { window.Close(); }
     }
@@ -286,6 +287,71 @@ public class ProjectPanelControlTests
             item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Equal("Sprites/hero.achx", requested);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ClickingConvertToAchj_RaisesFileConvertRequestedWithRelativePath()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0].Children[0]); // "hero.achx" under "Sprites"
+            string? requested = null;
+            control.FileConvertToAchjRequested += path => requested = path;
+
+            var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Single(i => (string)i.Header! == "Convert to .achj");
+            item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal("Sprites/hero.achx", requested);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RightClickingAchjRow_HasNoConvertItem()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achj"), root, "hero.achj") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "hero.achj" file
+
+            var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Select(i => i.Header).ToArray();
+            Assert.DoesNotContain("Convert to .achj", headers);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ClickingConvertAnimationsToAchj_RaisesFolderConvertRequestedWithRelativePath()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/Enemies/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites"
+            string? requested = null;
+            control.FolderConvertToAchjRequested += path => requested = path;
+
+            var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Single(i => (string)i.Header! == "Convert Animations to .achj");
+            item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal("Sprites", requested);
         }
         finally { window.Close(); }
     }

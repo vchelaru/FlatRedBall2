@@ -318,6 +318,8 @@ public partial class MainWindow : Window
         ProjectPanel.FileCopyPathRequested += relativePath => CopyProjectFilePathToClipboard(relativePath);
         ProjectPanel.FileDeleteRequested += relativePath => _ = DeleteProjectFileAsync(relativePath);
         ProjectPanel.FileDuplicateRequested += relativePath => _ = DuplicateProjectFileAsync(relativePath);
+        ProjectPanel.FileConvertToAchjRequested += relativePath => _ = ConvertProjectFileToAchjAsync(relativePath);
+        ProjectPanel.FolderConvertToAchjRequested += relativePath => _ = ConvertProjectFolderToAchjAsync(relativePath);
         // Right-clicking blank space in the tree offers "New Animation" (#908) -- same flow as
         // File > New.
         ProjectPanel.NewAnimationRequested += () => OnNewClick(null, null!);
@@ -2479,6 +2481,91 @@ public partial class MainWindow : Window
         }
 
         await LoadAnimationFileAsync(copyPath);
+    }
+
+    /// <summary>
+    /// Issue #1376: right-click "Convert to .achj" on a Project-tree <c>.achx</c> row.
+    /// </summary>
+    internal async Task ConvertProjectFileToAchjAsync(string relativePath)
+    {
+        var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
+        if (sourcePath is null) return;
+
+        await ConvertToAchjAsync(
+            new[] { sourcePath },
+            $"Convert \"{new FilePath(sourcePath).NoPath}\" to .achj? The original .achx is moved to the Recycle Bin.");
+    }
+
+    /// <summary>
+    /// Issue #1376: right-click "Convert Animations to .achj" on a Project-tree folder row;
+    /// converts every <c>.achx</c> under it (not under <c>bin</c>/<c>obj</c>).
+    /// </summary>
+    internal async Task ConvertProjectFolderToAchjAsync(string relativePath)
+    {
+        var folder = ResolveProjectFolderAbsolutePath(relativePath);
+        if (folder is null) return;
+
+        var sources = Directory.EnumerateFiles(folder, "*.achx", SearchOption.AllDirectories)
+            .Where(f => !BinObjPathFilter.IsExcluded(Path.GetRelativePath(folder, f)))
+            .ToList();
+        if (sources.Count == 0)
+        {
+            ShowStatusMessage("No .achx files to convert in this folder.");
+            return;
+        }
+
+        await ConvertToAchjAsync(
+            sources,
+            $"Convert {sources.Count} .achx file(s) under \"{new FilePath(folder).NoPath}\" to .achj? " +
+            "The originals are moved to the Recycle Bin.");
+    }
+
+    /// <summary>
+    /// Confirms, converts each source with <see cref="AchxToAchjConverter"/>, and recycles only the
+    /// originals that actually converted -- a skipped (an .achj already exists) or failed file stays
+    /// put. Recycling is the safety net for an accidental convert, which is why the confirm names
+    /// it. Open tabs on a recycled original are closed, same reason as
+    /// <see cref="DeleteProjectFileAsync"/>.
+    /// </summary>
+    private async Task ConvertToAchjAsync(IReadOnlyList<string> sources, string confirmText)
+    {
+        if (!await _appCommands.ConfirmAsync(confirmText, "Convert to .achj")) return;
+
+        int converted = 0, skipped = 0;
+        var problems = new List<string>();
+        foreach (var source in sources)
+        {
+            var result = AchxToAchjConverter.Convert(source);
+            var name = new FilePath(source).NoPath;
+            if (result.Status == AchxConversionStatus.SkippedTargetExists)
+            {
+                skipped++;
+                continue;
+            }
+            if (result.Status == AchxConversionStatus.Failed)
+            {
+                problems.Add($"{name}: {result.Error}");
+                continue;
+            }
+
+            var error = DeleteToRecycleBin(source);
+            if (error is not null)
+            {
+                problems.Add($"{name}: converted, but the original could not be recycled ({error})");
+                continue;
+            }
+
+            converted++;
+            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
+                CloseTabCore(openTab);
+        }
+
+        if (problems.Count > 0)
+            ShowStatusMessage($"⚠ Converted {converted}, {problems.Count} problem(s): {string.Join("; ", problems)}", isError: true);
+        else
+            ShowStatusMessage(skipped > 0
+                ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
+                : $"Converted {converted} to .achj.");
     }
 
     /// <summary>

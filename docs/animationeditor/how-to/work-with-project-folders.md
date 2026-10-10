@@ -36,6 +36,14 @@ You can add new animation files by right-clicking on a project's folder and sele
 
 Any changes made on disk, such as copying an existing animation without using the AnimationEditor, are automatically reflected in the project tabs immediately.
 
+## Convert .achx Files to .achj
+
+To convert one file, right-click an `.achx` file in the **Animations** tab and select **Convert to .achj**. To convert every `.achx` file in a folder and its sub-folders, right-click the folder and select **Convert Animations to .achj**. Files under `bin` and `obj` folders are skipped.
+
+Conversion changes only the file format. After confirming, the AnimationEditor writes the `.achj` next to the original and moves the `.achx` to the Recycle Bin. If something goes wrong, restore the `.achx` from the Recycle Bin and delete the new `.achj`.
+
+A file is skipped, and its `.achx` is left alone, if an `.achj` with the same name already exists.
+
 ## Find Which Animations Use an Image
 
 If a project is open, you can track which portions of an image are used by animations in your project. To do this, open an image (double click it) to view it, then click **Analyze Image Usage**. Each animation is displayed in a different color.
