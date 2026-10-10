@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using DotTiled;
 using System;
 using System.Collections.Generic;
@@ -139,7 +140,7 @@ public static class TsxAnimationValidator
             if (anchor.Animation.Count != tile.Animation.Count)
             {
                 issues.Add(new TsxGroupIssue(anchorId, tile.ID,
-                    $"tile {tile.ID}: has {tile.Animation.Count} animation frame(s) but its group anchor (tile {anchorId}) has {anchor.Animation.Count}."));
+                    $"tile {tile.ID}: has {Plural.Format(tile.Animation.Count, "animation frame")} but its group anchor (tile {anchorId}) has {anchor.Animation.Count}."));
                 continue;
             }
 

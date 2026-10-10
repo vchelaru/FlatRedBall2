@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -184,7 +185,7 @@ public static class MultiTileToTiledAnimationMapper
             // on a real tile in the *next* row instead of failing, silently misplacing a satellite
             // onto an unrelated tile every save.
             if (originColumn + footprintColumns > tilesetInfo.ColumnCount)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")} - skipped.");
 
             // The footprint's bottom-right cell (the largest tile id any cell in this footprint can
             // compute to, since the column bound above already guarantees every cell's column is
@@ -192,7 +193,7 @@ public static class MultiTileToTiledAnimationMapper
             // simply past the tileset's declared tile count, including a partial last row.
             var maxTileId = (uint)(((originRow + footprintRows - 1) * tilesetInfo.ColumnCount) + (originColumn + footprintColumns - 1));
             if (maxTileId >= tilesetInfo.TileCount)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
+                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")} - skipped.");
 
             for (var dy = 0; dy < footprintRows; dy++)
                 for (var dx = 0; dx < footprintColumns; dx++)
@@ -236,10 +237,10 @@ public static class MultiTileToTiledAnimationMapper
             else
             {
                 if (entryColumn + offset.Dx >= tilesetInfo.ColumnCount)
-                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")} - skipped.");
                 tileId = (uint)(((entryRow + offset.Dy) * tilesetInfo.ColumnCount) + (entryColumn + offset.Dx));
                 if (tileId >= tilesetInfo.TileCount)
-                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
+                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")} - skipped.");
             }
             satellites.Add(new TiledSatelliteMapping(tileId, frames, offset));
         }

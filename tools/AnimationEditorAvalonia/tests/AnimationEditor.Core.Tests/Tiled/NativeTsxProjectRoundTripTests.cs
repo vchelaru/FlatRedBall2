@@ -314,7 +314,7 @@ public class NativeTsxProjectRoundTripTests
         var issues = TsxAnimationValidator.Validate(tileset);
         var issue = Assert.Single(issues);
         Assert.Equal((uint)9, issue.TileId);
-        Assert.Contains("has 1 animation frame(s) but its group anchor (tile 8) has 2", issue.Message);
+        Assert.Contains("has 1 animation frame but its group anchor (tile 8) has 2", issue.Message);
 
         // (a) The satellite's actual on-disk frames (1 frame, duration 999) never make it into the
         // editable model -- only the anchor's frames (2 frames, duration 150) do.

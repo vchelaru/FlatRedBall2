@@ -1253,7 +1253,7 @@ public partial class MainWindow : Window
                 "Tiled sync failed", _failedBrush, $"{Path.GetFileName(tsxPath)}: {ex.Message}"));
         _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
-                "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {appliedCount} chain(s) applied"));
+                "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {Plural.Format(appliedCount, "chain")} applied"));
 
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
@@ -1840,7 +1840,7 @@ public partial class MainWindow : Window
     {
         PngUsageOverlayStatus.Text = groups.Count == 0
             ? "No chains reference this image."
-            : $"{groups.Count} chain(s) reference this image.";
+            : $"{Plural.Format(groups.Count, "chain")} {Plural.Noun(groups.Count, "references", "reference")} this image.";
         PngUsageOverlayStatus.IsVisible = true;
     }
 
@@ -2159,11 +2159,15 @@ public partial class MainWindow : Window
             // just report the selection count (#623).
             StatusCounts.Text = $"{selectedChainCount} chains selected";
         }
+        else if (_selectedState.SelectedFrames.Count >= 2)
+        {
+            StatusCounts.Text = $"{_selectedState.SelectedFrames.Count} frames selected";
+        }
         else
         {
             int totalFrames = acls.AnimationChains.Sum(c => c.Frames.Count);
             string totalTime = TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(acls));
-            StatusCounts.Text = $"{acls.AnimationChains.Count} chains · {totalFrames} frames · {totalTime}";
+            StatusCounts.Text = $"{Plural.Format(acls.AnimationChains.Count, "chain")} · {Plural.Format(totalFrames, "frame")} · {totalTime}";
         }
     }
 
@@ -2516,7 +2520,7 @@ public partial class MainWindow : Window
 
         await ConvertToAchjAsync(
             sources,
-            $"Convert {sources.Count} .achx file(s) under \"{new FilePath(folder).NoPath}\" to .achj? " +
+            $"Convert {Plural.Format(sources.Count, ".achx file")} under \"{new FilePath(folder).NoPath}\" to .achj? " +
             "The originals are moved to the Recycle Bin.");
     }
 
@@ -2561,7 +2565,7 @@ public partial class MainWindow : Window
         }
 
         if (problems.Count > 0)
-            ShowStatusMessage($"⚠ Converted {converted}, {problems.Count} problem(s): {string.Join("; ", problems)}", isError: true);
+            ShowStatusMessage($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}", isError: true);
         else
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
@@ -2939,7 +2943,7 @@ public partial class MainWindow : Window
         ProjectPanel.SetEntries(scan);
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
-            : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
+            : $"Found {Plural.Format(entries.Count, ".achx file")} under \"{rootFolder.Name}\".", isError: false);
         RefreshFilesPanel();
         return entries.Count;
     }

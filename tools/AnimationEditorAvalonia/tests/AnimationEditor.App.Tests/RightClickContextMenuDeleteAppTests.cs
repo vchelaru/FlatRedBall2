@@ -110,7 +110,7 @@ public class RightClickContextMenuDeleteAppTests
             Assert.Equal(3, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextMenuItem(tree, "Delete Frame");
+            ClickContextMenuItem(tree, "Delete 3 Frames");
 
             Assert.Empty(chain.Frames);
         }
@@ -153,7 +153,7 @@ public class RightClickContextMenuDeleteAppTests
             Assert.Equal(2, tree.SelectedItems!.Count);
 
             OpenContextMenu(window);
-            ClickContextMenuItem(tree, "Delete Rectangle");
+            ClickContextMenuItem(tree, "Delete 2 Rectangles");
 
             Assert.Empty(frame.ShapesSave.AARectSaves);
         }

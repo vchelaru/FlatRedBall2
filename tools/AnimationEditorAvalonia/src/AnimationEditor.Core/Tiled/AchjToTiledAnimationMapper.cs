@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -195,7 +196,7 @@ public static class AchjToTiledAnimationMapper
         // an unrelated tile.
         if (column >= tilesetInfo.ColumnCount)
             return Skip(s => s.ColumnOutOfRange++,
-                $"{label}: frame rect origin ({left}, {top}) resolves to column {column}, which is past the tileset's {tilesetInfo.ColumnCount} column(s) - skipped.");
+                $"{label}: frame rect origin ({left}, {top}) resolves to column {column}, which is past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")} - skipped.");
 
         var tileId = (uint)((row * tilesetInfo.ColumnCount) + column);
 
@@ -205,7 +206,7 @@ public static class AchjToTiledAnimationMapper
         // ColumnCount) is also correct for a tileset whose last row is partial.
         if (tileId >= tilesetInfo.TileCount)
             return Skip(s => s.RowOutOfRange++,
-                $"{label}: frame rect origin ({left}, {top}) resolves to tile id {tileId}, which is past the tileset's {tilesetInfo.TileCount} tile(s) - skipped.");
+                $"{label}: frame rect origin ({left}, {top}) resolves to tile id {tileId}, which is past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")} - skipped.");
 
         return new MappedFrame(tileId, FrameDurationMs(frame.FrameLength, timeUnit));
     }
