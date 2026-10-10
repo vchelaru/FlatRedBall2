@@ -7016,7 +7016,11 @@ public partial class MainWindow : Window
             new()
             {
                 Id = "delete", Description = "Delete", Category = "Edit",
-                Gestures = new[] { new HotkeyGesture("Delete") },
+                // Mac keyboards have no Delete key; Backspace is what they send. Elsewhere Backspace
+                // stays unbound so a stray press never deletes the selection.
+                Gestures = _useMacOSChrome
+                    ? new[] { new HotkeyGesture("Delete"), new HotkeyGesture("Back") }
+                    : new[] { new HotkeyGesture("Delete") },
                 // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
                 ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
                 Action = HandleDelete,
