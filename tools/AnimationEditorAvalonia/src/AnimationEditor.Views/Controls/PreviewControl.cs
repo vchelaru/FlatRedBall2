@@ -3273,7 +3273,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     }
 
     private static void RenderSkCore(
-        SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKImage?> cache, CanvasPalette palette)
+        SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKImage?> cache, CanvasPalette palette,
+        GRContext? gpu = null)
     {
         canvas.Clear(palette.Background);
 
@@ -3297,7 +3298,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
                 float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
                 float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling);
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
             }
         }
         else
@@ -3308,7 +3309,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             {
                 float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
                 float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f, showOutline: s.ShowBoundingBox, s.RenderScaling);
+                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
             }
 
             if (s.Frame is not null &&
@@ -3317,7 +3318,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             {
                 float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
                 float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling);
+                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
             }
         }
 
@@ -3605,7 +3606,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     internal static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, ResolvedFrameColor color, SKImage img,
-        float cx, float cy, float zoom, float alpha, bool showOutline = true, float? snapRenderScaling = null)
+        float cx, float cy, float zoom, float alpha, bool showOutline = true, float? snapRenderScaling = null,
+        GRContext? gpuContext = null)
     {
         var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
 
@@ -3653,10 +3655,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // Below 1x the draw is bilinear, and SkiaSharp's DrawImage has no strict source-rect
         // constraint, so sampling past the source rect pulls in the neighbouring frames on the
         // sheet. Copy the frame 1:1 into its own exact-size image first: a standalone image clamps
-        // at its edge. Nothing is cached, so there is nothing to invalidate.
+        // at its edge. Nothing is cached, so there is nothing to invalidate. On the GPU path the
+        // copy is a GPU render target, so the frame never round-trips through CPU memory; with no
+        // GPU context (headless tests, export, software rendering) it falls back to a raster surface.
         if (zoom < 1 && sw > 0 && sh > 0)
         {
-            using var surface = SKSurface.Create(new SKImageInfo(sw, sh));
+            var info = new SKImageInfo(sw, sh);
+            using var surface = (gpuContext is null ? null : SKSurface.Create(gpuContext, budgeted: true, info))
+                                ?? SKSurface.Create(info);
             surface.Canvas.DrawImage(img, src, SKRect.Create(sw, sh), new SKSamplingOptions(SKFilterMode.Nearest));
             using var frameImage = surface.Snapshot();
             canvas.DrawImage(frameImage, dst, sampling, paint);
@@ -3764,7 +3770,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             using var lease = feature.Lease();
 
             DrawTimeOverlay.TimeAndDraw(lease, _drawTimes,
-                canvas => PreviewControl.RenderSkCore(canvas, _snap, _cache, _palette));
+                canvas => PreviewControl.RenderSkCore(canvas, _snap, _cache, _palette, lease.GrContext));
         }
     }
 }
