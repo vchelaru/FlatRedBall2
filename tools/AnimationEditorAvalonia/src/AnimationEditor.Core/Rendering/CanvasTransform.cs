@@ -262,6 +262,30 @@ public static class CanvasTransform
         static float Snap(float pan, float scale) => (MathF.Round(pan * scale) + PointSamplingBias) / scale;
     }
 
+    /// <summary>
+    /// Snaps the centre of a centred, point-sampled footprint (the AnimationEditor preview's sprite)
+    /// so the footprint's top-left lands on a whole device pixel plus <see cref="PointSamplingBias"/>.
+    /// Below <paramref name="zoom"/> 1 the sampling is bilinear and the centre is returned unchanged.
+    /// <para>
+    /// Resizing a panel by 1 px slides a centred sprite by 0.5 px. Drawn as-is, every texel is
+    /// resampled at a half-pixel offset on each step and the sprite sizzles. Snapping makes it move
+    /// in whole pixels instead: shift, hold, shift, hold. Rounds half up (not ties-to-even) so that
+    /// alternation stays even rather than pairing up.
+    /// </para>
+    /// </summary>
+    public static (float Cx, float Cy) SnapCenterForPointSampling(
+        float cx, float cy, float footprintW, float footprintH, float zoom, float renderScaling)
+    {
+        if (zoom < 1f) return (cx, cy);
+        return (SnapEdge(cx, footprintW, renderScaling), SnapEdge(cy, footprintH, renderScaling));
+
+        static float SnapEdge(float centre, float extent, float scale)
+        {
+            float edge = centre - extent / 2f;
+            return (MathF.Floor(edge * scale + 0.5f) + PointSamplingBias) / scale + extent / 2f;
+        }
+    }
+
     // ── Drag auto-pan (#540) ──────────────────────────────────────────────────
 
     /// <summary>

@@ -643,4 +643,69 @@ public class CanvasTransformTests
             }
         }
     }
+
+    // ── SnapCenterForPointSampling ────────────────────────────────────────────
+    // The preview keeps its sprite centred, so resizing the panel by 1 px slides the centre by
+    // 0.5 px. Nearest-neighbour sampling at a half-pixel offset resamples every texel differently
+    // on each step, which shows as sizzling. Snapping the footprint's top-left to a whole device
+    // pixel makes the sprite move in whole pixels, which falls out as shift / hold / shift / hold.
+
+    [Fact]
+    public void SnapCenterForPointSampling_FootprintTopLeftLandsOnDevicePixelPlusBias()
+    {
+        // 9 texels at zoom 1.5 = 13.5 px wide, so the half-width is itself fractional.
+        var (cx, cy) = CanvasTransform.SnapCenterForPointSampling(100.3f, 57.8f, 13.5f, 9f, 1.5f, 1f);
+
+        Assert.Equal(0.0, Frac((cx - 13.5f / 2f) - CanvasTransform.PointSamplingBias), 4);
+        Assert.Equal(0.0, Frac((cy - 9f / 2f) - CanvasTransform.PointSamplingBias), 4);
+
+        static double Frac(double v) => v - Math.Round(v);
+    }
+
+    [Fact]
+    public void SnapCenterForPointSampling_CentreMovingHalfAPixelPerStep_ShiftsThenHolds()
+    {
+        // A panel growing by 1 px per step moves the centre by 0.5 px. The drawn position must
+        // advance by a whole pixel every other step, never by a fraction.
+        var xs = new List<float>();
+        for (int step = 0; step < 8; step++)
+            xs.Add(CanvasTransform.SnapCenterForPointSampling(200f + step * 0.5f, 0f, 14f, 14f, 2f, 1f).Cx);
+
+        for (int i = 1; i < xs.Count; i++)
+        {
+            float delta = xs[i] - xs[i - 1];
+            Assert.True(delta == 0f || Math.Abs(delta - 1f) < 1e-4f, $"step {i} moved the sprite by {delta}");
+        }
+        Assert.Equal(4, xs.Zip(xs.Skip(1), (a, b) => b - a).Count(d => d > 0.5f));
+    }
+
+    [Fact]
+    public void SnapCenterForPointSampling_ZoomBelowOne_ReturnsCentreUnchanged()
+    {
+        var (cx, cy) = CanvasTransform.SnapCenterForPointSampling(10.5f, 20.5f, 4f, 4f, 0.5f, 1f);
+
+        Assert.Equal(10.5f, cx);
+        Assert.Equal(20.5f, cy);
+    }
+
+    [Theory]
+    [InlineData(1.5f, 1f)]
+    [InlineData(1.5f, 1.5f)]
+    [InlineData(2.5f, 2f)]
+    public void SnapCenterForPointSampling_NoTexelBoundaryLandsOnPixelCenter(float zoom, float scale)
+    {
+        foreach (float rawCx in new[] { 100f, 100.5f, 101f, 333.25f })
+        {
+            const int texels = 9;
+            float footprint = texels * zoom;
+            var (cx, _) = CanvasTransform.SnapCenterForPointSampling(rawCx, 0f, footprint, footprint, zoom, scale);
+
+            for (int texel = 0; texel <= texels; texel++)
+            {
+                double boundary = (cx - footprint / 2.0 + texel * (double)zoom) * scale;
+                double fromCentre = Math.Abs(boundary - Math.Floor(boundary) - 0.5);
+                Assert.True(fromCentre >= 1.0 / 32, $"texel {texel} boundary {boundary} sits {fromCentre} from a pixel centre");
+            }
+        }
+    }
 }

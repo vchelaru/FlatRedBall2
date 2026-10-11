@@ -818,6 +818,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// </summary>
     private RenderSnapshot BuildRenderSnapshot(float width, float height)
     {
+        float renderScaling = (float)(TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0);
         if (IsGroupPreviewActive)
         {
             return new RenderSnapshot(
@@ -826,7 +827,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
                 BuildShapeInfos(), 0f, 0f, default, default,
-                BuildGroupLayers());
+                BuildGroupLayers(), renderScaling);
         }
 
         var chain         = _selectedState!.SelectedChain;
@@ -867,7 +868,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                                   _draggedGuideIdx, _draggingHGuide,
                                   BuildShapeInfos(), frameOffX, frameOffY,
                                   ResolveColor(chain, displayFrame), ResolveColor(chain, onionFrame),
-                                  Array.Empty<PreviewLayer>());
+                                  Array.Empty<PreviewLayer>(), renderScaling);
     }
 
     // -- Injected services -----------------------------------------------------
@@ -3182,7 +3183,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         ResolvedFrameColor FrameColor, ResolvedFrameColor OnionColor,
         // Multi-select group preview (#576): when non-empty, RenderSkCore draws these back-to-front
         // INSTEAD of Frame/OnionFrame. Empty for the ordinary single-selection render path.
-        PreviewLayer[] GroupLayers);
+        PreviewLayer[] GroupLayers,
+        // Logical-to-device scale (display scaling) used to snap the sprite to whole device pixels.
+        float RenderScaling);
 
     /// <summary>One composited chain in a multi-select group preview (#576) — its current frame,
     /// resolved texture path, and its own resting RelativeX/Y offset and effective color.</summary>
@@ -3294,7 +3297,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
                 float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
                 float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox);
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling);
             }
         }
         else
@@ -3305,7 +3308,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             {
                 float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
                 float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f, showOutline: s.ShowBoundingBox);
+                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f, showOutline: s.ShowBoundingBox, s.RenderScaling);
             }
 
             if (s.Frame is not null &&
@@ -3314,7 +3317,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             {
                 float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
                 float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox);
+                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling);
             }
         }
 
@@ -3602,13 +3605,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     internal static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, ResolvedFrameColor color, SKImage img,
-        float cx, float cy, float zoom, float alpha, bool showOutline = true)
+        float cx, float cy, float zoom, float alpha, bool showOutline = true, float? snapRenderScaling = null)
     {
         var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
 
         var src = SKRectI.Create(sx, sy, sw, sh);
         float dw = sw * zoom;
         float dh = sh * zoom;
+        // Live preview only (export passes null and keeps exact placement): the sprite is centred on
+        // a panel whose size changes, so snap the on-screen footprint to whole device pixels or a
+        // 1 px resize sizzles it. A diagonal flip transposes the footprint.
+        if (snapRenderScaling is { } scale)
+        {
+            bool transposed = frame.FlipDiagonal;
+            (cx, cy) = CanvasTransform.SnapCenterForPointSampling(
+                cx, cy, transposed ? dh : dw, transposed ? dw : dh, zoom, scale);
+        }
         float dx = cx - dw / 2;
         float dy = cy - dh / 2;
         var dst = SKRect.Create(dx, dy, dw, dh);
