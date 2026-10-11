@@ -3360,7 +3360,7 @@ public partial class MainWindow : Window
             if (_suppressInterpolateSync) return;
             PreviewCtrl.InterpolateOffsets = InterpolateToggle.IsChecked == true;
         };
-        // PreviewControl auto-resets InterpolateOffsets when the chain changes; resync the toggle.
+        // PreviewControl restores each chain's own InterpolateOffsets on selection change; resync the toggle.
         PreviewCtrl.InterpolateOffsetsChanged += isOn =>
         {
             _suppressInterpolateSync = true;

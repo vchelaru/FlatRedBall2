@@ -86,6 +86,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private bool _showUserGuides = true;
     private bool _showBoundingBox = true;
     private bool _interpolateOffsets;
+    // Chains the user turned Interpolate on for. This is an incremental step: the toggle is kept
+    // per chain in memory for the session instead of clearing on every selection change, but it
+    // is not saved to the .achx. Persisting it to disk (possibly as a per-frame setting) may
+    // come later.
+    private readonly HashSet<AnimationChainSave> _interpolatedChains = new(ReferenceEqualityComparer.Instance);
 
     // -- Pan drag --------------------------------------------------------------
     private bool  _isPanning;
@@ -285,13 +290,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// When <c>true</c>, the displayed sprite position eases between consecutive frames'
     /// <c>RelativeX/Y</c> offsets instead of snapping at each frame switch. Preview-only:
     /// the FlatRedBall runtime always snaps, so this does not reflect in-game behavior and
-    /// is not persisted. Auto-resets to <c>false</c> whenever the selected chain changes.
+    /// is not persisted. Remembered per chain: selecting a chain restores its own setting.
     /// </summary>
     public bool InterpolateOffsets
     {
         get => _interpolateOffsets;
         set
         {
+            if (_playback.Chain is { } chain)
+            {
+                if (value) _interpolatedChains.Add(chain);
+                else _interpolatedChains.Remove(chain);
+            }
             if (_interpolateOffsets == value) return;
             _interpolateOffsets = value;
             InvalidateVisual();
@@ -299,8 +309,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         }
     }
 
-    /// <summary>Fired when <see cref="InterpolateOffsets"/> changes, including the automatic
-    /// reset on selection change, so the toolbar toggle can resync its checked state.</summary>
+    /// <summary>Fired when <see cref="InterpolateOffsets"/> changes, including the per-chain
+    /// restore on selection change, so the toolbar toggle can resync its checked state.</summary>
     public event Action<bool>? InterpolateOffsetsChanged;
 
     public double SpeedMultiplier
@@ -1026,8 +1036,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             _playback.Play();
         }
 
-        // Interpolation is a transient per-chain preview aid; clear it when the selection changes.
-        InterpolateOffsets = false;
+        // Restore the selected chain's own Interpolate setting (see _interpolatedChains).
+        InterpolateOffsets = chain is not null && _interpolatedChains.Contains(chain);
         InvalidateVisual();
         // A new chain/frame changes the union extent → refresh the host's scrollbars.
         RaiseViewChanged();
