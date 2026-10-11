@@ -3205,17 +3205,17 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     // Outline through the vertices; (originX, originY) is the polygon origin in screen space.
     private static SKPath BuildPolygonPath(PreviewShapeInfo sh, float originX, float originY, float om)
     {
-        var path = new SKPath();
+        using var builder = new SKPathBuilder();
         var pts = sh.Points ?? Array.Empty<float>();
         for (int i = 0; i + 1 < pts.Length; i += 2)
         {
             float x = originX + pts[i] * om;
             float y = originY - pts[i + 1] * om;
-            if (i == 0) path.MoveTo(x, y);
-            else path.LineTo(x, y);
+            if (i == 0) builder.MoveTo(x, y);
+            else builder.LineTo(x, y);
         }
-        if (sh.IsClosed) path.Close();
-        return path;
+        if (sh.IsClosed) builder.Close();
+        return builder.Detach();
     }
 
     // Normal shapes first, then selected, then hovered, so the shape being edited isn't buried
@@ -3459,7 +3459,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 if (sy >= RulerSize && sy <= s.Height)
                 {
                     float baseline = Math.Clamp(sy - 2f, RulerSize + lHeight, s.Height - lMargin);
-                    canvas.DrawText(FormatGuideLabel(true, wy), RulerSize + lMargin, baseline, dragLabelFont, dragLabelPaint);
+                    canvas.DrawText(FormatGuideLabel(true, wy), RulerSize + lMargin, baseline, SKTextAlign.Left, dragLabelFont, dragLabelPaint);
                 }
             }
             else if (!s.DraggingHGuide && s.DraggedGuideIdx < s.VGuides.Length)
@@ -3469,7 +3469,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 if (sx >= RulerSize && sx <= s.Width)
                 {
                     float lx = Math.Clamp(sx + lMargin, RulerSize + lMargin, s.Width - 50f);
-                    canvas.DrawText(FormatGuideLabel(false, wx), lx, RulerSize + lHeight, dragLabelFont, dragLabelPaint);
+                    canvas.DrawText(FormatGuideLabel(false, wx), lx, RulerSize + lHeight, SKTextAlign.Left, dragLabelFont, dragLabelPaint);
                 }
             }
         }
@@ -3509,7 +3509,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             float tickH = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
             canvas.DrawLine(sx, RulerSize - tickH, sx, RulerSize, tickPaint);
             if (isMajor)
-                canvas.DrawText(FormatRulerLabel(majorStep, wx), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wx), sx + 1f, RulerSize - tickH - 1f, SKTextAlign.Left, labelFont, labelPaint);
         }
 
         // Left (vertical) ruler - ticks at world-Y positions.
@@ -3527,7 +3527,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 canvas.Save();
                 canvas.Translate(RulerSize - tickW - 1f, sy);
                 canvas.RotateDegrees(-90f);
-                canvas.DrawText(FormatRulerLabel(majorStep, wy), 0f, 0f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wy), 0f, 0f, SKTextAlign.Left, labelFont, labelPaint);
                 canvas.Restore();
             }
         }

@@ -290,7 +290,7 @@ public class WireframeControl : TextureViewport
         canvas.DrawRoundRect(tagRect, 3f, 3f, bgPaint);
 
         using var textPaint = new SKPaint { Color = EditorColors.FrameLabelText, IsAntialias = true };
-        canvas.DrawText(label, tagRect.Left + PadX, tagRect.Top + tagHeight - PadY, font, textPaint);
+        canvas.DrawText(label, tagRect.Left + PadX, tagRect.Top + tagHeight - PadY, SKTextAlign.Left, font, textPaint);
     }
 
     /// <summary>

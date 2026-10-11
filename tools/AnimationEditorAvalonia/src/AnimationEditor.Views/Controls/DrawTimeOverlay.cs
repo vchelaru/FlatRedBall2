@@ -52,6 +52,6 @@ internal static class DrawTimeOverlay
         using var bg = new SKPaint { Color = new SKColor(0, 0, 0, 210) };
         canvas.DrawRect(box, bg);
         using var fg = new SKPaint { Color = new SKColor(0, 255, 80), IsAntialias = true };
-        canvas.DrawText(text, box.Left + 6f, box.Bottom - 6f, font, fg);
+        canvas.DrawText(text, box.Left + 6f, box.Bottom - 6f, SKTextAlign.Left, font, fg);
     }
 }

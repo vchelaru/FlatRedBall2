@@ -2658,7 +2658,8 @@ public partial class MainWindow : Window
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuExportGodot.Click += OnExportGodotClick;
-        MenuExportGif.Click += (_, _) => _ = ExportGifAsync();
+        MenuExportGif.Click += (_, _) => _ = ExportAnimatedImageAsync(AnimatedImageFormat.Gif);
+        MenuExportWebp.Click += (_, _) => _ = ExportAnimatedImageAsync(AnimatedImageFormat.Webp);
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
@@ -3063,55 +3064,57 @@ public partial class MainWindow : Window
         _ = _appCommands.ExportAsync(ExportFormat.Godot);
 
     // Remembered for the session so a second export starts from the last choices.
-    private GifExportOptions? _gifExportOptions;
+    private readonly Dictionary<AnimatedImageFormat, AnimationExportOptions> _animatedExportOptions = new();
 
     /// <summary>
     /// Exports the selected animations (stacked like the group preview, with each one's Interpolate
-    /// setting) as an animated GIF. Asks for options, then a path, then renders off the UI thread.
+    /// setting) as an animated image. Asks for options, then a path, then renders off the UI thread.
     /// </summary>
-    private async Task ExportGifAsync()
+    private async Task ExportAnimatedImageAsync(AnimatedImageFormat format)
     {
         var sources = _selectedState.PreviewChains
             .Where(chain => chain.Frames.Count > 0)
-            .Select(chain => new GifSourceChain(chain, PreviewCtrl.IsChainInterpolated(chain)))
+            .Select(chain => new ExportSourceChain(chain, PreviewCtrl.IsChainInterpolated(chain)))
             .ToList();
         if (sources.Count == 0)
         {
-            ShowStatusMessage("Select an animation with frames to export as a GIF.", isError: true);
+            ShowStatusMessage($"Select an animation with frames to export as a {format.Name}.", isError: true);
             return;
         }
 
-        var initial = _gifExportOptions ?? new GifExportOptions(50, Transparent: true, PreviewCtrl.CanvasBackgroundArgb, Scale: 1);
-        var options = await EditorDialogs.ShowExportGifAsync(
-            _dialogHost, initial, seed => PickCustomColorAsync("GIF Background", Color.FromUInt32(seed)));
+        if (!_animatedExportOptions.TryGetValue(format, out var initial))
+            initial = new AnimationExportOptions(format.FrameRates[0], Transparent: true, PreviewCtrl.CanvasBackgroundArgb, Scale: 1);
+        var options = await EditorDialogs.ShowExportAnimatedImageAsync(
+            _dialogHost, format, initial, seed => PickCustomColorAsync($"{format.Name} Background", Color.FromUInt32(seed)));
         if (options is null) return;
-        _gifExportOptions = options;
+        _animatedExportOptions[format] = options;
 
         var path = await _appCommands.FileDialogService.PickSaveFileAsync(
-            "Export as GIF", "gif", new[] { new FileTypeChoice("gif", "GIF image (*.gif)") });
+            $"Export as {format.Name}", format.Extension,
+            new[] { new FileTypeChoice(format.Extension, format.FileTypeDescription) });
         if (string.IsNullOrEmpty(path)) return;
 
         try
         {
-            ShowStatusMessage("Exporting GIF…");
+            ShowStatusMessage($"Exporting {format.Name}…");
             // Resolved here, on the UI thread, because it reads project state.
             var texturePaths = new Dictionary<AnimationFrameSave, string?>(ReferenceEqualityComparer.Instance);
             foreach (var frame in sources.SelectMany(source => source.Chain.Frames))
                 texturePaths[frame] = _thumbnailService.ResolveTexturePath(frame);
             float offsetMultiplier = _appState.OffsetMultiplier;
 
-            byte[] gif = await Task.Run(() => GifRenderer.Render(
-                sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
-            await File.WriteAllBytesAsync(path, gif);
+            byte[] image = await Task.Run(() => AnimatedImageRenderers.Render(
+                format, sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
+            await File.WriteAllBytesAsync(path, image);
             ShowToast($"Exported {Path.GetFileName(path)}");
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            ShowErrorBanner($"GIF export failed: {ex.Message}");
+            ShowErrorBanner($"{format.Name} export failed: {ex.Message}");
         }
     }
 
-    internal const string ReleasesUrl ="https://github.com/vchelaru/FlatRedBall2/releases";
+    internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
         => _ = ShowAboutDialogAsync();
@@ -7844,7 +7847,7 @@ public partial class MainWindow : Window
 
             using var resized = new SKBitmap(newW, newH);
             using var canvas  = new SKCanvas(resized);
-            canvas.DrawBitmap(src, new SKRect(0, 0, newW, newH));
+            canvas.DrawBitmap(src, new SKRect(0, 0, newW, newH), new SKSamplingOptions(SKFilterMode.Nearest));
             canvas.Flush();
             using var stream = File.OpenWrite(newAbsPath);
             resized.Encode(stream, SKEncodedImageFormat.Png, 100);

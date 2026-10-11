@@ -1,8 +1,10 @@
+using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Views.Export;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
 using Xunit;
+using static AnimationEditor.Views.Tests.CodecTestHelper;
 
 namespace AnimationEditor.Views.Tests;
 
@@ -14,16 +16,6 @@ public class GifRendererTests : IDisposable
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
-    // Writes a PNG whose pixels are given left to right on one row.
-    private string WriteRow(string name, params SKColor[] pixels)
-    {
-        using var bitmap = new SKBitmap(pixels.Length, 1);
-        for (int x = 0; x < pixels.Length; x++) bitmap.SetPixel(x, 0, pixels[x]);
-        string path = Path.Combine(_folder, name);
-        File.WriteAllBytes(path, bitmap.Encode(SKEncodedImageFormat.Png, 100).ToArray());
-        return path;
-    }
-
     private static AnimationFrameSave Frame(string texture, float left, float right, float length = 0.1f, float x = 0, float y = 0) =>
         new()
         {
@@ -31,41 +23,21 @@ public class GifRendererTests : IDisposable
             TopCoordinate = 0, BottomCoordinate = 1, FrameLength = length, RelativeX = x, RelativeY = y,
         };
 
-    private static GifExportOptions Solid(int scale = 1, int fps = 50) =>
+    private static AnimationExportOptions Solid(int scale = 1, int fps = 50) =>
         new(fps, Transparent: false, BackgroundArgb: 0xFFFFFFFF, scale);
 
-    private byte[] Render(IReadOnlyList<GifSourceChain> sources, GifExportOptions options) =>
+    private byte[] Render(IReadOnlyList<ExportSourceChain> sources, AnimationExportOptions options) =>
         GifRenderer.Render(sources, frame => Path.Combine(_folder, frame.TextureName), offsetMultiplier: 1f, options);
-
-    private static SKCodec Open(byte[] gif) => SKCodec.Create(new SKMemoryStream(gif))!;
-
-    private static SKColor PixelAt(byte[] gif, int frameIndex, int x, int y)
-    {
-        using var codec = Open(gif);
-        var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Bgra8888, SKAlphaType.Unpremul);
-        using var bitmap = new SKBitmap(info);
-        int required = codec.FrameInfo[frameIndex].RequiredFrame;
-        if (required >= 0)
-        {
-            Assert.Equal(SKCodecResult.Success, codec.GetPixels(info, bitmap.GetPixels(), new SKCodecOptions(required)));
-            Assert.Equal(SKCodecResult.Success, codec.GetPixels(info, bitmap.GetPixels(), new SKCodecOptions(frameIndex, required)));
-        }
-        else
-        {
-            Assert.Equal(SKCodecResult.Success, codec.GetPixels(info, bitmap.GetPixels(), new SKCodecOptions(frameIndex)));
-        }
-        return bitmap.GetPixel(x, y);
-    }
 
     [Fact]
     public void Render_TwoFrames_ScalesTheSpriteAndKeepsEachFramesDuration()
     {
-        string sheet = WriteRow("sheet.png", SKColors.Red, SKColors.Blue);
+        string sheet = WriteRow(_folder, "sheet.png", SKColors.Red, SKColors.Blue);
         var chain = new AnimationChainSave { Name = "Blink", Loop = true };
         chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
         chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
 
-        byte[] gif = Render(new[] { new GifSourceChain(chain, false) }, Solid(scale: 3));
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, false) }, Solid(scale: 3));
 
         using var codec = Open(gif);
         Assert.Equal((3, 3), (codec.Info.Width, codec.Info.Height));
@@ -79,12 +51,12 @@ public class GifRendererTests : IDisposable
     [Fact]
     public void Render_FrameOffsets_WidenTheCanvasToHoldEveryPosition()
     {
-        WriteRow("sheet.png", SKColors.Red);
+        WriteRow(_folder, "sheet.png", SKColors.Red);
         var chain = new AnimationChainSave { Name = "Slide", Loop = true };
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 4));
 
-        byte[] gif = Render(new[] { new GifSourceChain(chain, false) }, Solid());
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, false) }, Solid());
 
         using var codec = Open(gif);
         // A 1px sprite centered at x=0 spans [-0.5, 0.5] snapped to [0, 1]; at x=4 it spans [4, 5].
@@ -97,12 +69,12 @@ public class GifRendererTests : IDisposable
     [Fact]
     public void Render_Transparent_LeavesTheBackgroundTransparent()
     {
-        WriteRow("sheet.png", SKColors.Red);
+        WriteRow(_folder, "sheet.png", SKColors.Red);
         var chain = new AnimationChainSave { Name = "Slide", Loop = true };
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 2));
 
-        byte[] gif = Render(new[] { new GifSourceChain(chain, false) }, new GifExportOptions(50, Transparent: true, 0, 1));
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, false) }, new AnimationExportOptions(50, Transparent: true, 0, 1));
 
         Assert.Equal(SKColors.Red, PixelAt(gif, 0, 0, 0));
         Assert.Equal(0, PixelAt(gif, 0, 2, 0).Alpha);
@@ -113,14 +85,14 @@ public class GifRendererTests : IDisposable
     [Fact]
     public void Render_SeveralAnimations_StackInSelectionOrderWithTheLastOnTop()
     {
-        WriteRow("back.png", SKColors.Red);
-        WriteRow("front.png", SKColors.Blue);
+        WriteRow(_folder, "back.png", SKColors.Red);
+        WriteRow(_folder, "front.png", SKColors.Blue);
         var back = new AnimationChainSave { Name = "Back", Loop = true };
         back.Frames.Add(Frame("back.png", 0f, 1f));
         var front = new AnimationChainSave { Name = "Front", Loop = true };
         front.Frames.Add(Frame("front.png", 0f, 1f));
 
-        byte[] gif = Render(new[] { new GifSourceChain(back, false), new GifSourceChain(front, false) }, Solid());
+        byte[] gif = Render(new[] { new ExportSourceChain(back, false), new ExportSourceChain(front, false) }, Solid());
 
         Assert.Equal(SKColors.Blue, PixelAt(gif, 0, 0, 0));
     }
@@ -128,13 +100,13 @@ public class GifRendererTests : IDisposable
     [Fact]
     public void Render_MoreThanOneFrameRate_ChangesOnlyTheStepsNotTheTotalDuration()
     {
-        WriteRow("sheet.png", SKColors.Red);
+        WriteRow(_folder, "sheet.png", SKColors.Red);
         var chain = new AnimationChainSave { Name = "Slide", Loop = false };
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 10));
 
-        byte[] at50 = Render(new[] { new GifSourceChain(chain, true) }, Solid(fps: 50));
-        byte[] at25 = Render(new[] { new GifSourceChain(chain, true) }, Solid(fps: 25));
+        byte[] at50 = Render(new[] { new ExportSourceChain(chain, true) }, Solid(fps: 50));
+        byte[] at25 = Render(new[] { new ExportSourceChain(chain, true) }, Solid(fps: 25));
 
         using var fast = Open(at50);
         using var slow = Open(at25);
@@ -150,6 +122,6 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("missing.png", 0f, 1f));
 
         Assert.Throws<InvalidOperationException>(() =>
-            GifRenderer.Render(new[] { new GifSourceChain(chain, false) }, _ => null, 1f, Solid()));
+            GifRenderer.Render(new[] { new ExportSourceChain(chain, false) }, _ => null, 1f, Solid()));
     }
 }

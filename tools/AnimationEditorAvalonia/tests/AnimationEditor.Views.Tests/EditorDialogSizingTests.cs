@@ -59,13 +59,18 @@ public class EditorDialogSizingTests
         AssertAutoSized(host.CapturedOptions);
     }
 
-    [AvaloniaFact]
-    public async Task ShowExportGifAsync_AutoSizesToContent()
+    [AvaloniaTheory]
+    [InlineData("Gif")]
+    [InlineData("Webp")]
+    public async Task ShowExportAnimatedImageAsync_AutoSizesToContent(string formatName)
     {
         var host = new OptionsCapturingDialogHost();
-        var defaults = new AnimationEditor.Core.Export.Gif.GifExportOptions(50, Transparent: true, 0xFF000000, Scale: 1);
+        var format = formatName == "Gif"
+            ? AnimationEditor.Core.Export.AnimatedImageFormat.Gif
+            : AnimationEditor.Core.Export.AnimatedImageFormat.Webp;
+        var defaults = new AnimationEditor.Core.Export.AnimationExportOptions(10, Transparent: true, 0xFF000000, Scale: 1);
 
-        var choice = await EditorDialogs.ShowExportGifAsync(host, defaults, _ => Task.FromResult<uint?>(null));
+        var choice = await EditorDialogs.ShowExportAnimatedImageAsync(host, format, defaults, _ => Task.FromResult<uint?>(null));
 
         AssertAutoSized(host.CapturedOptions);
         Assert.Null(choice);

@@ -101,6 +101,7 @@
                             <MenuItem Header="_PixiJS…" x:Name="MenuExportPixiJs" />
                             <MenuItem Header="_Godot SpriteFrames…" x:Name="MenuExportGodot" />
                             <MenuItem Header="Animated _GIF…" x:Name="MenuExportGif" />
+                            <MenuItem Header="Animated _WebP…" x:Name="MenuExportWebp" />
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">

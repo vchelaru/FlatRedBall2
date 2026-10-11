@@ -15,7 +15,7 @@ public sealed record GifRgbaFrame(byte[] Rgba, int DelayCentiseconds);
 /// </summary>
 public static class GifEncoder
 {
-    private const int MaxDimension = 65535;
+    public const int MaxDimension = 65535;
 
     public static byte[] Encode(int width, int height, IReadOnlyList<GifRgbaFrame> frames, bool transparent)
     {
