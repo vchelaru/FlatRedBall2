@@ -3638,7 +3638,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // img is a cached, immutable SKImage owned by ThumbnailService — drawn directly, NOT
         // rebuilt from the source bitmap here. Rebuilding it per frame was a full-atlas copy +
         // GPU re-upload (67 MB/frame for a 4096² sheet), the #514 preview-framerate bottleneck.
-        canvas.DrawImage(img, src, dst, sampling, paint);
+        // Below 1x the draw is bilinear, which would sample the neighbouring frames on the sheet
+        // past the source rect. Draw the frame's own pixels instead so it clamps at the frame edge.
+        if (zoom < 1 && FrameCropCache.Get(img, src) is { } crop)
+            canvas.DrawImage(crop, dst, sampling, paint);
+        else
+            canvas.DrawImage(img, src, dst, sampling, paint);
 
         if (flip) canvas.Restore();
 
