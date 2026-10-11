@@ -9,8 +9,8 @@ namespace AnimationEditor.Core.Rendering;
 /// In snap mode the offset is exactly the current frame's — this mirrors the FlatRedBall
 /// runtime, which overwrites the sprite position on every frame switch and never blends.
 /// In interpolate mode the offset eases linearly toward the next frame across the current
-/// frame's display time; the last frame has no successor and holds its own offset until the
-/// preview loops. Interpolation is a <b>preview-only authoring aid</b>: it is not stored in
+/// frame's display time. The last frame eases toward frame 0 when the chain loops and holds
+/// its own offset when it does not. Interpolation is a <b>preview-only authoring aid</b>: it is not stored in
 /// the <c>.achx</c> and the runtime does not reproduce it.
 /// </para>
 /// </summary>
@@ -30,14 +30,13 @@ public static class OffsetInterpolator
         frameIndex = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
         var current = chain.Frames[frameIndex];
 
-        // The last frame has no successor to ease toward: hold its offset rather than easing
-        // back toward frame 0, so a non-looping clip settles on its final position. (If the
-        // clip loops, the offset snaps at the same instant the image already hard-cuts.)
+        // A looping chain's last frame eases back toward frame 0. A non-looping chain's last
+        // frame has no successor, so it holds and the clip settles on its final position.
         int lastIndex = chain.Frames.Count - 1;
-        if (!interpolate || frameIndex >= lastIndex)
+        if (!interpolate || lastIndex == 0 || (frameIndex == lastIndex && !chain.Loop))
             return (current.RelativeX, current.RelativeY);
 
-        var next = chain.Frames[frameIndex + 1];
+        var next = chain.Frames[frameIndex == lastIndex ? 0 : frameIndex + 1];
 
         // 0.1s default matches PlaybackController's handling of unset frame lengths.
         double frameLength = current.FrameLength > 0 ? current.FrameLength : 0.1;

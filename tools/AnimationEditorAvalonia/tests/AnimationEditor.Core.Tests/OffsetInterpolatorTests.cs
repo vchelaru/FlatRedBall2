@@ -36,11 +36,22 @@ public class OffsetInterpolatorTests
     }
 
     [Fact]
-    public void ComputeOffset_InterpolateOnLastFrame_HoldsLastFrameOffset()
+    public void ComputeOffset_InterpolateOnLastFrame_Looping_EasesTowardFirstFrame()
     {
-        // The last frame has no successor to ease toward, so it holds its own offset
-        // regardless of elapsed — the loop snaps back to frame 0 only when the image hard-cuts.
+        // A looping chain's last frame is followed by frame 0, so it eases back toward it.
+        var chain = MakeChain((-10f, 0f), (10f, 0f));
+        chain.Loop = true;
+        var (x, y) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 1, frameElapsed: 0.05, interpolate: true);
+        Assert.Equal(0f, x, precision: 4);
+        Assert.Equal(0f, y, precision: 4);
+    }
+
+    [Fact]
+    public void ComputeOffset_InterpolateOnLastFrame_NotLooping_HoldsLastFrameOffset()
+    {
+        // A non-looping chain stops on its last frame, so that frame holds its own offset.
         var chain = MakeChain((10f, 20f), (50f, 60f));
+        chain.Loop = false;
         var (x, y) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 1, frameElapsed: 0.05, interpolate: true);
         Assert.Equal(50f, x, precision: 4);
         Assert.Equal(60f, y, precision: 4);
