@@ -3638,10 +3638,17 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // img is a cached, immutable SKImage owned by ThumbnailService — drawn directly, NOT
         // rebuilt from the source bitmap here. Rebuilding it per frame was a full-atlas copy +
         // GPU re-upload (67 MB/frame for a 4096² sheet), the #514 preview-framerate bottleneck.
-        // Below 1x the draw is bilinear, which would sample the neighbouring frames on the sheet
-        // past the source rect. Draw the frame's own pixels instead so it clamps at the frame edge.
-        if (zoom < 1 && FrameCropCache.Get(img, src) is { } crop)
-            canvas.DrawImage(crop, dst, sampling, paint);
+        // Below 1x the draw is bilinear, and SkiaSharp's DrawImage has no strict source-rect
+        // constraint, so sampling past the source rect pulls in the neighbouring frames on the
+        // sheet. Copy the frame 1:1 into its own exact-size image first: a standalone image clamps
+        // at its edge. Nothing is cached, so there is nothing to invalidate.
+        if (zoom < 1 && sw > 0 && sh > 0)
+        {
+            using var surface = SKSurface.Create(new SKImageInfo(sw, sh));
+            surface.Canvas.DrawImage(img, src, SKRect.Create(sw, sh), new SKSamplingOptions(SKFilterMode.Nearest));
+            using var frameImage = surface.Snapshot();
+            canvas.DrawImage(frameImage, dst, sampling, paint);
+        }
         else
             canvas.DrawImage(img, src, dst, sampling, paint);
 
