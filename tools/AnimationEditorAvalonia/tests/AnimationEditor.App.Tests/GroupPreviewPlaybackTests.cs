@@ -315,4 +315,36 @@ public class GroupPreviewPlaybackTests
         Assert.Equal(1, ctrl.GroupTracks.First(t => t.Chain == a).Playback.CurrentFrameIndex);
         Assert.Equal(2, ctrl.GroupTracks.First(t => t.Chain == b).Playback.CurrentFrameIndex);
     }
+
+    /// <summary>
+    /// Each track honors its own chain's remembered Interpolate setting (#1387): A was turned on
+    /// while selected alone, B never was, so halfway through frame 0 only A eases toward frame 1.
+    /// </summary>
+    [AvaloniaFact]
+    public void GroupLayers_EachTrackUsesItsOwnInterpolateSetting()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var a = MakeChain("A", 2);
+        var b = MakeChain("B", 2);
+        a.Frames[1].RelativeX = 10f;
+        b.Frames[1].RelativeX = 10f;
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(a);
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(b);
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.PauseAutoPlayback();
+        ctx.SelectedState.SelectedChain = a;
+        Dispatcher.UIThread.RunJobs();
+        ctrl.InterpolateOffsets = true;
+
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+        ctrl.ScrubGroupTrack(a, 0, 0.5);
+        ctrl.ScrubGroupTrack(b, 0, 0.5);
+
+        var offsets = ctrl.GetGroupLayerOffsetsForTest();
+        Assert.Equal(5f, offsets[0].X, 0.01f);
+        Assert.Equal(0f, offsets[1].X, 0.01f);
+    }
 }

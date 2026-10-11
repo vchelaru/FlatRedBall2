@@ -617,9 +617,23 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             if (GetCurrentPlaybackFrame(chain) is not { } frame) continue;
             string? texPath = _thumbnailService!.ResolveTexturePath(frame);
             _thumbnailService.GetImage(texPath);
-            layers.Add(new PreviewLayer(frame, texPath, frame.RelativeX, frame.RelativeY, ResolveColor(chain, frame)));
+            var (offX, offY) = ResolveGroupLayerOffset(chain, frame);
+            layers.Add(new PreviewLayer(frame, texPath, offX, offY, ResolveColor(chain, frame)));
         }
         return layers.ToArray();
+    }
+
+    /// <summary>
+    /// A group layer's offset: eased at its own track's playhead when its chain's Interpolate is on
+    /// (#1387), else the frame's stored offset. A pinned frame the playhead isn't on stays put.
+    /// </summary>
+    private (float X, float Y) ResolveGroupLayerOffset(AnimationChainSave chain, AnimationFrameSave frame)
+    {
+        var controller = GetPlaybackController(chain);
+        if (controller is null || !_interpolatedChains.Contains(chain)
+            || controller.CurrentFrameIndex != chain.Frames.IndexOf(frame))
+            return (frame.RelativeX, frame.RelativeY);
+        return OffsetInterpolator.ComputeOffset(chain, controller.CurrentFrameIndex, controller.FrameElapsed, true);
     }
 
     /// <summary>Whether the animation is currently playing.</summary>
@@ -1793,9 +1807,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     {
         if (chain.Frames.Count == 0) return null;
         if (IsGroupPreviewActive && GroupPinnedFrame(chain) is { } pinned) return pinned;
-        var controller = _groupPlayback.GetValueOrDefault(chain)
-            ?? (ReferenceEquals(chain, _selectedState!.SelectedChain) ? _playback : null);
-        if (controller is null) return null;
+        if (GetPlaybackController(chain) is not { } controller) return null;
         int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
         return chain.Frames[idx];
     }
@@ -1806,6 +1818,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         var snap = BuildRenderSnapshot(100f, 100f);
         return (snap.FrameOffsetX, snap.FrameOffsetY);
     }
+
+    /// <summary>Test-only: returns each group layer's drawn offset, back-to-front.</summary>
+    internal (float X, float Y)[] GetGroupLayerOffsetsForTest() =>
+        BuildGroupLayers().Select(l => (l.OffsetX, l.OffsetY)).ToArray();
+
+    /// <summary>The chain's own group track, or the single-chain controller when it is the selected chain.</summary>
+    private PlaybackController? GetPlaybackController(AnimationChainSave chain) =>
+        _groupPlayback.GetValueOrDefault(chain)
+            ?? (ReferenceEquals(chain, _selectedState!.SelectedChain) ? _playback : null);
 
     /// <summary>Test-only: returns the shape infos that would be passed to the renderer for the current state.</summary>
     internal PreviewShapeInfo[] GetShapeInfosForTest() => BuildShapeInfos();
