@@ -33,6 +33,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- The AnimationEditor builds this project, and the editor requires zero warnings. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <!-- NuGet Metadata -->
     <PackageId>FlatRedBall.AnimationChain.Common</PackageId>

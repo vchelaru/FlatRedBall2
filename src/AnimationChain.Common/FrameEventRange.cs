@@ -13,7 +13,10 @@ internal static class FrameEventRange
     /// included (a large delta skipping frames still enters them), and the run always ends on
     /// <paramref name="newIndex"/>. An advance covering a full loop or more yields each frame once.
     /// </summary>
+    /// <param name="previousIndex">Frame index before the advance.</param>
+    /// <param name="newIndex">Frame index after the advance.</param>
     /// <param name="wraps">How many times the advance wrapped past the chain's end.</param>
+    /// <param name="frameCount">Number of frames in the chain.</param>
     public static (int Start, int Length) Get(int previousIndex, int newIndex, int wraps, int frameCount)
     {
         if (wraps == 0)
