@@ -918,11 +918,12 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         snap.Image       = _image;
         snap.ImageWidth  = _bitmap?.Width ?? 0;
         snap.ImageHeight = _bitmap?.Height ?? 0;
-        // Snapped for render (issue #1140 follow-up) -- the live _panX/_panY stay full precision
+        // Snapped to device pixels + a tie-break bias for render (issue #1140 follow-up) -- the live _panX/_panY stay full precision
         // so repeated fit/clamp/zoom math never accumulates rounding error; only what's actually
         // drawn (and the frame-box overlay, via TextureRectToScreen using this same snapshot) is
         // snapped, so the image, grid, outline, and overlay all move together.
-        (snap.PanX, snap.PanY) = CanvasTransform.SnapPanForPointSampling(_panX, _panY, _zoom);
+        float renderScaling = (float)(TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0);
+        (snap.PanX, snap.PanY) = CanvasTransform.SnapPanForPointSampling(_panX, _panY, _zoom, renderScaling);
         snap.Zoom        = _zoom;
         snap.ShowGrid    = _showGrid;
         snap.Grid        = _grid;

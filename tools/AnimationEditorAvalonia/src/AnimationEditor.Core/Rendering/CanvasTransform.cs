@@ -226,26 +226,41 @@ public static class CanvasTransform
     }
 
     /// <summary>
-    /// Rounds pan to the nearest whole screen pixel when point-sampling would otherwise land
-    /// exactly (or near-exactly) on a texel boundary -- only relevant at <paramref name="zoom"/>
-    /// &gt;= 1, the threshold at which <c>TextureViewport</c> switches to nearest-neighbor
-    /// sampling for pixel-art fidelity. Below that, bilinear sampling blends continuously across
-    /// any offset, so there's no boundary ambiguity to fix and the pan is returned unchanged.
-    /// Uses <see cref="MathF.Round(float)"/> (round-to-nearest, ties-to-even), not floor/ceiling
-    /// -- floor or ceiling would bias every fit-to-view in the same direction, while round-to-
-    /// nearest's worst case is an imperceptible &lt;= 0.5 screen-pixel shift with no consistent
-    /// direction across different fits.
+    /// Device-pixel offset added after rounding in <see cref="SnapPanForPointSampling"/>. Any
+    /// power-of-two fraction that is an odd multiple of 1/16 keeps texel boundaries at least 1/16
+    /// of a pixel from a pixel centre for the common zooms (multiples of 1/8 device pixel), and is
+    /// far below anything visible.
+    /// </summary>
+    public const float PointSamplingBias = 1f / 16f;
+
+    /// <summary>
+    /// Snaps pan so point-sampling never lands a texel boundary exactly on a device pixel centre --
+    /// only relevant at <paramref name="zoom"/> &gt;= 1, where <c>TextureViewport</c> switches to
+    /// nearest-neighbor sampling for pixel-art fidelity. Below that, bilinear sampling blends
+    /// continuously across any offset, so the pan is returned unchanged.
+    /// <para>
+    /// Rounds to a whole <i>device</i> pixel (<paramref name="renderScaling"/> converts logical to
+    /// device units), then adds <see cref="PointSamplingBias"/>. Rounding alone is not enough: at a
+    /// fractional zoom such as 1.5 every other texel boundary lands on a pixel centre even with an
+    /// integer pan, and at 150% display scaling an integer logical pan is a half device pixel.
+    /// </para>
     /// </summary>
     /// <remarks>
-    /// Issue #1140 follow-up: a fit-to-view centering computation landed on an exact half-pixel
-    /// pan (<c>panY = -3446.5</c> at <c>zoom = 4</c>) for a real animation chain. Nearest-neighbor
-    /// sampling exactly on a texel boundary is a genuine tie, and GPU/driver tie-breaking for that
-    /// case isn't guaranteed stable frame-to-frame -- visible as shimmer on the rendered image
-    /// even though the camera itself never changed (confirmed via logging: pan/zoom were
-    /// bit-identical across every render during the reported jitter).
+    /// A boundary exactly on a pixel centre is a genuine nearest-neighbor tie, and GPU/driver
+    /// tie-breaking isn't stable when the geometry changes. Issue #1140 follow-up: fit-to-view landed
+    /// on <c>panY = -3446.5</c> at zoom 4 and the image shimmered with an unchanged camera. Fractional
+    /// zoom (1.5) reproduced it again as sizzling while resizing a panel, because the first fix only
+    /// handled integer zoom. Uses <see cref="MathF.Round(float)"/> (ties-to-even) rather than
+    /// floor/ceiling so fits aren't biased in one direction.
     /// </remarks>
-    public static (float PanX, float PanY) SnapPanForPointSampling(float panX, float panY, float zoom) =>
-        zoom >= 1f ? (MathF.Round(panX), MathF.Round(panY)) : (panX, panY);
+    public static (float PanX, float PanY) SnapPanForPointSampling(
+        float panX, float panY, float zoom, float renderScaling)
+    {
+        if (zoom < 1f) return (panX, panY);
+        return (Snap(panX, renderScaling), Snap(panY, renderScaling));
+
+        static float Snap(float pan, float scale) => (MathF.Round(pan * scale) + PointSamplingBias) / scale;
+    }
 
     // ── Drag auto-pan (#540) ──────────────────────────────────────────────────
 

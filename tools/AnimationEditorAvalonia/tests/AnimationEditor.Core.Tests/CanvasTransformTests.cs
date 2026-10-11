@@ -577,12 +577,12 @@ public class CanvasTransformTests
     // chain landed on panY=-3446.5 at zoom=4).
 
     [Fact]
-    public void SnapPanForPointSampling_ExactReproValues_RoundsToWholePixel()
+    public void SnapPanForPointSampling_ExactReproValues_LandsOnWholePixelPlusBias()
     {
-        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(-4312f, -3446.5f, 4f);
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(-4312f, -3446.5f, 4f, 1f);
 
-        Assert.Equal(-4312f, panX);
-        Assert.Equal(-3446f, panY); // banker's rounding: -3446.5 rounds to the nearest even integer
+        Assert.Equal(-4312f + CanvasTransform.PointSamplingBias, panX);
+        Assert.Equal(-3446f + CanvasTransform.PointSamplingBias, panY); // banker's rounding: -3446.5 -> -3446
     }
 
     [Fact]
@@ -590,7 +590,7 @@ public class CanvasTransformTests
     {
         // Bilinear sampling below 1x blends continuously across any offset -- no boundary
         // ambiguity to fix, so snapping would only needlessly move the image.
-        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.5f, 20.5f, 0.5f);
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.5f, 20.5f, 0.5f, 1.5f);
 
         Assert.Equal(10.5f, panX);
         Assert.Equal(20.5f, panY);
@@ -600,9 +600,47 @@ public class CanvasTransformTests
     public void SnapPanForPointSampling_ZoomAtLeastOne_RoundsToNearestNotAlwaysDown()
     {
         // Math.Round, not Floor -- Floor/Ceiling would bias every fit in the same direction.
-        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.9f, 20.1f, 1f);
+        var (panX, panY) = CanvasTransform.SnapPanForPointSampling(10.9f, 20.1f, 1f, 1f);
 
-        Assert.Equal(11f, panX);
-        Assert.Equal(20f, panY);
+        Assert.Equal(11f + CanvasTransform.PointSamplingBias, panX);
+        Assert.Equal(20f + CanvasTransform.PointSamplingBias, panY);
+    }
+
+    [Fact]
+    public void SnapPanForPointSampling_HighDpi_SnapsInDevicePixels()
+    {
+        // At 150% display scaling a logical pan of 11 is device pixel 16.5 -- a half-pixel offset.
+        // Snapping must land on a whole *device* pixel (16) plus the bias, expressed back in logical units.
+        var (panX, _) = CanvasTransform.SnapPanForPointSampling(11f, 0f, 1f, 1.5f);
+
+        Assert.Equal((16f + CanvasTransform.PointSamplingBias) / 1.5f, panX, 4);
+    }
+
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(1.5f)]
+    [InlineData(2f)]
+    [InlineData(2.5f)]
+    [InlineData(3f)]
+    [InlineData(4f)]
+    public void SnapPanForPointSampling_NoTexelBoundaryLandsOnPixelCenter(float zoom)
+    {
+        // A texel boundary exactly on a device pixel centre is a nearest-neighbour tie the GPU
+        // resolves unpredictably, so the image shimmers whenever a repaint changes the geometry
+        // (e.g. dragging the panel splitter at 150% wireframe zoom). With an integer pan, zoom 1.5
+        // puts every other boundary on a centre; the bias must move all of them clear.
+        foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
+        foreach (float rawPan in new[] { 0f, 7f, -13f, 100.5f, -3446.5f, 0.25f, 33.75f })
+        {
+            var (pan, _) = CanvasTransform.SnapPanForPointSampling(rawPan, 0f, zoom, scale);
+
+            for (int texel = 0; texel < 64; texel++)
+            {
+                double boundary = pan * scale + texel * (double)zoom * scale;
+                double fromCentre = Math.Abs(boundary - Math.Floor(boundary) - 0.5);
+                Assert.True(fromCentre >= 1.0 / 32,
+                    $"zoom {zoom}, scale {scale}, pan {rawPan}: texel {texel} boundary {boundary} sits {fromCentre} from a pixel centre");
+            }
+        }
     }
 }
