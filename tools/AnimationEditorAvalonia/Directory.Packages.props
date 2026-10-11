@@ -32,6 +32,10 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="NJsonSchema" Version="11.*" />
     <PackageVersion Include="SkiaSharp" Version="4.148.0" />
+    <!-- Avalonia.Skia 12 pulls this at 3.119, and the native Skia must match the managed SkiaSharp
+         exactly (4.148 refuses to load a 119 native library). Windows and macOS natives already follow
+         SkiaSharp itself; Linux needs this explicit pin. -->
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.148.0" />
     <PackageVersion Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.7" />
     <PackageVersion Include="Velopack" Version="1.2.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />

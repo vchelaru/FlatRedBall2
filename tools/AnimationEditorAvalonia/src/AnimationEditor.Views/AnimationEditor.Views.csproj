@@ -23,6 +23,7 @@
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Skia" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
     <!-- Phase 7 (#644): shared SVG toolbar/spinner icons; see ThemeIconResources.axaml. -->
     <PackageReference Include="Svg.Controls.Skia.Avalonia" />
   </ItemGroup>
