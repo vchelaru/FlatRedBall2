@@ -1702,7 +1702,7 @@
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,4,0"
-                                          ToolTip.Tip="Ease the sprite between frame offsets during playback (preview only — the game snaps)">
+                                          ToolTip.Tip="Ease the sprite between frame offsets during playback (preview only — the game snaps). Remembered per animation; with several selected, sets them all.">
                                 <TextBlock Text="Interpolate" VerticalAlignment="Center" />
                             </ToggleButton>
 

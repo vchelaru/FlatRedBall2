@@ -336,7 +336,7 @@ public class GroupPreviewPlaybackTests
         ctrl.PauseAutoPlayback();
         ctx.SelectedState.SelectedChain = a;
         Dispatcher.UIThread.RunJobs();
-        ctrl.InterpolateOffsets = true;
+        ctrl.SetInterpolateOffsets(true);
 
         ctx.SelectedState.SelectedNodes = new List<object> { a, b };
         Dispatcher.UIThread.RunJobs();

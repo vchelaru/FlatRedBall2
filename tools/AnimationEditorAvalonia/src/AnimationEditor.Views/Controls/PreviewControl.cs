@@ -85,7 +85,6 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private bool _showOrigin;
     private bool _showUserGuides = true;
     private bool _showBoundingBox = true;
-    private bool _interpolateOffsets;
     // Chains the user turned Interpolate on for. This is an incremental step: the toggle is kept
     // per chain in memory for the session instead of clearing on every selection change, but it
     // is not saved to the .achx. Persisting it to disk (possibly as a per-frame setting) may
@@ -287,31 +286,47 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     public event Action? GuidesChanged;
 
     /// <summary>
-    /// When <c>true</c>, the displayed sprite position eases between consecutive frames'
-    /// <c>RelativeX/Y</c> offsets instead of snapping at each frame switch. Preview-only:
-    /// the FlatRedBall runtime always snaps, so this does not reflect in-game behavior and
-    /// is not persisted. Remembered per chain: selecting a chain restores its own setting.
+    /// Whether the previewed animations ease the sprite between consecutive frames'
+    /// <c>RelativeX/Y</c> offsets instead of snapping at each frame switch: <c>true</c> when every
+    /// previewed animation does, <c>false</c> when none do, <c>null</c> when a multi-animation group
+    /// is mixed. Preview-only: the FlatRedBall runtime always snaps, so this does not reflect
+    /// in-game behavior and is not persisted. Remembered per animation for the session.
     /// </summary>
-    public bool InterpolateOffsets
+    public bool? InterpolateOffsets
     {
-        get => _interpolateOffsets;
-        set
+        get
         {
-            if (_playback.Chain is { } chain)
-            {
-                if (value) _interpolatedChains.Add(chain);
-                else _interpolatedChains.Remove(chain);
-            }
-            if (_interpolateOffsets == value) return;
-            _interpolateOffsets = value;
-            InvalidateVisual();
-            InterpolateOffsetsChanged?.Invoke(value);
+            var targets = InterpolateTargets();
+            if (targets.Count == 0) return false;
+            int on = targets.Count(_interpolatedChains.Contains);
+            return on == 0 ? false : on == targets.Count ? true : null;
         }
     }
 
-    /// <summary>Fired when <see cref="InterpolateOffsets"/> changes, including the per-chain
-    /// restore on selection change, so the toolbar toggle can resync its checked state.</summary>
-    public event Action<bool>? InterpolateOffsetsChanged;
+    /// <summary>Turns Interpolate on or off for every previewed animation (the whole group in multi-select).</summary>
+    public void SetInterpolateOffsets(bool on)
+    {
+        foreach (var chain in InterpolateTargets())
+        {
+            if (on) _interpolatedChains.Add(chain);
+            else _interpolatedChains.Remove(chain);
+        }
+        InvalidateVisual();
+        InterpolateOffsetsChanged?.Invoke(InterpolateOffsets);
+    }
+
+    // The group's chains in multi-select, else the single previewed chain.
+    private List<AnimationChainSave> InterpolateTargets() =>
+        IsGroupPreviewActive ? _groupPlayback.Keys.ToList()
+        : _playback.Chain is { } chain ? new List<AnimationChainSave> { chain }
+        : new List<AnimationChainSave>();
+
+    private bool IsInterpolated(AnimationChainSave? chain) =>
+        chain is not null && _interpolatedChains.Contains(chain);
+
+    /// <summary>Fired after <see cref="SetInterpolateOffsets"/> and after every selection change
+    /// (which swaps in each animation's own setting), so the toolbar toggle can resync.</summary>
+    public event Action<bool?>? InterpolateOffsetsChanged;
 
     public double SpeedMultiplier
     {
@@ -630,7 +645,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private (float X, float Y) ResolveGroupLayerOffset(AnimationChainSave chain, AnimationFrameSave frame)
     {
         var controller = GetPlaybackController(chain);
-        if (controller is null || !_interpolatedChains.Contains(chain)
+        if (controller is null || !IsInterpolated(chain)
             || controller.CurrentFrameIndex != chain.Frames.IndexOf(frame))
             return (frame.RelativeX, frame.RelativeY);
         return OffsetInterpolator.ComputeOffset(chain, controller.CurrentFrameIndex, controller.FrameElapsed, true);
@@ -976,7 +991,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // to once-per-frame-switch like the snap path.
         _playback.PlaybackTicked += () =>
         {
-            if (_interpolateOffsets) Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+            if (IsInterpolated(_playback.Chain)) Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         };
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
@@ -1050,8 +1065,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             _playback.Play();
         }
 
-        // Restore the selected chain's own Interpolate setting (see _interpolatedChains).
-        InterpolateOffsets = chain is not null && _interpolatedChains.Contains(chain);
+        // Each animation keeps its own Interpolate setting (see _interpolatedChains); resync the toggle.
+        InterpolateOffsetsChanged?.Invoke(InterpolateOffsets);
         InvalidateVisual();
         // A new chain/frame changes the union extent → refresh the host's scrollbars.
         RaiseViewChanged();
@@ -1074,7 +1089,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             return (displayFrame.RelativeX, displayFrame.RelativeY);
 
         return OffsetInterpolator.ComputeOffset(
-            chain, _playback.CurrentFrameIndex, _playback.FrameElapsed, _interpolateOffsets);
+            chain, _playback.CurrentFrameIndex, _playback.FrameElapsed, IsInterpolated(chain));
     }
 
     // -- Public API ------------------------------------------------------------

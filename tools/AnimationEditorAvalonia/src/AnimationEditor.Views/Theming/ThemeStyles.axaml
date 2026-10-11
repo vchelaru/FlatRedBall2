@@ -72,6 +72,13 @@
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Padding" Value="10,0"/>
     </Style>
+    <!-- Mixed state (e.g. Interpolate with a multi-select group where only some animations have it
+         on): Fluent's indeterminate fill is nearly identical to unchecked, so outline it in the
+         checked color to read as "partly on". -->
+    <Style Selector="ToggleButton.toolbarToggle:indeterminate /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBackgroundChecked}"/>
+        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
     <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
     <Style Selector="Button.plus">
         <Setter Property="ContentTemplate">

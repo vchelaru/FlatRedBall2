@@ -191,6 +191,7 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
+    private bool _interpolateWasMixed;
     private bool _suppressGuideVisibilitySync;
 
     // Shift+Up/Down range-select (#1023): the row a range grows from. Reset to whatever
@@ -3358,12 +3359,14 @@ public partial class MainWindow : Window
         InterpolateToggle.IsCheckedChanged += (_, _) =>
         {
             if (_suppressInterpolateSync) return;
-            PreviewCtrl.InterpolateOffsets = InterpolateToggle.IsChecked == true;
+            // Clicking a mixed group turns every animation on, whatever ToggleButton cycles to.
+            PreviewCtrl.SetInterpolateOffsets(_interpolateWasMixed || InterpolateToggle.IsChecked == true);
         };
         // PreviewControl restores each chain's own InterpolateOffsets on selection change; resync the toggle.
         PreviewCtrl.InterpolateOffsetsChanged += isOn =>
         {
             _suppressInterpolateSync = true;
+            _interpolateWasMixed = isOn is null;
             InterpolateToggle.IsChecked = isOn;
             _suppressInterpolateSync = false;
         };

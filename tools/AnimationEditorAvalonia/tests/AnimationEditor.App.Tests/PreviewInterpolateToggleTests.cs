@@ -2,6 +2,7 @@ using AnimationEditor.App.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
+using System.Collections.Generic;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -28,7 +29,7 @@ public class PreviewInterpolateToggleTests
         var ctrl = ctx.CreatePreviewControl();
         ctx.SelectedState.SelectedChain = MakeChain("A");
         Dispatcher.UIThread.RunJobs();
-        ctrl.InterpolateOffsets = true;
+        ctrl.SetInterpolateOffsets(true);
 
         ctx.SelectedState.SelectedChain = MakeChain("B");
         Dispatcher.UIThread.RunJobs();
@@ -44,7 +45,7 @@ public class PreviewInterpolateToggleTests
         var a = MakeChain("A");
         ctx.SelectedState.SelectedChain = a;
         Dispatcher.UIThread.RunJobs();
-        ctrl.InterpolateOffsets = true;
+        ctrl.SetInterpolateOffsets(true);
 
         ctx.SelectedState.SelectedChain = MakeChain("B");
         Dispatcher.UIThread.RunJobs();
@@ -64,7 +65,7 @@ public class PreviewInterpolateToggleTests
         ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(a);
         ctx.SelectedState.SelectedChain = a;
         Dispatcher.UIThread.RunJobs();
-        ctrl.InterpolateOffsets = true;
+        ctrl.SetInterpolateOffsets(true);
 
         // Selecting a frame of the same chain (e.g. to delete it) must not clear the toggle.
         ctx.SelectedState.SelectedFrame = a.Frames[1];
@@ -85,7 +86,7 @@ public class PreviewInterpolateToggleTests
         ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(a);
         ctx.SelectedState.SelectedChain = a;
         Dispatcher.UIThread.RunJobs();
-        ctrl.InterpolateOffsets = true;
+        ctrl.SetInterpolateOffsets(true);
 
         ctrl.ScrubToFrame(0, 0.5);
         Dispatcher.UIThread.RunJobs();
@@ -109,5 +110,40 @@ public class PreviewInterpolateToggleTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(0f, ctrl.GetFrameOffsetForTest().X, 0.01f);
+    }
+
+    [AvaloniaFact]
+    public void InterpolateOffsets_GroupWithMixedSettings_IsNull()
+    {
+        var ctx  = TestHelpers.BuildServices();
+        var ctrl = ctx.CreatePreviewControl();
+        var a = MakeChain("A");
+        var b = MakeChain("B");
+        ctx.SelectedState.SelectedChain = a;
+        Dispatcher.UIThread.RunJobs();
+        ctrl.SetInterpolateOffsets(true);
+
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(ctrl.InterpolateOffsets);
+    }
+
+    [AvaloniaFact]
+    public void SetInterpolateOffsets_GroupSelected_AppliesToEveryChain()
+    {
+        var ctx  = TestHelpers.BuildServices();
+        var ctrl = ctx.CreatePreviewControl();
+        var a = MakeChain("A");
+        var b = MakeChain("B");
+        ctx.SelectedState.SelectedNodes = new List<object> { a, b };
+        Dispatcher.UIThread.RunJobs();
+
+        ctrl.SetInterpolateOffsets(true);
+
+        Assert.True(ctrl.InterpolateOffsets);
+        ctx.SelectedState.SelectedChain = b;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(ctrl.InterpolateOffsets);
     }
 }
