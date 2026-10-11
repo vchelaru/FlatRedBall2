@@ -73,4 +73,41 @@ public class PreviewInterpolateToggleTests
 
         Assert.True(ctrl.InterpolateOffsets);
     }
+
+    [AvaloniaFact]
+    public void ScrubToFrame_Interpolating_ShowsEasedOffset()
+    {
+        var ctx  = TestHelpers.BuildServices();
+        var ctrl = ctx.CreatePreviewControl();
+        var a = MakeChain("A");
+        a.Frames[1].RelativeX = 10f;
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(a);
+        ctx.SelectedState.SelectedChain = a;
+        Dispatcher.UIThread.RunJobs();
+        ctrl.InterpolateOffsets = true;
+
+        ctrl.ScrubToFrame(0, 0.5);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(5f, ctrl.GetFrameOffsetForTest().X, 0.01f);
+    }
+
+    [AvaloniaFact]
+    public void ScrubToFrame_NotInterpolating_ShowsFrameOffset()
+    {
+        var ctx  = TestHelpers.BuildServices();
+        var ctrl = ctx.CreatePreviewControl();
+        var a = MakeChain("A");
+        a.Frames[1].RelativeX = 10f;
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(a);
+        ctx.SelectedState.SelectedChain = a;
+        Dispatcher.UIThread.RunJobs();
+
+        ctrl.ScrubToFrame(0, 0.5);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(0f, ctrl.GetFrameOffsetForTest().X, 0.01f);
+    }
 }

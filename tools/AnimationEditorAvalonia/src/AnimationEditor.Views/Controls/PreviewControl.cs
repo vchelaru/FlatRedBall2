@@ -1044,15 +1044,20 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     }
 
     /// <summary>
-    /// Resolves the (X, Y) offset for the display frame. During free playback the offset
-    /// honors <see cref="InterpolateOffsets"/>; when a frame is pinned via tree selection it
-    /// is shown statically at its own stored offset.
+    /// Resolves the (X, Y) offset for the display frame, honoring <see cref="InterpolateOffsets"/>
+    /// at the playhead's position. A pinned frame (tree selection or scrub) interpolates too when
+    /// the playhead is on it, so scrubbing shows what playback would show (#1385); a frame
+    /// selected at its start is at t = 0, which is its own stored offset.
     /// </summary>
     private (float X, float Y) ResolveFrameOffset(
         AnimationChainSave? chain, AnimationFrameSave? displayFrame, bool pinned)
     {
-        if (pinned || displayFrame is null)
-            return (displayFrame?.RelativeX ?? 0f, displayFrame?.RelativeY ?? 0f);
+        if (displayFrame is null) return (0f, 0f);
+
+        bool playheadOnFrame = chain is not null
+            && _playback.CurrentFrameIndex == chain.Frames.IndexOf(displayFrame);
+        if (pinned && !playheadOnFrame)
+            return (displayFrame.RelativeX, displayFrame.RelativeY);
 
         return OffsetInterpolator.ComputeOffset(
             chain, _playback.CurrentFrameIndex, _playback.FrameElapsed, _interpolateOffsets);
@@ -1793,6 +1798,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         if (controller is null) return null;
         int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
         return chain.Frames[idx];
+    }
+
+    /// <summary>Test-only: returns the display-frame offset the renderer would draw at for the current state.</summary>
+    internal (float X, float Y) GetFrameOffsetForTest()
+    {
+        var snap = BuildRenderSnapshot(100f, 100f);
+        return (snap.FrameOffsetX, snap.FrameOffsetY);
     }
 
     /// <summary>Test-only: returns the shape infos that would be passed to the renderer for the current state.</summary>
