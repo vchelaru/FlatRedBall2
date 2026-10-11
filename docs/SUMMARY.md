@@ -13,6 +13,7 @@
   * [Edit Animations](animationeditor/how-to/edit-animations.md)
   * [Edit Frames](animationeditor/how-to/edit-frames.md)
   * [Preview an Animation](animationeditor/how-to/preview-an-animation.md)
+  * [Export an Animation as a GIF](animationeditor/how-to/export-an-animation-as-a-gif.md)
   * [Work with Tiled TileSets (.tsx)](animationeditor/how-to/work-with-tiled-tilesets-.tsx.md)
   * [Add Shapes to Frames](animationeditor/how-to/add-shapes-to-frames.md)
   * [Use Lock and Multi-Select](animationeditor/how-to/use-lock-and-multi-select.md)

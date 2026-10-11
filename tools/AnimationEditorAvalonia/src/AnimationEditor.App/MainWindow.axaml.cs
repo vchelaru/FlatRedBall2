@@ -3,6 +3,7 @@ using AnimationEditor.App.Services;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.Export;
+using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
@@ -19,6 +20,7 @@ using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
 using AnimationEditor.Views.Dialogs;
+using AnimationEditor.Views.Export;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -2656,6 +2658,7 @@ public partial class MainWindow : Window
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuExportGodot.Click += OnExportGodotClick;
+        MenuExportGif.Click += (_, _) => _ = ExportGifAsync();
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
@@ -3059,7 +3062,56 @@ public partial class MainWindow : Window
     private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.ExportAsync(ExportFormat.Godot);
 
-    internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
+    // Remembered for the session so a second export starts from the last choices.
+    private GifExportOptions? _gifExportOptions;
+
+    /// <summary>
+    /// Exports the selected animations (stacked like the group preview, with each one's Interpolate
+    /// setting) as an animated GIF. Asks for options, then a path, then renders off the UI thread.
+    /// </summary>
+    private async Task ExportGifAsync()
+    {
+        var sources = _selectedState.PreviewChains
+            .Where(chain => chain.Frames.Count > 0)
+            .Select(chain => new GifSourceChain(chain, PreviewCtrl.IsChainInterpolated(chain)))
+            .ToList();
+        if (sources.Count == 0)
+        {
+            ShowStatusMessage("Select an animation with frames to export as a GIF.", isError: true);
+            return;
+        }
+
+        var initial = _gifExportOptions ?? new GifExportOptions(50, Transparent: true, PreviewCtrl.CanvasBackgroundArgb, Scale: 1);
+        var options = await EditorDialogs.ShowExportGifAsync(
+            _dialogHost, initial, seed => PickCustomColorAsync("GIF Background", Color.FromUInt32(seed)));
+        if (options is null) return;
+        _gifExportOptions = options;
+
+        var path = await _appCommands.FileDialogService.PickSaveFileAsync(
+            "Export as GIF", "gif", new[] { new FileTypeChoice("gif", "GIF image (*.gif)") });
+        if (string.IsNullOrEmpty(path)) return;
+
+        try
+        {
+            ShowStatusMessage("Exporting GIF…");
+            // Resolved here, on the UI thread, because it reads project state.
+            var texturePaths = new Dictionary<AnimationFrameSave, string?>(ReferenceEqualityComparer.Instance);
+            foreach (var frame in sources.SelectMany(source => source.Chain.Frames))
+                texturePaths[frame] = _thumbnailService.ResolveTexturePath(frame);
+            float offsetMultiplier = _appState.OffsetMultiplier;
+
+            byte[] gif = await Task.Run(() => GifRenderer.Render(
+                sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
+            await File.WriteAllBytesAsync(path, gif);
+            ShowToast($"Exported {Path.GetFileName(path)}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            ShowErrorBanner($"GIF export failed: {ex.Message}");
+        }
+    }
+
+    internal const string ReleasesUrl ="https://github.com/vchelaru/FlatRedBall2/releases";
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
         => _ = ShowAboutDialogAsync();

@@ -234,6 +234,6 @@ public class PlaybackController
     }
 
     // Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
-    private static double FrameLength(AnimationFrameSave frame) =>
+    internal static double FrameLength(AnimationFrameSave frame) =>
         frame.FrameLength > 0 ? frame.FrameLength : 0.1;
 }

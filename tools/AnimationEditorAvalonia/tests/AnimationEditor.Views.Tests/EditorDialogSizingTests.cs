@@ -60,6 +60,18 @@ public class EditorDialogSizingTests
     }
 
     [AvaloniaFact]
+    public async Task ShowExportGifAsync_AutoSizesToContent()
+    {
+        var host = new OptionsCapturingDialogHost();
+        var defaults = new AnimationEditor.Core.Export.Gif.GifExportOptions(50, Transparent: true, 0xFF000000, Scale: 1);
+
+        var choice = await EditorDialogs.ShowExportGifAsync(host, defaults, _ => Task.FromResult<uint?>(null));
+
+        AssertAutoSized(host.CapturedOptions);
+        Assert.Null(choice);
+    }
+
+    [AvaloniaFact]
     public async Task ShowAddMultipleFramesAsync_AutoSizesToContent()
     {
         var host = new OptionsCapturingDialogHost();

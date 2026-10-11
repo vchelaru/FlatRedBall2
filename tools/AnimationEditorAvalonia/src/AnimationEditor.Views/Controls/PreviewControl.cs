@@ -324,6 +324,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private bool IsInterpolated(AnimationChainSave? chain) =>
         chain is not null && _interpolatedChains.Contains(chain);
 
+    /// <summary>Whether Interpolate is on for <paramref name="chain"/>, for exports that must match the preview.</summary>
+    public bool IsChainInterpolated(AnimationChainSave chain) => IsInterpolated(chain);
+
+    /// <summary>The canvas background as it is drawn now (theme or user override), packed <c>0xAARRGGBB</c>.</summary>
+    public uint CanvasBackgroundArgb => (uint)_palette.Background;
+
     /// <summary>Fired after <see cref="SetInterpolateOffsets"/> and after every selection change
     /// (which swaps in each animation's own setting), so the toolbar toggle can resync.</summary>
     public event Action<bool?>? InterpolateOffsetsChanged;
@@ -3187,7 +3193,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// Resolves a frame's sticky effective color within its chain. Returns an all-unset result
     /// when the frame isn't part of <paramref name="chain"/> (e.g. no selection).
     /// </summary>
-    private static ResolvedFrameColor ResolveColor(AnimationChainSave? chain, AnimationFrameSave? frame)
+    internal static ResolvedFrameColor ResolveColor(AnimationChainSave? chain, AnimationFrameSave? frame)
     {
         if (chain is null || frame is null) return default;
         int idx = chain.Frames.IndexOf(frame);
@@ -3594,7 +3600,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         return (sx, sy, sw, sh);
     }
 
-    private static void DrawFrameCore(
+    internal static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, ResolvedFrameColor color, SKImage img,
         float cx, float cy, float zoom, float alpha, bool showOutline = true)
     {

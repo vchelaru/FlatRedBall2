@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia;
@@ -325,6 +326,105 @@ public static class EditorDialogs
             appCommands.AdjustOffsetsJustifyBottom(chain, getTextureHeight);
         else
             appCommands.AdjustOffsetsAdjustAll(chain, result.X, result.Y, result.Relative);
+    }
+
+    /// <summary>Whole-number upscales the Export as GIF dialog offers.</summary>
+    internal static readonly int[] GifScaleChoices = { 1, 2, 3, 4, 6, 8 };
+
+    /// <summary>
+    /// Asks for the frame rate, background and size of a GIF export. Returns <c>null</c> on cancel.
+    /// <paramref name="pickColor"/> opens the editor's color picker for the solid background.
+    /// </summary>
+    public static Task<GifExportOptions?> ShowExportGifAsync(
+        IEditorDialogHost host, GifExportOptions initial, Func<uint, Task<uint?>> pickColor)
+    {
+        var frameRate = new ComboBox
+        {
+            ItemsSource = GifTiming.SupportedFrameRates.Select(rate => $"{rate} fps").ToList(),
+            SelectedIndex = Math.Max(0, GifTiming.SupportedFrameRates.ToList().IndexOf(initial.FrameRate)),
+            MinWidth = 120,
+        };
+        var frameRateHint = new TextBlock
+        {
+            Text = "GIF can't play faster than 50 fps, so 60 isn't offered.",
+            FontSize = 11, Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap,
+        };
+
+        var transparent = new RadioButton
+        {
+            Content = "Transparent", GroupName = "gifBackground", IsChecked = initial.Transparent,
+        };
+        var transparentHint = new TextBlock
+        {
+            Text = "Each pixel is fully on or off. Soft edges get a jagged fringe; fine for pixel art.",
+            FontSize = 11, Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(20, 0, 0, 0),
+        };
+        var solid = new RadioButton
+        {
+            Content = "Solid color", GroupName = "gifBackground", IsChecked = !initial.Transparent,
+        };
+        uint backgroundArgb = 0xFF000000u | initial.BackgroundArgb;
+        var swatch = new Border
+        {
+            Width = 28, Height = 18, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1),
+            Background = new SolidColorBrush(Color.FromUInt32(backgroundArgb)),
+        };
+        var chooseColor = new Button { Content = "Choose…" };
+        chooseColor.Click += async (_, _) =>
+        {
+            if (await pickColor(backgroundArgb) is { } picked)
+            {
+                backgroundArgb = 0xFF000000u | picked;
+                swatch.Background = new SolidColorBrush(Color.FromUInt32(backgroundArgb));
+            }
+        };
+        var solidRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(20, 0, 0, 0),
+            Children = { swatch, chooseColor },
+        };
+        void SyncBackgroundEnabled() => solidRow.IsEnabled = solid.IsChecked == true;
+        solid.IsCheckedChanged += (_, _) => SyncBackgroundEnabled();
+        SyncBackgroundEnabled();
+
+        var scale = new ComboBox
+        {
+            ItemsSource = GifScaleChoices.Select(s => $"{s}×").ToList(),
+            SelectedIndex = Math.Max(0, Array.IndexOf(GifScaleChoices, initial.Scale)),
+            MinWidth = 120,
+        };
+        var scaleHint = new TextBlock
+        {
+            Text = "Whole-number upscale with crisp pixels, handy for sharing small sprites.",
+            FontSize = 11, Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap,
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(14), Spacing = 6 };
+        panel.Children.Add(new TextBlock { Text = "Frame rate:" });
+        panel.Children.Add(frameRate);
+        panel.Children.Add(frameRateHint);
+        panel.Children.Add(new TextBlock { Text = "Background:", Margin = new Thickness(0, 8, 0, 0) });
+        panel.Children.Add(transparent);
+        panel.Children.Add(transparentHint);
+        panel.Children.Add(solid);
+        panel.Children.Add(solidRow);
+        panel.Children.Add(new TextBlock { Text = "Size:", Margin = new Thickness(0, 8, 0, 0) });
+        panel.Children.Add(scale);
+        panel.Children.Add(scaleHint);
+
+        var dialog = new EditorDialog<GifExportOptions?>(
+            new EditorDialogOptions("Export as GIF", 380, SizeToContentHeight: true), panel, cancelResult: null);
+        dialog.Confirm = () => dialog.Complete(new GifExportOptions(
+            GifTiming.SupportedFrameRates[Math.Max(0, frameRate.SelectedIndex)],
+            transparent.IsChecked == true,
+            backgroundArgb,
+            GifScaleChoices[Math.Max(0, scale.SelectedIndex)]));
+        dialog.Cancel = () => dialog.Complete(null);
+        var buttons = BuildButtonRow(("Export", dialog.Confirm), ("Cancel", dialog.Cancel));
+        buttons.Margin = new Thickness(0, 10, 0, 0);
+        panel.Children.Add(buttons);
+        return host.ShowAsync(dialog);
     }
 
     internal static (Grid AdjustAllRow, NumericUpDown XInput, NumericUpDown YInput) BuildAdjustAllRow()
