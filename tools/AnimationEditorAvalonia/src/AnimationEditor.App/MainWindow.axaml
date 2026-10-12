@@ -499,6 +499,24 @@
                         </Style>
                         <!-- Narrow the expand/collapse indent column to shift tree content left;
                              the 12×12 chevron icon stays centered within it. -->
+                        <!-- Row icons: ONE Svg per row bound to the node kind's path (a Svg parses its
+                             file on construction, so one hidden Svg per possible icon made every tree
+                             rebuild, and so every tab switch, several times slower). Frame/shape icons are
+                             compact; the chain ("animation") icon is enlarged (#261) and muted. -->
+                        <Style Selector="svg|Svg.kind-icon">
+                            <Setter Property="Width" Value="14" />
+                            <Setter Property="Height" Value="14" />
+                            <Setter Property="CurrentColor" Value="{DynamicResource IconInkDim}" />
+                        </Style>
+                        <Style Selector="svg|Svg.kind-icon.chain">
+                            <Setter Property="Width" Value="{StaticResource TreeNodeIconSize}" />
+                            <Setter Property="Height" Value="{StaticResource TreeNodeIconSize}" />
+                            <Setter Property="CurrentColor" Value="{DynamicResource IconInkMuted}" />
+                        </Style>
+                        <Style Selector="svg|Svg.warning-icon">
+                            <Setter Property="Width" Value="14" />
+                            <Setter Property="Height" Value="14" />
+                        </Style>
                         <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="10" />
@@ -649,55 +667,24 @@
                                            VerticalAlignment="Center"
                                            Stretch="Uniform"
                                            Source="{Binding Thumbnail}" />
-                                    <svg:Svg IsVisible="{Binding ShowGenericChainIcon}"
-                                             Width="{StaticResource TreeNodeIconSize}" Height="{StaticResource TreeNodeIconSize}"
+                                    <svg:Svg Classes="kind-icon"
+                                             Classes.chain="{Binding ShowGenericChainIcon}"
+                                             IsVisible="{Binding KindIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
-                                             CurrentColor="{DynamicResource IconInkMuted}" />
-                                    <svg:Svg IsVisible="{Binding IsFrameNode}"
-                                             Width="14" Height="14"
+                                             Path="{Binding KindIconPath}" />
+                                    <!-- Warning decoration, one control for both cases: a native tsx
+                                         validation issue (#1140, a multi-tile group whose satellite tile
+                                         drifted out of lockstep with its anchor, or a dangling ParentId)
+                                         and a frameless chain in a native tsx project (#1367, a tsx keeps
+                                         an animation only on its tiles, so it is dropped on save). Only
+                                         ever set on chain nodes; TreeNodeVm.WarningTooltip says which. -->
+                                    <svg:Svg Classes="warning-icon"
+                                             IsVisible="{Binding WarningIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                             ToolTip.Tip="{Binding WarningTooltip}"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFrame.svg"
-                                             CurrentColor="{DynamicResource IconInkDim}" />
-                                    <svg:Svg IsVisible="{Binding IsRectNode}"
-                                             Width="14" Height="14"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconShape.svg"
-                                             CurrentColor="{DynamicResource IconInkDim}" />
-                                    <svg:Svg IsVisible="{Binding IsCircleNode}"
-                                             Width="14" Height="14"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCircle.svg"
-                                             CurrentColor="{DynamicResource IconInkDim}" />
-                                    <svg:Svg IsVisible="{Binding IsPolygonNode}"
-                                             Width="14" Height="14"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPolygon.svg"
-                                             CurrentColor="{DynamicResource IconInkDim}" />
-                                    <!-- Native tsx project validation issue (#1140): a multi-tile group whose
-                                         satellite tile has drifted out of lockstep with its anchor, or a
-                                         dangling ParentId. Only ever set on chain nodes, from
-                                         TreeBuilder.ApplyValidationIssues. -->
-                                    <svg:Svg IsVisible="{Binding HasValidationIssue}"
-                                             ToolTip.Tip="This animation can't be represented correctly in this tsx file - see the tileset's group tiles."
-                                             Width="14" Height="14"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconWarning.svg"
-                                             CurrentColor="{DynamicResource IconWarning}" />
-                                    <!-- Frameless chain in a native tsx project (#1367): a tsx keeps an
-                                         animation only on its tiles, so this one is dropped on save. -->
-                                    <svg:Svg IsVisible="{Binding HasEmptyAnimationWarning}"
-                                             ToolTip.Tip="This animation has no frames, so it won't be saved in the tsx. Add a frame to keep it."
-                                             Width="14" Height="14"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconWarning.svg"
+                                             Path="{Binding WarningIconPath}"
                                              CurrentColor="{DynamicResource IconWarning}" />
                                 </StackPanel>
                                 <!-- Header lives in the star column so it ellipsizes when the panel is

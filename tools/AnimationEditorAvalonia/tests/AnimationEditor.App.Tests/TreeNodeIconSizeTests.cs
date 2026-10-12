@@ -133,6 +133,29 @@ public class TreeNodeIconSizeTests
     }
 
     [AvaloniaFact]
+    public void EachRow_CreatesAtMostTwoIconSvgs_NotOnePerPossibleIcon()
+    {
+        // Realizing a row used to build seven icon Svg controls (one per icon the row might
+        // show, most of them hidden). Each parses its SVG on creation, which dominated the
+        // cost of rebuilding the tree on a tab switch. A row now has a kind icon and a
+        // warning icon, each bound to a path.
+        var window = CreateWindowWithFullTree();
+        try
+        {
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            int rows = tree.GetVisualDescendants().OfType<TreeViewItem>().Count();
+            int iconSvgs = tree.GetVisualDescendants()
+                .OfType<Avalonia.Svg.Skia.Svg>()
+                .Count(s => s.FindAncestorOfType<Button>() is null);
+
+            Assert.Equal(4, rows);   // chain, frame, rect, circle
+            Assert.True(iconSvgs <= rows * 2,
+                $"{iconSvgs} icon Svg controls for {rows} rows; at most a kind icon and a warning icon per row.");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void EnlargingChainIcon_DoesNotMakeAnyRowTaller()
     {
         var window = CreateWindowWithFullTree();

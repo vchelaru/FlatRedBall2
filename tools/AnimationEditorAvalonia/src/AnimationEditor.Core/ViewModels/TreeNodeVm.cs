@@ -129,7 +129,7 @@ public class TreeNodeVm : INotifyPropertyChanged
     public bool HasValidationIssue
     {
         get => _hasValidationIssue;
-        set { if (_hasValidationIssue != value) { _hasValidationIssue = value; Notify(); } }
+        set { if (_hasValidationIssue != value) { _hasValidationIssue = value; NotifyWarningChanged(nameof(HasValidationIssue)); } }
     }
 
     private bool _hasEmptyAnimationWarning;
@@ -142,8 +142,53 @@ public class TreeNodeVm : INotifyPropertyChanged
     public bool HasEmptyAnimationWarning
     {
         get => _hasEmptyAnimationWarning;
-        set { if (_hasEmptyAnimationWarning != value) { _hasEmptyAnimationWarning = value; Notify(); } }
+        set { if (_hasEmptyAnimationWarning != value) { _hasEmptyAnimationWarning = value; NotifyWarningChanged(nameof(HasEmptyAnimationWarning)); } }
     }
+
+    private void NotifyWarningChanged(string property)
+    {
+        Notify(property);
+        Notify(nameof(WarningIconPath));
+        Notify(nameof(WarningTooltip));
+    }
+
+    private const string IconRoot = "avares://AnimationEditor.Views/Assets/icons/svg/";
+
+    /// <summary>
+    /// The single SVG the tree row shows as its kind icon, or <c>null</c> when the row shows a
+    /// first-frame thumbnail instead (a chain with one). The row template binds one icon control
+    /// to this path rather than carrying one hidden control per possible icon: every control is
+    /// built, and its SVG parsed, for every row on every tree rebuild.
+    /// </summary>
+    public string? KindIconPath =>
+        IsChainNode ? (_thumbnail is null ? IconRoot + "IconChain.svg" : null)
+        : IsFrameNode ? IconRoot + "IconFrame.svg"
+        : IsRectNode ? IconRoot + "IconShape.svg"
+        : IsCircleNode ? IconRoot + "IconCircle.svg"
+        : IsPolygonNode ? IconRoot + "IconPolygon.svg"
+        : null;
+
+    /// <summary>
+    /// The warning icon path for the row (a tsx validation issue, #1140, or an empty animation,
+    /// #1367), or <c>null</c> when the row has no warning. See <see cref="WarningTooltip"/>.
+    /// </summary>
+    public string? WarningIconPath =>
+        _hasValidationIssue || _hasEmptyAnimationWarning ? IconRoot + "IconWarning.svg" : null;
+
+    /// <summary>Explains <see cref="WarningIconPath"/>; both messages, one per line, when both apply.</summary>
+    public string? WarningTooltip =>
+        (_hasValidationIssue, _hasEmptyAnimationWarning) switch
+        {
+            (true, true) => ValidationIssueTooltip + "\n" + EmptyAnimationTooltip,
+            (true, false) => ValidationIssueTooltip,
+            (false, true) => EmptyAnimationTooltip,
+            _ => null,
+        };
+
+    private const string ValidationIssueTooltip =
+        "This animation can't be represented correctly in this tsx file - see the tileset's group tiles.";
+    private const string EmptyAnimationTooltip =
+        "This animation has no frames, so it won't be saved in the tsx. Add a frame to keep it.";
 
     /// <summary>True when this node represents an animation frame. Set once at construction time.</summary>
     public bool IsFrameNode  { get; set; }
@@ -217,6 +262,7 @@ public class TreeNodeVm : INotifyPropertyChanged
                 Notify();
                 Notify(nameof(HasThumbnail));
                 Notify(nameof(ShowGenericChainIcon));
+                Notify(nameof(KindIconPath));
             }
         }
     }

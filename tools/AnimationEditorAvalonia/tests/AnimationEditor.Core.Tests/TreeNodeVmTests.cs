@@ -20,6 +20,77 @@ public class TreeNodeVmTests
         Assert.Equal(nameof(TreeNodeVm.Meta), changed);
     }
 
+    // ── Row icons: one kind icon + one warning icon per row, not one control per possibility ──
+
+    private const string IconRoot = "avares://AnimationEditor.Views/Assets/icons/svg/";
+
+    [Theory]
+    [InlineData("frame", "IconFrame.svg")]
+    [InlineData("rect", "IconShape.svg")]
+    [InlineData("circle", "IconCircle.svg")]
+    [InlineData("polygon", "IconPolygon.svg")]
+    [InlineData("chain", "IconChain.svg")]
+    public void KindIconPath_IsTheSvgForTheNodeKind(string kind, string file)
+    {
+        var vm = new TreeNodeVm
+        {
+            IsFrameNode = kind == "frame",
+            IsRectNode = kind == "rect",
+            IsCircleNode = kind == "circle",
+            IsPolygonNode = kind == "polygon",
+            IsChainNode = kind == "chain",
+        };
+
+        Assert.Equal(IconRoot + file, vm.KindIconPath);
+    }
+
+    [Fact]
+    public void KindIconPath_ChainWithThumbnail_IsNullSoTheThumbnailShowsInstead()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.Thumbnail = new object();
+
+        Assert.Null(vm.KindIconPath);
+        Assert.Contains(nameof(TreeNodeVm.KindIconPath), changed);
+    }
+
+    [Fact]
+    public void WarningIcon_ValidationIssue_ShowsWarningWithItsTooltip()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.HasValidationIssue = true;
+
+        Assert.Equal(IconRoot + "IconWarning.svg", vm.WarningIconPath);
+        Assert.Contains("tsx file", vm.WarningTooltip);
+        Assert.Contains(nameof(TreeNodeVm.WarningIconPath), changed);
+    }
+
+    [Fact]
+    public void WarningIcon_EmptyAnimation_ShowsWarningWithItsTooltip()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+
+        vm.HasEmptyAnimationWarning = true;
+
+        Assert.Equal(IconRoot + "IconWarning.svg", vm.WarningIconPath);
+        Assert.Contains("no frames", vm.WarningTooltip);
+    }
+
+    [Fact]
+    public void WarningIcon_NoWarning_IsNull()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+
+        Assert.Null(vm.WarningIconPath);
+        Assert.Null(vm.WarningTooltip);
+    }
+
     // ── IsEditing ─────────────────────────────────────────────────────────────
 
     [Fact]
