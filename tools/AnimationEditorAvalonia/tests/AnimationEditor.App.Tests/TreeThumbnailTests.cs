@@ -34,7 +34,7 @@ public class TreeThumbnailTests
 
     private static ObservableCollection<TreeNodeVm> GetRoots(MainWindow w)
     {
-        var tree = w.FindControl<TreeView>("AnimTree")
+        var tree = w.AnimTree
             ?? throw new InvalidOperationException("AnimTree control not found");
         return (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
     }

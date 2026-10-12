@@ -74,7 +74,7 @@ public class CrossTabCutPasteTests
                 await window.OpenFileAsTab(pathA);
                 FlushUi();
                 RebuildTree(window);
-                var tree = window.FindControl<TreeView>("AnimTree")!;
+                var tree = window.AnimTree!;
                 var walkNode = tree.ItemsSource!.Cast<TreeNodeVm>().First();
                 tree.SelectedItems!.Clear();
                 tree.SelectedItems.Add(walkNode);

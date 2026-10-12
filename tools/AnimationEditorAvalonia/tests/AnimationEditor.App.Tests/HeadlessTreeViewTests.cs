@@ -52,7 +52,7 @@ public class HeadlessTreeViewTests
 
     /// <summary>Returns the AnimTree control from a window.</summary>
     private static TreeView GetTree(MainWindow w)
-        => w.FindControl<TreeView>("AnimTree")
+        => w.AnimTree
            ?? throw new InvalidOperationException("AnimTree control not found");
 
     /// <summary>

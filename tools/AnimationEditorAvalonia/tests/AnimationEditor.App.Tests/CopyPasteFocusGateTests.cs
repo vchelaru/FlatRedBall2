@@ -94,7 +94,7 @@ public class CopyPasteFocusGateTests
                 new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
             await window.Clipboard!.SetTextAsync(xml);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             tree.Focus();
             Dispatcher.UIThread.RunJobs();
 
@@ -130,7 +130,7 @@ public class CopyPasteFocusGateTests
                 new List<AnimationFrameSave> { new() { TextureName = "pasted.png", FrameLength = 0.1f } });
             await window.Clipboard!.SetTextAsync(xml);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             tree.Focus();
             Dispatcher.UIThread.RunJobs();
 
@@ -193,7 +193,7 @@ public class CopyPasteFocusGateTests
                 new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
             await window.Clipboard!.SetTextAsync(xml);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             tree.Focus();
             Dispatcher.UIThread.RunJobs();
 
@@ -220,7 +220,7 @@ public class CopyPasteFocusGateTests
 
             // Directly seed the tree and select the chain node, matching the pattern
             // used by HeadlessTreeViewTests to avoid needing a full UI rebuild cycle.
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
             var chainVm = new TreeNodeVm { Header = "Run", Data = chain };
             roots.Add(chainVm);

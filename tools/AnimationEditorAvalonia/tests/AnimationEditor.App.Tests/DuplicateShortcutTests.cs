@@ -39,7 +39,7 @@ public class DuplicateShortcutTests
 
     private static TreeNodeVm SeedAndSelect(MainWindow window, object data, string header)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         var vm = new TreeNodeVm { Header = header, Data = data };
         roots.Add(vm);

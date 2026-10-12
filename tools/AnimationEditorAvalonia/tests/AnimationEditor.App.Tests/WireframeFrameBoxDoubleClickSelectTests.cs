@@ -109,7 +109,7 @@ public class WireframeFrameBoxDoubleClickSelectTests
 
         TriggerRefreshTreeView(window);
 
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var chainNode = (TreeNodeVm)tree.ItemsSource!.Cast<object>().First();
         chainNode.IsExpanded = true;
         Dispatcher.UIThread.RunJobs();

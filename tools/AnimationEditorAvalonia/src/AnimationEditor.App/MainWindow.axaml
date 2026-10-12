@@ -22,6 +22,337 @@
              32px Fluent row height (TreeViewItemMinHeight) so the row never grows. Frame and
              shape icons are not affected; they stay at the compact 14px size. -->
         <x:Double x:Key="TreeNodeIconSize">28</x:Double>
+        <!-- The ANIMATIONS tree. Instantiated once per open tab (MainWindow.CreateTabTree), so it is
+             a template, not a named element. Event handlers resolve against MainWindow. -->
+        <DataTemplate x:Key="AnimTreeViewTemplate">
+        <TreeView
+                  Background="{DynamicResource BgCanvas}"
+                  SelectionMode="Multiple"
+                  AutomationProperties.Name="Animations"
+                  AutomationProperties.AutomationId="animations-tree"
+                  ScrollViewer.VerticalScrollBarVisibility="Visible"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                  ScrollViewer.AllowAutoHide="False">
+            <TreeView.Styles>
+                <Style Selector="TextBlock#RowHeaderLabel">
+                    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+                </Style>
+                <Style Selector="TextBlock#RowHeaderLabel.auto-name">
+                    <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+                    <Setter Property="FontStyle" Value="Italic" />
+                    <Setter Property="ToolTip.Tip" Value="Auto name from the tile id -- no Name in the .tsx. Rename to give it one." />
+                </Style>
+                <Style Selector="TreeViewItem">
+                    <Setter Property="IsExpanded"
+                            Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+                    <!-- Tighten the row: drop the Fluent 32px min-height slack and padding so
+                         rows hug their content (icon/text) instead of floating in centered air. -->
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Padding" Value="0" />
+                    <!-- Let the band's 1px bleed (below) render past the row bounds instead of
+                         being clipped, so adjacent bands overlap and no seam shows. -->
+                    <Setter Property="ClipToBounds" Value="False" />
+                    <!-- Flatten Fluent's rounded row corners (ControlCornerRadius). PART_LayoutRoot
+                         carries both the zebra band and the selection highlight via
+                         CornerRadius="{TemplateBinding CornerRadius}"; with the default radius the
+                         stacked per-row bands leave rounded-corner notches between them, so a
+                         group's band reads as broken. Square corners let consecutive rows' bands
+                         tile flush into one continuous block. -->
+                    <Setter Property="CornerRadius" Value="0" />
+                    <!-- Zebra band per animation group: the container Background is the row's
+                         lowest layer (Fluent paints :selected / :pointerover on top of it), and
+                         it spans the full row width including the indent column — so the band
+                         reads as a clean horizontal stripe rather than a staircase. IsOddStripe
+                         is cascaded from the root chain to every frame/shape child, so the whole
+                         group shares one band. The ActualThemeVariant binding is only there to
+                         re-resolve the brush when the user toggles light/dark at runtime. -->
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <MultiBinding Converter="{x:Static conv:StripeBrushConverter.Instance}">
+                                <ReflectionBinding Path="IsOddStripe" />
+                                <Binding Path="ActualThemeVariant"
+                                         RelativeSource="{RelativeSource Self}" />
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                    <!-- Search filter: hide rows the filter excludes, but always keep the
+                         selected row visible (safety net for off-filter programmatic selection). -->
+                    <Setter Property="IsVisible">
+                        <Setter.Value>
+                            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                                <ReflectionBinding Path="PinnedVisible" />
+                                <ReflectionBinding Path="IsSelected"
+                                                   RelativeSource="{RelativeSource Self}" />
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+                <!-- Narrow the expand/collapse indent column to shift tree content left;
+                     the 12×12 chevron icon stays centered within it. -->
+                <!-- Row icons: ONE Svg per row bound to the node kind's path (a Svg parses its
+                     file on construction, so one hidden Svg per possible icon made every tree
+                     rebuild, and so every tab switch, several times slower). Frame/shape icons are
+                     compact; the chain ("animation") icon is enlarged (#261) and muted. -->
+                <Style Selector="svg|Svg.kind-icon">
+                    <Setter Property="Width" Value="14" />
+                    <Setter Property="Height" Value="14" />
+                    <Setter Property="CurrentColor" Value="{DynamicResource IconInkDim}" />
+                </Style>
+                <Style Selector="svg|Svg.kind-icon.chain">
+                    <Setter Property="Width" Value="{StaticResource TreeNodeIconSize}" />
+                    <Setter Property="Height" Value="{StaticResource TreeNodeIconSize}" />
+                    <Setter Property="CurrentColor" Value="{DynamicResource IconInkMuted}" />
+                </Style>
+                <Style Selector="svg|Svg.warning-icon">
+                    <Setter Property="Width" Value="14" />
+                    <Setter Property="Height" Value="14" />
+                </Style>
+                <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
+                    <Setter Property="Margin" Value="0" />
+                    <Setter Property="Width" Value="10" />
+                </Style>
+                <!-- Zebra bands must read as one continuous block per animation group. Each row's
+                     band is its own PART_LayoutRoot background; because rows land on fractional pixel
+                     positions, two adjacent opaque bands anti-alias against the canvas at their shared
+                     edge and never composite to full opacity there — a faint seam at every row
+                     boundary. A 2px downward bleed (with clipping off, above) makes each band overlap
+                     the next so the overlapping band fully covers the boundary pixels. Rows in a group
+                     share a color so the overlap is invisible; the last band of a group bleeds 2px of
+                     its low-contrast color past the group, which is imperceptible against the canvas. -->
+                <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+                    <Setter Property="Margin" Value="0,0,0,-2" />
+                    <Setter Property="ClipToBounds" Value="False" />
+                </Style>
+                <!-- The Fluent theme's :empty style overrides the panel width to 12px for
+                     leaf items, causing their content to start ~20px left of non-leaf items.
+                     Override it here with the same width so leaf and non-leaf items
+                     always indent identically.  The ToggleButton inside is already hidden for
+                     :empty items by the Fluent theme; the panel becomes an invisible spacer. -->
+                <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
+                    <Setter Property="Width" Value="10" />
+                </Style>
+                <!-- Issue #586: the 10px indent column above (kept narrow so tree content isn't
+                     pushed right) makes a poor click target on its own. A negative margin lets
+                     the ToggleButton overflow that column — enlarging the hit-test area — while
+                     the container's own width, and the 12×12 chevron icon centered inside, stay
+                     visually unchanged. -->
+                <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
+                    <Setter Property="VerticalAlignment" Value="Stretch" />
+                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                    <Setter Property="Width" Value="NaN" />
+                    <Setter Property="Height" Value="NaN" />
+                    <Setter Property="Margin" Value="-6,-3,-6,-3" />
+                    <Setter Property="Template">
+                        <ControlTemplate>
+                            <Border Background="Transparent">
+                                <Path x:Name="ChevronPath"
+                                      Width="12" Height="12"
+                                      Data="{StaticResource TreeViewItemCollapsedChevronPathData}"
+                                      Fill="{DynamicResource TreeViewItemForeground}"
+                                      Stretch="Uniform"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter>
+                </Style>
+                <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:checked /template/ Path#ChevronPath">
+                    <Setter Property="Data" Value="{StaticResource TreeViewItemExpandedChevronPathData}" />
+                </Style>
+                <!-- Inline "Add Frame" button: hidden by default, revealed on row hover.
+                     #1173: anchored on Grid.tree-row:pointerover, NOT
+                     TreeViewItem:pointerover. Avalonia's :pointerover pseudo-class
+                     propagates to every visual ancestor under the pointer, so hovering a
+                     frame row (nested inside its expanded parent chain's TreeViewItem)
+                     also marked the *parent chain's* TreeViewItem :pointerover, which
+                     then matched every descendant Button/TextBlock under it, including
+                     the chain's own, revealing its buttons and widening every row's meta
+                     text under that chain even though the pointer was never over the
+                     chain header. Grid.tree-row is the DataTemplate's own root element,
+                     i.e. just that row's header content: it does not visually contain any
+                     nested child TreeViewItems (those render in the TreeViewItem's own
+                     separate ItemsPresenter), so its :pointerover can only ever reflect
+                     the pointer being over that specific row. -->
+                <Style Selector="Button.add-frame-btn">
+                    <Setter Property="Opacity" Value="0" />
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                    <Setter Property="Focusable" Value="False" />
+                </Style>
+                <Style Selector="Grid.tree-row:pointerover Button.add-frame-btn">
+                    <Setter Property="Opacity" Value="1" />
+                    <Setter Property="IsHitTestVisible" Value="True" />
+                    <Setter Property="Focusable" Value="True" />
+                </Style>
+                <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked,
+                     but always visible (via the .locked class, bound to
+                     TreeNodeVm.IsLocked) so a locked chain is recognizable at a glance
+                     without hovering. -->
+                <Style Selector="Button.lock-btn">
+                    <Setter Property="Opacity" Value="0" />
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                    <Setter Property="Focusable" Value="False" />
+                </Style>
+                <Style Selector="Grid.tree-row:pointerover Button.lock-btn">
+                    <Setter Property="Opacity" Value="1" />
+                    <Setter Property="IsHitTestVisible" Value="True" />
+                    <Setter Property="Focusable" Value="True" />
+                </Style>
+                <!-- Unlocked, the lock sits left of add-frame (30). Locked hides add-frame
+                     (CanAddFrame), so the lock takes its slot at the edge (4) instead of leaving a gap. -->
+                <Style Selector="Button.lock-btn">
+                    <Setter Property="Margin" Value="0,0,30,0" />
+                </Style>
+                <Style Selector="Button.lock-btn.locked">
+                    <Setter Property="Margin" Value="0,0,4,0" />
+                    <Setter Property="Opacity" Value="1" />
+                    <Setter Property="IsHitTestVisible" Value="True" />
+                    <Setter Property="Focusable" Value="True" />
+                </Style>
+                <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are visible:
+                     none (8), locked (30, one lane, since the lock takes add-frame's slot), or hovered
+                     while unlocked (56, both lanes). ":not(.locked)" on the hover rule keeps a
+                     locked+hovered row on the locked margin regardless of declaration order. The hover
+                     rule is scoped to TextBlock.meta.chain (#1173) since frames never show these icons. -->
+                <Style Selector="TextBlock.meta">
+                    <Setter Property="Margin" Value="8,0,8,0" />
+                </Style>
+                <Style Selector="TextBlock.meta.locked">
+                    <Setter Property="Margin" Value="8,0,30,0" />
+                </Style>
+                <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
+                    <Setter Property="Margin" Value="8,0,56,0" />
+                </Style>
+                <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
+                <Style Selector="Border.cut-pending">
+                    <Setter Property="Background" Value="#28E07030" />
+                    <Setter Property="CornerRadius" Value="2" />
+                    <Setter Property="Padding" Value="2,1" />
+                </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+                <TreeDataTemplate x:DataType="models:TreeNodeVm"
+                                  ItemsSource="{Binding Children}">
+                    <Border Classes.cut-pending="{Binding IsPendingCut}"
+                            HorizontalAlignment="Stretch">
+                    <!-- Overlay container: the content row (icon · Header · Meta) plus the
+                         hover-only Add-Frame button floated on top at the right. Floating the
+                         button (instead of giving it its own grid column) keeps every row's Meta
+                         on the same right edge — chain rows are no longer inset by the button while
+                         frame rows hug the edge (the jagged offset in #623). Classes="tree-row"
+                         scopes the hover-reveal styles above to just this row (#1173).
+                         Background="Transparent" (not left null) makes the whole row
+                         hit-test-visible, not just its child controls, since otherwise
+                         hovering empty space between the header text and the meta text
+                         would fail to trigger Grid.tree-row:pointerover. -->
+                    <Grid Classes="tree-row" Background="Transparent" HorizontalAlignment="Stretch">
+                    <Grid ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- Node kind icons: SVG files are the single source of truth for path data. -->
+                            <!-- Chain node: first-frame thumbnail when the chain has frames, generic glyph
+                                 otherwise. Only the chain ("animation") icon is enlarged so the first-frame
+                                 preview is readable; frame/shape icons stay at the compact 14px size. -->
+                            <Image IsVisible="{Binding HasThumbnail}"
+                                   Width="{StaticResource TreeNodeIconSize}" Height="{StaticResource TreeNodeIconSize}"
+                                   Margin="0,0,4,0"
+                                   VerticalAlignment="Center"
+                                   Stretch="Uniform"
+                                   Source="{Binding Thumbnail}" />
+                            <svg:Svg Classes="kind-icon"
+                                     Classes.chain="{Binding ShowGenericChainIcon}"
+                                     IsVisible="{Binding KindIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                     Margin="0,0,4,0"
+                                     VerticalAlignment="Center"
+                                     Path="{Binding KindIconPath}" />
+                            <!-- Warning decoration, one control for both cases: a native tsx
+                                 validation issue (#1140, a multi-tile group whose satellite tile
+                                 drifted out of lockstep with its anchor, or a dangling ParentId)
+                                 and a frameless chain in a native tsx project (#1367, a tsx keeps
+                                 an animation only on its tiles, so it is dropped on save). Only
+                                 ever set on chain nodes; TreeNodeVm.WarningTooltip says which. -->
+                            <svg:Svg Classes="warning-icon"
+                                     IsVisible="{Binding WarningIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                     ToolTip.Tip="{Binding WarningTooltip}"
+                                     Margin="0,0,4,0"
+                                     VerticalAlignment="Center"
+                                     Path="{Binding WarningIconPath}"
+                                     CurrentColor="{DynamicResource IconWarning}" />
+                        </StackPanel>
+                        <!-- Header lives in the star column so it ellipsizes when the panel is
+                             narrowed instead of forcing a horizontal scrollbar (#623). -->
+                        <Panel Grid.Column="1" VerticalAlignment="Center">
+                                <!-- Auto-named tsx chain ("ID:{tileId}", no Name property
+                                     in the tsx): dimmed italic so it reads as a placeholder. -->
+                                <TextBlock x:Name="RowHeaderLabel"
+                                           Text="{Binding Header}"
+                                           Classes.auto-name="{Binding IsAutoName}"
+                                           Padding="2,1"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           IsVisible="{Binding !IsEditing}"
+                                           DoubleTapped="OnHeaderTextDoubleTapped" />
+                                <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
+                                <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                         IsVisible="{Binding IsEditing}"
+                                         Background="{DynamicResource BgActive}"
+                                         Foreground="{DynamicResource Ink}"
+                                         CaretBrush="{DynamicResource Ink}"
+                                         SelectionBrush="#4466aa"
+                                         BorderThickness="1"
+                                         Margin="0"
+                                         Padding="2,1"
+                                         VerticalAlignment="Stretch"
+                                         VerticalContentAlignment="Center"
+                                         HorizontalAlignment="Stretch" />
+                            </Panel>
+                        <!-- Meta's right margin clears whichever icon lane(s) are visible
+                             (see the TextBlock.meta styles above, #1035) so it never
+                             overlaps the add-frame/lock buttons floated on top. -->
+                        <TextBlock Grid.Column="2"
+                                   Classes="meta"
+                                   Classes.locked="{Binding IsLocked}"
+                                   Classes.chain="{Binding IsChainNode}"
+                                   Text="{Binding Meta}"
+                                   Foreground="{DynamicResource AccentCool}"
+                                   FontSize="11"
+                                   TextAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </Grid>
+                        <!-- Inline "Add Frame" button — only on chain nodes; revealed on row hover.
+                             Floated in the overlay (not a grid column) and right-aligned into the
+                             Meta's reserved right margin, so it never offsets the Meta or shifts
+                             layout on hover. 22px pointer target (Fitts's Law); zero vertical margin
+                             keeps it under the 32px Fluent row height (TreeViewItemMinHeight). -->
+                        <Button Classes="add-frame-btn plus"
+                                IsVisible="{Binding CanAddFrame}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Width="22" Height="22"
+                                Padding="0"
+                                Margin="0,0,4,0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                ToolTip.Tip="Add Frame"
+                                Click="OnAddFrameBtnClick"
+                                DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                        <Button Classes="lock-btn lock-icon"
+                                Classes.locked="{Binding IsLocked}"
+                                IsVisible="{Binding IsChainNode}"
+                                AutomationProperties.AutomationId="chain-lock-btn"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Width="22" Height="22"
+                                Padding="0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                ToolTip.Tip="Lock Animation"
+                                Click="OnLockBtnClick" />
+                    </Grid>
+                    </Border>
+                </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -404,7 +735,6 @@
                                  and model edits, and focus moving into the tree keeps the box open. -->
                             <viewsControls:SearchToggleBox x:Name="AnimSearchBox"
                                                            Placeholder="Filter animations…"
-                                                           KeepOpenWhenFocusMovesInto="{Binding #AnimTree}"
                                                            QueryChanged="OnAnimSearchQueryChanged" />
                             <Button x:Name="ExpandAllBtn"
                                     Content="⊞"
@@ -435,333 +765,10 @@
                     </DockPanel>
                 </Border>
 
-                <TreeView x:Name="AnimTree" Grid.Row="1"
-                          Background="{DynamicResource BgCanvas}"
-                          SelectionMode="Multiple"
-                          AutomationProperties.Name="Animations"
-                          AutomationProperties.AutomationId="animations-tree"
-                          ScrollViewer.VerticalScrollBarVisibility="Visible"
-                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                          ScrollViewer.AllowAutoHide="False">
-                    <TreeView.Styles>
-                        <Style Selector="TextBlock#RowHeaderLabel">
-                            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-                        </Style>
-                        <Style Selector="TextBlock#RowHeaderLabel.auto-name">
-                            <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
-                            <Setter Property="FontStyle" Value="Italic" />
-                            <Setter Property="ToolTip.Tip" Value="Auto name from the tile id -- no Name in the .tsx. Rename to give it one." />
-                        </Style>
-                        <Style Selector="TreeViewItem">
-                            <Setter Property="IsExpanded"
-                                    Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
-                            <!-- Tighten the row: drop the Fluent 32px min-height slack and padding so
-                                 rows hug their content (icon/text) instead of floating in centered air. -->
-                            <Setter Property="MinHeight" Value="0" />
-                            <Setter Property="Padding" Value="0" />
-                            <!-- Let the band's 1px bleed (below) render past the row bounds instead of
-                                 being clipped, so adjacent bands overlap and no seam shows. -->
-                            <Setter Property="ClipToBounds" Value="False" />
-                            <!-- Flatten Fluent's rounded row corners (ControlCornerRadius). PART_LayoutRoot
-                                 carries both the zebra band and the selection highlight via
-                                 CornerRadius="{TemplateBinding CornerRadius}"; with the default radius the
-                                 stacked per-row bands leave rounded-corner notches between them, so a
-                                 group's band reads as broken. Square corners let consecutive rows' bands
-                                 tile flush into one continuous block. -->
-                            <Setter Property="CornerRadius" Value="0" />
-                            <!-- Zebra band per animation group: the container Background is the row's
-                                 lowest layer (Fluent paints :selected / :pointerover on top of it), and
-                                 it spans the full row width including the indent column — so the band
-                                 reads as a clean horizontal stripe rather than a staircase. IsOddStripe
-                                 is cascaded from the root chain to every frame/shape child, so the whole
-                                 group shares one band. The ActualThemeVariant binding is only there to
-                                 re-resolve the brush when the user toggles light/dark at runtime. -->
-                            <Setter Property="Background">
-                                <Setter.Value>
-                                    <MultiBinding Converter="{x:Static conv:StripeBrushConverter.Instance}">
-                                        <ReflectionBinding Path="IsOddStripe" />
-                                        <Binding Path="ActualThemeVariant"
-                                                 RelativeSource="{RelativeSource Self}" />
-                                    </MultiBinding>
-                                </Setter.Value>
-                            </Setter>
-                            <!-- Search filter: hide rows the filter excludes, but always keep the
-                                 selected row visible (safety net for off-filter programmatic selection). -->
-                            <Setter Property="IsVisible">
-                                <Setter.Value>
-                                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                                        <ReflectionBinding Path="PinnedVisible" />
-                                        <ReflectionBinding Path="IsSelected"
-                                                           RelativeSource="{RelativeSource Self}" />
-                                    </MultiBinding>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <!-- Narrow the expand/collapse indent column to shift tree content left;
-                             the 12×12 chevron icon stays centered within it. -->
-                        <!-- Row icons: ONE Svg per row bound to the node kind's path (a Svg parses its
-                             file on construction, so one hidden Svg per possible icon made every tree
-                             rebuild, and so every tab switch, several times slower). Frame/shape icons are
-                             compact; the chain ("animation") icon is enlarged (#261) and muted. -->
-                        <Style Selector="svg|Svg.kind-icon">
-                            <Setter Property="Width" Value="14" />
-                            <Setter Property="Height" Value="14" />
-                            <Setter Property="CurrentColor" Value="{DynamicResource IconInkDim}" />
-                        </Style>
-                        <Style Selector="svg|Svg.kind-icon.chain">
-                            <Setter Property="Width" Value="{StaticResource TreeNodeIconSize}" />
-                            <Setter Property="Height" Value="{StaticResource TreeNodeIconSize}" />
-                            <Setter Property="CurrentColor" Value="{DynamicResource IconInkMuted}" />
-                        </Style>
-                        <Style Selector="svg|Svg.warning-icon">
-                            <Setter Property="Width" Value="14" />
-                            <Setter Property="Height" Value="14" />
-                        </Style>
-                        <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
-                            <Setter Property="Margin" Value="0" />
-                            <Setter Property="Width" Value="10" />
-                        </Style>
-                        <!-- Zebra bands must read as one continuous block per animation group. Each row's
-                             band is its own PART_LayoutRoot background; because rows land on fractional pixel
-                             positions, two adjacent opaque bands anti-alias against the canvas at their shared
-                             edge and never composite to full opacity there — a faint seam at every row
-                             boundary. A 2px downward bleed (with clipping off, above) makes each band overlap
-                             the next so the overlapping band fully covers the boundary pixels. Rows in a group
-                             share a color so the overlap is invisible; the last band of a group bleeds 2px of
-                             its low-contrast color past the group, which is imperceptible against the canvas. -->
-                        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
-                            <Setter Property="Margin" Value="0,0,0,-2" />
-                            <Setter Property="ClipToBounds" Value="False" />
-                        </Style>
-                        <!-- The Fluent theme's :empty style overrides the panel width to 12px for
-                             leaf items, causing their content to start ~20px left of non-leaf items.
-                             Override it here with the same width so leaf and non-leaf items
-                             always indent identically.  The ToggleButton inside is already hidden for
-                             :empty items by the Fluent theme; the panel becomes an invisible spacer. -->
-                        <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
-                            <Setter Property="Width" Value="10" />
-                        </Style>
-                        <!-- Issue #586: the 10px indent column above (kept narrow so tree content isn't
-                             pushed right) makes a poor click target on its own. A negative margin lets
-                             the ToggleButton overflow that column — enlarging the hit-test area — while
-                             the container's own width, and the 12×12 chevron icon centered inside, stay
-                             visually unchanged. -->
-                        <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
-                            <Setter Property="VerticalAlignment" Value="Stretch" />
-                            <Setter Property="HorizontalAlignment" Value="Stretch" />
-                            <Setter Property="Width" Value="NaN" />
-                            <Setter Property="Height" Value="NaN" />
-                            <Setter Property="Margin" Value="-6,-3,-6,-3" />
-                            <Setter Property="Template">
-                                <ControlTemplate>
-                                    <Border Background="Transparent">
-                                        <Path x:Name="ChevronPath"
-                                              Width="12" Height="12"
-                                              Data="{StaticResource TreeViewItemCollapsedChevronPathData}"
-                                              Fill="{DynamicResource TreeViewItemForeground}"
-                                              Stretch="Uniform"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter>
-                        </Style>
-                        <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:checked /template/ Path#ChevronPath">
-                            <Setter Property="Data" Value="{StaticResource TreeViewItemExpandedChevronPathData}" />
-                        </Style>
-                        <!-- Inline "Add Frame" button: hidden by default, revealed on row hover.
-                             #1173: anchored on Grid.tree-row:pointerover, NOT
-                             TreeViewItem:pointerover. Avalonia's :pointerover pseudo-class
-                             propagates to every visual ancestor under the pointer, so hovering a
-                             frame row (nested inside its expanded parent chain's TreeViewItem)
-                             also marked the *parent chain's* TreeViewItem :pointerover, which
-                             then matched every descendant Button/TextBlock under it, including
-                             the chain's own, revealing its buttons and widening every row's meta
-                             text under that chain even though the pointer was never over the
-                             chain header. Grid.tree-row is the DataTemplate's own root element,
-                             i.e. just that row's header content: it does not visually contain any
-                             nested child TreeViewItems (those render in the TreeViewItem's own
-                             separate ItemsPresenter), so its :pointerover can only ever reflect
-                             the pointer being over that specific row. -->
-                        <Style Selector="Button.add-frame-btn">
-                            <Setter Property="Opacity" Value="0" />
-                            <Setter Property="IsHitTestVisible" Value="False" />
-                            <Setter Property="Focusable" Value="False" />
-                        </Style>
-                        <Style Selector="Grid.tree-row:pointerover Button.add-frame-btn">
-                            <Setter Property="Opacity" Value="1" />
-                            <Setter Property="IsHitTestVisible" Value="True" />
-                            <Setter Property="Focusable" Value="True" />
-                        </Style>
-                        <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked,
-                             but always visible (via the .locked class, bound to
-                             TreeNodeVm.IsLocked) so a locked chain is recognizable at a glance
-                             without hovering. -->
-                        <Style Selector="Button.lock-btn">
-                            <Setter Property="Opacity" Value="0" />
-                            <Setter Property="IsHitTestVisible" Value="False" />
-                            <Setter Property="Focusable" Value="False" />
-                        </Style>
-                        <Style Selector="Grid.tree-row:pointerover Button.lock-btn">
-                            <Setter Property="Opacity" Value="1" />
-                            <Setter Property="IsHitTestVisible" Value="True" />
-                            <Setter Property="Focusable" Value="True" />
-                        </Style>
-                        <!-- Unlocked, the lock sits left of add-frame (30). Locked hides add-frame
-                             (CanAddFrame), so the lock takes its slot at the edge (4) instead of leaving a gap. -->
-                        <Style Selector="Button.lock-btn">
-                            <Setter Property="Margin" Value="0,0,30,0" />
-                        </Style>
-                        <Style Selector="Button.lock-btn.locked">
-                            <Setter Property="Margin" Value="0,0,4,0" />
-                            <Setter Property="Opacity" Value="1" />
-                            <Setter Property="IsHitTestVisible" Value="True" />
-                            <Setter Property="Focusable" Value="True" />
-                        </Style>
-                        <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are visible:
-                             none (8), locked (30, one lane, since the lock takes add-frame's slot), or hovered
-                             while unlocked (56, both lanes). ":not(.locked)" on the hover rule keeps a
-                             locked+hovered row on the locked margin regardless of declaration order. The hover
-                             rule is scoped to TextBlock.meta.chain (#1173) since frames never show these icons. -->
-                        <Style Selector="TextBlock.meta">
-                            <Setter Property="Margin" Value="8,0,8,0" />
-                        </Style>
-                        <Style Selector="TextBlock.meta.locked">
-                            <Setter Property="Margin" Value="8,0,30,0" />
-                        </Style>
-                        <Style Selector="Grid.tree-row:pointerover TextBlock.meta.chain:not(.locked)">
-                            <Setter Property="Margin" Value="8,0,56,0" />
-                        </Style>
-                        <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
-                        <Style Selector="Border.cut-pending">
-                            <Setter Property="Background" Value="#28E07030" />
-                            <Setter Property="CornerRadius" Value="2" />
-                            <Setter Property="Padding" Value="2,1" />
-                        </Style>
-                    </TreeView.Styles>
-                    <TreeView.ItemTemplate>
-                        <TreeDataTemplate x:DataType="models:TreeNodeVm"
-                                          ItemsSource="{Binding Children}">
-                            <Border Classes.cut-pending="{Binding IsPendingCut}"
-                                    HorizontalAlignment="Stretch">
-                            <!-- Overlay container: the content row (icon · Header · Meta) plus the
-                                 hover-only Add-Frame button floated on top at the right. Floating the
-                                 button (instead of giving it its own grid column) keeps every row's Meta
-                                 on the same right edge — chain rows are no longer inset by the button while
-                                 frame rows hug the edge (the jagged offset in #623). Classes="tree-row"
-                                 scopes the hover-reveal styles above to just this row (#1173).
-                                 Background="Transparent" (not left null) makes the whole row
-                                 hit-test-visible, not just its child controls, since otherwise
-                                 hovering empty space between the header text and the meta text
-                                 would fail to trigger Grid.tree-row:pointerover. -->
-                            <Grid Classes="tree-row" Background="Transparent" HorizontalAlignment="Stretch">
-                            <Grid ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <!-- Node kind icons: SVG files are the single source of truth for path data. -->
-                                    <!-- Chain node: first-frame thumbnail when the chain has frames, generic glyph
-                                         otherwise. Only the chain ("animation") icon is enlarged so the first-frame
-                                         preview is readable; frame/shape icons stay at the compact 14px size. -->
-                                    <Image IsVisible="{Binding HasThumbnail}"
-                                           Width="{StaticResource TreeNodeIconSize}" Height="{StaticResource TreeNodeIconSize}"
-                                           Margin="0,0,4,0"
-                                           VerticalAlignment="Center"
-                                           Stretch="Uniform"
-                                           Source="{Binding Thumbnail}" />
-                                    <svg:Svg Classes="kind-icon"
-                                             Classes.chain="{Binding ShowGenericChainIcon}"
-                                             IsVisible="{Binding KindIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="{Binding KindIconPath}" />
-                                    <!-- Warning decoration, one control for both cases: a native tsx
-                                         validation issue (#1140, a multi-tile group whose satellite tile
-                                         drifted out of lockstep with its anchor, or a dangling ParentId)
-                                         and a frameless chain in a native tsx project (#1367, a tsx keeps
-                                         an animation only on its tiles, so it is dropped on save). Only
-                                         ever set on chain nodes; TreeNodeVm.WarningTooltip says which. -->
-                                    <svg:Svg Classes="warning-icon"
-                                             IsVisible="{Binding WarningIconPath, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                             ToolTip.Tip="{Binding WarningTooltip}"
-                                             Margin="0,0,4,0"
-                                             VerticalAlignment="Center"
-                                             Path="{Binding WarningIconPath}"
-                                             CurrentColor="{DynamicResource IconWarning}" />
-                                </StackPanel>
-                                <!-- Header lives in the star column so it ellipsizes when the panel is
-                                     narrowed instead of forcing a horizontal scrollbar (#623). -->
-                                <Panel Grid.Column="1" VerticalAlignment="Center">
-                                        <!-- Auto-named tsx chain ("ID:{tileId}", no Name property
-                                             in the tsx): dimmed italic so it reads as a placeholder. -->
-                                        <TextBlock x:Name="RowHeaderLabel"
-                                                   Text="{Binding Header}"
-                                                   Classes.auto-name="{Binding IsAutoName}"
-                                                   Padding="2,1"
-                                                   VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   IsVisible="{Binding !IsEditing}"
-                                                   DoubleTapped="OnHeaderTextDoubleTapped" />
-                                        <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
-                                        <TextBox Text="{Binding EditingText, Mode=TwoWay}"
-                                                 IsVisible="{Binding IsEditing}"
-                                                 Background="{DynamicResource BgActive}"
-                                                 Foreground="{DynamicResource Ink}"
-                                                 CaretBrush="{DynamicResource Ink}"
-                                                 SelectionBrush="#4466aa"
-                                                 BorderThickness="1"
-                                                 Margin="0"
-                                                 Padding="2,1"
-                                                 VerticalAlignment="Stretch"
-                                                 VerticalContentAlignment="Center"
-                                                 HorizontalAlignment="Stretch" />
-                                    </Panel>
-                                <!-- Meta's right margin clears whichever icon lane(s) are visible
-                                     (see the TextBlock.meta styles above, #1035) so it never
-                                     overlaps the add-frame/lock buttons floated on top. -->
-                                <TextBlock Grid.Column="2"
-                                           Classes="meta"
-                                           Classes.locked="{Binding IsLocked}"
-                                           Classes.chain="{Binding IsChainNode}"
-                                           Text="{Binding Meta}"
-                                           Foreground="{DynamicResource AccentCool}"
-                                           FontSize="11"
-                                           TextAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                            </Grid>
-                                <!-- Inline "Add Frame" button — only on chain nodes; revealed on row hover.
-                                     Floated in the overlay (not a grid column) and right-aligned into the
-                                     Meta's reserved right margin, so it never offsets the Meta or shifts
-                                     layout on hover. 22px pointer target (Fitts's Law); zero vertical margin
-                                     keeps it under the 32px Fluent row height (TreeViewItemMinHeight). -->
-                                <Button Classes="add-frame-btn plus"
-                                        IsVisible="{Binding CanAddFrame}"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        Width="22" Height="22"
-                                        Padding="0"
-                                        Margin="0,0,4,0"
-                                        HorizontalContentAlignment="Center"
-                                        VerticalContentAlignment="Center"
-                                        ToolTip.Tip="Add Frame"
-                                        Click="OnAddFrameBtnClick"
-                                        DoubleTapped="OnAddFrameBtnDoubleTapped" />
-                                <Button Classes="lock-btn lock-icon"
-                                        Classes.locked="{Binding IsLocked}"
-                                        IsVisible="{Binding IsChainNode}"
-                                        AutomationProperties.AutomationId="chain-lock-btn"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        Width="22" Height="22"
-                                        Padding="0"
-                                        HorizontalContentAlignment="Center"
-                                        VerticalContentAlignment="Center"
-                                        ToolTip.Tip="Lock Animation"
-                                        Click="OnLockBtnClick" />
-                            </Grid>
-                            </Border>
-                        </TreeDataTemplate>
-                    </TreeView.ItemTemplate>
-                </TreeView>
+                <!-- One TreeView per open tab lives in here, only the active tab's visible. Switching tabs
+                     shows the other tab's tree again instead of clearing and rebuilding a single one,
+                     which cost most of a tab switch. Built from the AnimTreeViewTemplate resource. -->
+                <Grid x:Name="AnimTreeHost" Grid.Row="1" />
 
                 <!-- ── Add Animation button ── -->
                 <Border Grid.Row="2"

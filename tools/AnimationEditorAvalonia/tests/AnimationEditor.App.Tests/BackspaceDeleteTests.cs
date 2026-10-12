@@ -54,7 +54,7 @@ public class BackspaceDeleteTests
                 .Invoke(window, new object[] { System.Array.Empty<string>() });
             FlushUi();
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = ((System.Collections.IEnumerable)tree.ItemsSource!).Cast<TreeNodeVm>().First();
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(chainNode.Children[0].Children[0]);
@@ -114,7 +114,7 @@ public class BackspaceDeleteTests
                 .Invoke(window, new object[] { System.Array.Empty<string>() });
             FlushUi();
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = ((System.Collections.IEnumerable)tree.ItemsSource!).Cast<TreeNodeVm>().First();
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(chainNode.Children[0].Children[0]);

@@ -72,7 +72,7 @@ public class NewAndLoadResetTests
             window.FindControl<MenuItem>("MenuNew")!
                   .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
-            var tree  = window.FindControl<TreeView>("AnimTree")!;
+            var tree  = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             Assert.Empty(roots);
         }
@@ -118,7 +118,7 @@ public class NewAndLoadResetTests
             ctx.AppCommands.AddAnimationChainWithName("Walk");
             Dispatcher.UIThread.RunJobs();
 
-            var tree  = window.FindControl<TreeView>("AnimTree")!;
+            var tree  = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             Assert.NotEmpty(roots);
 
@@ -285,7 +285,7 @@ public class NewAndLoadResetTests
                 .Invoke(window, [path, false]);
             Dispatcher.UIThread.RunJobs();
 
-            var tree  = window.FindControl<TreeView>("AnimTree")!;
+            var tree  = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
 
             Assert.Equal(3, roots.Count);

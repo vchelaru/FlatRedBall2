@@ -216,7 +216,7 @@ public class ChainTsxOwnerTileTests : IDisposable
             ctx.SelectedState.SelectedChain = chain;
             Dispatcher.UIThread.RunJobs();
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             var node = roots.Single(r => ReferenceEquals(r.Data, chain));
             Assert.Equal("ID:5", node.Header);
@@ -253,7 +253,7 @@ public class ChainTsxOwnerTileTests : IDisposable
 
             Assert.Equal("ID:999", chain.Name);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             var node = roots.Single(r => ReferenceEquals(r.Data, chain));
             Assert.Equal("ID:999", node.Header);
@@ -311,7 +311,7 @@ public class ChainTsxOwnerTileTests : IDisposable
 
     private static AnimationEditor.Core.ViewModels.TreeNodeVm TreeNode(MainWindow window, AnimationChainSave chain)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
         return roots.Single(r => ReferenceEquals(r.Data, chain));
     }

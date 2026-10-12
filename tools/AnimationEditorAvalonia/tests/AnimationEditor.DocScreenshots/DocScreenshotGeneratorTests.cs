@@ -200,11 +200,14 @@ public class DocScreenshotGeneratorTests
                 {
                     scenario.Arrange(window, ctx);
 
+                    // The animation trees are created per tab, so none carries a name in the window's scope.
                     Control target = scenario.TargetControlName is null
                         ? window
-                        : window.FindControl<Control>(scenario.TargetControlName)
-                            ?? throw new InvalidOperationException(
-                                $"Scenario '{scenario.Name}': control '{scenario.TargetControlName}' not found.");
+                        : scenario.TargetControlName == "AnimTree"
+                            ? window.AnimTree
+                            : window.FindControl<Control>(scenario.TargetControlName)
+                                ?? throw new InvalidOperationException(
+                                    $"Scenario '{scenario.Name}': control '{scenario.TargetControlName}' not found.");
 
                     var outputPath = Path.Combine(outputDir, scenario.OutputFileName);
                     ScreenshotCapture.Capture(target, outputPath);

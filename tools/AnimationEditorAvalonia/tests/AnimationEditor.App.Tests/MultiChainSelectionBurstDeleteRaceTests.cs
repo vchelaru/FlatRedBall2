@@ -79,7 +79,7 @@ public class MultiChainSelectionBurstDeleteRaceTests
 
             TriggerRefreshTreeView(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var nodes = tree.ItemsSource!.Cast<TreeNodeVm>().ToList();
             var nodeA = nodes.First(n => ReferenceEquals(n.Data, chainA));
             var nodeB = nodes.First(n => ReferenceEquals(n.Data, chainB));

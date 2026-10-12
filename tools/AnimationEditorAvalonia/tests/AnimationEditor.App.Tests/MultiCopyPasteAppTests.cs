@@ -64,7 +64,7 @@ public class MultiCopyPasteAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             var frameNodes = chainNode.Children;
 
@@ -103,7 +103,7 @@ public class MultiCopyPasteAppTests
             await window.Clipboard!.SetTextAsync(
                 ClipboardPayload.Serialize(new List<AnimationFrameSave> { frame }));
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(chainNode);
@@ -145,7 +145,7 @@ public class MultiCopyPasteAppTests
             };
             await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames));
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var seedNode = FirstChainNode(tree).Children[0];
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(seedNode);
@@ -190,7 +190,7 @@ public class MultiCopyPasteAppTests
             };
             await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames));
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var seedNode = FirstChainNode(tree).Children[0];
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(seedNode);
@@ -226,7 +226,7 @@ public class MultiCopyPasteAppTests
             };
             await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipChains));
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var runNode = tree.ItemsSource!.Cast<TreeNodeVm>().First(n => n.Header == "Run");
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(runNode);
@@ -267,7 +267,7 @@ public class MultiCopyPasteAppTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var frameNodes = FirstChainNode(tree).Children;
             var shapeNode = frameNodes[0].Children[0];
 
@@ -309,7 +309,7 @@ public class MultiCopyPasteAppTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var frameNodes = FirstChainNode(tree).Children;
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(frameNodes[0]);
@@ -347,7 +347,7 @@ public class MultiCopyPasteAppTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.AddRange(new[] { walk, run });
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = tree.ItemsSource!.Cast<TreeNodeVm>().ToList();
             tree.SelectedItems!.Clear();
             tree.SelectedItems.Add(roots[0]);

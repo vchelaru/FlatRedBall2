@@ -43,7 +43,7 @@ public class MainWindowMenuFlowTests
     }
 
     private static TreeView GetTree(MainWindow w)
-        => w.FindControl<TreeView>("AnimTree")
+        => w.AnimTree
            ?? throw new InvalidOperationException("AnimTree not found");
 
     private static ObservableCollection<TreeNodeVm> GetRoots(TreeView tree)

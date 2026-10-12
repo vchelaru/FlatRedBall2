@@ -42,7 +42,7 @@ public class FrameDragReorderHeadlessTests
 
     private static ObservableCollection<TreeNodeVm> Roots(MainWindow window)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         return (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
     }
 
@@ -98,7 +98,7 @@ public class FrameDragReorderHeadlessTests
             var chain = MakeChain(ctx.ProjectManager.AnimationChainListSave!, "Walk", 4);
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var frameNodes = ChainNode(window, chain).Children.ToList();
             foreach (var node in frameNodes)
                 tree.SelectedItems!.Add(node);

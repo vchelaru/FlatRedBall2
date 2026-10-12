@@ -70,7 +70,7 @@ public class TreeSelectionBurstCoalescingTests
 
         TriggerRefreshTreeView(window);
 
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         foreach (var root in roots) root.IsExpanded = true;
         Dispatcher.UIThread.RunJobs();
@@ -90,7 +90,7 @@ public class TreeSelectionBurstCoalescingTests
         var (window, ctx, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             RealSingleClick(window, rows[0]); // settle an initial selection + drain any pending sync
 
             int fireCount = 0;
@@ -131,7 +131,7 @@ public class TreeSelectionBurstCoalescingTests
         var (window, ctx, flatOrder, _) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             tree.SelectedItem = flatOrder[0]; // chain0 -- drain any pending sync from setup
             Dispatcher.UIThread.RunJobs();
 
@@ -156,7 +156,7 @@ public class TreeSelectionBurstCoalescingTests
         var (window, ctx, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             RealSingleClick(window, rows[0]);
 
             tree.SelectedItems!.Clear();

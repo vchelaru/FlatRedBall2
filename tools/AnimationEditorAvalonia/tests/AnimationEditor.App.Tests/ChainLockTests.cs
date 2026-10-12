@@ -56,7 +56,7 @@ public class ChainLockTests
         return (window, ctx, chain);
     }
 
-    private static TreeView GetTree(MainWindow w) => w.FindControl<TreeView>("AnimTree")!;
+    private static TreeView GetTree(MainWindow w) => w.AnimTree!;
 
     private static Button GetLockButtonForChainRow(MainWindow window, AnimationChainSave chain)
     {

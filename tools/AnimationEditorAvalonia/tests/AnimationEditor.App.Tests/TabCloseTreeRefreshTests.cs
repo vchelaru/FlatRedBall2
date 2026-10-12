@@ -42,7 +42,7 @@ public class TabCloseTreeRefreshTests
             .Invoke(window, [tab])!;
 
     private static TreeView GetTree(MainWindow w) =>
-        w.FindControl<TreeView>("AnimTree")
+        w.AnimTree
         ?? throw new InvalidOperationException("AnimTree control not found");
 
     private static void WriteAchx(string path, string chainName)
@@ -214,8 +214,9 @@ public class TabCloseTreeRefreshTests
             Assert.Single(tabManager.Tabs);
             Assert.Equal(new AnimationEditor.Core.Paths.FilePath(savedPath), tabManager.ActiveTab!.Path);
 
+            // Each tab has its own tree, and the closed tab's is discarded: read the visible one.
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)
-                tree.ItemsSource!;
+                GetTree(window).ItemsSource!;
             Assert.Contains(roots, n => n.Header == "Idle");
             Assert.DoesNotContain(roots, n => n.Header == "Walk");
         }

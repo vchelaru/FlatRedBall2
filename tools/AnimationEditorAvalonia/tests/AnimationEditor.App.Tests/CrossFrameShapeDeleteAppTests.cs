@@ -66,7 +66,7 @@ public class CrossFrameShapeDeleteAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var frameNodes = FirstChainNode(tree).Children;
             var rectNode = frameNodes[0].Children[0];
             var circleNode = frameNodes[1].Children[0];

@@ -40,6 +40,56 @@ public static class TreeBuilder
         return result;
     }
 
+    /// <summary>
+    /// True when <paramref name="roots"/> is still exactly the tree <see cref="BuildTree"/> would
+    /// build for <paramref name="acls"/>: the same chains, frames and shapes, by reference, in the
+    /// same order. A tab's tree is kept while the tab is in the background and shown again on the
+    /// next switch; a document can change under it meanwhile (a cross-tab cut removes chains from
+    /// the source document), so this decides whether it may be reused or must be rebuilt.
+    /// Compares structure only: names, meta text and the like change only through the active
+    /// document's own commands, which keep the tree in sync as they run.
+    /// </summary>
+    public static bool RootsMatchModel(IReadOnlyList<TreeNodeVm> roots, AnimationChainListSave acls)
+    {
+        var chains = acls.AnimationChains;
+        if (roots.Count != chains.Count)
+            return false;
+
+        for (int c = 0; c < chains.Count; c++)
+        {
+            var chainNode = roots[c];
+            var frames = chains[c].Frames;
+            if (!ReferenceEquals(chainNode.Data, chains[c]) || chainNode.Children.Count != frames.Count)
+                return false;
+
+            for (int f = 0; f < frames.Count; f++)
+            {
+                var frameNode = chainNode.Children[f];
+                if (!ReferenceEquals(frameNode.Data, frames[f]) || !ShapeNodesMatch(frameNode, frames[f]))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // BuildFrameNode only makes nodes for rect, circle and polygon shapes, in ShapesSave order.
+    private static bool ShapeNodesMatch(TreeNodeVm frameNode, AnimationFrameSave frame)
+    {
+        int next = 0;
+        if (frame.ShapesSave is not null)
+        {
+            foreach (var shape in frame.ShapesSave.Shapes)
+            {
+                if (shape is not (AARectSave or CircleSave or PolygonSave))
+                    continue;
+                if (next >= frameNode.Children.Count || !ReferenceEquals(frameNode.Children[next].Data, shape))
+                    return false;
+                next++;
+            }
+        }
+        return next == frameNode.Children.Count;
+    }
+
     // ── Tsx validation issues (#1140) ────────────────────────────────────────
 
     /// <summary>

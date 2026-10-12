@@ -86,7 +86,7 @@ public class CloseProjectTests
             Assert.Null(ctx.ProjectManager.FileName);
             Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
 
-            var tree  = window.FindControl<TreeView>("AnimTree")!;
+            var tree  = window.AnimTree!;
             var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
             Assert.Empty(roots);
         }

@@ -42,7 +42,7 @@ public class ChainDragReorderHeadlessTests
 
     private static ObservableCollection<TreeNodeVm> Roots(MainWindow window)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         return (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
     }
 

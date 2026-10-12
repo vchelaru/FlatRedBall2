@@ -45,7 +45,7 @@ public class HotkeyDispatchTests
 
     private static TreeNodeVm SeedAndSelect(MainWindow window, object data, string header)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         var vm = new TreeNodeVm { Header = header, Data = data };
         roots.Add(vm);
@@ -231,7 +231,7 @@ public class HotkeyDispatchTests
             var chain = new AnimationChainSave { Name = "Walk" };
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             var vm = SeedAndSelect(window, chain, "Walk");
-            var roots = (ObservableCollection<TreeNodeVm>)window.FindControl<TreeView>("AnimTree")!.ItemsSource!;
+            var roots = (ObservableCollection<TreeNodeVm>)window.AnimTree!.ItemsSource!;
             Assert.Contains(vm, roots);
 
             window.KeyPress(Key.N, RawInputModifiers.Control, PhysicalKey.None, null);
@@ -451,7 +451,7 @@ public class HotkeyDispatchTests
         {
             var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
             var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
-            window.FindControl<TreeView>("AnimTree")!.Focus();
+            window.AnimTree!.Focus();
 
             window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.None, null);
             Dispatcher.UIThread.RunJobs();

@@ -1354,3 +1354,109 @@ public class TreeBuilderSingletonTests
         Assert.Same(chain, ctx.SelectedState.SelectedChain);
     }
 }
+
+// -- RootsMatchModel: may a cached tree be shown again without rebuilding? ----
+
+public class TreeBuilderRootsMatchModelTests
+{
+    private static AnimationChainListSave Model()
+    {
+        var acls = new AnimationChainListSave();
+        foreach (var name in new[] { "Walk", "Run" })
+        {
+            var chain = new AnimationChainSave { Name = name };
+            for (int i = 0; i < 2; i++)
+                chain.Frames.Add(new AnimationFrameSave { ShapesSave = new ShapesSave() });
+            acls.AnimationChains.Add(chain);
+        }
+        acls.AnimationChains[0].Frames[0].ShapesSave!.Add(new AARectSave { Name = "Box" });
+        acls.AnimationChains[0].Frames[0].ShapesSave!.Add(new CircleSave { Name = "Ball" });
+        return acls;
+    }
+
+    private static List<TreeNodeVm> Built(AnimationChainListSave acls) => TreeBuilder.BuildTree(acls);
+
+    [Fact]
+    public void FreshlyBuiltTree_Matches()
+    {
+        var acls = Model();
+        Assert.True(TreeBuilder.RootsMatchModel(Built(acls), acls));
+    }
+
+    [Fact]
+    public void ChainRemovedFromModel_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        acls.AnimationChains.RemoveAt(0);   // what a cross-tab cut does to the source document
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void ChainsReordered_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        (acls.AnimationChains[0], acls.AnimationChains[1]) = (acls.AnimationChains[1], acls.AnimationChains[0]);
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void FrameRemoved_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        acls.AnimationChains[1].Frames.RemoveAt(1);
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void FrameReplaced_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        acls.AnimationChains[1].Frames[0] = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void ShapeAdded_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        acls.AnimationChains[0].Frames[1].ShapesSave!.Add(new CircleSave { Name = "New" });
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void ShapeRemoved_DoesNotMatch()
+    {
+        var acls = Model();
+        var roots = Built(acls);
+        var shapes = acls.AnimationChains[0].Frames[0].ShapesSave!;
+        shapes.Remove(shapes.Shapes.First());
+        Assert.False(TreeBuilder.RootsMatchModel(roots, acls));
+    }
+
+    [Fact]
+    public void FrameWithNoShapesCollection_Matches()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave());   // ShapesSave left null
+        acls.AnimationChains.Add(chain);
+        Assert.True(TreeBuilder.RootsMatchModel(Built(acls), acls));
+    }
+
+    [Fact]
+    public void EmptyTreeAndEmptyModel_Match()
+    {
+        Assert.True(TreeBuilder.RootsMatchModel(new List<TreeNodeVm>(), new AnimationChainListSave()));
+    }
+
+    [Fact]
+    public void EmptyTreeAndNonEmptyModel_DoNotMatch()
+    {
+        Assert.False(TreeBuilder.RootsMatchModel(new List<TreeNodeVm>(), Model()));
+    }
+}

@@ -875,6 +875,21 @@ public class TabManagerTests
     }
 
     [Fact]
+    public void Rename_CarriesTheCachedTreeToTheRenamedTab()
+    {
+        // The tab's tree view is built once and kept; a Save As renames the tab by replacing its
+        // entry, which must not throw the tree away (the next switch back would rebuild it).
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+        var tree = new object();
+        tm.ActiveTab!.CachedTreeState = tree;
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\projects\hero.achx"));
+
+        Assert.Same(tree, tm.Tabs[0].CachedTreeState);
+    }
+
+    [Fact]
     public void Rename_UpdatesTabPath()
     {
         var tm = new TabManager();

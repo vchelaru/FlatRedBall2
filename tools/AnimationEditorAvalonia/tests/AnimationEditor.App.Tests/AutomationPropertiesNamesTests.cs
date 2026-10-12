@@ -34,7 +34,7 @@ public class AutomationPropertiesNamesTests
                 ?? throw new InvalidOperationException("HistoryTab not found");
             var historyList = window.FindControl<ItemsControl>("HistoryList")
                 ?? throw new InvalidOperationException("HistoryList not found");
-            var animTree = window.FindControl<TreeView>("AnimTree")
+            var animTree = window.AnimTree
                 ?? throw new InvalidOperationException("AnimTree not found");
             var undo = window.FindControl<Button>("HistoryUndoButton")
                 ?? throw new InvalidOperationException("HistoryUndoButton not found");

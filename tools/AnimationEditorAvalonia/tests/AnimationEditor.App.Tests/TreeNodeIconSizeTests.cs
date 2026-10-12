@@ -68,7 +68,7 @@ public class TreeNodeIconSizeTests
 
     private static void ExpandAll(MainWindow window)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         static void Recurse(TreeNodeVm n)
         {
@@ -81,7 +81,7 @@ public class TreeNodeIconSizeTests
     /// <summary>The single realized, visible icon SVG whose path ends with the given filename.</summary>
     private static Avalonia.Svg.Skia.Svg IconSvg(MainWindow window, string fileName)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         return tree.GetVisualDescendants()
             .OfType<Avalonia.Svg.Skia.Svg>()
             .Where(s => s.Path is not null && s.Path.EndsWith(fileName))
@@ -142,7 +142,7 @@ public class TreeNodeIconSizeTests
         var window = CreateWindowWithFullTree();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             int rows = tree.GetVisualDescendants().OfType<TreeViewItem>().Count();
             int iconSvgs = tree.GetVisualDescendants()
                 .OfType<Avalonia.Svg.Skia.Svg>()
@@ -161,7 +161,7 @@ public class TreeNodeIconSizeTests
         var window = CreateWindowWithFullTree();
         try
         {
-            var items = window.FindControl<TreeView>("AnimTree")!
+            var items = window.AnimTree!
                 .GetVisualDescendants()
                 .OfType<TreeViewItem>()
                 .ToList();

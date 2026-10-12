@@ -104,7 +104,7 @@ public class RightClickContextMenuDuplicateAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             chainNode.IsExpanded = true;
             FlushUi();
@@ -146,7 +146,7 @@ public class RightClickContextMenuDuplicateAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             chainNode.IsExpanded = true;
             FlushUi();
@@ -185,7 +185,7 @@ public class RightClickContextMenuDuplicateAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNodes = tree.ItemsSource is System.Collections.IEnumerable roots
                 ? roots.Cast<TreeNodeVm>().ToList()
                 : throw new Xunit.Sdk.XunitException("No tree roots");
@@ -220,7 +220,7 @@ public class RightClickContextMenuDuplicateAppTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNodes = tree.ItemsSource is System.Collections.IEnumerable roots
                 ? roots.Cast<TreeNodeVm>().ToList()
                 : throw new Xunit.Sdk.XunitException("No tree roots");

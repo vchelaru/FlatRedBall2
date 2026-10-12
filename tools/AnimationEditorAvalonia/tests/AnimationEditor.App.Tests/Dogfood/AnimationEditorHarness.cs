@@ -97,7 +97,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <summary>Undo history descriptions, most recent first.</summary>
     public List<string> UndoLabels => UndoManager.UndoHistory.Select(command => command.Description).ToList();
 
-    public TreeView AnimTree => Control<TreeView>("AnimTree");
+    public TreeView AnimTree => Window.AnimTree;
 
     /// <summary>The ANIMATIONS tree's search box. Its parts are reached through it because it has its own namescope.</summary>
     public SearchToggleBox AnimSearch => Control<SearchToggleBox>("AnimSearchBox");

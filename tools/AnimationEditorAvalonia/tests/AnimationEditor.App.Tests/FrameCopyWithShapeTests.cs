@@ -50,7 +50,7 @@ public class FrameCopyWithShapeTests
 
         // Build the authentic tree (chain -> frame -> shape) into the same
         // ObservableCollection the window's SyncTreeSelection reads.
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         roots.Clear();
         foreach (var node in TreeBuilder.BuildTree(acls))
@@ -83,7 +83,7 @@ public class FrameCopyWithShapeTests
             ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var selectedData = (tree.SelectedItem as TreeNodeVm)?.Data;
 
             await window.Clipboard!.SetTextAsync("seed");

@@ -50,7 +50,7 @@ public class ChainRowDoubleTapFocusTests
     }
 
     private static TreeView GetTree(MainWindow w)
-        => w.FindControl<TreeView>("AnimTree")
+        => w.AnimTree
            ?? throw new InvalidOperationException("AnimTree control not found");
 
     private static void TriggerRefreshTreeView(MainWindow window)

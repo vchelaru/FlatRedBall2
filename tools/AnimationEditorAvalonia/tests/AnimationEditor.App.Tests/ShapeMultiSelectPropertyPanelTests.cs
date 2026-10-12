@@ -62,7 +62,7 @@ public class ShapeMultiSelectPropertyPanelTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             chainNode.IsExpanded = true;
             FlushUi();
@@ -115,7 +115,7 @@ public class ShapeMultiSelectPropertyPanelTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             chainNode.IsExpanded = true;
             FlushUi();
@@ -170,7 +170,7 @@ public class ShapeMultiSelectPropertyPanelTests
 
             RebuildTree(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
             chainNode.IsExpanded = true;
             FlushUi();

@@ -275,6 +275,7 @@ public partial class MainWindow : Window
 
         NumericExpressionInput.Install();
         InitializeComponent();
+        InitializeTabTrees();
 
         if (_useMacOSChrome)
             ApplyMacOSWindowChrome();
@@ -410,6 +411,7 @@ public partial class MainWindow : Window
         // lose the session (issue #439). Called synchronously so the write lands before any kill;
         // SaveTabsToSettings only reads tab state and writes a file, touching no UI controls.
         _tabManager.TabsChanged += SaveTabsToSettings;
+        _tabManager.TabsChanged += PruneTabTrees;
         // Any recorded edit to the active preview tab promotes it to permanent (#841) -- leaving
         // it previewable would silently discard the edit the next time a different file is
         // single-clicked in the Project tree. Guarded against the load sequence's own
@@ -993,6 +995,7 @@ public partial class MainWindow : Window
         // ResetToBlankDocument (#1147) also clears any native-tsx/texture-size/ReferencedPngs
         // state the last tab left behind.
         ShowAchxPane();
+        ShowTree(_noTabTree);
         _projectManager.ResetToBlankDocument();
         _selectedState.Reset();
         _undoManager.Clear();
@@ -2068,9 +2071,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void WireTreeRootsCompanionSave()
+    private void WireTreeRootsCompanionSave(ObservableCollection<TreeNodeVm> roots)
     {
-        _treeRoots.CollectionChanged += (_, args) =>
+        roots.CollectionChanged += (_, args) =>
         {
             if (args.NewItems != null)
                 foreach (TreeNodeVm vm in args.NewItems)
@@ -3512,7 +3515,30 @@ public partial class MainWindow : Window
 
     // ── Tree view ─────────────────────────────────────────────────────────────
 
-    private readonly ObservableCollection<TreeNodeVm> _treeRoots = new();
+    // One animation tree per open tab (kept on TabEntry.CachedTreeState), only the active tab's
+    // visible. Building a tree's rows is the expensive part of a tab switch, so switching back to a
+    // tab shows its tree again instead of clearing and rebuilding a single shared one.
+    private sealed class TabTree
+    {
+        public TabTree(TreeView view) => View = view;
+
+        public TreeView View { get; }
+        public ObservableCollection<TreeNodeVm> Roots { get; } = new();
+
+        /// <summary>Set when something the tree shows changed while it was hidden; it is rebuilt on the next switch.</summary>
+        public bool Stale { get; set; }
+    }
+
+    private readonly HashSet<TabTree> _allTabTrees = new();
+    // Shown when no tab is active (a blank document, or no file open).
+    private TabTree _noTabTree = null!;
+    // The tree currently visible, which every tree helper below operates on.
+    private TabTree _activeTree = null!;
+
+    private ObservableCollection<TreeNodeVm> _treeRoots => _activeTree.Roots;
+    /// <summary>The visible tab's tree. Tests read it here: the trees come from a template, so none is named in XAML.</summary>
+    internal TreeView AnimTree => _activeTree.View;
+
     private readonly ObservableCollection<TimelineFrameVm> _timelineFrames = new();
     private double _timelineEffectivePps = TimelineBuilder.PixelsPerSecond;
     private int _currentTimelineFrameIndex = -1;
@@ -3530,83 +3556,177 @@ public partial class MainWindow : Window
 
     private void WireTreeView()
     {
-        AnimTree.ItemsSource = _treeRoots;
-        DragDrop.SetAllowDrop(AnimTree, true);
-
-        // Selection changes in the tree → SelectedState
-        AnimTree.SelectionChanged += OnTreeSelectionChanged;
-        DragDrop.AddDragOverHandler(AnimTree, OnTreeDragOver);
-        DragDrop.AddDropHandler(AnimTree, OnTreeDrop);
-
-        // Context menu
-        var cm = new ContextMenu();
-        cm.Opening += OnTreeContextMenuOpening;
-        AnimTree.ContextMenu = cm;
-
-        // Tunnel-phase PointerPressed: select the right-clicked node BEFORE the context menu opens,
-        // so OnTreeContextMenuOpening always sees the item under the pointer, not the previous selection.
-        AnimTree.AddHandler(
-            InputElement.PointerPressedEvent,
-            OnTreePointerPressed,
-            RoutingStrategies.Tunnel);
-
-        // Frame drag-and-drop reorder: a press on a frame row arms a drag candidate, a
-        // pointer move past the threshold starts the Avalonia drag (issue #500).
-        AnimTree.AddHandler(
-            InputElement.PointerMovedEvent,
-            OnTreeFrameDragPointerMoved,
-            RoutingStrategies.Bubble);
-        AnimTree.AddHandler(
-            InputElement.PointerReleasedEvent,
-            OnTreeFrameDragPointerReleased,
-            RoutingStrategies.Bubble);
-
-        // Chain drag-and-drop reorder: a press on a chain row arms a chain-drag candidate, a
-        // pointer move past the threshold starts the Avalonia drag (parallel to the frame path).
-        AnimTree.AddHandler(
-            InputElement.PointerMovedEvent,
-            OnTreeChainDragPointerMoved,
-            RoutingStrategies.Bubble);
-        AnimTree.AddHandler(
-            InputElement.PointerReleasedEvent,
-            OnTreeChainDragPointerReleased,
-            RoutingStrategies.Bubble);
-
-        // Shape drag-and-drop reorder within a frame (#1285).
-        AnimTree.AddHandler(
-            InputElement.PointerMovedEvent,
-            OnTreeShapeDragPointerMoved,
-            RoutingStrategies.Bubble);
-        AnimTree.AddHandler(
-            InputElement.PointerReleasedEvent,
-            (_, _) => ClearShapeDragCandidate(),
-            RoutingStrategies.Bubble);
-
-        // Hovering a chain/frame row highlights it on the wireframe (#1216); a shape row, in the preview.
-        TreeHoverTracker.Attach(AnimTree, data =>
-        {
-            WireframeCtrl.SetTreeHover(data);
-            PreviewCtrl.SetTreeHoverShape(data); // shape rows outline in the preview (#1297)
-        });
-
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) => AddAnimationChainAndBeginInlineRename();
 
         // Expand/Collapse toolbar buttons
         ExpandAllBtn.Click  += (_, _) => SetAllExpanded(true);
         CollapseAllBtn.Click += (_, _) => SetAllExpanded(false);
+    }
+
+    // ── Per-tab trees ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates the tree shown while no tab is active. Called once from the constructor, before
+    /// anything touches <see cref="AnimTree"/> or <see cref="_treeRoots"/>.
+    /// </summary>
+    private void InitializeTabTrees()
+    {
+        _noTabTree = CreateTabTree();
+        _noTabTree.View.IsVisible = true;
+        _activeTree = _noTabTree;
+        AnimSearchBox.KeepOpenWhenFocusMovesInto = _noTabTree.View;
+    }
+
+    private TabTree CreateTabTree()
+    {
+        var template = (Avalonia.Controls.Templates.IDataTemplate)Resources["AnimTreeViewTemplate"]!;
+        var tree = new TabTree((TreeView)template.Build(null)!);
+        tree.View.IsVisible = false;
+        WireTabTree(tree);
+        AnimTreeHost.Children.Add(tree.View);
+        _allTabTrees.Add(tree);
+        return tree;
+    }
+
+    /// <summary>The tab's own tree, created on first use.</summary>
+    private TabTree TreeForTab(TabEntry tab)
+    {
+        if (tab.CachedTreeState is not TabTree tree)
+        {
+            tree = CreateTabTree();
+            tab.CachedTreeState = tree;
+        }
+        return tree;
+    }
+
+    /// <summary>Makes <paramref name="tree"/> the visible tree. The others stay alive, hidden.</summary>
+    private void ShowTree(TabTree tree)
+    {
+        if (ReferenceEquals(tree, _activeTree))
+            return;
+
+        var previous = _activeTree;
+        // A hidden control keeps focus, so key presses would still be routed through the old tree.
+        if (TopLevel.GetTopLevel(this)?.FocusManager is { } focus
+            && focus.GetFocusedElement() is Avalonia.Visual focused
+            && previous.View.IsVisualAncestorOf(focused))
+        {
+            Focus();
+        }
+
+        previous.View.IsVisible = false;
+        tree.View.IsVisible = true;
+        _activeTree = tree;
+        // The shift-range anchor belongs to the tree it was set in.
+        _treeSelectionAnchor = null;
+        // Focus moving into the tree keeps the filter box open.
+        AnimSearchBox.KeepOpenWhenFocusMovesInto = tree.View;
+        PruneTabTrees();
+    }
+
+    /// <summary>
+    /// Drops the trees of closed tabs. The visible tree is kept even when its tab is gone (closing
+    /// the active tab hands over to another tab's tree a moment later; removing it first would flash
+    /// an empty tree).
+    /// </summary>
+    private void PruneTabTrees()
+    {
+        if (_activeTree is null) return;
+        var inUse = _tabManager.Tabs.Select(tab => tab.CachedTreeState).OfType<TabTree>().ToHashSet();
+        foreach (var tree in _allTabTrees.ToList())
+        {
+            if (ReferenceEquals(tree, _noTabTree) || ReferenceEquals(tree, _activeTree) || inUse.Contains(tree))
+                continue;
+            AnimTreeHost.Children.Remove(tree.View);
+            tree.View.ItemsSource = null;
+            _allTabTrees.Remove(tree);
+        }
+    }
+
+    /// <summary>Flags every hidden tree so it is rebuilt, not shown, the next time its tab is activated.</summary>
+    private void MarkHiddenTreesStale()
+    {
+        foreach (var tree in _allTabTrees)
+            if (!ReferenceEquals(tree, _activeTree))
+                tree.Stale = true;
+    }
+
+    // Wires one tab tree's TreeView. The handlers read AnimTree (the visible tree) when they run,
+    // which is the tree the event came from, since only the visible one receives input.
+    private void WireTabTree(TabTree tree)
+    {
+        var tv = tree.View;
+        tv.ItemsSource = tree.Roots;
+        DragDrop.SetAllowDrop(tv, true);
+
+        // Selection changes in the tree → SelectedState
+        tv.SelectionChanged += OnTreeSelectionChanged;
+        DragDrop.AddDragOverHandler(tv, OnTreeDragOver);
+        DragDrop.AddDropHandler(tv, OnTreeDrop);
+
+        // Context menu
+        var cm = new ContextMenu();
+        cm.Opening += OnTreeContextMenuOpening;
+        tv.ContextMenu = cm;
+
+        // Tunnel-phase PointerPressed: select the right-clicked node BEFORE the context menu opens,
+        // so OnTreeContextMenuOpening always sees the item under the pointer, not the previous selection.
+        tv.AddHandler(
+            InputElement.PointerPressedEvent,
+            OnTreePointerPressed,
+            RoutingStrategies.Tunnel);
+
+        // Frame drag-and-drop reorder: a press on a frame row arms a drag candidate, a
+        // pointer move past the threshold starts the Avalonia drag (issue #500).
+        tv.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeFrameDragPointerMoved,
+            RoutingStrategies.Bubble);
+        tv.AddHandler(
+            InputElement.PointerReleasedEvent,
+            OnTreeFrameDragPointerReleased,
+            RoutingStrategies.Bubble);
+
+        // Chain drag-and-drop reorder: a press on a chain row arms a chain-drag candidate, a
+        // pointer move past the threshold starts the Avalonia drag (parallel to the frame path).
+        tv.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeChainDragPointerMoved,
+            RoutingStrategies.Bubble);
+        tv.AddHandler(
+            InputElement.PointerReleasedEvent,
+            OnTreeChainDragPointerReleased,
+            RoutingStrategies.Bubble);
+
+        // Shape drag-and-drop reorder within a frame (#1285).
+        tv.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeShapeDragPointerMoved,
+            RoutingStrategies.Bubble);
+        tv.AddHandler(
+            InputElement.PointerReleasedEvent,
+            (_, _) => ClearShapeDragCandidate(),
+            RoutingStrategies.Bubble);
+
+        // Hovering a chain/frame row highlights it on the wireframe (#1216); a shape row, in the preview.
+        TreeHoverTracker.Attach(tv, data =>
+        {
+            WireframeCtrl.SetTreeHover(data);
+            PreviewCtrl.SetTreeHoverShape(data); // shape rows outline in the preview (#1297)
+        });
 
         // Double-tap on blank row space for non-chain nodes (frame/rect/circle centering).
         // Chain focus (#716) is handled earlier, in OnTreePointerPressed's Tunnel-phase
         // ClickCount==2 branch — see that method's comment for why DoubleTappedEvent alone
         // is unreliable for chain rows (TreeViewItem's native expand toggle races it).
-        AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
+        tv.DoubleTapped += OnAnimTreeDoubleTapped;
 
         // Tunnel-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel).
         // Must be Tunnel (not Bubble) so we intercept Enter/Escape BEFORE the event
         // reaches TreeViewItem.OnKeyDown, which in Avalonia 12.x handles Key.Enter by
         // toggling IsExpanded — collapsing the chain mid-rename if we arrive too late.
-        AnimTree.AddHandler(
+        tv.AddHandler(
             InputElement.KeyDownEvent,
             OnInlineRenameKeyDown,
             RoutingStrategies.Tunnel);
@@ -3615,7 +3735,7 @@ public partial class MainWindow : Window
         // handling, which otherwise just moves the single selection to the next/previous row
         // and discards the rest. Registered after OnInlineRenameKeyDown so a rename in progress
         // (which already swallows Up/Down via e.Handled) takes precedence.
-        AnimTree.AddHandler(
+        tv.AddHandler(
             InputElement.KeyDownEvent,
             OnAnimTreeShiftArrowKeyDown,
             RoutingStrategies.Tunnel);
@@ -3623,18 +3743,18 @@ public partial class MainWindow : Window
         // Tunnel-phase Home/End: Avalonia's TreeView has no first/last-row navigation of its own,
         // so a keyboard-only user at the bottom of a long tree could only hold Up. Registered
         // after OnInlineRenameKeyDown for the same reason as the Shift+arrow handler.
-        AnimTree.AddHandler(
+        tv.AddHandler(
             InputElement.KeyDownEvent,
             OnAnimTreeHomeEndKeyDown,
             RoutingStrategies.Tunnel);
 
         // Bubble-phase LostFocus from the inline TextBox: commit
-        AnimTree.AddHandler(
+        tv.AddHandler(
             InputElement.LostFocusEvent,
             OnInlineRenameLostFocus,
             RoutingStrategies.Bubble);
 
-        WireTreeRootsCompanionSave();
+        WireTreeRootsCompanionSave(tree.Roots);
     }
 
     private void SetAllExpanded(bool expanded)
@@ -4653,12 +4773,33 @@ public partial class MainWindow : Window
     /// </summary>
     private void RebuildTreeView(IReadOnlyList<string> expandedChainNames)
     {
+        // Each tab has its own tree. Show the active tab's, and when it is still exactly the tree
+        // this document would build (the usual tab switch back), keep it rather than clearing and
+        // rebuilding it: realizing every row's controls was most of the cost of a tab switch.
+        var acls = _projectManager.AnimationChainListSave;
+        var tree = _tabManager.ActiveTab is { Kind: TabKind.Achx } activeTab ? TreeForTab(activeTab) : _noTabTree;
+        ShowTree(tree);
+        bool reuse = acls is not null && !tree.Stale && TreeBuilder.RootsMatchModel(tree.Roots, acls);
+        tree.Stale = false;
+
         _suppressTreeSelectionHandling = true;
         try
         {
+            if (reuse)
+            {
+                // The query may have changed since this tree was last shown.
+                TreeBuilder.ApplyQueryFilter(_treeRoots, _treeFilterQuery);
+                RefreshFilesPanel();
+                RefreshTreeThumbnails();
+                SyncTsxDecorationsIntoTree();
+                // A cut can have been cancelled, or completed elsewhere, while this tree was hidden.
+                SyncPendingCutHighlights();
+                SyncTreeSelection();
+                return;
+            }
+
             _treeRoots.Clear();
 
-            var acls = _projectManager.AnimationChainListSave;
             if (acls is null)
             {
                 RefreshFilesPanel();
@@ -4768,6 +4909,9 @@ public partial class MainWindow : Window
     private void OnPngChangedOnDisk(string absolutePath)
     {
         _thumbnailService.InvalidatePath(absolutePath);
+        // The loop below refreshes the visible tree's chain icons; the other tabs' trees would keep
+        // the old ones, so they are rebuilt when their tab is next shown.
+        MarkHiddenTreesStale();
 
         // Force-reload the wireframe texture if it matches the changed PNG
         if (string.Equals(WireframeCtrl.LoadedTexturePath,

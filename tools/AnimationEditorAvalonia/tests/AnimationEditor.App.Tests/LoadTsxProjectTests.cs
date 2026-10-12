@@ -94,7 +94,7 @@ public class LoadTsxProjectTests
 
             Assert.True(ctx.ProjectManager.IsNativeTsxProject);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             Assert.Single(roots);
             Assert.Equal("ID:0", roots[0].Header);
@@ -227,7 +227,7 @@ public class LoadTsxProjectTests
                 .Invoke(window, [path, false]);
             Dispatcher.UIThread.RunJobs();
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
             var anchorNode = Assert.Single(roots);
             Assert.Equal("ID:8", anchorNode.Header);

@@ -43,7 +43,7 @@ public class TreeContextMenuTests
     // so we drive the builder directly). Returns its top-level items.
     private static List<object> OpenMenuFor(MainWindow window, object data, string header)
     {
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         var vm = new TreeNodeVm { Header = header, Data = data };
         roots.Add(vm);

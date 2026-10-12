@@ -47,7 +47,7 @@ public class SelectionModelFallbackTests
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
         ctx.SelectedState.SelectedFrame = frame;
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         tree.Focus();
         Dispatcher.UIThread.RunJobs();
         Assert.Null(tree.SelectedItem);   // precondition: tree has no realized selection

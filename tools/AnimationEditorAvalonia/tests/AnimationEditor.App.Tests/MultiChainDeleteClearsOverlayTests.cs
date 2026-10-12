@@ -82,7 +82,7 @@ public class MultiChainDeleteClearsOverlayTests
 
             TriggerRefreshTreeView(window);
 
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             var nodes = tree.ItemsSource!.Cast<TreeNodeVm>().ToList();
             var chainANode = nodes.First(n => ReferenceEquals(n.Data, chainA));
             var chainBNode = nodes.First(n => ReferenceEquals(n.Data, chainB));

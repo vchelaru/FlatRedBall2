@@ -44,7 +44,7 @@ public class SidebarTabsTests
         try
         {
             var tabs = window.FindControl<TabControl>("SidebarTabs");
-            var tree = window.FindControl<TreeView>("AnimTree");
+            var tree = window.AnimTree;
             Assert.NotNull(tabs);
             Assert.NotNull(tree);
             Assert.DoesNotContain(tabs!, tree!.GetVisualAncestors());

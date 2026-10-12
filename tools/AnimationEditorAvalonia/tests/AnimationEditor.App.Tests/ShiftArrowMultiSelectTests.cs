@@ -70,7 +70,7 @@ public class ShiftArrowMultiSelectTests
 
         TriggerRefreshTreeView(window);
 
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
         foreach (var root in roots) root.IsExpanded = true; // default, but explicit for clarity
         Dispatcher.UIThread.RunJobs();
@@ -93,7 +93,7 @@ public class ShiftArrowMultiSelectTests
         var (window, _, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             RealSingleClick(window, rows[1]); // chain0's frame0 (index 1: chain0=0, frame0=1)
 
             ShiftKeyPress(window, Key.Down);
@@ -112,7 +112,7 @@ public class ShiftArrowMultiSelectTests
         var (window, _, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             // flatOrder: [0]=chain0 [1]=frame0-0 [2]=frame0-1 [3]=chain1 [4]=frame1-0 [5]=frame1-1
             RealSingleClick(window, rows[2]); // anchor = chain0's frame1 (last row of chain0)
 
@@ -134,7 +134,7 @@ public class ShiftArrowMultiSelectTests
         var (window, _, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             RealSingleClick(window, rows[2]); // anchor = chain0's frame1
 
             ShiftKeyPress(window, Key.Down);
@@ -157,7 +157,7 @@ public class ShiftArrowMultiSelectTests
         var (window, _, flatOrder, rows) = BuildTwoChainsTwoFramesEach();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var tree = window.AnimTree!;
             RealSingleClick(window, rows[1]); // chain0's frame0
 
             window.KeyPress(Key.Down, RawInputModifiers.None, PhysicalKey.None, null);

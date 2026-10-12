@@ -126,6 +126,14 @@ namespace AnimationEditor.Core.Models
         public Dictionary<object, bool>? CachedTreeExpandState { get; set; }
 
         /// <summary>
+        /// The UI layer's per-tab animation tree (its <c>TreeView</c>, node view-models and the model
+        /// they were built for), kept so switching back to this tab shows the tree again instead of
+        /// rebuilding it. Opaque here because Core has no UI types; <see cref="TabManager.Rename"/>
+        /// carries it to the replacement entry.
+        /// </summary>
+        public object? CachedTreeState { get; set; }
+
+        /// <summary>
         /// True while this is the single reusable "preview" tab (issue #841): a click in the
         /// Open Project Folder tree opens/replaces this tab instead of adding a new permanent
         /// one. Cleared by <see cref="TabManager.Promote"/> when the tree row is double-clicked

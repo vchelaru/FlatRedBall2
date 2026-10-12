@@ -90,6 +90,10 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 Tests that exercise path logic **must** use Windows-style backslash literals (e.g. `@"C:\projects\MyAnim.achx"`) to prove the cross-platform handling works — not `Path.Combine`, which would only exercise the current OS's separator.
 
+## One animation tree per tab
+
+**Landmine — the ANIMATIONS `TreeView` is built per tab (`MainWindow.TabTree`, kept on `TabEntry.CachedTreeState`), only the active tab's is visible.** `MainWindow.AnimTree` is the visible one. The trees come from the `AnimTreeViewTemplate` resource, so none is in the window's name scope and `FindControl<TreeView>("AnimTree")` returns null: use `window.AnimTree`. A `TreeView` or roots reference held across a tab switch or close points at a hidden or discarded tree. `RebuildTreeView` shows a tab's kept tree only while `TreeBuilder.RootsMatchModel` says it still matches the document, and rebuilds it otherwise.
+
 ## Tree reorder: chains, frames, and shapes within their type
 
 Drag-and-drop tree reorder covers chains, frames, and shapes (pure resolvers `ChainDropResolver` / `FrameDropResolver` / `ShapeDropResolver`, wired in `MainWindow`). **Shapes only reorder among shapes of their own type in the same frame (#1285):** `.achx` and `.achj` save shapes grouped by type (rects, polygons, circles), so a cross-type order is lost on save and reload. `ShapesSave.Move`/`SetOrder` enforce the grouping; dropping on another type shows the `ShapeReorderNotice` toast. The drop commits through `AppCommands.MoveShapeToIndex`.

@@ -76,7 +76,7 @@ public class ShapeSelectionInspectorTests
         typeof(MainWindow).GetMethod("RebuildTreeView", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
             .Invoke(window, new object[] { System.Array.Empty<string>() });
         FlushUi();
-        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var tree = window.AnimTree!;
         var roots = ((System.Collections.IEnumerable)tree.ItemsSource!).Cast<TreeNodeVm>().ToList();
         void ExpandAll(IEnumerable<TreeNodeVm> ns) { foreach (var n in ns) { n.IsExpanded = true; ExpandAll(n.Children); } }
         ExpandAll(roots);
