@@ -111,6 +111,7 @@ With pooling on, `Destroy()` returns the instance to a free list instead of tear
 - `CustomDestroy` does **not** run when a pooled entity is destroyed; it runs only for non-pooled destroys. Pooled instances keep everything `CustomInitialize` allocated.
 - The engine resets per-life state automatically on recycle: `Position`, `Velocity`, `Acceleration`, `Rotation`, `RotationVelocity`, `Drag`, `Z`, `IsVisible`.
 - Override `protected override void Reset()` to clear **entity-specific dynamic state** the entity itself mutates over its life — lifetime accumulators, health, mode flags, internal state-machine cursors. Forgetting to reset these is the pooling footgun: stale state bleeds into the next life and is hard to diagnose.
+- Pool return removes the entity's sprites from every camera's `SnappedSprites`, so `Reset()` must re-add any the entity wants snapped.
 - The `configure` callback passed to `Create` runs before `Reset()`, so `Reset()` can overwrite values the caller just set.
 - If you're coming from FRB1: its per-life `CustomInitialize` is `Reset()` here, and its generated build-once step is `CustomInitialize` here.
 

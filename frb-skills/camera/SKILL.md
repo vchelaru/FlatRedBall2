@@ -225,7 +225,7 @@ cam.ScrollingWindowWidth  = 200f;
 cam.ScrollingWindowHeight = 120f;
 ```
 
-**Pixel-perfect snapping** — `CameraControllingEntity.SnapToPixel`, on by default, rounds the camera position to `1 / Camera.PixelsPerUnit`. It does not snap sprites.
+**Pixel-perfect snapping** — `CameraControllingEntity.SnapToPixel`, on by default, rounds the camera position to `1 / Camera.PixelsPerUnit`. It does not snap sprites. To snap a sprite's draw position to the screen pixel grid, add it to `camera.SnappedSprites` (`src/Rendering/Camera.cs`, an `ISet<Sprite>`). Each camera snaps to its own grid, world-space sprites only, and simulated position is untouched. At an integer zoom with Point sampling it changes nothing visible; it matters at fractional zoom or with Linear filtering.
 
 **Screen shake** (async; pass `Token` to cancel on screen transition):
 ```csharp

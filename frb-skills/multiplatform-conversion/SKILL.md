@@ -167,6 +167,9 @@ Reference: `templates/frb2-multiplatform/MyGame.BlazorGL`. Each sample's `.Blazo
   The package's `frb-host.js` defines `tickJS`, `initRenderJS`, optional hooks
   (`window.frbBeforeTick`, `window.frbAfterInit`), content prefetching via
   `content-manifest.json`, and keyboard/mouse scroll prevention for itch.io iframes.
+  It also defines `frbDiagPlatform` and `frbDiagPublish` for the `?diag=perf` opt-in (see the
+  `performance` skill); a vendored older copy without them still works but reports platform `unknown`.
+  The template's `Index.razor.cs` does not call the probe yet.
 - **`Properties/launchSettings.json`** — pick a unique launch port (check the other samples' `launchSettings.json`). Concurrent debugging across samples breaks if ports collide.
 
 **Do not duplicate** `App.razor`, `MainLayout.razor`, `_Imports.razor`, `Pages/Index.razor`, or the `tickJS`/`initRenderJS` JS block. They ship from `FlatRedBall2.BlazorGL` and are wired by the `RootComponents.Add<App>` and `frb-host.js` reference above. The package's Index resolves `Func<Game>` from DI on the first tick — that's why `Program.cs` must register it.

@@ -134,6 +134,8 @@ AddCollisionRelationship(_playerFactory, tiles)
 
 `SolidSides` on adjacent tiles are maintained automatically — interior shared edges are cleared so entities glide across flat surfaces without snagging on seams.
 
+`tiles.Rectangles` and `tiles.Polygons` enumerate the shapes it holds (full-cell and sub-cell rects; cell and spanning polygons). Mutating the collection while iterating throws, so `.ToList()` first.
+
 ### SlopeMode (per-relationship)
 
 When one side is a `TileShapes` containing polygon (slope) tiles, `relationship.SlopeMode` controls how overlap is resolved:

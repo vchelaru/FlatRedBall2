@@ -61,9 +61,12 @@ Usings: `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
 Engine.Audio.Play(sfx);                             // play with defaults
 Engine.Audio.Play(sfx, volume: 0.5f, pitch: 0f, pan: 0f);
 Engine.Audio.IsPlaying(sfx);                        // true if any instance is active
+
+var h = Engine.Audio.Play(sfx, loop: true);         // SoundHandle: h.IsPlaying, h.Stop()
+await Engine.Audio.PlayAsync(sfx, cancellationToken: Token);  // completes when the sound ends (game time)
 ```
 
-Per-frame dedup: calling `Play(sfx)` multiple times in a single frame (e.g., from `CollisionOccurred` firing on multiple pairs) plays the sound only once. Cross-frame overlap is allowed.
+Per-frame dedup: calling `Play(sfx)` multiple times in a single frame (e.g., from `CollisionOccurred` firing on multiple pairs) plays the sound only once; pass `playAlways: true` to stack instances. Cross-frame overlap is allowed.
 
 ## Background Music
 
@@ -110,6 +113,7 @@ Engine.Audio.MusicEnabled = false; // pauses current song immediately; true resu
 - **`Song.FromUri` only works with OGG** — on DesktopGL (NVorbis), `Song.FromUri` fails at runtime with MP3. Use the MGCB pipeline and `Engine.Content.Load<Song>` for MP3 files.
 - **`Load<>` name drops the source extension** — `Load<Song>("Audio/song")`, not `"Audio/song.ogg"`. Passing the extension makes MonoGame look for `song.ogg.xnb` (the pipeline builds `song.xnb`) and throws `FileNotFoundException`. The `.mgcb` defining it must be in the `.Desktop` head, not `Common`.
 - **Track SoundEffect only when loaded via `FromStream`** — call `Engine.Content.Track(sfx)` when using `SoundEffect.FromStream` so it is disposed on screen transition. MGCB-loaded assets (`Engine.Content.Load<SoundEffect>`) are disposed automatically by the ContentLoader — do not call `Track` for those.
-- **Per-frame dedup in collision handlers** — `Play(sfx)` in a `CollisionOccurred` handler is safe to call unconditionally; it fires at most once per frame regardless of how many pairs collide.
+- **Per-frame dedup in collision handlers** — `Play(sfx)` in a `CollisionOccurred` handler is safe to call unconditionally; it fires at most once per frame regardless of how many pairs collide (unless `playAlways: true`).
+- **Looping sounds are not stopped on screen change** — keep the `SoundHandle` and call `Stop()` in `CustomDestroy`.
 - **`PlayPitchableSong` is OGG-only**, same as `Song.FromUri`. It loads the raw file directly (not via `Song`), so `Engine.Content.Load<Song>`/MGCB assets don't apply here.
 - **`MusicPitch` is a silent no-op while a `PlaySong`/`PlayPlaylist` track is active** — `Song`/`MediaPlayer` expose no pitch API on any backend. Switch to `PlayPitchableSong` to get real pitch control.

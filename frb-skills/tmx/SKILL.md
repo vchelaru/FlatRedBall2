@@ -163,6 +163,10 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 - **Rectangles** support any position, size, and `rotation` that's an exact multiple of 90 — the rect stays axis-aligned (just reoriented/swapped) and is clipped against the grid, so it can span any number of cells and doesn't need to be grid-aligned at all. This is the recommended way to author a hand-drawn collision boundary that doesn't match the tile grid (a wall, a boss-arena floor, an irregular pit).
 - **Rotated rectangles at other angles, and all polygons,** are converted to a polygon. One that fits within a single cell is positioned relative to whichever grid cell contains its center (same convention as a tileset tile's sub-cell `<object>`s). One whose bounds span multiple cells (a large diagonal wall, a wide slope) is registered as a free-floating shape instead, so it's still found by broad-phase collision queries regardless of which cell the querying shape occupies — no size limit. Tiled rotates around the object's own `(x,y)`, not its bounding-box center, so don't assume a rotated shape's world position matches a naive center-based mental model.
 
+### Generated shapes follow the map
+
+Shapes from `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` move with `TileMap.X`/`Y`/`CenterOn`, so set the map's position freely. To enumerate what was generated, use the live `TileShapes.Rectangles` and `TileShapes.Polygons` instead of scanning `GetTileAtCell`; call `.ToList()` first if the loop adds or removes shapes.
+
 ### Reading object-layer data directly (no entity, no collision)
 
 `TileMap.GetObjectLayerData(layerName)` returns each object's world-space rect (or, for polygons, `ObjectLayerEntry.Points`), Class, tile GlobalId, and merged properties — for object layers used purely as data markers (a Water zone's bounds, Coast tile terrain/side properties) rather than `CreateEntities` spawns or collision generation. Rotation is ignored for every shape here; use `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` if you need rotation-aware collision instead.

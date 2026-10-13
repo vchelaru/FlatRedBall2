@@ -55,6 +55,10 @@ bool justReleased = pad.WasButtonJustReleased(Buttons.A);
 float axisValue = pad.GetAxis(GamepadAxis.LeftStickX);  // -1.0 to 1.0
 ```
 
+Also on `IGamepad` (`src/Input/IGamepad.cs`): `IsConnected`, `SetVibration(left, right)`, and `Deadzone` / `DeadzoneType` for the sticks. Leaving `Deadzone` null keeps MonoGame's default thresholds. `Engine.Input.GamepadConnectionChanged(index, connected)` fires on plug and unplug, and also once at startup for pads already plugged in. It lives as long as the engine, so unsubscribe in `CustomDestroy`.
+
+**"Press any button/key"** (`src/Input/AnyInputExtensions.cs`): `pad.WasAnyButtonJustPressed()` / `GetButtonJustPressed()` and `keyboard.WasAnyKeyPressed()` / `GetKeyPressed()`. For a title-screen wait, `await Engine.Time.DelayUntil(() => pad.WasAnyButtonJustPressed())`.
+
 ## KeyboardInput2D — Directional Movement from Four Keys
 
 `KeyboardInput2D` implements `I2DInput` and maps four keys to a normalized X/Y pair.
@@ -167,6 +171,7 @@ The concrete types on each side of `.Or` do not matter — anything implementing
 ## Common Pitfalls
 
 - **Input feels one frame late** — Input state is captured once at the start of each frame, before any entity logic runs. This is by design.
+- **A disconnected pad reads as unpressed and is safe to poll.** Use `IsConnected` only for join prompts and "controller unplugged" messages.
 - **Gamepad index out of range** — `GetGamepad` only accepts 0–3. Wrap in a try/catch or validate the index if it comes from user data.
 - **`WasKeyPressed` fires repeatedly** — This means you're checking `IsKeyDown` instead of `WasKeyPressed`. Use `WasKeyPressed` for one-shot actions.
 - **Mouse cursor is invisible** — MonoGame defaults `IsMouseVisible` to `false`. If the game uses `cursor.WorldPosition` or any click input, set `IsMouseVisible = true;` in the `Game1` constructor. Forgetting this makes the game appear unresponsive to mouse input since players cannot see where they are clicking.
