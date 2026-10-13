@@ -52,7 +52,7 @@ dotnet build src/FlatRedBall2.csproj
 dotnet test tests/FlatRedBall2.Tests/
 ```
 
-**Animation editor work: dogfood it headlessly.** `tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/Dogfood/README.md` describes the harness that drives the real editor window with simulated input (clicks, drags, keys, scripted dialogs, tab strip, wireframe geometry) and the find-a-bug, pin-it, fix-it loop built on it. Read it before changing the animation editor. It never touches the desktop, so it is safe to run while the machine is in use; never launch the editor itself to check a change.
+**Animation editor work: dogfood it headlessly.** `tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/Dogfood/README.md` describes the harness that drives the real editor window with simulated input (clicks, drags, keys, scripted dialogs, tab strip, wireframe geometry) and the find-a-bug, pin-it, fix-it loop built on it. Read it before changing the animation editor. It never touches the desktop, so it is safe to run while the machine is in use.
 
 ## Available Skills
 
@@ -131,7 +131,7 @@ For a third-party API's shape (MonoGame, Gum, MonoGame.Extended, etc.): official
 
 ## Manual-Test Scratch Projects
 
-A change that needs a human to see or hear it (audio, rendering, input feel) needs a runnable harness, built without being asked. Put it under `diagnostics/manual-test/<Name>/` (gitignored as a whole — never commit/push it; this differs from a feasibility spike like `diagnostics/MusicPitchSpike`, which documents a finding and *is* committed). Give it a classic `.sln` (`dotnet new sln --format sln`) and open it yourself. Never launch the app process yourself (`dotnet run`, starting the exe) — even for an existing tool — open the project/solution and let the human run it their own way.
+A change that needs a human to see or hear it (audio, rendering, input feel) needs a runnable harness, built without being asked. Put it under `diagnostics/manual-test/<Name>/` (gitignored as a whole — never commit/push it; this differs from a feasibility spike like `diagnostics/MusicPitchSpike`, which documents a finding and *is* committed). Give it a classic `.sln` (`dotnet new sln --format sln`) and open it yourself. You may also run the app or harness yourself. Anything that starts a browser or dev server runs in the foreground with a Bash `timeout`, at below-normal priority, never in an unattended loop.
 
 ## Don't Infer Conventions from `samples/`
 
