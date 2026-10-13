@@ -31,6 +31,7 @@ With `FRB_GOLDEN_IMAGES=1` a missing GL device is a failure, not a skip, so a br
    - Keep scenes small (a few dozen pixels per side) and deterministic: no randomness, no real time. Advance animation with `screen.Update(...)`, not wall clock.
    - Golden names are file names: letters, digits, `-`, `_`.
 2. Push the branch, then run **Actions > Regenerate golden images** on it (`gh workflow run golden-images-regenerate.yml --ref <branch>`). It renders on the same llvmpipe runner, commits `Golden/<name>.png` to the branch, and re-runs the tests.
+   GitHub does not start PR checks for a commit pushed by the workflow's built-in token, so the PR shows no checks and stays blocked. Push an empty commit yourself afterwards (`git pull && git commit --allow-empty -m "Re-trigger PR checks" && git push`).
 3. Open the new PNG and look at it. A golden you did not look at only proves the renderer is deterministic, not correct.
 
 To change an existing golden deliberately, run the same workflow; unchanged scenes are left byte-identical. Never generate goldens locally: update mode (`FRB_GOLDEN_UPDATE=1`) refuses to run outside GitHub Actions.
