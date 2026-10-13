@@ -353,6 +353,7 @@ public class TileMapCreateEntitiesTests
     private class TaggedEntity : Entity
     {
         public string? Tag { get; set; }
+        public string? Configured { get; set; }
     }
 
     [Fact]
@@ -1285,5 +1286,71 @@ public class TileMapCreateEntitiesTests
 
         collision.AllTiles.ShouldHaveSingleItem();
         created.Count.ShouldBe(1);
+    }
+
+    // ============================================================================================
+    // Factory.EntitySpawned
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_PaintedCell_RaisesEntitySpawnedWithPositionApplied()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        var seen = new System.Collections.Generic.List<(float x, float y)>();
+        factory.EntitySpawned += e => seen.Add((e.X, e.Y));
+
+        tileMap.CreateEntities("Coin", factory);
+
+        seen.ShouldHaveSingleItem().ShouldBe((24f, -40f));
+    }
+
+    [Fact]
+    public void CreateEntities_ObjectLayer_RaisesEntitySpawnedAfterPropertiesAndConfigure()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var tileObj = new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16, 16));
+        tileObj.Properties.SetString("Tag", "ruby");
+        objLayer.AddObject(tileObj);
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TaggedEntity>(screen);
+        var seen = new System.Collections.Generic.List<(float x, string? tag, string? configured)>();
+        factory.EntitySpawned += e => seen.Add((e.X, e.Tag, e.Configured));
+
+        tileMap.CreateEntities("Coin", factory, configure: e => e.Configured = "yes");
+
+        seen.ShouldHaveSingleItem().ShouldBe((24f, "ruby", "yes"));
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_RaisesEntitySpawnedOnlyWhenSpawned()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+        int count = 0;
+        factory.EntitySpawned += _ => count++;
+
+        tileMap.CreateEntities("Coin", factory);
+        count.ShouldBe(0);
+
+        tileMap.LazySpawner.Update(left: 0f, right: 100f, bottom: -100f, top: 100f);
+        count.ShouldBe(1);
     }
 }

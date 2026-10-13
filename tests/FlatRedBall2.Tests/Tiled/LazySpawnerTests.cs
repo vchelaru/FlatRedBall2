@@ -285,4 +285,34 @@ public class LazySpawnerTests
 
         factory.Count.ShouldBe(1);
     }
+
+    [Fact]
+    public void EntitySpawned_RaisedOnLazySpawn_AfterPositionAndApplyAfterInit()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.OneShot);
+        manager.Add(factory, 50f, 60f, applyAfterInit: e => e.Tag = "applied");
+        var seen = new System.Collections.Generic.List<(float x, float y, string? tag)>();
+        factory.EntitySpawned += e => seen.Add((e.X, e.Y, e.Tag));
+
+        seen.ShouldBeEmpty();
+        manager.Update(0f, 100f, 0f, 100f);
+
+        seen.ShouldHaveSingleItem().ShouldBe((50f, 60f, "applied"));
+    }
+
+    [Fact]
+    public void EntitySpawned_Reloadable_RaisedOnEachRespawn()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.Reloadable);
+        manager.Add(factory, 50f, 50f, null);
+        int count = 0;
+        factory.EntitySpawned += _ => count++;
+
+        manager.Update(0f, 100f, 0f, 100f);
+        factory[0].Destroy();
+        manager.Update(200f, 300f, 0f, 100f);
+        manager.Update(0f, 100f, 0f, 100f);
+
+        count.ShouldBe(2);
+    }
 }

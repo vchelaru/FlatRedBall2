@@ -142,10 +142,7 @@ internal sealed class LazySpawnRecord<T> : ILazySpawnRecord where T : Entity, ne
 
     private void Spawn()
     {
-        var entity = _factory.Create();
-        entity.X = _worldX;
-        entity.Y = _worldY;
-        _applyAfterInit?.Invoke(entity);
+        var entity = _factory.CreatePlaced(_worldX, _worldY, _applyAfterInit);
         _state = LazySpawnRecordState.Live;
         entity.Destroyed += OnEntityDestroyed;
     }

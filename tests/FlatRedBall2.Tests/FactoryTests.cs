@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using FlatRedBall2.Collision;
 using Shouldly;
 using Xunit;
@@ -529,5 +532,157 @@ public class FactoryTests
         var factory = new Factory<ConfigurableEntity>(screen);
 
         Should.Throw<System.ArgumentNullException>(() => factory.Create(null!));
+    }
+
+    // ============================================================================================
+    // EntitySpawned
+    // ============================================================================================
+
+    private class SpawnProbe : Entity
+    {
+        public bool WasInitialized { get; private set; }
+        public override void CustomInitialize() => WasInitialized = true;
+    }
+
+    private class ThrowingInitEntity : Entity
+    {
+        public override void CustomInitialize() => throw new InvalidOperationException("boom");
+    }
+
+    [Fact]
+    public void EntitySpawned_Create_RaisedOnceWithEntity()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TestEntity>(screen);
+        var spawned = new List<TestEntity>();
+        factory.EntitySpawned += spawned.Add;
+
+        var entity = factory.Create();
+
+        spawned.ShouldHaveSingleItem().ShouldBeSameAs(entity);
+    }
+
+    [Fact]
+    public void EntitySpawned_CreateWithConfigure_Raised()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TestEntity>(screen);
+        var spawned = new List<TestEntity>();
+        factory.EntitySpawned += spawned.Add;
+
+        var entity = factory.Create(e => e.X = 5f);
+
+        spawned.ShouldHaveSingleItem().ShouldBeSameAs(entity);
+    }
+
+    [Fact]
+    public void EntitySpawned_Handler_SeesInitializedEntityInFactoryAndScreen()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<SpawnProbe>(screen);
+        bool? initialized = null, inInstances = null, inScreen = null;
+        factory.EntitySpawned += e =>
+        {
+            initialized = e.WasInitialized;
+            inInstances = factory.Instances.Contains(e);
+            inScreen = screen.Entities.Contains(e);
+        };
+
+        factory.Create();
+
+        initialized.ShouldBe(true);
+        inInstances.ShouldBe(true);
+        inScreen.ShouldBe(true);
+    }
+
+    [Fact]
+    public void EntitySpawned_AfterUnsubscribe_NotRaised()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TestEntity>(screen);
+        int count = 0;
+        Action<TestEntity> handler = _ => count++;
+        factory.EntitySpawned += handler;
+        factory.Create();
+        factory.EntitySpawned -= handler;
+
+        factory.Create();
+
+        count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void EntitySpawned_CustomInitializeThrows_NotRaised()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<ThrowingInitEntity>(screen);
+        int count = 0;
+        factory.EntitySpawned += _ => count++;
+
+        Should.Throw<InvalidOperationException>(() => factory.Create());
+
+        count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void EntitySpawned_PooledReuse_RaisedOnEveryCreate()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+        var spawned = new List<PoolableBullet>();
+        factory.EntitySpawned += spawned.Add;
+
+        var first = factory.Create();
+        first.Destroy();
+        var second = factory.Create();
+
+        second.ShouldBeSameAs(first);
+        spawned.Count.ShouldBe(2);
+        spawned[1].ShouldBeSameAs(first);
+    }
+
+    [Fact]
+    public void EntitySpawned_PooledReuse_HandlerSeesResetEntityInScreen()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+        var first = factory.Create();
+        first.X = 100f;
+        first.Destroy();
+        float? xSeen = null;
+        bool? inScreen = null;
+        factory.EntitySpawned += e =>
+        {
+            xSeen = e.X;
+            inScreen = screen.Entities.Contains(e);
+        };
+
+        factory.Create();
+
+        xSeen.ShouldBe(0f);
+        inScreen.ShouldBe(true);
+    }
+
+    [Fact]
+    public void EntitySpawned_Prewarm_NotRaised()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+        int count = 0;
+        factory.EntitySpawned += _ => count++;
+
+        factory.Prewarm(3);
+        count.ShouldBe(0);
+
+        factory.Create();
+        count.ShouldBe(1);
     }
 }

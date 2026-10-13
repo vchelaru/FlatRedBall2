@@ -115,7 +115,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
         if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
         for (int i = 0; i < count; i++)
         {
-            var instance = Create();
+            var instance = CreateCore(null, raiseSpawned: false);
             instance.Destroy();
         }
         return this;
@@ -260,7 +260,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// is fully wired into rendering, physics, and (if <see cref="IsSolidGrid"/> is set) the
     /// solid-grid index.
     /// </summary>
-    public T Create() => CreateCore(null);
+    public T Create() => CreateCore(null, raiseSpawned: true);
 
     /// <summary>
     /// Creates a new <typeparamref name="T"/> and runs <paramref name="configure"/> against it
@@ -273,10 +273,56 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     public T Create(Action<T> configure)
     {
         if (configure == null) throw new ArgumentNullException(nameof(configure));
-        return CreateCore(configure);
+        return CreateCore(configure, raiseSpawned: true);
     }
 
-    private T CreateCore(Action<T>? configure)
+    /// <summary>
+    /// Raised once for every entity this factory spawns, after the entity is created, added to
+    /// the screen and this factory's <see cref="Instances"/>, and <see cref="Entity.CustomInitialize"/>
+    /// has run. Fires for every creation path: <see cref="Create()"/>, <see cref="Create(Action{T})"/>,
+    /// and Tiled spawns (<see cref="Tiled.TileMap.CreateEntities{T}"/>, including lazy spawns).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For Tiled spawns the event fires after the placement position, Tiled custom properties and
+    /// the <c>configure</c> callback have been applied, so the handler sees the finished entity.
+    /// For a direct <see cref="Create()"/> the entity is still at its default position.
+    /// </para>
+    /// <para>
+    /// With <see cref="EnablePooling"/>, the event fires on <b>every</b> spawn, including when a
+    /// pooled instance is reused (after it has been reset), even though
+    /// <see cref="Entity.CustomInitialize"/> only runs on first creation. It does not fire for
+    /// instances created by <see cref="Prewarm(int)"/>, nor when creation throws. A handler that
+    /// subscribes to the entity itself (for example its events) should do so once per instance,
+    /// since a reused instance raises this event again.
+    /// </para>
+    /// </remarks>
+    public event Action<T>? EntitySpawned;
+
+    /// <summary>
+    /// Creates an entity for a Tiled placement: positions it, runs <paramref name="afterInit"/>
+    /// (Tiled property application and the caller's configure callback), then raises
+    /// <see cref="EntitySpawned"/> so handlers see the finished entity. Shared by eager and lazy spawn.
+    /// </summary>
+    internal T CreatePlaced(float x, float y, Action<T>? afterInit)
+    {
+        var entity = CreateCore(null, raiseSpawned: false);
+        entity.X = x;
+        entity.Y = y;
+        afterInit?.Invoke(entity);
+        EntitySpawned?.Invoke(entity);
+        return entity;
+    }
+
+    private T CreateCore(Action<T>? configure, bool raiseSpawned)
+    {
+        var entity = CreateOrRecycle(configure);
+        if (raiseSpawned)
+            EntitySpawned?.Invoke(entity);
+        return entity;
+    }
+
+    private T CreateOrRecycle(Action<T>? configure)
     {
         if (_poolingEnabled && _freeList!.Count > 0)
         {
