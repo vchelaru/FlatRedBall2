@@ -45,7 +45,7 @@ public class TileMapLayerTintTests
 
         map.GetLayer("Main").Color = new Color(255, 128, 64);
 
-        live.TintColor.ShouldBe(new Color(255, 128, 64));
+        live.TintColor.ShouldBe(new Color(255, 128, 64, 255));
         map.GetLayer("Main").Color.ShouldBe(new Color(255, 128, 64));
     }
 
@@ -56,8 +56,43 @@ public class TileMapLayerTintTests
 
         map.GetLayer("Main").Alpha = 0.25f;
 
-        live.Opacity.ShouldBe(0.25f);
         map.GetLayer("Main").Alpha.ShouldBe(0.25f);
+        // The fade rides in the tint's alpha with Opacity left at 1: MGEx's renderer multiplies
+        // RGB by Opacity too, which a non-premultiplied blend then applies a second time.
+        live.TintColor!.Value.A.ShouldBe((byte)64);
+        live.Opacity.ShouldBe(1f);
+    }
+
+    [Fact]
+    public void Color_Set_KeepsAlphaAndAlpha_Set_KeepsColor()
+    {
+        var (map, live) = BuildHandMade();
+        var layer = map.GetLayer("Main");
+
+        layer.Alpha = 0.5f;
+        layer.Color = new Color(10, 20, 30, 200); // the color's own alpha channel is ignored
+
+        layer.Alpha.ShouldBe(0.5f);
+        layer.Color.ShouldBe(new Color(10, 20, 30));
+        live.TintColor.ShouldBe(new Color(10, 20, 30, 128));
+    }
+
+    [Fact]
+    public void Construction_LayerWithOpacityAndTint_FoldsOpacityIntoAlpha()
+    {
+        var tilemap = new Tilemap("t", 2, 2, 16, 16, TilemapOrientation.Orthogonal);
+        var live = new TilemapTileLayer("Main", 2, 2, 16, 16)
+        {
+            Opacity = 0.5f,
+            TintColor = new Color(255, 0, 0, 128), // what a TMX tintcolor="#80ff0000" parses to
+        };
+        tilemap.Layers.Add(live);
+
+        var layer = new TileMap(tilemap).GetLayer("Main");
+
+        layer.Color.ShouldBe(new Color(255, 0, 0));
+        layer.Alpha.ShouldBe(0.5f * 128 / 255f, 0.001f);
+        live.Opacity.ShouldBe(1f);
     }
 
     [Fact]

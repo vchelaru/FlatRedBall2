@@ -28,6 +28,7 @@ public class TileMapLayer
         Renderable = renderable;
         _tileLayer = tileLayer;
         _tilesets = tilesets;
+        AdoptLayerColor();
     }
 
     /// <summary>
@@ -41,6 +42,7 @@ public class TileMapLayer
         _tileLayer = tileLayer;
         _tilesets = tilesets;
         _isTestMode = true;
+        AdoptLayerColor();
     }
 
     /// <summary>
@@ -85,27 +87,63 @@ public class TileMapLayer
         set => Renderable.IsVisible = value;
     }
 
+    private Color _color = Color.White;
+    private float _alpha = 1f;
+
     /// <summary>
     /// Color tint multiplied with the layer's tile pixels. Default <c>White</c> (no tint), or the
-    /// Tiled layer's <c>tintcolor</c> if the TMX sets one. Multiplied by <see cref="Alpha"/> at
-    /// draw time. Same name and meaning as <see cref="Sprite.Color"/>.
+    /// Tiled layer's <c>tintcolor</c> if the TMX sets one. The alpha channel is ignored; use
+    /// <see cref="Alpha"/> to fade. Same name and meaning as <see cref="Sprite.Color"/>.
     /// </summary>
     public Color Color
     {
-        get => (_tileLayer ?? throw NoBackingLayer()).TintColor ?? Color.White;
-        set => (_tileLayer ?? throw NoBackingLayer()).TintColor = value;
+        get => _color;
+        set
+        {
+            _color = new Color(value.R, value.G, value.B);
+            PushColorToLayer();
+        }
     }
 
     /// <summary>
     /// Opacity from 0 (fully transparent) to 1 (fully opaque). Default <c>1</c>, or the Tiled
-    /// layer's <c>opacity</c> if the TMX sets one. Multiplied with <see cref="Color"/> at draw
-    /// time. Same name and meaning as <see cref="Sprite.Alpha"/>. To fade a whole map, loop
-    /// over <see cref="TileMap.Layers"/>.
+    /// layer's <c>opacity</c> (times its <c>tintcolor</c> alpha) if the TMX sets one. Same name
+    /// and meaning as <see cref="Sprite.Alpha"/>. To fade a whole map, loop over
+    /// <see cref="TileMap.Layers"/>.
     /// </summary>
     public float Alpha
     {
-        get => (_tileLayer ?? throw NoBackingLayer()).Opacity;
-        set => (_tileLayer ?? throw NoBackingLayer()).Opacity = value;
+        get => _alpha;
+        set
+        {
+            _alpha = value;
+            PushColorToLayer();
+        }
+    }
+
+    // MonoGame.Extended draws tiles with a non-premultiplied blend state but computes the layer color
+    // as TintColor * Opacity, which scales RGB as well as alpha. Opacity < 1 would therefore apply
+    // the fade twice (a half-faded layer renders at quarter strength). Carry the fade in the tint's
+    // alpha channel and keep Opacity at 1 so the blend applies it exactly once.
+    private void PushColorToLayer()
+    {
+        if (_tileLayer == null) return;
+        _tileLayer.Opacity = 1f;
+        _tileLayer.TintColor = new Color(_color.R, _color.G, _color.B,
+            (byte)System.Math.Clamp((int)System.MathF.Round(_alpha * 255f), 0, 255));
+    }
+
+    // Takes over what the TMX parser put on the layer (tintcolor, opacity) and rewrites it into the
+    // form PushColorToLayer uses. Untouched layers are left alone.
+    private void AdoptLayerColor()
+    {
+        var tint = _tileLayer!.TintColor;
+        if (tint == null && _tileLayer.Opacity == 1f) return;
+
+        var t = tint ?? Color.White;
+        _color = new Color(t.R, t.G, t.B);
+        _alpha = t.A / 255f * _tileLayer.Opacity;
+        PushColorToLayer();
     }
 
     /// <summary>
@@ -197,13 +235,11 @@ public class TileMapLayer
     private void EnsureMutable()
     {
         if (_tileLayer == null || _tilesets == null)
-            throw NoBackingLayer();
+            throw new InvalidOperationException(
+                "This TileMapLayer was constructed without a backing TilemapTileLayer " +
+                "(legacy test seam). Tile mutation requires a TileMap built from a TMX " +
+                "file or from the Tilemap-based test constructor.");
     }
-
-    private static InvalidOperationException NoBackingLayer() =>
-        new("This TileMapLayer was constructed without a backing TilemapTileLayer " +
-            "(legacy test seam). This member requires a TileMap built from a TMX " +
-            "file or from the Tilemap-based test constructor.");
 
     private List<int> FindGlobalIdsForClass(string className)
     {

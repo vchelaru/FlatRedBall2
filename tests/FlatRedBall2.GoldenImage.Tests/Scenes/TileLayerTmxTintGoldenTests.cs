@@ -24,8 +24,10 @@ public class TileLayerTmxTintGoldenTests
         var map = new TileMap("Tiled/Fixtures/TintedLayers.tmx", device);
 
         map.GetLayer("Tinted").Color.ShouldBe(new Color(0xff, 0x80, 0x40));
-        map.GetLayer("Tinted").Alpha.ShouldBe(0.5f);
-        map.GetLayer("TintedWithAlpha").Color.ShouldBe(new Color(0xff, 0x00, 0x00, 0x80));
+        map.GetLayer("Tinted").Alpha.ShouldBe(0.5f, 0.01f);
+        // The tintcolor alpha channel is folded into Alpha.
+        map.GetLayer("TintedWithAlpha").Color.ShouldBe(new Color(0xff, 0x00, 0x00));
+        map.GetLayer("TintedWithAlpha").Alpha.ShouldBe(0x80 / 255f, 0.01f);
         map.GetLayer("Plain").Color.ShouldBe(Color.White);
         map.GetLayer("Plain").Alpha.ShouldBe(1f);
     }
