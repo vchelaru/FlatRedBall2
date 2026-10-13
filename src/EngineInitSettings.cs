@@ -66,7 +66,7 @@ public class EngineInitSettings
 
     /// <summary>
     /// A stable name for this game's saved data, required to use <see cref="FlatRedBallService.Storage"/>:
-    /// it names the save folder on desktop and the browser database on web. Leaving it unset makes the
+    /// it names the save folder on desktop and the key namespace in browser storage on web. Leaving it unset makes the
     /// first storage call throw <see cref="InvalidOperationException"/>, on every platform. Letters,
     /// digits, space, '-', '_', '.'; at most 64 characters. Renaming it later orphans existing saves.
     /// </summary>

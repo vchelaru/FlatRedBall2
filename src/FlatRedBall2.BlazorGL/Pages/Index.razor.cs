@@ -1,5 +1,6 @@
 using System;
 using FlatRedBall2.Diagnostics;
+using FlatRedBall2.IO;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Xna.Framework;
@@ -53,6 +54,9 @@ public partial class Index
             _perfProbe = PerfDiagnosticsProbe.TryCreateFromQuery(
                 new Uri(Navigation.Uri).Query, FlatRedBallService.Default, GetBrowserLabel,
                 Console.WriteLine, PublishToJs);
+            // localStorage-backed Engine.Storage; Initialize calls this with EngineInitSettings.StorageName.
+            FlatRedBallService.Default.StorageBackendFactory =
+                name => new BrowserStorageBackend(name, new LocalStorageApi());
             try
             {
                 _game = GameFactory();

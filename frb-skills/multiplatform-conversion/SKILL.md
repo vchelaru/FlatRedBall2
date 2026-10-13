@@ -118,7 +118,7 @@ using var reader = new StreamReader(stream);
 var json = reader.ReadToEnd();
 ```
 
-This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings legitimately need `File` and stay desktop-only — gate them with `#if !KNI`.
+This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings go through `Engine.Storage` (`GameStorage` in `src/IO`), not `File`: files on desktop, `localStorage` on web, same code, no `#if !KNI`. Set `EngineInitSettings.StorageName` or the first storage call throws. Web caps at about 5 MiB per origin (values are base64), and `IsPersistent` is false if the browser blocks `localStorage`.
 
 ## Content pipeline — single source of truth in Common
 
@@ -217,6 +217,7 @@ A head that adds `[JSImport]` needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 - **Module-less names start from an empty object, not `window`.** Only a literal `globalThis.` prefix re-roots onto the real global, so `[JSImport("globalThis.localStorage.setItem")]` works and `[JSImport("localStorage.setItem")]` throws. A bare name like `[JSImport("myFn")]` throws `must be a Function but was undefined` even when the console shows `typeof myFn === 'function'`; trust the console, the error is the resolver. The function is bound to its parent object (`localStorage` above). Use this form only when you want no shim file.
 - **`IJSRuntime.InvokeAsync` resolves the same dotted string from `window`**, so a name that works there can fail under `[JSImport]`.
 - **The argument order is `[JSImport(functionName, moduleName)]`.** Swapped, it throws `ES6 module ... was not imported yet`.
+- **`[JSImport]` can call functions but not read properties.** `localStorage.length` is a property, so `LocalStorageApi` (`src/FlatRedBall2.BlazorGL`) reads it with `JSHost.GlobalThis.GetPropertyAsJSObject("localStorage")`.
 - **Strings cross cheaply; byte arrays don't.** A `Task<byte[]>` return fails with SYSLIB1072. Pass bytes as base64 and decode with `Convert.FromBase64String`.
 
 ## Browser input and user activation

@@ -9,7 +9,7 @@ namespace FlatRedBall2.IO;
 internal sealed class StorageNotConfiguredException() : InvalidOperationException(
     "Storage is not configured. Set EngineInitSettings.StorageName (a stable name for this game, " +
     "such as \"MyGame\") when calling Engine.Initialize; it names the save folder on desktop and the " +
-    "browser database on web.");
+    "key namespace in browser storage on web.");
 
 /// <summary>
 /// Installed by <c>Initialize</c> when no <see cref="EngineInitSettings.StorageName"/> is given: every

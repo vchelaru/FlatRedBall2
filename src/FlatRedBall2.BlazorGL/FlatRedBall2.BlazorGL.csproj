@@ -6,6 +6,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>FlatRedBall2.BlazorGL</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- [JSImport] source generation (LocalStorageApi) requires it. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- NuGet metadata -->
     <Authors>Victor Chelaru</Authors>

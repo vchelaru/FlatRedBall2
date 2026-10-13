@@ -32,6 +32,10 @@ deciding deliberately rather than letting the next seam copy it a third time.
 
 Known caveats to flag in that follow-up, not solved by the helper itself: SDL2 on Wayland needs `libdecor` for window borders/titlebar, or the window comes up borderless (the `wayland,x11` fallback won't catch this since Wayland itself still succeeds); and fractional-scaling compositors can rescale the window, since MonoGame/SDL2 HiDPI support on Wayland is imperfect.
 
+## Wire the frb2-multiplatform template's Index.razor.cs to browser storage (#1468)
+
+`src/FlatRedBall2.BlazorGL/Pages/Index.razor.cs` sets `FlatRedBallService.Default.StorageBackendFactory` to a `BrowserStorageBackend` over `LocalStorageApi` before `_game.Run()`; the template's vendored `MyGame.BlazorGL/Pages/Index.razor.cs` does not, because the template restores `FlatRedBall2.Kni` from nuget.org and the latest release predates it. Until then a template web build keeps `Engine.Storage` in memory (`IsPersistent` false). Once a release with `BrowserStorageBackend` is published, copy the factory line in.
+
 ## Wire the frb2-multiplatform template's Index.razor.cs to PerfDiagnosticsProbe (#1318)
 
 `src/FlatRedBall2.BlazorGL/Pages/Index.razor.cs` reads `?diag=perf` and drives `PerfDiagnosticsProbe`; the template's vendored `MyGame.BlazorGL/Pages/Index.razor.cs` does not, because the template restores `FlatRedBall2.Kni` from nuget.org and the latest release predates the probe. Once a release containing `PerfDiagnosticsProbe` is published, copy the `Navigation` inject, probe creation before `_game.Run()`, `_perfProbe?.OnTick()` after `_game.Tick()`, and the two JS helpers (`GetBrowserLabel`, `PublishToJs`) into the template. Its `frb-host.js` already has `frbDiagPlatform` / `frbDiagPublish`.

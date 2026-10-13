@@ -1302,13 +1302,28 @@ public class FlatRedBallService
         }
 
         IO.StorageKey.ValidateStorageName(name, nameof(EngineInitSettings.StorageName));
+        var factory = StorageBackendFactory;
+        if (factory != null)
+        {
+            Storage.Backend = factory(name);
+            return;
+        }
 #if !KNI
         Storage.Backend = new IO.FileStorageBackend(
             settings!.StorageRootDirectory ?? IO.FileStorageBackend.DefaultRoot(name));
 #endif
-        // KNI (web): stays in-memory until the browser backend exists. FileStorageBackend is not compiled
-        // into the KNI assembly, so a web build can never write to the WASM virtual file system by accident.
+        // KNI without a factory (a host that does not use FlatRedBall2.BlazorGL) stays in-memory, with
+        // IsPersistent false. FileStorageBackend is not compiled into the KNI assembly, so a web build can
+        // never write to the WASM virtual file system by accident.
     }
+
+    /// <summary>
+    /// For host integrations: builds the storage backend from <see cref="EngineInitSettings.StorageName"/>
+    /// when <c>Initialize</c> runs, replacing the platform default (files on desktop, memory on web).
+    /// <c>FlatRedBall2.BlazorGL</c> sets it to browser storage; games do not need to. Set it before
+    /// <c>Initialize</c>.
+    /// </summary>
+    public Func<string, IO.IStorageBackend>? StorageBackendFactory { get; set; }
 
     /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
     public ContentLoader Content { get; } = new ContentLoader();
