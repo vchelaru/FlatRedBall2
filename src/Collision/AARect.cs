@@ -51,11 +51,13 @@ public class AARect : IAttachable, IRenderable, ICollidable
     /// </remarks>
     public SolidSides SolidSides { get; set; } = SolidSides.All;
 
-    // Set by TileShapes.AssignSurroundedTilesSolidOutward on tiles that carry a push-out chain.
-    // An overlapping shape whose center is inside this rect is pushed through an allowed side
-    // even when its center is on the inner half, which the corner-clip rule would otherwise
-    // reject. Cleared when TileShapes recomputes this tile's SolidSides.
-    internal bool PushesOutFromInside { get; set; }
+    // FlatRedBall 1's RepositionHalfSize. When true, a push is skipped if the overlapping shape's
+    // center is on the inner side of this rect's center, which rejects corner clips (an actor
+    // grazing a rect corner is not shoved across the whole rect). Defaults to true here, whereas
+    // FRB1 defaults to false and sets it only on L-shaped corners and cloud tiles.
+    // TileShapes.AssignSurroundedTilesSolidOutward clears it on the tiles it routes pushes through,
+    // except L-shaped corners; recomputing a tile's SolidSides resets it to true.
+    internal bool RepositionHalfSize { get; set; } = true;
 
     // IAttachable
     /// <inheritdoc/>

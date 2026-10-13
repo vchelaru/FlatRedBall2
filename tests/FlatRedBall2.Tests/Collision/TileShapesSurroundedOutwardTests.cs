@@ -236,4 +236,51 @@ public class TileShapesSurroundedOutwardTests
             for (int r = 3; r <= 5; r++)
                 (tiles.GetTileAtCell(c, r)!.SolidSides & SolidSides.Left).ShouldBe(SolidSides.None, $"cell ({c},{r})");
     }
+
+    // ── Corner-clip limit (FRB1 RepositionHalfSize) ──────────────────────────
+
+    [Fact]
+    public void AfterPass_FilledInTileInSolidBlock_IsNotLimitedToHalf()
+    {
+        var tiles = Block(0, 0, 6, 6);
+
+        tiles.AssignSurroundedTilesSolidOutward();
+
+        tiles.GetTileAtCell(3, 3)!.RepositionHalfSize.ShouldBeFalse();
+        tiles.GetTileAtCell(0, 3)!.RepositionHalfSize.ShouldBeFalse(); // neighbor of a filled-in tile
+    }
+
+    [Fact]
+    public void AfterPass_LShapedCornerTile_KeepsTheHalfLimit()
+    {
+        // Plus shape: the center is surrounded and every diagonal around it is empty (L-shaped).
+        var tiles = new TileShapes { GridSize = Grid };
+        foreach (var (c, r) in new[] { (1, 1), (0, 1), (2, 1), (1, 0), (1, 2) })
+            tiles.AddTileAtCell(c, r);
+
+        tiles.AssignSurroundedTilesSolidOutward();
+
+        tiles.GetTileAtCell(1, 1)!.SolidSides.ShouldNotBe(SolidSides.None);
+        tiles.GetTileAtCell(1, 1)!.RepositionHalfSize.ShouldBeTrue();
+        tiles.GetTileAtCell(0, 1)!.RepositionHalfSize.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WithoutPass_AllTilesKeepTheHalfLimit()
+    {
+        var tiles = Block(0, 0, 6, 6);
+
+        tiles.Rectangles.ShouldAllBe(r => r.RepositionHalfSize);
+    }
+
+    [Fact]
+    public void AddingATileAfterPass_ResetsTheHalfLimitOnNeighbors()
+    {
+        var tiles = Block(0, 0, 6, 6);
+        tiles.AssignSurroundedTilesSolidOutward();
+
+        tiles.AddTileAtCell(7, 3);
+
+        tiles.GetTileAtCell(6, 3)!.RepositionHalfSize.ShouldBeTrue();
+    }
 }

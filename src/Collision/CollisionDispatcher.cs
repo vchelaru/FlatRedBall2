@@ -145,21 +145,9 @@ internal static class CollisionDispatcher
         float bCenterX = (bLeft + bRight) / 2f;
         float bCenterY = (bBottom + bTop) / 2f;
 
-        // The center-side rules below reject corner clips. They also reject an actor whose center
-        // is inside a tile's inner half, which stalls a push-out chain; tiles marked by
-        // TileShapes.AssignSurroundedTilesSolidOutward skip them when the center is inside.
-        bool skipCenterRule = false;
-        if (b.PushesOutFromInside)
-        {
-            float acx, acy;
-            if (a is Circle c0) { acx = c0.AbsoluteX; acy = c0.AbsoluteY; }
-            else
-            {
-                var (n0, x0, n1, x1) = GetBounds(a);
-                acx = (n0 + x0) / 2f; acy = (n1 + x1) / 2f;
-            }
-            skipCenterRule = acx > bLeft && acx < bRight && acy > bBottom && acy < bTop;
-        }
+        // The center-side rules below reject corner clips. Tiles that AssignSurroundedTilesSolidOutward
+        // routes pushes through clear AARect.RepositionHalfSize to push the full distance.
+        bool skipCenterRule = !b.RepositionHalfSize;
 
         if (a is Circle circle)
         {

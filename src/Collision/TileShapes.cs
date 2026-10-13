@@ -169,6 +169,12 @@ public class TileShapes : ICollidable
     /// Polygon and sub-cell tiles count as occupied cells but never donate directions.
     /// </para>
     /// <para>
+    /// Collision normally ignores a push when the actor's center is on the inner side of the tile's
+    /// center, so a corner graze doesn't shove it across the tile. Filled-in tiles and their
+    /// neighbors push the full distance instead, so a body smaller than a tile still gets out;
+    /// L-shaped inside corners keep the limit, as in FlatRedBall 1 (<c>RepositionHalfSize</c>).
+    /// </para>
+    /// <para>
     /// The optional map edges are world coordinates. A direction is not granted when it would lead to
     /// a cell whose center is beyond an edge, and a direction a tile has only because it points off
     /// the map is not passed on to its neighbors, so the pass never creates an exit off the map.
@@ -256,12 +262,12 @@ public class TileShapes : ICollidable
             if (pending.Count == startedCount) break;
         }
 
-        // Mark the tiles a push-out chain runs through: the ones just filled in and their
-        // neighbors. Chain hops land an actor inside the next tile, often past its midpoint.
+        // Lift the corner-clip limit on the filled-in tiles and their neighbors, which a push-out
+        // chain runs through, except where the tile is an L-shaped corner (as in FlatRedBall 1).
         foreach (var cell in surrounded)
         {
             foreach (var n in new[] { cell, (cell.col - 1, cell.row), (cell.col + 1, cell.row), (cell.col, cell.row - 1), (cell.col, cell.row + 1) })
-                if (_tiles.TryGetValue(n, out var t)) t.PushesOutFromInside = true;
+                if (_tiles.TryGetValue(n, out var t)) t.RepositionHalfSize = IsLShapedCorner(n.Item1, n.Item2);
         }
     }
 
@@ -692,8 +698,28 @@ public class TileShapes : ICollidable
         if (hasUp)    dirs &= ~SolidSides.Up;
 
         tile.SolidSides = dirs;
-        tile.PushesOutFromInside = false;
+
+        // Back to the default corner-clip limit; AssignSurroundedTilesSolidOutward lifts it on
+        // tiles it fills in, and a tile edit near them discards that along with their sides.
+        tile.RepositionHalfSize = true;
     }
+
+    // FlatRedBall 1's L-shaped test: two adjacent neighbors present with the diagonal between
+    // them empty (an inside corner). Only these tiles keep the corner-clip limit after the pass.
+    private bool IsLShapedCorner(int col, int row)
+    {
+        bool left  = IsFullOrPolyCell(col - 1, row);
+        bool right = IsFullOrPolyCell(col + 1, row);
+        bool down  = IsFullOrPolyCell(col, row - 1);
+        bool up    = IsFullOrPolyCell(col, row + 1);
+        return (left && up && !IsFullOrPolyCell(col - 1, row + 1))
+            || (up && right && !IsFullOrPolyCell(col + 1, row + 1))
+            || (right && down && !IsFullOrPolyCell(col + 1, row - 1))
+            || (down && left && !IsFullOrPolyCell(col - 1, row - 1));
+    }
+
+    private bool IsFullOrPolyCell(int col, int row) =>
+        _tiles.ContainsKey((col, row)) || _polyTiles.ContainsKey((col, row));
 
     // Sets SolidSides on the polygon tile at (col, row) based on cardinal
     // neighbor occupancy. A neighbor on a side blocks push in that direction so SAT
