@@ -241,6 +241,35 @@ public class GameStorageTests
     }
 
     [Fact]
+    public async Task ReadBytesAsync_NonUtf8Bytes_RoundTripsExactly()
+    {
+        var storage = NewStorage();
+        byte[] data = { 0xFF, 0xFE, 0x00, 0x80, 0xC3, 0x28 }; // invalid as UTF-8
+
+        await storage.WriteBytesAsync("bin", data);
+
+        (await storage.ReadBytesAsync("bin")).ShouldBe(data);
+    }
+
+    [Fact]
+    public async Task ReadBytesAsync_MissingKey_ReturnsNull()
+    {
+        (await NewStorage().ReadBytesAsync("missing")).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ReadBytesAsync_MutatingResult_DoesNotChangeStorage()
+    {
+        var storage = NewStorage();
+        await storage.WriteBytesAsync("bin", new byte[] { 1, 2, 3 });
+
+        var first = (await storage.ReadBytesAsync("bin"))!;
+        first[0] = 99;
+
+        (await storage.ReadBytesAsync("bin")).ShouldBe(new byte[] { 1, 2, 3 });
+    }
+
+    [Fact]
     public async Task WriteBytesAsync_RoundTripsThroughOpenReadAsync()
     {
         var storage = NewStorage();
@@ -336,6 +365,7 @@ public class GameStorageTests
 
         await Should.ThrowAsync<ArgumentException>(() => storage.ExistsAsync(key));
         await Should.ThrowAsync<ArgumentException>(() => storage.ReadTextAsync(key));
+        await Should.ThrowAsync<ArgumentException>(() => storage.ReadBytesAsync(key));
         await Should.ThrowAsync<ArgumentException>(() => storage.WriteTextAsync(key, "x"));
         await Should.ThrowAsync<ArgumentException>(() => storage.OpenReadAsync(key));
         await Should.ThrowAsync<ArgumentException>(() => storage.OpenWriteAsync(key));
@@ -432,6 +462,7 @@ public class GameStorageTests
         cts.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(() => storage.ReadTextAsync("a", cts.Token));
+        await Should.ThrowAsync<OperationCanceledException>(() => storage.ReadBytesAsync("a", cts.Token));
         await Should.ThrowAsync<OperationCanceledException>(() => storage.OpenReadAsync("a", cts.Token));
         await Should.ThrowAsync<OperationCanceledException>(() => storage.OpenWriteAsync("a", cts.Token));
         await Should.ThrowAsync<OperationCanceledException>(() => storage.ExistsAsync("a", cts.Token));

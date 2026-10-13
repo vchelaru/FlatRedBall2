@@ -154,7 +154,11 @@ public sealed class GameStorage
         return await RunAsync("list", prefix, () => backend.ListAsync(prefix, cancellationToken)).ConfigureAwait(false);
     }
 
-    private async Task<byte[]?> ReadBytesAsync(string key, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads the raw bytes of <paramref name="key"/>. Returns <c>null</c> if it does not exist. The array
+    /// is yours; changing it does not change what is stored.
+    /// </summary>
+    public async Task<byte[]?> ReadBytesAsync(string key, CancellationToken cancellationToken = default)
     {
         StorageKey.ValidateKey(key, nameof(key));
         cancellationToken.ThrowIfCancellationRequested();

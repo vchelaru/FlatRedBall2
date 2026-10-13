@@ -24,7 +24,10 @@ public interface IStorageBackend
     /// </summary>
     bool IsPersistent { get; }
 
-    /// <summary>The stored bytes, or <c>null</c> if <paramref name="key"/> does not exist.</summary>
+    /// <summary>
+    /// The stored bytes, or <c>null</c> if <paramref name="key"/> does not exist. Return an array the
+    /// caller may keep and mutate, not your internal storage.
+    /// </summary>
     Task<byte[]?> ReadAsync(string key, CancellationToken cancellationToken);
 
     /// <summary>Stores a copy of <paramref name="data"/> under <paramref name="key"/>, replacing any existing value.</summary>
