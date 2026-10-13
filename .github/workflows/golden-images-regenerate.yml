@@ -8,6 +8,11 @@ name: Regenerate golden images
 #   gh workflow run golden-images-regenerate.yml --ref <your-branch>
 on:
   workflow_dispatch:
+  # TEMP-1420: a new workflow cannot be dispatched until it exists on the default branch, so this
+  # run fires on the branch's first push. Removed before merge.
+  push:
+    branches: [1420-golden-image-ci]
+    paths: ['.github/workflows/golden-images-regenerate.yml']
 
 permissions:
   contents: write
@@ -77,4 +82,4 @@ jobs:
           git push origin "HEAD:${GITHUB_REF_NAME}"
           # Pushes made with GITHUB_TOKEN trigger no workflows; run the tests on the new commit so
           # the PR's required checks do not stay on the pre-golden commit.
-          gh workflow run tests.yml --ref "${GITHUB_REF_NAME}"
+          gh workflow run tests.yml --ref "${GITHUB_REF_NAME}" || echo "::warning::Could not dispatch tests.yml; push an empty commit to re-run the PR checks."
