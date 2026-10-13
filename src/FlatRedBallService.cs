@@ -83,6 +83,7 @@ public class FlatRedBallService
     /// </summary>
     public FlatRedBallService()
     {
+        Audio.Time = Time;
         SourceContentRoots = new List<string>(DetectSourceContentRoots(AppContext.BaseDirectory));
         OutputContentRoot = IO.TitleLocation.Default;
     }

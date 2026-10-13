@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Media;
 using NVorbis;
@@ -12,8 +14,8 @@ namespace FlatRedBall2.Audio;
 /// </summary>
 public class AudioManager
 {
-    private readonly List<(SoundEffect Effect, SoundEffectInstance Instance)> _activeSounds = new();
-    private readonly HashSet<SoundEffect> _playedThisFrame = new();
+    private readonly List<(object Key, ISoundInstance Instance, SoundHandle Handle)> _activeSounds = new();
+    private readonly HashSet<object> _playedThisFrame = new();
 
     private float _soundVolume = 1f;
     private float _musicVolume = 1f;
@@ -26,33 +28,98 @@ public class AudioManager
     // ── Sound effects ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Plays a sound effect. If the same <paramref name="soundEffect"/> was already played this
-    /// frame, the call is silently ignored (per-frame dedup). Cross-frame stacking is allowed.
-    /// Has no effect when <see cref="SoundEnabled"/> is <c>false</c> or <see cref="ConcurrentSounds"/>
-    /// has reached <see cref="MaxConcurrentSounds"/>.
+    /// Plays a sound effect and returns a <see cref="SoundHandle"/> for stopping it or checking
+    /// whether it is still playing. Pass <c>loop: true</c> for a sound that repeats until you call
+    /// <see cref="SoundHandle.Stop"/> (stop it yourself, e.g. in <c>CustomDestroy</c>; it is not
+    /// stopped on screen change).
+    /// <para>
+    /// By default, a second call for the same <paramref name="soundEffect"/> in the same frame is
+    /// silently ignored (per-frame dedup) so overlapping collision handlers do not stack the sound.
+    /// Pass <paramref name="playAlways"/> <c>true</c> to bypass that and stack instances (for
+    /// example the same effect at different pitches). Cross-frame stacking is always allowed.
+    /// </para>
+    /// Nothing plays (the returned handle is inert) when <see cref="SoundEnabled"/> is <c>false</c>
+    /// or <see cref="ConcurrentSounds"/> has reached <see cref="MaxConcurrentSounds"/>; both apply
+    /// even with <paramref name="playAlways"/>.
     /// </summary>
-    public void Play(SoundEffect soundEffect, float volume = 1f, float pitch = 0f, float pan = 0f)
-    {
-        if (!_soundEnabled) return;
-        if (_playedThisFrame.Contains(soundEffect)) return;
-        if (_activeSounds.Count >= MaxConcurrentSounds) return;
+    /// <param name="volume">Per-play volume in [0, 1], multiplied by <see cref="SoundVolume"/>.</param>
+    /// <param name="pitch">[-1, 1]; +/-1 is one octave up/down.</param>
+    /// <param name="pan">[-1, 1]; -1 is full left, +1 is full right.</param>
+    /// <param name="loop">Repeat until <see cref="SoundHandle.Stop"/> is called.</param>
+    /// <param name="playAlways">Skip the same-frame dedup for this call.</param>
+    public SoundHandle Play(SoundEffect soundEffect, float volume = 1f, float pitch = 0f, float pan = 0f,
+        bool loop = false, bool playAlways = false)
+        => PlayInstance(soundEffect, () => new XnaSoundInstance(soundEffect.CreateInstance()),
+            volume, pitch, pan, loop, playAlways);
 
-        var instance = soundEffect.CreateInstance();
+    /// <summary>
+    /// Plays <paramref name="soundEffect"/> and returns a task that completes when it has finished
+    /// playing, so game code can sequence on it (<c>await Engine.Audio.PlayAsync(sfx)</c>).
+    /// <para>
+    /// The wait is game time (<see cref="TimeManager.Delay"/>): it follows <see cref="TimeManager.TimeScale"/>,
+    /// freezes while the screen is paused, and is shortened or lengthened by <paramref name="pitch"/>.
+    /// It always waits the full duration, even when nothing audible played (sound disabled, deduped,
+    /// capped), so sequencing does not change with the mute setting. Not for looping sounds; use
+    /// <see cref="Play"/> with <c>loop: true</c>.
+    /// </para>
+    /// </summary>
+    /// <param name="cancellationToken">
+    /// Pass <see cref="Screen.Token"/> to cancel when the screen switches. Cancelling does not stop
+    /// the sound itself.
+    /// </param>
+    /// <exception cref="InvalidOperationException">Thrown when this manager is not owned by an engine.</exception>
+    public Task PlayAsync(SoundEffect soundEffect, float volume = 1f, float pitch = 0f, float pan = 0f,
+        bool playAlways = false, CancellationToken cancellationToken = default)
+        => PlayAsyncInstance(soundEffect, soundEffect.Duration,
+            () => new XnaSoundInstance(soundEffect.CreateInstance()),
+            volume, pitch, pan, playAlways, cancellationToken);
+
+    internal SoundHandle PlayInstance(object key, Func<ISoundInstance> create,
+        float volume, float pitch, float pan, bool loop, bool playAlways)
+    {
+        if (!_soundEnabled) return new SoundHandle(null);
+        if (!playAlways && _playedThisFrame.Contains(key)) return new SoundHandle(null);
+        if (_activeSounds.Count >= MaxConcurrentSounds) return new SoundHandle(null);
+
+        var instance = create();
         instance.Volume = System.Math.Clamp(volume * _soundVolume, 0f, 1f);
         instance.Pitch = System.Math.Clamp(pitch, -1f, 1f);
         instance.Pan = System.Math.Clamp(pan, -1f, 1f);
+        instance.IsLooped = loop;
         instance.Play();
 
-        _activeSounds.Add((soundEffect, instance));
-        _playedThisFrame.Add(soundEffect);
+        var handle = new SoundHandle(instance);
+        _activeSounds.Add((key, instance, handle));
+        if (!playAlways)
+            _playedThisFrame.Add(key);
+        return handle;
     }
 
-    /// <summary>Returns <c>true</c> if any tracked instance of <paramref name="soundEffect"/> is currently playing.</summary>
-    public bool IsPlaying(SoundEffect soundEffect)
+    internal Task PlayAsyncInstance(object key, TimeSpan duration, Func<ISoundInstance> create,
+        float volume, float pitch, float pan, bool playAlways, CancellationToken cancellationToken)
     {
-        foreach (var (effect, instance) in _activeSounds)
+        if (Time == null)
+            throw new InvalidOperationException("PlayAsync requires an AudioManager owned by a FlatRedBallService.");
+
+        PlayInstance(key, create, volume, pitch, pan, loop: false, playAlways);
+
+        // XNA pitch: +/-1 = one octave = 2x/0.5x playback rate.
+        var rate = System.Math.Pow(2, System.Math.Clamp(pitch, -1f, 1f));
+        return Time.Delay(TimeSpan.FromTicks((long)(duration.Ticks / rate)), cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if any instance of <paramref name="soundEffect"/> started through
+    /// <see cref="Play"/> is currently playing. Use the <see cref="SoundHandle"/> returned by
+    /// <see cref="Play"/> to ask about one specific playback.
+    /// </summary>
+    public bool IsPlaying(SoundEffect soundEffect) => IsPlayingKey(soundEffect);
+
+    internal bool IsPlayingKey(object key)
+    {
+        foreach (var (k, instance, _) in _activeSounds)
         {
-            if (effect == soundEffect && instance.State == SoundState.Playing)
+            if (k == key && instance.State == SoundState.Playing)
                 return true;
         }
         return false;
@@ -193,6 +260,9 @@ public class AudioManager
         }
     }
 
+    /// <summary>Set by <see cref="FlatRedBallService"/>; clock used by <see cref="PlayAsync"/>.</summary>
+    internal TimeManager? Time { get; set; }
+
     // ── Limits / diagnostics ───────────────────────────────────────────────────
 
     /// <summary>Maximum number of concurrently tracked sound effect instances. Default is 32.</summary>
@@ -225,9 +295,10 @@ public class AudioManager
 
         for (int i = _activeSounds.Count - 1; i >= 0; i--)
         {
-            var (_, instance) = _activeSounds[i];
+            var (_, instance, handle) = _activeSounds[i];
             if (instance.State == SoundState.Stopped)
             {
+                handle.Release();
                 instance.Dispose();
                 _activeSounds.RemoveAt(i);
             }
