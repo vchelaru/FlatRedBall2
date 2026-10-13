@@ -40,6 +40,13 @@ public sealed class GraphicsDeviceFixture : IDisposable
 
     public GraphicsDeviceFixture()
     {
+        // SDL's Cocoa backend sets the app main menu during video init, and AppKit asserts when that
+        // happens off the main thread. xUnit runs fixtures on a worker thread, so on macOS this is a
+        // native abort of the whole test host (crash-reporter popup), which the catch below cannot
+        // intercept. Report "no device" instead, same as a headless agent.
+        if (OperatingSystem.IsMacOS())
+            return;
+
         try
         {
             _game = new SharedGame();
