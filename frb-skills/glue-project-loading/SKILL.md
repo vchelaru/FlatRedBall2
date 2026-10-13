@@ -67,6 +67,8 @@ the `.gluj` has been read. See `gum-integration` for what goes wrong otherwise.
 a derived element to supply, so it is incomplete by construction. `CreateScreen`/`CreateEntity`
 throw; this is normal for a `GameScreen` base that levels derive from.
 
+**Named lists are tracked by bare name, project-wide.** `InstancesOfList("Bullets")` merges every list called that, so a list an entity declares for itself lands in the same collection as a screen list with the same name. Keep list names unique across elements. Tracked instances are destroyed on every screen change, so a list never carries members across screens.
+
 ## Hot reload
 
 A `GlueScreen` watches the source tree the `.gluj` sits in and restarts itself when Glue writes

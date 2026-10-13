@@ -878,6 +878,14 @@ public class FlatRedBallService
             factory.DestroyAll();
         _factories.Clear();
 
+        // A Glue project plays the factories' role for the entities it loads, so it is released in
+        // the same step. The outgoing screen's project is included because a screen can hold one
+        // that was never assigned to GlueProject (e.g. replaced by a reload).
+        var outgoingProject = (CurrentScreen as Glue.GlueScreen)?.Project;
+        GlueProject?.ReleaseInstances();
+        if (!ReferenceEquals(outgoingProject, GlueProject))
+            outgoingProject?.ReleaseInstances();
+
         // Clear any Gum elements left over from the previous screen.
         // This covers controls added via AddToRoot() as well as screen-specific GumRenderables,
         // which are abandoned with the old Screen object.

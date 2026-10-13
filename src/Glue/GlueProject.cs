@@ -391,6 +391,40 @@ public sealed class GlueProject
             free.Add(entity);
     }
 
+    /// <summary>
+    /// Destroys every instance this project is tracking and empties the pools. Called on each screen
+    /// change, where it does for loaded entities what destroying the factories does for
+    /// <see cref="Factory{T}"/> ones. The loaded definitions are kept; only instances go.
+    /// </summary>
+    /// <remarks>
+    /// Pools are emptied too: a recycled shell still holds the previous screen's shapes and
+    /// registrations, and <see cref="Factory{T}"/> discards its own pool at the same point. The
+    /// cached lists <see cref="InstancesOf"/> handed out are emptied in place, not replaced, so a
+    /// holder of one sees the change.
+    /// </remarks>
+    internal void ReleaseInstances()
+    {
+        var tracked = _instances.Values.SelectMany(l => l).Distinct().ToList();
+
+        foreach (var entity in tracked)
+        {
+            // Destroying a parent destroys its children, which may already have been forgotten.
+            if (entity.GlueName is not null && _instances.TryGetValue(entity.GlueName, out var list) &&
+                list.Contains(entity))
+            {
+                entity.Destroy();
+            }
+        }
+
+        foreach (var list in _instances.Values)
+            list.Clear();
+
+        foreach (var list in _listInstances.Values)
+            list.Clear();
+
+        _pool.Clear();
+    }
+
     /// <summary>Forgets a destroyed instance, so a relationship does not keep collecting corpses.</summary>
     /// <remarks>
     /// Removed from every named list, not just its type-wide one — an entity can be live in several
