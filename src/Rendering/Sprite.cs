@@ -23,7 +23,8 @@ namespace FlatRedBall2.Rendering;
 /// <b>Sizing modes:</b> see <see cref="TextureScale"/> for how <see cref="Width"/> and
 /// <see cref="Height"/> are determined. <b>Animation:</b> assign <see cref="AnimationChains"/>
 /// then call <see cref="PlayAnimation(string)"/>; per-frame texture, source rectangle, flip
-/// flags, and relative offsets are applied automatically while <see cref="Animate"/> is true.
+/// flags, relative offsets and color are applied automatically while <see cref="Animate"/> is true;
+/// <see cref="FrameControlledProperties"/> hands flip, offset or color back to game code.
 /// </para>
 /// </summary>
 public class Sprite : IRenderable, IAttachable
@@ -51,11 +52,12 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// X position. Relative to <see cref="Parent"/> when attached, world when unattached.
     /// <para>
-    /// <b>Animated sprites:</b> this value is overwritten with <see cref="AnimationFrame.RelativeX"/>
-    /// on every frame switch. Assigning <see cref="X"/> in game code on a sprite that is playing
-    /// an animation is clobbered on the next advance — bake the offset into the frames' <c>RelativeX</c>
-    /// in the <c>.achx</c> / source asset instead, or attach the sprite to a child entity whose own
-    /// <c>X</c> carries the offset.
+    /// <b>Animated sprites:</b> while <see cref="SpriteFrameProperties.Offset"/> is in
+    /// <see cref="FrameControlledProperties"/> (the default), this value is overwritten with
+    /// <see cref="AnimationFrame.RelativeX"/> on every frame switch, so assigning <see cref="X"/> in game
+    /// code is clobbered on the next advance. Clear that flag to own X/Y in game code, bake the offset into
+    /// the frames' <c>RelativeX</c> in the <c>.achx</c> / source asset, or attach the sprite to a child
+    /// entity whose own <c>X</c> carries the offset.
     /// </para>
     /// </summary>
     public float X { get; set; }
@@ -63,11 +65,12 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// Y position (Y+ up in world space). Relative to <see cref="Parent"/> when attached, world when unattached.
     /// <para>
-    /// <b>Animated sprites:</b> this value is overwritten with <see cref="AnimationFrame.RelativeY"/>
-    /// on every frame switch. Assigning <see cref="Y"/> in game code on a sprite that is playing
-    /// an animation is clobbered on the next advance — bake the offset into the frames' <c>RelativeY</c>
-    /// in the <c>.achx</c> / source asset instead, or attach the sprite to a child entity whose own
-    /// <c>Y</c> carries the offset.
+    /// <b>Animated sprites:</b> while <see cref="SpriteFrameProperties.Offset"/> is in
+    /// <see cref="FrameControlledProperties"/> (the default), this value is overwritten with
+    /// <see cref="AnimationFrame.RelativeY"/> on every frame switch, so assigning <see cref="Y"/> in game
+    /// code is clobbered on the next advance. Clear that flag to own X/Y in game code, bake the offset into
+    /// the frames' <c>RelativeY</c> in the <c>.achx</c> / source asset, or attach the sprite to a child
+    /// entity whose own <c>Y</c> carries the offset.
     /// </para>
     /// </summary>
     public float Y { get; set; }
@@ -117,7 +120,8 @@ public class Sprite : IRenderable, IAttachable
     {
         get
         {
-            if (CurrentFrame?.ColorOperation == Animation.ColorOperation.Add)
+            if (FrameControlledProperties.HasFlag(SpriteFrameProperties.Color)
+                && CurrentFrame?.ColorOperation == Animation.ColorOperation.Add)
             {
                 if (ReferenceEquals(_batch, WorldSpaceBatch.Instance)) return WorldSpaceAddColorBatch.Instance;
                 if (ReferenceEquals(_batch, ScreenSpaceBatch.Instance)) return ScreenSpaceAddColorBatch.Instance;
@@ -241,14 +245,14 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    /// <summary>Mirrors the texture left-to-right when <c>true</c>. Overwritten by the current animation frame while <see cref="Animate"/> is on.</summary>
+    /// <summary>Mirrors the texture left-to-right when <c>true</c>. Overwritten by each animation frame change unless <see cref="SpriteFrameProperties.Flip"/> is cleared from <see cref="FrameControlledProperties"/>.</summary>
     public bool FlipHorizontal { get; set; }
 
     /// <summary>
     /// Mirrors the texture top-to-bottom when <c>true</c>. Note that <see cref="Batches.WorldSpaceBatch"/>
     /// already applies a base Y-flip to compensate for the camera transform — this property toggles
-    /// <em>relative to upright</em>, not relative to texture pixels. Overwritten by the current animation
-    /// frame while <see cref="Animate"/> is on.
+    /// <em>relative to upright</em>, not relative to texture pixels. Overwritten by each animation
+    /// frame change unless <see cref="SpriteFrameProperties.Flip"/> is cleared from <see cref="FrameControlledProperties"/>.
     /// </summary>
     public bool FlipVertical { get; set; }
 
@@ -257,8 +261,8 @@ public class Sprite : IRenderable, IAttachable
     /// Combines with <see cref="FlipHorizontal"/>/<see cref="FlipVertical"/> in the same D→H→V
     /// order Tiled and the AnimationEditor use. MonoGame's <c>SpriteEffects</c> has no diagonal
     /// value, so this is implemented as a rotation offset rather than a texture-sampling flag —
-    /// see <see cref="ComputeDrawTransform"/>. Overwritten by the current animation frame while
-    /// <see cref="Animate"/> is on.
+    /// see <see cref="ComputeDrawTransform"/>. Overwritten by each animation frame change unless
+    /// <see cref="SpriteFrameProperties.Flip"/> is cleared from <see cref="FrameControlledProperties"/>.
     /// </summary>
     public bool FlipDiagonal { get; set; }
 
@@ -285,6 +289,30 @@ public class Sprite : IRenderable, IAttachable
             _currentChainIndex = -1;
             _playbackVersion++;
             CurrentFrame = null;
+        }
+    }
+
+    private SpriteFrameProperties _frameControlledProperties = SpriteFrameProperties.All;
+
+    /// <summary>
+    /// Which property groups animation frames write onto this sprite. Default
+    /// <see cref="SpriteFrameProperties.All"/>. Clear a group to take it over in game code, for example
+    /// <c>FrameControlledProperties &amp;= ~SpriteFrameProperties.Flip</c> so an enemy can face the player
+    /// regardless of the art frames' flips. Texture and source rectangle always follow the frame.
+    /// <para>
+    /// Setting a group that was off applies the current frame's values for it immediately. Clearing a
+    /// group leaves the property at whatever the last frame wrote.
+    /// </para>
+    /// </summary>
+    public SpriteFrameProperties FrameControlledProperties
+    {
+        get => _frameControlledProperties;
+        set
+        {
+            var newlyEnabled = value & ~_frameControlledProperties;
+            _frameControlledProperties = value;
+            if (newlyEnabled != SpriteFrameProperties.None && CurrentFrame != null)
+                ApplyFrameProperties(CurrentFrame, newlyEnabled);
         }
     }
 
@@ -557,14 +585,26 @@ public class Sprite : IRenderable, IAttachable
         CurrentFrame = frame;
         _texture = frame.Texture;
         _sourceRectangle = frame.SourceRectangle;
-        FlipHorizontal = frame.FlipHorizontal;
-        FlipVertical = frame.FlipVertical;
-        FlipDiagonal = frame.FlipDiagonal;
-        X = frame.RelativeX;
-        Y = frame.RelativeY;
+        ApplyFrameProperties(frame, _frameControlledProperties);
         RecalculateDimensions();
 
         ReconcileShapes(frame);
+    }
+
+    // Writes only the groups in `groups` from the frame onto the sprite.
+    private void ApplyFrameProperties(AnimationFrame frame, SpriteFrameProperties groups)
+    {
+        if (groups.HasFlag(SpriteFrameProperties.Flip))
+        {
+            FlipHorizontal = frame.FlipHorizontal;
+            FlipVertical = frame.FlipVertical;
+            FlipDiagonal = frame.FlipDiagonal;
+        }
+        if (groups.HasFlag(SpriteFrameProperties.Offset))
+        {
+            X = frame.RelativeX;
+            Y = frame.RelativeY;
+        }
     }
 
     private void ReconcileShapes(AnimationFrame frame)
@@ -775,6 +815,17 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
+    // The vertex color handed to SpriteBatch.Draw: Color, plus the frame's multiply color/alpha when
+    // the Color group is frame-controlled, times Alpha. Extracted so it is testable without a GraphicsDevice.
+    internal Color ComputeDrawColor()
+    {
+        var frame = CurrentFrame;
+        var baseColor = frame != null && _frameControlledProperties.HasFlag(SpriteFrameProperties.Color)
+            ? SpriteFrameColor.Apply(frame, Color)
+            : Color;
+        return baseColor * Alpha;
+    }
+
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
@@ -787,12 +838,13 @@ public class Sprite : IRenderable, IAttachable
         float srcH = SourceRectangle?.Height ?? Texture.Height;
 
         var frame    = CurrentFrame;
-        var color    = (frame != null ? SpriteFrameColor.Apply(frame, Color) : Color) * Alpha;
+        var color    = ComputeDrawColor();
         var origin   = new Vector2(srcW / 2f, srcH / 2f);
         var scale    = new Vector2(Width / srcW, Height / srcH);
         var position = new Vector2(AbsoluteX, AbsoluteY);
 
-        if (frame?.ColorOperation == Animation.ColorOperation.Add)
+        if (FrameControlledProperties.HasFlag(SpriteFrameProperties.Color)
+            && frame?.ColorOperation == Animation.ColorOperation.Add)
         {
             AddColorEffect.Get(spriteBatch.GraphicsDevice)
                 .Parameters["ColorOffset"].SetValue(SpriteFrameColor.GetAddOffset(frame));
