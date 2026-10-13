@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Math;
@@ -22,6 +24,10 @@ namespace FlatRedBall2.Rendering;
 /// <para>
 /// <b>Y+ is up</b> in world space; the camera transform (see <see cref="GetTransformMatrix"/>)
 /// flips Y to screen space (Y+ down) for rendering.
+/// </para>
+/// <para>
+/// The camera owns the pixel grid (<c>1 / <see cref="PixelsPerUnit"/></c>), so it also owns pixel-snapping
+/// of sprites: see <see cref="SnappedSprites"/>.
 /// </para>
 /// </summary>
 public class Camera
@@ -94,6 +100,32 @@ public class Camera
     /// (<c>snapInterval = 1f / PixelsPerUnit</c>).
     /// </summary>
     public float PixelsPerUnit => _viewport.Height / (float)OrthogonalHeight * Zoom;
+
+    private readonly HashSet<Sprite> _snappedSprites = new();
+
+    /// <summary>
+    /// Sprites whose <b>draw</b> position is rounded to this camera's pixel grid, so pixel art does not
+    /// shimmer or show uneven texel widths while it moves at sub-pixel positions. The sprite's own
+    /// <see cref="Sprite.X"/>/<see cref="Sprite.Y"/> (and physics, collision, attached shapes) are never
+    /// changed; only the position handed to the renderer is.
+    /// <para>
+    /// The grid is this camera's screen pixels (<c>1 / <see cref="PixelsPerUnit"/></c> world units),
+    /// measured from the camera's own position, and the sprite's left and bottom edges are the ones
+    /// aligned to it. It is per camera: in split-screen each camera rounds on its own grid and zoom.
+    /// Only sprites drawn through the world-space batch are snapped; a sprite whose
+    /// <see cref="Sprite.Batch"/> is <see cref="Batches.ScreenSpaceBatch"/> is never snapped.
+    /// </para>
+    /// <para>
+    /// <see cref="Screen.Remove(IRenderable)"/> drops a sprite from every camera's set, which entity
+    /// destroy and pool return both go through. <b>A pooled entity must therefore re-add its sprites in
+    /// <c>Reset()</c></b>: <see cref="Entity.CustomInitialize"/> runs once per instance, not on every
+    /// recycle. Compare <see cref="FlatRedBall2.Entities.CameraControllingEntity.SnapToPixel"/>, which
+    /// snaps the camera's position, not sprites.
+    /// </para>
+    /// </summary>
+    public ISet<Sprite> SnappedSprites => _snappedSprites;
+
+    internal bool HasSnappedSprites => _snappedSprites.Count > 0;
 
     private Viewport _viewport;
 
@@ -293,6 +325,42 @@ public class Camera
         return new NumericsVector2(
             (screenPosition.X - vpW / 2f) / scaleX + X,
             -(screenPosition.Y - vpH / 2f) / scaleY + Y);
+    }
+
+    /// <summary>
+    /// Rounds the center of a <paramref name="width"/> x <paramref name="height"/> world-unit rectangle
+    /// (rotated by <paramref name="rotationRadians"/>) so the left and bottom edges of its bounding box land
+    /// on whole screen pixels of this camera. Returns <paramref name="worldPosition"/> unchanged when the
+    /// camera has no viewport yet. Used by <see cref="Sprite.Draw"/> for <see cref="SnappedSprites"/>.
+    /// </summary>
+    internal Vector2 SnapWorldPosition(Vector2 worldPosition, float width, float height, float rotationRadians)
+    {
+        // Use the same per-axis scale GetTransformMatrix applies. OrthogonalWidth is truncated to an
+        // int, so the X scale can differ slightly from PixelsPerUnit (which is derived from height).
+        float scaleX = _viewport.Width / (float)OrthogonalWidth * Zoom;
+        float scaleY = _viewport.Height / (float)OrthogonalHeight * Zoom;
+        if (scaleX <= 0f || scaleY <= 0f) return worldPosition;
+
+        float cos = MathF.Abs(MathF.Cos(rotationRadians));
+        float sin = MathF.Abs(MathF.Sin(rotationRadians));
+        float halfWidthPixels = (width * cos + height * sin) / 2f * scaleX;
+        float halfHeightPixels = (width * sin + height * cos) / 2f * scaleY;
+
+        return new Vector2(
+            SnapAxis(worldPosition.X, X, scaleX, _viewport.Width / 2f, halfWidthPixels, flipped: false),
+            SnapAxis(worldPosition.Y, Y, scaleY, _viewport.Height / 2f, halfHeightPixels, flipped: true));
+    }
+
+    // One axis of SnapWorldPosition. The edge of the sprite that faces the screen origin (left, or
+    // top on the flipped Y axis) is rounded half-up in screen pixels, then converted back to world
+    // units. Ties round toward +screen, so in world Y (flipped) a tie rounds down.
+    internal static float SnapAxis(float world, float cameraPosition, float pixelsPerUnit,
+        float viewportHalfPixels, float halfExtentPixels, bool flipped)
+    {
+        float sign = flipped ? -1f : 1f;
+        float edge = viewportHalfPixels + sign * (world - cameraPosition) * pixelsPerUnit - halfExtentPixels;
+        float snappedEdge = MathF.Floor(edge + 0.5f);
+        return cameraPosition + sign * (snappedEdge + halfExtentPixels - viewportHalfPixels) / pixelsPerUnit;
     }
 
     /// <summary>

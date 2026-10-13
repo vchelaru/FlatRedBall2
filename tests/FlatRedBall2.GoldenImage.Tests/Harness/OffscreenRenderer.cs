@@ -43,4 +43,42 @@ public static class OffscreenRenderer
         target.GetData(pixels);
         return new PixelImage(width, height, pixels);
     }
+
+    /// <summary>
+    /// Draws <paramref name="screen"/> once per camera in <see cref="Screen.Cameras"/>, each into its own
+    /// <see cref="Camera.NormalizedViewport"/> region of the image (split-screen). The cameras' position,
+    /// <see cref="Camera.Zoom"/> and snapped sprites are used as the caller set them; only the viewport and
+    /// orthogonal extents are applied here. The image is cleared once to <paramref name="background"/>.
+    /// </summary>
+    public static PixelImage RenderCameras(
+        GraphicsDevice device, Screen screen, int width, int height, Color? background = null)
+    {
+        using var target = new RenderTarget2D(device, width, height);
+        using var spriteBatch = new SpriteBatch(device);
+
+        var full = new Viewport(0, 0, width, height);
+        foreach (var camera in screen.Cameras)
+            camera.ApplyToHostRect(full, orthogonalHeight: height);
+
+        device.SetRenderTarget(target);
+        device.Viewport = full;
+        device.Clear(background ?? new Color(24, 32, 64));
+        try
+        {
+            foreach (var camera in screen.Cameras)
+            {
+                device.Viewport = camera.Viewport;
+                screen.Draw(spriteBatch, new RenderDiagnostics(), camera);
+            }
+        }
+        finally
+        {
+            device.Viewport = full;
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[width * height];
+        target.GetData(pixels);
+        return new PixelImage(width, height, pixels);
+    }
 }

@@ -591,6 +591,10 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     /// <see cref="Factory{T}.Create()"/> (or prewarm) for an instance; that path runs
     /// <see cref="CustomInitialize"/> instead. Has no effect on non-pooled factories.
     /// </para>
+    /// <para>
+    /// Pool return drops this entity's sprites from every <see cref="Camera.SnappedSprites"/>, so
+    /// re-add them here to keep them pixel-snapped on the next life.
+    /// </para>
     /// </summary>
     protected virtual void Reset() { }
 

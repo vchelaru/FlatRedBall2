@@ -156,8 +156,19 @@ public class Screen : ILifecycleEvents
         _renderList.Add(renderable);
     }
 
-    /// <summary>Unregisters <paramref name="renderable"/> from drawing. Idempotent.</summary>
-    public void Remove(IRenderable renderable) => _renderList.Remove(renderable);
+    /// <summary>
+    /// Unregisters <paramref name="renderable"/> from drawing and, if it is a <see cref="Sprite"/>, drops it
+    /// from every camera's <see cref="Camera.SnappedSprites"/>. Idempotent.
+    /// </summary>
+    public void Remove(IRenderable renderable)
+    {
+        _renderList.Remove(renderable);
+        if (renderable is Sprite sprite)
+        {
+            for (int i = 0; i < Cameras.Count; i++)
+                Cameras[i].SnappedSprites.Remove(sprite);
+        }
+    }
 
     /// <summary>
     /// Registers all tiles in <paramref name="tiles"/> for rendering and wires up future

@@ -20,6 +20,11 @@ namespace FlatRedBall2.Rendering;
 /// <see cref="Layer.IsScreenSpace"/> only affects Gum elements.
 /// </para>
 /// <para>
+/// <b>Pixel snapping:</b> add a world-space sprite to <see cref="Camera.SnappedSprites"/> to have
+/// each camera round its <i>draw</i> position to that camera's screen pixel grid. <see cref="X"/>/<see cref="Y"/>
+/// stay as simulated; the sprite carries no snapping state of its own, and screen-space sprites are never snapped.
+/// </para>
+/// <para>
 /// <b>Sizing modes:</b> see <see cref="TextureScale"/> for how <see cref="Width"/> and
 /// <see cref="Height"/> are determined. <b>Animation:</b> assign <see cref="AnimationChains"/>
 /// then call <see cref="PlayAnimation(string)"/>; per-frame texture, source rectangle, flip
@@ -851,6 +856,22 @@ public class Sprite : IRenderable, IAttachable
         return baseColor * Alpha;
     }
 
+    // The world position handed to SpriteBatch.Draw: AbsoluteX/Y, rounded to the camera's pixel grid
+    // when this sprite is in camera.SnappedSprites and draws through a world-space batch. Screen-space
+    // batches have no camera grid, so they are never snapped. Extracted so it is testable without a
+    // GraphicsDevice.
+    internal Vector2 ComputeDrawPosition(Camera camera)
+    {
+        var position = new Vector2(AbsoluteX, AbsoluteY);
+        if (camera.HasSnappedSprites
+            && Batch is WorldSpaceBatch or WorldSpaceAddColorBatch
+            && camera.SnappedSprites.Contains(this))
+        {
+            position = camera.SnapWorldPosition(position, Width, Height, AbsoluteRotation.Radians);
+        }
+        return position;
+    }
+
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
@@ -865,7 +886,7 @@ public class Sprite : IRenderable, IAttachable
         var color    = ComputeDrawColor();
         var origin   = new Vector2(srcW / 2f, srcH / 2f);
         var scale    = new Vector2(Width / srcW, Height / srcH);
-        var position = new Vector2(AbsoluteX, AbsoluteY);
+        var position = ComputeDrawPosition(camera);
 
         // Only the add-color batches run the shader; set the offset for every sprite drawn through
         // one (even a zero AddColor) so a stale offset from the previous sprite can't leak.
