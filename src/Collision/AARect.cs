@@ -51,6 +51,12 @@ public class AARect : IAttachable, IRenderable, ICollidable
     /// </remarks>
     public SolidSides SolidSides { get; set; } = SolidSides.All;
 
+    // Set by TileShapes.AssignSurroundedTilesSolidOutward on tiles that carry a push-out chain.
+    // An overlapping shape whose center is inside this rect is pushed through an allowed side
+    // even when its center is on the inner half, which the corner-clip rule would otherwise
+    // reject. Cleared when TileShapes recomputes this tile's SolidSides.
+    internal bool PushesOutFromInside { get; set; }
+
     // IAttachable
     /// <inheritdoc/>
     public Entity? Parent

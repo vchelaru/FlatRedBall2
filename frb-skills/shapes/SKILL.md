@@ -100,6 +100,8 @@ tiles.IsVisible = true;                      // debug visualization
 
 `SolidSides` are maintained automatically on every add/remove — interior shared edges between adjacent tiles are cleared to prevent seam snagging. No manual refresh needed.
 
+**Landmine:** a fully surrounded tile has `SolidSides.None`, so an actor more than about a tile deep inside a thick wall gets no push and stays stuck. Call `tiles.AssignSurroundedTilesSolidOutward()` once after the collection is built (optionally with the map's edges so exits never lead off-map); adding or removing a tile afterward recomputes sides near it, so call it again.
+
 Integrates with `AddCollisionRelationship` — see `collision-relationships` skill.
 
 ## SolidSides (AARect only)
