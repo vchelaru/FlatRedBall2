@@ -101,7 +101,7 @@ public class GlueProjectTests
 
         screen.BuildObjects();
 
-        var list = screen.Objects["PlayerBallList"].ShouldBeOfType<System.Collections.Generic.List<object>>();
+        var list = screen.Objects["PlayerBallList"].ShouldBeOfType<System.Collections.Generic.List<GlueEntity>>();
 
         list.ShouldNotBeEmpty();
         list[0].ShouldBeOfType<GlueEntity>();

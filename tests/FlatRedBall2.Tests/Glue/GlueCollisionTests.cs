@@ -245,7 +245,7 @@ public class GlueCollisionTests
         var screen = (GlueScreen)engine.CurrentScreen;
         var listAVsTarget =
             (CollisionRelationship<GlueEntity, GlueEntity>)screen.Objects["ListAVsTarget"];
-        var blobInB = (GlueEntity)((List<object>)screen.Objects["ListB"]).Single();
+        var blobInB = (GlueEntity)((List<GlueEntity>)screen.Objects["ListB"]).Single();
 
         // A spawn with no explicit list joins only lists opted into the factory (ListA), never ListB.
         var spawned = project.CreateEntity(@"Entities\Blob", screen);

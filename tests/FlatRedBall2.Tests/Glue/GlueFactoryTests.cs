@@ -143,8 +143,8 @@ public class GlueFactoryTests
 
         var spawned = project.CreateEntity(@"Entities\Blob", engine.CurrentScreen);
 
-        project.InstancesOfList("ListA").ShouldContain(spawned);
-        project.InstancesOfList("ListC").ShouldContain(spawned);
+        ((GlueScreen)engine.CurrentScreen).GetList("ListA").ShouldContain(spawned);
+        ((GlueScreen)engine.CurrentScreen).GetList("ListC").ShouldContain(spawned);
     }
 
     private static (FlatRedBallService Engine, GlueProject Project) BootedBaseTypedLists()
@@ -166,7 +166,7 @@ public class GlueFactoryTests
 
         var zombie = project.CreateEntity(@"Entities\Zombie", engine.CurrentScreen);
 
-        project.InstancesOfList("EnemyList").ShouldContain(zombie);
+        ((GlueScreen)engine.CurrentScreen).GetList("EnemyList").ShouldContain(zombie);
     }
 
     // The condition is "any descendant", not "direct child": Boss derives from Zombie derives from Enemy.
@@ -177,7 +177,7 @@ public class GlueFactoryTests
 
         var boss = project.CreateEntity(@"Entities\Boss", engine.CurrentScreen);
 
-        project.InstancesOfList("EnemyList").ShouldContain(boss);
+        ((GlueScreen)engine.CurrentScreen).GetList("EnemyList").ShouldContain(boss);
     }
 
     // The base type's own spawn must still join exactly once -- the ancestor walk starts at the
@@ -189,6 +189,6 @@ public class GlueFactoryTests
 
         var enemy = project.CreateEntity(@"Entities\Enemy", engine.CurrentScreen);
 
-        project.InstancesOfList("EnemyList").Count(e => e == enemy).ShouldBe(1);
+        ((GlueScreen)engine.CurrentScreen).GetList("EnemyList").Count(e => e == enemy).ShouldBe(1);
     }
 }

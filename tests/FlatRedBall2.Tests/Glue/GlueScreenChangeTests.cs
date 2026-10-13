@@ -31,6 +31,9 @@ public class GlueScreenChangeTests
 
     private static void Step(FlatRedBallService engine) => engine.Update(new GameTime());
 
+    private static IReadOnlyList<GlueEntity> List(FlatRedBallService engine, string name) =>
+        ((GlueScreen)engine.CurrentScreen).GetList(name);
+
     [Fact]
     public void RestartScreen_SpawnedGlueEntity_IsDestroyedAndNoLongerTracked()
     {
@@ -44,8 +47,8 @@ public class GlueScreenChangeTests
 
         destroyed.ShouldBeTrue();
         project.InstancesOf(BlobName).ShouldNotContain(spawned);
-        project.InstancesOfList("ListA").ShouldNotContain(spawned);
-        project.InstancesOfList("ListC").ShouldNotContain(spawned);
+        List(engine, "ListA").ShouldNotContain(spawned);
+        List(engine, "ListC").ShouldNotContain(spawned);
     }
 
     // The fixture's screen authors one Blob in ListA (BlobInA). Each restart must leave exactly the
@@ -54,7 +57,7 @@ public class GlueScreenChangeTests
     public void RestartScreen_TwiceInARow_ListHoldsOnlyTheCurrentScreensMembers()
     {
         var (engine, project) = Boot("TwoLists");
-        int authoredInA = project.InstancesOfList("ListA").Count;
+        int authoredInA = List(engine, "ListA").Count;
         authoredInA.ShouldBe(1);
 
         for (int i = 0; i < 2; i++)
@@ -64,14 +67,13 @@ public class GlueScreenChangeTests
             Step(engine);
         }
 
-        project.InstancesOfList("ListA").Count.ShouldBe(authoredInA);
-        project.InstancesOfList("ListB").Count.ShouldBe(1);
-        project.InstancesOfList("ListC").ShouldBeEmpty();
+        List(engine, "ListA").Count.ShouldBe(authoredInA);
+        List(engine, "ListB").Count.ShouldBe(1);
+        List(engine, "ListC").ShouldBeEmpty();
         project.InstancesOf(BlobName).Count.ShouldBe(2);
     }
 
-    // The new screen's relationship binds to the project's live list, so a stale entry in it is
-    // collided against forever.
+    // The new screen's relationship binds to the new screen's own list, which starts empty.
     [Fact]
     public void RestartScreen_RelationshipBuiltInNewScreen_DoesNotSeeOldEntities()
     {
@@ -119,7 +121,7 @@ public class GlueScreenChangeTests
         project.FindScreen(GameScreenName).ShouldNotBeNull();
         project.FindEntity(BlobName).ShouldNotBeNull();
         project.CreateEntity(BlobName, engine.CurrentScreen).ShouldNotBeNull();
-        project.InstancesOfList("ListA").Count.ShouldBe(2);
+        List(engine, "ListA").Count.ShouldBe(2);
     }
 
     // Every level derived from a shared base repeats the base's lists, so the same list name is
@@ -147,10 +149,10 @@ public class GlueScreenChangeTests
             engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
 
             var spawned = project.CreateEntity(BlobName, engine.CurrentScreen);
-            project.InstancesOfList("ListA").Count(e => e == spawned).ShouldBe(1);
+            List(engine, "ListA").Count(e => e == spawned).ShouldBe(1);
 
             spawned.Destroy();
-            project.InstancesOfList("ListA").ShouldNotContain(spawned);
+            List(engine, "ListA").ShouldNotContain(spawned);
         }
         finally
         {
@@ -158,12 +160,10 @@ public class GlueScreenChangeTests
         }
     }
 
-    // Characterization, not an endorsement: lists are tracked by bare name, so a list an entity
-    // declares for itself lands in the same bucket as a screen list with that name. Here Target
-    // declares its own ListA (holding one Blob) and the screen declares ListA (holding one Blob);
-    // each would be 1 if scoped, but the project's ListA holds both. Flip this when lists are scoped.
+    // A list belongs to the element that declares it: Target declares its own ListA (holding one
+    // Blob) and the screen declares ListA (holding one Blob), and each instance holds just its own.
     [Fact]
-    public void InstancesOfList_EntityAndScreenDeclareSameListName_AreStillConflated()
+    public void GetList_EntityAndScreenDeclareSameListName_AreSeparate()
     {
         string root = Path.Combine(Path.GetTempPath(), "frb2-glue-scope-" + Guid.NewGuid().ToString("N"));
         try
@@ -183,9 +183,11 @@ public class GlueScreenChangeTests
             engine.GlueProject = project;
             engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
 
-            var screenListA = (List<object>)((GlueScreen)engine.CurrentScreen).Objects["ListA"];
-            screenListA.Count.ShouldBe(1);
-            project.InstancesOfList("ListA").Count.ShouldBe(2);
+            var screen = (GlueScreen)engine.CurrentScreen;
+            var target = (GlueEntity)screen.Objects["Target"];
+            screen.GetList("ListA").Count.ShouldBe(1);
+            target.GetList("ListA").Count.ShouldBe(1);
+            target.GetList("ListA").ShouldNotBeSameAs(screen.GetList("ListA"));
         }
         finally
         {

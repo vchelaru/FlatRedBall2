@@ -47,14 +47,13 @@ public sealed class GlueObjectBuilder
     /// </summary>
     /// <param name="save">The object to build.</param>
     /// <param name="elementName">The owning screen or entity's Glue name, for diagnostics.</param>
-    /// <param name="listName">
-    /// The Glue list <paramref name="save"/> is a member of, if any — threaded through to
-    /// <see cref="GlueProject.CreateEntity(string, Screen, string?)"/> when this builds a nested
-    /// entity, so a design-time-placed list member is as visible to a relationship bound to that
-    /// list's name as one spawned into it at runtime.
+    /// <param name="isListMember">
+    /// Whether <paramref name="save"/> is a declared member of a list. A nested entity built as a
+    /// list member joins only that list (the caller adds it), so it is kept out of the screen's
+    /// factory-associated lists, which an ordinary nested entity joins.
     /// </param>
     /// <returns>The configured instance, or null if this build cannot construct that type.</returns>
-    public object? Create(NamedObjectSave save, string? elementName = null, string? listName = null)
+    public object? Create(NamedObjectSave save, string? elementName = null, bool isListMember = false)
     {
         var typeName = GlueTypeName.Parse(save.SourceClassType);
 
@@ -66,7 +65,7 @@ public sealed class GlueObjectBuilder
         // An object whose type names another element is a nested entity — built from that element's
         // own data rather than constructed from a CLR type.
         if (typeName.IsElementReference)
-            return CreateNestedEntity(save, elementName, listName);
+            return CreateNestedEntity(save, elementName, isListMember);
 
         if (!GlueTypeMap.TryCreate(typeName, out object? instance))
         {
@@ -294,7 +293,7 @@ public sealed class GlueObjectBuilder
     /// either, this reports and skips — which is what every build did before a project context
     /// existed.
     /// </remarks>
-    private object? CreateNestedEntity(NamedObjectSave save, string? elementName, string? listName)
+    private object? CreateNestedEntity(NamedObjectSave save, string? elementName, bool isListMember)
     {
         if (_project is null || _owningScreen is null)
         {
@@ -319,7 +318,7 @@ public sealed class GlueObjectBuilder
             return null;
         }
 
-        var entity = _project.CreateEntity(referenced.Name!, _owningScreen, listName);
+        var entity = _project.CreateEntity(referenced.Name!, _owningScreen, joinFactoryLists: !isListMember);
 
         // The instance's own instructions layer on top of the entity's authored values.
         ApplyInstructions(entity, save, elementName);

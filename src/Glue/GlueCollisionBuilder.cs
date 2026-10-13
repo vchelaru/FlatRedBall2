@@ -71,7 +71,6 @@ internal static class GlueCollisionBuilder
         string? elementName,
         Dictionary<string, object> objects,
         List<GlueLoadDiagnostic> diagnostics,
-        GlueProject? project,
         Screen? screen)
     {
         foreach (var save in namedObjects)
@@ -79,7 +78,7 @@ internal static class GlueCollisionBuilder
             if (!IsRelationship(save) || string.IsNullOrEmpty(save.InstanceName) || save.IsDisabled)
                 continue;
 
-            var built = BuildOne(save, elementName, objects, diagnostics, project, screen);
+            var built = BuildOne(save, elementName, objects, diagnostics, screen);
 
             if (built is not null)
                 objects[save.InstanceName] = built;
@@ -91,7 +90,6 @@ internal static class GlueCollisionBuilder
         string? elementName,
         Dictionary<string, object> objects,
         List<GlueLoadDiagnostic> diagnostics,
-        GlueProject? project,
         Screen? screen)
     {
         var settings = GlueCollisionSettings.From(save);
@@ -122,7 +120,7 @@ internal static class GlueCollisionBuilder
             return null;
         }
 
-        var first = ResolveSide(settings.FirstCollisionName!, objects, project);
+        var first = ResolveSide(settings.FirstCollisionName!, objects);
 
         if (first is null)
         {
@@ -142,7 +140,7 @@ internal static class GlueCollisionBuilder
             return null;
         }
 
-        var second = ResolveSide(settings.SecondCollisionName, objects, project);
+        var second = ResolveSide(settings.SecondCollisionName, objects);
 
         if (second is null)
         {
@@ -159,35 +157,13 @@ internal static class GlueCollisionBuilder
     /// Resolves one side to something collidable: an entity list, a single entity, or tile shapes.
     /// </summary>
     /// <remarks>
-    /// A Glue list is built once, at load, into a plain snapshot (<see cref="GlueElementBuilder.Build"/>).
-    /// Binding a relationship straight to that snapshot means an entity spawned afterwards — via
-    /// <see cref="GlueProject.CreateEntity(string, Screen, string?)"/>, the Factory-equivalent path —
-    /// is invisible to it forever. <see cref="GlueProject.InstancesOfList"/> is the live list every
-    /// instance spawned into <paramref name="name"/> is tracked in (added on create, removed on
-    /// destroy), so this resolves to that instead of the snapshot.
-    /// <para>Keyed by the list's own instance name, not its element type — two differently-named
-    /// lists of the same entity type (e.g. two enemy waves) must stay distinct live views, not
-    /// collapse onto one shared list. An entity can still be live in both at once (G82): membership
-    /// is per list, not exclusive.</para>
+    /// An entity list resolves to the owner's own live list, so an entity spawned into it after the
+    /// relationship was built is seen. The owner is whoever's <paramref name="objects"/> this is: a
+    /// relationship on an entity binds to that instance's list, never another instance's. A list of
+    /// anything but entities cannot be collided and resolves to nothing.
     /// </remarks>
-    private static object? ResolveSide(
-        string name, Dictionary<string, object> objects, GlueProject? project)
-    {
-        if (!objects.TryGetValue(name, out object? side))
-            return null;
-
-        // A Glue list holds whatever could be built; a relationship needs the entities in it.
-        if (side is List<object> list)
-        {
-            var entities = list.OfType<GlueEntity>().ToList();
-            if (entities.Count != list.Count)
-                return null;
-
-            return project is not null ? (object)project.InstancesOfList(name) : entities;
-        }
-
-        return side;
-    }
+    private static object? ResolveSide(string name, Dictionary<string, object> objects) =>
+        objects.TryGetValue(name, out object? side) && side is not List<object> ? side : null;
 
     private static object? Register(
         NamedObjectSave save,

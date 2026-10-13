@@ -99,6 +99,10 @@ internal static class GlueCameraBuilder
                 camera.Targets.AddRange(list.OfType<Entity>());
                 break;
 
+            case List<GlueEntity> entities:
+                camera.Targets.AddRange(entities);
+                break;
+
             case Entity single:
                 camera.Targets.Add(single);
                 break;
