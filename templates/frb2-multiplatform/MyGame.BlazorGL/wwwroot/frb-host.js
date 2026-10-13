@@ -72,6 +72,21 @@ window.initRenderJS = function (instance) {
     window.requestAnimationFrame(tickJS);
 };
 
+// Perf diagnostics opt-in: opening the page with ?diag=perf (optionally &frames=N, default 300)
+// makes the engine print one "[frb-diag] {json}" console line after N frames and set
+// window.__frbDiag to the parsed object. Called from the host page's C# when it is enabled.
+window.frbDiagPlatform = function () {
+    var ua = navigator.userAgent, m;
+    if ((m = /Firefox\/([\d.]+)/.exec(ua))) return 'Firefox ' + m[1];
+    if ((m = /Edg\/([\d.]+)/.exec(ua))) return 'Edge ' + m[1];
+    if ((m = /Chrome\/([\d.]+)/.exec(ua))) return 'Chrome ' + m[1];
+    if ((m = /Version\/([\d.]+).*Safari/.exec(ua))) return 'Safari ' + m[1];
+    return ua;
+};
+window.frbDiagPublish = function (json) {
+    window.__frbDiag = JSON.parse(json);
+};
+
 // Prevent arrow keys, space, and mouse wheel from scrolling the page (e.g. inside an
 // itch.io iframe). Games that need these events can override by removing these listeners.
 window.addEventListener("keydown", function (e) {

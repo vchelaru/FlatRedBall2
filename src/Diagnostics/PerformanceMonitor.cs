@@ -80,6 +80,11 @@ public class PerformanceMonitor
         internal set => _timerResolutionMs = value;
     }
 
+    // Total frames recorded since construction, and the most recent one. Let PerfDiagnosticsProbe
+    // count real frames: a host tick that skipped Draw records nothing.
+    internal long FramesRecorded { get; private set; }
+    internal FrameProfile LastProfile => _current;
+
     /// <summary>Rolling stats for the full Update+Draw frame time.</summary>
     public PerformanceStat FrameTotalMs => ComputeStat(static p => p.FrameTotalMs);
 
@@ -123,6 +128,7 @@ public class PerformanceMonitor
         if (!IsEnabled) return;
 
         _current = profile;
+        FramesRecorded++;
         _relationships = relationships;
         _window[_next] = profile;
         _next = (_next + 1) % _window.Length;

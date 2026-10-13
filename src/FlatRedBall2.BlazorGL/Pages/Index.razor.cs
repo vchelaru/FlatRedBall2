@@ -1,4 +1,5 @@
 using System;
+using FlatRedBall2.Diagnostics;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Xna.Framework;
@@ -22,7 +23,11 @@ public partial class Index
     /// </summary>
     [Inject] public Func<Game> GameFactory { get; set; } = default!;
 
+    /// <summary>Source of the page URL, read once for the <c>?diag=perf</c> opt-in.</summary>
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
     private Game? _game;
+    private PerfDiagnosticsProbe? _perfProbe;
 
     /// <inheritdoc />
     protected override void OnAfterRender(bool firstRender)
@@ -44,9 +49,28 @@ public partial class Index
     {
         if (_game == null)
         {
+            // Before the game exists so the diagnostics are on from its first frame.
+            _perfProbe = PerfDiagnosticsProbe.TryCreateFromQuery(
+                new Uri(Navigation.Uri).Query, FlatRedBallService.Default, GetBrowserLabel,
+                Console.WriteLine, PublishToJs);
             _game = GameFactory();
             _game.Run();
         }
         _game.Tick();
+        _perfProbe?.OnTick();
+    }
+
+    // frbDiagPlatform / frbDiagPublish live in frb-host.js. A project that vendored an older copy
+    // lacks them; the probe still reports to the console, just without a browser name.
+    private string? GetBrowserLabel()
+    {
+        try { return (JsRuntime as IJSInProcessRuntime)?.Invoke<string?>("frbDiagPlatform"); }
+        catch (JSException) { return null; }
+    }
+
+    private void PublishToJs(string json)
+    {
+        try { (JsRuntime as IJSInProcessRuntime)?.InvokeVoid("frbDiagPublish", json); }
+        catch (JSException) { }
     }
 }
