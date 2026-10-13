@@ -84,6 +84,8 @@ if (_brickFactory.Instances.Count == 0)
     MoveToScreen<NextLevelScreen>();
 ```
 
+`Factory<T>.EntitySpawned` fires after every spawn, including pooled reuse and Tiled/lazy spawns (not `Prewarm`), with the entity fully initialized. Subscribe to it instead of wrapping `Create`. A handler that subscribes to the entity's own events must do so once per instance, since reuse raises `EntitySpawned` again for the same instance.
+
 `Engine.GetFactory<T>()` looks up a factory by type — used when spawning from inside another entity. Throws if no factory for `T` exists yet on the screen.
 
 ## Destroying Entities

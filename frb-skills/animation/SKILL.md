@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished and named frame events (FrameEventRaised), and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
+description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished/AnimationLooped/FrameChanged and named frame events (FrameEventRaised), and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -43,7 +43,11 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends |
+| `AnimationLooped` | — | Fires when a looping chain wraps. Never fires for non-looping chains or from `PlayAnimation` |
+| `FrameChanged` | — | Fires when the displayed frame changes, including `PlayAnimation` to a different chain (not re-playing the same one). `CurrentFrame` is already the new frame |
 | `FrameEventRaised` | — | Fires per `AnimationFrameEvent` when its frame is entered. Branch on `e.Name`, never on a frame index, so reordering frames in the AnimationEditor can't break it. Skipped frames still fire; the XML doc has the loop/frame-0 rules |
+
+`AnimationLooped` and `FrameChanged` each fire at most once per update, even if a large delta spans several loops or frames (`FrameEventRaised` still reports every frame crossed). Order within an update: `FrameChanged`, `FrameEventRaised`, `AnimationLooped`, `AnimationFinished`; a handler that switches animation suppresses the rest for the old chain.
 
 `PlayAnimation` resets time to frame 0 and sets `Animate = true`. Calling it every frame with the same chain restarts on frame 0 every tick — guard with `CurrentAnimation?.Name != "Run"`.
 
