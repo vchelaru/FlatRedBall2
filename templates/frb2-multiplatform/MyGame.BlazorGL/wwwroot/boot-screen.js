@@ -18,7 +18,8 @@
 //     browser paints the screen before the engine's synchronous init blocks the thread. A host
 //     that never asks simply does not skip.
 //   - It never asks for a click: the game's own click-to-start stays the only audio gate.
-//   - A boot failure stays on screen with a short message instead of hanging, and the console
+//   - A boot failure stays on screen with a short message and a Reload button (see the comment
+//     in createView for why it is manual) instead of hanging, and the console
 //     gets one "[frb-boot-screen] boot failure: rule=... url=... status=..." line naming why.
 //     Only files the runtime cannot start without count (see classifyFrameworkUrl), and nothing
 //     latches once a frame has completed.
@@ -40,6 +41,7 @@
     var POLL_MS = 100;
     var LOADING_TEXT = 'Loading';
     var FAILED_TEXT = 'Failed to start. Check the browser console.';
+    var RELOAD_TEXT = 'Reload';
 
     function formatBytes(n) {
         if (!(n > 0)) return '';
@@ -247,7 +249,8 @@
         };
     }
 
-    function createView(doc) {
+    // onReload: what the failure screen's Reload button does (start() passes location.reload).
+    function createView(doc, onReload) {
         var css =
             '#frb-boot-screen{position:fixed;top:0;left:0;right:0;bottom:0;z-index:900;background:#000;color:#ddd;' +
             'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
@@ -263,7 +266,14 @@
             '@media (prefers-reduced-motion:reduce){#frb-boot-screen .frb-fill{animation:none;width:100%;opacity:.5}}' +
             '#frb-boot-screen .frb-meta{margin-top:12px;font-size:13px;display:flex;gap:14px;' +
             'font-variant-numeric:tabular-nums;opacity:.85}' +
-            '#frb-boot-screen .frb-err{color:#ff6b6b;text-align:center;font-size:13px;margin-top:22px;max-width:70%}';
+            '#frb-boot-screen .frb-err{color:#ff6b6b;text-align:center;font-size:13px;margin-top:22px;max-width:70%}' +
+            // Same font as the rest of the screen (inherit), so no font is added. A real <button> so
+            // Tab, Enter and Space work with no extra code; :focus-visible keeps the ring for
+            // keyboard users only.
+            '#frb-boot-screen .frb-reload{margin-top:16px;font:inherit;font-size:13px;color:#ddd;background:transparent;' +
+            'border:1px solid #555;border-radius:4px;padding:6px 18px;cursor:pointer}' +
+            '#frb-boot-screen .frb-reload:hover{border-color:#e3141a;color:#fff}' +
+            '#frb-boot-screen .frb-reload:focus-visible{outline:2px solid #e3141a;outline-offset:2px}';
 
         function el(tag, className, text) {
             var e = doc.createElement(tag);
@@ -292,7 +302,42 @@
         var err = el('div', 'frb-err', FAILED_TEXT);
         err.style.display = 'none';
 
-        [style, logo, bar, meta, err].forEach(function (child) { rootEl.appendChild(child); });
+        // ---------------------------------------------------------------------------------------
+        // Reload button: shown ONLY on the failure screen.
+        //
+        // What it is for: on a first load over https, the page can fail to start with
+        // "net::ERR_CERT_VERIFIER_CHANGED" on a burst of _framework/ requests, and a plain page
+        // reload fixes it. Without this button the player sees "Failed to start" with nothing to
+        // do about it.
+        //
+        // Why it happens (full write-up and experiments in the issue linked below): a freshly
+        // launched browser rebuilds its certificate verifier several times in its first few
+        // seconds. When that happens Chromium makes every current HTTP/2 session go away, and the
+        // requests still queued in the session waiting for a stream id (a server allows about 100
+        // concurrent streams, Blazor requests every _framework/ file at once) fail with that error.
+        // Blazor's loader does not retry a failed fetch, so the runtime never starts. It is common
+        // on a Debug dev server over https (~270 requests), rare on a Release publish (~120
+        // requests, 1 failure in 60 test loads), and needs an HTTP/2 host plus a browser that
+        // started moments before the page loaded.
+        //
+        // Deliberately a MANUAL reload, not an automatic retry: the decision (recorded in the
+        // issue) was not to paper over a failure whose trigger is outside our control and only
+        // partly understood. The player gets an honest failure and a one-click way out. If this
+        // shows up in the wild, the issue lists the next options (a bounded one-shot retry of an
+        // idempotent _framework/ fetch in installFetchCounter, or fewer concurrent requests).
+        //
+        // https://github.com/vchelaru/FlatRedBall2/issues/1467
+        //
+        // Keyboard: a <button> is focusable and fires click on Enter and Space, so there is no key
+        // handling here. It is display:none (so also out of the Tab order) in every other state.
+        // ---------------------------------------------------------------------------------------
+        var reload = el('button', 'frb-reload', RELOAD_TEXT);
+        reload.setAttribute('type', 'button');
+        reload.addEventListener('click', function () { if (onReload) onReload(); });
+        reload.style.display = 'none';
+        var reloadFocused = false;
+
+        [style, logo, bar, meta, err, reload].forEach(function (child) { rootEl.appendChild(child); });
         (doc.body || doc.documentElement).appendChild(rootEl);
 
         return {
@@ -300,6 +345,13 @@
                 size.textContent = formatBytes(state.bytes);
                 bar.style.display = meta.style.display = state.failed ? 'none' : '';
                 err.style.display = state.failed ? '' : 'none';
+                reload.style.display = state.failed ? '' : 'none';
+                // Put keyboard focus on it the first time the failure shows: nothing else on this
+                // screen is interactive, and the canvas that used to hold focus never started.
+                if (state.failed && !reloadFocused) {
+                    reloadFocused = true;
+                    try { reload.focus(); } catch (e) { }
+                }
                 // For tooling: a script can read why without scraping the console.
                 rootEl.setAttribute('data-state', state.failed ? 'failed' : 'loading');
                 if (state.failure) rootEl.setAttribute('data-failure', describe(state.failure.rule, state.failure));
@@ -314,7 +366,7 @@
         if (win.__frbBootScreen) return;
         win.__frbBootScreen = true;
         var doc = win.document;
-        var view = createView(doc);
+        var view = createView(doc, function () { win.location.reload(); });
 
         var restoreChain = function () { };
         var restoreFetch = function () { };

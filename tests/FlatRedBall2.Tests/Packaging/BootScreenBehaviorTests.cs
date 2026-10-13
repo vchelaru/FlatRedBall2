@@ -406,15 +406,73 @@ public class BootScreenBehaviorTests
         result.ShouldBe("{\"setPhase\":\"undefined\",\"phase\":false}");
     }
 
+    // A fake DOM just big enough for createView: elements record their children, style, attributes
+    // and click listeners, so a test can render a state and then "click" the Reload button.
+    private const string FakeDom = @"
+            const made = [];
+            const node = (tag) => { const n = { tag, className: '', style: {}, children: [], attrs: {}, listeners: {}, textContent: '',
+                appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; },
+                addEventListener(type, fn) { this.listeners[type] = fn; }, focus() { this.focused = true; }, parentNode: null }; made.push(n); return n; };
+            const doc = { createElement: node, body: node('body') };
+            const reloadNode = () => made.find((n) => n.className === 'frb-reload');";
+
+    [Fact]
+    public void CreateView_Render_NotFailed_ReloadControlIsHidden()
+    {
+        // Reload exists only for the failure screen. While loading it must not be visible or
+        // reachable by Tab (display:none removes it from both).
+        var result = RunNode(FakeDom + @"
+            const view = b.createView(doc, () => {});
+            view.render({ bytes: 2048, failed: false, failure: null });
+            out({ tag: reloadNode().tag, display: reloadNode().style.display });");
+
+        result.ShouldBe("{\"tag\":\"button\",\"display\":\"none\"}");
+    }
+
+    [Fact]
+    public void CreateView_Render_Failed_ShowsReloadButtonLabelledReload()
+    {
+        var result = RunNode(FakeDom + @"
+            const view = b.createView(doc, () => {});
+            view.render({ bytes: 0, failed: true, failure: { rule: 'x' } });
+            const r = reloadNode();
+            out({ display: r.style.display, text: r.textContent, type: r.attrs.type });");
+
+        result.ShouldBe("{\"display\":\"\",\"text\":\"Reload\",\"type\":\"button\"}");
+    }
+
+    [Fact]
+    public void CreateView_Failed_ActivatingReload_CallsTheReloadCallbackOnce()
+    {
+        // A real <button> turns Enter and Space into a click, so the click handler is the whole
+        // keyboard story.
+        var result = RunNode(FakeDom + @"
+            let reloads = 0;
+            const view = b.createView(doc, () => reloads++);
+            view.render({ bytes: 0, failed: true, failure: { rule: 'x' } });
+            reloadNode().listeners.click();
+            out(reloads);");
+
+        result.ShouldBe("1");
+    }
+
+    [Fact]
+    public void CreateView_FailedThenLoadingState_NeverShowsReloadWhileLoading()
+    {
+        var result = RunNode(FakeDom + @"
+            const view = b.createView(doc, () => {});
+            const seen = [];
+            for (const failed of [false, true, false]) { view.render({ bytes: 0, failed, failure: failed ? { rule: 'x' } : null }); seen.push(reloadNode().style.display); }
+            out(seen);");
+
+        result.ShouldBe("[\"none\",\"\",\"none\"]");
+    }
+
     [Fact]
     public void CreateView_Render_ShowsLoadingAndSizeWithNoPhaseLine()
     {
-        var result = RunNode(@"
-            const made = [];
-            const node = (tag) => { const n = { tag, className: '', style: {}, children: [], attrs: {}, textContent: '',
-                appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, parentNode: null }; made.push(n); return n; };
-            const doc = { createElement: node, body: node('body') };
-            const view = b.createView(doc);
+        var result = RunNode(FakeDom + @"
+            const view = b.createView(doc, () => {});
             view.render({ bytes: 2048, failed: false, failure: null });
             const classes = made.map((n) => n.className).filter(Boolean);
             const texts = made.filter((n) => n.style.display !== 'none').map((n) => n.textContent).filter((t) => t && !t.includes('{'));
