@@ -66,17 +66,28 @@ public sealed class GameStorage
         return reader.ReadToEnd();
     }
 
-    /// <summary>Stores <paramref name="text"/> as UTF-8 (no byte-order mark), replacing any existing value.</summary>
+    /// <summary>
+    /// Stores <paramref name="text"/> as UTF-8 (no byte-order mark), replacing any existing value.
+    /// All-or-nothing: if it throws, the previous value is intact.
+    /// </summary>
     public async Task WriteTextAsync(string key, string text, CancellationToken cancellationToken = default)
     {
-        StorageKey.ValidateKey(key, nameof(key));
         ArgumentNullException.ThrowIfNull(text);
+        await WriteBytesAsync(key, Utf8NoBom.GetBytes(text), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Stores <paramref name="data"/>, replacing any existing value. All-or-nothing: if it throws,
+    /// the previous value is intact.
+    /// </summary>
+    public async Task WriteBytesAsync(string key, ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
         cancellationToken.ThrowIfCancellationRequested();
         var backend = _backend;
-        var bytes = Utf8NoBom.GetBytes(text);
         await RunAsync("write", key, async () =>
         {
-            await backend.WriteAsync(key, bytes, cancellationToken).ConfigureAwait(false);
+            await backend.WriteAsync(key, data, cancellationToken).ConfigureAwait(false);
             return true;
         }).ConfigureAwait(false);
     }
@@ -92,27 +103,31 @@ public sealed class GameStorage
     }
 
     /// <summary>
-    /// Opens a stream whose contents replace <paramref name="key"/> when it is disposed with
-    /// <c>await using</c> (or <c>DisposeAsync</c>). Nothing is visible to readers before then, so a
-    /// half-written save is never seen, and the old value survives if the commit fails.
+    /// Opens a write buffer for <paramref name="key"/>. The stored value changes only when you call
+    /// <see cref="StorageWriteStream.CommitAsync"/>, replacing it in one step; disposing without
+    /// committing (including when an exception skips the commit) discards the data and keeps the
+    /// old value, so a partial save is never stored.
     /// <para>
-    /// Gotchas: a synchronous <c>using</c>/<c>Dispose()</c> cannot commit, so it discards the data
-    /// and throws <see cref="InvalidOperationException"/>. A commit failure is thrown from
-    /// <c>DisposeAsync</c> as <see cref="StorageException"/>. An <c>await using</c> also commits
-    /// when the body threw, so serialize to a string or buffer first if a partial write would be
-    /// worse than none. <paramref name="cancellationToken"/> covers opening only; the commit is
-    /// never cancelled, so a screen change cannot drop a save halfway.
+    /// <paramref name="cancellationToken"/> covers opening only; pass a token to
+    /// <see cref="StorageWriteStream.CommitAsync"/> to cancel the commit.
     /// </para>
     /// </summary>
-    public async Task<Stream> OpenWriteAsync(string key, CancellationToken cancellationToken = default)
+    /// <example>
+    /// <code>
+    /// await using var s = await Engine.Storage.OpenWriteAsync("saves/slot1.json");
+    /// await JsonSerializer.SerializeAsync(s, saveData);
+    /// await s.CommitAsync();
+    /// </code>
+    /// </example>
+    public async Task<StorageWriteStream> OpenWriteAsync(string key, CancellationToken cancellationToken = default)
     {
         StorageKey.ValidateKey(key, nameof(key));
         cancellationToken.ThrowIfCancellationRequested();
         var backend = _backend;
         await Task.CompletedTask.ConfigureAwait(false);
-        return new StorageWriteStream(data => RunAsync("write", key, async () =>
+        return new StorageWriteStream((data, ct) => RunAsync("write", key, async () =>
         {
-            await backend.WriteAsync(key, data, CancellationToken.None).ConfigureAwait(false);
+            await backend.WriteAsync(key, data, ct).ConfigureAwait(false);
             return true;
         }));
     }

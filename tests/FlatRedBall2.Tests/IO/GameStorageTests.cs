@@ -81,14 +81,16 @@ public class GameStorageTests
     }
 
     [Fact]
-    public async Task OpenWriteAsync_DisposeAsync_CommitsBytes()
+    public async Task OpenWriteAsync_CommitAsync_MakesDataVisible()
     {
         var storage = NewStorage();
 
         await using (var stream = await storage.OpenWriteAsync("bin"))
         {
             await stream.WriteAsync(new byte[] { 1, 2, 3 });
-            (await storage.ExistsAsync("bin")).ShouldBeFalse(); // nothing visible until dispose
+            (await storage.ExistsAsync("bin")).ShouldBeFalse(); // nothing visible until commit
+            await stream.CommitAsync();
+            (await storage.ExistsAsync("bin")).ShouldBeTrue();
         }
 
         await using var read = (await storage.OpenReadAsync("bin"))!;
@@ -98,7 +100,30 @@ public class GameStorageTests
     }
 
     [Fact]
-    public async Task OpenWriteAsync_NeverDisposed_LeavesExistingValueUntouched()
+    public async Task OpenWriteAsync_DisposeWithoutCommit_KeepsOldValue()
+    {
+        var storage = NewStorage();
+        await storage.WriteTextAsync("a", "old");
+
+        await using (var stream = await storage.OpenWriteAsync("a"))
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("partial"));
+
+        (await storage.ReadTextAsync("a")).ShouldBe("old");
+    }
+
+    [Fact]
+    public async Task OpenWriteAsync_SyncDisposeWithoutCommit_StoresNothingAndDoesNotThrow()
+    {
+        var storage = NewStorage();
+
+        using (var stream = await storage.OpenWriteAsync("a"))
+            stream.WriteByte(7);
+
+        (await storage.ExistsAsync("a")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task OpenWriteAsync_NeverDisposed_LeavesOldValueUntouched()
     {
         var storage = NewStorage();
         await storage.WriteTextAsync("a", "old");
@@ -110,29 +135,138 @@ public class GameStorageTests
     }
 
     [Fact]
-    public async Task OpenWriteAsync_SyncDispose_ThrowsAndStoresNothing()
+    public async Task OpenWriteAsync_ExceptionBeforeCommit_KeepsOldValue()
+    {
+        var storage = NewStorage();
+        await storage.WriteTextAsync("a", "old");
+
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            await using var stream = await storage.OpenWriteAsync("a");
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("partial"));
+            throw new InvalidOperationException("serializer blew up");
+        });
+
+        (await storage.ReadTextAsync("a")).ShouldBe("old");
+    }
+
+    [Fact]
+    public async Task CommitAsync_Twice_Throws()
+    {
+        var storage = NewStorage();
+        await using var stream = await storage.OpenWriteAsync("a");
+        stream.WriteByte(1);
+        await stream.CommitAsync();
+
+        await Should.ThrowAsync<InvalidOperationException>(() => stream.CommitAsync());
+    }
+
+    [Fact]
+    public async Task Write_AfterCommit_ThrowsAndStoredValueUnchanged()
+    {
+        var storage = NewStorage();
+        await using var stream = await storage.OpenWriteAsync("a");
+        stream.WriteByte(1);
+        await stream.CommitAsync();
+
+        stream.CanWrite.ShouldBeFalse();
+        Should.Throw<NotSupportedException>(() => stream.WriteByte(2));
+
+        await using var read = (await storage.OpenReadAsync("a"))!;
+        read.Length.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task CommitAsync_AfterDispose_Throws()
     {
         var storage = NewStorage();
         var stream = await storage.OpenWriteAsync("a");
-        stream.WriteByte(7);
+        stream.WriteByte(1);
+        await stream.DisposeAsync();
 
-        Should.Throw<InvalidOperationException>(() => stream.Dispose());
+        await Should.ThrowAsync<ObjectDisposedException>(() => stream.CommitAsync());
+        (await storage.ExistsAsync("a")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CommitAsync_CancelledToken_ThrowsAndStoresNothing()
+    {
+        var storage = NewStorage();
+        await using var stream = await storage.OpenWriteAsync("a");
+        stream.WriteByte(1);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => stream.CommitAsync(cts.Token));
 
         (await storage.ExistsAsync("a")).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task OpenWriteAsync_CommitFails_DisposeAsyncThrowsStorageException()
+    public async Task CommitAsync_BackendFails_ThrowsStorageExceptionAndOldValueSurvives()
     {
+        var inner = new InMemoryStorageBackend();
+        var failing = new FailOnWriteBackend(inner);
         var storage = NewStorage();
-        storage.Backend = new FailingBackend(new IOException("disk full"));
-        var stream = await storage.OpenWriteAsync("a");
-        stream.WriteByte(1);
+        storage.Backend = failing;
+        await storage.WriteTextAsync("a", "old");
+        await using var stream = await storage.OpenWriteAsync("a");
+        stream.WriteByte((byte)'n');
+        failing.Fail = true;
 
-        var ex = await Should.ThrowAsync<StorageException>(async () => await stream.DisposeAsync());
+        var ex = await Should.ThrowAsync<StorageException>(() => stream.CommitAsync());
 
         ex.InnerException.ShouldBeOfType<IOException>();
+        (await storage.ReadTextAsync("a")).ShouldBe("old");
+
+        // A failed commit leaves the stream uncommitted, so the caller can retry.
+        failing.Fail = false;
+        await stream.CommitAsync();
+        (await storage.ReadTextAsync("a")).ShouldBe("n");
     }
+
+    [Fact]
+    public async Task WriteTextAsync_BackendFails_OldValueSurvives()
+    {
+        var inner = new InMemoryStorageBackend();
+        var failing = new FailOnWriteBackend(inner);
+        var storage = NewStorage();
+        storage.Backend = failing;
+        await storage.WriteTextAsync("a", "old");
+        failing.Fail = true;
+
+        await Should.ThrowAsync<StorageException>(() => storage.WriteTextAsync("a", "new"));
+
+        (await storage.ReadTextAsync("a")).ShouldBe("old");
+    }
+
+    [Fact]
+    public async Task WriteBytesAsync_RoundTripsThroughOpenReadAsync()
+    {
+        var storage = NewStorage();
+
+        await storage.WriteBytesAsync("bin", new byte[] { 9, 8, 7 });
+
+        await using var read = (await storage.OpenReadAsync("bin"))!;
+        var buffer = new byte[3];
+        (await read.ReadAsync(buffer)).ShouldBe(3);
+        buffer.ShouldBe(new byte[] { 9, 8, 7 });
+    }
+
+    // Delegates to a real in-memory store but fails writes on demand, to prove a failed write leaves
+    // the old value alone.
+    private sealed class FailOnWriteBackend(InMemoryStorageBackend inner) : IStorageBackend
+    {
+        public bool Fail { get; set; }
+        public bool IsPersistent => true;
+        public Task<byte[]?> ReadAsync(string key, CancellationToken cancellationToken) => inner.ReadAsync(key, cancellationToken);
+        public Task WriteAsync(string key, ReadOnlyMemory<byte> data, CancellationToken cancellationToken) =>
+            Fail ? throw new IOException("disk full") : inner.WriteAsync(key, data, cancellationToken);
+        public Task<bool> DeleteAsync(string key, CancellationToken cancellationToken) => inner.DeleteAsync(key, cancellationToken);
+        public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken) => inner.ExistsAsync(key, cancellationToken);
+        public Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken cancellationToken) => inner.ListAsync(prefix, cancellationToken);
+    }
+
 
     [Fact]
     public async Task OpenReadAsync_ThenOverwrite_StreamKeepsOldSnapshot()
@@ -205,6 +339,7 @@ public class GameStorageTests
         await Should.ThrowAsync<ArgumentException>(() => storage.WriteTextAsync(key, "x"));
         await Should.ThrowAsync<ArgumentException>(() => storage.OpenReadAsync(key));
         await Should.ThrowAsync<ArgumentException>(() => storage.OpenWriteAsync(key));
+        await Should.ThrowAsync<ArgumentException>(() => storage.WriteBytesAsync(key, new byte[1]));
         await Should.ThrowAsync<ArgumentException>(() => storage.DeleteAsync(key));
     }
 
