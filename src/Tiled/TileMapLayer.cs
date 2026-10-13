@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FlatRedBall2.Rendering;
+using Microsoft.Xna.Framework;
 using MonoGame.Extended.Tilemaps;
 
 namespace FlatRedBall2.Tiled;
@@ -82,6 +83,29 @@ public class TileMapLayer
     {
         get => Renderable.IsVisible;
         set => Renderable.IsVisible = value;
+    }
+
+    /// <summary>
+    /// Color tint multiplied with the layer's tile pixels. Default <c>White</c> (no tint), or the
+    /// Tiled layer's <c>tintcolor</c> if the TMX sets one. Multiplied by <see cref="Alpha"/> at
+    /// draw time. Same name and meaning as <see cref="Sprite.Color"/>.
+    /// </summary>
+    public Color Color
+    {
+        get => (_tileLayer ?? throw NoBackingLayer()).TintColor ?? Color.White;
+        set => (_tileLayer ?? throw NoBackingLayer()).TintColor = value;
+    }
+
+    /// <summary>
+    /// Opacity from 0 (fully transparent) to 1 (fully opaque). Default <c>1</c>, or the Tiled
+    /// layer's <c>opacity</c> if the TMX sets one. Multiplied with <see cref="Color"/> at draw
+    /// time. Same name and meaning as <see cref="Sprite.Alpha"/>. To fade a whole map, loop
+    /// over <see cref="TileMap.Layers"/>.
+    /// </summary>
+    public float Alpha
+    {
+        get => (_tileLayer ?? throw NoBackingLayer()).Opacity;
+        set => (_tileLayer ?? throw NoBackingLayer()).Opacity = value;
     }
 
     /// <summary>
@@ -173,11 +197,13 @@ public class TileMapLayer
     private void EnsureMutable()
     {
         if (_tileLayer == null || _tilesets == null)
-            throw new InvalidOperationException(
-                "This TileMapLayer was constructed without a backing TilemapTileLayer " +
-                "(legacy test seam). Tile mutation requires a TileMap built from a TMX " +
-                "file or from the Tilemap-based test constructor.");
+            throw NoBackingLayer();
     }
+
+    private static InvalidOperationException NoBackingLayer() =>
+        new("This TileMapLayer was constructed without a backing TilemapTileLayer " +
+            "(legacy test seam). This member requires a TileMap built from a TMX " +
+            "file or from the Tilemap-based test constructor.");
 
     private List<int> FindGlobalIdsForClass(string className)
     {

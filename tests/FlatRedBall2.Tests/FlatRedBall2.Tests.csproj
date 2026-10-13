@@ -32,5 +32,6 @@
     <None Include="Animation\Content\Corpus\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Animation\Content\Snapshot\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Glue\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Tiled\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
