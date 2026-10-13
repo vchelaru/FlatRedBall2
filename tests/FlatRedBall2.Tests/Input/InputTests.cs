@@ -32,6 +32,10 @@ file sealed class FakeGamepad : IGamepad
     public bool WasButtonJustPressed(Buttons button) => ButtonJustPressed;
     public bool WasButtonJustReleased(Buttons button) => ButtonJustReleased;
     public float GetAxis(GamepadAxis axis) => 0f;
+    public bool IsConnected => true;
+    public float? Deadzone { get; set; }
+    public GamepadDeadzoneType DeadzoneType { get; set; }
+    public bool SetVibration(float leftMotor, float rightMotor) => true;
 }
 
 // --- Cursor ---
@@ -427,6 +431,10 @@ file sealed class FakeDPadGamepad : IGamepad
     public bool WasButtonJustPressed(Buttons button) => false;
     public bool WasButtonJustReleased(Buttons button) => false;
     public float GetAxis(GamepadAxis axis) => 0f;
+    public bool IsConnected => true;
+    public float? Deadzone { get; set; }
+    public GamepadDeadzoneType DeadzoneType { get; set; }
+    public bool SetVibration(float leftMotor, float rightMotor) => true;
 }
 
 public class GamepadDPadInput2DTests

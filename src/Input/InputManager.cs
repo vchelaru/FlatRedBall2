@@ -15,17 +15,28 @@ public class InputManager
     private readonly Keyboard _keyboard = new Keyboard();
     private readonly Cursor _cursor = new Cursor();
     private readonly Gamepad[] _gamepads;
+    private readonly bool[] _wasConnected = new bool[4];
 
     /// <summary>
     /// Creates the input manager and allocates four gamepad slots. Called once by the engine
     /// during startup; game code does not construct this directly.
     /// </summary>
-    public InputManager()
+    public InputManager() : this(new MonoGameGamepadPlatform()) { }
+
+    internal InputManager(IGamepadPlatform gamepadPlatform)
     {
         _gamepads = new Gamepad[4];
         for (int i = 0; i < 4; i++)
-            _gamepads[i] = new Gamepad(i);
+            _gamepads[i] = new Gamepad(i, gamepadPlatform);
     }
+
+    /// <summary>
+    /// Raised during the input update when a gamepad is plugged in or unplugged, with the gamepad index (0–3) and
+    /// whether it is now connected. Pads already connected at startup raise a "connected" event on the first update.
+    /// Handlers run before entity and screen logic, and <see cref="IGamepad.IsConnected"/> already reflects the change.
+    /// This lives as long as the engine, so a screen or entity that subscribes must unsubscribe when it is destroyed.
+    /// </summary>
+    public event Action<int, bool>? GamepadConnectionChanged;
 
     /// <summary>Keyboard input. State is captured once per frame before entity and screen logic runs.</summary>
     public IKeyboard Keyboard => _keyboard;
@@ -33,7 +44,7 @@ public class InputManager
     /// <summary>Mouse/touch cursor. <see cref="ICursor.WorldPosition"/> is in Y+ up world space, matching entity coordinates.</summary>
     public ICursor Cursor => _cursor;
 
-    /// <summary>Returns the gamepad at the given index (0–3). Safe to call when no controller is connected — returns zeroed state.</summary>
+    /// <summary>Returns the gamepad at the given index (0–3). Safe to call when no controller is connected — returns zeroed state; check <see cref="IGamepad.IsConnected"/>.</summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown for index values outside 0–3.</exception>
     public IGamepad GetGamepad(int index)
     {
@@ -70,7 +81,16 @@ public class InputManager
     {
         _keyboard.Update();
         _cursor.Update(realTimeSinceStart);
-        foreach (var gp in _gamepads)
-            gp.Update();
+        for (int i = 0; i < _gamepads.Length; i++)
+            _gamepads[i].Update();
+
+        // Raised after every pad has updated so a handler sees consistent state across all four.
+        for (int i = 0; i < _gamepads.Length; i++)
+        {
+            var connected = _gamepads[i].IsConnected;
+            if (connected == _wasConnected[i]) continue;
+            _wasConnected[i] = connected;
+            GamepadConnectionChanged?.Invoke(i, connected);
+        }
     }
 }
