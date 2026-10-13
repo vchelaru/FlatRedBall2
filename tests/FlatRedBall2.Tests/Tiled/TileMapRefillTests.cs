@@ -6,6 +6,7 @@ using FlatRedBall2.Tiled;
 using MonoGame.Extended.Tilemaps;
 using Shouldly;
 using Xunit;
+using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Tests.Tiled;
 
@@ -213,14 +214,178 @@ public class TileMapRefillTests
         tiles.Rectangles.Single().Width.ShouldBe(32f);
     }
 
-    [Fact]
-    public void Refill_IntoNonEmptyCollection_Throws()
+    // 4x4 map with layers A, B, C sharing one tileset, all of class "Solid": id 0 = full tile,
+    // id 1 = triangle polygon, id 2 = half-height sub-cell rect, id 3 = a different triangle.
+    // placements are (layer, col, tmxRow, localId).
+    private static Tilemap LayeredTilemap(params (string layer, int col, int row, int localId)[] placements)
     {
-        var map = SolidMap(0, 0);
-        var tiles = new TileShapes();
-        map.GenerateCollisionFromClass(tiles, "Solid");
+        var tilemap = new Tilemap("test", 4, 4, 16, 16, TilemapOrientation.Orthogonal);
+        var tileset = new TilemapTileset("ts", null!, 16, 16, 4, 4) { FirstGlobalId = 1 };
+        tileset.AddTileData(new TilemapTileData(0) { Class = "Solid" });
+        var slope = new TilemapTileData(1) { Class = "Solid" };
+        slope.CollisionObjects.Add(new TilemapPolygonObject(1, XnaVec2.Zero, new[]
+            { new XnaVec2(0, 0), new XnaVec2(16, 16), new XnaVec2(0, 16) }));
+        tileset.AddTileData(slope);
+        var curb = new TilemapTileData(2) { Class = "Solid" };
+        curb.CollisionObjects.Add(new TilemapRectangleObject(2, XnaVec2.Zero, new XnaVec2(16, 8)));
+        tileset.AddTileData(curb);
+        var slope2 = new TilemapTileData(3) { Class = "Solid" };
+        slope2.CollisionObjects.Add(new TilemapPolygonObject(3, XnaVec2.Zero, new[]
+            { new XnaVec2(16, 0), new XnaVec2(16, 16), new XnaVec2(0, 16) }));
+        tileset.AddTileData(slope2);
+        tilemap.Tilesets.Add(tileset);
+        foreach (string name in new[] { "A", "B", "C" })
+        {
+            var layer = new TilemapTileLayer(name, 4, 4, 16, 16);
+            foreach (var (l, col, row, id) in placements)
+                if (l == name) layer.SetTile(col, row, new TilemapTile(globalId: 1 + id));
+            tilemap.Layers.Add(layer);
+        }
+        return tilemap;
+    }
 
-        Should.Throw<InvalidOperationException>(() => map.GenerateCollisionFromClass(tiles, "Solid"));
+    private static TileMap LayeredMap(params (string layer, int col, int row, int localId)[] placements) =>
+        new TileMap(LayeredTilemap(placements));
+
+    [Fact]
+    public void Fill_TwoLayersIntoOneCollection_HoldsUnionOfThoseLayersOnly()
+    {
+        var map = LayeredMap(("A", 0, 0, 0), ("B", 3, 3, 0), ("C", 3, 0, 0));
+        var tiles = new TileShapes();
+
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        map.GenerateCollisionFromClass(tiles, "Solid", "C");
+
+        tiles.Rectangles.Count().ShouldBe(2);
+        tiles.GetTileAtCell(0, 3).ShouldNotBeNull();   // A: TMX (0,0)
+        tiles.GetTileAtCell(3, 3).ShouldNotBeNull();   // C: TMX (3,0)
+        tiles.GetTileAtCell(3, 0).ShouldBeNull();      // B: TMX (3,3) never filled
+    }
+
+    [Fact]
+    public void Fill_SecondLayerIntoCollectionWithRelationship_RelationshipHitsActorsAtBothLayers()
+    {
+        var screen = NewScreen();
+        var map = LayeredMap(("A", 0, 0, 0), ("C", 3, 0, 0));
+        var tiles = new TileShapes();
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        var actorA = new Entity { X = tiles.GetTileAtCell(0, 3)!.X - 6f, Y = tiles.GetTileAtCell(0, 3)!.Y };
+        actorA.Add(new AARect { Width = 8f, Height = 8f });
+        var actorC = new Entity { X = tiles.GetTileAtCell(0, 3)!.X + 3 * 16f - 6f, Y = tiles.GetTileAtCell(0, 3)!.Y };
+        actorC.Add(new AARect { Width = 8f, Height = 8f });
+        screen.Register(actorA);
+        screen.Register(actorC);
+        var hit = new List<Entity>();
+        var rel = screen.AddCollisionRelationship(new[] { actorA, actorC }, tiles);
+        rel.MoveFirstOnCollision();
+        rel.CollisionOccurred += (a, _) => hit.Add(a);
+
+        map.GenerateCollisionFromClass(tiles, "Solid", "C");
+        screen.Update(Frame());
+
+        hit.Distinct().Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public void Fill_SameLayerTwice_DoesNotDuplicateFullTiles()
+    {
+        var map = LayeredMap(("A", 1, 1, 0));
+        var tiles = new TileShapes();
+
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+
+        tiles.Rectangles.Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public void Fill_SameLayerTwice_DoesNotDuplicateSubCellRectsOrPolygonTiles()
+    {
+        var map = LayeredMap(("A", 1, 1, 2), ("A", 2, 2, 1));
+        var tiles = new TileShapes();
+
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+
+        tiles.Rectangles.Count().ShouldBe(1);
+        tiles.Polygons.Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public void Fill_AllLayersThenOneLayer_DoesNotDuplicate()
+    {
+        var map = LayeredMap(("A", 0, 0, 0), ("A", 1, 1, 2), ("C", 3, 3, 1));
+        var tiles = new TileShapes();
+
+        map.GenerateCollisionFromClass(tiles, "Solid");
+        int rects = tiles.Rectangles.Count(), polys = tiles.Polygons.Count();
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+
+        tiles.Rectangles.Count().ShouldBe(rects);
+        tiles.Polygons.Count().ShouldBe(polys);
+    }
+
+    [Fact]
+    public void Fill_DifferentPolygonsInSameCellFromTwoLayers_KeepsBoth()
+    {
+        var map = LayeredMap(("A", 1, 1, 1), ("C", 1, 1, 3));
+        var tiles = new TileShapes();
+
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        Should.NotThrow(() => map.GenerateCollisionFromClass(tiles, "Solid", "C"));
+
+        tiles.Polygons.Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public void Fill_AfterMapMoved_AppendsAlignedWithEarlierFill()
+    {
+        var map = LayeredMap(("A", 0, 0, 0), ("C", 1, 0, 0));
+        var tiles = new TileShapes();
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+
+        map.X += 100f;
+        map.GenerateCollisionFromClass(tiles, "Solid", "C");
+
+        tiles.GetTileAtCell(1, 3)!.X.ShouldBe(tiles.GetTileAtCell(0, 3)!.X + 16f);
+    }
+
+    [Fact]
+    public void Fill_IntoNonEmptyCollectionFromMapAtOtherPosition_Throws()
+    {
+        var tiles = new TileShapes();
+        SolidMap(0, 0).GenerateCollisionFromClass(tiles, "Solid");
+        var other = SolidMap(3, 3);
+        other.X = 500f;
+
+        Should.Throw<InvalidOperationException>(() => other.GenerateCollisionFromClass(tiles, "Solid"));
+    }
+
+    [Fact]
+    public void Fill_IntoNonEmptyCollectionFromMapWithOtherTileSize_Throws()
+    {
+        var tiles = new TileShapes();
+        SolidMap(0, 0).GenerateCollisionFromClass(tiles, "Solid");
+        var other = new TileMap(SolidTilemap(0, 0, tileSize: 32));
+
+        Should.Throw<InvalidOperationException>(() => other.GenerateCollisionFromClass(tiles, "Solid"));
+    }
+
+    // Pins a known limitation: a hot reload rebuilds the collection from the LAST fill only.
+    [Fact]
+    public void TryReload_AfterTwoFillsIntoOneCollection_RebuildsFromLastFillOnly()
+    {
+        var map = LayeredMap(("A", 0, 0, 0), ("C", 3, 0, 0));
+        var tiles = new TileShapes();
+        map.GenerateCollisionFromClass(tiles, "Solid", "A");
+        map.GenerateCollisionFromClass(tiles, "Solid", "C");
+        tiles.Rectangles.Count().ShouldBe(2);
+
+        map.TryReload(LayeredTilemap(("A", 0, 0, 0), ("C", 3, 0, 0))).ShouldBeTrue();
+
+        tiles.Rectangles.Count().ShouldBe(1);
+        tiles.GetTileAtCell(3, 3).ShouldNotBeNull();
+        tiles.GetTileAtCell(0, 3).ShouldBeNull();
     }
 
     [Fact]

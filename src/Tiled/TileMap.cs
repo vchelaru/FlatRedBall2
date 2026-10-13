@@ -789,12 +789,14 @@ public class TileMap
     /// <see cref="TileShapes"/> you already own instead of creating one. Use it to swap maps without
     /// touching collision relationships: keep one <see cref="TileShapes"/>, call
     /// <see cref="TileShapes.Clear"/>, then fill it from the new map. Relationships on it keep their
-    /// handlers and response.
+    /// handlers and response. Filling adds to whatever <paramref name="target"/> already holds, so
+    /// calling it once per layer stacks several layers into one collection.
     /// </summary>
     /// <param name="target">
-    /// Must be empty (call <see cref="TileShapes.Clear"/> first). Its origin and
-    /// <see cref="TileShapes.GridSize"/> are set from this map; its other settings (color, layer,
-    /// visibility) are kept.
+    /// If empty, its origin and <see cref="TileShapes.GridSize"/> are set from this map. If it already
+    /// holds shapes, its grid must already match this map (see the exception below) and only shapes
+    /// it does not already contain are added. Its other settings (color, layer, visibility) are kept.
+    /// Call <see cref="TileShapes.Clear"/> to start over.
     /// </param>
     /// <param name="className">The tile/object class to match (case-insensitive).</param>
     /// <param name="layerName">See <see cref="GenerateCollisionFromClass(string, string?)"/>.</param>
@@ -804,8 +806,17 @@ public class TileMap
     /// map replaces the earlier registration instead of adding a second one. One-shot passes you ran
     /// on the previous contents (such as assigning surrounded tiles) are not repeated; rerun them
     /// after each fill.
+    /// <para>
+    /// <b>Hot reload limitation:</b> <see cref="TryReloadFrom"/> rebuilds <paramref name="target"/>
+    /// from the <i>last</i> fill only. Earlier fills into the same collection (other layers) are not
+    /// replayed, so after a reload the collection holds just the last fill's shapes.
+    /// </para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException"><paramref name="target"/> already has shapes.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="target"/> already holds shapes and its tile size or origin does not match this
+    /// map (for example it was filled from a different map, or moved by hand). Call
+    /// <see cref="TileShapes.Clear"/> first.
+    /// </exception>
     /// <exception cref="NotSupportedException">The map is not orthogonal; see <see cref="GenerateCollisionFromClass(string, string?)"/>.</exception>
     public void GenerateCollisionFromClass(TileShapes target, string className, string? layerName = null)
     {
@@ -849,9 +860,10 @@ public class TileMap
 
     /// <summary>
     /// Same matching as <see cref="GenerateCollisionFromProperty(string, string?)"/>, but fills an
-    /// empty <see cref="TileShapes"/> you already own. See
-    /// <see cref="GenerateCollisionFromClass(TileShapes, string, string?)"/> for the map-swap pattern,
-    /// tracking, and exceptions.
+    /// <see cref="TileShapes"/> you already own, adding to whatever it holds. See
+    /// <see cref="GenerateCollisionFromClass(TileShapes, string, string?)"/> for the map-swap and
+    /// layer-stacking patterns, tracking, the hot-reload limitation (a reload rebuilds from the last
+    /// fill only), and exceptions.
     /// </summary>
     public void GenerateCollisionFromProperty(TileShapes target, string propertyName, string? layerName = null)
     {
@@ -876,6 +888,7 @@ public class TileMap
 
         // One TileShapes follows one map: a previous map must not keep shifting or reloading
         // shapes that now belong to this one, and refilling from this map must not double-track.
+        // Only the last fill is kept as the reload recipe (earlier fills are not replayed).
         if (target._generatedBy != null && target._generatedBy.TryGetTarget(out var previous))
             previous.Untrack(target);
         Untrack(target);
@@ -1484,6 +1497,8 @@ public class TileMap
     /// (e.g. extra <c>AddPolygonTileAtCell</c> calls) are wiped: the engine rebuilds each
     /// tracked collection from the new tile data. Put augmentations in
     /// <c>CustomInitialize</c> if you need them to survive a full restart.
+    /// A collection filled more than once (see <see cref="GenerateCollisionFromClass(TileShapes, string, string?)"/>)
+    /// is rebuilt from its last fill only; earlier fills into it are not replayed.
     /// </remarks>
     public bool TryReloadFrom(string tmxPath)
     {

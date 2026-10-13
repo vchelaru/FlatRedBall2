@@ -277,6 +277,80 @@ public class TileShapes : ICollidable
             foreach (var r in list) yield return r;
     }
 
+    /// <summary>
+    /// Adds every shape of <paramref name="other"/> (same origin and GridSize) that this collection
+    /// does not already hold, so merging overlapping fills adds nothing twice. A polygon tile whose
+    /// cell already holds a different polygon is kept as a spanning polygon instead of throwing.
+    /// </summary>
+    internal void AppendDistinctFrom(TileShapes other)
+    {
+        foreach (var cell in other._tiles.Keys)
+            AddTileAtCell(cell.col, cell.row);
+
+        foreach (var (cell, poly) in other._polyTiles)
+        {
+            if (_tiles.ContainsKey(cell)) continue;
+            if (!_polyTiles.TryGetValue(cell, out var existing))
+                AddPolygonTileAtCell(cell.col, cell.row, poly);
+            else if (!SameShape(existing, poly))
+                AddSpanningPolygonIfNew(WorldPoints(poly));
+        }
+
+        foreach (var (cell, rects) in other._subCellRects)
+        {
+            float centerX = X + cell.col * GridSize + GridSize / 2f;
+            float centerY = Y + cell.row * GridSize + GridSize / 2f;
+            foreach (var rect in rects)
+            {
+                if (HasSubCellRect(cell, rect)) continue;
+                AddRectangleTileAtCell(cell.col, cell.row, rect.X - centerX, rect.Y - centerY, rect.Width, rect.Height);
+            }
+        }
+
+        foreach (var poly in other._spanningPolygons)
+            AddSpanningPolygonIfNew(WorldPoints(poly));
+    }
+
+    private const float DuplicateTolerance = 1e-3f;
+
+    private bool HasSubCellRect((int col, int row) cell, AARect rect)
+    {
+        if (!_subCellRects.TryGetValue(cell, out var list)) return false;
+        foreach (var r in list)
+        {
+            if (MathF.Abs(r.X - rect.X) < DuplicateTolerance && MathF.Abs(r.Y - rect.Y) < DuplicateTolerance
+                && MathF.Abs(r.Width - rect.Width) < DuplicateTolerance && MathF.Abs(r.Height - rect.Height) < DuplicateTolerance)
+                return true;
+        }
+        return false;
+    }
+
+    private void AddSpanningPolygonIfNew(Vector2[] worldPoints)
+    {
+        foreach (var existing in _spanningPolygons)
+            if (SamePoints(WorldPoints(existing), worldPoints)) return;
+        AddSpanningPolygon(worldPoints);
+    }
+
+    private static bool SameShape(Polygon a, Polygon b) => SamePoints(WorldPoints(a), WorldPoints(b));
+
+    private static Vector2[] WorldPoints(Polygon poly)
+    {
+        var points = new Vector2[poly.Points.Count];
+        for (int i = 0; i < points.Length; i++)
+            points[i] = poly.Points[i] + new Vector2(poly.X, poly.Y);
+        return points;
+    }
+
+    private static bool SamePoints(Vector2[] a, Vector2[] b)
+    {
+        if (a.Length != b.Length) return false;
+        for (int i = 0; i < a.Length; i++)
+            if (MathF.Abs(a[i].X - b[i].X) >= DuplicateTolerance || MathF.Abs(a[i].Y - b[i].Y) >= DuplicateTolerance)
+                return false;
+        return true;
+    }
+
     internal bool IsEmpty =>
         _tiles.Count == 0 && _polyTiles.Count == 0 && _subCellRects.Count == 0 && _spanningPolygons.Count == 0;
 

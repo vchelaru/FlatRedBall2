@@ -68,7 +68,9 @@ var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "Gamepla
 
 `Remove(map)` undoes `Add(map)` for visuals only: layers stop drawing, lazy spawning and tile animation stop. It does **not** touch the map's generated `TileShapes` or any relationship on them; those keep drawing and colliding until you remove them. A swap is `Add(newMap)`, `Remove(oldMap)`, `Remove(oldTiles)`, `RemoveCollisionRelationship(oldRel)`, then `AddCollisionRelationship` on the new map's shapes (handlers on the old relationship are not carried over). Re-adding a map restores only its visuals, so a relationship you removed has to be created again. Entities already spawned from the old map stay alive; destroy them yourself. `Remove(tiles)` and `RemoveCollisionRelationship(rel)` are safe to call from a collision handler; the relationship removal takes effect when that collision pass ends.
 
-To keep relationships and their handlers across a map swap, keep one `TileShapes`, call `Clear()`, then `map.GenerateCollisionFromClass(tiles, "SolidCollision")` (the overload taking your `TileShapes`; it throws if the collection is not empty). The collection follows the new map and stops following the old one. Rerun any one-shot pass you ran over the shapes (such as surrounded-tile assignment) after each refill.
+To keep relationships and their handlers across a map swap, keep one `TileShapes`, call `Clear()`, then `map.GenerateCollisionFromClass(tiles, "SolidCollision")` (the overload taking your `TileShapes`). The collection follows the new map and stops following the old one. Rerun any one-shot pass you ran over the shapes (such as surrounded-tile assignment) after each refill.
+
+That overload adds to whatever the collection already holds, without duplicating shapes, so calling it once per layer (`layerName: "A"`, then `"C"`) stacks those layers into one collection. A hot reload rebuilds such a collection from the last fill only, and filling a collection built for a different map origin or tile size throws until you `Clear()` it.
 
 ## Slope Tiles and Sub-Cell Shapes
 

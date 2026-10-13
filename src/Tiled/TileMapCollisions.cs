@@ -264,17 +264,45 @@ public static class TileMapCollisions
         TileShapes target)
     {
         RequireOrthogonal(tilemap);
-        if (!target.IsEmpty)
-            throw new InvalidOperationException(
-                "Cannot generate collision into a TileShapes that already has shapes. Call Clear() first.");
 
         // mapY is the top edge (Tiled convention). TileShapes.Y is the bottom edge
         // (Y-up convention). Convert: bottom = top - totalHeight. The layer-less path uses the
         // map-level height (not a per-layer one) because object layers may precede tile layers.
-        target.GridSize = tilemap.TileWidth;
-        target.X = mapX;
-        target.Y = mapY - (layer?.Height ?? tilemap.Height) * tilemap.TileHeight;
+        float originY = mapY - (layer?.Height ?? tilemap.Height) * tilemap.TileHeight;
 
+        if (target.IsEmpty)
+        {
+            target.GridSize = tilemap.TileWidth;
+            target.X = mapX;
+            target.Y = originY;
+            Scan(tilemap, layer, tilePredicate, objectPredicate, target);
+            return;
+        }
+
+        // Appending: the existing shapes fix the grid, so the new ones must line up with it.
+        // Shapes follow their map by delta, so a map moved between fills still matches.
+        const float originTolerance = 0.01f;
+        if (target.GridSize != tilemap.TileWidth
+            || MathF.Abs(target.X - mapX) > originTolerance
+            || MathF.Abs(target.Y - originY) > originTolerance)
+            throw new InvalidOperationException(
+                "Cannot add to a TileShapes whose grid does not match this map (tile size or origin differs, " +
+                "for example it was filled from another map or offset by hand). Call Clear() first.");
+
+        // Scan into a scratch collection, then merge only what the target does not already hold, so
+        // overlapping fills (the same layer twice, or all layers then one) add nothing twice.
+        var scratch = new TileShapes { GridSize = target.GridSize, X = target.X, Y = target.Y };
+        Scan(tilemap, layer, tilePredicate, objectPredicate, scratch);
+        target.AppendDistinctFrom(scratch);
+    }
+
+    private static void Scan(
+        Tilemap tilemap,
+        TilemapTileLayer? layer,
+        Func<TilemapTileData, bool> tilePredicate,
+        Func<TilemapObject, bool>? objectPredicate,
+        TileShapes target)
+    {
         if (layer != null)
             RegenerateInto(tilemap, layer, tilePredicate, target);
         else
