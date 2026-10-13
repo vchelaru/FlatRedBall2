@@ -546,6 +546,12 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     /// Called by <see cref="Factory{T}.Create()"/> immediately after engine injection.
     /// <see cref="Engine"/> and <see cref="Engine"/>.<see cref="FlatRedBallService.CurrentScreen"/>
     /// are both available — use this (not the constructor) to access engine services or add child shapes.
+    /// <para>
+    /// Runs <b>once per instance</b>, including pooled entities (<see cref="Factory{T}.EnablePooling"/>):
+    /// it is not called again when a pooled instance is reused. This differs from FRB1's
+    /// <c>CustomInitialize</c>, which reruns on every reuse; if you pool, put per-life code in
+    /// <see cref="Reset"/>.
+    /// </para>
     /// </summary>
     /// <remarks>
     /// <see cref="Screen.Register"/> does <b>not</b> call this automatically. If you instantiate an
@@ -573,13 +579,18 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
 
     /// <summary>
     /// Override to clear per-life dynamic state (lifetime accumulators, mode flags, health) when
-    /// this entity is recycled from a pooled <see cref="Factory{T}"/>. Called per-recycle in place
-    /// of <see cref="CustomInitialize"/>; the engine has already reset <see cref="Position"/>,
-    /// <see cref="Velocity"/>, <see cref="Acceleration"/>, <see cref="Rotation"/>,
-    /// <see cref="RotationVelocity"/>, <see cref="Drag"/>, <see cref="IsVisible"/>, and re-attached
-    /// renderables to the screen. Not called on the first <see cref="Factory{T}.Create()"/> for an
-    /// instance — that path runs <see cref="CustomInitialize"/> exactly once. Has no effect on
-    /// non-pooled factories.
+    /// this entity is recycled from a pooled <see cref="Factory{T}"/>. This is the per-life hook:
+    /// it runs on every reuse, whereas <see cref="CustomInitialize"/> runs once per instance.
+    /// FRB1's per-life <c>CustomInitialize</c> maps to <c>Reset()</c>.
+    /// <para>
+    /// The engine has already reset <see cref="Position"/>, <see cref="Velocity"/>,
+    /// <see cref="Acceleration"/>, <see cref="Rotation"/>, <see cref="RotationVelocity"/>,
+    /// <see cref="Drag"/>, <see cref="Z"/>, <see cref="IsVisible"/>, and re-attached renderables to
+    /// the screen. The caller's configure callback runs before <c>Reset()</c>, so values it set
+    /// are visible here and can be overwritten. Not called on the first
+    /// <see cref="Factory{T}.Create()"/> (or prewarm) for an instance; that path runs
+    /// <see cref="CustomInitialize"/> instead. Has no effect on non-pooled factories.
+    /// </para>
     /// </summary>
     protected virtual void Reset() { }
 
@@ -635,8 +646,8 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
         Destroyed?.Invoke();
     }
 
-    // Resets engine-owned per-life state. Called by Factory<T> on pool recycle before the user's
-    // Reset() override and the caller's configure callback.
+    // Resets engine-owned per-life state. Called by Factory<T> on pool recycle before the caller's
+    // configure callback and the user's Reset() override (in that order).
     internal void ResetEngineState()
     {
         Position = Vector2.Zero;

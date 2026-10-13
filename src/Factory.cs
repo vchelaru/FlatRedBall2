@@ -81,8 +81,10 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// Enables object pooling on this factory. When enabled, calling <see cref="Entity.Destroy"/>
     /// on a created instance returns it to a free list instead of tearing it down; the next
     /// <see cref="Create()"/> reuses that instance. <see cref="Entity.CustomInitialize"/> runs
-    /// exactly once per instance (on first creation); on every subsequent recycle the engine
-    /// resets per-life state and the entity's <see cref="Entity.Reset"/> override is called.
+    /// exactly once per instance (on first creation) and is not called again on reuse; on every
+    /// subsequent recycle the engine resets per-life state and the entity's
+    /// <see cref="Entity.Reset"/> override is called. This is not the same as FRB1's
+    /// <c>CustomInitialize</c> if you pool: put per-life code in <c>Reset()</c>.
     /// <see cref="Entity.CustomDestroy"/> does <b>not</b> run on pooled destroys.
     /// </summary>
     /// <remarks>
