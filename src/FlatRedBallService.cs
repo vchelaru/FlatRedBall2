@@ -384,19 +384,6 @@ public class FlatRedBallService
     }
 
     /// <summary>
-    /// Initializes the engine, sizes the window for <typeparamref name="TScreen"/>, and starts it —
-    /// the whole boot. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
-    /// </summary>
-    /// <remarks>
-    /// A Glue project named by <paramref name="settings"/> is loaded before the screen starts, so
-    /// <paramref name="configure"/> can read <see cref="GlueProject"/>.
-    /// <para>
-    /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
-    /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
-    /// MonoGame defaults the property to <c>false</c>.
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Boots a whole Glue project: loads <paramref name="glueProjectFile"/>, applies the display
     /// settings it declares, and starts its start-up screen. Call this inside <c>Game.Initialize</c>,
     /// after <c>base.Initialize()</c>.
@@ -413,10 +400,29 @@ public class FlatRedBallService
     /// your own, or to pass a <c>configure</c> callback.
     /// </para>
     /// </remarks>
+    /// <param name="game">The MonoGame <c>Game</c> hosting the engine.</param>
+    /// <param name="glueProjectFile">Relative path to the <c>.gluj</c> Glue project file.</param>
     public void Initialize(Game game, string glueProjectFile) =>
         Initialize<Glue.GlueScreen>(
             game, new EngineInitSettings { GlueProjectFile = glueProjectFile });
 
+    /// <summary>
+    /// Initializes the engine, sizes the window for <typeparamref name="TScreen"/>, and starts it —
+    /// the whole boot. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
+    /// </summary>
+    /// <remarks>
+    /// A Glue project named by <paramref name="settings"/> is loaded before the screen starts, so
+    /// <paramref name="configure"/> can read <see cref="GlueProject"/>.
+    /// <para>
+    /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
+    /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
+    /// MonoGame defaults the property to <c>false</c>.
+    /// </para>
+    /// </remarks>
+    /// <typeparam name="TScreen">The screen to start; also determines the window settings applied.</typeparam>
+    /// <param name="game">The MonoGame <c>Game</c> hosting the engine.</param>
+    /// <param name="settings">Optional engine settings; <c>null</c> uses the defaults.</param>
+    /// <param name="configure">Optional callback run on the screen instance before its <c>CustomInitialize</c>.</param>
     public void Initialize<TScreen>(
         Game game, EngineInitSettings? settings = null, Action<TScreen>? configure = null)
         where TScreen : Screen, new()
@@ -473,6 +479,8 @@ public class FlatRedBallService
     /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
     /// MonoGame defaults the property to <c>false</c>.
     /// </remarks>
+    /// <param name="game">The MonoGame <c>Game</c> hosting the engine.</param>
+    /// <param name="settings">Optional engine settings; <c>null</c> uses the defaults.</param>
     public void Initialize(Game game, EngineInitSettings? settings = null)
     {
         // Before the first BeginPhase below: settings is the only place profiling can be turned on
