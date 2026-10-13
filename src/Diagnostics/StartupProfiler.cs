@@ -49,11 +49,11 @@ public sealed class StartupProfiler
 
     /// <summary>
     /// Raised with the phase name each time <see cref="BeginPhase"/> is called, whether or not
-    /// <see cref="IsEnabled"/> is set. Names only, no timings: it exists so a host (the BlazorGL
-    /// boot screen) can show what the engine is doing while it boots, which the report built after
-    /// loading finishes cannot do. Raised synchronously on the boot thread, so a handler should
-    /// be cheap. An exception from a handler is swallowed, because a broken progress display must
-    /// not take the boot down.
+    /// <see cref="IsEnabled"/> is set. Names only, no timings: it exists so a host can observe
+    /// what the engine is doing while it boots, which the report built after loading finishes
+    /// cannot do. Raised synchronously on the boot thread, so a handler should be cheap. An
+    /// exception from a handler is swallowed, because a broken progress display must not take the
+    /// boot down.
     /// </summary>
     public event Action<string>? PhaseStarted;
 

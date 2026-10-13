@@ -2,8 +2,10 @@
 // BEFORE _framework/blazor.webassembly.js (it has to be installed before the runtime download
 // starts to count it). It injects its own DOM and CSS, so index.html carries no markup.
 //
-// What it shows: the logo, an indeterminate bar, "Loading" with the running size of the
-// _framework/ download, and (when the engine reports one) the current boot phase. Nothing in
+// What it shows: the logo, an indeterminate bar, and "Loading" with the running size of the
+// _framework/ download. There is deliberately no status text for engine init: it runs as one
+// synchronous block, so the browser could not repaint a changing line while it ran. The bar
+// animates with a transform, which keeps moving while the main thread is busy. Nothing in
 // Content/ is counted; frb-host.js prefetches that concurrently and it is not what the player is
 // waiting on.
 //
@@ -12,6 +14,9 @@
 //     installBeforeTickChain), so Pattern B canvas re-pinning keeps working.
 //   - It removes itself after the game has completed a couple of frames, and on timers if the
 //     frame signal never arrives, so a stale copy cannot cover a working game.
+//   - It asks the host (frb-host.js, through window.frbSkipTick) to skip the first tick, so the
+//     browser paints the screen before the engine's synchronous init blocks the thread. A host
+//     that never asks simply does not skip.
 //   - It never asks for a click: the game's own click-to-start stays the only audio gate.
 //   - A boot failure stays on screen with a short message instead of hanging, and the console
 //     gets one "[frb-boot-screen] boot failure: rule=... url=... status=..." line naming why.
@@ -23,8 +28,9 @@
 (function (root) {
     'use strict';
 
-    // Completed game ticks before the screen goes away. The first tick builds the Game and runs
-    // all engine and Gum init synchronously, so a completed tick means a frame has been drawn.
+    // Completed game ticks before the screen goes away. The first real tick builds the Game and
+    // runs all engine and Gum init synchronously, so a completed tick means a frame has been drawn.
+    // A tick the host skipped (see skipTick) draws nothing and does not count.
     var FRAMES_BEFORE_HIDE = 2;
     // The host loop is up (window.theInstance exists) but frbBeforeTick never reached us.
     var HOST_GRACE_MS = 5000;
@@ -69,17 +75,17 @@
         return text;
     }
 
-    // env: { now(): ms, onHide(): void, log(level, message): void }. Pure state machine; the DOM
+    // env: { now(): ms, onHide(): void, log(level, message): void, onSkip(): void }. Pure state machine; the DOM
     // and timers live in start().
     function createController(env) {
         var c = {
             bytes: 0,
-            phase: '',
             failed: false,
             failure: null,
             hidden: false,
             dirty: true,
             beforeTickCalls: 0,
+            skippedTicks: 0,
             hostReadyAt: null,
             startedAt: env.now()
         };
@@ -92,20 +98,18 @@
             c.dirty = true;
         };
 
-        c.setPhase = function (name) {
-            if (c.hidden) return;
-            c.phase = String(name);
-            c.dirty = true;
-        };
+        // Real (non-skipped) ticks that have finished, as of the current frbBeforeTick. Call N means
+        // N-1 ticks have been through the host loop, and skipped ones drew nothing.
+        function completedTicks() { return Math.max(0, c.beforeTickCalls - 1 - c.skippedTicks); }
 
         // A failure sticks: neither the frame count nor the timers dismiss it. The exception is a
-        // failure reported after a tick has completed: the game is running, so it is logged and
-        // dropped. (A first tick that throws reports before the second frbBeforeTick, so it
-        // still latches.) rule is a short id; info optionally has url, status and message.
+        // failure reported after a real tick has completed: the game is running, so it is logged
+        // and dropped. (The first real tick that throws reports before the next frbBeforeTick, so
+        // it still latches.) rule is a short id; info optionally has url, status and message.
         c.fail = function (rule, info) {
             if (c.hidden || c.failed) return;
             rule = rule || 'unknown';
-            if (c.beforeTickCalls >= 2) {
+            if (completedTicks() >= 1) {
                 if (!ignoredOnce[rule]) {
                     ignoredOnce[rule] = true;
                     log('warn', 'boot failure ignored, game already running: ' + describe(rule, info));
@@ -131,18 +135,29 @@
         };
 
         // One call per frbBeforeTick, which runs before that frame's TickDotNet. So call N means
-        // N-1 ticks have completed.
+        // N-1 ticks have gone through the host loop.
         c.beforeTick = function () {
             if (c.hidden) return;
             c.beforeTickCalls++;
-            if (!c.failed && c.beforeTickCalls - 1 >= FRAMES_BEFORE_HIDE) c.hide();
+            if (!c.failed && completedTicks() >= FRAMES_BEFORE_HIDE) c.hide();
+        };
+
+        // Asked by the host once per frame, right after frbBeforeTick. True exactly once, on the
+        // first frame: the host then skips that frame's TickDotNet, so the browser gets a frame to
+        // paint this screen's latest state before init blocks the thread. onSkip lets the DOM side
+        // render synchronously, because the poll timer cannot run once init starts.
+        c.skipTick = function () {
+            if (c.hidden || c.failed || c.skippedTicks > 0 || c.beforeTickCalls !== 1) return false;
+            c.skippedTicks = 1;
+            if (env.onSkip) env.onSkip();
+            return true;
         };
 
         // probe: { hostReady: bool, errorUiVisible: bool }
         c.poll = function (probe) {
             if (c.hidden) return;
             var now = env.now();
-            if (probe.errorUiVisible && c.beforeTickCalls < 2) c.fail('blazor-error-ui', { message: probe.errorUiText });
+            if (probe.errorUiVisible && completedTicks() < 1) c.fail('blazor-error-ui', { message: probe.errorUiText });
             if (c.failed) return;
             if (probe.hostReady && c.hostReadyAt === null) c.hostReadyAt = now;
             if (c.hostReadyAt !== null && c.beforeTickCalls === 0 && now - c.hostReadyAt > HOST_GRACE_MS) c.hide();
@@ -248,7 +263,6 @@
             '@media (prefers-reduced-motion:reduce){#frb-boot-screen .frb-fill{animation:none;width:100%;opacity:.5}}' +
             '#frb-boot-screen .frb-meta{margin-top:12px;font-size:13px;display:flex;gap:14px;' +
             'font-variant-numeric:tabular-nums;opacity:.85}' +
-            '#frb-boot-screen .frb-phase{margin-top:6px;font-size:12px;opacity:.6;min-height:1.2em}' +
             '#frb-boot-screen .frb-err{color:#ff6b6b;text-align:center;font-size:13px;margin-top:22px;max-width:70%}';
 
         function el(tag, className, text) {
@@ -275,18 +289,16 @@
         var size = el('span');
         meta.appendChild(label);
         meta.appendChild(size);
-        var phase = el('div', 'frb-phase');
         var err = el('div', 'frb-err', FAILED_TEXT);
         err.style.display = 'none';
 
-        [style, logo, bar, meta, phase, err].forEach(function (child) { rootEl.appendChild(child); });
+        [style, logo, bar, meta, err].forEach(function (child) { rootEl.appendChild(child); });
         (doc.body || doc.documentElement).appendChild(rootEl);
 
         return {
             render: function (state) {
                 size.textContent = formatBytes(state.bytes);
-                phase.textContent = state.phase;
-                bar.style.display = meta.style.display = phase.style.display = state.failed ? 'none' : '';
+                bar.style.display = meta.style.display = state.failed ? 'none' : '';
                 err.style.display = state.failed ? '' : 'none';
                 // For tooling: a script can read why without scraping the console.
                 rootEl.setAttribute('data-state', state.failed ? 'failed' : 'loading');
@@ -312,6 +324,11 @@
                 try { win.console[level]('[frb-boot-screen] ' + message); } catch (e) { }
             },
             now: function () { return win.performance && win.performance.now ? win.performance.now() : Date.now(); },
+            // Called as the host skips the first tick: paint the latest byte count now, since the
+            // poll timer cannot run once the engine's synchronous init starts.
+            onSkip: function () {
+                if (controller.dirty) { controller.dirty = false; view.render(controller); }
+            },
             onHide: function () {
                 win.clearInterval(timer);
                 win.removeEventListener('error', onError, true);
@@ -337,8 +354,9 @@
         }, function () { return !controller.hidden; });
         win.addEventListener('error', onError, true);
 
+        // Asked by frb-host.js once per frame; true only for the first one.
+        win.frbSkipTick = controller.skipTick;
         // Called from the engine through Pages/Index.razor.cs; no-ops once the screen is gone.
-        win.frbBootPhase = controller.setPhase;
         win.frbBootFailed = function (message) { controller.fail('frbBootFailed', { message: message }); };
 
         view.render(controller);
@@ -363,6 +381,7 @@
         isFrameworkUrl: isFrameworkUrl,
         classifyFrameworkUrl: classifyFrameworkUrl,
         createController: createController,
+        createView: createView,
         installBeforeTickChain: installBeforeTickChain,
         installFetchCounter: installFetchCounter,
         constants: { FRAMES_BEFORE_HIDE: FRAMES_BEFORE_HIDE, HOST_GRACE_MS: HOST_GRACE_MS, MAX_VISIBLE_MS: MAX_VISIBLE_MS }

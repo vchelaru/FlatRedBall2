@@ -42,6 +42,31 @@ public class BootScreenBehaviorTests
         }
     }
 
+    private static string RunNodeRaw(string script, string hostPath)
+    {
+        var scriptPath = Path.Combine(Path.GetTempPath(), $"frb-host-{Guid.NewGuid():N}.js");
+        File.WriteAllText(scriptPath, script);
+        try
+        {
+            var startInfo = new ProcessStartInfo("node", $"\"{scriptPath}\"")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            startInfo.Environment["HOST_PATH"] = hostPath;
+            using var process = Process.Start(startInfo)!;
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            process.ExitCode.ShouldBe(0, stderr);
+            return stdout;
+        }
+        finally
+        {
+            File.Delete(scriptPath);
+        }
+    }
+
     [Fact]
     public void InstallBeforeTickChain_PageAssignsHookAfterInstall_RunsBothAndKeepsPageHook()
     {
@@ -297,6 +322,129 @@ public class BootScreenBehaviorTests
             win.fetch('_framework/dotnet.native.abc.wasm').then(() => new Promise((r) => setTimeout(r, 20))).then(() => out(reported));");
 
         result.ShouldBe("[\"fetch-non-ok\",404,\"_framework/dotnet.native.abc.wasm\"]");
+    }
+
+    [Fact]
+    public void Controller_SkipTick_SkipsTheFirstTickOnlyOnce()
+    {
+        // The host asks before every tick. Skipping the first one gives the browser a frame to
+        // paint the screen before engine init blocks the thread; skipping more would just stall.
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {} });
+            const asked = [];
+            for (let i = 0; i < 4; i++) { c.beforeTick(); asked.push(c.skipTick()); }
+            out(asked);");
+
+        result.ShouldBe("[true,false,false,false]");
+    }
+
+    [Fact]
+    public void Controller_SkipTick_HidesOnlyAfterTwoRealFrames()
+    {
+        // The skipped tick draws nothing, so it must not count toward the frames that prove the
+        // game is on screen: hide on call 4, not call 3.
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {} });
+            const states = [];
+            for (let i = 0; i < 4; i++) { c.beforeTick(); c.skipTick(); states.push(c.hidden); }
+            out(states);");
+
+        result.ShouldBe("[false,false,false,true]");
+    }
+
+    [Fact]
+    public void Controller_SkipTick_FirstRealTickThrew_StillLatches()
+    {
+        // With the first tick skipped, the Game is built in tick 2, so its exception arrives
+        // after the second frbBeforeTick. That is still a boot failure, not a running game.
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: () => {} });
+            c.beforeTick(); c.skipTick();
+            c.beforeTick(); c.skipTick();
+            c.fail('frbBootFailed', { message: 'InvalidOperationException: boom' });
+            for (let i = 0; i < 5; i++) { c.beforeTick(); c.skipTick(); }
+            out({ failed: c.failed, hidden: c.hidden });");
+
+        result.ShouldBe("{\"failed\":true,\"hidden\":false}");
+    }
+
+    [Fact]
+    public void Controller_SkipTick_FailureAfterOneRealFrame_IsIgnored()
+    {
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: () => {} });
+            c.beforeTick(); c.skipTick();
+            c.beforeTick(); c.skipTick();
+            c.beforeTick(); c.skipTick();
+            c.fail('blazor-error-ui', { message: 'late' });
+            out({ failed: c.failed });");
+
+        result.ShouldBe("{\"failed\":false}");
+    }
+
+    [Fact]
+    public void Controller_AlreadyFailed_DoesNotSkipATick()
+    {
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: () => {} });
+            c.fail('x');
+            c.beforeTick();
+            out(c.skipTick());");
+
+        result.ShouldBe("false");
+    }
+
+    [Fact]
+    public void Controller_HasNoPhaseState()
+    {
+        // The engine's init is one synchronous block, so a phase line could never paint while it
+        // changes. The screen shows "Loading" and the download size only.
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {} });
+            out({ setPhase: typeof c.setPhase, phase: 'phase' in c });");
+
+        result.ShouldBe("{\"setPhase\":\"undefined\",\"phase\":false}");
+    }
+
+    [Fact]
+    public void CreateView_Render_ShowsLoadingAndSizeWithNoPhaseLine()
+    {
+        var result = RunNode(@"
+            const made = [];
+            const node = (tag) => { const n = { tag, className: '', style: {}, children: [], attrs: {}, textContent: '',
+                appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, parentNode: null }; made.push(n); return n; };
+            const doc = { createElement: node, body: node('body') };
+            const view = b.createView(doc);
+            view.render({ bytes: 2048, failed: false, failure: null });
+            const classes = made.map((n) => n.className).filter(Boolean);
+            const texts = made.filter((n) => n.style.display !== 'none').map((n) => n.textContent).filter((t) => t && !t.includes('{'));
+            out({ phaseElement: classes.includes('frb-phase'), texts });");
+
+        result.ShouldBe("{\"phaseElement\":false,\"texts\":[\"Loading\",\"2 KB\"]}");
+    }
+
+    [Theory]
+    [InlineData("src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js")]
+    [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/wwwroot/frb-host.js")]
+    public void FrbHost_TickJs_SkipsTheTickWhenTheHookSaysSo(string relativePath)
+    {
+        // The loop still schedules the next frame when a tick is skipped; only the .NET call is
+        // withheld. Without the hook (no boot screen, or an older one) every frame ticks.
+        var hostPath = Path.Combine(TemplatePackageReferenceTests.RepoRootForTests, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var result = RunNodeRaw(@"
+            const vm = require('vm'); const fs = require('fs');
+            const run = (skipHook) => {
+                let ticks = 0, scheduled = 0;
+                const win = { addEventListener: () => {}, requestAnimationFrame: () => scheduled++, theInstance: { invokeMethod: () => ticks++ } };
+                if (skipHook) { let first = true; win.frbSkipTick = () => { const s = first; first = false; return s; }; }
+                const ctx = { window: win, document: { write: () => {} }, console };
+                vm.runInNewContext(fs.readFileSync(process.env.HOST_PATH, 'utf8') + '\n;globalThis.__tick = tickJS;', ctx);
+                ctx.__tick(); ctx.__tick();
+                return { ticks, scheduled };
+            };
+            process.stdout.write(JSON.stringify({ withHook: run(true), withoutHook: run(false) }));", hostPath);
+
+        result.ShouldBe("{\"withHook\":{\"ticks\":1,\"scheduled\":2},\"withoutHook\":{\"ticks\":2,\"scheduled\":2}}");
     }
 
     [Fact]

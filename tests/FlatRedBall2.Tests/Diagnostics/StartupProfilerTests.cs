@@ -112,8 +112,8 @@ public class StartupProfilerTests
     [Fact]
     public void BeginPhase_WhenDisabled_StillRaisesPhaseStartedWithName()
     {
-        // The browser boot screen shows the phase name without anyone opting into profiling, so
-        // the live sink must not depend on IsEnabled.
+        // A host watches boot progress without anyone opting into profiling, so the live sink
+        // must not depend on IsEnabled.
         var profiler = new StartupProfiler { IsEnabled = false };
         var started = new List<string>();
         profiler.PhaseStarted += started.Add;

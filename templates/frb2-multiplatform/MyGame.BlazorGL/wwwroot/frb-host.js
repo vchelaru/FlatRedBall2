@@ -38,10 +38,16 @@
 // who need to re-pin canvas.width/height each frame.
 function tickJS() {
     if (typeof window.frbBeforeTick === 'function') window.frbBeforeTick();
-    try {
-        window.theInstance.invokeMethod('TickDotNet');
-    } catch (e) {
-        console.error('TickDotNet exception:', e);
+    // Optional hook (boot-screen.js): true skips this frame's tick, so the page paints once
+    // before the first tick's synchronous engine init blocks the thread.
+    var skip = false;
+    try { skip = typeof window.frbSkipTick === 'function' && window.frbSkipTick() === true; } catch (e) { }
+    if (!skip) {
+        try {
+            window.theInstance.invokeMethod('TickDotNet');
+        } catch (e) {
+            console.error('TickDotNet exception:', e);
+        }
     }
     window.requestAnimationFrame(tickJS);
 }
