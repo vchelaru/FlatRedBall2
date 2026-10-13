@@ -198,7 +198,7 @@ public class SpriteColorAndFrameControlGoldenTests
         frameControlled.FlipHorizontal.ShouldBeFalse();
         // Marker pixel 1 unit in from the sprite's top corner: top-right when flipped, top-left otherwise.
         ShouldBeNear(image[Width / 2 - 30 + 6, Height / 2 - 7], 255, 255, 255);   // manual: marker top-right
-        ShouldBeNear(image[Width / 2 - 30 - 7, Height / 2 - 7], 220, 40, 40);     // manual: top-left is plain red
+        ShouldBeNear(image[Width / 2 - 30 - 7, Height / 2 - 7], 40, 200, 60);     // manual: top-left shows the green quadrant (mirrored)
         ShouldBeNear(image[Width / 2 + 30 - 7, Height / 2 - 7], 255, 255, 255);   // frame-controlled: marker top-left
     }
 }
