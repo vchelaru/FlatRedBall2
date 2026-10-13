@@ -7,7 +7,7 @@ namespace FlatRedBall2.Tiled;
 /// A read-only snapshot of one object on a Tiled object layer, returned by
 /// <see cref="TileMap.GetObjectLayerData"/> for game code that wants raw Tiled object data
 /// without spawning an entity (<see cref="TileMap.CreateEntities{T}"/>) or generating collision
-/// (<see cref="TileMap.GenerateCollisionFromClass"/>).
+/// (<see cref="TileMap.GenerateCollisionFromClass(string, string?)"/>).
 /// </summary>
 /// <param name="X">Left edge, in world space (already includes the owning <see cref="TileMap"/>'s position).</param>
 /// <param name="Y">

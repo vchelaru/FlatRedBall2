@@ -462,7 +462,7 @@ public class TileMap
 
     /// <summary>
     /// Left edge of the map in world space. Setting this repositions all layers and every
-    /// <see cref="TileShapes"/> generated from this map (see <see cref="GenerateCollisionFromClass"/>).
+    /// <see cref="TileShapes"/> generated from this map (see <see cref="GenerateCollisionFromClass(string, string?)"/>).
     /// </summary>
     public float X
     {
@@ -609,13 +609,13 @@ public class TileMap
     /// Returns a snapshot of every object on the object layer named <paramref name="layerName"/>
     /// (case-insensitive) — position, size, class, tile global ID, and properties — for reading
     /// Tiled object data directly instead of going through <see cref="CreateEntities{T}"/>
-    /// (spawns entities) or <see cref="GenerateCollisionFromClass"/> (builds collision).
+    /// (spawns entities) or <see cref="GenerateCollisionFromClass(string, string?)"/> (builds collision).
     /// </summary>
     /// <remarks>
     /// Rectangle objects, tile-insert objects, polygon objects (as <see cref="ObjectLayerEntry.Points"/>),
     /// and other simple (unsized) object types are all included. Object rotation is ignored —
     /// <see cref="ObjectLayerEntry"/> always describes the object's unrotated placement; use
-    /// <see cref="GenerateCollisionFromClass"/> or <see cref="GenerateCollisionFromProperty"/>
+    /// <see cref="GenerateCollisionFromClass(string, string?)"/> or <see cref="GenerateCollisionFromProperty(string, string?)"/>
     /// instead if you need rotation-aware collision shapes.
     /// </remarks>
     /// <param name="layerName">The object layer's name (case-insensitive).</param>
@@ -779,20 +779,42 @@ public class TileMap
     /// </exception>
     public TileShapes GenerateCollisionFromClass(string className, string? layerName = null)
     {
+        var tsc = new TileShapes { Name = className };
+        GenerateCollisionFromClass(tsc, className, layerName);
+        return tsc;
+    }
+
+    /// <summary>
+    /// Same matching as <see cref="GenerateCollisionFromClass(string, string?)"/>, but fills a
+    /// <see cref="TileShapes"/> you already own instead of creating one. Use it to swap maps without
+    /// touching collision relationships: keep one <see cref="TileShapes"/>, call
+    /// <see cref="TileShapes.Clear"/>, then fill it from the new map. Relationships on it keep their
+    /// handlers and response.
+    /// </summary>
+    /// <param name="target">
+    /// Must be empty (call <see cref="TileShapes.Clear"/> first). Its origin and
+    /// <see cref="TileShapes.GridSize"/> are set from this map; its other settings (color, layer,
+    /// visibility) are kept.
+    /// </param>
+    /// <param name="className">The tile/object class to match (case-insensitive).</param>
+    /// <param name="layerName">See <see cref="GenerateCollisionFromClass(string, string?)"/>.</param>
+    /// <remarks>
+    /// <paramref name="target"/> follows this map's <see cref="X"/>/<see cref="Y"/> from now on and
+    /// stops following whichever map filled it before. Filling the same collection again from this
+    /// map replaces the earlier registration instead of adding a second one. One-shot passes you ran
+    /// on the previous contents (such as assigning surrounded tiles) are not repeated; rerun them
+    /// after each fill.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException"><paramref name="target"/> already has shapes.</exception>
+    /// <exception cref="NotSupportedException">The map is not orthogonal; see <see cref="GenerateCollisionFromClass(string, string?)"/>.</exception>
+    public void GenerateCollisionFromClass(TileShapes target, string className, string? layerName = null)
+    {
         Func<TilemapTileData, bool> predicate = td =>
             string.Equals(td.Class, className, StringComparison.OrdinalIgnoreCase);
         Func<TilemapObject, bool>? objectPredicate = layerName == null
             ? obj => string.Equals(obj.Class, className, StringComparison.OrdinalIgnoreCase)
             : null;
-
-        TileShapes tsc = layerName != null
-            ? TileMapCollisions.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
-            : TileMapCollisions.GenerateFromClass(_tilemap, className, _x, _y);
-
-        tsc.Name = className;
-
-        _trackedCollections.Add(new TrackedCollection(predicate, objectPredicate, layerName, tsc));
-        return tsc;
+        FillAndTrack(target, predicate, objectPredicate, layerName);
     }
 
     /// <summary>
@@ -820,18 +842,54 @@ public class TileMap
     /// </exception>
     public TileShapes GenerateCollisionFromProperty(string propertyName, string? layerName = null)
     {
+        var tsc = new TileShapes();
+        GenerateCollisionFromProperty(tsc, propertyName, layerName);
+        return tsc;
+    }
+
+    /// <summary>
+    /// Same matching as <see cref="GenerateCollisionFromProperty(string, string?)"/>, but fills an
+    /// empty <see cref="TileShapes"/> you already own. See
+    /// <see cref="GenerateCollisionFromClass(TileShapes, string, string?)"/> for the map-swap pattern,
+    /// tracking, and exceptions.
+    /// </summary>
+    public void GenerateCollisionFromProperty(TileShapes target, string propertyName, string? layerName = null)
+    {
         Func<TilemapTileData, bool> predicate = td =>
             td.Properties.TryGetValue(propertyName, out _);
         Func<TilemapObject, bool>? objectPredicate = layerName == null
             ? obj => obj.Properties.TryGetValue(propertyName, out _)
             : null;
+        FillAndTrack(target, predicate, objectPredicate, layerName);
+    }
 
-        TileShapes tsc = layerName != null
-            ? TileMapCollisions.GenerateFromProperty(_tilemap, GetInternalLayer(layerName), propertyName, _x, _y)
-            : TileMapCollisions.GenerateFromProperty(_tilemap, propertyName, _x, _y);
+    private void FillAndTrack(
+        TileShapes target,
+        Func<TilemapTileData, bool> predicate,
+        Func<TilemapObject, bool>? objectPredicate,
+        string? layerName)
+    {
+        TileMapCollisions.FillInto(
+            _tilemap,
+            layerName != null ? GetInternalLayer(layerName) : null,
+            predicate, objectPredicate, _x, _y, target);
 
-        _trackedCollections.Add(new TrackedCollection(predicate, objectPredicate, layerName, tsc));
-        return tsc;
+        // One TileShapes follows one map: a previous map must not keep shifting or reloading
+        // shapes that now belong to this one, and refilling from this map must not double-track.
+        if (target._generatedBy != null && target._generatedBy.TryGetTarget(out var previous))
+            previous.Untrack(target);
+        Untrack(target);
+        _trackedCollections.Add(new TrackedCollection(predicate, objectPredicate, layerName, target));
+        target._generatedBy = new WeakReference<TileMap>(this);
+    }
+
+    private void Untrack(TileShapes target)
+    {
+        for (int i = _trackedCollections.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(_trackedCollections[i].Collection, target))
+                _trackedCollections.RemoveAt(i);
+        }
     }
 
     /// <summary>
@@ -863,7 +921,7 @@ public class TileMap
     /// body and that point rotates with it, around the object's stored <c>(x,y)</c> — Tiled's
     /// pivot is the position, <b>not</b> the bounding-box center, so a rotated marker's center can
     /// land well away from where the unrotated box sat. This matches
-    /// <see cref="GenerateCollisionFromClass"/>, so an entity and a collision shape built from the
+    /// <see cref="GenerateCollisionFromClass(string, string?)"/>, so an entity and a collision shape built from the
     /// same rotated object agree. Shapes with no extent are unaffected — rotation has nothing to
     /// swing. Contrast with <see cref="GetObjectLayerData"/>, which reports unrotated placements.
     /// </para>
@@ -907,7 +965,7 @@ public class TileMap
     /// to empty and the matched object is removed from its object layer — so one Tiled source
     /// produces exactly one runtime object. Without it a visible tile double-draws under the
     /// spawned entity, and a rectangle or polygon is also picked up as a collision shape by
-    /// <see cref="GenerateCollisionFromClass"/>. That method consumes nothing, so when the same
+    /// <see cref="GenerateCollisionFromClass(string, string?)"/>. That method consumes nothing, so when the same
     /// class feeds both, call <c>CreateEntities</c> <b>first</b> — generating collision first
     /// builds the shape before the removal happens, leaving you with both. In-memory only; the
     /// on-disk TMX is never modified and a fresh load re-applies the removal. Pass <c>false</c>
@@ -1335,7 +1393,7 @@ public class TileMap
     /// <paramref name="row"/>), if any tile layer there has a tile whose tileset Class matches
     /// <paramref name="className"/>. Used by Glue's tile-typed entity spawning
     /// (<see cref="Glue.GlueTileBuilder"/>), which locates spawn points via
-    /// <see cref="GenerateCollisionFromClass"/> rather than <see cref="CreateEntities{T}"/> and so
+    /// <see cref="GenerateCollisionFromClass(string, string?)"/> rather than <see cref="CreateEntities{T}"/> and so
     /// needs this separately. Painted tiles carry no per-instance property bag, so only the
     /// tileset's own class-level properties apply — the same limit <see cref="CreateEntities{T}"/>
     /// documents for painted cells.
@@ -1343,7 +1401,7 @@ public class TileMap
     /// <remarks>
     /// <paramref name="col"/>/<paramref name="row"/> use <see cref="TileShapes"/>' own cell
     /// numbering (row 0 at the map's <b>bottom</b>, matching <see cref="TileShapes.GetTileAtCell"/>
-    /// and what <see cref="GenerateCollisionFromClass"/> returns) — <b>not</b>
+    /// and what <see cref="GenerateCollisionFromClass(string, string?)"/> returns) — <b>not</b>
     /// <see cref="GetCellAt"/>'s Tiled-native convention (row 0 at the top). The two disagree
     /// because <c>TileMapCollisions</c> flips the row when building a <see cref="TileShapes"/> to
     /// go from Tiled's Y-down layer data to this engine's Y-up world space; this method un-flips it
@@ -1422,7 +1480,7 @@ public class TileMap
     /// <see cref="TileShapes"/> references — collision relationships keep working
     /// without reattachment. Rebuilt shapes land at the map's current position, so reloading a
     /// moved map keeps its collision aligned with its layers. Hand-authored mutations made directly to a generated
-    /// <see cref="TileShapes"/> after <see cref="GenerateCollisionFromClass"/>
+    /// <see cref="TileShapes"/> after <see cref="GenerateCollisionFromClass(string, string?)"/>
     /// (e.g. extra <c>AddPolygonTileAtCell</c> calls) are wiped: the engine rebuilds each
     /// tracked collection from the new tile data. Put augmentations in
     /// <c>CustomInitialize</c> if you need them to survive a full restart.

@@ -231,16 +231,8 @@ public static class TileMapCollisions
         float mapY,
         Func<TilemapTileData, bool> predicate)
     {
-        // mapY is the top edge (Tiled convention). TileShapes.Y is the bottom edge
-        // (Y-up convention). Convert: bottom = top - totalHeight.
-        var collection = new TileShapes
-        {
-            X = mapX,
-            Y = mapY - layer.Height * tilemap.TileHeight,
-            GridSize = tilemap.TileWidth
-        };
-
-        AddMatchingTiles(tilemap, layer, predicate, collection);
+        var collection = new TileShapes();
+        FillInto(tilemap, layer, predicate, null, mapX, mapY, collection);
         return collection;
     }
 
@@ -251,29 +243,42 @@ public static class TileMapCollisions
         Func<TilemapTileData, bool> tilePredicate,
         Func<TilemapObject, bool> objectPredicate)
     {
-        var collection = new TileShapes
-        {
-            X = mapX,
-            // Map-level height, not a per-layer height — must be set before any object layer is
-            // processed (object layers may appear before tile layers in Tiled's layer order).
-            Y = mapY - tilemap.Height * tilemap.TileHeight,
-            GridSize = tilemap.TileWidth
-        };
-
-        foreach (var layer in tilemap.Layers)
-        {
-            switch (layer)
-            {
-                case TilemapTileLayer tileLayer:
-                    AddMatchingTiles(tilemap, tileLayer, tilePredicate, collection);
-                    break;
-                case TilemapObjectLayer objectLayer:
-                    AddMatchingObjects(objectLayer, mapX, mapY, objectPredicate, collection);
-                    break;
-            }
-        }
-
+        var collection = new TileShapes();
+        FillInto(tilemap, null, tilePredicate, objectPredicate, mapX, mapY, collection);
         return collection;
+    }
+
+    /// <summary>
+    /// Positions the empty <paramref name="target"/> to the map (origin, <see cref="TileShapes.GridSize"/>)
+    /// and fills it. With <paramref name="layer"/> only that tile layer is scanned; otherwise every
+    /// tile layer plus object layers (via <paramref name="objectPredicate"/>). Shared by the
+    /// <c>Generate*</c> entry points and <see cref="TileMap"/>'s fill-an-existing-collection overloads.
+    /// </summary>
+    internal static void FillInto(
+        Tilemap tilemap,
+        TilemapTileLayer? layer,
+        Func<TilemapTileData, bool> tilePredicate,
+        Func<TilemapObject, bool>? objectPredicate,
+        float mapX,
+        float mapY,
+        TileShapes target)
+    {
+        RequireOrthogonal(tilemap);
+        if (!target.IsEmpty)
+            throw new InvalidOperationException(
+                "Cannot generate collision into a TileShapes that already has shapes. Call Clear() first.");
+
+        // mapY is the top edge (Tiled convention). TileShapes.Y is the bottom edge
+        // (Y-up convention). Convert: bottom = top - totalHeight. The layer-less path uses the
+        // map-level height (not a per-layer one) because object layers may precede tile layers.
+        target.GridSize = tilemap.TileWidth;
+        target.X = mapX;
+        target.Y = mapY - (layer?.Height ?? tilemap.Height) * tilemap.TileHeight;
+
+        if (layer != null)
+            RegenerateInto(tilemap, layer, tilePredicate, target);
+        else
+            RegenerateInto(tilemap, tilePredicate, objectPredicate!, target);
     }
 
     /// <summary>

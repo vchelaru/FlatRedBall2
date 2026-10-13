@@ -103,6 +103,10 @@ public class TileShapes : ICollidable
     internal Action<IRenderable>? _onTileAdded;
     internal Action<IRenderable>? _onTileRemoved;
 
+    // The TileMap currently tracking this collection (weak, so a retired map is not kept alive by a
+    // long-lived collection). Lets a second map take over without the first still shifting it.
+    internal WeakReference<FlatRedBall2.Tiled.TileMap>? _generatedBy;
+
     /// <summary>
     /// Optional logical name for diagnostics, snapshots, and game-specific lookup.
     /// </summary>
@@ -273,10 +277,22 @@ public class TileShapes : ICollidable
             foreach (var r in list) yield return r;
     }
 
+    internal bool IsEmpty =>
+        _tiles.Count == 0 && _polyTiles.Count == 0 && _subCellRects.Count == 0 && _spanningPolygons.Count == 0;
+
     /// <summary>
     /// Removes all tiles (rectangles and polygons) from this collection.
     /// After clearing, <see cref="X"/>, <see cref="Y"/>, and <see cref="GridSize"/> can be changed again.
     /// </summary>
+    /// <remarks>
+    /// The collection itself stays valid: a <see cref="CollisionRelationship{A,B}"/> on it keeps its
+    /// handlers and response, and <c>Screen.Add(TileShapes)</c> render-list sync keeps working, so an
+    /// emptied collection can be refilled in place (see
+    /// <see cref="Tiled.TileMap.GenerateCollisionFromClass(TileShapes, string, string?)"/>). Cleared tiles leave
+    /// the render list immediately. A pair that was touching the collection fires
+    /// <see cref="CollisionRelationship{A,B}.CollisionEnded"/> on the next collision pass unless the
+    /// actor still overlaps what the collection holds by then. Safe to call on an empty collection.
+    /// </remarks>
     public void Clear()
     {
         foreach (var tile in _tiles.Values)
