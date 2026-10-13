@@ -78,9 +78,12 @@ public static partial class GoldenVerifier
         var outcome = comparison.Outcome == ComparisonOutcome.SizeMismatch
             ? GoldenOutcome.SizeMismatch
             : GoldenOutcome.Mismatch;
+        string files = comparison.Diff is null
+            ? $"{name}.actual.png and {name}.expected.png"
+            : $"{name}.actual.png, {name}.expected.png and {name}.diff.png";
         return new GoldenResult(outcome,
-            $"{name}: {comparison.Summary}. See {name}.actual.png, {name}.expected.png and {name}.diff.png " +
-            $"in {options.ArtifactDirectory} (CI uploads them as the golden-image-failures artifact).");
+            $"{name}: {comparison.Summary}. See {files} in {options.ArtifactDirectory} " +
+            "(CI uploads them as the golden-image-failures artifact).");
     }
 }
 
