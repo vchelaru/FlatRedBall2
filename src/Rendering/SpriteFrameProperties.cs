@@ -20,7 +20,8 @@ public enum SpriteFrameProperties
     Offset = 2,
 
     /// <summary>
-    /// The frame's color channels, alpha and color operation (Multiply and Add), applied at draw time.
+    /// The frame's color channels, alpha and color operation. Multiply color and alpha are applied at
+    /// draw time; an Add operation is assigned to <see cref="Sprite.AddColor"/>.
     /// </summary>
     Color = 4,
 

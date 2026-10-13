@@ -77,9 +77,11 @@ public class AnimationFrame
     /// <summary>
     /// Optional per-frame color operation for how <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/>
     /// combine with the texture, or <c>null</c> for none. Applied automatically by
-    /// <see cref="FlatRedBall2.Rendering.Sprite.Draw"/> — <see cref="FlatRedBall2.Animation.ColorOperation.Multiply"/>
-    /// scales the draw color, <see cref="FlatRedBall2.Animation.ColorOperation.Add"/> offsets the texture via
-    /// a pixel shader (see <see cref="FlatRedBall2.Rendering.Batches.WorldSpaceAddColorBatch"/>).
+    /// <see cref="FlatRedBall2.Rendering.Sprite"/> — <see cref="FlatRedBall2.Animation.ColorOperation.Multiply"/>
+    /// scales the draw color, <see cref="FlatRedBall2.Animation.ColorOperation.Add"/> is assigned to
+    /// <see cref="FlatRedBall2.Rendering.Sprite.AddColor"/> (a pixel-shader offset, see
+    /// <see cref="FlatRedBall2.Rendering.Batches.WorldSpaceAddColorBatch"/>). A sprite can opt out via
+    /// <see cref="FlatRedBall2.Rendering.Sprite.FrameControlledProperties"/>.
     /// </summary>
     public ColorOperation? ColorOperation;
 

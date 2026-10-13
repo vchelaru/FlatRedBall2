@@ -17,7 +17,7 @@ public static class SpriteFrameColor
     /// <see cref="AnimationFrame.Green"/>/<see cref="AnimationFrame.Blue"/> (unset channels default
     /// to 255, the identity). <see cref="ColorOperation.Add"/> leaves RGB unchanged here — it is
     /// applied by the pixel shader in <see cref="Batches.WorldSpaceAddColorBatch"/>/
-    /// <see cref="Batches.ScreenSpaceAddColorBatch"/> instead; see <see cref="GetAddOffset"/>.
+    /// <see cref="Batches.ScreenSpaceAddColorBatch"/> instead, via <see cref="Sprite.AddColor"/>; see <see cref="GetAddOffset"/>.
     /// </para>
     /// <para>
     /// <see cref="AnimationFrame.Alpha"/> is independent of <see cref="AnimationFrame.ColorOperation"/>
