@@ -79,7 +79,7 @@ public class TileMapLayerTintTests
 
     // TiledTmxParser.ParseFromStream rejects a null GraphicsDevice, so a TMX cannot be loaded into
     // a Tilemap on CI. This runs the parser's document-to-data steps (the part that reads
-    // tintcolor/opacity) without a device; TileMapLayerTintGpuLoadTests covers the full TileMap path.
+    // tintcolor/opacity) without a device; the golden project's TileLayerTmxTintGoldenTests cover the full TileMap path.
     private static TilemapData ConvertFixture()
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, FixturePath));
@@ -114,28 +114,5 @@ public class TileMapLayerTintTests
 
         plain.TintColor.ShouldBeNull();
         plain.Opacity.ShouldBe(1f);
-    }
-}
-
-// Needs a real GraphicsDevice (TiledTmxParser requires one), so these silently skip on CI.
-[Collection(GraphicsDeviceCollection.Name)]
-public class TileMapLayerTintGpuLoadTests
-{
-    private readonly GraphicsDeviceFixture _fixture;
-
-    public TileMapLayerTintGpuLoadTests(GraphicsDeviceFixture fixture) => _fixture = fixture;
-
-    [Fact]
-    public void LoadedTmx_TintColorAndOpacity_ReachLayer()
-    {
-        if (!_fixture.IsAvailable) return;
-
-        var map = new TileMap("Tiled/Fixtures/TintedLayers.tmx", _fixture.GraphicsDevice!);
-
-        map.GetLayer("Tinted").Color.ShouldBe(new Color(0xff, 0x80, 0x40));
-        map.GetLayer("Tinted").Alpha.ShouldBe(0.5f);
-        map.GetLayer("TintedWithAlpha").Color.ShouldBe(new Color(0xff, 0x00, 0x00, 0x80));
-        map.GetLayer("Plain").Color.ShouldBe(Color.White);
-        map.GetLayer("Plain").Alpha.ShouldBe(1f);
     }
 }

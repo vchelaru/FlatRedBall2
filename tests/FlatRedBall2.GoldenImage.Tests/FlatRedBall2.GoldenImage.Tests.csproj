@@ -31,6 +31,10 @@
     <Compile Include="..\FlatRedBall2.Tests\GraphicsDeviceFixture.cs" Link="GraphicsDeviceFixture.cs" />
   </ItemGroup>
   <ItemGroup>
+    <!-- TMX fixture shared with the engine suite, loaded through TitleContainer relative to bin/. -->
+    <None Include="..\FlatRedBall2.Tests\Tiled\Fixtures\TintedLayers.tmx" Link="Tiled\Fixtures\TintedLayers.tmx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>GoldenDirectory</_Parameter1>
       <_Parameter2>$(GoldenDirectory)</_Parameter2>
