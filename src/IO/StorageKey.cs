@@ -5,7 +5,8 @@ namespace FlatRedBall2.IO;
 /// <summary>
 /// The key rules every backend shares, enforced in <see cref="GameStorage"/> so a name that works on
 /// one platform cannot fail on another. Deliberately the intersection of what Windows, macOS,
-/// Linux, and browser storage accept.
+/// Linux, and browser storage accept. Lowercase only, because Windows and macOS file systems are
+/// case-insensitive and "Save" and "save" would be one file there but two keys elsewhere.
 /// </summary>
 internal static class StorageKey
 {
@@ -13,12 +14,12 @@ internal static class StorageKey
     internal const int MaxSegmentLength = 128;
 
     // Windows refuses these as file names (with or without an extension), so a file backend would
-    // fail on a key the in-memory and browser backends accept.
+    // fail on a key the in-memory and browser backends accept. Lowercase because keys are.
     private static readonly string[] ReservedNames =
     {
-        "CON", "PRN", "AUX", "NUL",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "con", "prn", "aux", "nul",
+        "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+        "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
     };
 
     /// <summary>Throws <see cref="ArgumentException"/> unless <paramref name="key"/> is a valid storage key.</summary>
@@ -79,9 +80,9 @@ internal static class StorageKey
 
         foreach (char c in segment)
         {
-            bool ok = c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '-' or '_' or '.';
+            bool ok = c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_' or '.';
             if (!ok)
-                throw Invalid(paramName, whole, $"contains '{c}'; only letters, digits, '-', '_', '.', and '/' are allowed");
+                throw Invalid(paramName, whole, $"contains '{c}'; only lowercase letters, digits, '-', '_', '.', and '/' are allowed");
         }
 
         if (segment.SequenceEqual(".") || segment.SequenceEqual(".."))
@@ -97,7 +98,7 @@ internal static class StorageKey
         var stem = dot < 0 ? segment : segment[..dot];
         foreach (var reserved in ReservedNames)
         {
-            if (stem.Equals(reserved, StringComparison.OrdinalIgnoreCase))
+            if (stem.SequenceEqual(reserved))
                 throw Invalid(paramName, whole, $"uses '{reserved}', a reserved file name on Windows");
         }
     }

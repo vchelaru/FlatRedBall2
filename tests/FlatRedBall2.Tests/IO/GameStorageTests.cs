@@ -192,7 +192,10 @@ public class GameStorageTests
     [InlineData("star*")]
     [InlineData("trailing.")]
     [InlineData("con")]
-    [InlineData("NUL.txt")]
+    [InlineData("nul.txt")]
+    [InlineData("Save")]
+    [InlineData("saves/Slot1.json")]
+    [InlineData("saveS")]
     public async Task EveryOperation_InvalidKey_ThrowsArgumentException(string key)
     {
         var storage = NewStorage();
@@ -227,6 +230,8 @@ public class GameStorageTests
     [InlineData("a/../")]
     [InlineData("a//")]
     [InlineData("bad char")]
+    [InlineData("Saves/")]
+    [InlineData("saves/Sl")]
     public async Task ListAsync_InvalidPrefix_ThrowsArgumentException(string prefix)
     {
         await Should.ThrowAsync<ArgumentException>(() => NewStorage().ListAsync(prefix));
@@ -235,7 +240,7 @@ public class GameStorageTests
     [Theory]
     [InlineData("a")]
     [InlineData("saves/slot-1_final.v2.json")]
-    [InlineData("A/B/C")]
+    [InlineData("a/b/c")]
     [InlineData(".hidden")]
     [InlineData("console")]
     public async Task WriteTextAsync_ValidKey_Succeeds(string key)

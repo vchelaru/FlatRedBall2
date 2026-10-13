@@ -12,12 +12,12 @@ namespace FlatRedBall2.IO;
 /// game code on desktop and web. Reached as <c>Engine.Storage</c>.
 /// <para>
 /// Everything is async because browser storage is. Keys are relative, '/'-separated names such as
-/// <c>"saves/slot1.json"</c>: letters, digits, '-', '_', '.', at most 256 characters, no '..', no
-/// leading '/'. They are validated the same way on every backend, so a key that works in a desktop
+/// <c>"saves/slot1.json"</c>: lowercase letters, digits, '-', '_', '.', at most 256 characters, no '..',
+/// no leading '/'. Uppercase is rejected on every platform because Windows and macOS file systems
+/// are case-insensitive, so <c>"Save"</c> and <c>"save"</c> would be one file there but two keys
+/// elsewhere. Keys are validated the same way on every backend, so a key that works in a desktop
 /// build works in the web build. An invalid key throws <see cref="ArgumentException"/>; an
-/// I/O or quota failure throws <see cref="StorageException"/>. Keys are case-sensitive here, but a
-/// case-insensitive file system may treat <c>"Save"</c> and <c>"save"</c> as one file, so do not
-/// rely on case to tell keys apart.
+/// I/O or quota failure throws <see cref="StorageException"/>.
 /// </para>
 /// <para>
 /// The default backend is memory-only (<see cref="IsPersistent"/> is <c>false</c>) until a
