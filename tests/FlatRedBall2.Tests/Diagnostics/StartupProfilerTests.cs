@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using FlatRedBall2.Diagnostics;
 using Shouldly;
@@ -105,5 +107,49 @@ public class StartupProfilerTests
         // Report generated while the phase is still open — it must say so rather than print a
         // duration that is really "time until someone asked for the report".
         profiler.GenerateReport().ShouldContain("incomplete");
+    }
+
+    [Fact]
+    public void BeginPhase_WhenDisabled_StillRaisesPhaseStartedWithName()
+    {
+        // The browser boot screen shows the phase name without anyone opting into profiling, so
+        // the live sink must not depend on IsEnabled.
+        var profiler = new StartupProfiler { IsEnabled = false };
+        var started = new List<string>();
+        profiler.PhaseStarted += started.Add;
+
+        profiler.BeginPhase("Gum project load");
+
+        started.ShouldBe(["Gum project load"]);
+        profiler.HasRecordedPhases.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void BeginPhase_NestedPhases_RaisesPhaseStartedInBeginOrder()
+    {
+        var profiler = CreateProfiler(new FakeClock());
+        var started = new List<string>();
+        profiler.PhaseStarted += started.Add;
+
+        profiler.BeginPhase("Engine.Initialize");
+        profiler.BeginPhase("Gum project load");
+        profiler.EndPhase();
+        profiler.EndPhase();
+        profiler.BeginPhase("Screen load");
+
+        started.ShouldBe(["Engine.Initialize", "Gum project load", "Screen load"]);
+    }
+
+    [Fact]
+    public void BeginPhase_PhaseStartedHandlerThrows_StillRecordsPhase()
+    {
+        // A broken UI sink must not take the boot down or corrupt the timing tree.
+        var profiler = CreateProfiler(new FakeClock());
+        profiler.PhaseStarted += _ => throw new InvalidOperationException("sink failed");
+
+        Should.NotThrow(() => profiler.BeginPhase("Engine.Initialize"));
+        profiler.EndPhase();
+
+        profiler.GenerateReport().ShouldContain("Engine.Initialize");
     }
 }

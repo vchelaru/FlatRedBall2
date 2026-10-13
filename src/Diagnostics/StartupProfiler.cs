@@ -47,6 +47,16 @@ public sealed class StartupProfiler
     /// </summary>
     public bool HasRecordedPhases => _roots.Count > 0;
 
+    /// <summary>
+    /// Raised with the phase name each time <see cref="BeginPhase"/> is called, whether or not
+    /// <see cref="IsEnabled"/> is set. Names only, no timings: it exists so a host (the BlazorGL
+    /// boot screen) can show what the engine is doing while it boots, which the report built after
+    /// loading finishes cannot do. Raised synchronously on the boot thread, so a handler should
+    /// be cheap. An exception from a handler is swallowed, because a broken progress display must
+    /// not take the boot down.
+    /// </summary>
+    public event Action<string>? PhaseStarted;
+
     // Swapped out in tests so a phase can be given an exact duration.
     internal Func<long> TimestampProvider { get; set; } = Stopwatch.GetTimestamp;
 
@@ -57,6 +67,8 @@ public sealed class StartupProfiler
     /// </summary>
     public void BeginPhase(string name)
     {
+        RaisePhaseStarted(name);
+
         if (!IsEnabled) return;
 
         var phase = new Phase
@@ -112,6 +124,12 @@ public sealed class StartupProfiler
             AppendPhase(sb, root, totalMs, nameColumnWidth);
 
         return sb.ToString();
+    }
+
+    private void RaisePhaseStarted(string name)
+    {
+        try { PhaseStarted?.Invoke(name); }
+        catch (Exception ex) { Debug.WriteLine($"StartupProfiler.PhaseStarted handler threw: {ex.Message}"); }
     }
 
     private static int MeasureNameColumn(Phase phase)

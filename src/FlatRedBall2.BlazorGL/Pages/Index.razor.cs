@@ -47,17 +47,46 @@ public partial class Index
     [JSInvokable]
     public void TickDotNet()
     {
-        if (_game == null)
+        var isFirstTick = _game == null;
+        if (isFirstTick)
         {
             // Before the game exists so the diagnostics are on from its first frame.
             _perfProbe = PerfDiagnosticsProbe.TryCreateFromQuery(
                 new Uri(Navigation.Uri).Query, FlatRedBallService.Default, GetBrowserLabel,
                 Console.WriteLine, PublishToJs);
-            _game = GameFactory();
-            _game.Run();
+            // -= first: a factory that threw leaves _game null, so the next tick retries from here.
+            FlatRedBallService.Default.StartupTiming.PhaseStarted -= PublishBootPhase;
+            FlatRedBallService.Default.StartupTiming.PhaseStarted += PublishBootPhase;
+            try
+            {
+                _game = GameFactory();
+                _game.Run();
+            }
+            catch (Exception)
+            {
+                InvokeBootScreen("frbBootFailed");
+                throw;
+            }
         }
-        _game.Tick();
+        _game!.Tick();
         _perfProbe?.OnTick();
+        // Boot is over once the first frame has run; later phases ("Screen load" on a screen
+        // change) are not boot progress.
+        if (isFirstTick)
+            FlatRedBallService.Default.StartupTiming.PhaseStarted -= PublishBootPhase;
+    }
+
+    // frbBootPhase / frbBootFailed are defined by boot-screen.js, which a project opts into with
+    // one <script> tag. Without it the first call throws once, and the sink disables itself.
+    private void PublishBootPhase(string phaseName) => InvokeBootScreen("frbBootPhase", phaseName);
+
+    private bool _bootScreenUnavailable;
+
+    private void InvokeBootScreen(string function, params object?[] args)
+    {
+        if (_bootScreenUnavailable) return;
+        try { (JsRuntime as IJSInProcessRuntime)?.InvokeVoid(function, args); }
+        catch (JSException) { _bootScreenUnavailable = true; }
     }
 
     // frbDiagPlatform / frbDiagPublish live in frb-host.js. A project that vendored an older copy
