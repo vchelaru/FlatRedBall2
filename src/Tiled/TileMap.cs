@@ -285,9 +285,11 @@ public class TileMap
     /// </summary>
     public LazySpawner LazySpawner { get; } = new LazySpawner();
 
-    // Reused each tick: the MGEx renderer only reads ElapsedGameTime, and GameTime is a class,
-    // so a fresh instance per frame would allocate on the hot path.
-    private readonly Microsoft.Xna.Framework.GameTime _animationGameTime = new();
+    // Reused while the delta is unchanged (the usual fixed-timestep case): the MGEx renderer only
+    // reads ElapsedGameTime, and GameTime is a class, so a fresh instance per frame would allocate
+    // on the hot path. Rebuilt via the constructor because KNI's ElapsedGameTime setter is not public.
+    private Microsoft.Xna.Framework.GameTime _animationGameTime = new();
+    private float _animationDeltaSeconds = float.NaN;
 
     /// <summary>
     /// Advances Tiled tile animations (<c>.tsx</c> frame sequences) by <paramref name="deltaSeconds"/>.
@@ -297,7 +299,11 @@ public class TileMap
     internal void AdvanceAnimations(float deltaSeconds)
     {
         if (_renderer == null) return;
-        _animationGameTime.ElapsedGameTime = TimeSpan.FromSeconds(deltaSeconds);
+        if (deltaSeconds != _animationDeltaSeconds)
+        {
+            _animationDeltaSeconds = deltaSeconds;
+            _animationGameTime = new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(deltaSeconds));
+        }
         _renderer.Update(_animationGameTime);
     }
 
