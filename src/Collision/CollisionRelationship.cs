@@ -245,9 +245,9 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // Reused scratch list for firing Ended during end-of-frame diff — avoids mid-iteration mutation.
     private List<(A, B)>? _scratchEndedPairs;
     // Entities we've subscribed to _onDestroy for so we can fire Ended synchronously on destruction.
-    // Tracked in a set to avoid double-subscribing across frames. HashSet<object> because A or B
-    // may be Entity, shape, or TileShapes; only Entity has _onDestroy.
-    private HashSet<object>? _hookedEntities;
+    // Tracked to avoid double-subscribing across frames; the delegate is kept so removing the
+    // relationship can unsubscribe it. A or B may be Entity, shape, or TileShapes; only Entity has _onDestroy.
+    private Dictionary<Entity, Action>? _hookedEntities;
     // Reused scratch set when a destroy hook fires or the relationship is disabled, to dedupe pairs
     // across current+previous before firing Ended once per unique pair.
     private HashSet<(A, B)>? _scratchUniqueEndedPairs;
@@ -395,9 +395,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private void HookEntityForDestroy(object side)
     {
         if (side is not Entity entity) return;
-        _hookedEntities ??= new HashSet<object>();
-        if (!_hookedEntities.Add(entity)) return; // already subscribed
-        entity._onDestroy += () => OnHookedEntityDestroyed(entity);
+        _hookedEntities ??= new Dictionary<Entity, Action>();
+        if (_hookedEntities.ContainsKey(entity)) return; // already subscribed
+        Action hook = () => OnHookedEntityDestroyed(entity);
+        _hookedEntities[entity] = hook;
+        entity._onDestroy += hook;
     }
 
     private void OnHookedEntityDestroyed(object destroyed)
@@ -423,7 +425,33 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             _previousContacts?.Remove(p);
             CollisionEnded?.Invoke(p.Item1, p.Item2);
         }
-        _hookedEntities?.Remove(destroyed);
+        if (destroyed is Entity destroyedEntity)
+            _hookedEntities?.Remove(destroyedEntity);
+    }
+
+    // Called by the screen once this relationship is removed: no pair is left in the "started"
+    // state, and no entity keeps a destroy hook (and with it a reference to this relationship).
+    void ICollisionRelationship.OnRemoved()
+    {
+        DeepCollisionCount = 0;
+        FireEndedForAllContacts();
+        if (_hookedEntities != null)
+        {
+            foreach (var kv in _hookedEntities)
+                kv.Key._onDestroy -= kv.Value;
+            _hookedEntities.Clear();
+        }
+        _currentContacts?.Clear();
+        _previousContacts?.Clear();
+    }
+
+    bool ICollisionRelationship.Involves(object participant)
+    {
+        for (int i = 0; i < _listA.Count; i++)
+            if (ReferenceEquals(_listA[i], participant)) return true;
+        for (int i = 0; i < _listB.Count; i++)
+            if (ReferenceEquals(_listB[i], participant)) return true;
+        return false;
     }
 
     // Fires CollisionEnded once per unique tracked pair, then drops all tracking. Called when the

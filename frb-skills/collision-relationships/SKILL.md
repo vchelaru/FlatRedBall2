@@ -114,6 +114,10 @@ still works while disabled, so game code can drive collision on its own schedule
 moment, and re-enabling refires `CollisionStarted` for pairs still overlapping — an enter/exit
 counter sees one extra pair of events per toggle.
 
+## Removing a Relationship — `RemoveCollisionRelationship`
+
+`Screen.RemoveCollisionRelationship(rel)` unregisters it for good; unlike `IsEnabled = false` it cannot be turned back on. `CollisionEnded` fires for pairs still overlapping, and the entities it tracked release their hooks. Calling it from a collision handler is safe: it takes effect when the current collision pass ends. Removing a `TileMap` via `Screen.Remove(map)` removes the relationships on its generated shapes automatically (see `levels`).
+
 ## Execution Order
 
 Collision runs after physics and before `CustomActivity` — by the time game logic runs, entities are already separated from any overlapping collision partner. See `engine-overview` for the full frame loop.

@@ -15,8 +15,39 @@ internal sealed class CollisionSystem
     /// <summary>Adds a collision relationship to be run each frame.</summary>
     internal void Add(ICollisionRelationship relationship) => _relationships.Add(relationship);
 
-    /// <summary>Removes a collision relationship.</summary>
-    internal void Remove(ICollisionRelationship relationship) => _relationships.Remove(relationship);
+    // Removals requested while RunAllCollisions is iterating (a CollisionOccurred handler removing a
+    // relationship or a map). Applied when the pass ends so the index loop never skips a relationship
+    // and a relationship mid-run finishes its pairs before its contacts are ended.
+    private List<ICollisionRelationship>? _pendingRemoval;
+    private bool _isRunning;
+
+    /// <summary>
+    /// Removes a collision relationship. Idempotent. Called during <see cref="RunAllCollisions"/>,
+    /// the removal takes effect at the end of the pass and the relationship is skipped if it has not run yet.
+    /// </summary>
+    internal void Remove(ICollisionRelationship relationship)
+    {
+        if (!_relationships.Contains(relationship)) return;
+        if (_isRunning)
+        {
+            _pendingRemoval ??= new List<ICollisionRelationship>();
+            if (!_pendingRemoval.Contains(relationship))
+                _pendingRemoval.Add(relationship);
+            return;
+        }
+        _relationships.Remove(relationship);
+        relationship.OnRemoved();
+    }
+
+    /// <summary>Removes every relationship that has <paramref name="participant"/> in either list.</summary>
+    internal void RemoveInvolving(object participant)
+    {
+        for (int i = _relationships.Count - 1; i >= 0; i--)
+        {
+            if (i < _relationships.Count && _relationships[i].Involves(participant))
+                Remove(_relationships[i]);
+        }
+    }
 
     /// <summary>Clears all collision relationships.</summary>
     internal void Clear() => _relationships.Clear();
@@ -27,10 +58,26 @@ internal sealed class CollisionSystem
     /// </summary>
     internal void RunAllCollisions()
     {
-        for (int i = 0; i < _relationships.Count; i++)
+        _isRunning = true;
+        try
         {
-            if (_relationships[i].IsEnabled)
-                _relationships[i].RunCollisions();
+            for (int i = 0; i < _relationships.Count; i++)
+            {
+                var rel = _relationships[i];
+                if (rel.IsEnabled && (_pendingRemoval == null || !_pendingRemoval.Contains(rel)))
+                    rel.RunCollisions();
+            }
+        }
+        finally
+        {
+            _isRunning = false;
+            if (_pendingRemoval != null && _pendingRemoval.Count > 0)
+            {
+                var pending = _pendingRemoval;
+                _pendingRemoval = null;
+                for (int i = 0; i < pending.Count; i++)
+                    Remove(pending[i]);
+            }
         }
     }
 }

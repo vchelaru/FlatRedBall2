@@ -170,22 +170,44 @@ public class Screen : ILifecycleEvents
         }
     }
 
+    private readonly Dictionary<Collision.TileShapes, (Action<IRenderable> Added, Action<IRenderable> Removed)> _tileShapeSync = new();
+
     /// <summary>
     /// Registers all tiles in <paramref name="tiles"/> for rendering and wires up future
     /// <see cref="Collision.TileShapes.AddTileAtCell"/> /
     /// <see cref="Collision.TileShapes.RemoveTileAtCell"/> /
     /// <see cref="Collision.TileShapes.AddPolygonTileAtCell"/> /
     /// <see cref="Collision.TileShapes.RemovePolygonTileAtCell"/>
-    /// calls so newly added or removed tiles stay in sync automatically.
+    /// calls so newly added or removed tiles stay in sync automatically. Adding the same
+    /// collection twice is a no-op. Undo with <see cref="Remove(Collision.TileShapes)"/>.
     /// </summary>
     public void Add(Collision.TileShapes tiles, Layer? layer = null)
     {
+        if (_tileShapeSync.ContainsKey(tiles)) return;
         if (layer != null || Layer != null)
             tiles.Layer = layer ?? Layer;
         foreach (var rect in tiles.AllTiles)
             _renderList.Add(rect);
-        tiles._onTileAdded += _renderList.Add;
-        tiles._onTileRemoved += r => _renderList.Remove(r);
+        Action<IRenderable> added = _renderList.Add;
+        Action<IRenderable> removed = r => _renderList.Remove(r);
+        tiles._onTileAdded += added;
+        tiles._onTileRemoved += removed;
+        _tileShapeSync[tiles] = (added, removed);
+    }
+
+    /// <summary>
+    /// Undoes <see cref="Add(Collision.TileShapes, Layer?)"/>: drops every tile from the render
+    /// list and stops tracking later tile changes. Does not touch the geometry or any
+    /// <see cref="CollisionRelationship{A,B}"/> using <paramref name="tiles"/>; remove those with
+    /// <see cref="RemoveCollisionRelationship{A,B}"/>. Idempotent.
+    /// </summary>
+    public void Remove(Collision.TileShapes tiles)
+    {
+        if (!_tileShapeSync.Remove(tiles, out var sync)) return;
+        tiles._onTileAdded -= sync.Added;
+        tiles._onTileRemoved -= sync.Removed;
+        foreach (var rect in tiles.AllTiles)
+            _renderList.Remove(rect);
     }
 
     /// <summary>
@@ -247,6 +269,37 @@ public class Screen : ILifecycleEvents
         if (mapLayer.Renderable == null) return;
         mapLayer.Renderable.Layer = layer ?? Layer;
         _renderList.Add(mapLayer.Renderable);
+    }
+
+    /// <summary>
+    /// Undoes <see cref="Add(TileMap, Layer?)"/>: the map's layers stop drawing, its lazy spawner
+    /// and tile animations stop ticking, and the shapes it generated
+    /// (<see cref="TileMap.GenerateCollisionFromClass"/>) leave the render list. Every
+    /// <see cref="CollisionRelationship{A,B}"/> on those generated shapes is removed too, so the
+    /// removed map's walls stop colliding. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Entities already spawned from the map stay alive; destroy them yourself. Adding the map back
+    /// restores drawing and ticking, but relationships have to be created again. When called from a
+    /// collision handler, relationship removal takes effect at the end of that collision pass.
+    /// </remarks>
+    public void Remove(TileMap map)
+    {
+        foreach (var mapLayer in map.Layers)
+            Remove(mapLayer);
+        _tileMaps.Unregister(map);
+        foreach (var shapes in map.GeneratedShapes)
+        {
+            Remove(shapes);
+            _collisionSystem.RemoveInvolving(shapes);
+        }
+    }
+
+    /// <summary>Removes a single <see cref="TileMapLayer"/> previously added with <see cref="Add(TileMapLayer, Layer?)"/>.</summary>
+    public void Remove(TileMapLayer mapLayer)
+    {
+        if (mapLayer.Renderable == null) return;
+        _renderList.Remove(mapLayer.Renderable);
     }
 
     private readonly ScreenRegistry<TileMap> _tileMaps = new();
@@ -955,6 +1008,20 @@ public class Screen : ILifecycleEvents
         return rel;
     }
 
+    /// <summary>
+    /// Removes a relationship created by one of the <c>AddCollisionRelationship</c> overloads. It stops
+    /// running, <see cref="CollisionRelationship{A,B}.CollisionEnded"/> fires for pairs still overlapping,
+    /// and the screen drops every reference to it. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Safe to call from a collision handler: the removal takes effect once the current collision
+    /// pass ends, and a relationship that has not run yet this frame is skipped.
+    /// </remarks>
+    public void RemoveCollisionRelationship<A, B>(CollisionRelationship<A, B> relationship)
+        where A : ICollidable
+        where B : ICollidable
+        => _collisionSystem.Remove(relationship);
+
     // Internal update — called by FlatRedBallService
     internal void Update(FrameTime frameTime)
     {
@@ -1030,7 +1097,12 @@ public class Screen : ILifecycleEvents
             }
             var lazySpawnRects = _lazySpawnRectBuffer.AsSpan(0, Cameras.Count);
             for (int i = 0; i < _tileMaps.Count; i++)
-                _tileMaps[i].LazySpawner.Update(lazySpawnRects);
+            {
+                // Spawning runs entity CustomInitialize, which may remove this map (or another).
+                var map = _tileMaps[i];
+                map.LazySpawner.Update(lazySpawnRects);
+                if (i < _tileMaps.Count && !ReferenceEquals(_tileMaps[i], map)) i--;
+            }
             if (engine != null)
                 engine._frameProfile.LazySpawnMs = ProfileClock.Ms(t1, System.Diagnostics.Stopwatch.GetTimestamp());
 

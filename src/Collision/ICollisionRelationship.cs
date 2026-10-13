@@ -20,4 +20,13 @@ internal interface ICollisionRelationship
 
     /// <summary>Human-readable label for diagnostics, e.g. "Enemy vs PlayerBullet".</summary>
     string DisplayName { get; }
+
+    /// <summary>
+    /// Called once when the screen drops this relationship: ends any in-progress contacts and
+    /// releases destroy hooks on the entities it tracked.
+    /// </summary>
+    void OnRemoved() { }
+
+    /// <summary>True when <paramref name="participant"/> is an element of either side's list.</summary>
+    bool Involves(object participant) => false;
 }

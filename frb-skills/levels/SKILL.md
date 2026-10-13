@@ -64,6 +64,10 @@ Each collection can have its own collision relationship. For jump-through platfo
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
 ```
 
+## Swapping or Removing a Map at Runtime
+
+`Remove(map)` undoes `Add(map)`: layers stop drawing, lazy spawning and tile animation stop, and the map's generated `TileShapes` leave the render list. It also removes every `CollisionRelationship` on those generated shapes, so a swap is `Remove(oldMap)`, `Add(newMap)`, then a new `AddCollisionRelationship` on the new map's shapes (handlers on the old relationship are not carried over). Entities already spawned from the old map stay alive; destroy them yourself. `Remove(tiles)` and `RemoveCollisionRelationship(rel)` do the same for a hand-built `TileShapes` or a relationship; both are safe to call from a collision handler and take effect when that collision pass ends.
+
 ## Slope Tiles and Sub-Cell Shapes
 
 Tiles in the tileset can declare custom collision via an `<objectgroup>` containing polygons and/or plain `<object>` rectangles. `GenerateCollisionFromClass` emits polygons as `Polygon` tiles and rectangles as sub-cell `AARect`s, instead of the default full-cell rect. Polygons and rects can coexist on the same tile. For platformer floors, set `SlopeMode = PlatformerFloor` on the **collision relationship** (not on the collection) so vertical separation uses a heightmap instead of SAT:
