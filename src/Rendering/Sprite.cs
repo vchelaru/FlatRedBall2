@@ -328,6 +328,40 @@ public class Sprite : IRenderable, IAttachable
     public event Action? AnimationFinished;
 
     /// <summary>
+    /// Fired when a looping animation wraps from its last frame back toward its first (FRB1
+    /// <c>JustCycled</c>). Non-looping chains never raise it; use <see cref="AnimationFinished"/>.
+    /// <list type="bullet">
+    /// <item>Raised at most once per update, even when a large delta spans several loops.</item>
+    /// <item>A single-frame looping chain "loops" each time its frame length elapses.</item>
+    /// <item>Follows <see cref="AnimationSpeed"/>, <see cref="Animate"/>, and screen pause exactly as
+    /// frame advance does; nothing is raised while the animation is not advancing.</item>
+    /// <item><see cref="PlayAnimation(string)"/> never raises it.</item>
+    /// <item>Raised after <see cref="FrameChanged"/> and <see cref="FrameEventRaised"/> for the same
+    /// update. A handler of either that switches animation suppresses it.</item>
+    /// </list>
+    /// </summary>
+    public event Action? AnimationLooped;
+
+    /// <summary>
+    /// Fired when the displayed <see cref="CurrentFrame"/> changes (FRB1 <c>JustChangedFrame</c>);
+    /// <see cref="CurrentFrame"/> is already the new frame during the handler.
+    /// <list type="bullet">
+    /// <item>Raised at most once per update, even when a large delta skips several frames; use
+    /// <see cref="FrameEventRaised"/> to see every frame crossed.</item>
+    /// <item>A loop that lands on the same frame (single-frame chain, or a delta of whole loops) is
+    /// not a frame change, though <see cref="AnimationLooped"/> still fires.</item>
+    /// <item><see cref="PlayAnimation(string)"/> switching to a different chain raises it
+    /// (frame 0 of the new chain is now shown). Re-playing the chain already playing does not.</item>
+    /// <item>On a non-looping chain it is raised before <see cref="AnimationFinished"/>.</item>
+    /// <item>Follows <see cref="AnimationSpeed"/>, <see cref="Animate"/>, and screen pause exactly as
+    /// frame advance does.</item>
+    /// <item>Raised before <see cref="FrameEventRaised"/> for the same update. A handler that switches
+    /// animation suppresses the rest of the old chain's notifications for that update.</item>
+    /// </list>
+    /// </summary>
+    public event Action? FrameChanged;
+
+    /// <summary>
     /// Raised for each <see cref="AnimationFrame.Events"/> entry when playback enters its frame, so
     /// game code reacts by event name instead of by frame index. Frame entry is defined as:
     /// <list type="bullet">
@@ -461,27 +495,43 @@ public class Sprite : IRenderable, IAttachable
         ApplyCurrentFrame();
 
         int playbackVersion = _playbackVersion;
-        RaiseEnteredFrameEvents(chain, previousFrameIndex, wraps);
-        if (finished && playbackVersion == _playbackVersion)
+        if (_currentFrameIndex != previousFrameIndex)
+        {
+            FrameChanged?.Invoke();
+            if (playbackVersion != _playbackVersion) return;
+        }
+
+        if (!RaiseEnteredFrameEvents(chain, previousFrameIndex, wraps)) return;
+        if (wraps > 0)
+        {
+            AnimationLooped?.Invoke();
+            if (playbackVersion != _playbackVersion) return;
+        }
+        if (finished)
             AnimationFinished?.Invoke();
     }
 
     private void RaiseFrameZeroEvents()
     {
         _playbackVersion++;
+        int playbackVersion = _playbackVersion;
+        FrameChanged?.Invoke();
+        if (playbackVersion != _playbackVersion) return;
         var chain = _animationChains![_currentChainIndex];
         if (chain.Count > 0)
-            RaiseEvents(chain[0], _playbackVersion);
+            RaiseEvents(chain[0], playbackVersion);
     }
 
-    private void RaiseEnteredFrameEvents(AnimationChain chain, int previousFrameIndex, int wraps)
+    // Returns false once a handler has switched animation.
+    private bool RaiseEnteredFrameEvents(AnimationChain chain, int previousFrameIndex, int wraps)
     {
-        if (FrameEventRaised == null) return;
+        if (FrameEventRaised == null) return true;
         var (start, length) = FlatRedBall2.AnimationEditorCommon.FrameEventRange.Get(previousFrameIndex, _currentFrameIndex, wraps, chain.Count);
         int playbackVersion = _playbackVersion;
         for (int j = 0; j < length; j++)
             if (!RaiseEvents(chain[(start + j) % chain.Count], playbackVersion))
-                return;
+                return false;
+        return true;
     }
 
     // Returns false once a handler has switched animation, so the caller stops raising the old chain's events.
