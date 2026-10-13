@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using FlatRedBall2.Collision;
 using Shouldly;
@@ -1731,4 +1732,77 @@ public class TileShapesTests
             SolidSides.Up | SolidSides.Left | SolidSides.Right);
     }
 
+    // ── Rectangles / Polygons enumeration ──────────────────────────────────────
+
+    [Fact]
+    public void Rectangles_IncludesFullCellAndSubCellRects()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddTileAtCell(1, 0);
+        tiles.AddRectangleTileAtCell(5, 5, 0f, -4f, 16f, 8f);
+        tiles.AddRectangleTileAtCell(5, 5, 0f, 6f, 4f, 4f); // second sub-cell rect in the same cell
+
+        tiles.Rectangles.Count().ShouldBe(4);
+        tiles.Rectangles.ShouldContain(tiles.GetTileAtCell(0, 0)!);
+        tiles.Rectangles.ShouldContain(tiles.GetRectangleTilesAtCell(5, 5)[1]);
+    }
+
+    [Fact]
+    public void Polygons_IncludesCellPolygonsAndSpanningPolygons()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+        tiles.AddSpanningPolygon(new[] { new Vector2(0f, 0f), new Vector2(40f, 0f), new Vector2(20f, 16f) });
+
+        tiles.Polygons.Count().ShouldBe(2);
+        tiles.Polygons.ShouldContain(tiles.GetPolygonTileAtCell(0, 0)!);
+    }
+
+    [Fact]
+    public void Rectangles_DoNotIncludePolygons_AndViceVersa()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddPolygonTileAtCell(1, 0, SquarePrototype());
+
+        tiles.Rectangles.Count().ShouldBe(1);
+        tiles.Polygons.Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public void Rectangles_AndPolygons_ReflectRuntimeAddAndRemove()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddTileAtCell(1, 0);
+        tiles.AddPolygonTileAtCell(2, 0, SquarePrototype());
+
+        tiles.RemoveTileAtCell(0, 0);
+        tiles.RemovePolygonTileAtCell(2, 0);
+        tiles.AddRectangleTileAtCell(3, 0, 0f, 0f, 8f, 8f);
+
+        tiles.Rectangles.Count().ShouldBe(2);
+        tiles.Polygons.ShouldBeEmpty();
+
+        tiles.Clear();
+
+        tiles.Rectangles.ShouldBeEmpty();
+        tiles.Polygons.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Rectangles_ToListSnapshot_AllowsRemovingWhileIterating()
+    {
+        var tiles = new TileShapes { GridSize = 16f };
+        for (int i = 0; i < 4; i++) tiles.AddTileAtCell(i, 0);
+
+        foreach (var rect in tiles.Rectangles.ToList())
+        {
+            var (col, row) = tiles.GetCellAt(new Vector2(rect.X, rect.Y));
+            tiles.RemoveTileAtCell(col, row);
+        }
+
+        tiles.Rectangles.ShouldBeEmpty();
+    }
 }

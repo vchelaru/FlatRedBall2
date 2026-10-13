@@ -454,28 +454,36 @@ public class TileMap
         PropagatePosition();
     }
 
-    /// <summary>Left edge of the map in world space. Setting this repositions all layers.</summary>
+    /// <summary>
+    /// Left edge of the map in world space. Setting this repositions all layers and every
+    /// <see cref="TileShapes"/> generated from this map (see <see cref="GenerateCollisionFromClass"/>).
+    /// </summary>
     public float X
     {
         get => _x;
         set
         {
+            float delta = value - _x;
             _x = value;
             PropagatePosition();
+            ShiftGeneratedShapes(delta, 0f);
         }
     }
 
     /// <summary>
     /// Top edge of the map in world space (Tiled convention — the map extends downward
-    /// into negative Y). Setting this repositions all layers.
+    /// into negative Y). Setting this repositions all layers and every <see cref="TileShapes"/>
+    /// generated from this map.
     /// </summary>
     public float Y
     {
         get => _y;
         set
         {
+            float delta = value - _y;
             _y = value;
             PropagatePosition();
+            ShiftGeneratedShapes(0f, delta);
         }
     }
 
@@ -752,6 +760,11 @@ public class TileMap
     /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
     /// object layers.
     /// </param>
+    /// <remarks>
+    /// The returned collection is tracked by this map: later changes to <see cref="X"/>,
+    /// <see cref="Y"/>, or <see cref="CenterOn"/> shift its shapes by the same amount, and
+    /// <see cref="TryReloadFrom"/> rebuilds it in place at the map's current position.
+    /// </remarks>
     /// <exception cref="NotSupportedException">
     /// <see cref="Orientation"/> is not <see cref="TilemapOrientation.Orthogonal"/> — the
     /// underlying <see cref="TileShapes"/> broad-phase grid has no diamond/staggered cell
@@ -788,6 +801,11 @@ public class TileMap
     /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
     /// object layers.
     /// </param>
+    /// <remarks>
+    /// The returned collection is tracked by this map: later changes to <see cref="X"/>,
+    /// <see cref="Y"/>, or <see cref="CenterOn"/> shift its shapes by the same amount, and
+    /// <see cref="TryReloadFrom"/> rebuilds it in place at the map's current position.
+    /// </remarks>
     /// <exception cref="NotSupportedException">
     /// <see cref="Orientation"/> is not <see cref="TilemapOrientation.Orthogonal"/> — the
     /// underlying <see cref="TileShapes"/> broad-phase grid has no diamond/staggered cell
@@ -1396,7 +1414,8 @@ public class TileMap
     /// <remarks>
     /// In-place reload preserves all entity state, camera position, and live
     /// <see cref="TileShapes"/> references — collision relationships keep working
-    /// without reattachment. Hand-authored mutations made directly to a generated
+    /// without reattachment. Rebuilt shapes land at the map's current position, so reloading a
+    /// moved map keeps its collision aligned with its layers. Hand-authored mutations made directly to a generated
     /// <see cref="TileShapes"/> after <see cref="GenerateCollisionFromClass"/>
     /// (e.g. extra <c>AddPolygonTileAtCell</c> calls) are wiped: the engine rebuilds each
     /// tracked collection from the new tile data. Put augmentations in
@@ -1545,6 +1564,20 @@ public class TileMap
 
         for (int i = 0; i < _layers.Count; i++)
             _layers[i].Z = i + offset;
+    }
+
+    // Generated TileShapes move by the same delta as the map instead of being re-pinned to it, so
+    // a game's own offset on a TileShapes (shapes.X += 5) survives map moves. Nothing runs unless
+    // the position actually changes; setting X/Y on TileShapes shifts its tiles in place, which
+    // keeps cell lookups (broad phase) consistent because they derive from the same X/Y.
+    private void ShiftGeneratedShapes(float dx, float dy)
+    {
+        if (dx == 0f && dy == 0f) return;
+        foreach (var tracked in _trackedCollections)
+        {
+            tracked.Collection.X += dx;
+            tracked.Collection.Y += dy;
+        }
     }
 
     private void PropagatePosition()

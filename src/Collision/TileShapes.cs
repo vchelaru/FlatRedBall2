@@ -110,6 +110,42 @@ public class TileShapes : ICollidable
 
 
     /// <summary>
+    /// Every <see cref="AARect"/> in this collection: full-cell tiles from
+    /// <see cref="AddTileAtCell"/> and sub-cell rectangles from <see cref="AddRectangleTileAtCell"/>.
+    /// Live view: reflects tiles added or removed after you read the property.
+    /// </summary>
+    /// <remarks>
+    /// Adding or removing tiles while iterating throws <see cref="InvalidOperationException"/>;
+    /// iterate <c>Rectangles.ToList()</c> first if the loop body changes the collection.
+    /// </remarks>
+    public IEnumerable<AARect> Rectangles
+    {
+        get
+        {
+            foreach (var r in _tiles.Values) yield return r;
+            foreach (var r in EnumerateSubCellRects()) yield return r;
+        }
+    }
+
+    /// <summary>
+    /// Every <see cref="Polygon"/> in this collection: cell tiles from
+    /// <see cref="AddPolygonTileAtCell"/> and multi-cell shapes from <see cref="AddSpanningPolygon"/>.
+    /// Live view: reflects tiles added or removed after you read the property.
+    /// </summary>
+    /// <remarks>
+    /// Adding or removing tiles while iterating throws <see cref="InvalidOperationException"/>;
+    /// iterate <c>Polygons.ToList()</c> first if the loop body changes the collection.
+    /// </remarks>
+    public IEnumerable<Polygon> Polygons
+    {
+        get
+        {
+            foreach (var p in _polyTiles.Values) yield return p;
+            foreach (var p in _spanningPolygons) yield return p;
+        }
+    }
+
+    /// <summary>
     /// Returns all tile shapes (rectangles and polygons) currently in this collection. Used by
     /// <c>Screen.Add(TileShapes)</c> to register tiles for rendering.
     /// </summary>
@@ -117,11 +153,8 @@ public class TileShapes : ICollidable
     {
         get
         {
-            foreach (var r in _tiles.Values) yield return r;
-            foreach (var p in _polyTiles.Values) yield return p;
-            foreach (var list in _subCellRects.Values)
-                foreach (var r in list) yield return r;
-            foreach (var p in _spanningPolygons) yield return p;
+            foreach (var r in Rectangles) yield return r;
+            foreach (var p in Polygons) yield return p;
         }
     }
 
