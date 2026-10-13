@@ -1,0 +1,80 @@
+name: Regenerate golden images
+
+# Manual. Re-renders every golden scene on the same Mesa llvmpipe runner the compare job uses and
+# commits the PNGs to the branch this was dispatched on. Goldens only ever come from this output:
+# a local GPU renders slightly differently and would make CI fail. See
+# tests/FlatRedBall2.GoldenImage.Tests/README.md.
+#
+#   gh workflow run golden-images-regenerate.yml --ref <your-branch>
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  regenerate:
+    name: Regenerate goldens (ubuntu, llvmpipe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A direct push to main is blocked by branch protection anyway; fail fast with a clear reason.
+    if: ${{ github.ref_name != github.event.repository.default_branch }}
+    env:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      FRB_GOLDEN_IMAGES: "1"
+      FRB_GOLDEN_UPDATE: "1"
+      FRB_GOLDEN_ARTIFACTS: ${{ github.workspace }}/golden-artifacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Install Mesa software GL and xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1 libglx-mesa0 libgl1-mesa-dri libegl1 mesa-utils
+
+      - name: Show GL renderer
+        run: xvfb-run -a glxinfo -B | grep -E "OpenGL (renderer|version) string"
+
+      - name: Render goldens
+        run: xvfb-run -a -s "-screen 0 1280x720x24" dotnet test tests/FlatRedBall2.GoldenImage.Tests/FlatRedBall2.GoldenImage.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --blame-crash --results-directory "$RUNNER_TEMP/golden-test-results"
+
+      - name: Upload rendered goldens
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-goldens
+          path: tests/FlatRedBall2.GoldenImage.Tests/Golden
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Commit and push changed goldens
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add tests/FlatRedBall2.GoldenImage.Tests/Golden
+          if git diff --cached --quiet; then
+            echo "Goldens unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Regenerate golden images on llvmpipe"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Pushes made with GITHUB_TOKEN trigger no workflows; run the tests on the new commit so
+          # the PR's required checks do not stay on the pre-golden commit.
+          gh workflow run tests.yml --ref "${GITHUB_REF_NAME}"

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Dispatched by "Regenerate golden images" after it pushes: a push made with GITHUB_TOKEN does
+  # not trigger pull_request/push runs, so without this the PR would keep the stale red check.
+  workflow_dispatch:
 
 jobs:
   engine-tests:
@@ -101,6 +104,69 @@ jobs:
       - name: Test AnimationEditor.DocScreenshots
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+  # Renders scenes offscreen on Mesa llvmpipe (software OpenGL under xvfb) and compares them to the
+  # checked-in PNGs in tests/FlatRedBall2.GoldenImage.Tests/Golden (#1420). Its own job because
+  # Linux GL has had intermittent native test-host crashes (#1300): a crash here fails only this
+  # job, never the ~1800 headless tests in engine-tests. It still gates the "dotnet test" check
+  # below, so a red golden job blocks merge like any other test failure.
+  golden-image-tests:
+    name: Golden image tests (ubuntu, llvmpipe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      FRB_GOLDEN_IMAGES: "1"
+      FRB_GOLDEN_ARTIFACTS: ${{ github.workspace }}/golden-artifacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Install Mesa software GL and xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1 libglx-mesa0 libgl1-mesa-dri libegl1 mesa-utils
+
+      # Goldens are only valid if llvmpipe really rendered them; fail loudly here, not as a pixel diff.
+      - name: Show GL renderer
+        run: xvfb-run -a glxinfo -B | grep -E "OpenGL (renderer|version) string"
+
+      # FRB_GOLDEN_IMAGES=1 makes a missing GL device a failure instead of a skip, so a broken
+      # xvfb/Mesa setup cannot turn this job into a green no-op.
+      - name: Test golden images
+        run: xvfb-run -a -s "-screen 0 1280x720x24" dotnet test tests/FlatRedBall2.GoldenImage.Tests/FlatRedBall2.GoldenImage.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --blame-crash --results-directory "$RUNNER_TEMP/golden-test-results"
+
+      - name: Upload golden image failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-image-failures
+          path: ${{ github.workspace }}/golden-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload golden test crash files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-image-test-crash
+          path: ${{ runner.temp }}/golden-test-results
+          if-no-files-found: ignore
+          retention-days: 3
+
   animationchain-pack:
     name: Pack AnimationChain NuGet (ubuntu)
     runs-on: ubuntu-latest
@@ -173,10 +239,17 @@ jobs:
 
   # Umbrella check that branch protection gates on. Stays named "dotnet test" so the
   # existing required-status-check entry in the main-protection ruleset keeps matching.
+  # always() + an explicit result check: with the default success() condition a failed need leaves
+  # this job *skipped*, and branch protection treats a skipped required check as passing.
   test:
     name: dotnet test
     runs-on: ubuntu-latest
-    needs: [engine-tests, animationchain-pack, animationchain-common-pack]
+    needs: [engine-tests, golden-image-tests, animationchain-pack, animationchain-common-pack]
+    if: ${{ always() }}
     steps:
       - name: All test and packaging jobs passed
-        run: echo "engine-tests, animationchain-pack, and animationchain-common-pack succeeded"
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null

@@ -6,3 +6,6 @@
 
 # Precompiled shader bytecode (ShadowDusk.Compiler output) - must never be line-ending-normalized.
 *.mgfx binary
+
+# Golden image PNGs are binary: never diff or normalize them.
+tests/FlatRedBall2.GoldenImage.Tests/Golden/*.png binary

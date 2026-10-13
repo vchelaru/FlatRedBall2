@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <!--
+      Where checked-in goldens live. Baked into the assembly so the harness reads (and, in the CI
+      regenerate workflow, writes) the source folder rather than a stale bin/ copy.
+    -->
+    <GoldenDirectory>$(MSBuildProjectDirectory)/Golden</GoldenDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="StbImageSharp" />
+    <PackageReference Include="StbImageWriteSharp" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Reuse the engine suite's shared-device fixture instead of forking it. -->
+    <Compile Include="..\FlatRedBall2.Tests\GraphicsDeviceFixture.cs" Link="GraphicsDeviceFixture.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>GoldenDirectory</_Parameter1>
+      <_Parameter2>$(GoldenDirectory)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
