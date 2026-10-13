@@ -12,17 +12,18 @@ namespace FlatRedBall2.Tests.Glue;
 
 // A list declared by a screen or entity belongs to that instance. OwnedLists has the screen declare
 // BulletList (factory-associated, Blob) and Entities\Enemy declare a BulletList of its own, plus a
-// Shield and a BulletList-vs-Shield relationship.
+// Shield and a BulletList-vs-Shield relationship. A spawn joins the lists registered for its type:
+// the screen's associated lists by default, adjustable with AddList / RemoveList.
 public class GlueOwnedListTests
 {
     private const string BlobName = @"Entities\Blob";
     private const string EnemyName = @"Entities\Enemy";
 
-    private static (FlatRedBallService Engine, GlueProject Project, GlueScreen Screen) Boot()
+    private static (FlatRedBallService Engine, GlueProject Project, GlueScreen Screen) Boot(string fixture = "OwnedLists")
     {
         var engine = new FlatRedBallService();
         var project = GlueProject.Load(Path.Combine(
-            AppContext.BaseDirectory, "Glue", "Fixtures", "OwnedLists", "OwnedLists.gluj"));
+            AppContext.BaseDirectory, "Glue", "Fixtures", fixture, fixture + ".gluj"));
         engine.GlueProject = project;
         engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
         return (engine, project, (GlueScreen)engine.CurrentScreen);
@@ -34,8 +35,9 @@ public class GlueOwnedListTests
         var (_, project, screen) = Boot();
         var first = project.CreateEntity(EnemyName, screen);
         var second = project.CreateEntity(EnemyName, screen);
+        var bullet = project.CreateEntity(BlobName, screen);
 
-        var bullet = first.CreateInList("BulletList");
+        first.GetList("BulletList").Add(bullet);
 
         first.GetList("BulletList").ShouldBe(new[] { bullet });
         second.GetList("BulletList").ShouldBeEmpty();
@@ -48,8 +50,10 @@ public class GlueOwnedListTests
         var (_, project, screen) = Boot();
         var first = project.CreateEntity(EnemyName, screen);
         var second = project.CreateEntity(EnemyName, screen);
-        var firstBullet = first.CreateInList("BulletList");
-        var secondBullet = second.CreateInList("BulletList");
+        var firstBullet = project.CreateEntity(BlobName, screen);
+        var secondBullet = project.CreateEntity(BlobName, screen);
+        first.GetList("BulletList").Add(firstBullet);
+        second.GetList("BulletList").Add(secondBullet);
 
         var seenByFirst = new List<GlueEntity>();
         var seenBySecond = new List<GlueEntity>();
@@ -66,7 +70,7 @@ public class GlueOwnedListTests
     }
 
     [Fact]
-    public void FactoryPathSpawn_JoinsTheScreensAssociatedList_NotAnEntitysOwnList()
+    public void DefaultSpawn_JoinsTheScreensAssociatedList_NotAnEntitysOwnList()
     {
         var (_, project, screen) = Boot();
         var enemy = project.CreateEntity(EnemyName, screen);
@@ -92,17 +96,136 @@ public class GlueOwnedListTests
     }
 
     [Fact]
+    public void RelationshipSeesAnEntityAddedDirectlyToTheOwnedList()
+    {
+        var (_, project, screen) = Boot();
+        var enemy = project.CreateEntity(EnemyName, screen);
+        var relationship = (CollisionRelationship<GlueEntity, GlueEntity>)enemy.Objects["BulletListVsShield"];
+        var seen = new List<GlueEntity>();
+        relationship.CollisionOccurred += (bullet, _) => seen.Add(bullet);
+        var bullet = project.CreateEntity(BlobName, screen);
+
+        enemy.GetList("BulletList").Add(bullet);
+        relationship.RunCollisions();
+
+        seen.ShouldBe(new[] { bullet });
+    }
+
+    [Fact]
     public void ScreenAndEntityListsWithTheSameName_StaySeparate()
     {
         var (_, project, screen) = Boot();
         var enemy = project.CreateEntity(EnemyName, screen);
 
-        project.CreateEntity(BlobName, screen);
-        enemy.CreateInList("BulletList");
-        enemy.CreateInList("BulletList");
+        var spawned = project.CreateEntity(BlobName, screen);
+        enemy.GetList("BulletList").Add(project.CreateEntity(BlobName, screen));
+        enemy.GetList("BulletList").Add(project.CreateEntity(BlobName, screen));
 
-        screen.GetList("BulletList").Count.ShouldBe(1);
+        screen.GetList("BulletList").Count.ShouldBe(3);
         enemy.GetList("BulletList").Count.ShouldBe(2);
+        enemy.GetList("BulletList").ShouldNotContain(spawned);
+    }
+
+    [Fact]
+    public void ListsToAddTo_ByDefault_IsTheScreensAssociatedList()
+    {
+        var (_, project, screen) = Boot();
+
+        project.ListsToAddTo(BlobName).ShouldBe(new[] { screen.GetList("BulletList") });
+        project.ListsToAddTo(EnemyName).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RemoveList_MakesASpawnSkipThatList()
+    {
+        var (_, project, screen) = Boot();
+
+        project.RemoveList(BlobName, screen.GetList("BulletList"));
+        var spawned = project.CreateEntity(BlobName, screen);
+
+        screen.GetList("BulletList").ShouldNotContain(spawned);
+        project.ListsToAddTo(BlobName).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AddList_ScreenList_MakesASpawnJoinItAgain()
+    {
+        var (_, project, screen) = Boot();
+        project.RemoveList(BlobName, screen.GetList("BulletList"));
+
+        project.AddList(BlobName, screen.GetList("BulletList"));
+        var spawned = project.CreateEntity(BlobName, screen);
+
+        screen.GetList("BulletList").ShouldContain(spawned);
+    }
+
+    [Fact]
+    public void AddList_EntityList_MakesASpawnJoinItAsWellAsTheScreenList()
+    {
+        var (_, project, screen) = Boot();
+        var enemy = project.CreateEntity(EnemyName, screen);
+        var other = project.CreateEntity(EnemyName, screen);
+
+        project.AddList(BlobName, enemy.GetList("BulletList"));
+        var spawned = project.CreateEntity(BlobName, screen);
+
+        enemy.GetList("BulletList").ShouldContain(spawned);
+        screen.GetList("BulletList").ShouldContain(spawned);
+        other.GetList("BulletList").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AddList_IsIdempotent_ASpawnJoinsOnce()
+    {
+        var (_, project, screen) = Boot();
+
+        project.AddList(BlobName, screen.GetList("BulletList"));
+        var spawned = project.CreateEntity(BlobName, screen);
+
+        screen.GetList("BulletList").Count(e => e == spawned).ShouldBe(1);
+    }
+
+    [Fact]
+    public void AddList_OnABaseEntity_AppliesToDerivedSpawns()
+    {
+        var (_, project, screen) = Boot("BaseTypedLists");
+        var extra = new GlueEntityList();
+
+        project.AddList(@"Entities\Enemy", extra);
+        var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+
+        extra.ShouldContain(zombie);
+        screen.GetList("EnemyList").ShouldContain(zombie);
+    }
+
+    [Fact]
+    public void RemoveList_OnADerivedEntity_LeavesTheBaseEntityJoining()
+    {
+        var (_, project, screen) = Boot("BaseTypedLists");
+
+        project.RemoveList(@"Entities\Zombie", screen.GetList("EnemyList"));
+        var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+        var enemy = project.CreateEntity(@"Entities\Enemy", screen);
+
+        screen.GetList("EnemyList").ShouldNotContain(zombie);
+        screen.GetList("EnemyList").ShouldContain(enemy);
+    }
+
+    [Fact]
+    public void ListsToAddTo_AfterAScreenChange_HoldsOnlyTheNewScreensLists()
+    {
+        var (engine, project, oldScreen) = Boot();
+        var enemy = project.CreateEntity(EnemyName, oldScreen);
+        var extra = enemy.GetList("BulletList");
+        project.AddList(BlobName, extra);
+
+        oldScreen.RestartScreen();
+        engine.Update(new GameTime());
+
+        var newScreen = (GlueScreen)engine.CurrentScreen;
+        project.ListsToAddTo(BlobName).ShouldBe(new[] { newScreen.GetList("BulletList") });
+        var spawned = project.CreateEntity(BlobName, newScreen);
+        extra.ShouldNotContain(spawned);
     }
 
     [Fact]
@@ -123,15 +246,14 @@ public class GlueOwnedListTests
     }
 
     [Fact]
-    public void DestroyedMember_LeavesItsList()
+    public void DestroyedMember_LeavesEveryListItWasIn()
     {
         var (_, project, screen) = Boot();
         var enemy = project.CreateEntity(EnemyName, screen);
-        var bullet = enemy.CreateInList("BulletList");
-        var spawned = project.CreateEntity(BlobName, screen);
+        var bullet = project.CreateEntity(BlobName, screen);
+        enemy.GetList("BulletList").Add(bullet);
 
         bullet.Destroy();
-        spawned.Destroy();
 
         enemy.GetList("BulletList").ShouldBeEmpty();
         screen.GetList("BulletList").ShouldBeEmpty();
@@ -142,7 +264,8 @@ public class GlueOwnedListTests
     {
         var (_, project, screen) = Boot();
         var enemy = project.CreateEntity(EnemyName, screen);
-        var bullet = enemy.CreateInList("BulletList");
+        var bullet = project.CreateEntity(BlobName, screen);
+        enemy.GetList("BulletList").Add(bullet);
         bool destroyed = false;
         bullet.Destroyed += () => destroyed = true;
 

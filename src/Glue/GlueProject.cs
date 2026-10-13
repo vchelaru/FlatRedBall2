@@ -23,6 +23,7 @@ public sealed class GlueProject
     private readonly Dictionary<string, EntitySave> _entities = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntity>> _instances = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntity>> _pool = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<GlueEntityList>> _listsToAddTo = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<GlueLoadDiagnostic> _diagnostics = new();
 
     private GlueProject(GlueLoadResult result, GlueContentSource? content)
@@ -148,12 +149,12 @@ public sealed class GlueProject
     /// entity. Registration order matches the engine's: the screen owns it, and destroying it
     /// removes it from this project's instance list.
     /// <para>This is the call game code makes at runtime, mirroring FRB1's
-    /// <c>&lt;Entity&gt;Factory.CreateNew()</c>: the instance joins every list on
-    /// <paramref name="screen"/> that opted into
-    /// <see cref="Model.NamedObjectSave.AssociateWithFactory"/> for this entity type or any entity it
-    /// derives from — none, one, or several. Only a screen's lists are associated with factories, as
-    /// in FRB1; an entity's own lists are filled with <see cref="GlueEntity.CreateInList"/>. Either
-    /// way the entity is tracked under <see cref="InstancesOf"/> by type.</para>
+    /// <c>&lt;Entity&gt;Factory.CreateNew()</c>: the instance joins every list in
+    /// <see cref="ListsToAddTo"/> for its entity type. By default those are the lists the current
+    /// screen declared with <see cref="Model.NamedObjectSave.AssociateWithFactory"/>, as in FRB1 where
+    /// the screen's init calls <c>AddList</c>; an entity's own lists are never associated by default.
+    /// Change the set with <see cref="AddList"/> and <see cref="RemoveList"/>. Either way the entity is
+    /// tracked under <see cref="InstancesOf"/> by type.</para>
     /// </remarks>
     /// <param name="glueName">The entity's Glue name, e.g. <c>Entities\Enemy</c>.</param>
     /// <param name="screen">The screen to register the entity on.</param>
@@ -163,9 +164,9 @@ public sealed class GlueProject
         CreateEntity(glueName, screen, joinFactoryLists: true);
 
     /// <summary>
-    /// Creates an entity that joins the screen's factory-associated lists only when
-    /// <paramref name="joinFactoryLists"/> is set. A caller that places the entity in one list itself
-    /// (an authored list member, <see cref="GlueScreen.CreateInList"/>) passes false.
+    /// Creates an entity that joins <see cref="ListsToAddTo"/> only when
+    /// <paramref name="joinFactoryLists"/> is set. An authored list member passes false: it is placed
+    /// in its one list by the builder.
     /// </summary>
     internal GlueEntity CreateEntity(string glueName, Screen screen, bool joinFactoryLists)
     {
@@ -207,27 +208,74 @@ public sealed class GlueProject
 
         Track(save.Name!, entity);
 
-        if (joinFactoryLists)
-            JoinFactoryLists(save, entity, screen);
+        if (joinFactoryLists && _listsToAddTo.TryGetValue(save.Name!, out var destinations))
+        {
+            foreach (var list in destinations)
+                list.Add(entity);
+        }
 
         return entity;
     }
 
     /// <summary>
-    /// Adds a newly created entity to the factory-associated lists of the screen it was created on.
+    /// The lists a spawn of this entity joins: <see cref="CreateEntity(string, Screen)"/>'s
+    /// destinations, FRB1's <c>ListsToAddTo</c>.
     /// </summary>
     /// <remarks>
-    /// A list typed with a base entity receives every derived spawn (FRB1's per-factory AddList), so
-    /// the entity's whole ancestor chain is consulted, not just its own name. A screen that is not a
-    /// <see cref="GlueScreen"/> declares no lists, so there is nothing to join.
+    /// A loaded screen fills this at init with its <see cref="Model.NamedObjectSave.AssociateWithFactory"/>
+    /// lists, and the set is cleared on every screen change.
     /// </remarks>
-    private void JoinFactoryLists(EntitySave save, GlueEntity entity, Screen screen)
+    /// <exception cref="ArgumentException">No entity has that name.</exception>
+    public IReadOnlyList<GlueEntityList> ListsToAddTo(string glueName)
     {
-        if (screen is not GlueScreen glueScreen)
-            return;
+        var save = FindEntity(glueName) ?? throw UnknownName(glueName, "entity", _entities.Keys);
+        return _listsToAddTo.TryGetValue(save.Name!, out var lists) ? lists : Array.Empty<GlueEntityList>();
+    }
 
-        foreach (var list in glueScreen.FactoryListsFor(SelfAndAncestors(save)))
-            entity.JoinList(list);
+    /// <summary>
+    /// Makes every spawn of this entity, and of any entity derived from it, join
+    /// <paramref name="list"/>, as FRB1's <c>Factory.AddList</c> does. Adding a list already there
+    /// changes nothing.
+    /// </summary>
+    /// <remarks>
+    /// Works for any list, a screen's or an entity's. The registration lasts until the screen changes.
+    /// </remarks>
+    /// <exception cref="ArgumentException">No entity has that name.</exception>
+    public void AddList(string glueName, GlueEntityList list)
+    {
+        foreach (var name in SelfAndDescendants(glueName))
+        {
+            if (!_listsToAddTo.TryGetValue(name, out var lists))
+                _listsToAddTo[name] = lists = new List<GlueEntityList>();
+
+            if (!lists.Contains(list))
+                lists.Add(list);
+        }
+    }
+
+    /// <summary>
+    /// Stops spawns of this entity, and of any entity derived from it, joining
+    /// <paramref name="list"/>. Members already in the list stay. Naming a derived entity removes the
+    /// list for that entity alone.
+    /// </summary>
+    /// <exception cref="ArgumentException">No entity has that name.</exception>
+    public void RemoveList(string glueName, GlueEntityList list)
+    {
+        foreach (var name in SelfAndDescendants(glueName))
+        {
+            if (_listsToAddTo.TryGetValue(name, out var lists))
+                lists.Remove(list);
+        }
+    }
+
+    private List<string> SelfAndDescendants(string glueName)
+    {
+        var root = FindEntity(glueName) ?? throw UnknownName(glueName, "entity", _entities.Keys);
+
+        return _entities.Values
+            .Where(e => e.Name is not null && SelfAndAncestors(e).Contains(root.Name!, StringComparer.OrdinalIgnoreCase))
+            .Select(e => e.Name!)
+            .ToList();
     }
 
     /// <summary>The entity's own name, then each base's, nearest first. Stops at a cycle or a base that is not an element.</summary>
@@ -329,8 +377,9 @@ public sealed class GlueProject
     /// Pools are emptied too: a recycled shell still holds the previous screen's shapes and
     /// registrations, and <see cref="Factory{T}"/> discards its own pool at the same point. The
     /// cached lists <see cref="InstancesOf"/> handed out are emptied in place, not replaced, so a
-    /// holder of one sees the change. Named lists need no clearing here: each belongs to the screen
-    /// or entity that declared it, and its members leave it as they are destroyed.
+    /// holder of one sees the change. The spawn destinations (<see cref="ListsToAddTo"/>) are cleared
+    /// too; the next screen registers its own. The lists themselves belong to the screen or entity that
+    /// declared them, and their members leave as they are destroyed.
     /// </remarks>
     internal void ReleaseInstances()
     {
@@ -350,6 +399,7 @@ public sealed class GlueProject
             list.Clear();
 
         _pool.Clear();
+        _listsToAddTo.Clear();
     }
 
     /// <summary>Forgets a destroyed instance, so a relationship does not keep collecting corpses.</summary>

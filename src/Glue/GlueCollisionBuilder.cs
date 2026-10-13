@@ -179,21 +179,21 @@ internal static class GlueCollisionBuilder
 
         switch (first, second)
         {
-            case (List<GlueEntity> a, List<GlueEntity> b):
+            case (GlueEntityList a, GlueEntityList b):
                 entityPair = ReferenceEquals(a, b) || (a.Count > 0 && a.SequenceEqual(b))
                     ? screen.AddSelfCollisionRelationship(a)
                     : screen.AddCollisionRelationship(a, b);
                 break;
 
-            case (List<GlueEntity> a, GlueEntity single):
+            case (GlueEntityList a, GlueEntity single):
                 entityPair = screen.AddCollisionRelationship(a, new List<GlueEntity> { single });
                 break;
 
-            case (GlueEntity single, List<GlueEntity> b):
+            case (GlueEntity single, GlueEntityList b):
                 entityPair = screen.AddCollisionRelationship(new List<GlueEntity> { single }, b);
                 break;
 
-            case (List<GlueEntity> a, TileShapes tiles):
+            case (GlueEntityList a, TileShapes tiles):
                 tilePair = screen.AddCollisionRelationship(a, tiles);
                 break;
 
@@ -299,7 +299,7 @@ internal static class GlueCollisionBuilder
 
     private static string Describe(object side) => side switch
     {
-        List<GlueEntity> => "list of entities",
+        GlueEntityList => "list of entities",
         GlueEntity => "single entity",
         TileShapes => "tile collection",
         _ => side.GetType().Name,

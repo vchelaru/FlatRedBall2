@@ -50,7 +50,7 @@ public sealed class GlueObjectBuilder
     /// <param name="isListMember">
     /// Whether <paramref name="save"/> is a declared member of a list. A nested entity built as a
     /// list member joins only that list (the caller adds it), so it is kept out of the screen's
-    /// factory-associated lists, which an ordinary nested entity joins.
+    /// spawn destinations (<see cref="GlueProject.ListsToAddTo"/>), which an ordinary nested entity joins.
     /// </param>
     /// <returns>The configured instance, or null if this build cannot construct that type.</returns>
     public object? Create(NamedObjectSave save, string? elementName = null, bool isListMember = false)

@@ -67,7 +67,7 @@ the `.gluj` has been read. See `gum-integration` for what goes wrong otherwise.
 a derived element to supply, so it is incomplete by construction. `CreateScreen`/`CreateEntity`
 throw; this is normal for a `GameScreen` base that levels derive from.
 
-**A list belongs to the screen or entity instance that declares it.** `owner.GetList("Bullets")` returns that instance's own live list, so each instance of an entity has a separate one and an entity list never merges with a screen list of the same name. A plain `CreateEntity` spawn joins only the current screen's `AssociateWithFactory` lists (entity lists are never factory-associated, as in FRB1); put an entity into any owner's list with `owner.CreateInList(name)`. Members leave a list when destroyed, and an entity's list members are destroyed with it.
+**A list belongs to the screen or entity instance that declares it.** `owner.GetList("Bullets")` returns that instance's own live `GlueEntityList`, so each instance of an entity has a separate one and an entity list never merges with a screen list of the same name. Add and remove members directly. `CreateEntity` joins the spawn to `project.ListsToAddTo(entity)`, which a screen fills at init from its `AssociateWithFactory` lists (entity lists are never associated by default, as in FRB1) and clears on every screen change; change it with `AddList`/`RemoveList`, which also apply to derived entities. Members leave every list when destroyed, and an entity's list members are destroyed with it.
 
 ## Hot reload
 

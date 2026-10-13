@@ -357,7 +357,4 @@ CLR-type registry entirely) rather than touching `Factory<T>`, `Screen.AddCollis
 
 Implementation tracked on issue #1088.
 
-**Revised in #1457.** The backing list is no longer project-wide per list name: the screen or entity
-instance that declares a list owns it (`GlueScreen.GetList`, `GlueEntity.GetList`), so each instance of
-an entity has its own. A spawn joins only the current screen's `AssociateWithFactory` lists, since FRB1
-associates factories with screens' lists only. `GlueProject.InstancesOfList` is gone.
+**Revised in #1457.** The backing list is no longer project-wide per list name: the screen or entity instance that declares a list owns it (`GlueScreen.GetList`, `GlueEntity.GetList`), so each instance of an entity has its own. `GlueProject` keeps the per-type destination lists a spawn joins (`ListsToAddTo`, FRB1's `ListsToAddTo`); a screen fills them at init from its `AssociateWithFactory` lists, `AddList`/`RemoveList` change them, and a screen change clears them. FRB1 associates factories with screens' lists only, so entity lists join only through `AddList`. `GlueProject.InstancesOfList` is gone.

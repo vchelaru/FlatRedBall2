@@ -108,7 +108,7 @@ public class GlueElementBuildTests
 
         screen.BuildObjects();
 
-        ((List<GlueEntity>)screen.Objects["PlayerList"]).ShouldBeEmpty();
+        ((GlueEntityList)screen.Objects["PlayerList"]).ShouldBeEmpty();
         screen.BuildDiagnostics.ShouldContain(d => d.Severity == GlueDiagnosticSeverity.Warning);
         screen.BuildDiagnostics.ShouldNotContain(d => d.Severity == GlueDiagnosticSeverity.Error);
     }

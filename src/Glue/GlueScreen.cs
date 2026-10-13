@@ -105,75 +105,40 @@ public class GlueScreen : Screen
     /// <summary>The live list this screen declared under <paramref name="listName"/>.</summary>
     /// <remarks>
     /// The list belongs to this screen: another screen, or an entity, that declares a list with the
-    /// same name has a separate one. Members join as they are spawned and leave as they are
-    /// destroyed, so a collision relationship bound to the list sees both.
+    /// same name has a separate one. Add and remove members directly. A list declared with
+    /// <see cref="Model.NamedObjectSave.AssociateWithFactory"/> also receives every spawn of its entity
+    /// type (see <see cref="GlueProject.ListsToAddTo"/>), and members leave when destroyed.
     /// </remarks>
     /// <exception cref="ArgumentException">This screen declares no entity list by that name.</exception>
-    public IReadOnlyList<GlueEntity> GetList(string listName) =>
+    public GlueEntityList GetList(string listName) =>
         GlueElementBuilder.FindEntityList(_objects, listName, GlueName);
 
-    /// <summary>
-    /// Creates an entity straight into one of this screen's lists, the runtime counterpart of an
-    /// authored list member.
-    /// </summary>
-    /// <param name="listName">A list this screen declared.</param>
-    /// <param name="entityName">
-    /// The entity to create, e.g. a derived type. Defaults to the entity type the list is declared
-    /// to hold.
-    /// </param>
-    /// <remarks>
-    /// The entity joins this list and no other. An ordinary spawn
-    /// (<see cref="GlueProject.CreateEntity(string, Screen)"/>) joins the factory-associated lists
-    /// instead.
-    /// </remarks>
-    public GlueEntity CreateInList(string listName, string? entityName = null) =>
-        GlueElementBuilder.CreateInList(Project, this, Save?.NamedObjects, _objects, listName, entityName, GlueName);
-
-    private Dictionary<string, List<List<GlueEntity>>>? _factoryLists;
+    private readonly List<(string EntityName, GlueEntityList List)> _registeredLists = new();
 
     /// <summary>
-    /// The lists on this screen that opted into factory spawning
-    /// (<see cref="Model.NamedObjectSave.AssociateWithFactory"/>) for any of these entity types.
+    /// Registers a list this screen declared as a spawn destination, as FRB1's screen init calls
+    /// <c>Factory.AddList</c>. Only a list that opted into factory spawning and names an entity type
+    /// qualifies.
     /// </summary>
-    /// <remarks>
-    /// Only a screen's own lists are associated with factories; an entity's lists never are. Top-level
-    /// lists only, matching where Glue declares them. A type can have any number of associated lists
-    /// at once (G82), and a spawn joins all of them.
-    /// </remarks>
-    internal IEnumerable<List<GlueEntity>> FactoryListsFor(IEnumerable<string> entityTypeNames)
+    private void RegisterFactoryList(NamedObjectSave save, GlueEntityList list)
     {
-        _factoryLists ??= IndexFactoryLists();
-
-        foreach (var typeName in entityTypeNames)
+        if (Project is null || !save.AssociateWithFactory || string.IsNullOrEmpty(save.SourceClassGenericType) ||
+            Project.FindEntity(save.SourceClassGenericType) is null)
         {
-            if (!_factoryLists.TryGetValue(typeName, out var lists))
-                continue;
-
-            foreach (var list in lists)
-                yield return list;
+            return;
         }
+
+        Project.AddList(save.SourceClassGenericType, list);
+        _registeredLists.Add((save.SourceClassGenericType, list));
     }
 
-    private Dictionary<string, List<List<GlueEntity>>> IndexFactoryLists()
+    /// <summary>Withdraws what a previous build registered, so a rebuild does not leave stale destinations.</summary>
+    private void UnregisterFactoryLists()
     {
-        var index = new Dictionary<string, List<List<GlueEntity>>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (entityName, list) in _registeredLists)
+            Project?.RemoveList(entityName, list);
 
-        foreach (var save in Save?.NamedObjects ?? new List<NamedObjectSave>())
-        {
-            if (!save.IsList || !save.AssociateWithFactory ||
-                string.IsNullOrEmpty(save.SourceClassGenericType) || string.IsNullOrEmpty(save.InstanceName) ||
-                !_objects.TryGetValue(save.InstanceName, out object? built) || built is not List<GlueEntity> list)
-            {
-                continue;
-            }
-
-            if (!index.TryGetValue(save.SourceClassGenericType, out var lists))
-                index[save.SourceClassGenericType] = lists = new List<List<GlueEntity>>();
-
-            lists.Add(list);
-        }
-
-        return index;
+        _registeredLists.Clear();
     }
 
     /// <summary>Applies an uncategorized state by name.</summary>
@@ -308,8 +273,8 @@ public class GlueScreen : Screen
                 Remove(renderable);
         }
 
+        UnregisterFactoryLists();
         _objects.Clear();
-        _factoryLists = null;
         _variables.Clear();
         _buildDiagnostics.Clear();
 
@@ -324,7 +289,8 @@ public class GlueScreen : Screen
             Content,
             register: RegisterBuilt,
             project: Project,
-            owningScreen: OwningScreenForSpawns());
+            owningScreen: OwningScreenForSpawns(),
+            onEntityList: RegisterFactoryList);
 
         // Variables run after objects, and after those objects' own instructions, because that is
         // the order FRB1 assigns in — an element variable is expected to win over an instruction.
@@ -628,53 +594,33 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
     /// <summary>The live list this entity declared under <paramref name="listName"/>.</summary>
     /// <remarks>
     /// The list belongs to this instance: every instance of the entity has its own, and a screen
-    /// that declares a list with the same name has a separate one. Members leave it as they are
-    /// destroyed, and are destroyed with this entity.
+    /// that declares a list with the same name has a separate one. Add and remove members directly.
+    /// Spawns do not join it unless it is registered with <see cref="GlueProject.AddList"/>. Members
+    /// leave when destroyed, and are destroyed with this entity.
     /// </remarks>
     /// <exception cref="ArgumentException">This entity declares no entity list by that name.</exception>
-    public IReadOnlyList<GlueEntity> GetList(string listName) =>
+    public GlueEntityList GetList(string listName) =>
         GlueElementBuilder.FindEntityList(_objects, listName, GlueName);
 
-    /// <summary>
-    /// Creates an entity straight into one of this instance's lists, the runtime counterpart of an
-    /// authored list member.
-    /// </summary>
-    /// <param name="listName">A list this entity declared.</param>
-    /// <param name="entityName">
-    /// The entity to create, e.g. a derived type. Defaults to the entity type the list is declared
-    /// to hold.
-    /// </param>
-    /// <remarks>
-    /// The new entity is registered on the current screen and joins this instance's list only.
-    /// </remarks>
-    public GlueEntity CreateInList(string listName, string? entityName = null) =>
-        GlueElementBuilder.CreateInList(
-            Project, OwningScreenForSpawns(), Save?.NamedObjects, _objects, listName, entityName, GlueName);
+    private List<GlueEntityList>? _joinedLists;
 
-    private List<List<GlueEntity>>? _joinedLists;
+    internal void NoteJoined(GlueEntityList list) => (_joinedLists ??= new List<GlueEntityList>()).Add(list);
 
-    /// <summary>Adds this entity to <paramref name="list"/>, remembering it so destroying the entity can leave.</summary>
-    internal void JoinList(List<GlueEntity> list)
-    {
-        list.Add(this);
-        (_joinedLists ??= new List<List<GlueEntity>>()).Add(list);
-    }
+    internal void NoteLeft(GlueEntityList list) => _joinedLists?.Remove(list);
 
-    /// <summary>Removes this entity from every list it joined.</summary>
+    /// <summary>Removes this entity from every list it is in.</summary>
     internal void LeaveLists()
     {
         if (_joinedLists is null)
             return;
 
-        foreach (var list in _joinedLists)
+        foreach (var list in _joinedLists.ToList())
             list.Remove(this);
-
-        _joinedLists.Clear();
     }
 
     /// <summary>A copy of every entity in the lists this instance declared.</summary>
     internal List<GlueEntity> OwnedListMembers() =>
-        _objects.Values.OfType<List<GlueEntity>>().SelectMany(l => l).ToList();
+        _objects.Values.OfType<GlueEntityList>().SelectMany(l => l).ToList();
 
     /// <summary>Applies an uncategorized state by name.</summary>
     public void SetState(string stateName) => SetState(null, stateName);

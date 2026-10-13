@@ -16,7 +16,9 @@ internal static class GlueElementBuilder
     /// an entity attaches children. Lists have no owner to register with, so their members are built
     /// but not added.
     /// <para>Every top-level list is created empty before anything is built, so a nested entity that
-    /// joins a factory-associated list finds it whatever order the element declares things in.</para>
+    /// joins a factory-associated list finds it whatever order the element declares things in.
+    /// <c>onEntityList</c> is told about each entity list at that point, which is how a screen
+    /// registers its factory-associated ones.</para>
     /// </remarks>
     internal static void Build(
         List<NamedObjectSave> namedObjects,
@@ -27,14 +29,21 @@ internal static class GlueElementBuilder
         GlueContentSource? content,
         Action<object> register,
         GlueProject? project = null,
-        Screen? owningScreen = null)
+        Screen? owningScreen = null,
+        Action<NamedObjectSave, GlueEntityList>? onEntityList = null)
     {
         var builder = new GlueObjectBuilder(diagnostics, content, project, owningScreen);
 
         foreach (var save in namedObjects)
         {
-            if (save.IsList && !string.IsNullOrEmpty(save.InstanceName))
-                objects[save.InstanceName] = NewList(save);
+            if (!save.IsList || string.IsNullOrEmpty(save.InstanceName))
+                continue;
+
+            var list = NewList(save);
+            objects[save.InstanceName] = list;
+
+            if (list is GlueEntityList entityList)
+                onEntityList?.Invoke(save, entityList);
         }
 
         BuildInto(namedObjects, builder, elementName, objects, diagnostics, addSingle);
@@ -102,7 +111,7 @@ internal static class GlueElementBuilder
                 foreach (var member in list)
                     yield return member;
             }
-            else if (item is List<GlueEntity> entities)
+            else if (item is GlueEntityList entities)
             {
                 foreach (var member in entities)
                     yield return member;
@@ -128,13 +137,13 @@ internal static class GlueElementBuilder
     }
 
     /// <summary>
-    /// An entity list is a live <see cref="List{T}"/> of <see cref="GlueEntity"/>: the owner's own
-    /// collection, which spawns join and destroyed members leave. Any other list is a plain
+    /// An entity list is a live <see cref="GlueEntityList"/>: the owner's own collection, which
+    /// spawns can join and destroyed members leave. Any other list is a plain
     /// snapshot of whatever could be constructed — FRB2 has no equivalent of Glue's
     /// <c>PositionedObjectList&lt;T&gt;</c>.
     /// </summary>
     private static object NewList(NamedObjectSave save) =>
-        IsEntityList(save) ? new List<GlueEntity>() : new List<object>();
+        IsEntityList(save) ? new GlueEntityList() : new List<object>();
 
     /// <summary>
     /// Fills a list with its authored members. The list is the one the owner already holds in
@@ -143,7 +152,7 @@ internal static class GlueElementBuilder
     /// <remarks>
     /// A nested entity member is registered on its owning screen as a side effect of being created
     /// (see <see cref="GlueObjectBuilder.Create"/>) and joins only this list: a declared member's
-    /// placement is unambiguous, so it never feeds the screen's factory-associated lists.
+    /// placement is unambiguous, so it never feeds the type's spawn destinations (<see cref="GlueProject.ListsToAddTo"/>).
     /// </remarks>
     private static object BuildList(
         GlueObjectBuilder builder,
@@ -164,10 +173,10 @@ internal static class GlueElementBuilder
 
             switch (list)
             {
-                case List<GlueEntity> entities when item is GlueEntity entity:
-                    entity.JoinList(entities);
+                case GlueEntityList entities when item is GlueEntity entity:
+                    entities.Add(entity);
                     break;
-                case List<GlueEntity>:
+                case GlueEntityList:
                     diagnostics.Add(new GlueLoadDiagnostic(
                         GlueDiagnosticSeverity.Warning,
                         $"'{contained.InstanceName}' is not an entity but sits in the entity list " +
@@ -185,53 +194,17 @@ internal static class GlueElementBuilder
 
     /// <summary>The live entity list the owner declared under this name.</summary>
     /// <exception cref="ArgumentException">The owner declares no entity list by that name.</exception>
-    internal static List<GlueEntity> FindEntityList(
+    internal static GlueEntityList FindEntityList(
         IReadOnlyDictionary<string, object> objects, string listName, string? ownerName)
     {
-        if (objects.TryGetValue(listName, out object? found) && found is List<GlueEntity> list)
+        if (objects.TryGetValue(listName, out object? found) && found is GlueEntityList list)
             return list;
 
         string known = string.Join(
-            ", ", objects.Where(o => o.Value is List<GlueEntity>).Select(o => $"'{o.Key}'"));
+            ", ", objects.Where(o => o.Value is GlueEntityList).Select(o => $"'{o.Key}'"));
 
         throw new ArgumentException(
             $"'{ownerName}' declares no entity list named '{listName}'. " +
             (known.Length == 0 ? "It declares none." : $"Its entity lists are {known}."));
-    }
-
-    /// <summary>
-    /// Creates an entity directly into one of the owner's lists: the runtime counterpart of an
-    /// authored list member, joining that list and no other.
-    /// </summary>
-    internal static GlueEntity CreateInList(
-        GlueProject? project,
-        Screen? screen,
-        List<NamedObjectSave>? namedObjects,
-        IReadOnlyDictionary<string, object> objects,
-        string listName,
-        string? entityName,
-        string? ownerName)
-    {
-        var list = FindEntityList(objects, listName, ownerName);
-
-        if (project is null || screen is null)
-        {
-            throw new InvalidOperationException(
-                $"'{ownerName}' needs a loaded project and a running screen to create into '{listName}'.");
-        }
-
-        entityName ??= namedObjects?
-            .FirstOrDefault(n => n.IsList && string.Equals(n.InstanceName, listName, StringComparison.Ordinal))
-            ?.SourceClassGenericType;
-
-        if (string.IsNullOrEmpty(entityName))
-        {
-            throw new InvalidOperationException(
-                $"List '{listName}' names no entity type, so pass the entity to create.");
-        }
-
-        var entity = project.CreateEntity(entityName, screen, joinFactoryLists: false);
-        entity.JoinList(list);
-        return entity;
     }
 }
