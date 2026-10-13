@@ -1,0 +1,162 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FlatRedBall2.IO;
+
+/// <summary>
+/// Saves and loads game data (settings, progress, high scores) under string keys, with the same
+/// game code on desktop and web. Reached as <c>Engine.Storage</c>.
+/// <para>
+/// Everything is async because browser storage is. Keys are relative, '/'-separated names such as
+/// <c>"saves/slot1.json"</c>: letters, digits, '-', '_', '.', at most 256 characters, no '..', no
+/// leading '/'. They are validated the same way on every backend, so a key that works in a desktop
+/// build works in the web build. An invalid key throws <see cref="ArgumentException"/>; an
+/// I/O or quota failure throws <see cref="StorageException"/>. Keys are case-sensitive here, but a
+/// case-insensitive file system may treat <c>"Save"</c> and <c>"save"</c> as one file, so do not
+/// rely on case to tell keys apart.
+/// </para>
+/// <para>
+/// The default backend is memory-only (<see cref="IsPersistent"/> is <c>false</c>) until a
+/// persistent one is assigned to <see cref="Backend"/>.
+/// </para>
+/// </summary>
+public sealed class GameStorage
+{
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+    private IStorageBackend _backend;
+
+    internal GameStorage(IStorageBackend backend)
+    {
+        _backend = backend;
+    }
+
+    /// <summary>
+    /// The backend that holds the data. Replacing it does not move existing data across; set it
+    /// before the first read or write.
+    /// </summary>
+    public IStorageBackend Backend
+    {
+        get => _backend;
+        set => _backend = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>Whether stored data survives the process ending. <c>false</c> means saves are lost on exit.</summary>
+    public bool IsPersistent => _backend.IsPersistent;
+
+    /// <summary>Whether <paramref name="key"/> has stored data.</summary>
+    public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        return await RunAsync("check", key, () => backend.ExistsAsync(key, cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads <paramref name="key"/> as UTF-8 text. Returns <c>null</c> if it does not exist.</summary>
+    public async Task<string?> ReadTextAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var bytes = await ReadBytesAsync(key, cancellationToken).ConfigureAwait(false);
+        if (bytes == null)
+            return null;
+        using var reader = new StreamReader(new MemoryStream(bytes, writable: false), Utf8NoBom, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
+
+    /// <summary>Stores <paramref name="text"/> as UTF-8 (no byte-order mark), replacing any existing value.</summary>
+    public async Task WriteTextAsync(string key, string text, CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
+        ArgumentNullException.ThrowIfNull(text);
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        var bytes = Utf8NoBom.GetBytes(text);
+        await RunAsync("write", key, async () =>
+        {
+            await backend.WriteAsync(key, bytes, cancellationToken).ConfigureAwait(false);
+            return true;
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens a read-only snapshot of <paramref name="key"/>. Later writes to the key do not change
+    /// what this stream returns. Returns <c>null</c> if the key does not exist.
+    /// </summary>
+    public async Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var bytes = await ReadBytesAsync(key, cancellationToken).ConfigureAwait(false);
+        return bytes == null ? null : new MemoryStream(bytes, writable: false);
+    }
+
+    /// <summary>
+    /// Opens a stream whose contents replace <paramref name="key"/> when it is disposed with
+    /// <c>await using</c> (or <c>DisposeAsync</c>). Nothing is visible to readers before then, so a
+    /// half-written save is never seen, and the old value survives if the commit fails.
+    /// <para>
+    /// Gotchas: a synchronous <c>using</c>/<c>Dispose()</c> cannot commit, so it discards the data
+    /// and throws <see cref="InvalidOperationException"/>. A commit failure is thrown from
+    /// <c>DisposeAsync</c> as <see cref="StorageException"/>. An <c>await using</c> also commits
+    /// when the body threw, so serialize to a string or buffer first if a partial write would be
+    /// worse than none. <paramref name="cancellationToken"/> covers opening only; the commit is
+    /// never cancelled, so a screen change cannot drop a save halfway.
+    /// </para>
+    /// </summary>
+    public async Task<Stream> OpenWriteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        await Task.CompletedTask.ConfigureAwait(false);
+        return new StorageWriteStream(data => RunAsync("write", key, async () =>
+        {
+            await backend.WriteAsync(key, data, CancellationToken.None).ConfigureAwait(false);
+            return true;
+        }));
+    }
+
+    /// <summary>Removes <paramref name="key"/>. Returns <c>false</c> if it did not exist.</summary>
+    public async Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        return await RunAsync("delete", key, () => backend.DeleteAsync(key, cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Keys that start with <paramref name="prefix"/>, sorted ordinally. The prefix is a plain string
+    /// match, not a folder: <c>"saves/"</c> lists a folder's keys, <c>"saves/slot"</c> a partial name.
+    /// Empty lists everything.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListAsync(string prefix = "", CancellationToken cancellationToken = default)
+    {
+        StorageKey.ValidatePrefix(prefix, nameof(prefix));
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        return await RunAsync("list", prefix, () => backend.ListAsync(prefix, cancellationToken)).ConfigureAwait(false);
+    }
+
+    private async Task<byte[]?> ReadBytesAsync(string key, CancellationToken cancellationToken)
+    {
+        StorageKey.ValidateKey(key, nameof(key));
+        cancellationToken.ThrowIfCancellationRequested();
+        var backend = _backend;
+        return await RunAsync("read", key, () => backend.ReadAsync(key, cancellationToken)).ConfigureAwait(false);
+    }
+
+    // Wraps any backend failure (except cancellation) so game code catches one exception type.
+    private static async Task<T> RunAsync<T>(string operation, string key, Func<Task<T>> action)
+    {
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not StorageException)
+        {
+            throw new StorageException($"Storage {operation} of \"{key}\" failed: {ex.Message}", ex);
+        }
+    }
+}

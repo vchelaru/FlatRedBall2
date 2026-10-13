@@ -1276,6 +1276,11 @@ public class FlatRedBallService
     public InputManager Input { get; } = new InputManager();
     /// <summary>Sound effect and music playback service.</summary>
     public AudioManager Audio { get; } = new AudioManager();
+    /// <summary>
+    /// Save and load game data by key, async, same code on every platform. Memory-only until a
+    /// persistent <see cref="IO.GameStorage.Backend"/> is assigned.
+    /// </summary>
+    public IO.GameStorage Storage { get; } = new IO.GameStorage(new IO.InMemoryStorageBackend());
     /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
     public ContentLoader Content { get; } = new ContentLoader();
     /// <summary>Engine clocks and async delay primitives. See <see cref="TimeManager"/>.</summary>

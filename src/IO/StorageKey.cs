@@ -1,0 +1,107 @@
+using System;
+
+namespace FlatRedBall2.IO;
+
+/// <summary>
+/// The key rules every backend shares, enforced in <see cref="GameStorage"/> so a name that works on
+/// one platform cannot fail on another. Deliberately the intersection of what Windows, macOS,
+/// Linux, and browser storage accept.
+/// </summary>
+internal static class StorageKey
+{
+    internal const int MaxKeyLength = 256;
+    internal const int MaxSegmentLength = 128;
+
+    // Windows refuses these as file names (with or without an extension), so a file backend would
+    // fail on a key the in-memory and browser backends accept.
+    private static readonly string[] ReservedNames =
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
+
+    /// <summary>Throws <see cref="ArgumentException"/> unless <paramref name="key"/> is a valid storage key.</summary>
+    internal static void ValidateKey(string key, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(key, paramName);
+        if (key.Length == 0)
+            throw Invalid(paramName, key, "is empty");
+        if (key.Length > MaxKeyLength)
+            throw Invalid(paramName, key, $"is longer than {MaxKeyLength} characters");
+
+        int start = 0;
+        while (true)
+        {
+            int slash = key.IndexOf('/', start);
+            int end = slash < 0 ? key.Length : slash;
+            ValidateSegment(key, key.AsSpan(start, end - start), paramName, isPrefixTail: false);
+            if (slash < 0)
+                break;
+            start = slash + 1;
+        }
+    }
+
+    /// <summary>
+    /// Throws <see cref="ArgumentException"/> unless <paramref name="prefix"/> is empty or the start of a
+    /// valid key: complete segments joined by '/', optionally ending in a partial segment or a trailing '/'.
+    /// </summary>
+    internal static void ValidatePrefix(string prefix, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(prefix, paramName);
+        if (prefix.Length > MaxKeyLength)
+            throw Invalid(paramName, prefix, $"is longer than {MaxKeyLength} characters");
+
+        int start = 0;
+        while (true)
+        {
+            int slash = prefix.IndexOf('/', start);
+            bool isTail = slash < 0;
+            int end = isTail ? prefix.Length : slash;
+            ValidateSegment(prefix, prefix.AsSpan(start, end - start), paramName, isPrefixTail: isTail);
+            if (isTail)
+                break;
+            start = slash + 1;
+        }
+    }
+
+    private static void ValidateSegment(string whole, ReadOnlySpan<char> segment, string paramName, bool isPrefixTail)
+    {
+        if (segment.Length == 0)
+        {
+            // A prefix may end in '/' or be empty; nothing else may have an empty segment.
+            if (isPrefixTail)
+                return;
+            throw Invalid(paramName, whole, "has an empty path segment (leading, trailing, or doubled '/')");
+        }
+        if (segment.Length > MaxSegmentLength)
+            throw Invalid(paramName, whole, $"has a path segment longer than {MaxSegmentLength} characters");
+
+        foreach (char c in segment)
+        {
+            bool ok = c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '-' or '_' or '.';
+            if (!ok)
+                throw Invalid(paramName, whole, $"contains '{c}'; only letters, digits, '-', '_', '.', and '/' are allowed");
+        }
+
+        if (segment.SequenceEqual(".") || segment.SequenceEqual(".."))
+            throw Invalid(paramName, whole, "contains a '.' or '..' path segment");
+
+        if (isPrefixTail)
+            return; // may be a partial name: "trailing." or "con" can still grow into a valid segment
+
+        if (segment[^1] == '.')
+            throw Invalid(paramName, whole, "has a path segment ending in '.' (Windows drops it)");
+
+        int dot = segment.IndexOf('.');
+        var stem = dot < 0 ? segment : segment[..dot];
+        foreach (var reserved in ReservedNames)
+        {
+            if (stem.Equals(reserved, StringComparison.OrdinalIgnoreCase))
+                throw Invalid(paramName, whole, $"uses '{reserved}', a reserved file name on Windows");
+        }
+    }
+
+    private static ArgumentException Invalid(string paramName, string key, string reason) =>
+        new($"Storage key \"{key}\" {reason}. Keys are relative, '/'-separated names.", paramName);
+}
