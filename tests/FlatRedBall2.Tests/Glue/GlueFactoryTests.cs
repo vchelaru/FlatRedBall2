@@ -146,4 +146,49 @@ public class GlueFactoryTests
         project.InstancesOfList("ListA").ShouldContain(spawned);
         project.InstancesOfList("ListC").ShouldContain(spawned);
     }
+
+    private static (FlatRedBallService Engine, GlueProject Project) BootedBaseTypedLists()
+    {
+        var engine = new FlatRedBallService();
+        var project = GlueProject.Load(Path.Combine(
+            AppContext.BaseDirectory, "Glue", "Fixtures", "BaseTypedLists", "BaseTypedLists.gluj"));
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
+        return (engine, project);
+    }
+
+    // FRB1's EnemyList of Entities\Enemy receives spawns from every derived entity's factory. Zombie
+    // derives from Enemy, so a Zombie spawn must land in the Enemy-typed list.
+    [Fact]
+    public void CreateEntity_OfDerivedEntity_JoinsListTypedWithItsBase()
+    {
+        var (engine, project) = BootedBaseTypedLists();
+
+        var zombie = project.CreateEntity(@"Entities\Zombie", engine.CurrentScreen);
+
+        project.InstancesOfList("EnemyList").ShouldContain(zombie);
+    }
+
+    // The condition is "any descendant", not "direct child": Boss derives from Zombie derives from Enemy.
+    [Fact]
+    public void CreateEntity_OfGrandchildEntity_JoinsListTypedWithItsAncestor()
+    {
+        var (engine, project) = BootedBaseTypedLists();
+
+        var boss = project.CreateEntity(@"Entities\Boss", engine.CurrentScreen);
+
+        project.InstancesOfList("EnemyList").ShouldContain(boss);
+    }
+
+    // The base type's own spawn must still join exactly once -- the ancestor walk starts at the
+    // entity itself, so a careless implementation would add it twice.
+    [Fact]
+    public void CreateEntity_OfListTypeItself_JoinsItsListOnce()
+    {
+        var (engine, project) = BootedBaseTypedLists();
+
+        var enemy = project.CreateEntity(@"Entities\Enemy", engine.CurrentScreen);
+
+        project.InstancesOfList("EnemyList").Count(e => e == enemy).ShouldBe(1);
+    }
 }

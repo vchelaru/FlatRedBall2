@@ -259,4 +259,29 @@ public class GlueCollisionTests
         seenByListA.ShouldNotContain(blobInB);
         seenByListA.ShouldContain(spawned);
     }
+
+    // EnemyList is typed Entities\Enemy; a Zombie (derived) spawn joins it, so a relationship built on
+    // that list must collide the spawn, just as FRB1's base-typed enemy lists do.
+    [Fact]
+    public void BuildObjects_BaseTypedList_CollidesSpawnOfDerivedEntity()
+    {
+        var engine = new FlatRedBallService();
+        var project = GlueProject.Load(Gluj("BaseTypedLists"));
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
+
+        var screen = (GlueScreen)engine.CurrentScreen;
+        var relationship =
+            (CollisionRelationship<GlueEntity, GlueEntity>)screen.Objects["EnemyListVsTarget"];
+
+        var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+        zombie.X = 0f;
+        zombie.Y = 0f;
+
+        var seen = new List<GlueEntity>();
+        relationship.CollisionOccurred += (enemy, _) => seen.Add(enemy);
+        relationship.RunCollisions();
+
+        seen.ShouldContain(zombie);
+    }
 }

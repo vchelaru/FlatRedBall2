@@ -280,10 +280,32 @@ public sealed class GlueProject
             return;
         }
 
-        if (save.Name is not null && _factoryListsByEntityType.TryGetValue(save.Name, out var listNames))
+        // A list typed with a base entity receives every derived spawn (FRB1's per-factory AddList),
+        // so the entity's whole ancestor chain is consulted, not just its own name.
+        var joined = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var typeName in SelfAndAncestors(save))
         {
+            if (!_factoryListsByEntityType.TryGetValue(typeName, out var listNames))
+                continue;
+
             foreach (var name in listNames)
-                TrackInList(name, entity);
+            {
+                if (joined.Add(name))
+                    TrackInList(name, entity);
+            }
+        }
+    }
+
+    /// <summary>The entity's own name, then each base's, nearest first. Stops at a cycle or a base that is not an element.</summary>
+    private IEnumerable<string> SelfAndAncestors(EntitySave save)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var current = save; current?.Name is not null && seen.Add(current.Name);
+             current = current.BaseEntity is null ? null : FindEntity(current.BaseEntity))
+        {
+            yield return current.Name;
         }
     }
 

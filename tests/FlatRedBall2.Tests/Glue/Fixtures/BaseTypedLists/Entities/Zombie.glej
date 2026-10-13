@@ -1,0 +1,24 @@
+{
+  "Tags": [
+    "GLUE"
+  ],
+  "Source": "GLUE",
+  "CreatedByOtherEntities": true,
+  "Is2D": true,
+  "Name": "Entities\\Zombie",
+  "CustomClassesForExport": [],
+  "NamedObjects": [],
+  "CustomVariables": [],
+  "Properties": [
+    {
+      "Name": "ImplementsICollidable",
+      "Value": true,
+      "Type": "Boolean"
+    },
+    {
+      "Name": "InputDevice",
+      "Value": 0
+    }
+  ],
+  "BaseEntity": "Entities\\Enemy"
+}
