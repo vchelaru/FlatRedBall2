@@ -277,7 +277,7 @@ public class Screen : ILifecycleEvents
     /// and tile animations stop ticking. Idempotent.
     /// </summary>
     /// <remarks>
-    /// Visuals only. The shapes from <see cref="TileMap.GenerateCollisionFromClass"/> keep drawing and
+    /// Visuals only. The shapes from <see cref="TileMap.GenerateCollisionFromClass(string, string?)"/> keep drawing and
     /// colliding, and their <see cref="CollisionRelationship{A,B}"/>s stay active, until you call
     /// <see cref="Remove(Collision.TileShapes)"/> and <see cref="RemoveCollisionRelationship{A,B}"/> yourself.
     /// Entities already spawned from the map stay alive; destroy them yourself. Adding the map back
