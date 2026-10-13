@@ -311,16 +311,6 @@ public class TileMap
     // (e.g. via ParseTmx caching) must be advanced once between them, not once each.
     internal bool SharesTilemapWith(TileMap other) => _tilemap != null && ReferenceEquals(_tilemap, other._tilemap);
 
-    /// <summary>The <see cref="TileShapes"/> this map generated, for <see cref="Screen.Remove(TileMap)"/>.</summary>
-    internal IEnumerable<TileShapes> GeneratedShapes
-    {
-        get
-        {
-            for (int i = 0; i < _trackedCollections.Count; i++)
-                yield return _trackedCollections[i].Collection;
-        }
-    }
-
     private readonly record struct TrackedCollection(
         Func<TilemapTileData, bool> Predicate,
         Func<TilemapObject, bool>? ObjectPredicate,

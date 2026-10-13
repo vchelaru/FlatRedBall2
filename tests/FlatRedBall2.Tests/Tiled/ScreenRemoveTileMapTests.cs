@@ -13,8 +13,9 @@ using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Tests.Tiled;
 
-// A TileMap, its generated TileShapes and the relationships on them are removable at runtime,
-// the way an entity is: nothing keeps drawing, ticking or colliding after Remove.
+// A TileMap, its TileShapes and the relationships on them are removable at runtime. Remove(TileMap)
+// removes visuals only; collision is removed separately with Remove(TileShapes) and
+// RemoveCollisionRelationship.
 public class ScreenRemoveTileMapTests
 {
     private class Marker : Entity { }
@@ -128,7 +129,7 @@ public class ScreenRemoveTileMapTests
     }
 
     [Fact]
-    public void Remove_TileMap_RemovesGeneratedShapesFromRenderList()
+    public void Remove_TileMap_LeavesGeneratedShapesInRenderList()
     {
         var screen = NewScreen();
         var map = new TileMap(SolidTilemap(0, 0));
@@ -136,15 +137,14 @@ public class ScreenRemoveTileMapTests
         var tile = tiles.Rectangles.Single();
         screen.Add(map);
         screen.Add(tiles);
-        screen.RenderList.ShouldContain(tile);
 
         screen.Remove(map);
 
-        screen.RenderList.ShouldNotContain(tile);
+        screen.RenderList.ShouldContain(tile);
     }
 
     [Fact]
-    public void Remove_TileMap_RemovesRelationshipsOnItsGeneratedShapes()
+    public void Remove_TileMap_LeavesRelationshipsOnItsGeneratedShapesColliding()
     {
         var screen = NewScreen();
         var map = new TileMap(SolidTilemap(0, 0));
@@ -158,26 +158,50 @@ public class ScreenRemoveTileMapTests
         screen.Remove(map);
         screen.Update(Frame());
 
-        actor.X.ShouldBe(startX);
+        actor.X.ShouldBeLessThan(startX);
     }
 
     [Fact]
-    public void Remove_TileMap_LeavesRelationshipsOnOtherShapes()
+    public void Remove_TileMap_ThenRemoveShapesAndRelationship_LeavesNothingColliding()
     {
         var screen = NewScreen();
-        var removed = new TileMap(SolidTilemap(0, 0));
-        var kept = new TileMap(SolidTilemap(3, 3));
-        removed.GenerateCollisionFromClass("Solid");
-        var keptTiles = kept.GenerateCollisionFromClass("Solid");
-        var actor = ActorOverlapping(keptTiles);
+        var map = new TileMap(SolidTilemap(0, 0));
+        var tiles = map.GenerateCollisionFromClass("Solid");
+        var tile = tiles.Rectangles.Single();
+        var actor = ActorOverlapping(tiles);
         screen.Register(actor);
-        screen.AddCollisionRelationship(new[] { actor }, keptTiles).MoveFirstOnCollision();
+        screen.Add(map);
+        screen.Add(tiles);
+        var rel = screen.AddCollisionRelationship(new[] { actor }, tiles);
+        rel.MoveFirstOnCollision();
         float startX = actor.X;
 
-        screen.Remove(removed);
+        screen.Remove(map);
+        screen.Remove(tiles);
+        screen.RemoveCollisionRelationship(rel);
         screen.Update(Frame());
 
-        actor.X.ShouldBeLessThan(startX);
+        actor.X.ShouldBe(startX);
+        screen.RenderList.ShouldNotContain(tile);
+    }
+
+    [Fact]
+    public void Remove_TileMap_Twice_IsIdempotent()
+    {
+        var screen = NewScreen();
+        var map = new TileMap(SolidTilemap(0, 0));
+        var tiles = map.GenerateCollisionFromClass("Solid");
+        var actor = ActorOverlapping(tiles);
+        screen.Register(actor);
+        screen.AddCollisionRelationship(new[] { actor }, tiles).MoveFirstOnCollision();
+        screen.Add(map);
+        screen.Add(tiles);
+
+        screen.Remove(map);
+        Should.NotThrow(() => screen.Remove(map));
+        screen.Update(Frame());
+
+        screen.RenderList.ShouldContain(tiles.Rectangles.Single());
     }
 
     [Fact]
@@ -193,11 +217,16 @@ public class ScreenRemoveTileMapTests
         screen.Register(actorAtA);
         screen.Register(actorAtB);
         screen.Add(mapA);
-        screen.AddCollisionRelationship(new[] { actorAtA, actorAtB }, tilesA).MoveFirstOnCollision();
+        screen.Add(tilesA);
+        var relA = screen.AddCollisionRelationship(new[] { actorAtA, actorAtB }, tilesA);
+        relA.MoveFirstOnCollision();
         float aStart = actorAtA.X, bStart = actorAtB.X;
 
-        screen.Remove(mapA);
         screen.Add(mapB);
+        screen.Add(tilesB);
+        screen.Remove(mapA);
+        screen.Remove(tilesA);
+        screen.RemoveCollisionRelationship(relA);
         screen.AddCollisionRelationship(new[] { actorAtA, actorAtB }, tilesB).MoveFirstOnCollision();
         screen.Update(Frame());
 
@@ -206,7 +235,7 @@ public class ScreenRemoveTileMapTests
     }
 
     [Fact]
-    public void Remove_TileMap_FromCollisionHandler_FinishesPassAndStopsCollidingAfter()
+    public void Remove_TileMap_FromCollisionHandler_FinishesPassAndStopsCollidingAfterExplicitRemoval()
     {
         var screen = NewScreen();
         var map = new TileMap(SolidTilemap(0, 0));
@@ -217,10 +246,16 @@ public class ScreenRemoveTileMapTests
         screen.Register(actor);
         screen.Register(trigger);
         screen.Add(map);
+        screen.Add(tiles);
         var tileRel = screen.AddCollisionRelationship(new[] { actor }, tiles);
         tileRel.MoveFirstOnCollision();
         var triggerRel = screen.AddCollisionRelationship(new[] { actor }, new[] { trigger });
-        triggerRel.CollisionOccurred += (_, _) => screen.Remove(map);
+        triggerRel.CollisionOccurred += (_, _) =>
+        {
+            screen.Remove(map);
+            screen.Remove(tiles);
+            screen.RemoveCollisionRelationship(tileRel);
+        };
         int tileHits = 0;
         tileRel.CollisionOccurred += (_, _) => tileHits++;
 
@@ -284,6 +319,7 @@ public class ScreenRemoveTileMapTests
         screen.Add(map);
         screen.Add(tiles);
         screen.Remove(map);
+        screen.Remove(tiles);
         return new WeakReference(map);
     }
 

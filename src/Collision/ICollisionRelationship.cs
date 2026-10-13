@@ -26,7 +26,4 @@ internal interface ICollisionRelationship
     /// releases destroy hooks on the entities it tracked.
     /// </summary>
     void OnRemoved() { }
-
-    /// <summary>True when <paramref name="participant"/> is an element of either side's list.</summary>
-    bool Involves(object participant) => false;
 }

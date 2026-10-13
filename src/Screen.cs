@@ -249,7 +249,8 @@ public class Screen : ILifecycleEvents
     /// against this screen's camera. Lazy-spawn placements registered before or after this
     /// call will fire when the camera reaches them. Also drives the map's Tiled tile animations:
     /// they advance by the TimeScale-scaled frame delta and freeze while the screen is paused.
-    /// Individual layer Z values and visibility are respected.
+    /// Individual layer Z values and visibility are respected. Does not add the map's generated
+    /// <see cref="TileShapes"/> or any collision relationship; see <see cref="Add(Collision.TileShapes, Layer?)"/>.
     /// </summary>
     public void Add(TileMap map, Layer? layer = null)
     {
@@ -272,27 +273,21 @@ public class Screen : ILifecycleEvents
     }
 
     /// <summary>
-    /// Undoes <see cref="Add(TileMap, Layer?)"/>: the map's layers stop drawing, its lazy spawner
-    /// and tile animations stop ticking, and the shapes it generated
-    /// (<see cref="TileMap.GenerateCollisionFromClass"/>) leave the render list. Every
-    /// <see cref="CollisionRelationship{A,B}"/> on those generated shapes is removed too, so the
-    /// removed map's walls stop colliding. Idempotent.
+    /// Undoes <see cref="Add(TileMap, Layer?)"/>: the map's layers stop drawing and its lazy spawner
+    /// and tile animations stop ticking. Idempotent.
     /// </summary>
     /// <remarks>
+    /// Visuals only. The shapes from <see cref="TileMap.GenerateCollisionFromClass"/> keep drawing and
+    /// colliding, and their <see cref="CollisionRelationship{A,B}"/>s stay active, until you call
+    /// <see cref="Remove(Collision.TileShapes)"/> and <see cref="RemoveCollisionRelationship{A,B}"/> yourself.
     /// Entities already spawned from the map stay alive; destroy them yourself. Adding the map back
-    /// restores drawing and ticking, but relationships have to be created again. When called from a
-    /// collision handler, relationship removal takes effect at the end of that collision pass.
+    /// restores drawing and ticking.
     /// </remarks>
     public void Remove(TileMap map)
     {
         foreach (var mapLayer in map.Layers)
             Remove(mapLayer);
         _tileMaps.Unregister(map);
-        foreach (var shapes in map.GeneratedShapes)
-        {
-            Remove(shapes);
-            _collisionSystem.RemoveInvolving(shapes);
-        }
     }
 
     /// <summary>Removes a single <see cref="TileMapLayer"/> previously added with <see cref="Add(TileMapLayer, Layer?)"/>.</summary>

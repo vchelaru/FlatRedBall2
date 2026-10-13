@@ -39,16 +39,6 @@ internal sealed class CollisionSystem
         relationship.OnRemoved();
     }
 
-    /// <summary>Removes every relationship that has <paramref name="participant"/> in either list.</summary>
-    internal void RemoveInvolving(object participant)
-    {
-        for (int i = _relationships.Count - 1; i >= 0; i--)
-        {
-            if (i < _relationships.Count && _relationships[i].Involves(participant))
-                Remove(_relationships[i]);
-        }
-    }
-
     /// <summary>Clears all collision relationships.</summary>
     internal void Clear() => _relationships.Clear();
 

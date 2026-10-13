@@ -445,15 +445,6 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _previousContacts?.Clear();
     }
 
-    bool ICollisionRelationship.Involves(object participant)
-    {
-        for (int i = 0; i < _listA.Count; i++)
-            if (ReferenceEquals(_listA[i], participant)) return true;
-        for (int i = 0; i < _listB.Count; i++)
-            if (ReferenceEquals(_listB[i], participant)) return true;
-        return false;
-    }
-
     // Fires CollisionEnded once per unique tracked pair, then drops all tracking. Called when the
     // relationship is disabled so no pair is left dangling in the "started" state.
     private void FireEndedForAllContacts()

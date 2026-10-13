@@ -116,7 +116,7 @@ counter sees one extra pair of events per toggle.
 
 ## Removing a Relationship — `RemoveCollisionRelationship`
 
-`Screen.RemoveCollisionRelationship(rel)` unregisters it for good; unlike `IsEnabled = false` it cannot be turned back on. `CollisionEnded` fires for pairs still overlapping, and the entities it tracked release their hooks. Calling it from a collision handler is safe: it takes effect when the current collision pass ends. Removing a `TileMap` via `Screen.Remove(map)` removes the relationships on its generated shapes automatically (see `levels`).
+`Screen.RemoveCollisionRelationship(rel)` unregisters it for good; unlike `IsEnabled = false` it cannot be turned back on. `CollisionEnded` fires for pairs still overlapping, and the entities it tracked release their hooks. Calling it from a collision handler is safe: it takes effect when the current collision pass ends. `Screen.Remove(map)` does not remove relationships (or the generated `TileShapes`); remove them explicitly with `Remove(tiles)` and this method (see `levels`).
 
 ## Execution Order
 

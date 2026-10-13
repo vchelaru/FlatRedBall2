@@ -66,7 +66,7 @@ var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "Gamepla
 
 ## Swapping or Removing a Map at Runtime
 
-`Remove(map)` undoes `Add(map)`: layers stop drawing, lazy spawning and tile animation stop, and the map's generated `TileShapes` leave the render list. It also removes every `CollisionRelationship` on those generated shapes, so a swap is `Remove(oldMap)`, `Add(newMap)`, then a new `AddCollisionRelationship` on the new map's shapes (handlers on the old relationship are not carried over). Entities already spawned from the old map stay alive; destroy them yourself. `Remove(tiles)` and `RemoveCollisionRelationship(rel)` do the same for a hand-built `TileShapes` or a relationship; both are safe to call from a collision handler and take effect when that collision pass ends.
+`Remove(map)` undoes `Add(map)` for visuals only: layers stop drawing, lazy spawning and tile animation stop. It does **not** touch the map's generated `TileShapes` or any relationship on them; those keep drawing and colliding until you remove them. A swap is `Add(newMap)`, `Remove(oldMap)`, `Remove(oldTiles)`, `RemoveCollisionRelationship(oldRel)`, then `AddCollisionRelationship` on the new map's shapes (handlers on the old relationship are not carried over). Re-adding a map restores only its visuals, so a relationship you removed has to be created again. Entities already spawned from the old map stay alive; destroy them yourself. `Remove(tiles)` and `RemoveCollisionRelationship(rel)` are safe to call from a collision handler; the relationship removal takes effect when that collision pass ends.
 
 ## Slope Tiles and Sub-Cell Shapes
 
