@@ -212,8 +212,8 @@ public sealed class GlueProject
     /// building a list's own authored member, whose placement is unambiguous. Leave this null for an
     /// ordinary spawn (the call game code makes at runtime, mirroring FRB1's
     /// <c>&lt;Entity&gt;Factory.CreateNew()</c>): the instance then joins every list of this entity
-    /// type that opted into <see cref="Model.NamedObjectSave.AssociateWithFactory"/> — none, one, or
-    /// several. Either way the entity is always tracked under <see cref="InstancesOf"/> by type. See
+    /// type, or of any entity it derives from, that opted into
+    /// <see cref="Model.NamedObjectSave.AssociateWithFactory"/> — none, one, or several. Either way the entity is always tracked under <see cref="InstancesOf"/> by type. See
     /// <see cref="InstancesOfList"/>.
     /// </param>
     /// <exception cref="ArgumentException">No element has that name.</exception>
