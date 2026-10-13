@@ -285,6 +285,26 @@ public class TileMap
     /// </summary>
     public LazySpawner LazySpawner { get; } = new LazySpawner();
 
+    // Reused each tick: the MGEx renderer only reads ElapsedGameTime, and GameTime is a class,
+    // so a fresh instance per frame would allocate on the hot path.
+    private readonly Microsoft.Xna.Framework.GameTime _animationGameTime = new();
+
+    /// <summary>
+    /// Advances Tiled tile animations (<c>.tsx</c> frame sequences) by <paramref name="deltaSeconds"/>.
+    /// <see cref="Screen"/> calls this each unpaused frame with the TimeScale-scaled delta for every
+    /// map registered via <c>Screen.Add(TileMap)</c>; game code does not call it.
+    /// </summary>
+    internal void AdvanceAnimations(float deltaSeconds)
+    {
+        if (_renderer == null) return;
+        _animationGameTime.ElapsedGameTime = TimeSpan.FromSeconds(deltaSeconds);
+        _renderer.Update(_animationGameTime);
+    }
+
+    // Animation state lives on the shared tile data, so two TileMaps over one parsed Tilemap
+    // (e.g. via ParseTmx caching) must be advanced once between them, not once each.
+    internal bool SharesTilemapWith(TileMap other) => _tilemap != null && ReferenceEquals(_tilemap, other._tilemap);
+
     private readonly record struct TrackedCollection(
         Func<TilemapTileData, bool> Predicate,
         Func<TilemapObject, bool>? ObjectPredicate,
@@ -375,12 +395,15 @@ public class TileMap
 
     /// <summary>
     /// Internal constructor for unit testing — creates a TileMap without loading a TMX file or
-    /// constructing a renderer. Pass a hand-built <see cref="Tilemap"/> from MonoGame.Extended.
+    /// needing a <see cref="GraphicsDevice"/>. Pass a hand-built <see cref="Tilemap"/> from MonoGame.Extended.
+    /// The renderer is created (it loads headless) so animation ticking is testable, but layers
+    /// get no <see cref="TileMapLayerRenderable"/>.
     /// </summary>
     internal TileMap(Tilemap tilemap, float x = 0f, float y = 0f)
     {
         _tilemap = tilemap;
-        _renderer = null!;
+        _renderer = new TilemapSpriteBatchRenderer();
+        _renderer.LoadTilemap(_tilemap);
         _graphicsDevice = null;
         _width = _tilemap.Width * _tilemap.TileWidth;
         _height = _tilemap.Height * _tilemap.TileHeight;

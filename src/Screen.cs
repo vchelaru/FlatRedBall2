@@ -214,15 +214,16 @@ public class Screen : ILifecycleEvents
     /// Adds all visual layers of a <see cref="TileMap"/> to this screen's render list and
     /// registers the map's <see cref="TileMap.LazySpawner"/> for per-frame ticking
     /// against this screen's camera. Lazy-spawn placements registered before or after this
-    /// call will fire when the camera reaches them.
+    /// call will fire when the camera reaches them. Also drives the map's Tiled tile animations:
+    /// they advance by the TimeScale-scaled frame delta and freeze while the screen is paused.
     /// Individual layer Z values and visibility are respected.
     /// </summary>
     public void Add(TileMap map, Layer? layer = null)
     {
         foreach (var mapLayer in map.Layers)
             Add(mapLayer, layer);
-        if (!_lazySpawnSources.Contains(map))
-            _lazySpawnSources.Register(map);
+        if (!_tileMaps.Contains(map))
+            _tileMaps.Register(map);
     }
 
     /// <summary>
@@ -237,7 +238,7 @@ public class Screen : ILifecycleEvents
         _renderList.Add(mapLayer.Renderable);
     }
 
-    private readonly ScreenRegistry<TileMap> _lazySpawnSources = new();
+    private readonly ScreenRegistry<TileMap> _tileMaps = new();
     private SpawnBounds[]? _lazySpawnRectBuffer;
 
     /// <summary>
@@ -1017,10 +1018,22 @@ public class Screen : ILifecycleEvents
                 _lazySpawnRectBuffer[c] = new SpawnBounds(cam.Left, cam.Right, cam.Bottom, cam.Top);
             }
             var lazySpawnRects = _lazySpawnRectBuffer.AsSpan(0, Cameras.Count);
-            for (int i = 0; i < _lazySpawnSources.Count; i++)
-                _lazySpawnSources[i].LazySpawner.Update(lazySpawnRects);
+            for (int i = 0; i < _tileMaps.Count; i++)
+                _tileMaps[i].LazySpawner.Update(lazySpawnRects);
             if (engine != null)
                 engine._frameProfile.LazySpawnMs = ProfileClock.Ms(t1, System.Diagnostics.Stopwatch.GetTimestamp());
+
+            // 1.26 Tiled tile animations — scaled delta, so TimeScale applies; skipped while paused
+            //      (this is the unpaused branch). Maps over a shared Tilemap advance only once.
+            for (int i = 0; i < _tileMaps.Count; i++)
+            {
+                var map = _tileMaps[i];
+                bool alreadyAdvanced = false;
+                for (int j = 0; j < i; j++)
+                    if (map.SharesTilemapWith(_tileMaps[j])) { alreadyAdvanced = true; break; }
+                if (!alreadyAdvanced)
+                    map.AdvanceAnimations(frameTime.DeltaSeconds);
+            }
 
             // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
             long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
