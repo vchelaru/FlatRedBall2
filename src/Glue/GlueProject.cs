@@ -233,49 +233,78 @@ public sealed class GlueProject
     }
 
     /// <summary>
-    /// Makes every spawn of this entity, and of any entity derived from it, join
-    /// <paramref name="list"/>, as FRB1's <c>Factory.AddList</c> does. Adding a list already there
-    /// changes nothing.
+    /// Makes every spawn of exactly this entity join <paramref name="list"/>, as FRB1's
+    /// <c>Factory.AddList</c> does on one factory. Adding a list already there changes nothing.
     /// </summary>
     /// <remarks>
-    /// Works for any list, a screen's or an entity's. The registration lasts until the screen changes.
+    /// Works for any list, a screen's or an entity's. It touches only the named entity's set: derived
+    /// entities each keep their own, as FRB1's derived factories do, so a Zombie spawn is unaffected by
+    /// a call naming its base Enemy. The registration lasts until the screen changes.
     /// </remarks>
     /// <exception cref="ArgumentException">No entity has that name.</exception>
     public void AddList(string glueName, GlueEntityList list)
     {
-        foreach (var name in SelfAndDescendants(glueName))
-        {
-            if (!_listsToAddTo.TryGetValue(name, out var lists))
-                _listsToAddTo[name] = lists = new List<GlueEntityList>();
-
-            if (!lists.Contains(list))
-                lists.Add(list);
-        }
+        var save = FindEntity(glueName) ?? throw UnknownName(glueName, "entity", _entities.Keys);
+        AddDestination(save.Name!, list);
     }
 
     /// <summary>
-    /// Stops spawns of this entity, and of any entity derived from it, joining
-    /// <paramref name="list"/>. Members already in the list stay. Naming a derived entity removes the
-    /// list for that entity alone.
+    /// Stops spawns of exactly this entity joining <paramref name="list"/>, like FRB1's
+    /// <c>Factory.RemoveList</c> on one factory. Members already in the list stay.
     /// </summary>
+    /// <remarks>
+    /// Derived entities are not touched, so removing a base-typed list from Enemy leaves Zombie spawns
+    /// joining it; call it for each type to remove it everywhere.
+    /// </remarks>
     /// <exception cref="ArgumentException">No entity has that name.</exception>
     public void RemoveList(string glueName, GlueEntityList list)
     {
-        foreach (var name in SelfAndDescendants(glueName))
-        {
-            if (_listsToAddTo.TryGetValue(name, out var lists))
-                lists.Remove(list);
-        }
+        var save = FindEntity(glueName) ?? throw UnknownName(glueName, "entity", _entities.Keys);
+
+        if (_listsToAddTo.TryGetValue(save.Name!, out var lists))
+            lists.Remove(list);
     }
 
-    private List<string> SelfAndDescendants(string glueName)
+    private void AddDestination(string entityName, GlueEntityList list)
     {
-        var root = FindEntity(glueName) ?? throw UnknownName(glueName, "entity", _entities.Keys);
+        if (!_listsToAddTo.TryGetValue(entityName, out var lists))
+            _listsToAddTo[entityName] = lists = new List<GlueEntityList>();
 
-        return _entities.Values
-            .Where(e => e.Name is not null && SelfAndAncestors(e).Contains(root.Name!, StringComparer.OrdinalIgnoreCase))
-            .Select(e => e.Name!)
-            .ToList();
+        if (!lists.Contains(list))
+            lists.Add(list);
+    }
+
+    /// <summary>
+    /// What a screen does at init for a list that opted into factory spawning: gives it to the factory
+    /// of the list's entity type and of every entity derived from it, skipping abstract entities and
+    /// ones with no factory. Returns the entities it registered the list for.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors FRB1's generated <c>InitializeFactoriesAndSorting</c>. Its docs say only the most base
+    /// and most derived types are registered, but the generator registers every non-abstract factory
+    /// entity whose type is the list's or inherits from it at any depth, and that is what this follows.
+    /// </remarks>
+    internal List<string> AssociateList(string listEntityName, GlueEntityList list)
+    {
+        var listType = FindEntity(listEntityName);
+        var registered = new List<string>();
+
+        if (listType?.Name is null)
+            return registered;
+
+        foreach (var entity in _entities.Values)
+        {
+            if (entity.Name is null || !entity.CreatedByOtherEntities || entity.IsAbstract ||
+                !SelfAndAncestors(entity).Contains(listType.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            AddDestination(entity.Name, list);
+            registered.Add(entity.Name);
+        }
+
+        return registered;
     }
 
     /// <summary>The entity's own name, then each base's, nearest first. Stops at a cycle or a base that is not an element.</summary>

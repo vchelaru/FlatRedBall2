@@ -117,8 +117,8 @@ public class GlueScreen : Screen
 
     /// <summary>
     /// Registers a list this screen declared as a spawn destination, as FRB1's screen init calls
-    /// <c>Factory.AddList</c>. Only a list that opted into factory spawning and names an entity type
-    /// qualifies.
+    /// <c>Factory.AddList</c> on each factory of the list's type or a derived type. Only a list that
+    /// opted into factory spawning and names an entity type qualifies.
     /// </summary>
     private void RegisterFactoryList(NamedObjectSave save, GlueEntityList list)
     {
@@ -128,8 +128,8 @@ public class GlueScreen : Screen
             return;
         }
 
-        Project.AddList(save.SourceClassGenericType, list);
-        _registeredLists.Add((save.SourceClassGenericType, list));
+        foreach (var entityName in Project.AssociateList(save.SourceClassGenericType, list))
+            _registeredLists.Add((entityName, list));
     }
 
     /// <summary>Withdraws what a previous build registered, so a rebuild does not leave stale destinations.</summary>

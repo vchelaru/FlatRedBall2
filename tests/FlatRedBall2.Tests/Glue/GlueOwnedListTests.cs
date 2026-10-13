@@ -185,17 +185,46 @@ public class GlueOwnedListTests
         screen.GetList("BulletList").Count(e => e == spawned).ShouldBe(1);
     }
 
+    // FRB1's screen init calls AddList on every factory whose entity is the list's type or derives
+    // from it, so each derived factory holds its own reference to the base-typed list.
     [Fact]
-    public void AddList_OnABaseEntity_AppliesToDerivedSpawns()
+    public void ListsToAddTo_ByDefault_HoldsABaseTypedListForEveryDerivedEntityToo()
+    {
+        var (_, project, screen) = Boot("BaseTypedLists");
+        var enemyList = screen.GetList("EnemyList");
+
+        project.ListsToAddTo(@"Entities\Enemy").ShouldBe(new[] { enemyList });
+        project.ListsToAddTo(@"Entities\Zombie").ShouldBe(new[] { enemyList });
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { enemyList });
+        project.ListsToAddTo(@"Entities\Target").ShouldBeEmpty();
+    }
+
+    // AddList and RemoveList act on one entity's destination set, like a call on one FRB1 factory.
+    [Fact]
+    public void AddList_OnABaseEntity_DoesNotReachDerivedSpawns()
     {
         var (_, project, screen) = Boot("BaseTypedLists");
         var extra = new GlueEntityList();
 
         project.AddList(@"Entities\Enemy", extra);
         var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+        var enemy = project.CreateEntity(@"Entities\Enemy", screen);
 
-        extra.ShouldContain(zombie);
+        extra.ShouldBe(new[] { enemy });
+        zombie.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void RemoveList_OnABaseEntity_LeavesDerivedSpawnsJoining()
+    {
+        var (_, project, screen) = Boot("BaseTypedLists");
+
+        project.RemoveList(@"Entities\Enemy", screen.GetList("EnemyList"));
+        var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+        var enemy = project.CreateEntity(@"Entities\Enemy", screen);
+
         screen.GetList("EnemyList").ShouldContain(zombie);
+        screen.GetList("EnemyList").ShouldNotContain(enemy);
     }
 
     [Fact]
@@ -209,6 +238,43 @@ public class GlueOwnedListTests
 
         screen.GetList("EnemyList").ShouldNotContain(zombie);
         screen.GetList("EnemyList").ShouldContain(enemy);
+    }
+
+    // Only an entity with a factory (CreatedByOtherEntities, not abstract) receives AddList at screen
+    // init; the derived entity below it still does, because the rule is "any ancestor".
+    [Fact]
+    public void ListsToAddTo_ByDefault_SkipsEntitiesWithoutAFactory()
+    {
+        var project = LoadBaseTyped();
+        project.FindEntity(@"Entities\Zombie")!.CreatedByOtherEntities = false;
+        var (_, screen) = Start(project);
+
+        project.ListsToAddTo(@"Entities\Zombie").ShouldBeEmpty();
+        project.ListsToAddTo(@"Entities\Enemy").ShouldBe(new[] { screen.GetList("EnemyList") });
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { screen.GetList("EnemyList") });
+    }
+
+    [Fact]
+    public void ListsToAddTo_ByDefault_SkipsAbstractEntities()
+    {
+        var project = LoadBaseTyped();
+        project.FindEntity(@"Entities\Zombie")!.NamedObjects.Add(
+            new FlatRedBall2.Glue.Model.NamedObjectSave { InstanceName = "Slot", SetByDerived = true });
+        var (_, screen) = Start(project);
+
+        project.ListsToAddTo(@"Entities\Zombie").ShouldBeEmpty();
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { screen.GetList("EnemyList") });
+    }
+
+    private static GlueProject LoadBaseTyped() => GlueProject.Load(Path.Combine(
+        AppContext.BaseDirectory, "Glue", "Fixtures", "BaseTypedLists", "BaseTypedLists.gluj"));
+
+    private static (FlatRedBallService Engine, GlueScreen Screen) Start(GlueProject project)
+    {
+        var engine = new FlatRedBallService();
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
+        return (engine, (GlueScreen)engine.CurrentScreen);
     }
 
     [Fact]
