@@ -16,7 +16,8 @@ namespace FlatRedBall2.Rendering;
 /// the parent.
 /// <para>
 /// Defaults to <see cref="Batches.WorldSpaceBatch"/> (camera-transformed, Y+ up). For HUD
-/// or screen-space sprites, assign a screen-space layer or set <see cref="Batch"/> directly.
+/// or screen-space sprites, set <see cref="Batch"/> to <see cref="Batches.ScreenSpaceBatch"/>;
+/// <see cref="Layer.IsScreenSpace"/> only affects Gum elements.
 /// </para>
 /// <para>
 /// <b>Sizing modes:</b> see <see cref="TextureScale"/> for how <see cref="Width"/> and
