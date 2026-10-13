@@ -8,11 +8,6 @@ name: Regenerate golden images
 #   gh workflow run golden-images-regenerate.yml --ref <your-branch>
 on:
   workflow_dispatch:
-  # TEMP-1420: a new workflow cannot be dispatched until it exists on the default branch, so this
-  # run fires on the branch's first push. Removed before merge.
-  push:
-    branches: [1420-golden-image-ci]
-    paths: ['.github/workflows/golden-images-regenerate.yml']
 
 permissions:
   contents: write

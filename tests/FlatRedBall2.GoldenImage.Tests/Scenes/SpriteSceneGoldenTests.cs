@@ -27,7 +27,7 @@ public class SpriteSceneGoldenTests
         flipped.FlipHorizontal = true;                                      // marker moves to the top-right
         screen.Add(flipped);
         var rotated = Make(40, 20);
-        rotated.Rotation = Angle.FromDegrees(90);                           // marker moves to the top-right
+        rotated.Rotation = Angle.FromDegrees(90);                           // counterclockwise: marker moves to the bottom-left
         screen.Add(rotated);
         var tinted = Make(-20, -25);
         tinted.Color = new Color(255, 120, 120);
