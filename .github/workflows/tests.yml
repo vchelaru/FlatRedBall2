@@ -237,6 +237,37 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Build-only (no tests): the engine job above compiles the MonoGame engine, never the KNI one,
+  # so a KNI-incompatible API (e.g. the GameTime.ElapsedGameTime setter, #1415) broke
+  # FlatRedBall2.Kni and every BlazorGL head on main with no check failing (#1441). ShmupSpace's
+  # head builds FlatRedBall2.BlazorGL, FlatRedBall2.Kni, and the sample's KNI Common project.
+  kni-blazorgl-build:
+    name: Build KNI and BlazorGL head (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build FlatRedBall2.Kni
+        run: dotnet build src/Kni/FlatRedBall2.Kni.csproj --verbosity minimal
+
+      - name: Build ShmupSpace BlazorGL head
+        run: dotnet build samples/ShmupSpace/ShmupSpace.BlazorGL/ShmupSpace.BlazorGL.csproj --verbosity minimal
+
   # Umbrella check that branch protection gates on. Stays named "dotnet test" so the
   # existing required-status-check entry in the main-protection ruleset keeps matching.
   # always() + an explicit result check: with the default success() condition a failed need leaves
@@ -244,7 +275,7 @@ jobs:
   test:
     name: dotnet test
     runs-on: ubuntu-latest
-    needs: [engine-tests, golden-image-tests, animationchain-pack, animationchain-common-pack]
+    needs: [engine-tests, golden-image-tests, kni-blazorgl-build, animationchain-pack, animationchain-common-pack]
     if: ${{ always() }}
     steps:
       - name: All test and packaging jobs passed
