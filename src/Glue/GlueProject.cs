@@ -275,14 +275,16 @@ public sealed class GlueProject
     }
 
     /// <summary>
-    /// What a screen does at init for a list that opted into factory spawning: gives it to the factory
-    /// of the list's entity type and of every entity derived from it, skipping abstract entities and
-    /// ones with no factory. Returns the entities it registered the list for.
+    /// What a screen does at init for a list that opted into factory spawning: gives it to the
+    /// factories the list is documented to reach, skipping abstract entities and ones with no factory.
+    /// Returns the entities it registered the list for.
     /// </summary>
     /// <remarks>
-    /// Mirrors FRB1's generated <c>InitializeFactoriesAndSorting</c>. Its docs say only the most base
-    /// and most derived types are registered, but the generator registers every non-abstract factory
-    /// entity whose type is the list's or inherits from it at any depth, and that is what this follows.
+    /// The rule follows FRB1's documentation, on purpose. A list always reaches its own entity's
+    /// factory. It reaches the factories of derived entities, at any depth, only when its entity is the
+    /// most base one (it has no base entity), so a list typed with an in-between entity does not reach
+    /// the entities below it. FRB1's code generator instead reaches every descendant of any list type;
+    /// that is treated as an FRB1 bug and is not copied.
     /// </remarks>
     internal List<string> AssociateList(string listEntityName, GlueEntityList list)
     {
@@ -292,10 +294,17 @@ public sealed class GlueProject
         if (listType?.Name is null)
             return registered;
 
+        bool reachesDescendants = listType.BaseEntity is null;
+
         foreach (var entity in _entities.Values)
         {
-            if (entity.Name is null || !entity.CreatedByOtherEntities || entity.IsAbstract ||
-                !SelfAndAncestors(entity).Contains(listType.Name, StringComparer.OrdinalIgnoreCase))
+            if (entity.Name is null || !entity.CreatedByOtherEntities || entity.IsAbstract)
+                continue;
+
+            bool isListType = string.Equals(entity.Name, listType.Name, StringComparison.OrdinalIgnoreCase);
+
+            if (!isListType &&
+                !(reachesDescendants && SelfAndAncestors(entity).Contains(listType.Name, StringComparer.OrdinalIgnoreCase)))
             {
                 continue;
             }

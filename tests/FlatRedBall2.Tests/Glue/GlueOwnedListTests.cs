@@ -185,10 +185,10 @@ public class GlueOwnedListTests
         screen.GetList("BulletList").Count(e => e == spawned).ShouldBe(1);
     }
 
-    // FRB1's screen init calls AddList on every factory whose entity is the list's type or derives
-    // from it, so each derived factory holds its own reference to the base-typed list.
+    // The documented rule: a list typed with the most base entity (Enemy, which has no base) reaches
+    // its own factory and every descendant's, each holding its own reference.
     [Fact]
-    public void ListsToAddTo_ByDefault_HoldsABaseTypedListForEveryDerivedEntityToo()
+    public void ListsToAddTo_ByDefault_MostBaseTypedList_ReachesEveryDescendant()
     {
         var (_, project, screen) = Boot("BaseTypedLists");
         var enemyList = screen.GetList("EnemyList");
@@ -240,8 +240,54 @@ public class GlueOwnedListTests
         screen.GetList("EnemyList").ShouldContain(enemy);
     }
 
-    // Only an entity with a factory (CreatedByOtherEntities, not abstract) receives AddList at screen
-    // init; the derived entity below it still does, because the rule is "any ancestor".
+    // The chain below is Enemy > Zombie > Boss. A list typed with the in-between Zombie reaches only
+    // Zombie's own factory; one typed with the most derived Boss reaches only Boss.
+    [Fact]
+    public void ListsToAddTo_ByDefault_InBetweenTypedList_ReachesOnlyThatEntity()
+    {
+        var project = LoadBaseTyped();
+        RetypeEnemyList(project, @"Entities\Zombie");
+        var (_, screen) = Start(project);
+        var list = screen.GetList("EnemyList");
+
+        project.ListsToAddTo(@"Entities\Zombie").ShouldBe(new[] { list });
+        project.ListsToAddTo(@"Entities\Enemy").ShouldBeEmpty();
+        project.ListsToAddTo(@"Entities\Boss").ShouldBeEmpty();
+        project.CreateEntity(@"Entities\Boss", screen);
+        list.ShouldBeEmpty();
+        var zombie = project.CreateEntity(@"Entities\Zombie", screen);
+        list.ShouldBe(new[] { zombie });
+    }
+
+    [Fact]
+    public void ListsToAddTo_ByDefault_MostDerivedTypedList_ReachesOnlyThatEntity()
+    {
+        var project = LoadBaseTyped();
+        RetypeEnemyList(project, @"Entities\Boss");
+        var (_, screen) = Start(project);
+
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { screen.GetList("EnemyList") });
+        project.ListsToAddTo(@"Entities\Zombie").ShouldBeEmpty();
+        project.ListsToAddTo(@"Entities\Enemy").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void CreateEntity_MostBaseTypedList_IsJoinedByEveryDescendantSpawn()
+    {
+        var (_, project, screen) = Boot("BaseTypedLists");
+
+        var spawns = new[] { @"Entities\Enemy", @"Entities\Zombie", @"Entities\Boss" }
+            .Select(name => project.CreateEntity(name, screen)).ToList();
+
+        screen.GetList("EnemyList").ShouldBe(spawns);
+    }
+
+    private static void RetypeEnemyList(GlueProject project, string entityName) =>
+        project.StartUpScreen!.NamedObjects.Single(n => n.InstanceName == "EnemyList")
+            .SourceClassGenericType = entityName;
+
+    // Only an entity with a factory (CreatedByOtherEntities, not abstract) receives the list at screen
+    // init. A most-base list still reaches descendants through a skipped intermediate entity.
     [Fact]
     public void ListsToAddTo_ByDefault_SkipsEntitiesWithoutAFactory()
     {
