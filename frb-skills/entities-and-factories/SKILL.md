@@ -108,9 +108,9 @@ With pooling on, `Destroy()` returns the instance to a free list instead of tear
 
 **Contract:**
 - `CustomInitialize` runs exactly once per instance, on first `Create()`. Shape children allocated there are reused across every recycle — the whole point.
-- `CustomDestroy` does **not** run when a pooled entity is destroyed. Use it only for one-time teardown of resources allocated in `CustomInitialize`.
+- `CustomDestroy` does **not** run when a pooled entity is destroyed; it runs only for non-pooled destroys. Pooled instances keep everything `CustomInitialize` allocated.
 - The engine resets per-life state automatically on recycle: `Position`, `Velocity`, `Acceleration`, `Rotation`, `RotationVelocity`, `Drag`, `Z`, `IsVisible`.
-- Override `protected void Reset()` to clear **entity-specific dynamic state** the entity itself mutates over its life — lifetime accumulators, health, mode flags, internal state-machine cursors. Forgetting to reset these is the pooling footgun: stale state bleeds into the next life and is hard to diagnose.
+- Override `protected override void Reset()` to clear **entity-specific dynamic state** the entity itself mutates over its life — lifetime accumulators, health, mode flags, internal state-machine cursors. Forgetting to reset these is the pooling footgun: stale state bleeds into the next life and is hard to diagnose.
 
 Skip pooling for entities that exist as singletons or near-singletons (player, level boss, HUD-anchored UI). The opt-in API exists so the default path stays predictable.
 
