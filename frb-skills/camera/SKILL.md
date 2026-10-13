@@ -225,7 +225,7 @@ cam.ScrollingWindowWidth  = 200f;
 cam.ScrollingWindowHeight = 120f;
 ```
 
-**Pixel-perfect snapping** — on by default (`SnapToPixel = true`). Uses `Camera.PixelsPerUnit`.
+**Pixel-perfect snapping** — `CameraControllingEntity.SnapToPixel`, on by default, rounds the camera position to `1 / Camera.PixelsPerUnit`. It does not snap sprites.
 
 **Screen shake** (async; pass `Token` to cancel on screen transition):
 ```csharp
