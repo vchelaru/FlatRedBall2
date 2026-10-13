@@ -10,6 +10,9 @@
 // This file is yours — modify it to add diagnostics, change canvas behavior, etc.
 // The version pin below must match nkast.Kni.Platform.Blazor.GL in MyGame.BlazorGL.csproj.
 
+// The shim list matches KNI's own BlazorGL template index.html. XHR is required: KNI's TitleContainer
+// reads every content file through nkXHR. A console "404" that names XHR.<v>.js is only the script that
+// issued the request (usually Gum's optional Content/Shader.xnb probe), not the shim itself failing.
 (function () {
     var v = '10.0.3';
     var shims = [

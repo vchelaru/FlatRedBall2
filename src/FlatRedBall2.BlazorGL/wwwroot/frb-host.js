@@ -6,6 +6,9 @@
 // during initial parse is the supported mechanism for sync-ordered script insertion;
 // browsers warn only when called from cross-origin parser-blocking scripts (not us).
 
+// The shim list matches KNI's own BlazorGL template index.html. XHR is required: KNI's TitleContainer
+// reads every content file through nkXHR. A console "404" that names XHR.<v>.js is only the script that
+// issued the request (usually Gum's optional Content/Shader.xnb probe), not the shim itself failing.
 (function () {
     var v = '10.0.3';
     var shims = [
