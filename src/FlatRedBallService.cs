@@ -480,6 +480,8 @@ public class FlatRedBallService
         if (settings?.ProfileStartup == true)
             StartupTiming.IsEnabled = true;
 
+        ConfigureStorage(settings);
+
         StartupTiming.BeginPhase("Engine.Initialize");
         StartupTiming.BeginPhase("Graphics and content setup");
 
@@ -1281,6 +1283,25 @@ public class FlatRedBallService
     /// persistent <see cref="IO.GameStorage.Backend"/> is assigned.
     /// </summary>
     public IO.GameStorage Storage { get; } = new IO.GameStorage(new IO.InMemoryStorageBackend());
+    // Picks the storage backend for a real boot. A bare constructor stays in-memory; only Initialize calls this.
+    internal void ConfigureStorage(EngineInitSettings? settings)
+    {
+        string? name = settings?.StorageName;
+        if (name is null)
+        {
+            Storage.Backend = new IO.UnconfiguredStorageBackend();
+            return;
+        }
+
+        IO.StorageKey.ValidateStorageName(name, nameof(EngineInitSettings.StorageName));
+#if !KNI
+        Storage.Backend = new IO.FileStorageBackend(
+            settings!.StorageRootDirectory ?? IO.FileStorageBackend.DefaultRoot(name));
+#endif
+        // KNI (web): stays in-memory until the browser backend exists. FileStorageBackend is not compiled
+        // into the KNI assembly, so a web build can never write to the WASM virtual file system by accident.
+    }
+
     /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
     public ContentLoader Content { get; } = new ContentLoader();
     /// <summary>Engine clocks and async delay primitives. See <see cref="TimeManager"/>.</summary>

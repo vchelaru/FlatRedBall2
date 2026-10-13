@@ -66,6 +66,36 @@ internal static class StorageKey
         }
     }
 
+    /// <summary>
+    /// Throws <see cref="ArgumentException"/> unless <paramref name="name"/> is usable as a game's storage
+    /// name: a folder name on desktop and a database name on web. Letters (either case), digits, space,
+    /// '-', '_', '.'; at most 64 characters; no leading/trailing space, no trailing '.'.
+    /// </summary>
+    internal static void ValidateStorageName(string name, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("The storage name is empty.", paramName);
+        if (name.Length > 64)
+            throw new ArgumentException($"Storage name \"{name}\" is longer than 64 characters.", paramName);
+        foreach (char c in name)
+        {
+            bool ok = c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '-' or '_' or '.' or ' ';
+            if (!ok)
+                throw new ArgumentException(
+                    $"Storage name \"{name}\" contains '{c}'; only letters, digits, space, '-', '_', and '.' are allowed.", paramName);
+        }
+        if (name[0] == ' ' || name[^1] == ' ' || name[^1] == '.')
+            throw new ArgumentException($"Storage name \"{name}\" cannot start or end with a space or end with '.'.", paramName);
+
+        int dot = name.IndexOf('.');
+        string stem = dot < 0 ? name : name[..dot];
+        foreach (var reserved in ReservedNames)
+        {
+            if (stem.Equals(reserved, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Storage name \"{name}\" uses '{reserved}', a reserved file name on Windows.", paramName);
+        }
+    }
+
     private static void ValidateSegment(string whole, ReadOnlySpan<char> segment, string paramName, bool isPrefixTail)
     {
         if (segment.Length == 0)

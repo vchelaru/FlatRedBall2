@@ -11,9 +11,22 @@ using Xunit;
 
 namespace FlatRedBall2.Tests.IO;
 
-public class GameStorageTests
+// Behavior every backend must show through GameStorage: round trips, atomic writes, key rules,
+// cancellation. Each backend gets a concrete subclass supplying a fresh, isolated backend.
+public abstract class StorageBackendContractTests : IDisposable
 {
-    private static GameStorage NewStorage() => new FlatRedBallService().Storage;
+    protected abstract IStorageBackend CreateBackend();
+
+    public virtual void Dispose()
+    {
+    }
+
+    protected GameStorage NewStorage()
+    {
+        var storage = new FlatRedBallService().Storage;
+        storage.Backend = CreateBackend();
+        return storage;
+    }
 
     // Throws the given exception from every operation, like a full disk or a revoked browser quota.
     private sealed class FailingBackend(Exception failure) : IStorageBackend
@@ -27,14 +40,13 @@ public class GameStorageTests
     }
 
     [Fact]
-    public async Task Storage_DefaultEngine_RoundTripsTextInMemory()
+    public async Task WriteTextAsync_ThenReadTextAsync_RoundTrips()
     {
         var storage = NewStorage();
 
         await storage.WriteTextAsync("saves/slot1.json", "{\"level\":3}");
 
         (await storage.ReadTextAsync("saves/slot1.json")).ShouldBe("{\"level\":3}");
-        storage.IsPersistent.ShouldBeFalse();
     }
 
     [Fact]

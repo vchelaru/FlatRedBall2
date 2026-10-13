@@ -65,6 +65,25 @@ public class EngineInitSettings
     public bool UseFontOversampling { get; init; } = false;
 
     /// <summary>
+    /// A stable name for this game's saved data, required to use <see cref="FlatRedBallService.Storage"/>:
+    /// it names the save folder on desktop and the browser database on web. Leaving it unset makes the
+    /// first storage call throw <see cref="InvalidOperationException"/>, on every platform. Letters,
+    /// digits, space, '-', '_', '.'; at most 64 characters. Renaming it later orphans existing saves.
+    /// </summary>
+    /// <remarks>
+    /// Initialize replaces <see cref="FlatRedBallService.Storage"/>'s backend, so set a custom
+    /// <see cref="IO.GameStorage.Backend"/> after Initialize, not before.
+    /// </remarks>
+    public string? StorageName { get; init; }
+
+    /// <summary>
+    /// Desktop only: the exact folder to keep saves in, instead of the default per-user location
+    /// (<c>FileStorageBackend.DefaultRoot</c>). <see cref="StorageName"/> is still required
+    /// and is not appended. Ignored on web.
+    /// </summary>
+    public string? StorageRootDirectory { get; init; }
+
+    /// <summary>
     /// Records a load-time breakdown during boot and prints it once the start-up screen has
     /// finished loading — see <see cref="FlatRedBallService.StartupTiming"/>. Off by default.
     /// <para>

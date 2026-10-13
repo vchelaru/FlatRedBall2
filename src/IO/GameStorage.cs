@@ -20,8 +20,10 @@ namespace FlatRedBall2.IO;
 /// I/O or quota failure throws <see cref="StorageException"/>.
 /// </para>
 /// <para>
-/// The default backend is memory-only (<see cref="IsPersistent"/> is <c>false</c>) until a
-/// persistent one is assigned to <see cref="Backend"/>.
+/// A bare <c>new FlatRedBallService()</c> is memory-only (<see cref="IsPersistent"/> is <c>false</c>), so
+/// tests never touch disk. <c>Initialize</c> switches to files on desktop when
+/// <see cref="EngineInitSettings.StorageName"/> is set, and makes every storage call throw
+/// <see cref="InvalidOperationException"/> when it is not. Assign <see cref="Backend"/> to choose another.
 /// </para>
 /// </summary>
 public sealed class GameStorage
@@ -173,7 +175,7 @@ public sealed class GameStorage
         {
             return await action().ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException and not StorageException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not StorageException and not StorageNotConfiguredException)
         {
             throw new StorageException($"Storage {operation} of \"{key}\" failed: {ex.Message}", ex);
         }
