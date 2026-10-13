@@ -71,6 +71,12 @@ public class GlueHotReloadTests : IDisposable
     /// A restart is queued during the watcher tick and applied at the top of the next frame, so
     /// seeing the restarted screen takes two updates.
     /// </summary>
+    // Negative, not zero: these tests write real files under a real FileSystemWatcher and also call
+    // MarkChangedAt. A real event delivered mid-Update is stamped later than that Update's "now", and
+    // with a zero window Tick would read it as "activity in the future" and skip the dirty set, so
+    // the test saw no reload (flaked once on Linux CI, cold JIT). A negative window tolerates that skew.
+    private static readonly TimeSpan NoDebounce = TimeSpan.FromMinutes(-1);
+
     private static void UpdateTwice(FlatRedBallService engine)
     {
         engine.Update(new Microsoft.Xna.Framework.GameTime());
@@ -114,7 +120,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine(nested);
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         File.WriteAllText(
             Path.Combine(_srcRoot, nested, "Screens", "Level1.glsj"),
@@ -217,7 +223,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         // Glue adds an object to Level1 and saves. Only the source tree changes.
         File.WriteAllText(
@@ -245,7 +251,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         File.WriteAllText(Path.Combine(_srcRoot, "Screens", "Level2.glsj"), """{ "Name": "Screens\\Level2" }""");
 
@@ -265,7 +271,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         File.WriteAllText(
             Path.Combine(_srcRoot, ProjectFileName),
@@ -298,7 +304,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         var rel = Path.Combine("Content", "Level1.tmx");
         Directory.CreateDirectory(Path.Combine(_srcRoot, "Content"));
@@ -319,7 +325,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         var objFile = Path.Combine(_srcRoot, "obj", "Debug", "Test.gluj");
         Directory.CreateDirectory(Path.GetDirectoryName(objFile)!);
@@ -340,7 +346,7 @@ public class GlueHotReloadTests : IDisposable
         var engine = MakeEngine();
         var screen = StartGlueScreen(engine);
         var watcher = screen.ContentDirectoryWatchers[0];
-        watcher.Debounce = TimeSpan.Zero;
+        watcher.Debounce = NoDebounce;
 
         var gusj = Path.Combine("Content", "GumProject", "Screens", "MainMenu.gusj");
         foreach (var root in new[] { _srcRoot, _destRoot })
