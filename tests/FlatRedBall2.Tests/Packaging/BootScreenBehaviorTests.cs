@@ -204,6 +204,102 @@ public class BootScreenBehaviorTests
     }
 
     [Fact]
+    public void Controller_Fail_LogsRuleUrlAndStatusAndKeepsFirstReason()
+    {
+        // The failed screen only says "check the console"; the console has to say what happened.
+        var result = RunNode(@"
+            const logs = [];
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: (level, msg) => logs.push(level + ' ' + msg) });
+            c.fail('fetch-non-ok', { url: 'https://game.test/_framework/dotnet.native.wasm', status: 404 });
+            c.fail('script-error', { url: 'https://game.test/_framework/other.js' });
+            out({ failed: c.failed, rule: c.failure.rule, status: c.failure.status, logs });");
+
+        result.ShouldBe("{\"failed\":true,\"rule\":\"fetch-non-ok\",\"status\":404,\"logs\":[\"error boot failure: rule=fetch-non-ok url=https://game.test/_framework/dotnet.native.wasm status=404\"]}");
+    }
+
+    [Fact]
+    public void Controller_FailAfterAFrameCompleted_DoesNotLatchAndLogsWhyItWasIgnored()
+    {
+        // Once a tick has completed the game is running; a late 404 or script error must not
+        // put a failure message over it.
+        var result = RunNode(@"
+            const logs = [];
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: (level, msg) => logs.push(level + ' ' + msg) });
+            c.beforeTick(); c.beforeTick();
+            c.fail('blazor-error-ui', { message: 'late' });
+            c.beforeTick();
+            out({ failed: c.failed, hidden: c.hidden, logs });");
+
+        result.ShouldBe("{\"failed\":false,\"hidden\":true,\"logs\":[\"warn boot failure ignored, game already running: rule=blazor-error-ui message=late\"]}");
+    }
+
+    [Fact]
+    public void Controller_FailFirstTickThrew_StillLatches()
+    {
+        // The C# side reports a first-tick exception while the next frbBeforeTick (call 2) has not
+        // run yet, so it must still count as a boot failure.
+        var result = RunNode(@"
+            const c = b.createController({ now: () => 0, onHide: () => {}, log: () => {} });
+            c.beforeTick();
+            c.fail('frbBootFailed', { message: 'InvalidOperationException: boom' });
+            for (let i = 0; i < 5; i++) c.beforeTick();
+            out({ failed: c.failed, hidden: c.hidden });");
+
+        result.ShouldBe("{\"failed\":true,\"hidden\":false}");
+    }
+
+    [Theory]
+    [InlineData("_framework/dotnet.native.abc123.wasm", "essential")]
+    [InlineData("_framework/Game.abc123.wasm", "essential")]
+    [InlineData("_framework/dotnet.js", "essential")]
+    [InlineData("_framework/blazor.webassembly.js", "essential")]
+    [InlineData("_framework/blazor.boot.json", "essential")]
+    [InlineData("_framework/Game.pdb", "optional")]
+    [InlineData("_framework/dotnet.js.map", "optional")]
+    [InlineData("_framework/aspnetcore-browser-refresh.js", "optional")]
+    [InlineData("_framework/blazor-hotreload.js", "optional")]
+    [InlineData("_framework/icudt.dat", "optional")]
+    [InlineData("Content/Shader.xnb", "none")]
+    public void ClassifyFrameworkUrl_Url_SeparatesBootEssentialFromOptional(string url, string expected)
+    {
+        // Only a file the runtime cannot start without may latch the failure screen; symbols,
+        // source maps and dev-server helpers are optional.
+        var result = RunNode($"out(b.classifyFrameworkUrl('{url}', 'https://game.test/index.html'));");
+
+        result.ShouldBe($"\"{expected}\"");
+    }
+
+    [Fact]
+    public void InstallFetchCounter_OptionalFrameworkFile404_IsReportedAsIgnoredNotFailure()
+    {
+        var result = RunNode(@"
+            let failures = 0; const ignored = [];
+            const win = {
+                location: { href: 'https://game.test/index.html' },
+                fetch: () => Promise.resolve(new Response('', { status: 404 })),
+            };
+            b.installFetchCounter(win, { onBytes: () => {}, onFail: () => failures++, onIgnored: (rule, info) => ignored.push([rule, info.status]) }, () => true);
+            win.fetch('_framework/Game.pdb').then(() => new Promise((r) => setTimeout(r, 20))).then(() => out({ failures, ignored }));");
+
+        result.ShouldBe("{\"failures\":0,\"ignored\":[[\"fetch-non-ok\",404]]}");
+    }
+
+    [Fact]
+    public void InstallFetchCounter_EssentialFile404_ReportsRuleUrlAndStatus()
+    {
+        var result = RunNode(@"
+            let reported;
+            const win = {
+                location: { href: 'https://game.test/index.html' },
+                fetch: () => Promise.resolve(new Response('', { status: 404 })),
+            };
+            b.installFetchCounter(win, { onBytes: () => {}, onFail: (rule, info) => reported = [rule, info.status, info.url] }, () => true);
+            win.fetch('_framework/dotnet.native.abc.wasm').then(() => new Promise((r) => setTimeout(r, 20))).then(() => out(reported));");
+
+        result.ShouldBe("[\"fetch-non-ok\",404,\"_framework/dotnet.native.abc.wasm\"]");
+    }
+
+    [Fact]
     public void FormatBytes_Sizes_UsesKbBelowOneMbAndOneDecimalMbAbove()
     {
         var result = RunNode(@"out([b.formatBytes(0), b.formatBytes(2048), b.formatBytes(32715571)]);");

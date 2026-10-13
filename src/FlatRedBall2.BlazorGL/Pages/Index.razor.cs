@@ -62,9 +62,9 @@ public partial class Index
                 _game = GameFactory();
                 _game.Run();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                InvokeBootScreen("frbBootFailed");
+                InvokeBootScreen("frbBootFailed", $"{ex.GetType().Name}: {ex.Message}");
                 throw;
             }
         }

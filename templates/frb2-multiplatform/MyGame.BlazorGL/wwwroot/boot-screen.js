@@ -13,7 +13,10 @@
 //   - It removes itself after the game has completed a couple of frames, and on timers if the
 //     frame signal never arrives, so a stale copy cannot cover a working game.
 //   - It never asks for a click: the game's own click-to-start stays the only audio gate.
-//   - A boot failure stays on screen with a short message instead of hanging.
+//   - A boot failure stays on screen with a short message instead of hanging, and the console
+//     gets one "[frb-boot-screen] boot failure: rule=... url=... status=..." line naming why.
+//     Only files the runtime cannot start without count (see classifyFrameworkUrl), and nothing
+//     latches once a frame has completed.
 //
 // This file is yours when vendored (like frb-host.js). There is no customization API; to change
 // the look, edit the CSS in createView.
@@ -43,18 +46,45 @@
         catch (e) { return false; }
     }
 
-    // env: { now(): ms, onHide(): void }. Pure state machine; the DOM and timers live in start().
+    var ESSENTIAL = [/\.(wasm|dll)$/i, /\/dotnet(\.[^\/]*)?\.js$/i, /\/blazor\.webassembly(\.[^\/]*)?\.js$/i, /\/blazor\.boot\.json$/i];
+
+    // 'none' for anything outside _framework/, 'essential' for what the runtime cannot start
+    // without, 'optional' for the rest (symbols, source maps, dev-server and hot-reload helpers,
+    // ICU data). A failed optional file must not put a failure screen over a game that boots.
+    function classifyFrameworkUrl(url, base) {
+        var path;
+        try { path = new URL(url, base).pathname; } catch (e) { return 'none'; }
+        if (path.indexOf('/_framework/') < 0) return 'none';
+        for (var i = 0; i < ESSENTIAL.length; i++) if (ESSENTIAL[i].test(path)) return 'essential';
+        return 'optional';
+    }
+
+    function describe(rule, info) {
+        var text = 'rule=' + rule;
+        if (info) {
+            if (info.url !== undefined) text += ' url=' + info.url;
+            if (info.status !== undefined) text += ' status=' + info.status;
+            if (info.message !== undefined) text += ' message=' + info.message;
+        }
+        return text;
+    }
+
+    // env: { now(): ms, onHide(): void, log(level, message): void }. Pure state machine; the DOM
+    // and timers live in start().
     function createController(env) {
         var c = {
             bytes: 0,
             phase: '',
             failed: false,
+            failure: null,
             hidden: false,
             dirty: true,
             beforeTickCalls: 0,
             hostReadyAt: null,
             startedAt: env.now()
         };
+        var log = env.log || function () { };
+        var ignoredOnce = {};
 
         c.addBytes = function (n) {
             if (c.hidden) return;
@@ -68,11 +98,30 @@
             c.dirty = true;
         };
 
-        // A failure sticks: neither the frame count nor the timers dismiss it.
-        c.fail = function () {
-            if (c.hidden) return;
+        // A failure sticks: neither the frame count nor the timers dismiss it. The exception is a
+        // failure reported after a tick has completed: the game is running, so it is logged and
+        // dropped. (A first tick that throws reports before the second frbBeforeTick, so it
+        // still latches.) rule is a short id; info optionally has url, status and message.
+        c.fail = function (rule, info) {
+            if (c.hidden || c.failed) return;
+            rule = rule || 'unknown';
+            if (c.beforeTickCalls >= 2) {
+                if (!ignoredOnce[rule]) {
+                    ignoredOnce[rule] = true;
+                    log('warn', 'boot failure ignored, game already running: ' + describe(rule, info));
+                }
+                return;
+            }
             c.failed = true;
+            c.failure = { rule: rule, url: info && info.url, status: info && info.status, message: info && info.message };
             c.dirty = true;
+            log('error', 'boot failure: ' + describe(rule, info));
+        };
+
+        // A failed request for a file the boot does not depend on: logged, never fatal.
+        c.note = function (rule, info) {
+            if (c.hidden) return;
+            log('warn', 'optional request failed, ignored: ' + describe(rule, info));
         };
 
         c.hide = function () {
@@ -93,7 +142,7 @@
         c.poll = function (probe) {
             if (c.hidden) return;
             var now = env.now();
-            if (probe.errorUiVisible) c.fail();
+            if (probe.errorUiVisible && c.beforeTickCalls < 2) c.fail('blazor-error-ui', { message: probe.errorUiText });
             if (c.failed) return;
             if (probe.hostReady && c.hostReadyAt === null) c.hostReadyAt = now;
             if (c.hostReadyAt !== null && c.beforeTickCalls === 0 && now - c.hostReadyAt > HOST_GRACE_MS) c.hide();
@@ -154,8 +203,14 @@
             catch (e) { return promise; }
             if (!isFrameworkUrl(url, base)) return promise;
 
+            var kind = classifyFrameworkUrl(url, base);
+            var report = function (rule, info) {
+                if (kind === 'essential') handlers.onFail(rule, info);
+                else if (handlers.onIgnored) handlers.onIgnored(rule, info);
+            };
+
             promise.then(function (response) {
-                if (!response.ok) { handlers.onFail(); return; }
+                if (!response.ok) { report('fetch-non-ok', { url: url, status: response.status }); return; }
                 var body = response.clone().body;
                 var reader = body && body.getReader();
                 if (!reader) return;
@@ -166,7 +221,9 @@
                         pump();
                     }, function () { });
                 })();
-            }, function () { handlers.onFail(); });
+            }, function (error) {
+                report('fetch-network-error', { url: url, message: error && error.message });
+            });
             return promise;
         };
         win.fetch = wrapped;
@@ -231,6 +288,9 @@
                 phase.textContent = state.phase;
                 bar.style.display = meta.style.display = phase.style.display = state.failed ? 'none' : '';
                 err.style.display = state.failed ? '' : 'none';
+                // For tooling: a script can read why without scraping the console.
+                rootEl.setAttribute('data-state', state.failed ? 'failed' : 'loading');
+                if (state.failure) rootEl.setAttribute('data-failure', describe(state.failure.rule, state.failure));
             },
             remove: function () {
                 if (rootEl.parentNode) rootEl.parentNode.removeChild(rootEl);
@@ -248,6 +308,9 @@
         var restoreFetch = function () { };
         var timer = 0;
         var controller = createController({
+            log: function (level, message) {
+                try { win.console[level]('[frb-boot-screen] ' + message); } catch (e) { }
+            },
             now: function () { return win.performance && win.performance.now ? win.performance.now() : Date.now(); },
             onHide: function () {
                 win.clearInterval(timer);
@@ -261,26 +324,30 @@
         function onError(e) {
             var target = e.target;
             var src = (target && (target.src || target.href)) || e.filename || '';
-            if (isFrameworkUrl(src, win.location.href)) controller.fail();
+            var kind = classifyFrameworkUrl(src, win.location.href);
+            if (kind === 'essential') controller.fail('script-error', { url: src, message: e.message });
+            else if (kind === 'optional') controller.note('script-error', { url: src, message: e.message });
         }
 
         restoreChain = installBeforeTickChain(win, controller.beforeTick);
         restoreFetch = installFetchCounter(win, {
             onBytes: controller.addBytes,
-            onFail: controller.fail
+            onFail: controller.fail,
+            onIgnored: controller.note
         }, function () { return !controller.hidden; });
         win.addEventListener('error', onError, true);
 
         // Called from the engine through Pages/Index.razor.cs; no-ops once the screen is gone.
         win.frbBootPhase = controller.setPhase;
-        win.frbBootFailed = controller.fail;
+        win.frbBootFailed = function (message) { controller.fail('frbBootFailed', { message: message }); };
 
         view.render(controller);
         timer = win.setInterval(function () {
             var errorUi = doc.getElementById('blazor-error-ui');
             controller.poll({
                 hostReady: !!win.theInstance,
-                errorUiVisible: !!errorUi && win.getComputedStyle(errorUi).display !== 'none'
+                errorUiVisible: !!errorUi && win.getComputedStyle(errorUi).display !== 'none',
+                errorUiText: errorUi ? (errorUi.textContent || '').replace(/\s+/g, ' ').trim() : ''
             });
             if (!controller.hidden && controller.dirty) {
                 controller.dirty = false;
@@ -294,6 +361,7 @@
     var api = {
         formatBytes: formatBytes,
         isFrameworkUrl: isFrameworkUrl,
+        classifyFrameworkUrl: classifyFrameworkUrl,
         createController: createController,
         installBeforeTickChain: installBeforeTickChain,
         installFetchCounter: installFetchCounter,
