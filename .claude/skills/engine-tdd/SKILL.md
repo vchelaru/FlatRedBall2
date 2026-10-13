@@ -15,6 +15,8 @@ Exceptions: XML docs, style-only edits, pure renames, dead-code removal.
 
 Any change touching a shader, blend state, render target, or pixel color math requires either a pixel-verification test or the user manually checking rendered output — never "manual test: not needed." Passing unit tests on surrounding math (offset clamping, parameter selection) does not cover this.
 
+For render-affecting `src/` changes, add a golden scene test and regenerate its PNG with the `golden-images-regenerate.yml` workflow (CI output only, never a local render). How: `tests/FlatRedBall2.GoldenImage.Tests/README.md`.
+
 ## API Design — Flag Before Implementing
 
 Before adding any new `public` or `virtual` member to an engine base class (`Screen`, `Entity`, `FlatRedBallService`, etc.), stop and flag it as an API design decision. Ask before writing code. New public/virtual surface is a footgun risk — it implies intent to users, shows up in IntelliSense, and is hard to remove once shipped.

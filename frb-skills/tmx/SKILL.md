@@ -17,6 +17,10 @@ TMX files are the standard level format. A base template and standard tileset li
 
 Tiled tile animations advance automatically for maps added with `Screen.Add(tileMap)` (scaled by `TimeScale`, frozen while paused). A `TileMap` never added to a screen does not animate.
 
+## Tint and fade layers at runtime
+
+`TileMapLayer.Color` and `Alpha` tint and fade one layer; Tiled's `tintcolor` and `opacity` seed them. Loop `map.Layers` to fade a whole map. `Alpha` lives in the tint's alpha channel (MonoGame.Extended's own `Opacity` double-applies on its non-premultiplied blend, so FRB2 keeps it at 1), and `Color` ignores its own alpha channel.
+
 ## Communication convention — reference tiles by numeric ID
 
 When discussing a tile (its polygon, class, position, collision shape, etc.), always refer to it by its numeric **tile ID** — e.g., "tile ID 11's polygon" rather than "the slope triangle". The ID is the unambiguous handle that matches the `.tsx` file and Tiled's editor; descriptions alone are ambiguous when multiple tiles have similar shapes.
