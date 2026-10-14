@@ -173,10 +173,9 @@ public class TileShapes : ICollidable
     /// Polygon and sub-cell tiles count as occupied cells but never donate directions.
     /// </para>
     /// <para>
-    /// Collision normally ignores a push when the actor's center is on the inner side of the tile's
-    /// center, so a corner graze doesn't shove it across the tile. Filled-in tiles and their
-    /// neighbors push the full distance instead, so a body smaller than a tile still gets out;
-    /// L-shaped inside corners keep the limit, as in FlatRedBall 1 (<c>RepositionHalfSize</c>).
+    /// The pass does not touch the corner-clip limit: as in FlatRedBall 1 it is a per-tile flag
+    /// (<c>RepositionHalfSize</c>) that is set only on L-shaped inside corners and maintained on every
+    /// tile edit, so every other tile pushes the full distance and a body smaller than a tile still gets out.
     /// </para>
     /// <para>
     /// The optional map edges are world coordinates. A direction is not granted when it would lead to
@@ -196,7 +195,6 @@ public class TileShapes : ICollidable
             if (tile.SolidSides == SolidSides.None)
                 pending.Add(cell);
         if (pending.Count == 0) return;
-        var surrounded = new List<(int col, int row)>(pending);
 
         bool IsOffMap(int col, int row)
         {
@@ -264,14 +262,6 @@ public class TileShapes : ICollidable
 
             // No tile made progress this round (e.g. a region whose every exit is off-map).
             if (pending.Count == startedCount) break;
-        }
-
-        // Lift the corner-clip limit on the filled-in tiles and their neighbors, which a push-out
-        // chain runs through, except where the tile is an L-shaped corner (as in FlatRedBall 1).
-        foreach (var cell in surrounded)
-        {
-            foreach (var n in new[] { cell, (cell.col - 1, cell.row), (cell.col + 1, cell.row), (cell.col, cell.row - 1), (cell.col, cell.row + 1) })
-                if (_tiles.TryGetValue(n, out var t)) t.RepositionHalfSize = IsLShapedCorner(n.Item1, n.Item2);
         }
     }
 
@@ -755,6 +745,7 @@ public class TileShapes : ICollidable
         UpdateSubCellRectDirections(col + 1, row);
         UpdateSubCellRectDirections(col, row - 1);
         UpdateSubCellRectDirections(col, row + 1);
+        UpdateDiagonalNeighborHalfSize(col, row);
     }
 
     private void UpdateNeighborDirections(int col, int row)
@@ -771,6 +762,16 @@ public class TileShapes : ICollidable
         UpdateSubCellRectDirections(col + 1, row);
         UpdateSubCellRectDirections(col, row - 1);
         UpdateSubCellRectDirections(col, row + 1);
+        UpdateDiagonalNeighborHalfSize(col, row);
+    }
+
+    // The L-shaped test reads the diagonal cells too, so an edit also changes the flag of the diagonal neighbors
+    // (their SolidSides depend only on the cardinal cells and are left alone).
+    private void UpdateDiagonalNeighborHalfSize(int col, int row)
+    {
+        foreach (var (c, r) in new[] { (col - 1, row - 1), (col + 1, row - 1), (col - 1, row + 1), (col + 1, row + 1) })
+            if (_tiles.TryGetValue((c, r), out var tile))
+                tile.RepositionHalfSize = IsLShapedCorner(c, r);
     }
 
     private void UpdateCellDirections(int col, int row)
@@ -789,13 +790,12 @@ public class TileShapes : ICollidable
 
         tile.SolidSides = dirs;
 
-        // Back to the default corner-clip limit; AssignSurroundedTilesSolidOutward lifts it on
-        // tiles it fills in, and a tile edit near them discards that along with their sides.
-        tile.RepositionHalfSize = true;
+        // FlatRedBall 1's per-tile flag: only L-shaped inside corners keep the corner-clip limit.
+        tile.RepositionHalfSize = IsLShapedCorner(col, row);
     }
 
     // FlatRedBall 1's L-shaped test: two adjacent neighbors present with the diagonal between
-    // them empty (an inside corner). Only these tiles keep the corner-clip limit after the pass.
+    // them empty (an inside corner). Only these tiles keep the corner-clip limit.
     private bool IsLShapedCorner(int col, int row)
     {
         bool left  = IsFullOrPolyCell(col - 1, row);

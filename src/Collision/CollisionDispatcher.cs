@@ -175,8 +175,8 @@ internal static class CollisionDispatcher
         float bCenterX = (bLeft + bRight) / 2f;
         float bCenterY = (bBottom + bTop) / 2f;
 
-        // The center-side rules below reject corner clips. Tiles that AssignSurroundedTilesSolidOutward
-        // routes pushes through clear AARect.RepositionHalfSize to push the full distance.
+        // The center-side rules below reject corner clips. Only rects with RepositionHalfSize (L-shaped tile corners
+        // and free-standing rects) apply them; every other rect pushes the full distance.
         bool skipCenterRule = !b.RepositionHalfSize;
 
         if (a is Circle circle)
