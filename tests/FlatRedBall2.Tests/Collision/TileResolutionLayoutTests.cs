@@ -412,12 +412,12 @@ public class TileResolutionLayoutTests
 
     // ── Float noise ──────────────────────────────────────────────────────────
 
-    // Quirk: after being pushed against a face, the actor can sit with a sub-ULP overlap. The directional
-    // separation then reports zero along the face axis (its test rounds to touching) while the raw overlap test
-    // still reports a collision, so the only axis left is the sideways one and the next pass shoves the actor a
-    // large distance along it. FlatRedBall 1 would pick the near-zero push instead.
+    // After being pushed against a face the actor can sit with a sub-ULP overlap. That must read as touching: the
+    // next pass leaves it where it is instead of pushing it sideways (it used to be shoved ~9.6 units, because the
+    // directional separation rounded the near face to zero while the raw overlap test still reported a collision).
+    // See TileResolutionTouchingContactTests for the focused cases.
     [Fact]
-    public void Quirk_OneUlpOverlapAfterAPush_ShovesTheActorSidewaysOnTheNextPass()
+    public void OneUlpOverlapAfterAPush_IsNotMovedByTheNextPass()
     {
         // Plus layout, left arm is cell (3,4) when padded by 3; use the padded map from the catalog.
         var tiles = TileWorld.Map(TileResolutionMaps.Get("plus"));
@@ -427,7 +427,7 @@ public class TileResolutionLayoutTests
 
         passes[0].X.ShouldBe(49.61f, 1e-4f);
         passes[0].Y.ShouldBe(56f, 1e-3f); // pushed down against the arm's underside, with ULP-level residue
-        passes[1].X.ShouldBe(40f, 1e-3f); // second pass: shoved ~9.6 units left
+        passes[1].X.ShouldBe(passes[0].X, 1e-6f);
         passes[1].Y.ShouldBe(passes[0].Y, 1e-6f);
     }
 }

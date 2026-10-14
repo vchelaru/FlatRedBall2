@@ -239,7 +239,7 @@
    <<vvvvvvvvvvvvvvvvvvvvvv>>
    <vvvvvvvvvvvvvvvvvvvvvvvv>
    vvvvvvvvvvvvvvvvvvvvvvvvvv
--- circ8 Circle r=8 starts=407 stuck=0 firstPassDistance=5617.7 restDistance=6002.8
+-- circ8 Circle r=8 starts=407 stuck=0 firstPassDistance=5617.7 restDistance=5940.3
    x from 40.61 step 4, y from 132.37 down step 4
    .................^^^^^^>
    ................<<^^^^>>
@@ -265,7 +265,7 @@
    <<vvvvvvvvvvvvvvvvvvvv>>
    .vvvvvvvvvvvvvvvvvvvvvv>
    ..vvvvvvvvvvvvvvvvvvvvv.
--- circ12 Circle r=12 starts=499 stuck=0 firstPassDistance=9207.4 restDistance=9856.9
+-- circ12 Circle r=12 starts=499 stuck=0 firstPassDistance=9207.4 restDistance=9799.9
    x from 36.61 step 4, y from 136.37 down step 4
    .................^^^^^^^^.
    .................<^^^^^^>>

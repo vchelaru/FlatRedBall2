@@ -169,12 +169,12 @@ public class TileResolutionSurroundedPassTests
         stuck.ShouldBeGreaterThan(0);
     }
 
-    // Quirk: the pass also lifts the center-side guard on the neighbors of the tiles it fills in. Those tiles then
-    // act on any overlap, however small. In the plus layout the left arm is such a neighbor: an actor resting flush
-    // against its underside (left there with a sub-ULP overlap by the first pass) is shoved 13.6 units sideways on the
-    // next pass with the pass applied, and not moved at all without it.
+    // The pass lifts the center-side guard on the neighbors of the tiles it fills in. Those tiles then act on any
+    // overlap, however small, so an actor resting flush against the left arm's underside (left with a sub-ULP overlap
+    // by the first pass) must still be treated as touching: it stays put on the next pass, with or without the pass
+    // applied (it used to be shoved 13.6 units sideways only with the pass).
     [Fact]
-    public void Quirk_Plus_ActorFlushUnderAnArmNextToTheFilledInCenter_IsShovedSidewaysOnTheSecondPassOnlyWithThePass()
+    public void Plus_ActorFlushUnderAnArmNextToTheFilledInCenter_IsNotMovedOnLaterPasses()
     {
         var spec = ActorSpec.Square(4f);
         var off = Built("plus", applyPass: false);
@@ -184,10 +184,7 @@ public class TileResolutionSurroundedPassTests
         var withPass = TileWorld.ResolvePasses(spec, on, 57.61f, 60.37f, 3);
 
         withoutPass.ShouldAllBe(p => MathF.Abs(p.X - 57.61f) < Tol && MathF.Abs(p.Y - 60f) < Tol);
-        withPass[0].X.ShouldBe(57.61f, Tol);
-        withPass[0].Y.ShouldBe(60f, Tol);
-        withPass[1].X.ShouldBe(44f, Tol);
-        withPass[1].Y.ShouldBe(60f, Tol);
+        withPass.ShouldAllBe(p => MathF.Abs(p.X - 57.61f) < Tol && MathF.Abs(p.Y - 60f) < Tol);
     }
 
     // Quirk: an actor much bigger than a tile standing in open air beside a staircase is correctly pushed back out

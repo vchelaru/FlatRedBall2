@@ -112,6 +112,7 @@ internal static class CollisionDispatcher
     {
         var dirs = b.SolidSides;
         if (dirs == SolidSides.None) return Vector2.Zero;
+        if (IsTouchingOrClear(a, b)) return Vector2.Zero;
 
         Vector2 best = Vector2.Zero;
         float bestMag = float.MaxValue;
@@ -129,6 +130,35 @@ internal static class CollisionDispatcher
             float mag = MathF.Abs(sep.X) + MathF.Abs(sep.Y); // one component is always zero
             if (mag < bestMag) { best = sep; bestMag = mag; }
         }
+    }
+
+    // True when 'a' does not overlap 'b' on at least one face, judged with the same arithmetic the per-face
+    // separations below use. The raw overlap test (GetRawSeparationVector) works on different float expressions
+    // and can still report a collision of a few ULPs when 'a' is only touching, which is what a push leaves
+    // behind. Without this check the near face then rounds to "no push" and the push is taken from a face on
+    // the other side of 'b', carrying 'a' across the tile. Applies to every face, solid or not.
+    private static bool IsTouchingOrClear(ICollidable a, AARect b)
+    {
+        float bLeft   = b.AbsoluteX - b.Width  / 2f;
+        float bRight  = b.AbsoluteX + b.Width  / 2f;
+        float bBottom = b.AbsoluteY - b.Height / 2f;
+        float bTop    = b.AbsoluteY + b.Height / 2f;
+
+        if (a is Circle circle)
+        {
+            float cx = circle.AbsoluteX, cy = circle.AbsoluteY, r = circle.Radius;
+            float dx = MathF.Abs(cx - System.Math.Clamp(cx, bLeft, bRight));
+            float dy = MathF.Abs(cy - System.Math.Clamp(cy, bBottom, bTop));
+            // Past a face line the circle clears the tile once its arc no longer reaches it (same targets as ComputeAxisSeparation).
+            if (cy < bBottom && (dx >= r || bBottom - MathF.Sqrt(r * r - dx * dx) - cy >= 0f)) return true;
+            if (cy > bTop    && (dx >= r || bTop    + MathF.Sqrt(r * r - dx * dx) - cy <= 0f)) return true;
+            if (cx < bLeft   && (dy >= r || bLeft   - MathF.Sqrt(r * r - dy * dy) - cx >= 0f)) return true;
+            if (cx > bRight  && (dy >= r || bRight  + MathF.Sqrt(r * r - dy * dy) - cx <= 0f)) return true;
+            return false;
+        }
+
+        var (aMinX, aMaxX, aMinY, aMaxY) = GetBounds(a);
+        return bBottom - aMaxY >= 0f || bTop - aMinY <= 0f || bLeft - aMaxX >= 0f || bRight - aMinX <= 0f;
     }
 
     // Returns the minimum displacement to push 'a' out of 'b' along one specific axis direction.
