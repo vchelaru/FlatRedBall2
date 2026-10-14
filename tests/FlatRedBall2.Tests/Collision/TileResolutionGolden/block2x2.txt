@@ -1,0 +1,90 @@
+==== block2x2
+-- sq4 Rect 4x4 starts=100 stuck=16 firstPassDistance=430.2 restDistance=430.2
+   x from 44.61 step 4, y from 80.37 down step 4
+   <^^^^^^^^>
+   <<^^^^^^>>
+   <<<^^^^>>>
+   <<<!!!!>>>
+   <<<!!!!>>>
+   <<<!!!!>>>
+   <<<!!!!>>>
+   <<vvvvvv>>
+   <vvvvvvvv>
+   vvvvvvvvvv
+-- sq8 Rect 8x8 starts=144 stuck=16 firstPassDistance=851.0 restDistance=851.0
+   x from 40.61 step 4, y from 84.37 down step 4
+   <^^^^^^^^^^>
+   <<^^^^^^^^>>
+   <<<^^^^^^>>>
+   <<<<^^^^>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<vvvvvv>>>
+   <<vvvvvvvv>>
+   <vvvvvvvvvv>
+   vvvvvvvvvvvv
+-- sq12 Rect 12x12 starts=196 stuck=16 firstPassDistance=1539.0 restDistance=1539.0
+   x from 36.61 step 4, y from 88.37 down step 4
+   <^^^^^^^^^^^^>
+   <<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<<^^^^^^>>>>
+   <<<<2^^^^1>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<3vvvv4>>>>
+   <<<vvvvvvvv>>>
+   <<vvvvvvvvvv>>
+   <vvvvvvvvvvvv>
+   vvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=139 stuck=16 firstPassDistance=844.8 restDistance=844.8
+   x from 40.61 step 4, y from 84.37 down step 4
+   .^^^^^^^^^^>
+   <<^^^^^^^^>>
+   <<<^^^^^^>>>
+   <<<<^^^^>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<<!!!!>>>>
+   <<<vvvvvv>>>
+   <<vvvvvvvv>>
+   .vvvvvvvvvv>
+   ..vvvvvvvvv.
+-- circ12 Circle r=12 starts=187 stuck=16 firstPassDistance=1485.5 restDistance=1485.5
+   x from 36.61 step 4, y from 88.37 down step 4
+   .^^^^^^^^^^^^.
+   .<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<<^^^^^^>>>>
+   <<<<2^^^^1>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<<!!!!>>>>>
+   <<<<3vvvv4>>>>
+   <<<vvvvvvvv>>>
+   <<vvvvvvvvvv>>
+   .vvvvvvvvvvvv>
+   ...vvvvvvvvv..
+-- rect6x14 Rect 6x14 starts=165 stuck=16 firstPassDistance=1115.4 restDistance=1115.4
+   x from 44.61 step 4, y from 92.37 down step 4
+   ^^^^^^^^^^>
+   <^^^^^^^^>>
+   <<^^^^^^>>>
+   <<<^^^^>>>>
+   <<<^^^^>>>>
+   <<<^^^^>>>>
+   <<<!!!!>>>>
+   <<<!!!!>>>>
+   <<<!!!!>>>>
+   <<<!!!!>>>>
+   <<<vvvv>>>>
+   <<<vvvv>>>>
+   <<vvvvvv>>>
+   <vvvvvvvv>>
+   vvvvvvvvvv>

@@ -1,0 +1,228 @@
+==== thickfloor
+-- sq4 Rect 4x4 starts=588 stuck=288 firstPassDistance=1726.2 restDistance=1726.2
+   x from 44.61 step 4, y from 96.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- sq8 Rect 8x8 starts=704 stuck=288 firstPassDistance=3155.0 restDistance=3155.0
+   x from 40.61 step 4, y from 100.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- sq12 Rect 12x12 starts=828 stuck=288 firstPassDistance=5139.0 restDistance=5139.0
+   x from 36.61 step 4, y from 104.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<2^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^1>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<3vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv4>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=699 stuck=288 firstPassDistance=3148.8 restDistance=3148.8
+   x from 40.61 step 4, y from 100.37 down step 4
+   .^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   ..vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.
+-- circ12 Circle r=12 starts=819 stuck=288 firstPassDistance=5085.5 restDistance=5085.5
+   x from 36.61 step 4, y from 104.37 down step 4
+   .^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^.
+   .<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<2^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^1>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>
+   <<<<3vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv4>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   ...vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv..
+-- rect6x14 Rect 6x14 starts=817 stuck=288 firstPassDistance=5205.1 restDistance=5205.1
+   x from 44.61 step 4, y from 108.37 down step 4
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+==== thickfloor (after AssignSurroundedTilesSolidOutward)
+-- sq4 Rect 4x4 starts=588 stuck=4 firstPassDistance=6643.0 restDistance=7603.0
+   x from 44.61 step 4, y from 96.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!>>>
+   <<<<22^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^11>>>>
+   <<<<22^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^11>>>>
+   <<<<<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>>>>
+   <<<<<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>>>>
+   <<<<33vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv44>>>>
+   <<<<33vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv44>>>>
+   <<<!vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- sq8 Rect 8x8 starts=704 stuck=0 firstPassDistance=11603.0 restDistance=11603.0
+   x from 40.61 step 4, y from 100.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- sq12 Rect 12x12 starts=828 stuck=0 firstPassDistance=16679.1 restDistance=16679.1
+   x from 36.61 step 4, y from 104.37 down step 4
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=699 stuck=0 firstPassDistance=11212.2 restDistance=11219.2
+   x from 40.61 step 4, y from 100.37 down step 4
+   .^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^^111>>>>
+   <<<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<<222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<<<22^^^^^^^^^^^^^^^^^^^^^^^^^^^^111>>>>>
+   <<<<<333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvvv444>>>>
+   <<<<333vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv44>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   ..vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.
+-- circ12 Circle r=12 starts=819 stuck=0 firstPassDistance=16000.4 restDistance=16000.4
+   x from 36.61 step 4, y from 104.37 down step 4
+   .^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^.
+   .<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<<22222^^^^^^^^^^^^^^^^^^^^^^^^^^^^11111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^^11111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<222222^^^^^^^^^^^^^^^^^^^^^^^^^^111111>>>>
+   <<<<<33333vvv^vvv^vvv^vvv^vvv^vvv^vv414441>>>>
+   <<<<<33333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<333333vvvvvvvvvvvvvvvvvvvvvvvvvvv44444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv444>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
+   ...vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv..
+-- rect6x14 Rect 6x14 starts=817 stuck=0 firstPassDistance=15752.5 restDistance=15752.5
+   x from 44.61 step 4, y from 108.37 down step 4
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
+   <^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
+   <<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
+   <<<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>>>
+   <<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^^111>>>>
+   <<<2222^^^^^^^^^^^^^^^^^^^^^^^^^^^^^111>>>>
+   <<<<222^^^^^^^^^^^^^^^^^^^^^^^^^^^^^111>>>>
+   <<<<222^^^^^^^^^^^^^^^^^^^^^^^^^^^^1111>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvv44444>>>>
+   <<<<33333vvvvvvvvvvvvvvvvvvvvvvvv444444>>>>
+   <<<<3333vvvvvvvvvvvvvvvvvvvvvvvvvv44444>>>>
+   <<<<333vvvvvvvvvvvvvvvvvvvvvvvvvvvv4444>>>>
+   <<<<333vvvvvvvvvvvvvvvvvvvvvvvvvvvvv444>>>>
+   <<<<333vvvvvvvvvvvvvvvvvvvvvvvvvvvvv444>>>>
+   <<<3333vvvvvvvvvvvvvvvvvvvvvvvvvvvvv444>>>>
+   <<<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>>
+   <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>>
+   <vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
+   vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>

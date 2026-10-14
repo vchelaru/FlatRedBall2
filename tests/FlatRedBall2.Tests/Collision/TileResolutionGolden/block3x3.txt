@@ -1,0 +1,228 @@
+==== block3x3
+-- sq4 Rect 4x4 starts=196 stuck=64 firstPassDistance=718.2 restDistance=718.2
+   x from 44.61 step 4, y from 96.37 down step 4
+   <^^^^^^^^^^^^>
+   <<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<<!!!!!!!!>>>
+   <<vvvvvvvvvv>>
+   <vvvvvvvvvvvv>
+   vvvvvvvvvvvvvv
+-- sq8 Rect 8x8 starts=256 stuck=64 firstPassDistance=1363.0 restDistance=1363.0
+   x from 40.61 step 4, y from 100.37 down step 4
+   <^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^>>>
+   <<<<^^^^^^^^>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvv
+-- sq12 Rect 12x12 starts=324 stuck=64 firstPassDistance=2339.0 restDistance=2339.0
+   x from 36.61 step 4, y from 104.37 down step 4
+   <^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^>>>>
+   <<<<2^^^^^^^^1>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<3vvvvvvvv4>>>>
+   <<<vvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=251 stuck=64 firstPassDistance=1356.8 restDistance=1356.8
+   x from 40.61 step 4, y from 100.37 down step 4
+   .^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^>>>
+   <<<<^^^^^^^^>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<<!!!!!!!!>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvv>
+   ..vvvvvvvvvvvvv.
+-- circ12 Circle r=12 starts=315 stuck=64 firstPassDistance=2285.5 restDistance=2285.5
+   x from 36.61 step 4, y from 104.37 down step 4
+   .^^^^^^^^^^^^^^^^.
+   .<^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^>>>>
+   <<<<2^^^^^^^^1>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<<!!!!!!!!>>>>>
+   <<<<3vvvvvvvv4>>>>
+   <<<vvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvv>
+   ...vvvvvvvvvvvvv..
+-- rect6x14 Rect 6x14 starts=285 stuck=64 firstPassDistance=1799.5 restDistance=1799.5
+   x from 44.61 step 4, y from 108.37 down step 4
+   ^^^^^^^^^^^^^^>
+   <^^^^^^^^^^^^>>
+   <<^^^^^^^^^^>>>
+   <<<^^^^^^^^>>>>
+   <<<^^^^^^^^>>>>
+   <<<^^^^^^^^>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<!!!!!!!!>>>>
+   <<<vvvvvvvv>>>>
+   <<<vvvvvvvv>>>>
+   <<vvvvvvvvvv>>>
+   <vvvvvvvvvvvv>>
+   vvvvvvvvvvvvvv>
+==== block3x3 (after AssignSurroundedTilesSolidOutward)
+-- sq4 Rect 4x4 starts=196 stuck=4 firstPassDistance=2051.0 restDistance=2115.0
+   x from 44.61 step 4, y from 96.37 down step 4
+   <^^^^^^^^^^^^>
+   <<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<!^^^^^^!>>>
+   <<<<22^^11>>>>
+   <<<<22^^11>>>>
+   <<<<<<<>>>>>>>
+   <<<<<<vv>>>>>>
+   <<<<33vv44>>>>
+   <<<<33vv44>>>>
+   <<<!vvvvvv!>>>
+   <<vvvvvvvvvv>>
+   <vvvvvvvvvvvv>
+   vvvvvvvvvvvvvv
+-- sq8 Rect 8x8 starts=256 stuck=0 firstPassDistance=4435.0 restDistance=4435.0
+   x from 40.61 step 4, y from 100.37 down step 4
+   <^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^>>>
+   <<<<^^^^^^^^>>>>
+   <<<<22221111>>>>
+   <<<<22221111>>>>
+   <<<<22221111>>>>
+   <<<<22221111>>>>
+   <<<<33334444>>>>
+   <<<<33334444>>>>
+   <<<<33334444>>>>
+   <<<<33334444>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvv
+-- sq12 Rect 12x12 starts=324 stuck=0 firstPassDistance=6906.4 restDistance=6906.4
+   x from 36.61 step 4, y from 104.37 down step 4
+   <^^^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^>>>>
+   <<<<2222121111>>>>
+   <<<<2222121111>>>>
+   <<<<2222121111>>>>
+   <<<<2222121111>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<vvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=251 stuck=0 firstPassDistance=4044.2 restDistance=4051.2
+   x from 40.61 step 4, y from 100.37 down step 4
+   .^^^^^^^^^^^^^^>
+   <<^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^>>>
+   <<<<^^^^^^^^>>>>
+   <<<<2222^111>>>>
+   <<<<22221111>>>>
+   <<<<<2221111>>>>
+   <<<<<<22111>>>>>
+   <<<<<3334444>>>>
+   <<<<33334444>>>>
+   <<<<3333v444>>>>
+   <<<<333vvv44>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvv>
+   ..vvvvvvvvvvvvv.
+-- circ12 Circle r=12 starts=315 stuck=0 firstPassDistance=6438.8 restDistance=6438.8
+   x from 36.61 step 4, y from 104.37 down step 4
+   .^^^^^^^^^^^^^^^^.
+   .<^^^^^^^^^^^^^^>>
+   <<<^^^^^^^^^^^^>>>
+   <<<<^^^^^^^^^^>>>>
+   <<<<2222211111>>>>
+   <<<<2222221111>>>>
+   <<<<2222121111>>>>
+   <<<<2222121111>>>>
+   <<<<<333434441>>>>
+   <<<<<333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333434444>>>>
+   <<<<3333334444>>>>
+   <<<<3333vvv444>>>>
+   <<<vvvvvvvvvvvv>>>
+   <<vvvvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvvvv>
+   ...vvvvvvvvvvvvv..
+-- rect6x14 Rect 6x14 starts=285 stuck=0 firstPassDistance=5225.5 restDistance=5225.5
+   x from 44.61 step 4, y from 108.37 down step 4
+   ^^^^^^^^^^^^^^>
+   <^^^^^^^^^^^^>>
+   <<^^^^^^^^^^>>>
+   <<<^^^^^^^^>>>>
+   <<<2222^111>>>>
+   <<<2222^111>>>>
+   <<<<222^111>>>>
+   <<<<2221111>>>>
+   <<<<3334444>>>>
+   <<<<3334444>>>>
+   <<<<3334444>>>>
+   <<<<3334444>>>>
+   <<<<333v444>>>>
+   <<<<333v444>>>>
+   <<<3333v444>>>>
+   <<<vvvvvvvv>>>>
+   <<vvvvvvvvvv>>>
+   <vvvvvvvvvvvv>>
+   vvvvvvvvvvvvvv>

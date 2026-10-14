@@ -1,0 +1,53 @@
+==== pillarGap1
+-- sq4 Rect 4x4 starts=180 stuck=2 firstPassDistance=1010.2 restDistance=1048.7
+   x from 28.61 step 4, y from 80.37 down step 4
+   <^^^^>..<^^^^>
+   <<^^>>..<<^^>>
+   <<<>>>..<<<>>>
+   <<<>>>..<<<>>>
+   <<<>>>..<<<>>>
+   <<<>>>..<<<>>>
+   <<<>>>..<<<>>>
+   <<<>>>..<<<>>>
+   <<<>11^^22<>>>
+   <<<>11^^22<>>>
+   <<<!^^^^^^!>>>
+   <<vvvvvvvvvv>>
+   <vvvvvvvvvvvv>
+   vvvvvvvvvvvvvv
+-- sq8 Rect 8x8 starts=256 stuck=0 firstPassDistance=2070.5 restDistance=2070.5
+   x from 24.61 step 4, y from 84.37 down step 4
+   <^^^^^^><^^^^^^>
+   <<^^^^>><<^^^^>>
+   <<<^^>>><<<^^>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<11112222>>>>
+   <<<<11112222>>>>
+   <<<<11112222>>>>
+   <<<<11112222>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   <vvvvvvvvvvvvvv>
+   vvvvvvvvvvvvvvvv
+-- circ8 Circle r=8 starts=250 stuck=0 firstPassDistance=1991.0 restDistance=2061.7
+   x from 24.61 step 4, y from 84.37 down step 4
+   .^^^^^^>.^^^^^^>
+   <<^^^^>><<^^^^>>
+   <<<^^>>><<<^^>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>>>><<<<>>>>
+   <<<<>1112222>>>>
+   <<<<11112222>>>>
+   <<<<1111^222>>>>
+   <<<<111^^^22>>>>
+   <<<vvvvvvvvvv>>>
+   <<vvvvvvvvvvvv>>
+   .vvvvvvvvvvvvvv>
+   ..vvvvvvvvvvvvv.

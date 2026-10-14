@@ -1,0 +1,66 @@
+==== single
+-- sq4 Rect 4x4 starts=36 stuck=0 firstPassDistance=142.2 restDistance=142.2
+   x from 44.61 step 4, y from 64.37 down step 4
+   <^^^^>
+   <<^^>>
+   <<<>>>
+   <<vv>>
+   <vvvv>
+   vvvvvv
+-- sq8 Rect 8x8 starts=64 stuck=0 firstPassDistance=339.0 restDistance=339.0
+   x from 40.61 step 4, y from 68.37 down step 4
+   <^^^^^^>
+   <<^^^^>>
+   <<<^^>>>
+   <<<<>>>>
+   <<<vv>>>
+   <<vvvv>>
+   <vvvvvv>
+   vvvvvvvv
+-- sq12 Rect 12x12 starts=100 stuck=0 firstPassDistance=663.7 restDistance=663.7
+   x from 36.61 step 4, y from 72.37 down step 4
+   <^^^^^^^^>
+   <<^^^^^^>>
+   <<<^^^^>>>
+   <<<<^^>>>>
+   <<<<<>>>>>
+   <<<<vv>>>>
+   <<<vvvv>>>
+   <<vvvvvv>>
+   <vvvvvvvv>
+   vvvvvvvvvv
+-- circ8 Circle r=8 starts=59 stuck=0 firstPassDistance=339.3 restDistance=339.3
+   x from 40.61 step 4, y from 68.37 down step 4
+   .2^^^^11
+   22^^^^11
+   <<<^^>>>
+   <<<<>>>>
+   <<<vv>>>
+   <<vvvv>>
+   .3vvvv44
+   ..vvvv4.
+-- circ12 Circle r=12 starts=91 stuck=0 firstPassDistance=662.5 restDistance=662.5
+   x from 36.61 step 4, y from 72.37 down step 4
+   .22^^^^11.
+   .22^^^^111
+   222^^^^111
+   <<<<^^>>>>
+   <<<<<>>>>>
+   <<<<vv>>>>
+   <<<vvvv>>>
+   333vvvv444
+   .33vvvv444
+   ...vvvv4..
+-- rect6x14 Rect 6x14 starts=77 stuck=0 firstPassDistance=431.3 restDistance=431.3
+   x from 44.61 step 4, y from 76.37 down step 4
+   ^^^^^^>
+   <^^^^>>
+   <<^^>>>
+   <<<>>>>
+   <<<>>>>
+   <<<>>>>
+   <<<>>>>
+   <<<>>>>
+   <<vv>>>
+   <vvvv>>
+   vvvvvv>

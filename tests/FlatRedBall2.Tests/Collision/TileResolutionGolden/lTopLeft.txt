@@ -1,0 +1,90 @@
+==== lTopLeft
+-- sq4 Rect 4x4 starts=84 stuck=1 firstPassDistance=427.3 restDistance=442.8
+   x from 44.61 step 4, y from 80.37 down step 4
+   <^^^^^^^^>
+   <<^^^^^^>>
+   <<<^^^^>>>
+   <<<!vvvv>>
+   <<<>44vvv>
+   <<<>44vvvv
+   <<<>>>....
+   <<vv>>....
+   <vvvv>....
+   vvvvvv....
+-- sq8 Rect 8x8 starts=128 stuck=0 firstPassDistance=931.0 restDistance=931.0
+   x from 40.61 step 4, y from 84.37 down step 4
+   <^^^^^^^^^^>
+   <<^^^^^^^^>>
+   <<<^^^^^^>>>
+   <<<<^^^^>>>>
+   <<<<4444v>>>
+   <<<<4444vv>>
+   <<<<4444vvv>
+   <<<<4444vvvv
+   <<<vv>>>....
+   <<vvvv>>....
+   <vvvvvv>....
+   vvvvvvvv....
+-- sq12 Rect 12x12 starts=180 stuck=0 firstPassDistance=1773.7 restDistance=1773.7
+   x from 36.61 step 4, y from 88.37 down step 4
+   <^^^^^^^^^^^^>
+   <<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<<^^^^^^>>>>
+   <<<<211111>>>>
+   <<<<344444>>>>
+   <<<<344444v>>>
+   <<<<344444vv>>
+   <<<<344444vvv>
+   <<<<3v4444vvvv
+   <<<vvvv>>>....
+   <<vvvvvv>>....
+   <vvvvvvvv>....
+   vvvvvvvvvv....
+-- circ8 Circle r=8 starts=122 stuck=0 firstPassDistance=901.1 restDistance=923.6
+   x from 40.61 step 4, y from 84.37 down step 4
+   .^^^^^^^^^^>
+   <<^^^^^^^^>>
+   <<<^^^^^^>>>
+   <<<<^^^^>>>>
+   <<<<4444v>>>
+   <<<<4444vv>>
+   <<<<>444vvv>
+   <<<<>>44vvv.
+   <<<vv>>>....
+   <<vvvv>>....
+   .vvvvvv>....
+   ..vvvvv.....
+-- circ12 Circle r=12 starts=169 stuck=0 firstPassDistance=1664.4 restDistance=1681.0
+   x from 36.61 step 4, y from 88.37 down step 4
+   .^^^^^^^^^^^^.
+   .<^^^^^^^^^^>>
+   <<<^^^^^^^^>>>
+   <<<<^^^^^^>>>>
+   <<<<211111>>>>
+   <<<<344444>>>>
+   <<<<344444v>>>
+   <<<<344444vv>>
+   <<<<<44444vvv>
+   <<<<3v>444vv..
+   <<<vvvv>>>....
+   <<vvvvvv>>....
+   .vvvvvvvv>....
+   ...vvvvv......
+-- rect6x14 Rect 6x14 starts=149 stuck=0 firstPassDistance=1236.3 restDistance=1288.2
+   x from 44.61 step 4, y from 92.37 down step 4
+   ^^^^^^^^^^>
+   <^^^^^^^^>>
+   <<^^^^^^>>>
+   <<<^^^^>>>>
+   <<<1111>>>>
+   <<<1111>>>>
+   <<<>444>>>>
+   <<<>444>>>>
+   <<<>444v>>>
+   <<<>444vv>>
+   <<<>444vvv>
+   <<<>>>>....
+   <<vv>>>....
+   <vvvv>>....
+   vvvvvv>....

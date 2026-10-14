@@ -1,0 +1,90 @@
+==== diagonalPair
+-- sq4 Rect 4x4 starts=68 stuck=0 firstPassDistance=284.4 restDistance=284.4
+   x from 44.61 step 4, y from 80.37 down step 4
+   ....<^^^^>
+   ....<<^^>>
+   ....<<<>>>
+   ....<<vv>>
+   <^^^24vvv>
+   <<^^44vvvv
+   <<<>>>....
+   <<vv>>....
+   <vvvv>....
+   vvvvvv....
+-- sq8 Rect 8x8 starts=112 stuck=0 firstPassDistance=677.9 restDistance=677.9
+   x from 40.61 step 4, y from 84.37 down step 4
+   ....<^^^^^^>
+   ....<<^^^^>>
+   ....<<<^^>>>
+   ....<<<<>>>>
+   <^^^2224v>>>
+   <<^^2244vv>>
+   <<<^2444vvv>
+   <<<<4444vvvv
+   <<<vv>>>....
+   <<vvvv>>....
+   <vvvvvv>....
+   vvvvvvvv....
+-- sq12 Rect 12x12 starts=164 stuck=0 firstPassDistance=1322.7 restDistance=1322.7
+   x from 36.61 step 4, y from 88.37 down step 4
+   ....<^^^^^^^^>
+   ....<<^^^^^^>>
+   ....<<<^^^^>>>
+   ....<<<<^^>>>>
+   <^^^22222>>>>>
+   <<^^222244>>>>
+   <<<^222444v>>>
+   <<<<224444vv>>
+   <<<<<44444vvv>
+   <<<<vv4444vvvv
+   <<<vvvv>>>....
+   <<vvvvvv>>....
+   <vvvvvvvv>....
+   vvvvvvvvvv....
+-- circ8 Circle r=8 starts=105 stuck=2 firstPassDistance=646.9 restDistance=656.2
+   x from 40.61 step 4, y from 84.37 down step 4
+   .....2^^^^11
+   ....22^^^^11
+   ....<<<^^>>>
+   ....<<<<>>>>
+   .2^^222av>>>
+   22^^221avv>>
+   <<<^^444vv44
+   <<<<>>44vv4.
+   <<<vv>>>....
+   <<vvvv>>....
+   .3vvvv44....
+   ..vvvv4.....
+-- circ12 Circle r=12 starts=151 stuck=1 firstPassDistance=1243.8 restDistance=1321.8
+   x from 36.61 step 4, y from 88.37 down step 4
+   .....22^^^^11.
+   .....22^^^^111
+   ....222^^^^111
+   ....<<<<^^>>>>
+   .22^22222>>>>>
+   .22^222211>>>>
+   222^2221a1v>>>
+   <<<<224444v444
+   <<<<<44444v444
+   <<<<vv>444v4..
+   <<<vvvv>>>....
+   333vvvv444....
+   .33vvvv444....
+   ...vvvv4......
+-- rect6x14 Rect 6x14 starts=133 stuck=4 firstPassDistance=825.0 restDistance=875.8
+   x from 44.61 step 4, y from 92.37 down step 4
+   ....^^^^^^>
+   ....<^^^^>>
+   ....<<^^>>>
+   ....<<<>>>>
+   ^^^^22<>>>>
+   <^^^2<<>>>>
+   <<^^><<>>>>
+   <<<))((>>>>
+   <<<>><4v>>>
+   <<<>>44vv>>
+   <<<>444vvv>
+   <<<>>>>....
+   <<vv>>>....
+   <vvvv>>....
+   vvvvvv>....
