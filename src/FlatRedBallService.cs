@@ -245,6 +245,19 @@ public class FlatRedBallService
     public Glue.GlueProject? GlueProject { get; set; }
 
     /// <summary>
+    /// The C# classes bound to Glue entities by name. Every Glue project this engine loads creates its
+    /// entities from this registry, so register before or after <c>Initialize</c> and the
+    /// registrations also apply after a reload.
+    /// </summary>
+    /// <remarks>
+    /// <code>
+    /// FlatRedBallService.Default.GlueEntities.Register&lt;Player&gt;(@"Entities\Player");
+    /// FlatRedBallService.Default.Initialize(this, "Content/FrbEditor/MyGame.gluj");
+    /// </code>
+    /// </remarks>
+    public Glue.GlueEntityRegistry GlueEntities { get; } = new();
+
+    /// <summary>
     /// The path <see cref="EngineInitSettings.GlueProjectFile"/> named, or null when none was given.
     /// Relative to <see cref="OutputContentRoot"/>, which is where the build drops the project.
     /// </summary>
@@ -295,7 +308,8 @@ public class FlatRedBallService
         GlueProject = Glue.GlueProject.Load(
             glueProjectFile,
             new Glue.GlueContentSource(Content, projectDirectory, _game?.GraphicsDevice, OutputContentRoot),
-            OutputRootedLoadOptions());
+            OutputRootedLoadOptions(),
+            GlueEntities);
     }
 
     /// <summary>

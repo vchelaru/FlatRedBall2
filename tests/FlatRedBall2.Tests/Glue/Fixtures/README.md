@@ -102,6 +102,10 @@ entire point.
 It also carries a populated `CustomClasses` array, which this epic excludes outright, so it doubles
 as proof that excluded shapes are tolerated rather than rejected.
 
+## CodeBehind (hand-authored)
+
+Not vendored from FRB1: a small project written for the entity-registry tests (`GlueEntityRegistryTests`). `Entities\Hero` has shapes, a sprite, variables and states; `Entities\Pellet` is pooled; the screen places a `Hero` with per-instance overrides, one of which (`Ghost`) names a member no test class has.
+
 ## Re-syncing
 
 Re-copy from the same source path and update the commit hash and date above. Do not "upgrade" a

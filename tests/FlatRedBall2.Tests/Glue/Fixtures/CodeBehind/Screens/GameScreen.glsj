@@ -1,0 +1,22 @@
+{
+  "Tags": [ "GLUE" ],
+  "Source": "GLUE",
+  "Name": "Screens\\GameScreen",
+  "NamedObjects": [
+    {
+      "InstanceName": "PlacedHero",
+      "SourceClassType": "Entities\\Hero",
+      "Properties": [ { "Name": "SourceType", "Value": 1, "Type": "SourceType" } ],
+      "InstructionSaves": [
+        { "Type": "float", "Member": "X", "Value": 50.0, "Time": 0.0 },
+        { "Type": "int", "Member": "Health", "Value": 9, "Time": 0.0 },
+        { "Type": "int", "Member": "Ghost", "Value": 1, "Time": 0.0 }
+      ],
+      "SourceType": 1,
+      "SourceFile": "Entities\\Hero",
+      "AttachToContainer": true
+    }
+  ],
+  "Events": [],
+  "CustomClassesForExport": []
+}

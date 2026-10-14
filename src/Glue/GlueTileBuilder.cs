@@ -183,15 +183,17 @@ internal static class GlueTileBuilder
                     if (tiles.GetTileAtCell(column, row) is not AARect tile)
                         continue;
 
-                    var instance = project.CreateEntity(entity, screen);
+                    // Positioned and configured before the entity's CustomInitialize runs.
+                    var instance = project.CreateEntity(entity, screen, configure: created =>
+                    {
+                        // The tile's own centre, so the entity lands where it was painted.
+                        created.X = tile.X;
+                        created.Y = tile.Y;
 
-                    // The tile's own centre, so the entity lands where it was painted.
-                    instance.X = tile.X;
-                    instance.Y = tile.Y;
-
-                    var properties = map.GetPaintedTileClassProperties(column, row, leafName);
-                    if (properties is not null)
-                        ApplyTileProperties(instance, properties);
+                        var properties = map.GetPaintedTileClassProperties(column, row, leafName);
+                        if (properties is not null)
+                            ApplyTileProperties(created, properties);
+                    });
 
                     spawned.Add(instance);
                 }

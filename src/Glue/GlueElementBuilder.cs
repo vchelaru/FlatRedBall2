@@ -99,6 +99,48 @@ internal static class GlueElementBuilder
     }
 
     /// <summary>
+    /// Puts the objects of an element that is being reused back to their authored state: shapes,
+    /// sprites and Gum visuals get their instructions again, and an entity list that lost its
+    /// authored members when the previous life ended gets them back.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is rebuilt, so references game code took to the built objects stay valid. That is the
+    /// point: a registered pooled entity runs <c>CustomInitialize</c> once, so what it captured there
+    /// has to outlive a reuse.
+    /// </remarks>
+    internal static void Reapply(
+        List<NamedObjectSave> namedObjects,
+        string? elementName,
+        Dictionary<string, object> objects,
+        GlueObjectBuilder builder,
+        List<GlueLoadDiagnostic> diagnostics)
+    {
+        foreach (var save in namedObjects)
+        {
+            if (string.IsNullOrEmpty(save.InstanceName)
+                || GlueTileBuilder.IsTileObject(save)
+                || GlueCollisionBuilder.IsRelationship(save)
+                || !objects.TryGetValue(save.InstanceName, out object? built))
+            {
+                continue;
+            }
+
+            if (save.IsList)
+            {
+                if (built is GlueEntityList)
+                    BuildList(builder, save, elementName, objects, diagnostics);
+
+                continue;
+            }
+
+            builder.Reapply(built, save, elementName);
+
+            if (save.ContainedObjects.Count > 0)
+                Reapply(save.ContainedObjects, elementName, objects, builder, diagnostics);
+        }
+    }
+
+    /// <summary>
     /// Walks built objects, replacing each list with its members, so callers can treat lists and
     /// single objects uniformly when unregistering.
     /// </summary>

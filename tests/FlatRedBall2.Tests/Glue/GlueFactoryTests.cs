@@ -50,6 +50,32 @@ public class GlueFactoryTests
         project.InstancesOf(DoorName).ShouldNotContain(door);
     }
 
+    // The screen updates and collides everything it holds, so a destroyed instance left in it keeps
+    // running activity for an entity that is gone.
+    [Fact]
+    public void Destroy_AnInstance_RemovesItFromTheScreen()
+    {
+        var (engine, project) = Booted();
+        var door = project.CreateEntity(DoorName, engine.CurrentScreen);
+
+        door.Destroy();
+
+        engine.CurrentScreen.Entities.ShouldNotContain(door);
+    }
+
+    [Fact]
+    public void CreateEntity_ARecycledInstance_IsOnTheScreenOnce()
+    {
+        var (engine, project) = Booted();
+        project.FindEntity(DoorName)!.PooledByFactory = true;
+        var first = project.CreateEntity(DoorName, engine.CurrentScreen);
+        first.Destroy();
+
+        project.CreateEntity(DoorName, engine.CurrentScreen);
+
+        engine.CurrentScreen.Entities.Count(e => e == first).ShouldBe(1);
+    }
+
     [Fact]
     public void Destroy_OneOfSeveral_LeavesTheOthersTracked()
     {

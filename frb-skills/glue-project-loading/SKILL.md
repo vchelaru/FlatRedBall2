@@ -30,6 +30,7 @@ then fails every asset it references. To load a project but boot your own screen
 | Move between screens | `Screen.MoveToScreen(string glueName)` |
 | Read/write an authored variable | the indexer on `GlueScreen`/`GlueEntity`, or `Get<T>` |
 | Claim a Glue type for FRB2 | `GlueTypeMap` |
+| Bind an entity to your own class | `FlatRedBallService.GlueEntities.Register<T>(name)` |
 
 ## Every loaded element shares one C# type
 
@@ -102,9 +103,30 @@ variable's declared type — Glue's declared types are frequently not CLR types 
 so a derived screen already carries its base's objects, variables, states, and referenced files.
 Code reading a `ScreenSave` never walks `BaseScreen` itself.
 
+## Code-behind: your class for a Glue entity
+
+```csharp
+FlatRedBallService.Default.GlueEntities.Register<Player>(@"Entities\Player");
+FlatRedBallService.Default.Initialize(this, "Content/FrbEditor/MyGame.gluj");
+```
+
+`Player` derives from `GlueEntity`, and everything Glue authored (objects, variables, states, lists,
+movement) is applied to it. `GlueEntityRegistry` belongs to the engine, so it works before
+`Initialize` and survives a hot reload. A derived Glue entity with no registration of its own uses
+its nearest registered ancestor's class.
+
+**`CustomInitialize` runs once per instance and `Reset()` is the per-life hook,** as for a
+hand-written pooled entity. FRB1's `CustomInitialize` ran on every reuse, so move that code to
+`Reset()`. Both run after the Glue data and the spawner's overrides are applied.
+
+**A pooled registered entity is not rebuilt on reuse.** Its objects are kept (so references taken in
+`CustomInitialize` stay valid) and put back to their authored values. A pooled entity with no
+registration is still rebuilt each time.
+
+A Glue variable or per-instance override is written to the class's property of the same name. A
+variable with no property is kept by name (`Get<T>`); an override with none is a build diagnostic.
+
 ## What is not wired
 
-Pooling (`PooledByFactory`), `SortAxis` partitioning, and input binding (`JumpInput`,
-`MovementInput`, `EntitySave.InputDevice`) are parsed and not applied — a loaded platformer entity
-has its authored physics but nothing telling it to move. `CustomClasses` and `Events` are out of
+`SortAxis` partitioning is parsed and not applied. `CustomClasses` and `Events` are out of
 scope entirely. `plan/804-glue-project-loader/` records why for each.

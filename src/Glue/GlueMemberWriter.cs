@@ -67,7 +67,8 @@ internal static class GlueMemberWriter
     [UnconditionalSuppressMessage("Trimming", "IL2075",
         Justification = "Every reflected type is rooted by the DynamicDependency attributes above, " +
                         "which cover the closed set of types GlueTypeMap can construct plus the two " +
-                        "loaded-element types.")]
+                        "loaded-element types. A registered code-behind class is rooted at its " +
+                        "GlueEntityRegistry.Register<T> call, whose type parameter keeps its properties.")]
     internal static PropertyInfo? FindProperty(object target, string memberName) =>
         target.GetType().GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
 }

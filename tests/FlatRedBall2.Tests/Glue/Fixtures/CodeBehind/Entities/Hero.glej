@@ -1,0 +1,57 @@
+{
+  "Tags": [ "GLUE" ],
+  "Source": "GLUE",
+  "CreatedByOtherEntities": true,
+  "Is2D": true,
+  "Name": "Entities\\Hero",
+  "CustomVariables": [
+    { "Name": "X", "SetByDerived": true, "Properties": [ { "Name": "Type", "Value": "float", "Type": "String" } ] },
+    { "Name": "Y", "SetByDerived": true, "Properties": [ { "Name": "Type", "Value": "float", "Type": "String" } ] },
+    { "Name": "Health", "DefaultValue": 3, "Properties": [ { "Name": "Type", "Value": "int", "Type": "String" } ] },
+    { "Name": "Speed", "DefaultValue": 5.0, "Properties": [ { "Name": "Type", "Value": "float", "Type": "String" } ] }
+  ],
+  "States": [
+    { "Name": "Calm", "InstructionSaves": [ { "Type": "int", "Member": "Health", "Value": 1 } ] },
+    { "Name": "Angry", "InstructionSaves": [ { "Type": "int", "Member": "Health", "Value": 7 } ] }
+  ],
+  "Properties": [
+    { "Name": "ImplementsICollidable", "Value": true, "Type": "Boolean" },
+    { "Name": "InputDevice", "Value": 0 }
+  ],
+  "NamedObjects": [
+    {
+      "InstanceName": "Body",
+      "SourceClassType": "FlatRedBall.Math.Geometry.AxisAlignedRectangle",
+      "Properties": [],
+      "InstructionSaves": [
+        { "Type": "float", "Member": "Width", "Value": 20.0, "Time": 0.0 },
+        { "Type": "float", "Member": "Height", "Value": 30.0, "Time": 0.0 }
+      ],
+      "SourceType": 2,
+      "SourceFile": "AxisAlignedRectangle",
+      "AttachToContainer": true
+    },
+    {
+      "InstanceName": "Aura",
+      "SourceClassType": "FlatRedBall.Math.Geometry.Circle",
+      "Properties": [],
+      "InstructionSaves": [
+        { "Type": "float", "Member": "Radius", "Value": 7.0, "Time": 0.0 }
+      ],
+      "SourceType": 2,
+      "SourceFile": "Circle",
+      "AttachToContainer": true
+    },
+    {
+      "InstanceName": "Art",
+      "SourceClassType": "FlatRedBall.Sprite",
+      "Properties": [],
+      "InstructionSaves": [
+        { "Type": "float", "Member": "TextureScale", "Value": 2.0, "Time": 0.0 }
+      ],
+      "SourceType": 2,
+      "SourceFile": "Sprite",
+      "AttachToContainer": true
+    }
+  ]
+}

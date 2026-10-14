@@ -25,11 +25,13 @@ public sealed class GlueProject
     private readonly Dictionary<string, List<GlueEntity>> _pool = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntityList>> _listsToAddTo = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<GlueLoadDiagnostic> _diagnostics = new();
+    private readonly HashSet<string> _reportedRegistrations = new(StringComparer.OrdinalIgnoreCase);
 
-    private GlueProject(GlueLoadResult result, GlueContentSource? content)
+    private GlueProject(GlueLoadResult result, GlueContentSource? content, GlueEntityRegistry? entities)
     {
         Result = result;
         Content = content;
+        Entities = entities ?? new GlueEntityRegistry();
         _diagnostics.AddRange(result.Diagnostics);
 
         foreach (var screen in result.Project.Screens.Where(s => !string.IsNullOrEmpty(s.Name)))
@@ -56,10 +58,25 @@ public sealed class GlueProject
     /// <summary>The screen the project starts on, or null if it names none that resolved.</summary>
     public ScreenSave? StartUpScreen => Result.StartUpScreen;
 
+    /// <summary>
+    /// The classes registered as code-behind for this project's entities. Shared with the engine
+    /// that loaded the project (<see cref="FlatRedBallService.GlueEntities"/>); a project loaded on
+    /// its own has a registry of its own.
+    /// </summary>
+    public GlueEntityRegistry Entities { get; }
+
     /// <summary>Loads a project from a <c>.gluj</c> path, optionally with a content source.</summary>
+    /// <param name="glujPath">The project file.</param>
+    /// <param name="content">Where referenced assets come from.</param>
+    /// <param name="options">How the file is read.</param>
+    /// <param name="entities">
+    /// The registry the project creates entities from. Omit it for a registry of the project's own;
+    /// the engine passes its own so registrations outlive a reload.
+    /// </param>
     public static GlueProject Load(
-        string glujPath, GlueContentSource? content = null, GlueLoadOptions? options = null) =>
-        new(GlueProjectLoader.Load(glujPath, options), content);
+        string glujPath, GlueContentSource? content = null, GlueLoadOptions? options = null,
+        GlueEntityRegistry? entities = null) =>
+        new(GlueProjectLoader.Load(glujPath, options), content, entities);
 
     /// <summary>
     /// Applies the project's display block to <paramref name="target"/>, usually
@@ -183,7 +200,8 @@ public sealed class GlueProject
     /// For callers already iterating the project's elements — looking the name back up would repeat
     /// work, and would fail outright for a save whose name no longer matches its dictionary key.
     /// </remarks>
-    internal GlueEntity CreateEntity(EntitySave save, Screen screen, bool joinFactoryLists = true)
+    internal GlueEntity CreateEntity(
+        EntitySave save, Screen screen, bool joinFactoryLists = true, Action<GlueEntity>? configure = null)
     {
         if (save.IsAbstract)
         {
@@ -192,19 +210,56 @@ public sealed class GlueProject
                 "created on its own.");
         }
 
-        var entity = TakeFromPool(save) ?? new GlueEntity { Save = save, Project = this };
+        var entity = TakeFromPool(save);
+        bool recycled = entity is not null;
+        entity ??= Instantiate(save);
 
-        screen.Register(entity);
+        if (recycled && entity.HasCodeBehind)
+        {
+            // Code-behind ran CustomInitialize once, on this instance's first life, and may hold
+            // references into what that built. So the objects are kept and put back to their
+            // authored values, as a hand-written pooled entity is, rather than rebuilt.
+            screen.AddEntity(entity);
+            entity.AttachRenderablesToScreen();
+            entity.ResetEngineState();
+            entity.ResetToAuthored();
+        }
+        else
+        {
+            screen.Register(entity);
 
-        // Rebuilt even for a recycled instance: BuildObjects clears what the previous life left
-        // behind, so a reused shell is indistinguishable from a fresh one.
-        entity.BuildObjects();
+            // Rebuilt even for a recycled instance: BuildObjects clears what the previous life left
+            // behind, so a reused shell is indistinguishable from a fresh one.
+            entity.BuildObjects();
+
+            // A pooled entity with code-behind is kept whole on destroy; see above.
+            entity._isPooled = save.PooledByFactory && entity.HasCodeBehind;
+        }
 
         BindInput(entity, save, screen);
 
         // Destroy is the only signal that an instance is gone. Without this the instance list keeps
         // handing out corpses, and a collision relationship built on it collides with them forever.
-        entity._onDestroy = () => Release(entity);
+        // It replaces the hook Register installed, so it has to do that hook's job too.
+        entity._onDestroy = () =>
+        {
+            screen.RemoveEntity(entity);
+
+            if (entity._isPooled)
+                entity.DetachRenderablesFromScreen();
+
+            Release(entity);
+        };
+
+        // Before CustomInitialize / Reset, as Factory<T>.Create(configure) is.
+        configure?.Invoke(entity);
+
+        // The lifecycle a hand-written entity has: CustomInitialize on an instance's first life,
+        // Reset() when a pooled instance is reused. Both see the Glue data already applied.
+        if (!recycled)
+            entity.CustomInitialize();
+        else if (entity.HasCodeBehind)
+            entity.InvokeResetForPool();
 
         Track(save.Name!, entity);
 
@@ -215,6 +270,41 @@ public sealed class GlueProject
         }
 
         return entity;
+    }
+
+    /// <summary>
+    /// A new instance of the class registered for this entity, or for the nearest ancestor that has
+    /// one, falling back to the shared <see cref="GlueEntity"/> type.
+    /// </summary>
+    private GlueEntity Instantiate(EntitySave save)
+    {
+        var entity = SelfAndAncestors(save)
+            .Select(name => Entities.TryCreate(name))
+            .FirstOrDefault(created => created is not null) ?? new GlueEntity();
+
+        entity.Save = save;
+        entity.Project = this;
+        return entity;
+    }
+
+    /// <summary>
+    /// Reports each registered class whose Glue name no entity in this project has, once. Registering
+    /// is a plain call that can happen before the project is loaded, so the check waits until a screen
+    /// is about to build; a typo would otherwise leave the entity quietly un-bound.
+    /// </summary>
+    internal void ReportUnknownRegistrations()
+    {
+        foreach (var name in Entities.RegisteredNames)
+        {
+            if (_entities.ContainsKey(name) || !_reportedRegistrations.Add(name))
+                continue;
+
+            _diagnostics.Add(new GlueLoadDiagnostic(
+                GlueDiagnosticSeverity.Warning,
+                $"A class is registered for '{name}', but this project has no entity with that name, " +
+                "so it will never be created. Names are Glue's own and include the folder.",
+                name));
+        }
     }
 
     /// <summary>
@@ -456,7 +546,7 @@ public sealed class GlueProject
     /// Glue writes element names with a backslash. Accepting a forward slash costs one replace and
     /// removes the likeliest thing a hand-typed name gets wrong.
     /// </summary>
-    private static string Normalize(string glueName) => glueName.Replace('/', '\\');
+    internal static string Normalize(string glueName) => glueName.Replace('/', '\\');
 
     /// <summary>The same "no screen named that" error <see cref="CreateScreen"/> raises.</summary>
     /// <remarks>

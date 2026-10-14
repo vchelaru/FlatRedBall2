@@ -281,6 +281,9 @@ public class GlueScreen : Screen
         if (Save is null)
             return;
 
+        // Before anything is built: registered classes are consulted as nested entities are created.
+        Project?.ReportUnknownRegistrations();
+
         // Assets first: an object's instructions name them, so they have to exist by then.
         Content?.Load(Save, _buildDiagnostics);
 
@@ -534,7 +537,7 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
     private GlueContentSource? _content;
     private readonly List<GlueLoadDiagnostic> _buildDiagnostics = new();
 
-    /// <summary>The entity data this was built from. Assign it before <c>CustomInitialize</c> runs.</summary>
+    /// <summary>The entity data this was built from. Set by <see cref="GlueProject"/> when it creates the entity.</summary>
     public EntitySave? Save { get; set; }
 
     /// <summary>
@@ -645,8 +648,29 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
     private bool _isTopDown;
     private bool _isPlatformer;
 
-    /// <inheritdoc />
-    public override void CustomInitialize() => BuildObjects();
+    /// <summary>
+    /// Whether a registered class (see <see cref="GlueEntityRegistry"/>) stands behind this entity
+    /// rather than the shared <see cref="GlueEntity"/> type.
+    /// </summary>
+    internal bool HasCodeBehind => GetType() != typeof(GlueEntity);
+
+    /// <summary>
+    /// Puts a reused entity back to the state its Glue data authors, without rebuilding it. Run on
+    /// each reuse of a pooled entity that has code-behind, ahead of <c>Reset()</c>.
+    /// </summary>
+    internal void ResetToAuthored()
+    {
+        if (Save is null)
+            return;
+
+        _runtimeVariables.Clear();
+        _variables.Clear();
+        _buildDiagnostics.Clear();
+
+        var builder = new GlueObjectBuilder(_buildDiagnostics, Content, Project, OwningScreenForSpawns());
+        GlueElementBuilder.Reapply(Save.NamedObjects, Save.Name, _objects, builder, _buildDiagnostics);
+        GlueVariableApplier.Apply(Save, this, _objects, _variables, _buildDiagnostics);
+    }
 
     /// <summary>
     /// Ticks whichever movement behaviour this entity's Glue properties asked for.
@@ -703,8 +727,9 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
 
     /// <summary>
     /// Builds every object in <see cref="Save"/>, attaching those authored to attach, then applies
-    /// the element's variables. Called by <see cref="CustomInitialize"/>; safe to call directly in
-    /// tests.
+    /// the element's variables. <see cref="GlueProject.CreateEntity(string, Screen)"/> calls it
+    /// before <c>CustomInitialize</c>, so a subclass sees the finished entity; safe to call directly
+    /// in tests.
     /// </summary>
     public void BuildObjects()
     {

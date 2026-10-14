@@ -234,6 +234,22 @@ public sealed class GlueObjectBuilder
         }
     }
 
+    /// <summary>
+    /// Puts an already-built shape, sprite or Gum visual back to the values <paramref name="save"/>
+    /// authors, for an entity that is reused rather than rebuilt. Other kinds are left alone.
+    /// </summary>
+    internal void Reapply(object instance, NamedObjectSave save, string? elementName)
+    {
+        if (instance is not (Collision.AARect or Collision.Circle or Collision.Polygon
+                or Rendering.Sprite or Gum.Wireframe.GraphicalUiElement))
+        {
+            return;
+        }
+
+        ApplyShapeVisibilityDefault(instance);
+        ApplyInstructions(instance, save, elementName);
+    }
+
     internal void ApplyInstructions(object instance, NamedObjectSave save, string? elementName)
     {
         foreach (var instruction in save.InstructionSaves)
@@ -266,7 +282,13 @@ public sealed class GlueObjectBuilder
 
             if (property is null || !property.CanWrite)
             {
-                Warn($"'{save.InstanceName}' has no writable '{memberName}' " +
+                // A registered class is where the author is expected to add the missing property, so
+                // name it.
+                string target = instance is GlueEntity && instance.GetType() != typeof(GlueEntity)
+                    ? $" on {instance.GetType().Name}"
+                    : string.Empty;
+
+                Warn($"'{save.InstanceName}' has no writable '{memberName}'{target} " +
                      $"(from Glue member '{instruction.Member}'); the value was skipped.", elementName);
                 continue;
             }
@@ -318,11 +340,12 @@ public sealed class GlueObjectBuilder
             return null;
         }
 
-        var entity = _project.CreateEntity(referenced.Name!, _owningScreen, joinFactoryLists: !isListMember);
-
-        // The instance's own instructions layer on top of the entity's authored values.
-        ApplyInstructions(entity, save, elementName);
-        return entity;
+        // The instance's own instructions layer on top of the entity's authored values. They are
+        // handed over rather than applied afterwards so they are in place before the entity's
+        // CustomInitialize runs, as a Factory<T>.Create configure callback is.
+        return _project.CreateEntity(
+            referenced, _owningScreen, joinFactoryLists: !isListMember,
+            configure: entity => ApplyInstructions(entity, save, elementName));
     }
 
     /// <summary>

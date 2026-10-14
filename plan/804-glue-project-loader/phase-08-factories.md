@@ -167,9 +167,14 @@ which is a cleaner design and needs nothing on the entity.
 
 **The observable difference that matters:** FRB2's pooled recycle runs `configure` on an entity whose
 `CustomInitialize` will **not** re-run (`frb-skills/entities-and-factories/SKILL.md:107-111`). For a
-`GlueEntity`, `CustomInitialize` *is* `BuildObjects()` — so a recycled entity keeps the children it
-built the first time. That matches FRB1's pooling semantics, but it is load-bearing and needs a test
-either way.
+`GlueEntity`, `CustomInitialize` *was* `BuildObjects()` — so a recycled entity kept the children it
+built the first time.
+
+**Revised in #1411.** `GlueEntity.CustomInitialize` no longer builds anything: `GlueProject.CreateEntity`
+builds the objects, then runs the lifecycle itself. A plain pooled `GlueEntity` is still rebuilt on each
+reuse. A pooled entity with registered code-behind (`GlueEntityRegistry`) is kept whole instead: put back
+to its authored values and given `Reset()`, not a second `CustomInitialize`, because that method may hold
+references into what the first build made.
 
 ### G84 — Pooling is unexercised by every vendored fixture
 

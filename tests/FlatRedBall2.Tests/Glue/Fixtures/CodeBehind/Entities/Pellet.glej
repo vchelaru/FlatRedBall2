@@ -1,0 +1,31 @@
+{
+  "Tags": [ "GLUE" ],
+  "Source": "GLUE",
+  "CreatedByOtherEntities": true,
+  "PooledByFactory": true,
+  "Is2D": true,
+  "Name": "Entities\\Pellet",
+  "CustomVariables": [
+    { "Name": "X", "SetByDerived": true, "Properties": [ { "Name": "Type", "Value": "float", "Type": "String" } ] },
+    { "Name": "Y", "SetByDerived": true, "Properties": [ { "Name": "Type", "Value": "float", "Type": "String" } ] },
+    { "Name": "Damage", "DefaultValue": 2, "Properties": [ { "Name": "Type", "Value": "int", "Type": "String" } ] }
+  ],
+  "Properties": [
+    { "Name": "ImplementsICollidable", "Value": true, "Type": "Boolean" },
+    { "Name": "InputDevice", "Value": 0 }
+  ],
+  "NamedObjects": [
+    {
+      "InstanceName": "Body",
+      "SourceClassType": "FlatRedBall.Math.Geometry.AxisAlignedRectangle",
+      "Properties": [],
+      "InstructionSaves": [
+        { "Type": "float", "Member": "Width", "Value": 4.0, "Time": 0.0 },
+        { "Type": "float", "Member": "Height", "Value": 4.0, "Time": 0.0 }
+      ],
+      "SourceType": 2,
+      "SourceFile": "AxisAlignedRectangle",
+      "AttachToContainer": true
+    }
+  ]
+}
