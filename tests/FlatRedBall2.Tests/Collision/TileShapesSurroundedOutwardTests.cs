@@ -43,14 +43,15 @@ public class TileShapesSurroundedOutwardTests
     // ── Without the pass ─────────────────────────────────────────────────────
 
     [Fact]
-    public void WithoutPass_CircleDeepInBlock_StaysStuck()
+    public void WithoutPass_CircleDeepInBlock_IsPushedOutOfTheNearestExposedFace()
     {
         var tiles = Block(0, 0, 6, 6);
         var (actor, rel) = Actor(tiles, new Circle { Radius = 10f }, 22f, 56f);
 
         rel.RunCollisions();
 
-        actor.X.ShouldBe(22f);
+        // Plain tiles have no center-side guard (as in FRB1): the left column's exposed Left face pushes it out.
+        actor.X.ShouldBe(-10f);
         actor.Y.ShouldBe(56f);
     }
 
@@ -266,11 +267,11 @@ public class TileShapesSurroundedOutwardTests
     }
 
     [Fact]
-    public void WithoutPass_AllTilesKeepTheHalfLimit()
+    public void WithoutPass_NoTileOfASolidBlockHasTheHalfLimit()
     {
         var tiles = Block(0, 0, 6, 6);
 
-        tiles.Rectangles.ShouldAllBe(r => r.RepositionHalfSize);
+        tiles.Rectangles.ShouldAllBe(r => !r.RepositionHalfSize);
     }
 
     [Fact]

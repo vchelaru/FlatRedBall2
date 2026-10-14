@@ -279,10 +279,10 @@ public class TileResolutionMovementTests
         }
     }
 
-    // Quirk: a 3-thick wall does not catch what a 1-thick wall lets through. Past the first tile's center line
-    // the actor is not pushed, the middle tile has no faces, and the far tile pushes it out the back.
+    // A 3-thick wall holds what a 1-thick wall lets through: its first tile pushes the actor back out whatever the
+    // phase, even once the actor's center is past that tile's center line (no center-side guard on plain tiles).
     [Fact]
-    public void Quirk_ThickWall_ActorAboveTheTunnelingSpeed_EndsOnTheFarSideAtEveryPhase()
+    public void ThickWall_ActorAboveThinWallTunnelingSpeed_IsStillHeldAtTheNearFaceAtEveryPhase()
     {
         var spec = ActorSpec.Square(4f);
         var tiles = TileWorld.Map(Enumerable.Repeat("....###....", 10).ToArray());
@@ -293,7 +293,7 @@ public class TileResolutionMovementTests
             var sim = new TileSim(spec, tiles, 10f + phase, 40.3f, zeroVelocityIntoSurface: false);
             sim.Actor.VelocityX = perFrame * 60f;
             sim.Step(120);
-            sim.Actor.X.ShouldBeGreaterThan(112f, $"phase={phase}");
+            sim.Actor.X.ShouldBe(60f, Tol, $"phase={phase}");
         }
     }
 
@@ -332,11 +332,10 @@ public class TileResolutionMovementTests
         sim.Actor.Y.ShouldBeLessThan(48f, "ended below the floor");
     }
 
-    // Quirk (FlatRedBall 1 would land the actor): a fast fall onto a 3-thick slab is not caught by the top row once
-    // the center is past that row's center line, the middle row has no faces, and the bottom row pushes the actor
-    // down and out of the slab.
+    // A fast fall onto a 3-thick slab is caught by the top row whatever the speed (the top row pushes up from anywhere
+    // inside it); a one-tile floor still lets the same fall through (Quirk_ThinFloor_*).
     [Fact]
-    public void Quirk_ThickSlab_FallingFasterThanHalfActorPlusHalfTile_PassesThroughTheWholeSlab()
+    public void ThickSlab_FallingFasterThanHalfActorPlusHalfTile_StillLandsOnTop()
     {
         var spec = ActorSpec.Square(8f);
         var tiles = TileWorld.Map(Enumerable.Repeat("..........", 8).Concat(new[] { "##########", "##########", "##########" }).Concat(Enumerable.Repeat("..........", 3)).ToArray()); // slab y 48..96
@@ -346,7 +345,7 @@ public class TileResolutionMovementTests
 
         sim.Step(200);
 
-        sim.Actor.Y.ShouldBeLessThan(48f, "ended below the slab");
+        sim.Actor.Y.ShouldBe(96f + 8f, Tol);
     }
 
     [Fact]

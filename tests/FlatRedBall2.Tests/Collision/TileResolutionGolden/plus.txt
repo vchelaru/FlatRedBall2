@@ -91,7 +91,7 @@
    ....<<vvvvvv>>....
    .....vvvvvvvv>....
    .......vvvvv......
--- rect6x14 Rect 6x14 starts=221 stuck=0 firstPassDistance=2109.1 restDistance=2230.7
+-- rect6x14 Rect 6x14 starts=221 stuck=0 firstPassDistance=2074.4 restDistance=2186.4
    x from 44.61 step 4, y from 108.37 down step 4
    ....^^^^^^>....
    ....<^^^^>>....
@@ -101,9 +101,9 @@
    <^^^222>111^^>>
    <<^^222>111^>>>
    <<<^222>111>>>>
-   <<<^222>111>>>>
-   <<<^222>111>>>>
-   <<<v333>444>>>>
+   <<<<222>11>>>>>
+   <<<<<22>1>>>>>>
+   <<<<333>44>>>>>
    <<<v333>444>>>>
    <<vv333>444v>>>
    <vvv333>444vv>>

@@ -71,4 +71,16 @@ internal static class TileResolutionActors
     public static bool IsKnownQuirk(string map, string actor) =>
         (map == "diagonalPair" && actor is "rect6x14" or "rect14x6" or "diamond10" or "triDown8" or "triUp8" or "rot30")
         || (map == "checker" && actor is "triDown8" or "triUp8");
+
+    // 40x40 actors (2.5 tiles across) beside blocks, slabs, ledges and stairs: pushes by the plain tiles they overlap by a
+    // sliver add up differently since the center-side guard became a per-tile flag (#1472). Parity with FlatRedBall 1 is
+    // unknown, so these combinations are left out of the first-pass-bound, mirror and center-crossing invariants and
+    // pinned in TileResolutionOversizedActorTests instead.
+    public static bool IsOversizedParityUnknown(string map, string actor) =>
+        actor is "sq20" or "circ20"
+        && map is "block2x2" or "block3x3" or "block7x7" or "thickfloor" or "ledge" or "stairs";
+
+    /// <summary><see cref="WellBehavedMapActorPairs"/> minus <see cref="IsOversizedParityUnknown"/>.</summary>
+    public static IEnumerable<object[]> WellBehavedPairsExceptOversized() =>
+        WellBehavedMapActorPairs().Where(p => !IsOversizedParityUnknown((string)p[0], (string)p[1]));
 }

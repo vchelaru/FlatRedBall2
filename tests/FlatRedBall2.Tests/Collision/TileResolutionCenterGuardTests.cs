@@ -52,10 +52,11 @@ public class TileResolutionCenterGuardTests
         end.Y.ShouldBe(tileCy + dirY * (8f + half), dirY != 0f ? Tol : 0.5f + Tol);
     }
 
-    // Center on the inner side of the center line: no push at all, the actor stays embedded in the block.
+    // Center on the inner side of the center line: plain tiles have no center-side guard (as in FlatRedBall 1), so the
+    // actor is pushed out through the exposed face from anywhere inside the tile.
     [Theory]
     [MemberData(nameof(BlockFaces))]
-    public void FaceTile_ActorCenterJustInsideTheCenterLine_IsNotPushed(string id, float tileCx, float tileCy, float dirX, float dirY)
+    public void FaceTile_ActorCenterJustInsideTheCenterLine_IsPushedOutThroughTheFace(string id, float tileCx, float tileCy, float dirX, float dirY)
     {
         var tiles = TileWorld.Map(Block3x3);
         var spec = Spec(id);
@@ -63,13 +64,14 @@ public class TileResolutionCenterGuardTests
 
         var end = TileWorld.ResolveOnce(spec, tiles, start.X, start.Y);
 
-        end.ShouldBe(start);
+        end.X.ShouldBe(dirX != 0f ? tileCx + dirX * 12f : start.X, Tol);
+        end.Y.ShouldBe(dirY != 0f ? tileCy + dirY * 12f : start.Y, Tol);
     }
 
-    // Exactly on the center line counts as the inner side.
+    // Exactly on the center line is pushed out too (it used to count as the inner side and stay put).
     [Theory]
     [MemberData(nameof(BlockFaces))]
-    public void FaceTile_ActorCenterExactlyOnTheCenterLine_IsNotPushed(string id, float tileCx, float tileCy, float dirX, float dirY)
+    public void FaceTile_ActorCenterExactlyOnTheCenterLine_IsPushedOutThroughTheFace(string id, float tileCx, float tileCy, float dirX, float dirY)
     {
         var tiles = TileWorld.Map(Block3x3);
         var spec = Spec(id);
@@ -77,18 +79,19 @@ public class TileResolutionCenterGuardTests
 
         var end = TileWorld.ResolveOnce(spec, tiles, start.X, start.Y);
 
-        end.ShouldBe(start);
+        end.X.ShouldBe(dirX != 0f ? tileCx + dirX * 12f : start.X, Tol);
+        end.Y.ShouldBe(dirY != 0f ? tileCy + dirY * 12f : start.Y, Tol);
     }
 
-    // ── A corner tile of a block: two faces exposed, each with its own guard ─────
+    // ── A corner tile of a block: two faces exposed, the shallower one wins ────────
 
     // Top-left corner tile of the 3x3 block: x 0..16, y 32..48, center (8, 40), faces Left and Up.
     [Theory]
-    [InlineData(9f, 41f, 9f, 52f)]    // upper-right quadrant: only Up is on the outward side -> up
+    [InlineData(9f, 41f, 9f, 52f)]    // upper-right quadrant: Up is shallower -> up
     [InlineData(7f, 41f, 7f, 52f)]    // upper-left quadrant: Up and Left tie (11 each); Up is evaluated first
-    [InlineData(7f, 39f, -4f, 39f)]   // lower-left quadrant: only Left -> left
-    [InlineData(9f, 39f, 9f, 39f)]    // lower-right quadrant: neither -> not pushed
-    public void CornerTile_PushDependsOnWhichQuadrantTheCenterIsIn(float startX, float startY, float endX, float endY)
+    [InlineData(7f, 39f, -4f, 39f)]   // lower-left quadrant: Left is shallower (11 vs 13) -> left
+    [InlineData(9f, 39f, 9f, 52f)]    // lower-right quadrant: Up and Left tie (13 each) -> up (used to be not pushed)
+    public void CornerTile_ActorInAnyQuadrant_IsPushedOutThroughTheShallowerExposedFace(float startX, float startY, float endX, float endY)
     {
         var tiles = TileWorld.Map(Block3x3);
         var spec = ActorSpec.Square(4f);
@@ -133,12 +136,12 @@ public class TileResolutionCenterGuardTests
     private static readonly string[] ThreeThickSlab = { "........", "########", "########", "########" }; // y 0..48
 
     [Theory]
-    [InlineData(41f, 52f)]   // center in the top row's upper half: pushed up and out
-    [InlineData(39f, 39f)]   // center in the top row's lower half: Up refuses, nothing else pushes -> stays embedded
+    [InlineData(41f, 52f)]   // top row, upper half: pushed up and out
+    [InlineData(39f, 52f)]   // top row, lower half: pushed up and out too (used to stay embedded)
     [InlineData(24f, 24f)]   // middle row: no exposed face at all
-    [InlineData(9f, 9f)]     // bottom row's upper half: Down refuses
-    [InlineData(7f, -4f)]    // bottom row's lower half: pushed DOWN, out of the bottom of the slab
-    public void ThickSlab_PushDependsOnWhichRowAndHalfTheCenterIsIn(float startY, float endY)
+    [InlineData(9f, -4f)]    // bottom row, upper half: pushed down and out (used to stay embedded)
+    [InlineData(7f, -4f)]    // bottom row, lower half: pushed down and out
+    public void ThickSlab_ActorInAnExposedRow_IsPushedOutThroughThatRowsFace(float startY, float endY)
     {
         var tiles = TileWorld.Map(ThreeThickSlab);
         var spec = ActorSpec.Square(4f);
@@ -200,18 +203,18 @@ public class TileResolutionCenterGuardTests
 
     // ── Entering a thick wall ───────────────────────────────────────────────────
 
-    // Quirk (FlatRedBall 1 would still push the actor back out here): in a 3-thick wall the first tile only
-    // exposes its outer face, so once the center is past that tile's center line nothing pushes and the actor
-    // simply sits inside the wall.
+    // In a 3-thick wall the first tile only exposes its outer face. With no center-side guard on plain tiles (as in
+    // FlatRedBall 1) it pushes the actor back out even once the actor's center is past that tile's center line.
     [Fact]
-    public void Quirk_ThickWall_ActorWhoseCenterPassesTheFirstTilesCenterLine_IsLeftInsideTheWall()
+    public void ThickWall_ActorWhoseCenterPassesTheFirstTilesCenterLine_IsPushedBackOut()
     {
         var tiles = TileWorld.Map(Enumerable.Repeat("....###....", 10).ToArray()); // wall x 64..112
         var spec = ActorSpec.Square(4f);
 
         var end = TileWorld.ResolveOnce(spec, tiles, 73f, 40.3f); // overlaps only the first tile (64..80), center right of 72
 
-        end.ShouldBe(new Vector2(73f, 40.3f));
+        end.X.ShouldBe(60f, Tol);
+        end.Y.ShouldBe(40.3f, Tol);
     }
 
     [Fact]

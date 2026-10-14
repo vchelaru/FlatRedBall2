@@ -92,12 +92,12 @@ public class TileResolutionSurroundedPassTests
 
     public static IEnumerable<object[]> FullyResolvedByThePass() =>
         new[] { "block3x3", "thickfloor" }
-            .SelectMany(m => new[] { "sq8", "sq12", "circ8", "circ12", "poly8", "diamond10", "rect6x14" }.Select(a => new object[] { m, a }))
-            .Concat(new[] { "block7x7" }.SelectMany(m => new[] { "sq12", "circ12", "diamond10", "rect6x14" }.Select(a => new object[] { m, a })));
+            .SelectMany(m => new[] { "sq4", "sq8", "sq12", "circ8", "circ12", "poly8", "diamond10", "rect6x14" }.Select(a => new object[] { m, a }))
+            .Concat(new[] { "block7x7" }.SelectMany(m => new[] { "sq4", "sq8", "sq12", "circ12", "diamond10", "rect6x14" }.Select(a => new object[] { m, a })));
 
     [Theory]
     [MemberData(nameof(FullyResolvedByThePass))]
-    public void WithPass_ActorAnywhereInsideTheBlockAtLeastAsBigAsTheDocumentedMinimum_EndsOutside(string map, string actor)
+    public void WithPass_ActorAnywhereInsideTheBlock_EndsOutside(string map, string actor)
     {
         var spec = TileResolutionActors.Get(actor);
         var tiles = Built(map, applyPass: true);
@@ -116,12 +116,13 @@ public class TileResolutionSurroundedPassTests
 
     // ── Known gaps: embedded actors the pass leaves stuck ───────────────────────────
 
-    // Quirk (FlatRedBall 1 resolves this): the corner tile of a block keeps the center-side guard on both exposed
-    // faces, so an actor small enough to sit entirely in its inner quadrant is never pushed, pass or no pass.
+    // The corner tile of a block has no center-side guard (as in FlatRedBall 1: it is not an L-shaped corner), so an
+    // actor small enough to sit entirely in its inner quadrant is pushed out through the shallower exposed face,
+    // pass or no pass. (Before the per-tile flag it was never pushed.)
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Quirk_Block3x3_SmallActorInsideACornerTilesInnerQuadrant_IsNotPushedOut(bool applyPass)
+    public void Block3x3_SmallActorInsideACornerTilesInnerQuadrant_IsPushedOutOfTheBlock(bool applyPass)
     {
         var tiles = Built("block3x3", applyPass); // corner tile (3,3): x 48..64, y 48..64, center (56, 56), faces Down|Left
         var spec = ActorSpec.Square(4f);
@@ -129,44 +130,26 @@ public class TileResolutionSurroundedPassTests
 
         var passes = TileWorld.ResolvePasses(spec, tiles, start.X, start.Y, RestPasses);
 
-        passes.ShouldAllBe(p => p == start);
-        TileWorld.Penetrates(spec, start.X, start.Y, tiles).ShouldBeTrue();
+        passes[0].X.ShouldBe(57.6f, Tol);
+        passes[0].Y.ShouldBe(44f, Tol); // Down (13.4) is shallower than Left (13.6)
+        TileWorld.Penetrates(spec, passes[^1].X, passes[^1].Y, tiles).ShouldBeFalse();
     }
 
-    // Quirk: in a large block the pass routes an equal-sized actor toward the corner tile and parks it exactly on
-    // that tile's center, where neither exposed face is willing to push (center-side guard uses >= / <=).
+    // In a large block the pass routes an equal-sized actor toward a corner tile; it now continues through that
+    // tile's exposed face instead of parking on its center (it used to stay embedded).
     [Fact]
-    public void Quirk_Block7x7_EqualSizedActor_IsRoutedToACornerTilesCenterAndStaysEmbedded()
+    public void Block7x7_EqualSizedActor_IsRoutedThroughACornerTileAndLeavesTheBlock()
     {
         var tiles = Built("block7x7", applyPass: true);
         var spec = ActorSpec.Square(8f);
 
         var passes = TileWorld.ResolvePasses(spec, tiles, 57.6f, 66.4f, RestPasses);
 
+        passes[0].X.ShouldBe(40f, Tol);
+        passes[0].Y.ShouldBe(40f, Tol); // the corner tile's center
         passes[^1].X.ShouldBe(40f, Tol);
-        passes[^1].Y.ShouldBe(40f, Tol);
-        TileWorld.Penetrates(spec, passes[^1].X, passes[^1].Y, tiles).ShouldBeTrue();
-    }
-
-    [Theory]
-    [InlineData("block3x3", "sq4")]
-    [InlineData("block7x7", "sq4")]
-    [InlineData("block7x7", "sq8")]
-    [InlineData("thickfloor", "sq4")]
-    public void Quirk_WithPass_SomeEmbeddedStartsForTheseActorsRemainStuck(string map, string actor)
-    {
-        var spec = TileResolutionActors.Get(actor);
-        var tiles = Built(map, applyPass: true);
-        int stuck = 0;
-
-        foreach (var p in Starts(map, spec))
-        {
-            if (!CenterInTile(tiles, p) || !TileWorld.Penetrates(spec, p.X, p.Y, tiles)) continue;
-            var last = TileWorld.ResolvePasses(spec, tiles, p.X, p.Y, RestPasses)[^1];
-            if (TileWorld.Penetrates(spec, last.X, last.Y, tiles)) stuck++;
-        }
-
-        stuck.ShouldBeGreaterThan(0);
+        passes[^1].Y.ShouldBe(24f, Tol);
+        TileWorld.Penetrates(spec, passes[^1].X, passes[^1].Y, tiles).ShouldBeFalse();
     }
 
     // The pass lifts the center-side guard on the neighbors of the tiles it fills in. Those tiles then act on any
@@ -185,25 +168,5 @@ public class TileResolutionSurroundedPassTests
 
         withoutPass.ShouldAllBe(p => MathF.Abs(p.X - 57.61f) < Tol && MathF.Abs(p.Y - 60f) < Tol);
         withPass.ShouldAllBe(p => MathF.Abs(p.X - 57.61f) < Tol && MathF.Abs(p.Y - 60f) < Tol);
-    }
-
-    // Quirk: an actor much bigger than a tile standing in open air beside a staircase is correctly pushed back out
-    // to the right without the pass. With the pass, the filled-in interior tiles it overlaps by a sliver push
-    // it the full distance down, through the staircase.
-    [Fact]
-    public void Quirk_Stairs_ActorOverTwoTilesWideBesideTheStaircase_IsPushedDownThroughItOnlyWithThePass()
-    {
-        var spec = ActorSpec.Square(20f);
-        var off = Built("stairs", applyPass: false);
-        var on = Built("stairs", applyPass: true);
-
-        var withoutPass = TileWorld.ResolveOnce(spec, off, 130.61f, 76.37f);
-        var withPass = TileWorld.ResolveOnce(spec, on, 130.61f, 76.37f);
-
-        withoutPass.X.ShouldBe(148f, Tol);
-        withoutPass.Y.ShouldBe(76.37f, Tol);
-        withPass.X.ShouldBe(76f, Tol);
-        withPass.Y.ShouldBe(28f, Tol);
-        TileWorld.SegmentIsClear(on, new Vector2(130.61f, 76.37f), withPass).ShouldBeFalse("the center crossed tiles");
     }
 }

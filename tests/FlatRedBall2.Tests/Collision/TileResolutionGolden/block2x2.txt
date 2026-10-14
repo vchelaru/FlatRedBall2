@@ -1,89 +1,89 @@
 ==== block2x2
--- sq4 Rect 4x4 starts=100 stuck=16 firstPassDistance=430.2 restDistance=430.2
+-- sq4 Rect 4x4 starts=100 stuck=0 firstPassDistance=748.4 restDistance=748.4
    x from 44.61 step 4, y from 80.37 down step 4
    <^^^^^^^^>
    <<^^^^^^>>
    <<<^^^^>>>
-   <<<!!!!>>>
-   <<<!!!!>>>
-   <<<!!!!>>>
-   <<<!!!!>>>
+   <<<<^^>>>>
+   <<<<34>>>>
+   <<<<43>>>>
+   <<<vvvv>>>
    <<vvvvvv>>
    <vvvvvvvv>
    vvvvvvvvvv
--- sq8 Rect 8x8 starts=144 stuck=16 firstPassDistance=851.0 restDistance=851.0
+-- sq8 Rect 8x8 starts=144 stuck=0 firstPassDistance=1559.4 restDistance=1559.4
    x from 40.61 step 4, y from 84.37 down step 4
    <^^^^^^^^^^>
    <<^^^^^^^^>>
    <<<^^^^^^>>>
    <<<<^^^^>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
+   <<<<3124>>>>
+   <<<<3344>>>>
+   <<<<3434>>>>
+   <<<<4433>>>>
    <<<vvvvvv>>>
    <<vvvvvvvv>>
    <vvvvvvvvvv>
    vvvvvvvvvvvv
--- sq12 Rect 12x12 starts=196 stuck=16 firstPassDistance=1539.0 restDistance=1539.0
+-- sq12 Rect 12x12 starts=196 stuck=0 firstPassDistance=2915.8 restDistance=2915.8
    x from 36.61 step 4, y from 88.37 down step 4
    <^^^^^^^^^^^^>
    <<^^^^^^^^^^>>
    <<<^^^^^^^^>>>
    <<<<^^^^^^>>>>
-   <<<<2^^^^1>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<3vvvv4>>>>
+   <<<<311224>>>>
+   <<<<331244>>>>
+   <<<<333444>>>>
+   <<<<334344>>>>
+   <<<<344334>>>>
+   <<<<444333>>>>
    <<<vvvvvvvv>>>
    <<vvvvvvvvvv>>
    <vvvvvvvvvvvv>
    vvvvvvvvvvvvvv
--- circ8 Circle r=8 starts=139 stuck=16 firstPassDistance=844.8 restDistance=844.8
+-- circ8 Circle r=8 starts=139 stuck=0 firstPassDistance=1467.1 restDistance=1467.1
    x from 40.61 step 4, y from 84.37 down step 4
    .^^^^^^^^^^>
    <<^^^^^^^^>>
    <<<^^^^^^>>>
    <<<<^^^^>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
-   <<<<!!!!>>>>
+   <<<<2124>>>>
+   <<<<3344>>>>
+   <<<<3434>>>>
+   <<<<3334>>>>
    <<<vvvvvv>>>
    <<vvvvvvvv>>
    .vvvvvvvvvv>
    ..vvvvvvvvv.
--- circ12 Circle r=12 starts=187 stuck=16 firstPassDistance=1485.5 restDistance=1485.5
+-- circ12 Circle r=12 starts=187 stuck=0 firstPassDistance=2627.5 restDistance=2627.5
    x from 36.61 step 4, y from 88.37 down step 4
    .^^^^^^^^^^^^.
    .<^^^^^^^^^^>>
    <<<^^^^^^^^>>>
    <<<<^^^^^^>>>>
-   <<<<2^^^^1>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<<!!!!>>>>>
-   <<<<3vvvv4>>>>
+   <<<<211221>>>>
+   <<<<231244>>>>
+   <<<<333444>>>>
+   <<<<334344>>>>
+   <<<<344334>>>>
+   <<<<333344>>>>
    <<<vvvvvvvv>>>
    <<vvvvvvvvvv>>
    .vvvvvvvvvvvv>
    ...vvvvvvvvv..
--- rect6x14 Rect 6x14 starts=165 stuck=16 firstPassDistance=1115.4 restDistance=1115.4
+-- rect6x14 Rect 6x14 starts=165 stuck=0 firstPassDistance=1801.4 restDistance=1801.4
    x from 44.61 step 4, y from 92.37 down step 4
    ^^^^^^^^^^>
    <^^^^^^^^>>
    <<^^^^^^>>>
    <<<^^^^>>>>
-   <<<^^^^>>>>
-   <<<^^^^>>>>
-   <<<!!!!>>>>
-   <<<!!!!>>>>
-   <<<!!!!>>>>
-   <<<!!!!>>>>
-   <<<vvvv>>>>
+   <<<<122>>>>
+   <<<<122>>>>
+   <<<<><2>>>>
+   <<<<><<>>>>
+   <<<<><3>>>>
+   <<<<433>>>>
+   <<<<433>>>>
    <<<vvvv>>>>
    <<vvvvvv>>>
    <vvvvvvvv>>

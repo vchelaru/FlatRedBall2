@@ -49,10 +49,12 @@ public class TileResolutionSolidSidesTests
         end.Y.ShouldBe(40f + dirY * 12f, Tol);
     }
 
-    // Entering from the opposite, unsolid side: the tile is invisible to the actor.
+    // Plain tiles have no center-side guard (as in FlatRedBall 1): a tile whose only solid face is `side` pushes an
+    // actor that overlaps it out through that face even when the actor is on the non-solid side. (One-way tiles use
+    // OneWayDirection on the relationship instead, so they are unaffected.)
     [Theory]
     [MemberData(nameof(SingleSides))]
-    public void SingleSide_ActorOnTheNonSolidSide_PassesThrough(string id, SolidSides side, float dirX, float dirY)
+    public void SingleSide_ActorOnTheNonSolidSide_IsPushedThroughTheSolidFace(string id, SolidSides side, float dirX, float dirY)
     {
         var tiles = TileWithSides(side);
         var spec = Spec(id);
@@ -60,13 +62,14 @@ public class TileResolutionSolidSidesTests
 
         var end = TileWorld.ResolveOnce(spec, tiles, start.X, start.Y);
 
-        end.ShouldBe(start);
+        end.X.ShouldBe(dirX != 0f ? 40f + dirX * 12f : start.X, Tol);
+        end.Y.ShouldBe(dirY != 0f ? 40f + dirY * 12f : start.Y, Tol);
     }
 
-    // Deep into the tile from the outward side but with the center past the center line: no push.
+    // Deep into the tile with the center a unit past the center line: pushed out through the solid face.
     [Theory]
     [MemberData(nameof(SingleSides))]
-    public void SingleSide_ActorCenterPastTheCenterLine_IsNotPushed(string id, SolidSides side, float dirX, float dirY)
+    public void SingleSide_ActorCenterPastTheCenterLine_IsPushedOutThroughTheSolidFace(string id, SolidSides side, float dirX, float dirY)
     {
         var tiles = TileWithSides(side);
         var spec = Spec(id);
@@ -74,7 +77,8 @@ public class TileResolutionSolidSidesTests
 
         var end = TileWorld.ResolveOnce(spec, tiles, start.X, start.Y);
 
-        end.ShouldBe(start);
+        end.X.ShouldBe(dirX != 0f ? 40f + dirX * 12f : start.X, Tol);
+        end.Y.ShouldBe(dirY != 0f ? 40f + dirY * 12f : start.Y, Tol);
     }
 
     // A one-way floor (Up only) approached from the side, center above the center line: it lifts the actor onto
@@ -92,14 +96,15 @@ public class TileResolutionSolidSidesTests
     }
 
     [Fact]
-    public void UpOnly_ActorOverlappingFromTheSideWithCenterBelowTheCenterLine_IsNotMoved()
+    public void UpOnly_ActorOverlappingFromTheSideWithCenterBelowTheCenterLine_IsAlsoLiftedOntoTheTile()
     {
         var tiles = TileWithSides(SolidSides.Up);
         var spec = ActorSpec.Square(4f);
 
         var end = TileWorld.ResolveOnce(spec, tiles, 30f, 36f);
 
-        end.ShouldBe(new Vector2(30f, 36f));
+        end.X.ShouldBe(30f, Tol);
+        end.Y.ShouldBe(52f, Tol);
     }
 
     // Two solid faces: the shallower of the two allowed axes is used.

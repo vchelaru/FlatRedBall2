@@ -111,15 +111,15 @@
    <<vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
    .vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv>
    ...vvvvvvvvvvvvvvvvvvvvvvvvvvvvv..
--- rect6x14 Rect 6x14 starts=689 stuck=0 firstPassDistance=7081.7 restDistance=7203.4
+-- rect6x14 Rect 6x14 starts=689 stuck=0 firstPassDistance=7228.9 restDistance=7350.5
    x from 28.61 step 4, y from 108.37 down step 4
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^>
    <^^^^^^^^^^^^^^^^^^^^^^^^^^^^>>
    <<^^^^^^^^^^^^^^^^^^^^^^^^^^>>>
    <<<^^^^^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<1111^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<1111^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<>444vvvvvvvvvvvvvvvvvvvv>>>>
+   <<<1111^^^^^^^^^^^^^^^^^^^1>>>>
+   <<<1111^^^^^^^^^^^^^^^^^^11>>>>
+   <<<>444vvvvvvvvvvvvvvvvvvv4>>>>
    <<<>444vvvvvvvvvvvvvvvvvvvv>>>>
    <<<>444vvvvvvvvvvvvvvvvvvvvv>>>
    <<<>444vvvvvvvvvvvvvvvvvvvvvv>>
@@ -129,9 +129,9 @@
    <<<>111^^^^^^^^^^^^^^^^^^^^^^>>
    <<<>111^^^^^^^^^^^^^^^^^^^^^>>>
    <<<>111^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<>111^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<>111^^^^^^^^^^^^^^^^^^^^>>>>
-   <<<4444vvvvvvvvvvvvvvvvvvvv>>>>
+   <<<>111^^^^^^^^^^^^^^^^^^^1>>>>
+   <<<>111^^^^^^^^^^^^^^^^^^11>>>>
+   <<<4444vvvvvvvvvvvvvvvvvvv4>>>>
    <<<vvvvvvvvvvvvvvvvvvvvvvvv>>>>
    <<vvvvvvvvvvvvvvvvvvvvvvvvvv>>>
    <vvvvvvvvvvvvvvvvvvvvvvvvvvvv>>
