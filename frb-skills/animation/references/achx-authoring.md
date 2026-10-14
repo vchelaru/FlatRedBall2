@@ -106,6 +106,7 @@ Each `<AnimationChain>` is a named sequence of frames.
 | `RelativeX` | No | `0` | Horizontal offset from entity origin — sprites already draw X-centered, so this is usually `0`. See Ground-Contact Point below |
 | `RelativeY` | No | `0` | Marks the frame's ground-contact point above the entity origin — set by eye to match the art, not computed from sprite height. See Ground-Contact Point below |
 | `Red`/`Green`/`Blue`/`Alpha`/`ColorOperation` | No | unset | Per-frame color; `ColorOperation` is `Multiply` or `Add`. Unset values inherit from the previous frame in the chain. See the color gotchas in `SKILL.md` |
+| `OffsetInterpolation`/`OffsetEasing`, `ColorInterpolation`/`ColorEasing`, `SkipOffsetKeyframe`/`SkipColorKeyframe` | No | snap / `Out` / `false` | Keyframe glide from this frame to the next (`.achj`: camelCase). Type is a `FlatRedBall.InterpolationCore` `InterpolationType` name (`Linear`, `Quadratic`, `Back`, `Bounce`, ...); omitted or unknown means snap. Easing is `In`/`Out`/`InOut`, ignored for snap and `Linear`. A `Skip*` frame is not a keyframe: its own value is ignored and the previous keyframe's glide spans it. FRB2-only: Gum/FRB1 ignore them |
 | `ShapesSave` | No | — | Per-frame collision shapes (`AARectSaves`/`CircleSaves`/`PolygonSaves`) — see `per-frame-shapes.md` |
 | `Events` | No | — | `<Event><Name>Footstep</Name><Data>optional</Data></Event>` entries, last in the frame (`.achj`: `"events": [{"name", "data"}]`). FRB2-only: Gum/FRB1 drop them if they re-save the file |
 

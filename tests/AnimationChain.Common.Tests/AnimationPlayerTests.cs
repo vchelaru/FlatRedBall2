@@ -22,6 +22,61 @@ public class AnimationPlayerTests
         return list;
     }
 
+    // ---- #1478: keyframe interpolation ----
+
+    [Fact]
+    public void CurrentOffset_LinearKeyframe_GlidesTowardNextFrame()
+    {
+        var list = MakeList(("Slide", new[] { 1.0, 1.0 }));
+        var chain = list["Slide"]!;
+        chain[0].OffsetCurve = KeyframeCurve.Parse("Linear", null);
+        chain[1].RelativeX = 100;
+        var player = new AnimationPlayer<TestFrame>(list);
+        player.Play("Slide");
+
+        player.Update(TimeSpan.FromSeconds(0.5));
+
+        player.CurrentOffset.X.ShouldBe(50f, 0.001f);
+    }
+
+    [Fact]
+    public void CurrentOffset_DefaultFrames_IsCurrentFrameOffset()
+    {
+        var list = MakeList(("Slide", new[] { 1.0, 1.0 }));
+        list["Slide"]![0].RelativeX = 10;
+        list["Slide"]![1].RelativeX = 100;
+        var player = new AnimationPlayer<TestFrame>(list);
+        player.Play("Slide");
+
+        player.Update(TimeSpan.FromSeconds(0.5));
+
+        player.CurrentOffset.X.ShouldBe(10f);
+    }
+
+    [Fact]
+    public void CurrentColor_LinearKeyframe_GlidesTowardNextFrame()
+    {
+        var list = MakeList(("Fade", new[] { 1.0, 1.0 }));
+        var chain = list["Fade"]!;
+        chain[0].Alpha = 0;
+        chain[0].ColorCurve = KeyframeCurve.Parse("Linear", null);
+        chain[1].Alpha = 200;
+        var player = new AnimationPlayer<TestFrame>(list);
+        player.Play("Fade");
+
+        player.Update(TimeSpan.FromSeconds(0.5));
+
+        player.CurrentColor.Alpha.ShouldBe(100);
+    }
+
+    [Fact]
+    public void CurrentOffset_NoAnimationPlaying_IsZero()
+    {
+        var player = new AnimationPlayer<TestFrame>(MakeList());
+
+        player.CurrentOffset.ShouldBe((0f, 0f));
+    }
+
     [Fact]
     public void Play_ChainLoopFalse_SeedsIsLoopingFalse()
     {

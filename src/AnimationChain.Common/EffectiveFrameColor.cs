@@ -13,7 +13,8 @@ public readonly record struct ResolvedFrameColor(
 /// Resolves a frame's <em>effective</em> color. A <c>null</c> <see cref="AnimationFrameSave.Red"/>/
 /// <see cref="AnimationFrameSave.Green"/>/<see cref="AnimationFrameSave.Blue"/>/<see cref="AnimationFrameSave.Alpha"/>/
 /// <see cref="AnimationFrameSave.ColorOperation"/> inherits the most recent earlier frame in the same chain
-/// that sets it; inheritance never crosses chains. The FlatRedBall2 engine, the
+/// that sets it; inheritance never crosses chains. A frame with <see cref="AnimationFrameSave.SkipColorKeyframe"/>
+/// (other than the first) contributes no channels, since its own values are ignored. The FlatRedBall2 engine, the
 /// FlatRedBall.AnimationChain.MonoGame/KNI packages, and the AnimationEditor all resolve through this
 /// type so the editor preview matches the game.
 /// </summary>
@@ -33,10 +34,13 @@ public static class EffectiveFrameColor
         for (int i = start; i >= 0; i--)
         {
             var f = frames[i];
-            red       ??= f.Red;
-            green     ??= f.Green;
-            blue      ??= f.Blue;
-            alpha     ??= f.Alpha;
+            if (i == 0 || !f.SkipColorKeyframe)
+            {
+                red   ??= f.Red;
+                green ??= f.Green;
+                blue  ??= f.Blue;
+                alpha ??= f.Alpha;
+            }
             operation ??= f.ColorOperation;
         }
 
@@ -57,10 +61,14 @@ public static class EffectiveFrameColor
         {
             var f = frames[i];
             // A set channel overrides the running value; `??=` would freeze on the first set value.
-            red       = f.Red           ?? red;
-            green     = f.Green         ?? green;
-            blue      = f.Blue          ?? blue;
-            alpha     = f.Alpha         ?? alpha;
+            // A color-skipped frame's channels are ignored (it is not a keyframe), but its operation still snaps.
+            if (i == 0 || !f.SkipColorKeyframe)
+            {
+                red   = f.Red   ?? red;
+                green = f.Green ?? green;
+                blue  = f.Blue  ?? blue;
+                alpha = f.Alpha ?? alpha;
+            }
             operation = f.ColorOperation ?? operation;
             result[i] = new ResolvedFrameColor(red, green, blue, alpha, operation);
         }

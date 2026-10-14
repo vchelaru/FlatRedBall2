@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FlatRedBall2.AnimationEditorCommon;
 
 namespace FlatRedBall2.Animation;
 
@@ -9,7 +10,7 @@ namespace FlatRedBall2.Animation;
 /// One frame of a texture-flipping animation. Holds a reference to the texture,
 /// the source region in pixel coordinates, flip flags, and how long this frame displays.
 /// </summary>
-public class AnimationFrame
+public class AnimationFrame : IKeyframeFrame
 {
     /// <summary>The texture to display for this frame.</summary>
     public Texture2D? Texture;
@@ -57,7 +58,7 @@ public class AnimationFrame
     /// <summary>
     /// Optional per-frame red channel, -255..255, or <c>null</c> when unset. Applied automatically
     /// by <see cref="FlatRedBall2.Rendering.Sprite.Draw"/> per <see cref="ColorOperation"/> — see
-    /// <see cref="FlatRedBall2.Rendering.SpriteFrameColor.Apply"/>. See <see cref="Green"/>, <see cref="Blue"/>.
+    /// <see cref="FlatRedBall2.Rendering.SpriteFrameColor.Apply(AnimationFrame, Microsoft.Xna.Framework.Color)"/>. See <see cref="Green"/>, <see cref="Blue"/>.
     /// </summary>
     public int? Red;
 
@@ -84,6 +85,43 @@ public class AnimationFrame
     /// <see cref="FlatRedBall2.Rendering.Sprite.FrameControlledProperties"/>.
     /// </summary>
     public ColorOperation? ColorOperation;
+
+    /// <summary>
+    /// When <c>true</c> this frame is not an offset keyframe: its <see cref="RelativeX"/>/<see cref="RelativeY"/>
+    /// and <see cref="OffsetCurve"/> are ignored, and the previous offset keyframe glides across it.
+    /// </summary>
+    public bool SkipOffsetKeyframe;
+
+    /// <summary>
+    /// When <c>true</c> this frame is not a color keyframe: its own color channels and <see cref="ColorCurve"/>
+    /// are ignored, and the previous color keyframe glides across it.
+    /// </summary>
+    public bool SkipColorKeyframe;
+
+    /// <summary>
+    /// Curve from this frame's offset to the next offset keyframe's, applied by <see cref="FlatRedBall2.Rendering.Sprite"/>
+    /// while <see cref="FlatRedBall2.Rendering.SpriteFrameProperties.Offset"/> is frame-controlled. Default is snap.
+    /// </summary>
+    public KeyframeCurve OffsetCurve;
+
+    /// <summary>
+    /// Curve from this frame's color to the next color keyframe's, applied by <see cref="FlatRedBall2.Rendering.Sprite"/>
+    /// while <see cref="FlatRedBall2.Rendering.SpriteFrameProperties.Color"/> is frame-controlled. Default is snap.
+    /// </summary>
+    public KeyframeCurve ColorCurve;
+
+    double IKeyframeFrame.DurationSeconds => FrameLength.TotalSeconds;
+    float IKeyframeFrame.RelativeX => RelativeX;
+    float IKeyframeFrame.RelativeY => RelativeY;
+    int? IKeyframeFrame.Red => Red;
+    int? IKeyframeFrame.Green => Green;
+    int? IKeyframeFrame.Blue => Blue;
+    int? IKeyframeFrame.Alpha => Alpha;
+    ColorOperation? IKeyframeFrame.ColorOperation => ColorOperation;
+    bool IKeyframeFrame.SkipOffsetKeyframe => SkipOffsetKeyframe;
+    bool IKeyframeFrame.SkipColorKeyframe => SkipColorKeyframe;
+    KeyframeCurve IKeyframeFrame.OffsetCurve => OffsetCurve;
+    KeyframeCurve IKeyframeFrame.ColorCurve => ColorCurve;
 
     /// <summary>
     /// Per-frame shape definitions reconciled against the parent entity at frame switch time.

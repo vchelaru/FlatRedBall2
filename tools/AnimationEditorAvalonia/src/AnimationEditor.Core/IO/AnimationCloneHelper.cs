@@ -27,6 +27,12 @@ public static class AnimationCloneHelper
             Blue             = source.Blue,
             Alpha            = source.Alpha,
             ColorOperation   = source.ColorOperation,
+            SkipOffsetKeyframe  = source.SkipOffsetKeyframe,
+            SkipColorKeyframe   = source.SkipColorKeyframe,
+            OffsetInterpolation = source.OffsetInterpolation,
+            OffsetEasing        = source.OffsetEasing,
+            ColorInterpolation  = source.ColorInterpolation,
+            ColorEasing         = source.ColorEasing,
         };
 
         if (source.ShapesSave is not null)

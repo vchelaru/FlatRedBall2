@@ -75,6 +75,10 @@ public static class AnimationChainListSaveExtensions
                     Blue = color.Blue,
                     Alpha = color.Alpha,
                     ColorOperation = color.Operation,
+                    SkipOffsetKeyframe = frameSave.SkipOffsetKeyframe,
+                    SkipColorKeyframe = frameSave.SkipColorKeyframe,
+                    OffsetCurve = KeyframeCurve.Parse(frameSave.OffsetInterpolation, frameSave.OffsetEasing),
+                    ColorCurve = KeyframeCurve.Parse(frameSave.ColorInterpolation, frameSave.ColorEasing),
                 };
 
                 frame.Texture = loadTexture(frameSave);

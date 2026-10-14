@@ -58,6 +58,53 @@ public class OffsetInterpolatorTests
     }
 
     [Fact]
+    public void ComputeOffset_InterpolateIgnoresCurvesAndSkipFlagsStoredInFile()
+    {
+        // The preview toggle predates per-frame curves (#1478): it eases every frame linearly, so a stored
+        // Instant curve or skip flag changes nothing until the editor UI for them lands.
+        var chain = MakeChain((0f, 0f), (999f, 999f), (100f, 0f));
+        chain.Frames[0].OffsetInterpolation = "Instant";
+        chain.Frames[1].SkipOffsetKeyframe = true;
+
+        var (x, _) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 0, frameElapsed: 0.05, interpolate: true);
+
+        Assert.Equal(499.5f, x, precision: 3);
+    }
+
+    [Fact]
+    public void ComputeOffset_SnapIgnoresCurvesStoredInFile()
+    {
+        var chain = MakeChain((10f, 0f), (50f, 0f));
+        chain.Frames[0].OffsetInterpolation = "Linear";
+
+        var (x, _) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 0, frameElapsed: 0.05, interpolate: false);
+
+        Assert.Equal(10f, x, precision: 4);
+    }
+
+    [Fact]
+    public void ComputeOffset_InterpolateUnsetFrameLength_UsesPlaybackDefault()
+    {
+        // FrameLength 0 plays as 0.1s, so 0.05s in is halfway.
+        var chain = MakeChain((0f, 0f), (100f, 0f));
+        chain.Frames[0].FrameLength = 0f;
+
+        var (x, _) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 0, frameElapsed: 0.05, interpolate: true);
+
+        Assert.Equal(50f, x, precision: 3);
+    }
+
+    [Fact]
+    public void ComputeOffset_InterpolateElapsedPastFrameLength_ClampsToNextFrameOffset()
+    {
+        var chain = MakeChain((0f, 0f), (100f, 0f));
+
+        var (x, _) = OffsetInterpolator.ComputeOffset(chain, frameIndex: 0, frameElapsed: 5.0, interpolate: true);
+
+        Assert.Equal(100f, x, precision: 3);
+    }
+
+    [Fact]
     public void ComputeOffset_InterpolateSingleFrameChain_ReturnsThatFrameOffset()
     {
         // Nothing to interpolate toward; return the only frame's offset.

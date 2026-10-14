@@ -146,4 +146,54 @@ public class EffectiveFrameColorTests
         EffectiveFrameColor.ChannelDefault(ColorOperation.Multiply).ShouldBe(255);
         EffectiveFrameColor.ChannelDefault(null).ShouldBe(255);
     }
+
+    // ---- #1478: a color-skipped frame's stored channels are ignored, so nothing inherits from them ----
+
+    [Fact]
+    public void ResolveAll_SkippedFrameChannels_AreNotInherited()
+    {
+        var frames = Chain(
+            new AnimationFrameSave { Red = 20 },
+            new AnimationFrameSave { Red = 255, SkipColorKeyframe = true },
+            new AnimationFrameSave());
+
+        var resolved = EffectiveFrameColor.ResolveAll(frames);
+
+        resolved[1].Red.ShouldBe(20);
+        resolved[2].Red.ShouldBe(20);
+    }
+
+    [Fact]
+    public void ResolveAll_SkippedFrameColorOperation_StillApplies()
+    {
+        // ColorOperation always snaps on frame change, so a skipped frame's operation is not ignored.
+        var frames = Chain(
+            new AnimationFrameSave { ColorOperation = ColorOperation.Multiply },
+            new AnimationFrameSave { ColorOperation = ColorOperation.Add, SkipColorKeyframe = true });
+
+        EffectiveFrameColor.ResolveAll(frames)[1].Operation.ShouldBe(ColorOperation.Add);
+    }
+
+    [Fact]
+    public void ResolveAll_FirstFrameMarkedSkipped_StillContributes()
+    {
+        var frames = Chain(
+            new AnimationFrameSave { Red = 20, SkipColorKeyframe = true },
+            new AnimationFrameSave());
+
+        EffectiveFrameColor.ResolveAll(frames)[1].Red.ShouldBe(20);
+    }
+
+    [Fact]
+    public void Resolve_SkippedFrameChannels_MatchResolveAll()
+    {
+        var frames = Chain(
+            new AnimationFrameSave { Red = 20 },
+            new AnimationFrameSave { Red = 255, SkipColorKeyframe = true },
+            new AnimationFrameSave());
+
+        var all = EffectiveFrameColor.ResolveAll(frames);
+        for (int i = 0; i < frames.Count; i++)
+            EffectiveFrameColor.Resolve(frames, i).ShouldBe(all[i]);
+    }
 }

@@ -6,6 +6,8 @@ using FlatRedBall2.Animation;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering.Batches;
+using KeyframeColor = FlatRedBall2.AnimationEditorCommon.KeyframeColor;
+using KeyframeEvaluator = FlatRedBall2.AnimationEditorCommon.KeyframeEvaluator;
 
 namespace FlatRedBall2.Rendering;
 
@@ -48,6 +50,10 @@ public class Sprite : IRenderable, IAttachable
     private int _currentChainIndex = -1;
     private int _currentFrameIndex;
     private double _timeIntoAnimation;
+    // Offset and color at the current playback time, keyframe-interpolated (#1478). Recomputed by
+    // ApplyCurrentFrame; equal to the current frame's own values unless the .achx stores a curve.
+    private (float X, float Y) _frameOffset;
+    private KeyframeColor _frameColor;
     // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
     private int _playbackVersion;
 
@@ -370,7 +376,7 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// The <see cref="AnimationFrame"/> currently displayed, or <c>null</c> when no animation is playing.
     /// <see cref="AnimationFrame.ColorOperation"/> Multiply and <see cref="AnimationFrame.Alpha"/>
-    /// are applied at draw time (see <see cref="SpriteFrameColor.Apply"/> and <see cref="Draw"/>), and
+    /// are applied at draw time (see <see cref="SpriteFrameColor.Apply(AnimationFrame, Color)"/> and <see cref="Draw"/>), and
     /// Add is assigned to <see cref="AddColor"/>, all while <see cref="SpriteFrameProperties.Color"/> is in
     /// <see cref="FrameControlledProperties"/>. <see cref="AnimationFrame.RelativeX"/>/<see cref="AnimationFrame.RelativeY"/>
     /// are likewise applied automatically (see <see cref="X"/>/<see cref="Y"/>).
@@ -609,10 +615,25 @@ public class Sprite : IRenderable, IAttachable
         CurrentFrame = frame;
         _texture = frame.Texture;
         _sourceRectangle = frame.SourceRectangle;
+        SampleKeyframes(chain);
         ApplyFrameProperties(frame, _frameControlledProperties);
         RecalculateDimensions();
 
         ReconcileShapes(frame);
+    }
+
+    // Evaluates the offset and color at the current playback time. With the default snap curve these
+    // are exactly the current frame's own values.
+    private void SampleKeyframes(AnimationChain chain)
+    {
+        int index = System.Math.Clamp(_currentFrameIndex, 0, chain.Count - 1);
+        double frameStart = 0;
+        for (int i = 0; i < index; i++)
+            frameStart += chain[i].FrameLength.TotalSeconds;
+        double elapsed = System.Math.Max(0, _timeIntoAnimation - frameStart);
+
+        _frameOffset = KeyframeEvaluator.EvaluateOffset(chain, IsLooping, index, elapsed);
+        _frameColor = KeyframeEvaluator.EvaluateColor(chain, IsLooping, index, elapsed);
     }
 
     // Writes only the groups in `groups` from the frame onto the sprite.
@@ -626,13 +647,13 @@ public class Sprite : IRenderable, IAttachable
         }
         if (groups.HasFlag(SpriteFrameProperties.Offset))
         {
-            X = frame.RelativeX;
-            Y = frame.RelativeY;
+            X = _frameOffset.X;
+            Y = _frameOffset.Y;
         }
         if (groups.HasFlag(SpriteFrameProperties.Color))
         {
             AddColor = frame.ColorOperation == Animation.ColorOperation.Add
-                ? SpriteFrameColor.GetAddOffset(frame)
+                ? SpriteFrameColor.GetAddOffset(_frameColor)
                 : Vector3.Zero;
         }
     }
@@ -851,7 +872,7 @@ public class Sprite : IRenderable, IAttachable
     {
         var frame = CurrentFrame;
         var baseColor = frame != null && _frameControlledProperties.HasFlag(SpriteFrameProperties.Color)
-            ? SpriteFrameColor.Apply(frame, Color)
+            ? SpriteFrameColor.Apply(frame.ColorOperation, _frameColor, Color)
             : Color;
         return baseColor * Alpha;
     }

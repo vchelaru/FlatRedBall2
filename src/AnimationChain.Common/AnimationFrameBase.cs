@@ -10,7 +10,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// depending on any specific renderer. See <see cref="AnimationFrameBase{TTexture}"/> for the
 /// texture-bearing subclass a renderer closes this over.
 /// </summary>
-public abstract class AnimationFrameBase
+public abstract class AnimationFrameBase : IKeyframeFrame
 {
     /// <summary>Name of the source texture file, as stored in the .achx.</summary>
     public string TextureName = string.Empty;
@@ -59,6 +59,38 @@ public abstract class AnimationFrameBase
 
     /// <summary>How <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/> combine with the texture, or <c>null</c> for none.</summary>
     public ColorOperation? ColorOperation;
+
+    /// <summary>When <c>true</c> this frame is not an offset keyframe (see <see cref="AnimationFrameSave.SkipOffsetKeyframe"/>).</summary>
+    public bool SkipOffsetKeyframe;
+
+    /// <summary>When <c>true</c> this frame is not a color keyframe (see <see cref="AnimationFrameSave.SkipColorKeyframe"/>).</summary>
+    public bool SkipColorKeyframe;
+
+    /// <summary>
+    /// The curve from this frame's <see cref="RelativeX"/>/<see cref="RelativeY"/> to the next offset keyframe's.
+    /// Default is snap (today's behavior). Read through <see cref="AnimationPlayer{TFrame}.CurrentOffset"/>;
+    /// a renderer that ignores it keeps snapping.
+    /// </summary>
+    public KeyframeCurve OffsetCurve;
+
+    /// <summary>
+    /// The curve from this frame's color to the next color keyframe's. Default is snap. Read through
+    /// <see cref="AnimationPlayer{TFrame}.CurrentColor"/>.
+    /// </summary>
+    public KeyframeCurve ColorCurve;
+
+    double IKeyframeFrame.DurationSeconds => FrameLength.TotalSeconds;
+    float IKeyframeFrame.RelativeX => RelativeX;
+    float IKeyframeFrame.RelativeY => RelativeY;
+    int? IKeyframeFrame.Red => Red;
+    int? IKeyframeFrame.Green => Green;
+    int? IKeyframeFrame.Blue => Blue;
+    int? IKeyframeFrame.Alpha => Alpha;
+    ColorOperation? IKeyframeFrame.ColorOperation => ColorOperation;
+    bool IKeyframeFrame.SkipOffsetKeyframe => SkipOffsetKeyframe;
+    bool IKeyframeFrame.SkipColorKeyframe => SkipColorKeyframe;
+    KeyframeCurve IKeyframeFrame.OffsetCurve => OffsetCurve;
+    KeyframeCurve IKeyframeFrame.ColorCurve => ColorCurve;
 
     /// <summary>
     /// Per-frame shape definitions. Present as data only — the caller is responsible for applying

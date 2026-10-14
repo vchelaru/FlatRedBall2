@@ -34,6 +34,26 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         }
     }
 
+    /// <summary>
+    /// The frame offset to draw at the current playback time, with keyframe interpolation applied
+    /// (see <see cref="KeyframeEvaluator"/>). Equals <see cref="CurrentFrame"/>'s own
+    /// <c>RelativeX</c>/<c>RelativeY</c> unless the file stores an offset curve. (0, 0) when nothing is playing.
+    /// </summary>
+    public (float X, float Y) CurrentOffset =>
+        CurrentChain is { Count: > 0 } chain
+            ? KeyframeEvaluator.EvaluateOffset(chain, IsLooping, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            : (0f, 0f);
+
+    /// <summary>
+    /// The frame color channels to draw at the current playback time, with keyframe interpolation
+    /// applied. Equals <see cref="CurrentFrame"/>'s own channels unless the file stores a color curve.
+    /// All <c>null</c> when nothing is playing.
+    /// </summary>
+    public KeyframeColor CurrentColor =>
+        CurrentChain is { Count: > 0 } chain
+            ? KeyframeEvaluator.EvaluateColor(chain, IsLooping, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            : default;
+
     /// <summary>The currently playing <see cref="AnimationChain{TFrame}"/>, or <c>null</c> if none.</summary>
     public AnimationChain<TFrame>? CurrentChain =>
         _currentChainIndex >= 0 ? _chains[_currentChainIndex] : null;
@@ -299,6 +319,9 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             }
         }
     }
+
+    private double ElapsedInCurrentFrame(AnimationChain<TFrame> chain)
+        => Math.Max(0, _timeIntoAnimation - GetTimeAtFrameStart(chain, _currentFrameIndex));
 
     private static double GetTimeAtFrameStart(AnimationChain<TFrame> chain, int frameIndex)
     {

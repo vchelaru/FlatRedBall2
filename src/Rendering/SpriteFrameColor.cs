@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using FlatRedBall2.Animation;
+using FlatRedBall2.AnimationEditorCommon;
 
 namespace FlatRedBall2.Rendering;
 
@@ -17,7 +18,7 @@ public static class SpriteFrameColor
     /// <see cref="AnimationFrame.Green"/>/<see cref="AnimationFrame.Blue"/> (unset channels default
     /// to 255, the identity). <see cref="ColorOperation.Add"/> leaves RGB unchanged here — it is
     /// applied by the pixel shader in <see cref="Batches.WorldSpaceAddColorBatch"/>/
-    /// <see cref="Batches.ScreenSpaceAddColorBatch"/> instead, via <see cref="Sprite.AddColor"/>; see <see cref="GetAddOffset"/>.
+    /// <see cref="Batches.ScreenSpaceAddColorBatch"/> instead, via <see cref="Sprite.AddColor"/>; see <see cref="GetAddOffset(AnimationFrame)"/>.
     /// </para>
     /// <para>
     /// <see cref="AnimationFrame.Alpha"/> is independent of <see cref="AnimationFrame.ColorOperation"/>
@@ -25,22 +26,29 @@ public static class SpriteFrameColor
     /// </para>
     /// </summary>
     public static Color Apply(AnimationFrame frame, Color baseColor)
+        => Apply(frame.ColorOperation, new KeyframeColor(frame.Red, frame.Green, frame.Blue, frame.Alpha), baseColor);
+
+    /// <summary>
+    /// Same as <see cref="Apply(AnimationFrame, Color)"/> for explicit channels, which is how
+    /// <see cref="Sprite"/> applies the keyframe-interpolated color between two frames.
+    /// </summary>
+    public static Color Apply(ColorOperation? operation, KeyframeColor channels, Color baseColor)
     {
         var result = baseColor;
 
-        if (frame.ColorOperation == ColorOperation.Multiply)
+        if (operation == ColorOperation.Multiply)
         {
-            int r = System.Math.Clamp(frame.Red ?? 255, 0, 255);
-            int g = System.Math.Clamp(frame.Green ?? 255, 0, 255);
-            int b = System.Math.Clamp(frame.Blue ?? 255, 0, 255);
+            int r = System.Math.Clamp(channels.Red ?? 255, 0, 255);
+            int g = System.Math.Clamp(channels.Green ?? 255, 0, 255);
+            int b = System.Math.Clamp(channels.Blue ?? 255, 0, 255);
             result.R = (byte)(result.R * r / 255);
             result.G = (byte)(result.G * g / 255);
             result.B = (byte)(result.B * b / 255);
         }
 
-        if (frame.Alpha.HasValue)
+        if (channels.Alpha.HasValue)
         {
-            int a = System.Math.Clamp(frame.Alpha.Value, 0, 255);
+            int a = System.Math.Clamp(channels.Alpha.Value, 0, 255);
             result.A = (byte)(result.A * a / 255);
         }
 
@@ -55,10 +63,14 @@ public static class SpriteFrameColor
     /// authored range (-255..255) before scaling.
     /// </summary>
     public static Vector3 GetAddOffset(AnimationFrame frame)
+        => GetAddOffset(new KeyframeColor(frame.Red, frame.Green, frame.Blue, frame.Alpha));
+
+    /// <summary>Same as <see cref="GetAddOffset(AnimationFrame)"/> for explicit (for example interpolated) channels.</summary>
+    public static Vector3 GetAddOffset(KeyframeColor channels)
     {
-        int r = System.Math.Clamp(frame.Red ?? 0, -255, 255);
-        int g = System.Math.Clamp(frame.Green ?? 0, -255, 255);
-        int b = System.Math.Clamp(frame.Blue ?? 0, -255, 255);
+        int r = System.Math.Clamp(channels.Red ?? 0, -255, 255);
+        int g = System.Math.Clamp(channels.Green ?? 0, -255, 255);
+        int b = System.Math.Clamp(channels.Blue ?? 0, -255, 255);
         return new Vector3(r / 255f, g / 255f, b / 255f);
     }
 }

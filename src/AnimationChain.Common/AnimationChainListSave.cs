@@ -395,6 +395,12 @@ public class AnimationChainListSave
         if (frame.Blue.HasValue) obj["blue"] = frame.Blue.Value;
         if (frame.Alpha.HasValue) obj["alpha"] = frame.Alpha.Value;
         if (frame.ColorOperation.HasValue) obj["colorOperation"] = frame.ColorOperation.Value.ToString();
+        if (frame.SkipOffsetKeyframe) obj["skipOffsetKeyframe"] = true;
+        if (frame.SkipColorKeyframe) obj["skipColorKeyframe"] = true;
+        if (frame.OffsetInterpolation != null) obj["offsetInterpolation"] = frame.OffsetInterpolation;
+        if (frame.OffsetEasing != null) obj["offsetEasing"] = frame.OffsetEasing;
+        if (frame.ColorInterpolation != null) obj["colorInterpolation"] = frame.ColorInterpolation;
+        if (frame.ColorEasing != null) obj["colorEasing"] = frame.ColorEasing;
         if (frame.ShapesSave is { } shapes) obj["shapes"] = WriteShapesJson(shapes);
         if (frame.Events.Count > 0)
         {
@@ -509,6 +515,16 @@ public class AnimationChainListSave
         if (frame.Alpha.HasValue) el.Add(new XElement("Alpha", frame.Alpha.Value));
         if (frame.ColorOperation.HasValue) el.Add(new XElement("ColorOperation", frame.ColorOperation.Value.ToString()));
 
+        // Keyframe interpolation (#1478), an FRB2 extension: written only when set, so existing files
+        // stay byte-identical, and FRB1's XmlSerializer skips the unknown elements. Curve names are
+        // written back exactly as read, including ones this version does not understand.
+        if (frame.SkipOffsetKeyframe) el.Add(new XElement("SkipOffsetKeyframe", "true"));
+        if (frame.SkipColorKeyframe) el.Add(new XElement("SkipColorKeyframe", "true"));
+        if (frame.OffsetInterpolation != null) el.Add(new XElement("OffsetInterpolation", frame.OffsetInterpolation));
+        if (frame.OffsetEasing != null) el.Add(new XElement("OffsetEasing", frame.OffsetEasing));
+        if (frame.ColorInterpolation != null) el.Add(new XElement("ColorInterpolation", frame.ColorInterpolation));
+        if (frame.ColorEasing != null) el.Add(new XElement("ColorEasing", frame.ColorEasing));
+
         // Preserve wrapper presence so every FRB1 file round-trips byte-identical: the loader sets
         // ShapesSave non-null iff the frame had a <ShapeCollectionSave> element. Some FRB1 files
         // omit it for shapeless frames (-> null here), others write an empty one (-> non-null,
@@ -620,6 +636,12 @@ public class AnimationChainListSave
         frame.Blue = IntElNullable(el, "Blue");
         frame.Alpha = IntElNullable(el, "Alpha");
         frame.ColorOperation = ColorOperationEl(el, "ColorOperation");
+        frame.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
+        frame.SkipColorKeyframe = BoolEl(el, "SkipColorKeyframe");
+        frame.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
+        frame.OffsetEasing = (string?)el.Element("OffsetEasing");
+        frame.ColorInterpolation = (string?)el.Element("ColorInterpolation");
+        frame.ColorEasing = (string?)el.Element("ColorEasing");
         // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
         // identity is its index, so the editor always shows a positional "Frame N" label.
 
@@ -863,6 +885,12 @@ public class AnimationChainListSave
             Blue = IntPropNullable(el, "blue"),
             Alpha = IntPropNullable(el, "alpha"),
             ColorOperation = ColorOperationProp(el, "colorOperation"),
+            SkipOffsetKeyframe = BoolProp(el, "skipOffsetKeyframe"),
+            SkipColorKeyframe = BoolProp(el, "skipColorKeyframe"),
+            OffsetInterpolation = StringProp(el, "offsetInterpolation"),
+            OffsetEasing = StringProp(el, "offsetEasing"),
+            ColorInterpolation = StringProp(el, "colorInterpolation"),
+            ColorEasing = StringProp(el, "colorEasing"),
         };
 
         if (el["shapes"] is JsonObject shapesObj)
@@ -960,6 +988,9 @@ public class AnimationChainListSave
 
     private static bool BoolProp(JsonObject parent, string name, bool defaultValue = false) =>
         parent[name] is JsonValue v ? v.GetValue<bool>() : defaultValue;
+
+    private static string? StringProp(JsonObject parent, string name) =>
+        parent[name] is JsonValue v ? v.GetValue<string>() : null;
 
     private static int? IntPropNullable(JsonObject parent, string name) =>
         parent[name] is JsonValue v ? v.GetValue<int>() : null;

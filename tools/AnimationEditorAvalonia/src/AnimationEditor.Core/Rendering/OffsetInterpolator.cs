@@ -1,4 +1,5 @@
 using System;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Rendering;
@@ -6,12 +7,12 @@ namespace AnimationEditor.Core.Rendering;
 /// <summary>
 /// Computes the position offset (<c>RelativeX/Y</c>) to display during preview playback.
 /// <para>
-/// In snap mode the offset is exactly the current frame's — this mirrors the FlatRedBall
-/// runtime, which overwrites the sprite position on every frame switch and never blends.
+/// In snap mode the offset is exactly the current frame's, regardless of any curve stored in the file.
 /// In interpolate mode the offset eases linearly toward the next frame across the current
-/// frame's display time. The last frame eases toward frame 0 when the chain loops and holds
-/// its own offset when it does not. Interpolation is a <b>preview-only authoring aid</b>: it is not stored in
-/// the <c>.achx</c> and the runtime does not reproduce it.
+/// frame's display time, whatever the file stores: the preview's Interpolate toggle is an authoring aid
+/// that predates per-frame curves. The last frame eases toward frame 0 when the chain loops and holds
+/// its own offset when it does not. The math is the shared <see cref="KeyframeEvaluator"/> that the
+/// runtime uses; this class only forces every frame to a linear keyframe.
 /// </para>
 /// </summary>
 public static class OffsetInterpolator
@@ -29,21 +30,31 @@ public static class OffsetInterpolator
 
         frameIndex = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
         var current = chain.Frames[frameIndex];
+        if (!interpolate || chain.Frames.Count == 1) return (current.RelativeX, current.RelativeY);
 
-        // A looping chain's last frame eases back toward frame 0. A non-looping chain's last
-        // frame has no successor, so it holds and the clip settles on its final position.
-        int lastIndex = chain.Frames.Count - 1;
-        if (!interpolate || lastIndex == 0 || (frameIndex == lastIndex && !chain.Loop))
-            return (current.RelativeX, current.RelativeY);
+        var frames = new LinearOffsetFrame[chain.Frames.Count];
+        for (int i = 0; i < frames.Length; i++)
+            frames[i] = new LinearOffsetFrame(chain.Frames[i]);
+        return KeyframeEvaluator.EvaluateOffset(frames, chain.Loop, frameIndex, frameElapsed);
+    }
 
-        var next = chain.Frames[frameIndex == lastIndex ? 0 : frameIndex + 1];
-
+    // A frame reduced to an always-keyframe, linear-offset frame. Color is unused by the offset path.
+    private readonly struct LinearOffsetFrame(AnimationFrameSave frame) : IKeyframeFrame
+    {
         // 0.1s default matches PlaybackController's handling of unset frame lengths.
-        double frameLength = current.FrameLength > 0 ? current.FrameLength : 0.1;
-        float t = (float)Math.Clamp(frameElapsed / frameLength, 0.0, 1.0);
+        public double DurationSeconds => frame.FrameLength > 0 ? frame.FrameLength : 0.1;
+        public float RelativeX => frame.RelativeX;
+        public float RelativeY => frame.RelativeY;
+        public int? Red => null;
+        public int? Green => null;
+        public int? Blue => null;
+        public int? Alpha => null;
+        public ColorOperation? ColorOperation => null;
+        public bool SkipOffsetKeyframe => false;
+        public bool SkipColorKeyframe => false;
+        public KeyframeCurve OffsetCurve => LinearCurve;
+        public KeyframeCurve ColorCurve => default;
 
-        return (
-            current.RelativeX + (next.RelativeX - current.RelativeX) * t,
-            current.RelativeY + (next.RelativeY - current.RelativeY) * t);
+        private static readonly KeyframeCurve LinearCurve = KeyframeCurve.Parse("Linear", null);
     }
 }

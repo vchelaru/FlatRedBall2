@@ -73,6 +73,46 @@ public class AnimationFrameSave
     /// </summary>
     public ColorOperation? ColorOperation;
 
+    /// <summary>
+    /// When <c>true</c>, this frame is not an <b>offset keyframe</b>: its own <see cref="RelativeX"/>/
+    /// <see cref="RelativeY"/> and <see cref="OffsetInterpolation"/> are ignored, and the previous offset
+    /// keyframe's curve glides across this frame to the next offset keyframe over the summed
+    /// <see cref="FrameLength"/>s. The first frame is always a keyframe regardless. Written only when
+    /// <c>true</c>. See <see cref="KeyframeEvaluator"/>.
+    /// </summary>
+    public bool SkipOffsetKeyframe;
+
+    /// <summary>
+    /// When <c>true</c>, this frame is not a <b>color keyframe</b>: its own <see cref="Red"/>/<see cref="Green"/>/
+    /// <see cref="Blue"/>/<see cref="Alpha"/> and <see cref="ColorInterpolation"/> are ignored (nothing
+    /// inherits from them either; <see cref="ColorOperation"/> still applies, as it never interpolates).
+    /// The first frame is always a keyframe. Written only when <c>true</c>. Independent of
+    /// <see cref="SkipOffsetKeyframe"/>.
+    /// </summary>
+    public bool SkipColorKeyframe;
+
+    /// <summary>
+    /// How the offset gets from this keyframe to the next: an <c>InterpolationType</c> name from
+    /// <c>FlatRedBall.InterpolationCore</c> (<c>Linear</c>, <c>Quadratic</c>, <c>Cubic</c>, <c>Back</c>,
+    /// <c>Bounce</c>, <c>Elastic</c>, ...). <c>null</c> (omitted from the file) or <c>Instant</c> means snap,
+    /// today's behavior. Stored as a raw string so values this version does not understand survive a
+    /// round trip; the format promises nothing about what a runtime does with it, and the recommendation for
+    /// a name a runtime does not know is to treat it as snap. See <see cref="KeyframeCurve.Parse"/>.
+    /// </summary>
+    public string? OffsetInterpolation;
+
+    /// <summary>
+    /// <c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="OffsetInterpolation"/>; <c>null</c> (omitted) means
+    /// <c>Out</c>. Ignored for snap and <c>Linear</c>.
+    /// </summary>
+    public string? OffsetEasing;
+
+    /// <summary>The curve from this keyframe's color to the next color keyframe's. Same rules as <see cref="OffsetInterpolation"/>.</summary>
+    public string? ColorInterpolation;
+
+    /// <summary>Easing for <see cref="ColorInterpolation"/>. Same rules as <see cref="OffsetEasing"/>.</summary>
+    public string? ColorEasing;
+
     /// <summary>Per-frame shape definitions. Empty by default.</summary>
     public ShapesSave? ShapesSave;
 

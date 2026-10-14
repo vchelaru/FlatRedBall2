@@ -60,6 +60,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Float-only easing curves (no XNA/MonoGame types), so safe in this MonoGame-free assembly. -->
+    <PackageReference Include="FlatRedBall.InterpolationCore" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
