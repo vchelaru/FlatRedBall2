@@ -182,7 +182,7 @@ Add(scoreLabel, layer: hudLayer);
 
 **Screen-space (default)**: `screen.Add(element)` places elements in Gum's native coordinate system (pixels, Y-down, origin top-left). Use for HUDs, menus.
 
-**World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed. `entity.IsVisible = false` hides it — don't reach into `element.Visible`.
+**World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity, shifts when the camera pans, and scales with `Camera.Zoom` like any world object. The visual is automatically removed when the entity is destroyed. `entity.IsVisible = false` hides it — don't reach into `element.Visible`.
 
 ## Overlay vs Camera UI: Rendering Quality
 
