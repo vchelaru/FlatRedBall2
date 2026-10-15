@@ -47,6 +47,7 @@ Raw visual objects with no built-in input handling. Use these for non-interactiv
 | `SpriteRuntime` | Textured image |
 | `CircleRuntime` | Anti-aliased circle; `IsFilled = true` for a fill, `StrokeColor` for an outline (Gum.Shapes package) |
 | `ArcRuntime` | Anti-aliased arc/ring segment (Gum.Shapes package) |
+| `SvgRuntime` | Vector SVG drawing (Gum.Shapes package; `Gum.GueDeriving` namespace) |
 
 ```csharp
 using Gum.GueDeriving;
@@ -62,6 +63,8 @@ fill.Width = _health / _maxHealth * 100f;
 ```
 
 **Rule: use Forms controls for interactive elements. Use visual types directly for non-interactive HUD (health indicators, icons, status bars).**
+
+**SVG:** `Add(new SvgRuntime { SourceFile = "Art/logo.svg", Width = 128 })` (needs `using Gum.GueDeriving;`). Use `entity.Add(svg)` for world space; it pans and zooms with the camera. Which SVG features and color options work is up to Gum, so check Gum's SVG docs instead of assuming.
 
 ## Quick Start
 
