@@ -89,6 +89,18 @@ public class PolygonPointsFileFormatTests
     }
 
     [Fact]
+    public void Json_PolygonFromOldFileWithoutFields_LoadsAsSnapKeyframe()
+    {
+        var json = SaveWith(new PolygonSave { Name = "P" }).ToJsonString();
+
+        var poly = AnimationChainListSave.FromString(json).AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.Single();
+
+        poly.SkipPointsKeyframe.ShouldBeFalse();
+        poly.PointsInterpolation.ShouldBeNull();
+        poly.PointsEasing.ShouldBeNull();
+    }
+
+    [Fact]
     public void Xml_SecondSave_IsByteIdentical()
     {
         var first = SaveWith(FullPolygon()).ToXmlString();

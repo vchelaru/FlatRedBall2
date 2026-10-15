@@ -1,0 +1,298 @@
+{
+  "fileRelativeTextures": true,
+  "timeMeasurementUnit": "Second",
+  "coordinateType": "UV",
+  "animationChains": [
+    {
+      "name": "Walk",
+      "frames": [
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [
+              {
+                "name": "Hit",
+                "x": 1,
+                "y": 0,
+                "scaleX": 8,
+                "scaleY": 4,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            ],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 0,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "offsetInterpolation": "Linear",
+                "offsetEasing": "InOut"
+              }
+            ]
+          }
+        },
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 2,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "skipOffsetKeyframe": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Walk",
+      "frames": [
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [
+              {
+                "name": "Hit",
+                "x": 1,
+                "y": 0,
+                "scaleX": 8,
+                "scaleY": 4,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            ],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 0,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "offsetInterpolation": "Linear",
+                "offsetEasing": "InOut"
+              }
+            ]
+          }
+        },
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 2,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "skipOffsetKeyframe": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Idle",
+      "frames": [
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [
+              {
+                "name": "Hit",
+                "x": 1,
+                "y": 0,
+                "scaleX": 8,
+                "scaleY": 4,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            ],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 0,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "offsetInterpolation": "Linear",
+                "offsetEasing": "InOut"
+              }
+            ]
+          }
+        },
+        {
+          "textureName": "hero.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 1,
+          "topCoordinate": 0,
+          "bottomCoordinate": 1,
+          "shapes": {
+            "rectangles": [],
+            "circles": [],
+            "polygons": [
+              {
+                "name": "Blade",
+                "x": 2,
+                "y": 1,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1,
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": 0
+                  },
+                  {
+                    "x": 10.5,
+                    "y": -7
+                  }
+                ],
+                "skipOffsetKeyframe": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
