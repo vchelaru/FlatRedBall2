@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using FlatRedBall2.Animation;
 
 namespace FlatRedBall2.AnimationEditorCommon;
@@ -215,6 +216,57 @@ public static class KeyframeEvaluator
         }
 
         return new KeyframeShapeValue(x, y, sizeX, sizeY);
+    }
+
+    /// <summary>
+    /// The points of <paramref name="polygon"/> (a polygon of frame <paramref name="frameIndex"/>)
+    /// <paramref name="elapsedInFrame"/> into that frame (#1484). Points are their own keyframe group, matched across
+    /// frames like <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> (by name and kind, the first
+    /// frame of a run is always a keyframe). Point i glides to point i of the next points keyframe; when the counts
+    /// differ the glide snaps and the earlier keyframe's points hold until the next frame plays. Back curves swing past
+    /// the endpoints. A polygon that is not in the frame returns its own points.
+    /// </summary>
+    public static IReadOnlyList<Vector2> EvaluateShapePoints(AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon)
+    {
+        var frames = SaveKeyframeFrame.Create(chain);
+        frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
+        var adapter = SaveKeyframeShape.Create(polygon);
+        if (frames.Length > 0)
+            foreach (var candidate in frames[frameIndex].KeyframeShapes)
+                if (candidate is SaveKeyframeShape saved && ReferenceEquals(saved.Source, polygon))
+                {
+                    adapter = saved;
+                    break;
+                }
+        return EvaluateShapePoints(frames, chain.Loop, frameIndex, elapsedInFrame, adapter);
+    }
+
+    /// <summary>
+    /// Same contract as <see cref="EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/> over any frame
+    /// list. Returns the keyframe's own list (no copy) whenever nothing glides.
+    /// </summary>
+    public static IReadOnlyList<Vector2> EvaluateShapePoints<TFrame>(
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape)
+        where TFrame : IKeyframeFrame
+    {
+        var own = shape.Points;
+        if (frames.Count == 0) return own;
+        frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
+        if (!TryMatch(frames[frameIndex], shape.Name, shape.Kind, out var current)) return own;
+
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipPointsKeyframe,
+            out var from, out var to, out float t);
+
+        var fromPoints = from.Points;
+        if (to is null || from.PointsCurve.IsSnap) return fromPoints;
+        var toPoints = to.Points;
+        if (fromPoints.Count != toPoints.Count) return fromPoints;
+
+        float eased = from.PointsCurve.Evaluate(t);
+        var result = new Vector2[fromPoints.Count];
+        for (int i = 0; i < result.Length; i++)
+            result[i] = new Vector2(Lerp(fromPoints[i].X, toPoints[i].X, eased), Lerp(fromPoints[i].Y, toPoints[i].Y, eased));
+        return result;
     }
 
     /// <summary>

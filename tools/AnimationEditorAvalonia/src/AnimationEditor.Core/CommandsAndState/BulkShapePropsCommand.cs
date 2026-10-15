@@ -9,13 +9,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// <summary>
     /// Captured Name/X/Y/P1/P2 of one shape (<see cref="AARectSave"/> or <see cref="CircleSave"/>),
     /// where P1/P2 are ScaleX/ScaleY for a rectangle or Radius/(unused) for a circle, plus its
-    /// keyframe flags and curves (#1478; the size ones are unused for a polygon). Used by
+    /// keyframe flags and curves (#1478, #1484; the size ones are unused for a polygon, the points ones for anything else). Used by
     /// <see cref="BulkShapePropsCommand"/> to snapshot shapes before and after a batch edit.
     /// </summary>
     internal readonly record struct ShapeFieldSnapshot(
         object Shape, string Name, float X, float Y, float P1, float P2,
         bool SkipOffset, string? OffsetType, string? OffsetEasing,
-        bool SkipSize, string? SizeType, string? SizeEasing)
+        bool SkipSize, string? SizeType, string? SizeEasing,
+        bool SkipPoints, string? PointsType, string? PointsEasing)
     {
         public static ShapeFieldSnapshot Capture(object shape)
         {
@@ -29,7 +30,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             };
             return new(shape, s.Name, s.X, s.Y, p1, p2,
                 s.SkipOffsetKeyframe, s.OffsetInterpolation, s.OffsetEasing,
-                sized?.SkipSizeKeyframe ?? false, sized?.SizeInterpolation, sized?.SizeEasing);
+                sized?.SkipSizeKeyframe ?? false, sized?.SizeInterpolation, sized?.SizeEasing,
+                (shape as PolygonSave)?.SkipPointsKeyframe ?? false, (shape as PolygonSave)?.PointsInterpolation, (shape as PolygonSave)?.PointsEasing);
         }
 
         public void RestoreToShape()
@@ -45,6 +47,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             if (Shape is SizedShapeSave sized)
             {
                 sized.SkipSizeKeyframe = SkipSize; sized.SizeInterpolation = SizeType; sized.SizeEasing = SizeEasing;
+            }
+            if (Shape is PolygonSave poly)
+            {
+                poly.SkipPointsKeyframe = SkipPoints; poly.PointsInterpolation = PointsType; poly.PointsEasing = PointsEasing;
             }
         }
     }

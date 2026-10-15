@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -50,7 +51,19 @@ public abstract class AnimationShapeFrame : IKeyframeShape
     /// <summary>Second size component in the shape's own unit (see <see cref="IKeyframeShape.SizeY"/>).</summary>
     protected virtual float SizeYValue => 0f;
 
+    /// <summary>The polygon points as the evaluator sees them; empty for every other kind.</summary>
+    protected virtual IReadOnlyList<Vector2> PointsValue => System.Array.Empty<Vector2>();
+
+    /// <summary>The curve from a polygon's points to the next points keyframe's; snap for every other kind.</summary>
+    protected virtual KeyframeCurve PointsCurveValue => default;
+
+    /// <summary>Whether a polygon is not a points keyframe; always <c>false</c> for every other kind.</summary>
+    protected virtual bool SkipPointsKeyframeValue => false;
+
     KeyframeShapeKind IKeyframeShape.Kind => ShapeKind;
+    IReadOnlyList<Vector2> IKeyframeShape.Points => PointsValue;
+    bool IKeyframeShape.SkipPointsKeyframe => SkipPointsKeyframeValue;
+    KeyframeCurve IKeyframeShape.PointsCurve => PointsCurveValue;
     float IKeyframeShape.X => RelativeX;
     float IKeyframeShape.Y => RelativeY;
     float IKeyframeShape.SizeX => SizeXValue;
@@ -93,6 +106,21 @@ public class AnimationPolygonFrame : AnimationShapeFrame
 {
     /// <summary>Polygon vertices in the shape's local space (relative to <see cref="AnimationShapeFrame.RelativeX"/>/<see cref="AnimationShapeFrame.RelativeY"/>).</summary>
     public Vector2[] Points { get; set; } = System.Array.Empty<Vector2>();
+
+    /// <summary>When <c>true</c> this polygon is not a points keyframe (see <see cref="PolygonSave.SkipPointsKeyframe"/>).</summary>
+    public bool SkipPointsKeyframe { get; set; }
+
+    /// <summary>The curve from this polygon's points to the next points keyframe's. Default is snap.</summary>
+    public KeyframeCurve PointsCurve { get; set; }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<Vector2> PointsValue => Points;
+
+    /// <inheritdoc/>
+    protected override KeyframeCurve PointsCurveValue => PointsCurve;
+
+    /// <inheritdoc/>
+    protected override bool SkipPointsKeyframeValue => SkipPointsKeyframe;
 
     /// <inheritdoc/>
     protected override KeyframeShapeKind ShapeKind => KeyframeShapeKind.Polygon;

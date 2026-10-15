@@ -47,10 +47,10 @@ Polygons can be convex or concave, but the polygon should not cross over itself.
 
 ### Glide Shapes Between Frames
 
-A shape's position and size can glide from one frame to the next instead of changing instantly. Select a rectangle, circle or polygon and use the keyframe diamond and curve buttons above its **Offset** fields (X and Y) and, for rectangles and circles, above its **Size** fields (Scale X and Scale Y, or Radius). They work like the ones in [Glide Between Frames](edit-frames.md#glide-between-frames), and Offset and Size are independent.
+A shape's position and size can glide from one frame to the next instead of changing instantly. Select a rectangle, circle or polygon and use the keyframe diamond and curve buttons above its **Offset** fields (X and Y) and, for rectangles and circles, above its **Size** fields (Scale X and Scale Y, or Radius). A polygon has no size; its **Points** have their own diamond and curve buttons above the vertex list. They work like the ones in [Glide Between Frames](edit-frames.md#glide-between-frames), and Offset, Size and Points are independent.
 
 Shapes are matched from frame to frame by name. A glide runs to the next frame that has a shape with the same name and a keyframe turned on, and stops where the name is missing, repeated in a frame, or changes shape type. A shape with no name never glides. The first frame that has a given name is always a keyframe.
 
-While one shape is selected, the timeline shows that shape's **Offset** and **Size** lanes under the frame cells in place of the frame's own lanes: a diamond at each keyframe and the curve to the next one. They cover every frame that has a shape with the same name, whichever frame's shape you selected, and leave a gap where the name is missing. Selecting several shapes shows no lanes.
+While one shape is selected, the timeline shows that shape's **Offset** and **Size** lanes (**Offset** and **Points** for a polygon) under the frame cells in place of the frame's own lanes: a diamond at each keyframe and the curve to the next one. They cover every frame that has a shape with the same name, whichever frame's shape you selected, and leave a gap where the name is missing. Selecting several shapes shows no lanes.
 
-Polygon points and shape colors do not glide.
+Polygon points glide vertex by vertex: the first vertex goes to the first vertex of the next frame, the second to the second, and so on, so a polygon that is re-wound with a different starting vertex glides slot to slot. If the vertex count differs between the two frames, the polygon snaps instead of gliding. While the Points keyframe is off, the vertex list shows the glided values read-only. Shape colors do not glide.

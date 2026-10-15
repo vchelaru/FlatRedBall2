@@ -79,6 +79,12 @@ public static class AnimationCloneHelper
             sizedCopy.SizeInterpolation = sizedSource.SizeInterpolation;
             sizedCopy.SizeEasing = sizedSource.SizeEasing;
         }
+        if (source is PolygonSave polySource && copy is PolygonSave polyCopy)
+        {
+            polyCopy.SkipPointsKeyframe = polySource.SkipPointsKeyframe;
+            polyCopy.PointsInterpolation = polySource.PointsInterpolation;
+            polyCopy.PointsEasing = polySource.PointsEasing;
+        }
         return copy;
     }
 }

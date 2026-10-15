@@ -13,7 +13,7 @@ public sealed record TimelineLanePlan(KeyframeLane? First, string FirstLabel, Ke
 /// <summary>
 /// Decides which keyframe lanes the single-chain timeline shows for the current selection (#1489). Lanes follow
 /// the selection and share two slots: a chain or frame shows the Sprite's Offset and Color, a single shape
-/// shows that shape's Offset and Size (labeled with its name) in their place, and several shapes show none.
+/// shows that shape's Offset and Size, or a polygon's Offset and Points (labeled with its name), in their place, and several shapes show none.
 /// </summary>
 public static class TimelineLanePlanner
 {
@@ -28,6 +28,11 @@ public static class TimelineLanePlanner
         if (selectedShapes.Count == 1)
         {
             if (selectedShapes[0] is not ShapeSave shape) return TimelineLanePlan.None;
+            // A polygon has no size, so its Points lane takes the second slot.
+            if (shape is PolygonSave)
+                return new TimelineLanePlan(
+                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths), $"{shape.Name} Offset",
+                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Points, cellWidths), $"{shape.Name} Points");
             return new TimelineLanePlan(
                 KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths), $"{shape.Name} Offset",
                 KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Size, cellWidths), $"{shape.Name} Size");

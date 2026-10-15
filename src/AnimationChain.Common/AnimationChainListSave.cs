@@ -617,6 +617,13 @@ public class AnimationChainListSave
         if (shape.SkipOffsetKeyframe) yield return new XElement("SkipOffsetKeyframe", "true");
         if (shape.OffsetInterpolation != null) yield return new XElement("OffsetInterpolation", shape.OffsetInterpolation);
         if (shape.OffsetEasing != null) yield return new XElement("OffsetEasing", shape.OffsetEasing);
+        if (shape is PolygonSave poly)
+        {
+            if (poly.SkipPointsKeyframe) yield return new XElement("SkipPointsKeyframe", "true");
+            if (poly.PointsInterpolation != null) yield return new XElement("PointsInterpolation", poly.PointsInterpolation);
+            if (poly.PointsEasing != null) yield return new XElement("PointsEasing", poly.PointsEasing);
+            yield break;
+        }
         if (shape is not SizedShapeSave sized) yield break;
         if (sized.SkipSizeKeyframe) yield return new XElement("SkipSizeKeyframe", "true");
         if (sized.SizeInterpolation != null) yield return new XElement("SizeInterpolation", sized.SizeInterpolation);
@@ -628,6 +635,13 @@ public class AnimationChainListSave
         target.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
         target.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
         target.OffsetEasing = (string?)el.Element("OffsetEasing");
+        if (target is PolygonSave poly)
+        {
+            poly.SkipPointsKeyframe = BoolEl(el, "SkipPointsKeyframe");
+            poly.PointsInterpolation = (string?)el.Element("PointsInterpolation");
+            poly.PointsEasing = (string?)el.Element("PointsEasing");
+            return;
+        }
         if (target is not SizedShapeSave sized) return;
         sized.SkipSizeKeyframe = BoolEl(el, "SkipSizeKeyframe");
         sized.SizeInterpolation = (string?)el.Element("SizeInterpolation");
@@ -639,6 +653,13 @@ public class AnimationChainListSave
         if (shape.SkipOffsetKeyframe) obj["skipOffsetKeyframe"] = true;
         if (shape.OffsetInterpolation != null) obj["offsetInterpolation"] = shape.OffsetInterpolation;
         if (shape.OffsetEasing != null) obj["offsetEasing"] = shape.OffsetEasing;
+        if (shape is PolygonSave poly)
+        {
+            if (poly.SkipPointsKeyframe) obj["skipPointsKeyframe"] = true;
+            if (poly.PointsInterpolation != null) obj["pointsInterpolation"] = poly.PointsInterpolation;
+            if (poly.PointsEasing != null) obj["pointsEasing"] = poly.PointsEasing;
+            return;
+        }
         if (shape is not SizedShapeSave sized) return;
         if (sized.SkipSizeKeyframe) obj["skipSizeKeyframe"] = true;
         if (sized.SizeInterpolation != null) obj["sizeInterpolation"] = sized.SizeInterpolation;
@@ -650,6 +671,13 @@ public class AnimationChainListSave
         target.SkipOffsetKeyframe = BoolProp(el, "skipOffsetKeyframe");
         target.OffsetInterpolation = StringProp(el, "offsetInterpolation");
         target.OffsetEasing = StringProp(el, "offsetEasing");
+        if (target is PolygonSave poly)
+        {
+            poly.SkipPointsKeyframe = BoolProp(el, "skipPointsKeyframe");
+            poly.PointsInterpolation = StringProp(el, "pointsInterpolation");
+            poly.PointsEasing = StringProp(el, "pointsEasing");
+            return;
+        }
         if (target is not SizedShapeSave sized) return;
         sized.SkipSizeKeyframe = BoolProp(el, "skipSizeKeyframe");
         sized.SizeInterpolation = StringProp(el, "sizeInterpolation");

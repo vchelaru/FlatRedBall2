@@ -166,6 +166,8 @@ public static class AnimationChainListSaveExtensions
                         RelativeY = poly.Y,
                         SkipOffsetKeyframe = poly.SkipOffsetKeyframe,
                         OffsetCurve = KeyframeCurve.Parse(poly.OffsetInterpolation, poly.OffsetEasing),
+                        SkipPointsKeyframe = poly.SkipPointsKeyframe,
+                        PointsCurve = KeyframeCurve.Parse(poly.PointsInterpolation, poly.PointsEasing),
                         Points = points,
                     });
                     break;

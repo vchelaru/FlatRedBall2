@@ -873,6 +873,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     private bool IsShapeLocked(object? shape) => IsFrameLocked(FindOwningFrame(shape));
 
+    // A polygon's vertices take no gestures while its chain is locked or its Points keyframe is off: a skipped
+    // frame's own points are ignored by playback, so a drag there would edit data nothing reads (#1484).
+    private bool IsPolygonVertexLocked(PolygonSave polygon) =>
+        IsShapeLocked(polygon)
+        || !KeyframeInspectorState.IsEffectivelyKeyframe(
+            ShapeKeyframeGroup.Points, polygon, FindOwningChain(FindOwningFrame(polygon)));
+
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
@@ -1626,7 +1633,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null)
             return StandardCursorType.SizeAll;
 
-        if (_selectedState!.SelectedPolygon is { } hoverPolygon && !IsShapeLocked(hoverPolygon))
+        if (_selectedState!.SelectedPolygon is { } hoverPolygon && !IsPolygonVertexLocked(hoverPolygon))
         {
             var vertices = PolygonScreenVertices(hoverPolygon);
             if (PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, vertices, VertexHandleRadius) >= 0
@@ -1748,14 +1755,18 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         }
         foreach (var p in frame.ShapesSave!.PolygonSaves)
         {
-            int n = PolygonVertices.Count(p);
+            // The vertices glide by the polygon's stored points curve (#1484); with the default snap curve they are its own.
+            var sampled = chain is null || frameIndex < 0
+                ? SaveKeyframeShape.Create(p).Points
+                : KeyframeSampler.SampleShapePoints(chain, frameIndex, elapsedInFrame, p);
+            int n = PolygonVertices.Count(sampled);
             var points = new float[n * 2];
             for (int i = 0; i < n; i++)
-                (points[i * 2], points[i * 2 + 1]) = PolygonVertices.Get(p, i);
+                (points[i * 2], points[i * 2 + 1]) = (sampled[i].X, sampled[i].Y);
             var v = ValueOf(p);
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, v.X, v.Y, 0f, 0f,
                 selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
-                points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
+                points, sampled.Count >= 2 && sampled[0] == sampled[^1], PolygonVertices.IsSelfIntersecting(p),
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f,
                 pinned && IsHoverTarget(p)));
@@ -1783,7 +1794,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private void UpdateHoverVertex(Point pos)
     {
         int index = -1;
-        if (_selectedState!.SelectedPolygon is { } polygon && !IsShapeLocked(polygon))
+        if (_selectedState!.SelectedPolygon is { } polygon && !IsPolygonVertexLocked(polygon))
             index = PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, PolygonScreenVertices(polygon), VertexHandleRadius);
         if (index == _hoverVertexIndex) return;
         _hoverVertexIndex = index;
@@ -1910,7 +1921,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// <summary>Right-click on a vertex of the selected polygon: a single "Delete Vertex" item (disabled at three vertices).</summary>
     private bool TryPopulateVertexMenu(Point pos)
     {
-        if (ContextMenu is null || _selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+        if (ContextMenu is null || _selectedState!.SelectedPolygon is not { } polygon || IsPolygonVertexLocked(polygon)) return false;
         if (pos.X < RulerSize || pos.Y < RulerSize) return false;
         int vertex = PreviewShapeHitTester.HitVertex((float)pos.X, (float)pos.Y, PolygonScreenVertices(polygon), VertexHandleRadius);
         if (vertex < 0) return false;
@@ -2154,7 +2165,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// </summary>
     private bool TryBeginPolygonVertexGesture(float px, float py)
     {
-        if (_selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+        if (_selectedState!.SelectedPolygon is not { } polygon || IsPolygonVertexLocked(polygon)) return false;
         if (px < RulerSize || py < RulerSize) return false;
 
         var vertices = PolygonScreenVertices(polygon);
@@ -2197,7 +2208,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     public bool TryDeleteHoveredVertex()
     {
         int vertex = _hoverVertexIndex;
-        if (vertex < 0 || _selectedState!.SelectedPolygon is not { } polygon || IsShapeLocked(polygon)) return false;
+        if (vertex < 0 || _selectedState!.SelectedPolygon is not { } polygon || IsPolygonVertexLocked(polygon)) return false;
 
         _appCommands!.DeletePolygonVertex(polygon, vertex);
         _hoverVertexIndex = -1; // the old index may be gone; the next pointer move re-resolves it

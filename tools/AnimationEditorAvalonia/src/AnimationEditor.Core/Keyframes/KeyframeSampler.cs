@@ -36,6 +36,15 @@ public static class KeyframeSampler
     public static KeyframeShapeValue SampleShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape) =>
         KeyframeEvaluator.EvaluateShape(chain, frameIndex, elapsedInFrame, shape);
 
+    /// <summary>
+    /// The points of <paramref name="polygon"/> <paramref name="elapsedInFrame"/> seconds into frame
+    /// <paramref name="frameIndex"/>, glided by the points curves stored in the chain (see
+    /// <see cref="KeyframeEvaluator.EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/>).
+    /// </summary>
+    public static IReadOnlyList<System.Numerics.Vector2> SampleShapePoints(
+        AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon) =>
+        KeyframeEvaluator.EvaluateShapePoints(chain, frameIndex, elapsedInFrame, polygon);
+
     /// <summary>Whether any frame of <paramref name="chain"/> has a curve that glides, so playback must repaint every tick.</summary>
     public static bool IsAnimated(AnimationChainSave? chain)
     {
@@ -48,7 +57,7 @@ public static class KeyframeSampler
             foreach (var shape in frame.ShapesSave.Shapes.OfType<ShapeSave>())
             {
                 var adapter = SaveKeyframeShape.Create(shape);
-                if (!adapter.OffsetCurve.IsSnap || !adapter.SizeCurve.IsSnap) return true;
+                if (!adapter.OffsetCurve.IsSnap || !adapter.SizeCurve.IsSnap || !adapter.PointsCurve.IsSnap) return true;
             }
         }
         return false;

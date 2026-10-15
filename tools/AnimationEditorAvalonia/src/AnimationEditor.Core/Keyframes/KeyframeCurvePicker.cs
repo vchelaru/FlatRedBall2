@@ -20,6 +20,9 @@ public enum ShapeKeyframeGroup
 
     /// <summary>The shape size (<c>ScaleX/ScaleY</c> or <c>Radius</c>; rectangles and circles only); stored as <c>SkipSizeKeyframe</c>, <c>SizeInterpolation</c>, <c>SizeEasing</c>.</summary>
     Size,
+
+    /// <summary>The polygon points (polygons only); stored as <c>SkipPointsKeyframe</c>, <c>PointsInterpolation</c>, <c>PointsEasing</c>.</summary>
+    Points,
 }
 
 /// <summary>The eight curves the inspector offers. Each maps to one fixed (type, easing) pair in the file.</summary>

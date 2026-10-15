@@ -1368,6 +1368,11 @@
                                                         <SolidColorBrush Color="{DynamicResource IconWarning}" />
                                                     </TextBlock.Foreground>
                                                 </TextBlock>
+                                                <TextBlock Text="Points"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropPolygonPointsKeyframe" />
                                                 <TextBlock Text="Vertices (relative to X, Y)" FontSize="11"
                                                            Foreground="{DynamicResource InkMid}" />
                                                 <StackPanel x:Name="PropPolygonVertices" Spacing="4" />

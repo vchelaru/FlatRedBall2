@@ -91,4 +91,66 @@ public class PreviewShapeKeyframePlaybackTests
         var rectInfo = ctrl.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Rect);
         Assert.Equal(20f, rectInfo.X, 0.01f);
     }
+
+    // ---- Polygon points (#1484) ----------------------------------------------------------------
+
+    private static AnimationChainSave MakePolygonChain(int frames = 2)
+    {
+        var chain = new AnimationChainSave { Name = "A" };
+        for (int i = 0; i < frames; i++)
+        {
+            var frame = new AnimationFrameSave { FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+            var poly = new PolygonSave { Name = "Blade" };
+            poly.Points.Add(new Vector2Save { X = i * 10f, Y = 0 });
+            poly.Points.Add(new Vector2Save { X = i * 10f + 10, Y = 0 });
+            poly.Points.Add(new Vector2Save { X = i * 10f + 10, Y = 10 });
+            frame.ShapesSave.Add(poly);
+            chain.Frames.Add(frame);
+        }
+        return chain;
+    }
+
+    [AvaloniaFact]
+    public void ScrubToFrame_StoredLinearPointsCurve_PolygonVerticesGlide()
+    {
+        var chain = MakePolygonChain();
+        chain.Frames[0].ShapesSave!.PolygonSaves.Single().PointsInterpolation = "Linear";
+        var (_, ctrl) = Open(chain);
+
+        ctrl.ScrubToFrame(0, 0.5);
+        Dispatcher.UIThread.RunJobs();
+
+        var info = ctrl.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon);
+        Assert.Equal(3, info.Points!.Length / 2);
+        Assert.Equal(5f, info.Points[0], 0.01f);
+        Assert.Equal(15f, info.Points[2], 0.01f);
+    }
+
+    [AvaloniaFact]
+    public void ScrubToFrame_NoStoredPointsCurve_PolygonHoldsItsOwnVertices()
+    {
+        var (_, ctrl) = Open(MakePolygonChain());
+
+        ctrl.ScrubToFrame(0, 0.5);
+        Dispatcher.UIThread.RunJobs();
+
+        var info = ctrl.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon);
+        Assert.Equal(0f, info.Points![0], 0.01f);
+    }
+
+    [AvaloniaFact]
+    public void SelectedFrameWithPointsKeyframeOff_ShowsTheVerticesInEffectAtItsStart()
+    {
+        var chain = MakePolygonChain(3);
+        chain.Frames[0].ShapesSave!.PolygonSaves.Single().PointsInterpolation = "Linear";
+        chain.Frames[1].ShapesSave!.PolygonSaves.Single().SkipPointsKeyframe = true;
+        var (ctx, ctrl) = Open(chain);
+
+        ctx.SelectedState.SelectedFrame = chain.Frames[1];
+        Dispatcher.UIThread.RunJobs();
+
+        // Frame 0 glides x 0 -> 20 across 0.2s; frame 1 starts halfway.
+        var info = ctrl.GetShapeInfosForTest().Single(s => s.Kind == PreviewControl.PreviewShapeKind.Polygon);
+        Assert.Equal(10f, info.Points![0], 0.01f);
+    }
 }

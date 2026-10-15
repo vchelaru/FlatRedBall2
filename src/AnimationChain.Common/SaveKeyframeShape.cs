@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
@@ -12,6 +16,7 @@ public sealed class SaveKeyframeShape : IKeyframeShape
         Source = source;
         OffsetCurve = KeyframeCurve.Parse(source.OffsetInterpolation, source.OffsetEasing);
         SizeCurve = source is SizedShapeSave sized ? KeyframeCurve.Parse(sized.SizeInterpolation, sized.SizeEasing) : KeyframeCurve.Snap;
+        PointsCurve = source is PolygonSave poly ? KeyframeCurve.Parse(poly.PointsInterpolation, poly.PointsEasing) : KeyframeCurve.Snap;
     }
 
     /// <summary>Adapts <paramref name="shape"/>.</summary>
@@ -57,4 +62,23 @@ public sealed class SaveKeyframeShape : IKeyframeShape
 
     /// <inheritdoc/>
     public KeyframeCurve SizeCurve { get; }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<Vector2> Points
+    {
+        get
+        {
+            if (Source is not PolygonSave poly) return Array.Empty<Vector2>();
+            var points = new Vector2[poly.Points.Count];
+            for (int i = 0; i < points.Length; i++)
+                points[i] = new Vector2(poly.Points[i].X, poly.Points[i].Y);
+            return points;
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool SkipPointsKeyframe => Source is PolygonSave poly && poly.SkipPointsKeyframe;
+
+    /// <inheritdoc/>
+    public KeyframeCurve PointsCurve { get; }
 }

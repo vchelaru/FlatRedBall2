@@ -5639,6 +5639,7 @@ public partial class MainWindow : Window
         WireShapeKeyframe(PropCircleOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorShapes(_selectedState.SelectedCircles));
         WireShapeKeyframe(PropCircleSizeKeyframe, ShapeKeyframeGroup.Size, () => InspectorShapes(_selectedState.SelectedCircles));
         WireShapeKeyframe(PropPolygonOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorShapes(_selectedState.SelectedPolygons));
+        WireShapeKeyframe(PropPolygonPointsKeyframe, ShapeKeyframeGroup.Points, () => InspectorShapes(_selectedState.SelectedPolygons));
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
         foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
@@ -6094,7 +6095,7 @@ public partial class MainWindow : Window
                 || (PropCirclePanel.IsVisible && !PropCirclePanel.IsEnabled)
                 || (PropPolygonPanel.IsVisible && !PropPolygonPanel.IsEnabled);
             PropPolygonVertices.IsEnabled = !IsShapeLocked(poly);
-            PropPolygonAddVertex.IsEnabled = !IsShapeLocked(poly);
+            PropPolygonAddVertex.IsEnabled = !IsShapeLocked(poly) && PolygonPointsEditable(poly);
 
             if (frame is not null && !hasShapeSelection)
             {
@@ -6230,6 +6231,7 @@ public partial class MainWindow : Window
     private readonly List<(NumericUpDown X, NumericUpDown Y)> _polygonVertexRows = new();
     private readonly List<(Border X, Border Y)> _polygonVertexCells = new();
     private int _activeVertexRow = -1;
+    private bool _polygonRowsEditable = true;
 
     private void RefreshPolygonPanel(PolygonSave polygon)
     {
@@ -6242,20 +6244,31 @@ public partial class MainWindow : Window
         ShowShapeKeyframes(polygons, PropPolygonOffsetKeyframe, PropPolygonX, PropPolygonY, null, null, null);
         PropPolygonWarning.IsVisible = PolygonVertices.IsSelfIntersecting(polygon);
 
-        int count = PolygonVertices.Count(polygon);
-        if (!ReferenceEquals(_polygonRowsFor, polygon) || _polygonVertexRows.Count != count)
-            RebuildPolygonVertexRows(polygon, count);
+        // The vertex rows edit the primary polygon. While its Points keyframe is off they show the glided vertices
+        // in effect at the start of its frame, read-only, so the stored (ignored) points can't be edited by mistake.
+        var pointsState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Points, polygons, ChainOfShape);
+        PropPolygonPointsKeyframe.Show(pointsState);
+        bool editable = PolygonPointsEditable(polygon);
+        var shown = KeyframeInspectorState.DisplayShapePoints(polygon, ChainOfShape(polygon));
+        int count = PolygonVertices.Count(shown);
+        if (!ReferenceEquals(_polygonRowsFor, polygon) || _polygonVertexRows.Count != count || _polygonRowsEditable != editable)
+            RebuildPolygonVertexRows(polygon, count, editable);
         for (int i = 0; i < count; i++)
         {
-            var (x, y) = PolygonVertices.Get(polygon, i);
-            _polygonVertexRows[i].X.Value = (decimal)x;
-            _polygonVertexRows[i].Y.Value = (decimal)y;
+            _polygonVertexRows[i].X.Value = (decimal)shown[i].X;
+            _polygonVertexRows[i].Y.Value = (decimal)shown[i].Y;
         }
+        PropPolygonAddVertex.IsEnabled = !IsShapeLocked(polygon) && editable;
     }
 
-    private void RebuildPolygonVertexRows(PolygonSave polygon, int count)
+    /// <summary>Whether the primary polygon's vertices take edits: its Points keyframe is on (a skipped one has its own points ignored).</summary>
+    private bool PolygonPointsEditable(PolygonSave? polygon) =>
+        polygon is null || KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Points, polygon, ChainOfShape(polygon));
+
+    private void RebuildPolygonVertexRows(PolygonSave polygon, int count, bool editable)
     {
         _polygonRowsFor = polygon;
+        _polygonRowsEditable = editable;
         _polygonVertexRows.Clear();
         _polygonVertexCells.Clear();
         PreviewCtrl.InspectorVertexIndex = -1;
@@ -6279,9 +6292,10 @@ public partial class MainWindow : Window
             var remove = new Button
             {
                 Name = $"PropPolygonVertex{i}Delete", Content = "✕", FontSize = 10, Padding = new Avalonia.Thickness(4, 0),
-                IsEnabled = count > 3,
+                IsEnabled = count > 3 && editable,
             };
-            ToolTip.SetTip(remove, count > 3 ? "Delete vertex" : "A polygon needs at least three vertices");
+            ToolTip.SetTip(remove, !editable ? "Turn on the Points keyframe to edit vertices"
+                : count > 3 ? "Delete vertex" : "A polygon needs at least three vertices");
             remove.Click += (_, _) => _appCommands.DeletePolygonVertex(polygon, index);
             Grid.SetColumn(remove, 5);
             row.Children.Add(remove);
@@ -6300,6 +6314,7 @@ public partial class MainWindow : Window
                 });
             }
             SealOnCommit(x, y);
+            SetComputedLook(editable, x, y);
             _polygonVertexRows.Add((x, y));
             _polygonVertexCells.Add((xCell, yCell));
             PropPolygonVertices.Children.Add(row);
@@ -6345,7 +6360,7 @@ public partial class MainWindow : Window
 
     private void ApplyPolygonVertex(int index)
     {
-        if (_suppressPropRefresh || _polygonRowsFor is not { } polygon) return;
+        if (_suppressPropRefresh || !_polygonRowsEditable || _polygonRowsFor is not { } polygon) return;
         var (xInput, yInput) = _polygonVertexRows[index];
         if (xInput.Value is not { } x || yInput.Value is not { } y) return;
         _appCommands.MovePolygonVertex(polygon, index, (float)x, (float)y);

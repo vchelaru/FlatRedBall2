@@ -211,6 +211,23 @@ public class PolygonSave : ShapeSave
     /// FRB1 closes an outline by repeating the first point at the end; that repeated point is stored here as-is.
     /// </summary>
     public List<Vector2Save> Points = new();
+
+    /// <summary>
+    /// When <c>true</c>, this polygon is not a <b>points keyframe</b> in its frame: its own <see cref="Points"/> and
+    /// <see cref="PointsInterpolation"/> are ignored, and the previous points keyframe of the same-named polygon glides
+    /// across it. The first frame of a run of frames that hold the name is always a keyframe. Independent of
+    /// <see cref="ShapeSave.SkipOffsetKeyframe"/>. Written only when <c>true</c>.
+    /// </summary>
+    public bool SkipPointsKeyframe;
+
+    /// <summary>
+    /// How <see cref="Points"/> get from this keyframe to the next points keyframe of the same-named polygon: point i
+    /// glides to point i, and a changed point count snaps. Same rules as <see cref="ShapeSave.OffsetInterpolation"/>.
+    /// </summary>
+    public string? PointsInterpolation;
+
+    /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="PointsInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
+    public string? PointsEasing;
 }
 
 /// <summary>Serialized 2D point used by <see cref="PolygonSave"/>.</summary>

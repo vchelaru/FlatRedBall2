@@ -95,7 +95,7 @@ public static class KeyframeLaneBuilder
     /// <summary>
     /// Builds the lane of <paramref name="shape"/>'s <paramref name="group"/> across the chain, or <c>null</c> when
     /// it should not show: no chain, an unnamed or ambiguously named shape (it snaps), a group the shape lacks (a
-    /// polygon's size), or the group not in use. The shape's name and kind are its identity: every frame that holds
+    /// polygon's size, a rectangle's or circle's points), or the group not in use. The shape's name and kind are its identity: every frame that holds
     /// exactly one shape of that name and kind has lane content, found with <see cref="KeyframeEvaluator.TryMatch"/>
     /// like playback. A frame without it leaves a gap that no span or hold crosses. The first frame of each run of
     /// such frames is always a keyframe; later ones are unless their skip flag is set, and a skipped frame has no
@@ -148,12 +148,12 @@ public static class KeyframeLaneBuilder
                 bool isLast = k == keyframes.Count - 1;
                 if (!isLast)
                 {
-                    spans.Add(new KeyframeLaneSpan(edges[from], edges[keyframes[k + 1]], CurveOf(group, match[from]!)));
+                    spans.Add(new KeyframeLaneSpan(edges[from], edges[keyframes[k + 1]], SpanCurve(group, match[from]!, match[keyframes[k + 1]]!)));
                     valuesDiffer |= ValuesDiffer(group, match[from]!, match[keyframes[k + 1]]!);
                 }
                 else if (runEnd == count - 1 && chain.Loop && match[0] is not null && from != 0)
                 {
-                    spans.Add(new KeyframeLaneSpan(edges[from], edges[count], CurveOf(group, match[from]!)));
+                    spans.Add(new KeyframeLaneSpan(edges[from], edges[count], SpanCurve(group, match[from]!, match[0]!)));
                 }
                 else
                 {
@@ -169,16 +169,39 @@ public static class KeyframeLaneBuilder
         return inUse ? new KeyframeLane(keyframeXs, spans, holds, edges[count], ticks) : null;
     }
 
-    private static bool IsSkipped(ShapeKeyframeGroup group, IKeyframeShape shape) =>
-        group == ShapeKeyframeGroup.Offset ? shape.SkipOffsetKeyframe : shape.SkipSizeKeyframe;
+    private static bool IsSkipped(ShapeKeyframeGroup group, IKeyframeShape shape) => group switch
+    {
+        ShapeKeyframeGroup.Offset => shape.SkipOffsetKeyframe,
+        ShapeKeyframeGroup.Size => shape.SkipSizeKeyframe,
+        _ => shape.SkipPointsKeyframe,
+    };
 
-    private static KeyframeCurve CurveOf(ShapeKeyframeGroup group, IKeyframeShape shape) =>
-        group == ShapeKeyframeGroup.Offset ? shape.OffsetCurve : shape.SizeCurve;
+    // The curve playback actually uses over a span: a polygon whose point count changes between two points keyframes snaps.
+    private static KeyframeCurve SpanCurve(ShapeKeyframeGroup group, IKeyframeShape from, IKeyframeShape to) =>
+        group == ShapeKeyframeGroup.Points && from.Points.Count != to.Points.Count ? KeyframeCurve.Snap : CurveOf(group, from);
 
-    private static bool ValuesDiffer(ShapeKeyframeGroup group, IKeyframeShape a, IKeyframeShape b) =>
-        group == ShapeKeyframeGroup.Offset
-            ? a.X != b.X || a.Y != b.Y
-            : a.SizeX != b.SizeX || a.SizeY != b.SizeY;
+    private static KeyframeCurve CurveOf(ShapeKeyframeGroup group, IKeyframeShape shape) => group switch
+    {
+        ShapeKeyframeGroup.Offset => shape.OffsetCurve,
+        ShapeKeyframeGroup.Size => shape.SizeCurve,
+        _ => shape.PointsCurve,
+    };
+
+    private static bool ValuesDiffer(ShapeKeyframeGroup group, IKeyframeShape a, IKeyframeShape b) => group switch
+    {
+        ShapeKeyframeGroup.Offset => a.X != b.X || a.Y != b.Y,
+        ShapeKeyframeGroup.Size => a.SizeX != b.SizeX || a.SizeY != b.SizeY,
+        _ => PointsDiffer(a.Points, b.Points),
+    };
+
+    // A changed count counts as a difference too: it snaps at the next keyframe.
+    private static bool PointsDiffer(IReadOnlyList<System.Numerics.Vector2> a, IReadOnlyList<System.Numerics.Vector2> b)
+    {
+        if (a.Count != b.Count) return true;
+        for (int i = 0; i < a.Count; i++)
+            if (a[i] != b[i]) return true;
+        return false;
+    }
 
     // Whether any keyframe's value differs from the previous keyframe's, compared on effective values.
     private static bool ValuesDiffer(AnimationChainSave chain, KeyframeGroup group, IReadOnlyList<int> keyframes)

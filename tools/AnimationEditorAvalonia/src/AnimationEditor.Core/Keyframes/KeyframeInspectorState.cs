@@ -88,7 +88,7 @@ public static class KeyframeInspectorState
     /// <summary>
     /// Computes the state for a shape group. A shape that is the first of a run of frames holding its name always
     /// counts as a keyframe whatever its flag says, and a shape that is not a keyframe has its curve ignored here.
-    /// A group a shape does not have (a polygon's size) reads as an always-on keyframe with the snap curve.
+    /// A group a shape does not have (a polygon's size, a rectangle's points) reads as an always-on keyframe with the snap curve.
     /// </summary>
     public static KeyframeGroupState ForShapes(
         ShapeKeyframeGroup group, IReadOnlyList<ShapeSave> shapes, Func<ShapeSave, AnimationChainSave?> chainOf)
@@ -114,9 +114,13 @@ public static class KeyframeInspectorState
         return new KeyframeGroupState(isKeyframe, canToggle, curve, note);
     }
 
-    /// <summary>Whether <paramref name="shape"/> has the keyframe group (a polygon has no size).</summary>
-    public static bool HasGroup(ShapeKeyframeGroup group, ShapeSave shape) =>
-        group == ShapeKeyframeGroup.Offset || shape is SizedShapeSave;
+    /// <summary>Whether <paramref name="shape"/> has the keyframe group (a polygon has no size; only a polygon has points).</summary>
+    public static bool HasGroup(ShapeKeyframeGroup group, ShapeSave shape) => group switch
+    {
+        ShapeKeyframeGroup.Offset => true,
+        ShapeKeyframeGroup.Size => shape is SizedShapeSave,
+        _ => shape is PolygonSave,
+    };
 
     /// <summary>Whether <paramref name="shape"/> is a keyframe of <paramref name="group"/>: the first of its run always, else unless its skip flag is set.</summary>
     public static bool IsEffectivelyKeyframe(ShapeKeyframeGroup group, ShapeSave shape, AnimationChainSave? chain) =>
@@ -156,6 +160,17 @@ public static class KeyframeInspectorState
         return (value.SizeX, value.SizeY);
     }
 
+    /// <summary>
+    /// The points the inspector shows for <paramref name="polygon"/>: its own when it is a points keyframe, else the
+    /// value in effect at the start of its frame (the glide from the previous points keyframe).
+    /// </summary>
+    public static IReadOnlyList<System.Numerics.Vector2> DisplayShapePoints(PolygonSave polygon, AnimationChainSave? chain)
+    {
+        if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Points, polygon, chain))
+            return SaveKeyframeShape.Create(polygon).Points;
+        return KeyframeSampler.SampleShapePoints(chain, IndexOfFrameHolding(polygon, chain), 0, polygon);
+    }
+
     internal static int IndexOfFrameHolding(ShapeSave shape, AnimationChainSave? chain)
     {
         if (chain is null) return -1;
@@ -164,20 +179,26 @@ public static class KeyframeInspectorState
         return -1;
     }
 
-    internal static bool GetSkip(ShapeKeyframeGroup group, ShapeSave shape) => group == ShapeKeyframeGroup.Offset
-        ? shape.SkipOffsetKeyframe
-        : shape is SizedShapeSave sized && sized.SkipSizeKeyframe;
+    internal static bool GetSkip(ShapeKeyframeGroup group, ShapeSave shape) => group switch
+    {
+        ShapeKeyframeGroup.Offset => shape.SkipOffsetKeyframe,
+        ShapeKeyframeGroup.Size => shape is SizedShapeSave sized && sized.SkipSizeKeyframe,
+        _ => shape is PolygonSave poly && poly.SkipPointsKeyframe,
+    };
 
     internal static void SetSkip(ShapeKeyframeGroup group, ShapeSave shape, bool skip)
     {
         if (group == ShapeKeyframeGroup.Offset) shape.SkipOffsetKeyframe = skip;
-        else if (shape is SizedShapeSave sized) sized.SkipSizeKeyframe = skip;
+        else if (group == ShapeKeyframeGroup.Size && shape is SizedShapeSave sized) sized.SkipSizeKeyframe = skip;
+        else if (group == ShapeKeyframeGroup.Points && shape is PolygonSave poly) poly.SkipPointsKeyframe = skip;
     }
 
-    internal static (string? Type, string? Easing) GetCurve(ShapeKeyframeGroup group, ShapeSave shape) =>
-        group == ShapeKeyframeGroup.Offset
-            ? (shape.OffsetInterpolation, shape.OffsetEasing)
-            : shape is SizedShapeSave sized ? (sized.SizeInterpolation, sized.SizeEasing) : (null, null);
+    internal static (string? Type, string? Easing) GetCurve(ShapeKeyframeGroup group, ShapeSave shape) => group switch
+    {
+        ShapeKeyframeGroup.Offset => (shape.OffsetInterpolation, shape.OffsetEasing),
+        ShapeKeyframeGroup.Size => shape is SizedShapeSave sized ? (sized.SizeInterpolation, sized.SizeEasing) : (null, null),
+        _ => shape is PolygonSave poly ? (poly.PointsInterpolation, poly.PointsEasing) : (null, null),
+    };
 
     internal static void SetCurve(ShapeKeyframeGroup group, ShapeSave shape, string? type, string? easing)
     {
@@ -186,10 +207,15 @@ public static class KeyframeInspectorState
             shape.OffsetInterpolation = type;
             shape.OffsetEasing = easing;
         }
-        else if (shape is SizedShapeSave sized)
+        else if (group == ShapeKeyframeGroup.Size && shape is SizedShapeSave sized)
         {
             sized.SizeInterpolation = type;
             sized.SizeEasing = easing;
+        }
+        else if (group == ShapeKeyframeGroup.Points && shape is PolygonSave poly)
+        {
+            poly.PointsInterpolation = type;
+            poly.PointsEasing = easing;
         }
     }
 

@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Numerics;
+
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>The geometry family of a per-frame shape. Shapes only interpolate into a same-named shape of the same kind.</summary>
@@ -9,7 +12,7 @@ public enum KeyframeShapeKind
     /// <summary>A circle; size is its radius.</summary>
     Circle,
 
-    /// <summary>A polygon; only its offset interpolates (its points are not interpolated).</summary>
+    /// <summary>A polygon; it has no size, but its points glide as their own keyframe group.</summary>
     Polygon,
 }
 
@@ -52,6 +55,18 @@ public interface IKeyframeShape
 
     /// <summary>The curve from this shape's size to the next size keyframe's.</summary>
     KeyframeCurve SizeCurve { get; }
+
+    /// <summary>
+    /// A polygon's vertices in its local space; empty for any other kind. Point i glides to point i of the
+    /// next points keyframe, and a differing count snaps.
+    /// </summary>
+    IReadOnlyList<Vector2> Points { get; }
+
+    /// <summary>When <c>true</c> the polygon is not a points keyframe: its own points and curve are ignored.</summary>
+    bool SkipPointsKeyframe { get; }
+
+    /// <summary>The curve from this polygon's points to the next points keyframe's.</summary>
+    KeyframeCurve PointsCurve { get; }
 }
 
 /// <summary>A shape's offset and size at one instant of playback, in the same units as <see cref="IKeyframeShape"/>.</summary>

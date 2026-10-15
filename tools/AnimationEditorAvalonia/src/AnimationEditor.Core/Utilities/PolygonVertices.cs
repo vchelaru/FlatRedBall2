@@ -20,6 +20,13 @@ public static class PolygonVertices
             && points[0].Y == points[^1].Y;
     }
 
+    /// <summary>
+    /// The vertex count of a displayed point list (for instance the glided points of a polygon whose points keyframe
+    /// is off): the same closing-point rule as <see cref="Count(PolygonSave)"/>.
+    /// </summary>
+    public static int Count(IReadOnlyList<System.Numerics.Vector2> points) =>
+        points.Count >= 2 && points[0] == points[^1] ? points.Count - 1 : points.Count;
+
     public static int Count(PolygonSave polygon) =>
         IsClosed(polygon) ? polygon.Points.Count - 1 : polygon.Points.Count;
 

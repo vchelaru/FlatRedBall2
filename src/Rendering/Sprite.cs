@@ -685,14 +685,20 @@ public class Sprite : IRenderable, IAttachable
             AnimationShapeFrame? entry = null;
             frameShapes?.TryGetValue(name, out entry);
             if (entry != null)
-                ApplyShapeEntry(name, entry, KeyframeEvaluator.EvaluateShape(chain, IsLooping, frameIndex, elapsedInFrame, entry));
+            {
+                var points = entry is AnimationPolygonFrame
+                    ? KeyframeEvaluator.EvaluateShapePoints(chain, IsLooping, frameIndex, elapsedInFrame, entry)
+                    : null;
+                ApplyShapeEntry(name, entry, KeyframeEvaluator.EvaluateShape(chain, IsLooping, frameIndex, elapsedInFrame, entry), points);
+            }
             else
                 DisableCollisionIfPresent(name);
         }
     }
 
-    // `value` is the entry's offset and size glided by its stored curves; with the default snap curve it is the entry's own.
-    private void ApplyShapeEntry(string name, AnimationShapeFrame entry, KeyframeShapeValue value)
+    // `value` is the entry's offset and size glided by its stored curves, `points` a polygon's glided points (null for
+    // other kinds); with the default snap curve they are the entry's own.
+    private void ApplyShapeEntry(string name, AnimationShapeFrame entry, KeyframeShapeValue value, IReadOnlyList<System.Numerics.Vector2>? points)
     {
         var existing = Parent!.FindShapeByName(name);
         switch (entry)
@@ -753,13 +759,13 @@ public class Sprite : IRenderable, IAttachable
                         throw new InvalidOperationException(
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var p = new Polygon { Name = name };
-                    ApplyPolygon(p, poly, value);
+                    ApplyPolygon(p, value, points!);
                     p.IsVisible = true;
                     Parent.Add(p);
                 }
                 else if (existing is Polygon p)
                 {
-                    ApplyPolygon(p, poly, value);
+                    ApplyPolygon(p, value, points!);
                     Parent.SetDefaultCollision(p, true);
                 }
                 else
@@ -808,9 +814,9 @@ public class Sprite : IRenderable, IAttachable
         c.Y = value.Y;
     }
 
-    private static void ApplyPolygon(Polygon p, AnimationPolygonFrame entry, KeyframeShapeValue value)
+    private static void ApplyPolygon(Polygon p, KeyframeShapeValue value, IReadOnlyList<System.Numerics.Vector2> points)
     {
-        p.SetPoints(entry.Points);
+        p.SetPoints(points);
         p.X = value.X;
         p.Y = value.Y;
     }
