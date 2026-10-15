@@ -107,3 +107,7 @@ a fresh PNG drop creates one frame sized to the whole sheet, and double-click-to
 a-cell is how that gets sized down without dragging edge handles by hand. Don't collapse
 the two gestures onto one shared size-preserving helper again — see
 `GridPlacementCalculator`'s doc comment for why that was tried and reverted.
+
+## Keyframe curves: Transform and Color play what the file stores
+
+The preview and the GIF/WebP export sample a chain through `KeyframeSampler` (`AnimationEditor.Core/Keyframes/`), which wraps the shared `KeyframeEvaluator`; there is no per-session Interpolate toggle. The inspector's diamond and eight-icon picker are `KeyframeControl` (`AnimationEditor.Views/Controls/`), mapped to stored (type, easing) names by `KeyframeCurvePicker`. A stored curve outside the eight reads as "nothing selected" and is never rewritten except by an explicit pick. A frame with its keyframe off ignores its own values, so edits to those fields go only to frames that are keyframes, and the read-only fields show `KeyframeInspectorState.DisplayOffset`/`DisplayColor`.

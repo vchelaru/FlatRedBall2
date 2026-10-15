@@ -166,3 +166,13 @@ Future versions of the AnimationEditor will allow you to control whether positiv
 Offsets can also be changed by dragging the frame in the preview. Every frame in an animation can be adjusted at once by selecting the whole animation, and several animations can be adjusted together by selecting all of them.
 
 <figure><img src="../../.gitbook/assets/edit-frames-drag-offset-in-preview.gif" alt="Dragging a frame in the preview to change its offset"><figcaption></figcaption></figure>
+
+## Glide Between Frames
+
+By default a frame's offset and color change instantly when the next frame starts. The **Transform** and **Color** sections of the **Inspector** tab can instead glide a value from one frame to the next.
+
+Each section has a keyframe diamond. A filled diamond means the frame is a keyframe for that section and its values are used. Click the diamond to turn it off; the frame then ignores its own values, the fields become read-only, and they show the value in effect at the start of the frame. The first frame of an animation is always a keyframe.
+
+Next to the diamond, eight curve buttons pick how the value moves from this keyframe to the next one: **Snap** (the default, no glide), **Linear**, **Ease In**, **Ease Out**, **Ease In-Out**, **Anticipate**, **Overshoot** and **Bounce**. A curve glides across every frame up to the next keyframe, so turning the diamond off on the frames in between stretches the glide over all of them.
+
+The preview and exported images play the curves. Offset and color are independent, and the other values on a frame, such as the image and its length, still change instantly. A curve stored in a file that is not one of the eight buttons shows none of them selected, with its name in the tooltip, and is kept until a button is clicked.
