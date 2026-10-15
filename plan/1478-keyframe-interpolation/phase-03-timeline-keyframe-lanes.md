@@ -10,7 +10,7 @@ Up to two thin lanes, Offset and Color, under the single-chain timeline's frame 
 
 - Each keyframe is an amber diamond centered on the left edge of its frame; the first spills left of the strip.
 - Between a keyframe and the next, the span's easing curve (the starting keyframe's, as the evaluator uses it)
-  is a stroked line over a faint fill. Step draws flat, then a vertical jump. After the last keyframe, a dashed
+  is a stroked line over a faint fill. Step draws flat, then a vertical jump. After the last keyframe, a solid
   hold line; a looping chain's last keyframe glides back instead, as the evaluator does.
 - A lane shows only when the property is in use: some keyframe's effective value differs from the previous
   keyframe's, or some span glides. Otherwise the strip keeps its current height.

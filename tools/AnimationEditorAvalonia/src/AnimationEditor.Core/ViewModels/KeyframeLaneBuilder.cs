@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.ViewModels;
 /// <param name="Curve">The starting keyframe's curve, the one the evaluator uses for the whole stretch.</param>
 public readonly record struct KeyframeLaneSpan(double StartX, double EndX, KeyframeCurve Curve);
 
-/// <summary>A stretch where a keyframe's value is held with nothing after it to glide to (drawn dashed).</summary>
+/// <summary>A stretch where a keyframe's value is held with nothing after it to glide to (drawn as a flat solid line).</summary>
 public readonly record struct KeyframeLaneHold(double StartX, double EndX);
 
 /// <summary>
