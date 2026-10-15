@@ -70,6 +70,7 @@ diagnostics/manual-test/
 /.claude/skills/multiplatform-conversion
 /.claude/skills/path-and-pathfollower
 /.claude/skills/performance
+/.claude/skills/persistence
 /.claude/skills/physics-and-movement
 /.claude/skills/platformer-movement
 /.claude/skills/screens

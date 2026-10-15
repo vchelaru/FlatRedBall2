@@ -82,7 +82,7 @@ public class GameScreen : Screen
 | `Random` | `GameRandom` | Seeded random with helpers (`Between`, `RadialVector2`) |
 | `Time` | `TimeManager` | Frame timing, async delays |
 | `Audio` | `AudioManager` | Load/play `SoundEffect` and `Song`, music, volume (see `audio`) |
-| `Storage` | `GameStorage` | Async save/load by key (text, bytes, streams); needs `EngineInitSettings.StorageName`; files on desktop, `localStorage` on web (see `multiplatform-conversion`) |
+| `Storage` | `GameStorage` | Async save/load by key (text, bytes, streams); needs `EngineInitSettings.StorageName`; files on desktop, `localStorage` on web (see `persistence`) |
 
 ## Which Skill to Read Next
 

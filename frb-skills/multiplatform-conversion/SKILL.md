@@ -118,7 +118,7 @@ using var reader = new StreamReader(stream);
 var json = reader.ReadToEnd();
 ```
 
-This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings go through `Engine.Storage` (`GameStorage` in `src/IO`), not `File`: files on desktop, `localStorage` on web, same code, no `#if !KNI`. Set `EngineInitSettings.StorageName` or the first storage call throws. Web caps at about 5 MiB per origin (values are base64), and `IsPersistent` is false if the browser blocks `localStorage`.
+This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings go through `Engine.Storage`, not `File`: same code on both platforms, no `#if !KNI`. See the `persistence` skill.
 
 ## Content pipeline — single source of truth in Common
 
