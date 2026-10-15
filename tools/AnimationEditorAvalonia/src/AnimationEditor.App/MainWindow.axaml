@@ -1057,20 +1057,25 @@
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource InkMid}" />
-                                                <Grid ColumnDefinitions="78,*">
-                                                    <TextBlock Text="Relative X" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                                    <NumericUpDown x:Name="PropRelX" Grid.Column="1"
-                                                                   Minimum="-10000" Maximum="10000"
-                                                                   Increment="1" FormatString="0.###" />
-                                                </Grid>
-                                                <Grid ColumnDefinitions="78,*">
-                                                    <TextBlock Text="Relative Y" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                                    <NumericUpDown x:Name="PropRelY" Grid.Column="1"
-                                                                   Minimum="-10000" Maximum="10000"
-                                                                   Increment="1" FormatString="0.###" />
-                                                </Grid>
+                                                <viewsControls:KeyframeControl x:Name="PropTransformKeyframe" />
+                                                <!-- One X / Y row, wrapping like COORDINATES. Read-only (and dimmed) while the
+                                                     frame's offset keyframe is off: the fields then show the value in effect. -->
+                                                <WrapPanel>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="X" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropRelX" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="-10000" Maximum="10000"
+                                                                       Increment="1" FormatString="0.###" />
+                                                    </Grid>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="Y" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropRelY" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="-10000" Maximum="10000"
+                                                                       Increment="1" FormatString="0.###" />
+                                                    </Grid>
+                                                </WrapPanel>
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                                     <ToggleButton x:Name="PropFlipH"
                                                                   ToolTip.Tip="Flip Horizontal"
@@ -1155,6 +1160,7 @@
                                                         </Border>
                                                     </Panel>
                                                 </StackPanel>
+                                                <viewsControls:KeyframeControl x:Name="PropColorKeyframe" />
                                                 <Grid ColumnDefinitions="44,*">
                                                     <TextBlock Text="Mode" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />

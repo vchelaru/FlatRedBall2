@@ -74,6 +74,31 @@ public static class KeyframeInspectorState
     public static bool IsFirstFrame(AnimationFrameSave frame, AnimationChainSave? chain) =>
         chain is not null && chain.Frames.Count > 0 && ReferenceEquals(chain.Frames[0], frame);
 
+    /// <summary>
+    /// The offset the inspector shows for <paramref name="frame"/>: its own when it is a keyframe, else the
+    /// value in effect at the start of the frame (the glide from the previous keyframe), so a read-only
+    /// field reads what playback shows there.
+    /// </summary>
+    public static (float X, float Y) DisplayOffset(AnimationFrameSave frame, AnimationChainSave? chain)
+    {
+        if (chain is null || IsEffectivelyKeyframe(KeyframeGroup.Offset, frame, chain))
+            return (frame.RelativeX, frame.RelativeY);
+        var sample = KeyframeSampler.Sample(chain, chain.Frames.IndexOf(frame), 0);
+        return (sample.OffsetX, sample.OffsetY);
+    }
+
+    /// <summary>
+    /// The color channels the inspector shows for <paramref name="frame"/>: its own stored channels (so an
+    /// omitted one stays blank) when it is a keyframe, else the value in effect at the start of the frame.
+    /// </summary>
+    public static KeyframeColor DisplayColor(AnimationFrameSave frame, AnimationChainSave? chain)
+    {
+        if (chain is null || IsEffectivelyKeyframe(KeyframeGroup.Color, frame, chain))
+            return new KeyframeColor(frame.Red, frame.Green, frame.Blue, frame.Alpha);
+        var color = KeyframeSampler.Sample(chain, chain.Frames.IndexOf(frame), 0).Color;
+        return new KeyframeColor(color.Red, color.Green, color.Blue, color.Alpha);
+    }
+
     internal static bool GetSkip(KeyframeGroup group, AnimationFrameSave frame) =>
         group == KeyframeGroup.Offset ? frame.SkipOffsetKeyframe : frame.SkipColorKeyframe;
 

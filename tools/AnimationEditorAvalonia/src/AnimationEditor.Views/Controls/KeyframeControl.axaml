@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.KeyframeControl">
+    <!--
+        Keyframe diamond + divider + eight curve icons for one property group (#1478). The diamond is
+        filled amber when the frame is a keyframe of the group and hollow when it is not; the icons
+        (built in code, one per KeyframeCurveChoice) wrap beside it and hide while the keyframe is off.
+        Glyphs are vector paths stroked with the button's Foreground, so they follow the theme.
+    -->
+    <UserControl.Styles>
+        <Style Selector="ToggleButton.kfDiamond">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgHover}" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond Path">
+            <Setter Property="Stroke" Value="{DynamicResource AccentSoft}" />
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="Fill" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond:checked Path">
+            <Setter Property="Fill" Value="{DynamicResource AccentSoft}" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond:indeterminate Path">
+            <Setter Property="Fill" Value="{DynamicResource AccentSoft}" />
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="ToggleButton.kfDiamond:disabled">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+
+        <Style Selector="ToggleButton.kfCurve">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,2,2" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+        </Style>
+        <Style Selector="ToggleButton.kfCurve Path">
+            <Setter Property="Stroke" Value="{Binding $parent[ToggleButton].Foreground}" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+        </Style>
+        <Style Selector="ToggleButton.kfCurve:checked">
+            <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        </Style>
+        <Style Selector="ToggleButton.kfCurve:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+        </Style>
+        <Style Selector="ToggleButton.kfCurve:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="Auto,Auto,*">
+        <ToggleButton x:Name="Diamond" x:FieldModifier="Public" Classes="kfDiamond"
+                      Grid.Column="0" VerticalAlignment="Top"
+                      ToolTip.Tip="Keyframe" ToolTip.ShowOnDisabled="True">
+            <Path Data="M 8,1.5 L 14.5,8 L 8,14.5 L 1.5,8 Z" Stretch="None" StrokeJoin="Round" />
+        </ToggleButton>
+        <Border x:Name="Divider" Grid.Column="1" Width="1" Height="18" Margin="4,3,8,0"
+                VerticalAlignment="Top" Background="{DynamicResource LineStrong}" />
+        <WrapPanel x:Name="CurvePanel" Grid.Column="2" VerticalAlignment="Top" />
+    </Grid>
+</UserControl>

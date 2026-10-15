@@ -13,6 +13,7 @@ using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Layout;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
@@ -5609,6 +5610,10 @@ public partial class MainWindow : Window
         PropFrameLen.ValueChanged  += (_, _) => ApplyFrameLen();
         PropRelX.ValueChanged      += (_, _) => ApplyFrameRelative();
         PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
+        PropTransformKeyframe.KeyframeToggled += isKeyframe => ApplyKeyframeToggled(KeyframeGroup.Offset, isKeyframe);
+        PropTransformKeyframe.CurveChosen     += curve => ApplyKeyframeCurve(KeyframeGroup.Offset, curve);
+        PropColorKeyframe.KeyframeToggled     += isKeyframe => ApplyKeyframeToggled(KeyframeGroup.Color, isKeyframe);
+        PropColorKeyframe.CurveChosen         += curve => ApplyKeyframeCurve(KeyframeGroup.Color, curve);
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
         foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
@@ -6081,19 +6086,28 @@ public partial class MainWindow : Window
                 PropFlipD.IsChecked = flipDMixed ? null : shownFrame.FlipDiagonal;
 
                 SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
-                SetValueOrMixed(PropRelX, frames.Select(f => (decimal)f.RelativeX).ToList());
-                SetValueOrMixed(PropRelY, frames.Select(f => (decimal)f.RelativeY).ToList());
+                // Keyframe off: the fields read-only and showing the value in effect at the frame's start.
+                var offsetState = KeyframeInspectorState.For(KeyframeGroup.Offset, frames, _objectFinder.GetAnimationChainContaining);
+                PropTransformKeyframe.Show(offsetState);
+                var offsets = frames.Select(f => KeyframeInspectorState.DisplayOffset(f, _objectFinder.GetAnimationChainContaining(f))).ToList();
+                SetValueOrMixed(PropRelX, offsets.Select(o => (decimal)o.X).ToList());
+                SetValueOrMixed(PropRelY, offsets.Select(o => (decimal)o.Y).ToList());
+                SetComputedLook(offsetState.FieldsEditable, PropRelX, PropRelY);
 
-                bool redMixed   = frames.Select(f => f.Red).Distinct().Count() > 1;
-                bool greenMixed = frames.Select(f => f.Green).Distinct().Count() > 1;
-                bool blueMixed  = frames.Select(f => f.Blue).Distinct().Count() > 1;
-                bool alphaMixed = frames.Select(f => f.Alpha).Distinct().Count() > 1;
+                var colorState = KeyframeInspectorState.For(KeyframeGroup.Color, frames, _objectFinder.GetAnimationChainContaining);
+                PropColorKeyframe.Show(colorState);
+                var colors = InspectorColors(frames);
+                bool redMixed   = colors.Select(c => c.Red).Distinct().Count() > 1;
+                bool greenMixed = colors.Select(c => c.Green).Distinct().Count() > 1;
+                bool blueMixed  = colors.Select(c => c.Blue).Distinct().Count() > 1;
+                bool alphaMixed = colors.Select(c => c.Alpha).Distinct().Count() > 1;
                 bool opMixed    = frames.Select(f => f.ColorOperation).Distinct().Count() > 1;
 
-                PropRed.Value   = redMixed   ? null : (shownFrame.Red.HasValue   ? shownFrame.Red.Value   : (decimal?)null);
-                PropGreen.Value = greenMixed ? null : (shownFrame.Green.HasValue ? shownFrame.Green.Value : (decimal?)null);
-                PropBlue.Value  = blueMixed  ? null : (shownFrame.Blue.HasValue  ? shownFrame.Blue.Value  : (decimal?)null);
-                PropAlpha.Value = alphaMixed ? null : (shownFrame.Alpha.HasValue ? shownFrame.Alpha.Value : (decimal?)null);
+                PropRed.Value   = redMixed   ? null : colors[0].Red;
+                PropGreen.Value = greenMixed ? null : colors[0].Green;
+                PropBlue.Value  = blueMixed  ? null : colors[0].Blue;
+                PropAlpha.Value = alphaMixed ? null : colors[0].Alpha;
+                SetComputedLook(colorState.FieldsEditable, PropRed, PropGreen, PropBlue, PropAlpha);
 
                 // Ghost the sticky effective value in each blank field: an omitted channel holds
                 // whatever an earlier frame last set (climbing back), or the operation's identity
@@ -6431,6 +6445,45 @@ public partial class MainWindow : Window
             PropChainTsxOwnerInput.Value = tileId;
     }
 
+    /// <summary>The selected frames whose <paramref name="group"/> keyframe is on: the only ones an edit to that
+    /// group's fields can change, since a skipped frame's own values are ignored (#1478).</summary>
+    private List<AnimationFrameSave> InspectorKeyframeFrames(KeyframeGroup group) =>
+        InspectorFrames()
+            .Where(f => KeyframeInspectorState.IsEffectivelyKeyframe(group, f, _objectFinder.GetAnimationChainContaining(f)))
+            .ToList();
+
+    /// <summary>What the color fields display for each of <paramref name="frames"/> (see <see cref="KeyframeInspectorState.DisplayColor"/>).</summary>
+    private List<KeyframeColor> InspectorColors(IReadOnlyList<AnimationFrameSave> frames) =>
+        frames.Select(f => KeyframeInspectorState.DisplayColor(f, _objectFinder.GetAnimationChainContaining(f))).ToList();
+
+    /// <summary>Makes numeric fields read-only and dimmed, with no spinner, while they show a computed value.</summary>
+    private static void SetComputedLook(bool editable, params NumericUpDown[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.IsReadOnly = !editable;
+            field.AllowSpin = editable;
+            field.ShowButtonSpinner = editable;
+            field.Opacity = editable ? 1.0 : 0.6;
+        }
+    }
+
+    private void ApplyKeyframeToggled(KeyframeGroup group, bool isKeyframe)
+    {
+        if (_suppressPropRefresh) return;
+        var frames = InspectorFrames();
+        if (frames.Count == 0) return;
+        _appCommands.SetFrameKeyframe(frames, group, isKeyframe);
+    }
+
+    private void ApplyKeyframeCurve(KeyframeGroup group, KeyframeCurveChoice curve)
+    {
+        if (_suppressPropRefresh) return;
+        var frames = InspectorFrames();
+        if (frames.Count == 0) return;
+        _appCommands.SetFrameKeyframeCurve(frames, group, curve);
+    }
+
     private void ApplyFrameFlip()
     {
         if (_suppressPropRefresh) return;
@@ -6453,7 +6506,7 @@ public partial class MainWindow : Window
     private void ApplyFrameRelative()
     {
         if (_suppressPropRefresh) return;
-        var frames = InspectorFrames();
+        var frames = InspectorKeyframeFrames(KeyframeGroup.Offset);
         if (frames.Count == 0) return;
         // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
         // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
@@ -6469,19 +6522,21 @@ public partial class MainWindow : Window
     private void ApplyFrameColor(NumericUpDown field)
     {
         if (_suppressPropRefresh) return;
-        var frames = InspectorFrames();
+        var frames = InspectorKeyframeFrames(KeyframeGroup.Color);
         if (frames.Count == 0) return;
-        ChannelEdit Edit(NumericUpDown channel, Func<AnimationFrameSave, int?> value) =>
-            ReferenceEquals(field, channel) ? ChannelEditOf(channel, frames.Select(value)) : ChannelEdit.Keep;
-        _appCommands.SetFrameColor(frames, Edit(PropRed, f => f.Red), Edit(PropGreen, f => f.Green), Edit(PropBlue, f => f.Blue));
+        // "(mixed)" is judged on what the fields display, which includes frames whose keyframe is off.
+        var shown = InspectorColors(InspectorFrames());
+        ChannelEdit Edit(NumericUpDown channel, Func<KeyframeColor, int?> value) =>
+            ReferenceEquals(field, channel) ? ChannelEditOf(channel, shown.Select(value)) : ChannelEdit.Keep;
+        _appCommands.SetFrameColor(frames, Edit(PropRed, c => c.Red), Edit(PropGreen, c => c.Green), Edit(PropBlue, c => c.Blue));
     }
 
     private void ApplyFrameAlpha()
     {
         if (_suppressPropRefresh) return;
-        var frames = InspectorFrames();
+        var frames = InspectorKeyframeFrames(KeyframeGroup.Color);
         if (frames.Count == 0) return;
-        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, frames.Select(f => f.Alpha)));
+        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, InspectorColors(InspectorFrames()).Select(c => c.Alpha)));
     }
 
     /// <summary>A blank color field clears the channel (omitted from the .achx, so it inherits),

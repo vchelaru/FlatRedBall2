@@ -136,4 +136,39 @@ public class KeyframeInspectorStateTests
         Assert.True(KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Color, chain.Frames[0], chain));
         Assert.False(KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Color, chain.Frames[1], chain));
     }
+
+    [Fact]
+    public void DisplayOffset_KeyframeShowsItsOwnValue_NonKeyframeShowsTheValueInEffect()
+    {
+        var chain = Chain(3);
+        chain.Frames[0].RelativeX = 0;
+        chain.Frames[0].OffsetInterpolation = "Linear";
+        chain.Frames[1].RelativeX = 999;
+        chain.Frames[2].RelativeX = 90;
+
+        Assert.Equal(999f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain).X);
+
+        chain.Frames[1].SkipOffsetKeyframe = true;
+        Assert.Equal(45f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain).X, 3);
+    }
+
+    [Fact]
+    public void DisplayColor_KeyframeKeepsBlankChannels_NonKeyframeShowsTheGlide()
+    {
+        var chain = Chain(3);
+        chain.Frames[0].Red = 0;
+        chain.Frames[0].Alpha = 0;
+        chain.Frames[0].ColorInterpolation = "Linear";
+        chain.Frames[2].Red = 200;
+        chain.Frames[2].Alpha = 100;
+
+        var own = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain);
+        Assert.Null(own.Red);
+
+        chain.Frames[1].SkipColorKeyframe = true;
+        var effective = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain);
+        Assert.Equal(100, effective.Red);
+        Assert.Equal(50, effective.Alpha);
+        Assert.Null(effective.Green);
+    }
 }
