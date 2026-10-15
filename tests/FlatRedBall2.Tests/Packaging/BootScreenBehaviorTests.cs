@@ -228,6 +228,61 @@ public class BootScreenBehaviorTests
         result.ShouldBe("{\"failures\":1,\"callerSawRejection\":true}");
     }
 
+    // Chromium reports ERR_FAILED for a request bound to an HTTP/2 session that goes away at a
+    // certificate-verifier rebuild and never retries it (#1467). The wrapper retries once, so the
+    // caller (Blazor's loader) gets the retried result and the screen never sees the first failure.
+    private const string RetryHarness = @"
+        const run = async (fetchImpl, call) => {
+            let calls = 0, failures = 0, bytes = 0;
+            const win = { location: { href: 'https://game.test/index.html' },
+                fetch: (...a) => { calls++; return fetchImpl(calls, ...a); } };
+            b.installFetchCounter(win, { onBytes: (n) => bytes += n, onFail: () => failures++ }, () => true);
+            let outcome;
+            try { const r = await call(win); outcome = 'status ' + r.status; } catch (e) { outcome = 'rejected ' + e.message; }
+            await new Promise((r) => setTimeout(r, 30));
+            return { outcome, calls, failures, bytes };
+        };";
+
+    [Fact]
+    public void InstallFetchCounter_FrameworkGetRejectsOnce_RetriesAndReturnsSecondResultWithoutFailing()
+    {
+        var result = RunNode(RetryHarness + @"
+            run((n) => n === 1 ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response(new Uint8Array(1000))),
+                (win) => win.fetch('https://game.test/_framework/System.Xml.wasm')).then(out);");
+
+        result.ShouldBe("{\"outcome\":\"status 200\",\"calls\":2,\"failures\":0,\"bytes\":1000}");
+    }
+
+    [Fact]
+    public void InstallFetchCounter_FrameworkGetRejectsTwice_RetriesOnlyOnceAndFailsTheBoot()
+    {
+        var result = RunNode(RetryHarness + @"
+            run(() => Promise.reject(new TypeError('Failed to fetch')),
+                (win) => win.fetch('https://game.test/_framework/System.Xml.wasm')).then(out);");
+
+        result.ShouldBe("{\"outcome\":\"rejected Failed to fetch\",\"calls\":2,\"failures\":1,\"bytes\":0}");
+    }
+
+    [Fact]
+    public void InstallFetchCounter_RequestsThatMustNotBeRetried_AreSentOnce()
+    {
+        var result = RunNode(RetryHarness + @"
+            (async () => {
+                const reject = () => Promise.reject(new TypeError('Failed to fetch'));
+                out({
+                    outsideFramework: await run(reject, (win) => win.fetch('https://game.test/Content/level.tmx')),
+                    post: await run(reject, (win) => win.fetch('https://game.test/_framework/x.wasm', { method: 'POST' })),
+                    postRequestObject: await run(reject, (win) => win.fetch({ url: 'https://game.test/_framework/x.wasm', method: 'POST' })),
+                    httpError: await run(() => Promise.resolve(new Response('', { status: 500 })), (win) => win.fetch('https://game.test/_framework/x.wasm')),
+                });
+            })();");
+
+        result.ShouldBe("{\"outsideFramework\":{\"outcome\":\"rejected Failed to fetch\",\"calls\":1,\"failures\":0,\"bytes\":0}," +
+            "\"post\":{\"outcome\":\"rejected Failed to fetch\",\"calls\":1,\"failures\":1,\"bytes\":0}," +
+            "\"postRequestObject\":{\"outcome\":\"rejected Failed to fetch\",\"calls\":1,\"failures\":1,\"bytes\":0}," +
+            "\"httpError\":{\"outcome\":\"status 500\",\"calls\":1,\"failures\":1,\"bytes\":0}}");
+    }
+
     [Fact]
     public void Controller_Fail_LogsRuleUrlAndStatusAndKeepsFirstReason()
     {

@@ -42,6 +42,12 @@
     var LOADING_TEXT = 'Loading';
     var FAILED_TEXT = 'Failed to start. Check the browser console.';
     var RELOAD_TEXT = 'Reload';
+    // Network-level failures of a _framework/ GET are retried this many times before the boot is
+    // reported as failed. Chromium fails a request bound to an HTTP/2 session that is going away
+    // (a certificate-verifier rebuild, common in a freshly launched browser) with ERR_FAILED and
+    // never retries it itself, and Blazor's loader does not either (#1467). Only pages that load
+    // this file get the retry; without boot-screen.js Blazor sees the first failure.
+    var FRAMEWORK_FETCH_RETRIES = 1;
 
     function formatBytes(n) {
         if (!(n > 0)) return '';
@@ -204,6 +210,20 @@
         };
     }
 
+    function isGetRequest(input, init) {
+        var method = (init && init.method) || (input && typeof input === 'object' && input.method) || 'GET';
+        return String(method).toUpperCase() === 'GET';
+    }
+
+    // Re-issues a request when the promise rejects (fetch rejects only on network-level failures;
+    // HTTP error statuses resolve and are not retried). An aborted request is not retried.
+    function retryOnNetworkError(promise, reissue, retriesLeft) {
+        return promise.catch(function (error) {
+            if (retriesLeft <= 0 || (error && error.name === 'AbortError')) throw error;
+            return retryOnNetworkError(reissue(), reissue, retriesLeft - 1);
+        });
+    }
+
     // Counts bytes of _framework/ responses by reading a clone of each one. The page still gets
     // the original promise and response untouched, so the runtime behaves the same with or
     // without this. isActive() lets the wrapper go inert after the screen is gone.
@@ -212,13 +232,20 @@
         if (typeof original !== 'function') return function () { };
         var base = win.location && win.location.href;
 
-        var wrapped = function (input) {
-            var promise = original.apply(this, arguments);
+        var wrapped = function (input, init) {
+            var self = this, args = arguments;
+            var promise = original.apply(self, args);
             if (!isActive()) return promise;
             var url;
             try { url = typeof input === 'string' ? input : (input && input.url) || String(input); }
             catch (e) { return promise; }
             if (!isFrameworkUrl(url, base)) return promise;
+
+            // The retried promise is the one returned to the caller and the one reported on, so a
+            // recovered first failure never reaches onFail and bytes are counted once.
+            if (isGetRequest(input, init)) {
+                promise = retryOnNetworkError(promise, function () { return original.apply(self, args); }, FRAMEWORK_FETCH_RETRIES);
+            }
 
             var kind = classifyFrameworkUrl(url, base);
             var report = function (rule, info) {
@@ -316,15 +343,13 @@
         // requests still queued in the session waiting for a stream id (a server allows about 100
         // concurrent streams, Blazor requests every _framework/ file at once) fail with that error.
         // Blazor's loader does not retry a failed fetch, so the runtime never starts. It is common
-        // on a Debug dev server over https (~270 requests), rare on a Release publish (~120
-        // requests, 1 failure in 60 test loads), and needs an HTTP/2 host plus a browser that
-        // started moments before the page loaded.
+        // on a Debug dev server over https (~270 requests), rarer on a Release publish (~120
+        // requests), and needs an HTTP/2 host plus a browser that started moments before the page
+        // loaded.
         //
-        // Deliberately a MANUAL reload, not an automatic retry: the decision (recorded in the
-        // issue) was not to paper over a failure whose trigger is outside our control and only
-        // partly understood. The player gets an honest failure and a one-click way out. If this
-        // shows up in the wild, the issue lists the next options (a bounded one-shot retry of an
-        // idempotent _framework/ fetch in installFetchCounter, or fewer concurrent requests).
+        // installFetchCounter retries a failed _framework/ GET once (FRAMEWORK_FETCH_RETRIES), which
+        // recovers most of these. If the retry fails too, the player gets an honest failure and a
+        // one-click way out: the manual Reload below.
         //
         // https://github.com/vchelaru/FlatRedBall2/issues/1467
         //
