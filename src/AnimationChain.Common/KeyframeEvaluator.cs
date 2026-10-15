@@ -75,7 +75,8 @@ public static class KeyframeEvaluator
 
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>.
-    /// An empty list yields (0, 0); an out-of-range index clamps.
+    /// An empty list yields (0, 0); an out-of-range index clamps. Back curves (Anticipate, Overshoot)
+    /// swing past the start/end values and the result is not clamped.
     /// </summary>
     public static (float X, float Y) EvaluateOffset<TFrame>(
         IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame)
@@ -100,7 +101,9 @@ public static class KeyframeEvaluator
     /// The color channels to display, same contract as
     /// <see cref="EvaluateOffset{TFrame}(IReadOnlyList{TFrame}, bool, int, double)"/>. Each channel
     /// glides independently; a channel unset at one end counts as the operation's identity (255, or 0
-    /// for Add) and a channel unset at both stays <c>null</c>. Results round away from zero.
+    /// for Add) and a channel unset at both stays <c>null</c>. Results round away from zero. Back
+    /// curves (Anticipate, Overshoot) swing past the end values, and the result is returned unclamped
+    /// (channels can go below 0 or above 255); the renderer clamps at draw time.
     /// </summary>
     public static KeyframeColor EvaluateColor<TFrame>(
         IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame)
@@ -157,15 +160,17 @@ public static class KeyframeEvaluator
         t = duration > 0 ? (float)Math.Clamp(position / duration, 0.0, 1.0) : 0f;
     }
 
+    // Endpoints are exact (KeyframeCurve.Evaluate returns exactly 0 and 1 there); anything else, including
+    // Back-curve swings below 0 or above 1, is the raw interpolation. Clamping is the renderers' job.
     private static float Lerp(float from, float to, float eased)
-        => eased <= 0f ? from : eased >= 1f ? to : from + (to - from) * eased;
+        => eased == 0f ? from : eased == 1f ? to : from + (to - from) * eased;
 
     private static int? LerpChannel(int? from, int? to, int fromIdentity, int toIdentity, float eased)
     {
         if (from is null && to is null) return null;
-        if (eased <= 0f) return from;
+        if (eased == 0f) return from;
         int a = from ?? fromIdentity, b = to ?? toIdentity;
-        if (eased >= 1f) return b;
+        if (eased == 1f) return b;
         return (int)Math.Round(a + (b - a) * (double)eased, MidpointRounding.AwayFromZero);
     }
 }

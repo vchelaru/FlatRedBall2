@@ -133,11 +133,11 @@ public class SpriteKeyframeInterpolationTests
     // ---- Color ----
 
     private static AnimationFrameSave Tint(int? alpha = null, int? red = null, string? type = null,
-        bool skip = false, FlatRedBall2.Animation.ColorOperation? op = null)
+        bool skip = false, FlatRedBall2.Animation.ColorOperation? op = null, string? easing = null)
         => new()
         {
             FrameLength = 1f, Alpha = alpha, Red = red, ColorOperation = op,
-            ColorInterpolation = type, SkipColorKeyframe = skip,
+            ColorInterpolation = type, ColorEasing = easing, SkipColorKeyframe = skip,
         };
 
     [Fact]
@@ -275,5 +275,49 @@ public class SpriteKeyframeInterpolationTests
         var chain = save.ToAnimationChainList(null!)[0];
 
         chain[2].Red.ShouldBe(20);
+    }
+
+    // ---- Back curves (Anticipate/Overshoot): the sprite follows the swing; draw color clamps ----
+
+    [Fact]
+    public void AnimateSelf_OvershootOffset_SpriteGoesPastEndValue()
+    {
+        var sprite = Play(Save(true, Slide(0, type: "Back", easing: "Out"), Slide(100)));
+
+        sprite.AnimateSelf(0.5);
+
+        sprite.X.ShouldBeGreaterThan(100f);
+    }
+
+    [Fact]
+    public void AnimateSelf_AnticipateOffset_SpriteDipsBeforeStartValue()
+    {
+        var sprite = Play(Save(true, Slide(0, type: "Back", easing: "In"), Slide(100)));
+
+        sprite.AnimateSelf(0.25);
+
+        sprite.X.ShouldBeLessThan(0f);
+    }
+
+    [Fact]
+    public void AnimateSelf_OvershootAlpha_DrawColorClampsWithoutWrapping()
+    {
+        var sprite = Play(Save(true, Tint(alpha: 0, type: "Back"), Tint(alpha: 255)));
+        // Back with the default Out easing overshoots past 255 at the midpoint.
+        sprite.AnimateSelf(0.5);
+
+        sprite.ComputeDrawColor().A.ShouldBe((byte)255);
+    }
+
+    [Fact]
+    public void AnimateSelf_AnticipateMultiplyRed_DrawColorClampsAtZeroWithoutWrapping()
+    {
+        var sprite = Play(Save(true,
+            Tint(red: 0, type: "Back", easing: "In", op: ColorOperation.Multiply),
+            Tint(red: 100, op: ColorOperation.Multiply)));
+
+        sprite.AnimateSelf(0.25);
+
+        sprite.ComputeDrawColor().R.ShouldBe((byte)0);
     }
 }

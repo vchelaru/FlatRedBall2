@@ -52,4 +52,36 @@ public class SpriteFrameColorTests
 
         offset.X.ShouldBe(-1f);
     }
+
+    [Fact]
+    public void Apply_KeyframeChannelsOutOfRange_ClampWithoutWrapping()
+    {
+        // Back curves can hand the sprite R/G/B and alpha outside 0..255.
+        var channels = new FlatRedBall2.AnimationEditorCommon.KeyframeColor(Red: 300, Green: -40, Blue: 255, Alpha: 400);
+
+        var result = SpriteFrameColor.Apply(ColorOperation.Multiply, channels, new Color(200, 200, 200, 200));
+
+        result.R.ShouldBe((byte)200);
+        result.G.ShouldBe((byte)0);
+        result.B.ShouldBe((byte)200);
+        result.A.ShouldBe((byte)200);
+    }
+
+    [Fact]
+    public void Apply_KeyframeNegativeAlpha_ClampsToTransparent()
+    {
+        var channels = new FlatRedBall2.AnimationEditorCommon.KeyframeColor(null, null, null, Alpha: -30);
+
+        SpriteFrameColor.Apply(null, channels, Color.White).A.ShouldBe((byte)0);
+    }
+
+    [Fact]
+    public void GetAddOffset_KeyframeChannelsOutOfRange_ClampToAuthoredRange()
+    {
+        var offset = SpriteFrameColor.GetAddOffset(new FlatRedBall2.AnimationEditorCommon.KeyframeColor(Red: 400, Green: -400, Blue: 0, Alpha: null));
+
+        offset.X.ShouldBe(1f);
+        offset.Y.ShouldBe(-1f);
+        offset.Z.ShouldBe(0f);
+    }
 }

@@ -387,4 +387,123 @@ public class KeyframeEvaluatorTests
 
         KeyframeEvaluator.EvaluateColor(chain, 1, 0.5).Alpha.ShouldBe(200);
     }
+
+    // ---- Overshoot / anticipate: the evaluator returns the raw value, clamping is the renderers' job ----
+
+    [Fact]
+    public void EvaluateOffset_Overshoot_GoesPastEndValueMidSpan()
+    {
+        var chain = Chain(true, Frame(0, 10, offsetType: "Back", offsetEasing: "Out"), Frame(100, 30));
+
+        var (x, y) = KeyframeEvaluator.EvaluateOffset(chain, 0, 0.5);
+
+        x.ShouldBeGreaterThan(100f);
+        y.ShouldBeGreaterThan(30f);
+    }
+
+    [Fact]
+    public void EvaluateOffset_Anticipate_GoesBeforeStartValueMidSpan()
+    {
+        var chain = Chain(true, Frame(0, 30, offsetType: "Back", offsetEasing: "In"), Frame(100, 10));
+
+        var (x, y) = KeyframeEvaluator.EvaluateOffset(chain, 0, 0.25);
+
+        x.ShouldBeLessThan(0f);
+        y.ShouldBeGreaterThan(30f); // dips "before" the start, which for a falling Y is above it
+    }
+
+    [Fact]
+    public void EvaluateOffset_AnticipateTowardsLowerValue_GoesAboveStartValue()
+    {
+        var chain = Chain(true, Frame(100, offsetType: "Back", offsetEasing: "In"), Frame(0));
+
+        KeyframeEvaluator.EvaluateOffset(chain, 0, 0.25).X.ShouldBeGreaterThan(100f);
+    }
+
+    [Theory]
+    [InlineData("In")]
+    [InlineData("Out")]
+    public void EvaluateOffset_BackCurve_EndpointsStayExact(string easing)
+    {
+        var chain = Chain(true, Frame(0, offsetType: "Back", offsetEasing: easing), Frame(100));
+
+        KeyframeEvaluator.EvaluateOffset(chain, 0, 0).X.ShouldBe(0f);
+        KeyframeEvaluator.EvaluateOffset(chain, 1, 0).X.ShouldBe(100f);
+    }
+
+    [Fact]
+    public void EvaluateColor_Overshoot_ReturnsValuesPastRangeUnclamped()
+    {
+        var chain = Chain(true,
+            ColorFrame(red: 0, green: 100, alpha: 0, type: "Back", easing: "Out"),
+            ColorFrame(red: 255, green: 255, alpha: 255));
+
+        var c = KeyframeEvaluator.EvaluateColor(chain, 0, 0.5);
+
+        c.Red!.Value.ShouldBeGreaterThan(255);
+        c.Green!.Value.ShouldBeGreaterThan(255);
+        c.Alpha!.Value.ShouldBeGreaterThan(255);
+    }
+
+    [Fact]
+    public void EvaluateColor_Anticipate_ReturnsNegativeChannelsUnclamped()
+    {
+        var chain = Chain(true,
+            ColorFrame(red: 0, alpha: 0, type: "Back", easing: "In"),
+            ColorFrame(red: 100, alpha: 200));
+
+        var c = KeyframeEvaluator.EvaluateColor(chain, 0, 0.25);
+
+        c.Red!.Value.ShouldBeLessThan(0);
+        c.Alpha!.Value.ShouldBeLessThan(0);
+    }
+
+    [Fact]
+    public void EvaluateColor_BackCurve_EndpointsStayExact()
+    {
+        var chain = Chain(true,
+            ColorFrame(red: 10, type: "Back", easing: "Out"),
+            ColorFrame(red: 200));
+
+        KeyframeEvaluator.EvaluateColor(chain, 0, 0).Red.ShouldBe(10);
+        KeyframeEvaluator.EvaluateColor(chain, 1, 0).Red.ShouldBe(200);
+    }
+
+    [Fact]
+    public void EvaluateColor_BackCurveNullChannelAtStart_StaysNullAtExactStart()
+    {
+        var chain = Chain(true, ColorFrame(type: "Back", easing: "Out"), ColorFrame(red: 100));
+
+        KeyframeEvaluator.EvaluateColor(chain, 0, 0).Red.ShouldBeNull();
+    }
+
+    [Fact]
+    public void EvaluateColor_OvershootWithNullStartChannel_UsesIdentityAsStart()
+    {
+        // Add: unset Red is 0. Overshoot towards 100 passes 100 mid-span.
+        var chain = Chain(true,
+            ColorFrame(op: ColorOpArg.Add, type: "Back", easing: "Out"),
+            ColorFrame(red: 100));
+
+        KeyframeEvaluator.EvaluateColor(chain, 0, 0.5).Red!.Value.ShouldBeGreaterThan(100);
+    }
+
+    [Fact]
+    public void EvaluateColor_AnticipateWithNullStartChannel_DipsBelowIdentity()
+    {
+        // Add: unset Red is 0, so anticipating towards 100 dips below 0.
+        var chain = Chain(true,
+            ColorFrame(op: ColorOpArg.Add, type: "Back", easing: "In"),
+            ColorFrame(red: 100));
+
+        KeyframeEvaluator.EvaluateColor(chain, 0, 0.25).Red!.Value.ShouldBeLessThan(0);
+    }
+
+    [Fact]
+    public void EvaluateColor_BackCurveChannelNullAtBothEnds_StaysNull()
+    {
+        var chain = Chain(true, ColorFrame(red: 0, type: "Back", easing: "Out"), ColorFrame(red: 100));
+
+        KeyframeEvaluator.EvaluateColor(chain, 0, 0.5).Green.ShouldBeNull();
+    }
 }

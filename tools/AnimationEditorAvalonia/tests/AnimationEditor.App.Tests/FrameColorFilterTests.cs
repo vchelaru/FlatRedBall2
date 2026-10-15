@@ -106,4 +106,25 @@ public class FrameColorFilterTests
 
         AssertNear(0, result.Red);
     }
+
+    [Fact]
+    public void Create_Multiply_ValueAbove255ClampsInsteadOfWrapping()
+    {
+        // A Back curve can overshoot a channel past 255; an unclamped byte cast would wrap 300 to 44.
+        using var filter = FrameColorFilter.Create(ColorOperation.Multiply, 300, null, null);
+        var result = Apply(filter, new SKColor(200, 200, 200, 255));
+
+        AssertNear(200, result.Red);
+    }
+
+    [Fact]
+    public void Create_Add_ValueBeyondRangeClampsAtThePixel()
+    {
+        using var filter = FrameColorFilter.Create(ColorOperation.Add, 400, -400, null);
+        var result = Apply(filter, new SKColor(100, 100, 100, 255));
+
+        AssertNear(255, result.Red);
+        AssertNear(0, result.Green);
+        AssertNear(100, result.Blue);
+    }
 }

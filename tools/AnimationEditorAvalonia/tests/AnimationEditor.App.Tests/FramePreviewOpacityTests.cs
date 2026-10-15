@@ -32,4 +32,17 @@ public class FramePreviewOpacityTests
         // Onion skin draws at layer 0.4; a fully opaque frame there is 255 * 0.4 ≈ 102.
         Assert.Equal(102, FramePreviewOpacity.Resolve(255, 0.4f));
     }
+
+    [Fact]
+    public void Resolve_AlphaAbove255_ClampsToOpaque()
+    {
+        // A Back curve can push an interpolated alpha past 255; byte wrap would make it near-transparent.
+        Assert.Equal(255, FramePreviewOpacity.Resolve(300, 1.0f));
+    }
+
+    [Fact]
+    public void Resolve_NegativeAlpha_ClampsToTransparent()
+    {
+        Assert.Equal(0, FramePreviewOpacity.Resolve(-40, 1.0f));
+    }
 }
