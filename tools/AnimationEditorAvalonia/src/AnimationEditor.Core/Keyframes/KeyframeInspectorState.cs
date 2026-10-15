@@ -48,21 +48,7 @@ public static class KeyframeInspectorState
         bool canToggle = frames.Any(f => !IsFirstFrame(f, chainOf(f)));
         bool? isKeyframe = others == 0 ? true : keyframes == 0 ? false : null;
 
-        KeyframeCurveChoice? curve = null;
-        string? note = null;
-        if (curves.Count > 0)
-        {
-            var first = curves[0];
-            bool allSame = curves.All(c => c.Type == first.Type && c.Easing == first.Easing);
-            var choices = curves.Select(c => KeyframeCurvePicker.FromStored(c.Type, c.Easing)).Distinct().ToList();
-            if (choices.Count == 1 && choices[0] is { } single)
-                curve = single;
-            else if (allSame)
-                note = KeyframeCurvePicker.DescribeStored(first.Type, first.Easing);
-            else
-                note = "Mixed";
-        }
-
+        var (curve, note) = SummarizeCurves(curves);
         return new KeyframeGroupState(isKeyframe, canToggle, curve, note);
     }
 
@@ -97,6 +83,124 @@ public static class KeyframeInspectorState
             return new KeyframeColor(frame.Red, frame.Green, frame.Blue, frame.Alpha);
         var color = KeyframeSampler.Sample(chain, chain.Frames.IndexOf(frame), 0).Color;
         return new KeyframeColor(color.Red, color.Green, color.Blue, color.Alpha);
+    }
+
+    /// <summary>
+    /// Computes the state for a shape group. A shape that is the first of a run of frames holding its name always
+    /// counts as a keyframe whatever its flag says, and a shape that is not a keyframe has its curve ignored here.
+    /// A group a shape does not have (a polygon's size) reads as an always-on keyframe with the snap curve.
+    /// </summary>
+    public static KeyframeGroupState ForShapes(
+        ShapeKeyframeGroup group, IReadOnlyList<ShapeSave> shapes, Func<ShapeSave, AnimationChainSave?> chainOf)
+    {
+        int keyframes = 0, others = 0;
+        var curves = new List<(string? Type, string? Easing)>();
+        foreach (var shape in shapes)
+        {
+            if (IsEffectivelyKeyframe(group, shape, chainOf(shape)))
+            {
+                keyframes++;
+                curves.Add(GetCurve(group, shape));
+            }
+            else
+            {
+                others++;
+            }
+        }
+
+        bool canToggle = shapes.Any(s => HasGroup(group, s) && !IsRunStart(s, chainOf(s)));
+        bool? isKeyframe = others == 0 ? true : keyframes == 0 ? false : null;
+        var (curve, note) = SummarizeCurves(curves);
+        return new KeyframeGroupState(isKeyframe, canToggle, curve, note);
+    }
+
+    /// <summary>Whether <paramref name="shape"/> has the keyframe group (a polygon has no size).</summary>
+    public static bool HasGroup(ShapeKeyframeGroup group, ShapeSave shape) =>
+        group == ShapeKeyframeGroup.Offset || shape is SizedShapeSave;
+
+    /// <summary>Whether <paramref name="shape"/> is a keyframe of <paramref name="group"/>: the first of its run always, else unless its skip flag is set.</summary>
+    public static bool IsEffectivelyKeyframe(ShapeKeyframeGroup group, ShapeSave shape, AnimationChainSave? chain) =>
+        !HasGroup(group, shape) || IsRunStart(shape, chain) || !GetSkip(group, shape);
+
+    /// <summary>Whether <paramref name="shape"/> is the first of a run of frames holding its name (see <see cref="KeyframeEvaluator.IsShapeRunStart"/>).</summary>
+    public static bool IsRunStart(ShapeSave shape, AnimationChainSave? chain)
+    {
+        int index = IndexOfFrameHolding(shape, chain);
+        return chain is null || index < 0 || KeyframeEvaluator.IsShapeRunStart(chain, index, shape);
+    }
+
+    /// <summary>
+    /// The offset the inspector shows for <paramref name="shape"/>: its own when it is a keyframe, else the value in
+    /// effect at the start of its frame, so a read-only field reads what playback shows there.
+    /// </summary>
+    public static (float X, float Y) DisplayShapeOffset(ShapeSave shape, AnimationChainSave? chain)
+    {
+        if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, shape, chain))
+            return (shape.X, shape.Y);
+        var value = KeyframeSampler.SampleShape(chain, IndexOfFrameHolding(shape, chain), 0, shape);
+        return (value.X, value.Y);
+    }
+
+    /// <summary>
+    /// The size components the inspector shows for <paramref name="shape"/> (rectangle ScaleX/ScaleY, circle Radius and 0):
+    /// its own when it is a keyframe, else the value in effect at the start of its frame.
+    /// </summary>
+    public static (float SizeX, float SizeY) DisplayShapeSize(ShapeSave shape, AnimationChainSave? chain)
+    {
+        if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Size, shape, chain))
+        {
+            var own = SaveKeyframeShape.Create(shape);
+            return (own.SizeX, own.SizeY);
+        }
+        var value = KeyframeSampler.SampleShape(chain, IndexOfFrameHolding(shape, chain), 0, shape);
+        return (value.SizeX, value.SizeY);
+    }
+
+    internal static int IndexOfFrameHolding(ShapeSave shape, AnimationChainSave? chain)
+    {
+        if (chain is null) return -1;
+        for (int i = 0; i < chain.Frames.Count; i++)
+            if (chain.Frames[i].ShapesSave?.Shapes.Contains(shape) == true) return i;
+        return -1;
+    }
+
+    internal static bool GetSkip(ShapeKeyframeGroup group, ShapeSave shape) => group == ShapeKeyframeGroup.Offset
+        ? shape.SkipOffsetKeyframe
+        : shape is SizedShapeSave sized && sized.SkipSizeKeyframe;
+
+    internal static void SetSkip(ShapeKeyframeGroup group, ShapeSave shape, bool skip)
+    {
+        if (group == ShapeKeyframeGroup.Offset) shape.SkipOffsetKeyframe = skip;
+        else if (shape is SizedShapeSave sized) sized.SkipSizeKeyframe = skip;
+    }
+
+    internal static (string? Type, string? Easing) GetCurve(ShapeKeyframeGroup group, ShapeSave shape) =>
+        group == ShapeKeyframeGroup.Offset
+            ? (shape.OffsetInterpolation, shape.OffsetEasing)
+            : shape is SizedShapeSave sized ? (sized.SizeInterpolation, sized.SizeEasing) : (null, null);
+
+    internal static void SetCurve(ShapeKeyframeGroup group, ShapeSave shape, string? type, string? easing)
+    {
+        if (group == ShapeKeyframeGroup.Offset)
+        {
+            shape.OffsetInterpolation = type;
+            shape.OffsetEasing = easing;
+        }
+        else if (shape is SizedShapeSave sized)
+        {
+            sized.SizeInterpolation = type;
+            sized.SizeEasing = easing;
+        }
+    }
+
+    private static (KeyframeCurveChoice? Curve, string? Note) SummarizeCurves(List<(string? Type, string? Easing)> curves)
+    {
+        if (curves.Count == 0) return (null, null);
+        var first = curves[0];
+        bool allSame = curves.All(c => c.Type == first.Type && c.Easing == first.Easing);
+        var choices = curves.Select(c => KeyframeCurvePicker.FromStored(c.Type, c.Easing)).Distinct().ToList();
+        if (choices.Count == 1 && choices[0] is { } single) return (single, null);
+        return (null, allSame ? KeyframeCurvePicker.DescribeStored(first.Type, first.Easing) : "Mixed");
     }
 
     internal static bool GetSkip(KeyframeGroup group, AnimationFrameSave frame) =>

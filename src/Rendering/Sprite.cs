@@ -8,6 +8,7 @@ using FlatRedBall2.Math;
 using FlatRedBall2.Rendering.Batches;
 using KeyframeColor = FlatRedBall2.AnimationEditorCommon.KeyframeColor;
 using KeyframeEvaluator = FlatRedBall2.AnimationEditorCommon.KeyframeEvaluator;
+using KeyframeShapeValue = FlatRedBall2.AnimationEditorCommon.KeyframeShapeValue;
 
 namespace FlatRedBall2.Rendering;
 
@@ -615,25 +616,20 @@ public class Sprite : IRenderable, IAttachable
         CurrentFrame = frame;
         _texture = frame.Texture;
         _sourceRectangle = frame.SourceRectangle;
-        SampleKeyframes(chain);
-        ApplyFrameProperties(frame, _frameControlledProperties);
-        RecalculateDimensions();
-
-        ReconcileShapes(frame);
-    }
-
-    // Evaluates the offset and color at the current playback time. With the default snap curve these
-    // are exactly the current frame's own values.
-    private void SampleKeyframes(AnimationChain chain)
-    {
         int index = System.Math.Clamp(_currentFrameIndex, 0, chain.Count - 1);
         double frameStart = 0;
         for (int i = 0; i < index; i++)
             frameStart += chain[i].FrameLength.TotalSeconds;
         double elapsed = System.Math.Max(0, _timeIntoAnimation - frameStart);
 
+        // Evaluates the offset and color at the current playback time. With the default snap curve these
+        // are exactly the current frame's own values.
         _frameOffset = KeyframeEvaluator.EvaluateOffset(chain, IsLooping, index, elapsed);
         _frameColor = KeyframeEvaluator.EvaluateColor(chain, IsLooping, index, elapsed);
+        ApplyFrameProperties(frame, _frameControlledProperties);
+        RecalculateDimensions();
+
+        ReconcileShapes(frame, chain, index, elapsed);
     }
 
     // Writes only the groups in `groups` from the frame onto the sprite.
@@ -658,7 +654,7 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    private void ReconcileShapes(AnimationFrame frame)
+    private void ReconcileShapes(AnimationFrame frame, AnimationChain chain, int frameIndex, double elapsedInFrame)
     {
         if (_animationChains == null) return;
 
@@ -689,13 +685,14 @@ public class Sprite : IRenderable, IAttachable
             AnimationShapeFrame? entry = null;
             frameShapes?.TryGetValue(name, out entry);
             if (entry != null)
-                ApplyShapeEntry(name, entry);
+                ApplyShapeEntry(name, entry, KeyframeEvaluator.EvaluateShape(chain, IsLooping, frameIndex, elapsedInFrame, entry));
             else
                 DisableCollisionIfPresent(name);
         }
     }
 
-    private void ApplyShapeEntry(string name, AnimationShapeFrame entry)
+    // `value` is the entry's offset and size glided by its stored curves; with the default snap curve it is the entry's own.
+    private void ApplyShapeEntry(string name, AnimationShapeFrame entry, KeyframeShapeValue value)
     {
         var existing = Parent!.FindShapeByName(name);
         switch (entry)
@@ -708,13 +705,13 @@ public class Sprite : IRenderable, IAttachable
                         throw new InvalidOperationException(
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var r = new AARect { Name = name };
-                    ApplyRectangle(r, rect);
+                    ApplyRectangle(r, value);
                     r.IsVisible = true;
                     Parent.Add(r);
                 }
                 else if (existing is AARect r)
                 {
-                    ApplyRectangle(r, rect);
+                    ApplyRectangle(r, value);
                     Parent.SetDefaultCollision(r, true);
                 }
                 else
@@ -732,13 +729,13 @@ public class Sprite : IRenderable, IAttachable
                         throw new InvalidOperationException(
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var c = new Circle { Name = name };
-                    ApplyCircle(c, circle);
+                    ApplyCircle(c, value);
                     c.IsVisible = true;
                     Parent.Add(c);
                 }
                 else if (existing is Circle c)
                 {
-                    ApplyCircle(c, circle);
+                    ApplyCircle(c, value);
                     Parent.SetDefaultCollision(c, true);
                 }
                 else
@@ -756,13 +753,13 @@ public class Sprite : IRenderable, IAttachable
                         throw new InvalidOperationException(
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var p = new Polygon { Name = name };
-                    ApplyPolygon(p, poly);
+                    ApplyPolygon(p, poly, value);
                     p.IsVisible = true;
                     Parent.Add(p);
                 }
                 else if (existing is Polygon p)
                 {
-                    ApplyPolygon(p, poly);
+                    ApplyPolygon(p, poly, value);
                     Parent.SetDefaultCollision(p, true);
                 }
                 else
@@ -796,26 +793,26 @@ public class Sprite : IRenderable, IAttachable
     }
 
     // Geometry-only — callers that just created the shape set IsVisible = true themselves.
-    private static void ApplyRectangle(AARect r, AnimationAARectFrame entry)
+    private static void ApplyRectangle(AARect r, KeyframeShapeValue value)
     {
-        r.Width = entry.Width;
-        r.Height = entry.Height;
-        r.X = entry.RelativeX;
-        r.Y = entry.RelativeY;
+        r.Width = value.SizeX;
+        r.Height = value.SizeY;
+        r.X = value.X;
+        r.Y = value.Y;
     }
 
-    private static void ApplyCircle(Circle c, AnimationCircleFrame entry)
+    private static void ApplyCircle(Circle c, KeyframeShapeValue value)
     {
-        c.Radius = entry.Radius;
-        c.X = entry.RelativeX;
-        c.Y = entry.RelativeY;
+        c.Radius = value.SizeX;
+        c.X = value.X;
+        c.Y = value.Y;
     }
 
-    private static void ApplyPolygon(Polygon p, AnimationPolygonFrame entry)
+    private static void ApplyPolygon(Polygon p, AnimationPolygonFrame entry, KeyframeShapeValue value)
     {
         p.SetPoints(entry.Points);
-        p.X = entry.RelativeX;
-        p.Y = entry.RelativeY;
+        p.X = value.X;
+        p.Y = value.Y;
     }
 
     // Rotation (radians) handed to SpriteBatch.Draw. SpriteBatch rotates corner offsets with the

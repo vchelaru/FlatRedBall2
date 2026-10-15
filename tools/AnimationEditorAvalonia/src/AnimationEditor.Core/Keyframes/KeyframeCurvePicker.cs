@@ -12,6 +12,16 @@ public enum KeyframeGroup
     Color,
 }
 
+/// <summary>The property group a keyframe diamond and curve picker edit on a shape (#1478).</summary>
+public enum ShapeKeyframeGroup
+{
+    /// <summary>The shape offset (<c>X/Y</c>); stored as <c>SkipOffsetKeyframe</c>, <c>OffsetInterpolation</c>, <c>OffsetEasing</c>.</summary>
+    Offset,
+
+    /// <summary>The shape size (<c>ScaleX/ScaleY</c> or <c>Radius</c>; rectangles and circles only); stored as <c>SkipSizeKeyframe</c>, <c>SizeInterpolation</c>, <c>SizeEasing</c>.</summary>
+    Size,
+}
+
 /// <summary>The eight curves the inspector offers. Each maps to one fixed (type, easing) pair in the file.</summary>
 public enum KeyframeCurveChoice
 {

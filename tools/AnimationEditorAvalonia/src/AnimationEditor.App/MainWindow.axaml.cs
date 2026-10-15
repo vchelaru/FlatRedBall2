@@ -5632,6 +5632,11 @@ public partial class MainWindow : Window
         PropTransformKeyframe.CurveChosen     += curve => ApplyKeyframeCurve(KeyframeGroup.Offset, curve);
         PropColorKeyframe.KeyframeToggled     += isKeyframe => ApplyKeyframeToggled(KeyframeGroup.Color, isKeyframe);
         PropColorKeyframe.CurveChosen         += curve => ApplyKeyframeCurve(KeyframeGroup.Color, curve);
+        WireShapeKeyframe(PropRectOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorShapes(_selectedState.SelectedRectangles));
+        WireShapeKeyframe(PropRectSizeKeyframe, ShapeKeyframeGroup.Size, () => InspectorShapes(_selectedState.SelectedRectangles));
+        WireShapeKeyframe(PropCircleOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorShapes(_selectedState.SelectedCircles));
+        WireShapeKeyframe(PropCircleSizeKeyframe, ShapeKeyframeGroup.Size, () => InspectorShapes(_selectedState.SelectedCircles));
+        WireShapeKeyframe(PropPolygonOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorShapes(_selectedState.SelectedPolygons));
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
         foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
@@ -6195,10 +6200,8 @@ public partial class MainWindow : Window
                 bool rectsCollide = rects.Count > 1 &&
                     _appCommands.HasSameFrameNameCollision(rects.Cast<object>().ToList());
                 SetNameOrMixed(PropRectName, rects.Select(r => r.Name ?? "").ToList(), rectsCollide);
-                SetValueOrMixed(PropRectX, rects.Select(r => (decimal)r.X).ToList());
-                SetValueOrMixed(PropRectY, rects.Select(r => (decimal)r.Y).ToList());
-                SetValueOrMixed(PropRectScaleX, rects.Select(r => (decimal)r.ScaleX).ToList());
-                SetValueOrMixed(PropRectScaleY, rects.Select(r => (decimal)r.ScaleY).ToList());
+                ShowShapeKeyframes(rects, PropRectOffsetKeyframe, PropRectX, PropRectY,
+                    PropRectSizeKeyframe, PropRectScaleX, PropRectScaleY);
             }
 
             if (circ is not null)
@@ -6206,9 +6209,8 @@ public partial class MainWindow : Window
                 bool circlesCollide = circles.Count > 1 &&
                     _appCommands.HasSameFrameNameCollision(circles.Cast<object>().ToList());
                 SetNameOrMixed(PropCircleName, circles.Select(c => c.Name ?? "").ToList(), circlesCollide);
-                SetValueOrMixed(PropCircleX, circles.Select(c => (decimal)c.X).ToList());
-                SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
-                SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
+                ShowShapeKeyframes(circles, PropCircleOffsetKeyframe, PropCircleX, PropCircleY,
+                    PropCircleSizeKeyframe, PropCircleRadius, null);
             }
 
             if (poly is not null)
@@ -6235,8 +6237,7 @@ public partial class MainWindow : Window
         bool namesCollide = polygons.Count > 1 &&
             _appCommands.HasSameFrameNameCollision(polygons.Cast<object>().ToList());
         SetNameOrMixed(PropPolygonName, polygons.Select(p => p.Name ?? "").ToList(), namesCollide);
-        SetValueOrMixed(PropPolygonX, polygons.Select(p => (decimal)p.X).ToList());
-        SetValueOrMixed(PropPolygonY, polygons.Select(p => (decimal)p.Y).ToList());
+        ShowShapeKeyframes(polygons, PropPolygonOffsetKeyframe, PropPolygonX, PropPolygonY, null, null, null);
         PropPolygonWarning.IsVisible = PolygonVertices.IsSelfIntersecting(polygon);
 
         int count = PolygonVertices.Count(polygon);
@@ -6369,7 +6370,17 @@ public partial class MainWindow : Window
             NumericEdit? bx = EditOf(PropPolygonX);
             NumericEdit? by = EditOf(PropPolygonY);
             string? bname = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? null : PropPolygonName.Text.Trim();
-            _appCommands.SetPolygonPropsBulk(polygons, bname, bx, by);
+            if (bname != null) _appCommands.SetPolygonPropsBulk(polygons, bname, null, null);
+            if (bx != null || by != null)
+                _appCommands.SetPolygonPropsBulk(ShapeKeyframes(polygons, ShapeKeyframeGroup.Offset), null, bx, by);
+            return;
+        }
+
+        if (!KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, polygon, ChainOfShape(polygon)))
+        {
+            // Offset keyframe off: X/Y show a computed value, so only the name can be edited.
+            if (!string.IsNullOrWhiteSpace(PropPolygonName.Text))
+                _appCommands.SetPolygonPropsBulk(new[] { polygon }, PropPolygonName.Text.Trim(), null, null);
             return;
         }
 
@@ -6484,6 +6495,53 @@ public partial class MainWindow : Window
             field.ShowButtonSpinner = editable;
             field.Opacity = editable ? 1.0 : 0.6;
         }
+    }
+
+    private AnimationChainSave? ChainOfShape(ShapeSave shape) =>
+        _objectFinder.GetAnimationFrameContaining(shape) is { } frame ? _objectFinder.GetAnimationChainContaining(frame) : null;
+
+    /// <summary>The shapes whose <paramref name="group"/> keyframe is on: the only ones an edit to that group's
+    /// fields can change, since a skipped shape's own values are ignored (#1478).</summary>
+    private List<T> ShapeKeyframes<T>(IReadOnlyList<T> shapes, ShapeKeyframeGroup group) where T : ShapeSave =>
+        shapes.Where(s => KeyframeInspectorState.IsEffectivelyKeyframe(group, s, ChainOfShape(s))).ToList();
+
+    private void WireShapeKeyframe(KeyframeControl control, ShapeKeyframeGroup group, Func<IReadOnlyList<ShapeSave>> shapes)
+    {
+        control.FirstKeyframeNote = "the first frame holding this shape's name is always a keyframe";
+        control.KeyframeToggled += isKeyframe =>
+        {
+            if (_suppressPropRefresh) return;
+            if (shapes() is { Count: > 0 } selected) _appCommands.SetShapeKeyframe(selected, group, isKeyframe);
+        };
+        control.CurveChosen += curve =>
+        {
+            if (_suppressPropRefresh) return;
+            if (shapes() is { Count: > 0 } selected) _appCommands.SetShapeKeyframeCurve(selected, group, curve);
+        };
+    }
+
+    /// <summary>Shows a shape panel's Offset (and, for rectangles and circles, Size) keyframe controls and fields. A
+    /// shape whose keyframe is off shows the value in effect at the start of its frame, read-only and dimmed.</summary>
+    private void ShowShapeKeyframes<T>(
+        IReadOnlyList<T> shapes, KeyframeControl offsetControl, NumericUpDown x, NumericUpDown y,
+        KeyframeControl? sizeControl, NumericUpDown? sizeX, NumericUpDown? sizeY) where T : ShapeSave
+    {
+        var offsetState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Offset, shapes, ChainOfShape);
+        offsetControl.Show(offsetState);
+        var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, ChainOfShape(s))).ToList();
+        SetValueOrMixed(x, offsets.Select(o => (decimal)o.X).ToList());
+        SetValueOrMixed(y, offsets.Select(o => (decimal)o.Y).ToList());
+        SetComputedLook(offsetState.FieldsEditable, x, y);
+
+        if (sizeControl is null || sizeX is null) return;
+        var sizeState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Size, shapes, ChainOfShape);
+        sizeControl.Show(sizeState);
+        var sizes = shapes.Select(s => KeyframeInspectorState.DisplayShapeSize(s, ChainOfShape(s))).ToList();
+        SetValueOrMixed(sizeX, sizes.Select(v => (decimal)v.SizeX).ToList());
+        SetComputedLook(sizeState.FieldsEditable, sizeX);
+        if (sizeY is null) return;
+        SetValueOrMixed(sizeY, sizes.Select(v => (decimal)v.SizeY).ToList());
+        SetComputedLook(sizeState.FieldsEditable, sizeY);
     }
 
     private void ApplyKeyframeToggled(KeyframeGroup group, bool isKeyframe)
@@ -6628,7 +6686,13 @@ public partial class MainWindow : Window
         NumericEdit? scaleY = EditOf(PropRectScaleY);
         string? name = PropRectName.Text;
 
-        _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
+        // Offset and size edits reach only the rectangles whose keyframe for that group is on (#1478): a
+        // skipped rectangle shows a computed value that must not be written back as its own.
+        if (name != null) _appCommands.SetRectPropsBulk(rects, name, null, null, null, null);
+        if (x != null || y != null)
+            _appCommands.SetRectPropsBulk(ShapeKeyframes(rects, ShapeKeyframeGroup.Offset), null, x, y, null, null);
+        if (scaleX != null || scaleY != null)
+            _appCommands.SetRectPropsBulk(ShapeKeyframes(rects, ShapeKeyframeGroup.Size), null, null, null, scaleX, scaleY);
     }
 
     private void ApplyCircleProps()
@@ -6643,7 +6707,12 @@ public partial class MainWindow : Window
         NumericEdit? radius = EditOf(PropCircleRadius);
         string? name = PropCircleName.Text;
 
-        _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
+        // See ApplyRectProps: offset and size edits reach only shapes whose keyframe for that group is on.
+        if (name != null) _appCommands.SetCirclePropsBulk(circles, name, null, null, null);
+        if (x != null || y != null)
+            _appCommands.SetCirclePropsBulk(ShapeKeyframes(circles, ShapeKeyframeGroup.Offset), null, x, y, null);
+        if (radius != null)
+            _appCommands.SetCirclePropsBulk(ShapeKeyframes(circles, ShapeKeyframeGroup.Size), null, null, null, radius);
     }
 
     // ── Playback controls wiring ──────────────────────────────────────────────

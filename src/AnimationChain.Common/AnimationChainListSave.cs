@@ -420,19 +420,27 @@ public class AnimationChainListSave
     {
         var rectsArray = new JsonArray();
         foreach (var r in shapes.AARectSaves)
-            rectsArray.Add((JsonNode)new JsonObject
+        {
+            var rectObj = new JsonObject
             {
                 ["name"] = r.Name, ["x"] = r.X, ["y"] = r.Y, ["scaleX"] = r.ScaleX, ["scaleY"] = r.ScaleY,
                 ["z"] = r.Z, ["alpha"] = r.Alpha, ["red"] = r.Red, ["green"] = r.Green, ["blue"] = r.Blue,
-            });
+            };
+            WriteShapeKeyframesJson(rectObj, r);
+            rectsArray.Add((JsonNode)rectObj);
+        }
 
         var circlesArray = new JsonArray();
         foreach (var c in shapes.CircleSaves)
-            circlesArray.Add((JsonNode)new JsonObject
+        {
+            var circleObj = new JsonObject
             {
                 ["name"] = c.Name, ["x"] = c.X, ["y"] = c.Y, ["radius"] = c.Radius,
                 ["z"] = c.Z, ["alpha"] = c.Alpha, ["red"] = c.Red, ["green"] = c.Green, ["blue"] = c.Blue,
-            });
+            };
+            WriteShapeKeyframesJson(circleObj, c);
+            circlesArray.Add((JsonNode)circleObj);
+        }
 
         var polysArray = new JsonArray();
         foreach (var p in shapes.PolygonSaves)
@@ -441,12 +449,14 @@ public class AnimationChainListSave
             foreach (var v in p.Points)
                 pointsArray.Add((JsonNode)new JsonObject { ["x"] = v.X, ["y"] = v.Y });
 
-            polysArray.Add((JsonNode)new JsonObject
+            var polyObj = new JsonObject
             {
                 ["name"] = p.Name, ["x"] = p.X, ["y"] = p.Y,
                 ["z"] = p.Z, ["alpha"] = p.Alpha, ["red"] = p.Red, ["green"] = p.Green, ["blue"] = p.Blue,
                 ["points"] = pointsArray,
-            });
+            };
+            WriteShapeKeyframesJson(polyObj, p);
+            polysArray.Add((JsonNode)polyObj);
         }
 
         return new JsonObject
@@ -562,7 +572,7 @@ public class AnimationChainListSave
                 new XElement("ScaleX", FloatStr(r.ScaleX)),
                 new XElement("ScaleY", FloatStr(r.ScaleY)),
                 new XElement("Name", r.Name),
-                WriteColor(r)));
+                WriteColor(r), WriteShapeKeyframes(r)));
 
         var polysEl = new XElement("PolygonSaves");
         foreach (var p in shapes.PolygonSaves)
@@ -578,7 +588,7 @@ public class AnimationChainListSave
                 new XElement("Y", FloatStr(p.Y)),
                 new XElement("Z", FloatStr(p.Z)),
                 pointsEl,
-                WriteColor(p)));
+                WriteColor(p), WriteShapeKeyframes(p)));
         }
 
         var circlesEl = new XElement("CircleSaves");
@@ -589,7 +599,7 @@ public class AnimationChainListSave
                 new XElement("Z", FloatStr(c.Z)),
                 new XElement("Radius", FloatStr(c.Radius)),
                 new XElement("Name", c.Name),
-                WriteColor(c)));
+                WriteColor(c), WriteShapeKeyframes(c)));
 
         return new XElement("ShapeCollectionSave",
             rectsEl,
@@ -597,6 +607,53 @@ public class AnimationChainListSave
             polysEl,
             circlesEl,
             new XElement("SphereSaves"));
+    }
+
+    // Shape keyframe interpolation (#1478), an FRB2 extension: written only when set, so existing files stay
+    // byte-identical, and FRB1's XmlSerializer skips the unknown elements. Curve names are written back exactly
+    // as read, including ones this version does not understand.
+    private static IEnumerable<XElement> WriteShapeKeyframes(ShapeSave shape)
+    {
+        if (shape.SkipOffsetKeyframe) yield return new XElement("SkipOffsetKeyframe", "true");
+        if (shape.OffsetInterpolation != null) yield return new XElement("OffsetInterpolation", shape.OffsetInterpolation);
+        if (shape.OffsetEasing != null) yield return new XElement("OffsetEasing", shape.OffsetEasing);
+        if (shape is not SizedShapeSave sized) yield break;
+        if (sized.SkipSizeKeyframe) yield return new XElement("SkipSizeKeyframe", "true");
+        if (sized.SizeInterpolation != null) yield return new XElement("SizeInterpolation", sized.SizeInterpolation);
+        if (sized.SizeEasing != null) yield return new XElement("SizeEasing", sized.SizeEasing);
+    }
+
+    private static void ReadShapeKeyframes(XElement el, ShapeSave target)
+    {
+        target.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
+        target.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
+        target.OffsetEasing = (string?)el.Element("OffsetEasing");
+        if (target is not SizedShapeSave sized) return;
+        sized.SkipSizeKeyframe = BoolEl(el, "SkipSizeKeyframe");
+        sized.SizeInterpolation = (string?)el.Element("SizeInterpolation");
+        sized.SizeEasing = (string?)el.Element("SizeEasing");
+    }
+
+    private static void WriteShapeKeyframesJson(JsonObject obj, ShapeSave shape)
+    {
+        if (shape.SkipOffsetKeyframe) obj["skipOffsetKeyframe"] = true;
+        if (shape.OffsetInterpolation != null) obj["offsetInterpolation"] = shape.OffsetInterpolation;
+        if (shape.OffsetEasing != null) obj["offsetEasing"] = shape.OffsetEasing;
+        if (shape is not SizedShapeSave sized) return;
+        if (sized.SkipSizeKeyframe) obj["skipSizeKeyframe"] = true;
+        if (sized.SizeInterpolation != null) obj["sizeInterpolation"] = sized.SizeInterpolation;
+        if (sized.SizeEasing != null) obj["sizeEasing"] = sized.SizeEasing;
+    }
+
+    private static void ReadShapeKeyframesJson(JsonObject el, ShapeSave target)
+    {
+        target.SkipOffsetKeyframe = BoolProp(el, "skipOffsetKeyframe");
+        target.OffsetInterpolation = StringProp(el, "offsetInterpolation");
+        target.OffsetEasing = StringProp(el, "offsetEasing");
+        if (target is not SizedShapeSave sized) return;
+        sized.SkipSizeKeyframe = BoolProp(el, "skipSizeKeyframe");
+        sized.SizeInterpolation = StringProp(el, "sizeInterpolation");
+        sized.SizeEasing = StringProp(el, "sizeEasing");
     }
 
     // Alpha/Red/Green/Blue trail each FRB1 shape in this order; preserved verbatim for round-trip.
@@ -691,6 +748,7 @@ public class AnimationChainListSave
                     ScaleY = FloatEl(r, "ScaleY", 16f),
                 };
                 ReadColor(r, rect);
+                ReadShapeKeyframes(r, rect);
                 shapes.Add(rect);
             }
         }
@@ -713,6 +771,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
+                ReadShapeKeyframes(p, poly);
                 shapes.Add(poly);
             }
         }
@@ -730,6 +789,7 @@ public class AnimationChainListSave
                     Radius = FloatEl(c, "Radius", 16f),
                 };
                 ReadColor(c, circle);
+                ReadShapeKeyframes(c, circle);
                 shapes.Add(circle);
             }
         }
@@ -759,6 +819,7 @@ public class AnimationChainListSave
                         ScaleY = FloatEl(child, "ScaleY", 16f),
                     };
                     ReadColor(child, rect);
+                    ReadShapeKeyframes(child, rect);
                     shapes.Add(rect);
                     break;
                 case "CircleSave":
@@ -770,6 +831,7 @@ public class AnimationChainListSave
                         Radius = FloatEl(child, "Radius", 16f),
                     };
                     ReadColor(child, circle);
+                    ReadShapeKeyframes(child, circle);
                     shapes.Add(circle);
                     break;
                 case "PolygonSave":
@@ -784,6 +846,7 @@ public class AnimationChainListSave
                         foreach (var v in pointsEl.Elements("Vector2Save"))
                             poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                     ReadColor(child, poly);
+                    ReadShapeKeyframes(child, poly);
                     shapes.Add(poly);
                     break;
             }
@@ -926,6 +989,7 @@ public class AnimationChainListSave
                     ScaleY = FloatProp(r, "scaleY", 16f),
                 };
                 ReadColorJson(r, rect);
+                ReadShapeKeyframesJson(r, rect);
                 shapes.Add(rect);
             }
         }
@@ -943,6 +1007,7 @@ public class AnimationChainListSave
                     Radius = FloatProp(c, "radius", 16f),
                 };
                 ReadColorJson(c, circle);
+                ReadShapeKeyframesJson(c, circle);
                 shapes.Add(circle);
             }
         }
@@ -965,6 +1030,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
                     }
                 ReadColorJson(p, poly);
+                ReadShapeKeyframesJson(p, poly);
                 shapes.Add(poly);
             }
         }

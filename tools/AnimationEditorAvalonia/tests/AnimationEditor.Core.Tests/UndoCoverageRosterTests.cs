@@ -133,6 +133,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframe)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframeCurve)]        = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetShapeKeyframe)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetShapeKeyframeCurve)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFramePixelRegion)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectProps)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
@@ -402,6 +404,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameKeyframe(new[] { Zebra(ctx).Frames[1] }, KeyframeGroup.Offset, false)));
         yield return Row(nameof(IAppCommands.SetFrameKeyframeCurve),
             ctx => Sync(() => ctx.AppCommands.SetFrameKeyframeCurve(new[] { Zebra(ctx).Frames[1] }, KeyframeGroup.Color, KeyframeCurveChoice.Bounce)));
+        yield return Row(nameof(IAppCommands.SetShapeKeyframe),
+            ctx => Sync(() => ctx.AppCommands.SetShapeKeyframe(new[] { SameNamedRectInFrame1(ctx) }, ShapeKeyframeGroup.Offset, false)));
+        yield return Row(nameof(IAppCommands.SetShapeKeyframeCurve),
+            ctx => Sync(() => ctx.AppCommands.SetShapeKeyframeCurve(new[] { Rect(ctx) }, ShapeKeyframeGroup.Size, KeyframeCurveChoice.Bounce)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
             ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16, 64, 64)));
         yield return Row(nameof(IAppCommands.SetRectProps),
@@ -506,6 +512,8 @@ public class UndoCoverageRosterTests
             new AARectSave { Name = "Rect", X = 0f, Y = 0f, ScaleX = 4f, ScaleY = 4f });
         zebra.Frames[0].ShapesSave!.Add(
             new AARectSave { Name = "Rect2", X = 8f, Y = 8f, ScaleX = 2f, ScaleY = 2f });
+        zebra.Frames[0].ShapesSave!.Add(new AARectSave { Name = "Slider", X = 1f, ScaleX = 3f, ScaleY = 3f });
+        zebra.Frames[1].ShapesSave!.Add(new AARectSave { Name = "Slider", X = 5f, ScaleX = 3f, ScaleY = 3f });
         zebra.Frames[0].ShapesSave!.Add(
             new CircleSave { Name = "Circle", X = 0f, Y = 0f, Radius = 4f });
         zebra.Frames[0].ShapesSave!.Add(
@@ -537,6 +545,9 @@ public class UndoCoverageRosterTests
     private static AnimationChainSave Zebra(TestServices ctx) => ctx.Acls.AnimationChains[0];
     private static AnimationChainSave Alpha(TestServices ctx) => ctx.Acls.AnimationChains[1];
     private static AARectSave Rect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.First();
+    // "Slider" appears in frames 0 and 1, so the frame 1 one is not the first of its run and can toggle.
+    private static AARectSave SameNamedRectInFrame1(TestServices ctx) =>
+        Zebra(ctx).Frames[1].ShapesSave!.AARectSaves.Single(r => r.Name == "Slider");
     private static AARectSave SecondRect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.ElementAt(1);
     private static CircleSave Circle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.First();
     private static CircleSave SecondCircle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.ElementAt(1);

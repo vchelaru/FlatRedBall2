@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using FlatRedBall2.Animation;
 
 namespace FlatRedBall2.AnimationEditorCommon;
@@ -18,6 +21,9 @@ public readonly struct SaveKeyframeFrame : IKeyframeFrame
         _color = color;
         OffsetCurve = KeyframeCurve.Parse(frame.OffsetInterpolation, frame.OffsetEasing);
         ColorCurve = KeyframeCurve.Parse(frame.ColorInterpolation, frame.ColorEasing);
+        KeyframeShapes = frame.ShapesSave is { Shapes.Count: > 0 } shapes
+            ? shapes.Shapes.OfType<ShapeSave>().Select(s => (IKeyframeShape)SaveKeyframeShape.Create(s)).ToArray()
+            : Array.Empty<IKeyframeShape>();
     }
 
     /// <summary>Adapts every frame of <paramref name="chain"/>, resolving color inheritance once.</summary>
@@ -65,4 +71,7 @@ public readonly struct SaveKeyframeFrame : IKeyframeFrame
 
     /// <inheritdoc/>
     public KeyframeCurve ColorCurve { get; }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IKeyframeShape> KeyframeShapes { get; }
 }

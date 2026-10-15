@@ -132,6 +132,10 @@ public static class AnimationChainListSaveExtensions
                         Name = rect.Name,
                         RelativeX = rect.X,
                         RelativeY = rect.Y,
+                        SkipOffsetKeyframe = rect.SkipOffsetKeyframe,
+                        OffsetCurve = KeyframeCurve.Parse(rect.OffsetInterpolation, rect.OffsetEasing),
+                        SkipSizeKeyframe = rect.SkipSizeKeyframe,
+                        SizeCurve = KeyframeCurve.Parse(rect.SizeInterpolation, rect.SizeEasing),
                         Width = rect.ScaleX * 2f,
                         Height = rect.ScaleY * 2f,
                     });
@@ -143,6 +147,10 @@ public static class AnimationChainListSaveExtensions
                         Name = circle.Name,
                         RelativeX = circle.X,
                         RelativeY = circle.Y,
+                        SkipOffsetKeyframe = circle.SkipOffsetKeyframe,
+                        OffsetCurve = KeyframeCurve.Parse(circle.OffsetInterpolation, circle.OffsetEasing),
+                        SkipSizeKeyframe = circle.SkipSizeKeyframe,
+                        SizeCurve = KeyframeCurve.Parse(circle.SizeInterpolation, circle.SizeEasing),
                         Radius = circle.Radius,
                     });
                     break;
@@ -156,6 +164,8 @@ public static class AnimationChainListSaveExtensions
                         Name = poly.Name,
                         RelativeX = poly.X,
                         RelativeY = poly.Y,
+                        SkipOffsetKeyframe = poly.SkipOffsetKeyframe,
+                        OffsetCurve = KeyframeCurve.Parse(poly.OffsetInterpolation, poly.OffsetEasing),
                         Points = points,
                     });
                     break;

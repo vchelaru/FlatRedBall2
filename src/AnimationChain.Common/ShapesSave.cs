@@ -146,11 +146,49 @@ public abstract class ShapeSave : Frb1ShapeData
     public float X;
     /// <summary>Y relative to the entity (Y+ up): the center of a rectangle or circle, the origin of a polygon.</summary>
     public float Y;
+
+    /// <summary>
+    /// When <c>true</c>, this shape is not an <b>offset keyframe</b> in its frame: its own <see cref="X"/>/<see cref="Y"/>
+    /// and <see cref="OffsetInterpolation"/> are ignored, and the previous offset keyframe of the same-named shape
+    /// glides across it. The first frame of a run of frames that hold the name is always a keyframe. Written only
+    /// when <c>true</c>. See <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/>.
+    /// </summary>
+    public bool SkipOffsetKeyframe;
+
+    /// <summary>
+    /// How <see cref="X"/>/<see cref="Y"/> get from this keyframe to the next one of the same-named shape: an
+    /// <c>InterpolationType</c> name, same rules as <see cref="AnimationFrameSave.OffsetInterpolation"/>.
+    /// <c>null</c> or <c>Instant</c> is snap.
+    /// </summary>
+    public string? OffsetInterpolation;
+
+    /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="OffsetInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
+    public string? OffsetEasing;
+}
+
+/// <summary>A shape with a size that can glide between keyframes: <see cref="AARectSave"/> and <see cref="CircleSave"/>.</summary>
+public abstract class SizedShapeSave : ShapeSave
+{
+    /// <summary>
+    /// When <c>true</c>, this shape is not a <b>size keyframe</b> in its frame: its own size and
+    /// <see cref="SizeInterpolation"/> are ignored. Independent of <see cref="ShapeSave.SkipOffsetKeyframe"/>.
+    /// Written only when <c>true</c>.
+    /// </summary>
+    public bool SkipSizeKeyframe;
+
+    /// <summary>
+    /// How the size (<c>ScaleX</c>/<c>ScaleY</c> for a rectangle, <c>Radius</c> for a circle) gets from this keyframe
+    /// to the next one of the same-named shape. Same rules as <see cref="ShapeSave.OffsetInterpolation"/>.
+    /// </summary>
+    public string? SizeInterpolation;
+
+    /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="SizeInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
+    public string? SizeEasing;
 }
 
 /// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
 /// <remarks>Serialized as <c>&lt;AxisAlignedRectangleSave&gt;</c> inside <c>&lt;AxisAlignedRectangleSaves&gt;</c>.</remarks>
-public class AARectSave : ShapeSave
+public class AARectSave : SizedShapeSave
 {
     /// <summary>Half-width (FRB1 convention). Loaded as <c>Width = ScaleX * 2</c>.</summary>
     public float ScaleX = 16f;
@@ -159,7 +197,7 @@ public class AARectSave : ShapeSave
 }
 
 /// <summary>Serialized circle entry within a <see cref="ShapesSave"/>.</summary>
-public class CircleSave : ShapeSave
+public class CircleSave : SizedShapeSave
 {
     /// <summary>Circle radius.</summary>
     public float Radius = 16f;

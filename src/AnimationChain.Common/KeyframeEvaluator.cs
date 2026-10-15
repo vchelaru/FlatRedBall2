@@ -47,6 +47,9 @@ public interface IKeyframeFrame
 
     /// <summary>The curve from this frame's color to the next color keyframe's.</summary>
     KeyframeCurve ColorCurve { get; }
+
+    /// <summary>The frame's shapes, for shape keyframe interpolation. Empty when it has none.</summary>
+    IReadOnlyList<IKeyframeShape> KeyframeShapes { get; }
 }
 
 /// <summary>The color channels at one instant of playback; <c>null</c> means no frame ever set the channel.</summary>
@@ -148,6 +151,153 @@ public static class KeyframeEvaluator
         t = 0f;
         // Nothing to glide to: a non-looping chain's last keyframe, or a looping chain with one keyframe.
         if (end < 0 || end == start) { end = -1; return; }
+        t = Progress(frames, start, end, frameIndex, elapsedInFrame);
+    }
+
+    // ---- Shapes (#1478) -------------------------------------------------------------------------
+
+    /// <summary>
+    /// The offset and size of <paramref name="shape"/> (a shape of frame <paramref name="frameIndex"/>)
+    /// <paramref name="elapsedInFrame"/> into that frame. Shapes match across frames by name and kind: a
+    /// glide runs to the next keyframe of the same group among the following frames that hold the name,
+    /// and stops where the name is missing, duplicated, or changes kind. A shape with no name, or whose
+    /// name is duplicated in its own frame, snaps. Offset and size are independent groups, each with its
+    /// own skip flag and curve; the first frame of a run of frames holding the name is always a keyframe.
+    /// A shape that is not in the frame returns its own values. Back curves swing past the endpoints.
+    /// </summary>
+    public static KeyframeShapeValue EvaluateShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape)
+    {
+        var frames = SaveKeyframeFrame.Create(chain);
+        frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
+        var adapter = SaveKeyframeShape.Create(shape);
+        if (frames.Length > 0)
+            foreach (var candidate in frames[frameIndex].KeyframeShapes)
+                if (candidate is SaveKeyframeShape saved && ReferenceEquals(saved.Source, shape))
+                {
+                    adapter = saved;
+                    break;
+                }
+        return EvaluateShape(frames, chain.Loop, frameIndex, elapsedInFrame, adapter);
+    }
+
+    /// <summary>
+    /// Same contract as <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> over any frame
+    /// list. <paramref name="shape"/> is looked up in frame <paramref name="frameIndex"/> by name and kind.
+    /// </summary>
+    public static KeyframeShapeValue EvaluateShape<TFrame>(
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape)
+        where TFrame : IKeyframeFrame
+    {
+        var own = new KeyframeShapeValue(shape.X, shape.Y, shape.SizeX, shape.SizeY);
+        if (frames.Count == 0) return own;
+        frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
+        if (!TryMatch(frames[frameIndex], shape.Name, shape.Kind, out var current)) return own;
+
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipOffsetKeyframe,
+            out var offsetFrom, out var offsetTo, out float offsetT);
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipSizeKeyframe,
+            out var sizeFrom, out var sizeTo, out float sizeT);
+
+        float x = offsetFrom.X, y = offsetFrom.Y;
+        if (offsetTo is not null && !offsetFrom.OffsetCurve.IsSnap)
+        {
+            float eased = offsetFrom.OffsetCurve.Evaluate(offsetT);
+            x = Lerp(offsetFrom.X, offsetTo.X, eased);
+            y = Lerp(offsetFrom.Y, offsetTo.Y, eased);
+        }
+
+        float sizeX = sizeFrom.SizeX, sizeY = sizeFrom.SizeY;
+        if (sizeTo is not null && !sizeFrom.SizeCurve.IsSnap)
+        {
+            float eased = sizeFrom.SizeCurve.Evaluate(sizeT);
+            sizeX = Lerp(sizeFrom.SizeX, sizeTo.SizeX, eased);
+            sizeY = Lerp(sizeFrom.SizeY, sizeTo.SizeY, eased);
+        }
+
+        return new KeyframeShapeValue(x, y, sizeX, sizeY);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="shape"/> of frame <paramref name="frameIndex"/> is the first frame of a run
+    /// of frames that hold its name (the previous frame lacks it, or it is frame 0). Such a shape is always a
+    /// keyframe, whatever its skip flags say.
+    /// </summary>
+    public static bool IsShapeRunStart(AnimationChainSave chain, int frameIndex, ShapeSave shape)
+    {
+        if (frameIndex <= 0 || frameIndex >= chain.Frames.Count) return true;
+        return !TryMatch(SaveKeyframeFrame.Create(chain)[frameIndex - 1], shape.Name, SaveKeyframeShape.KindOf(shape), out _);
+    }
+
+    // The one shape in `frame` with this name, if exactly one shape has it and it has the given kind.
+    private static bool TryMatch(IKeyframeFrame frame, string name, KeyframeShapeKind kind, out IKeyframeShape match)
+    {
+        match = null!;
+        if (string.IsNullOrEmpty(name)) return false;
+        var shapes = frame.KeyframeShapes;
+        IKeyframeShape? found = null;
+        for (int i = 0; i < shapes.Count; i++)
+        {
+            if (shapes[i].Name != name) continue;
+            if (found is not null) return false; // duplicate name in one frame: ambiguous
+            found = shapes[i];
+        }
+        if (found is null || found.Kind != kind) return false;
+        match = found;
+        return true;
+    }
+
+    // Shape counterpart of FindSegment: `from` is the controlling keyframe of `current`'s name, `to` the
+    // keyframe it glides to (null = hold `from`), `t` the linear progress. The segment only crosses frames
+    // that hold the name; the walk back and forward both stop at the first frame that does not.
+    private static void FindShapeSegment<TFrame>(
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame,
+        IKeyframeShape current, Func<IKeyframeShape, bool> isSkipped,
+        out IKeyframeShape from, out IKeyframeShape? to, out float t)
+        where TFrame : IKeyframeFrame
+    {
+        string name = current.Name;
+        var kind = current.Kind;
+
+        int start = frameIndex;
+        from = current;
+        while (start > 0 && isSkipped(from) && TryMatch(frames[start - 1], name, kind, out var previous))
+        {
+            start--;
+            from = previous;
+        }
+
+        int end = -1;
+        to = null;
+        for (int i = start + 1; ; i++)
+        {
+            bool wrapped = false;
+            if (i >= frames.Count)
+            {
+                if (!loop) break;
+                i = 0;
+                wrapped = true;
+            }
+            if (!TryMatch(frames[i], name, kind, out var next)) break;
+            // Frame 0 is the first frame of a run, so it is a keyframe whatever its flag says.
+            if (wrapped || !isSkipped(next))
+            {
+                end = i;
+                to = next;
+                break;
+            }
+        }
+
+        t = 0f;
+        // Nothing to glide to: the name stops, a non-looping chain ends, or a looping run holds one keyframe.
+        if (end < 0 || end == start) { to = null; return; }
+        t = Progress(frames, start, end, frameIndex, elapsedInFrame);
+    }
+
+    // Linear progress through the segment from `start` to `end` (end == 0 means the loop wrap, which
+    // spans through the last frame), at `elapsedInFrame` into `frameIndex`.
+    private static float Progress<TFrame>(IReadOnlyList<TFrame> frames, int start, int end, int frameIndex, double elapsedInFrame)
+        where TFrame : IKeyframeFrame
+    {
         int segmentEnd = end == 0 ? frames.Count : end;
         double duration = 0, position = elapsedInFrame;
         for (int i = start; i < segmentEnd; i++)
@@ -156,8 +306,7 @@ public static class KeyframeEvaluator
             duration += length;
             if (i < frameIndex) position += length;
         }
-
-        t = duration > 0 ? (float)Math.Clamp(position / duration, 0.0, 1.0) : 0f;
+        return duration > 0 ? (float)Math.Clamp(position / duration, 0.0, 1.0) : 0f;
     }
 
     // Endpoints are exact (KeyframeCurve.Evaluate returns exactly 0 and 1 there); anything else, including

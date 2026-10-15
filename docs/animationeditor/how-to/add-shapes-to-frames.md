@@ -44,3 +44,11 @@ Polygons can be convex or concave, but the polygon should not cross over itself.
 
 <figure><img src="../../.gitbook/assets/08_21_02_54.png" alt=""><figcaption><p>Invalid polygon crossing over itself</p></figcaption></figure>
 
+
+### Glide Shapes Between Frames
+
+A shape's position and size can glide from one frame to the next instead of changing instantly. Select a rectangle, circle or polygon and use the keyframe diamond and curve buttons above its **Offset** fields (X and Y) and, for rectangles and circles, above its **Size** fields (Scale X and Scale Y, or Radius). They work like the ones in [Glide Between Frames](edit-frames.md#glide-between-frames), and Offset and Size are independent.
+
+Shapes are matched from frame to frame by name. A glide runs to the next frame that has a shape with the same name and a keyframe turned on, and stops where the name is missing, repeated in a frame, or changes shape type. A shape with no name never glides. The first frame that has a given name is always a keyframe.
+
+Polygon points and shape colors do not glide.

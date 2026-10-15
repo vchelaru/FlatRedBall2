@@ -56,6 +56,9 @@ public partial class KeyframeControl : UserControl
         UpdateCurveTooltips();
     }
 
+    /// <summary>Why the diamond cannot be toggled, shown in its tooltip while it is disabled. Defaults to the sprite wording.</summary>
+    public string FirstKeyframeNote { get; set; } = "the first frame is always a keyframe";
+
     /// <summary>The diamond, for tests and automation.</summary>
     public ToggleButton DiamondButton => Diamond;
 
@@ -79,7 +82,7 @@ public partial class KeyframeControl : UserControl
     {
         Diamond.IsChecked = state.IsKeyframe;
         Diamond.IsEnabled = state.CanToggle;
-        ToolTip.SetTip(Diamond, state.CanToggle ? "Keyframe" : "Keyframe (the first frame is always a keyframe)");
+        ToolTip.SetTip(Diamond, state.CanToggle ? "Keyframe" : $"Keyframe ({FirstKeyframeNote})");
 
         CurvePanel.IsVisible = state.CurvesVisible;
         Divider.IsVisible = state.CurvesVisible;

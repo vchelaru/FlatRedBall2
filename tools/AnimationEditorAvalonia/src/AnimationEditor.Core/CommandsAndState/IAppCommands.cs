@@ -454,6 +454,19 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetFrameKeyframeCurve(IReadOnlyList<AnimationFrameSave> frames, KeyframeGroup group, KeyframeCurveChoice curve);
 
         /// <summary>
+        /// Turns the Offset or Size keyframe of <paramref name="shapes"/> on or off (#1478). The first shape of a run of
+        /// frames holding its name is always a keyframe and is left alone, as are locked frames' shapes and a polygon's
+        /// size. One undo step.
+        /// </summary>
+        void SetShapeKeyframe(IReadOnlyList<ShapeSave> shapes, ShapeKeyframeGroup group, bool isKeyframe);
+
+        /// <summary>
+        /// Sets the curve from each shape's Offset or Size keyframe to the next one. Only shapes whose keyframe is on
+        /// take it. One undo step.
+        /// </summary>
+        void SetShapeKeyframeCurve(IReadOnlyList<ShapeSave> shapes, ShapeKeyframeGroup group, KeyframeCurveChoice curve);
+
+        /// <summary>
         /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the
         /// four may be <c>null</c> to leave that component untouched per-frame — used when the
         /// inspector field is showing "(mixed)" and the user only edited one of the four. See

@@ -122,6 +122,7 @@ public class AnimationFrame : IKeyframeFrame
     bool IKeyframeFrame.SkipColorKeyframe => SkipColorKeyframe;
     KeyframeCurve IKeyframeFrame.OffsetCurve => OffsetCurve;
     KeyframeCurve IKeyframeFrame.ColorCurve => ColorCurve;
+    IReadOnlyList<IKeyframeShape> IKeyframeFrame.KeyframeShapes => Shapes;
 
     /// <summary>
     /// Per-frame shape definitions reconciled against the parent entity at frame switch time.

@@ -8,26 +8,43 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Captured Name/X/Y/P1/P2 of one shape (<see cref="AARectSave"/> or <see cref="CircleSave"/>),
-    /// where P1/P2 are ScaleX/ScaleY for a rectangle or Radius/(unused) for a circle. Used by
+    /// where P1/P2 are ScaleX/ScaleY for a rectangle or Radius/(unused) for a circle, plus its
+    /// keyframe flags and curves (#1478; the size ones are unused for a polygon). Used by
     /// <see cref="BulkShapePropsCommand"/> to snapshot shapes before and after a batch edit.
     /// </summary>
-    internal readonly record struct ShapeFieldSnapshot(object Shape, string Name, float X, float Y, float P1, float P2)
+    internal readonly record struct ShapeFieldSnapshot(
+        object Shape, string Name, float X, float Y, float P1, float P2,
+        bool SkipOffset, string? OffsetType, string? OffsetEasing,
+        bool SkipSize, string? SizeType, string? SizeEasing)
     {
-        public static ShapeFieldSnapshot Capture(object shape) => shape switch
+        public static ShapeFieldSnapshot Capture(object shape)
         {
-            AARectSave r => new(shape, r.Name, r.X, r.Y, r.ScaleX, r.ScaleY),
-            CircleSave c => new(shape, c.Name, c.X, c.Y, c.Radius, 0f),
-            PolygonSave p => new(shape, p.Name, p.X, p.Y, 0f, 0f),
-            _ => throw new ArgumentException($"Unsupported shape type: {shape.GetType()}", nameof(shape)),
-        };
+            var sized = shape as SizedShapeSave;
+            var s = shape as ShapeSave ?? throw new ArgumentException($"Unsupported shape type: {shape.GetType()}", nameof(shape));
+            var (p1, p2) = shape switch
+            {
+                AARectSave r => (r.ScaleX, r.ScaleY),
+                CircleSave c => (c.Radius, 0f),
+                _ => (0f, 0f),
+            };
+            return new(shape, s.Name, s.X, s.Y, p1, p2,
+                s.SkipOffsetKeyframe, s.OffsetInterpolation, s.OffsetEasing,
+                sized?.SkipSizeKeyframe ?? false, sized?.SizeInterpolation, sized?.SizeEasing);
+        }
 
         public void RestoreToShape()
         {
+            var s = (ShapeSave)Shape;
+            s.Name = Name; s.X = X; s.Y = Y;
+            s.SkipOffsetKeyframe = SkipOffset; s.OffsetInterpolation = OffsetType; s.OffsetEasing = OffsetEasing;
             switch (Shape)
             {
-                case AARectSave r: r.Name = Name; r.X = X; r.Y = Y; r.ScaleX = P1; r.ScaleY = P2; break;
-                case CircleSave c: c.Name = Name; c.X = X; c.Y = Y; c.Radius = P1; break;
-                case PolygonSave p: p.Name = Name; p.X = X; p.Y = Y; break;
+                case AARectSave r: r.ScaleX = P1; r.ScaleY = P2; break;
+                case CircleSave c: c.Radius = P1; break;
+            }
+            if (Shape is SizedShapeSave sized)
+            {
+                sized.SkipSizeKeyframe = SkipSize; sized.SizeInterpolation = SizeType; sized.SizeEasing = SizeEasing;
             }
         }
     }
@@ -60,12 +77,16 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// </summary>
         public string? CoalesceGroup { get; }
 
+        /// <param name="coalesce">
+        /// <c>false</c> for a discrete edit (a keyframe toggle or curve pick) that must never merge into
+        /// the field-typing undo entry before or after it.
+        /// </param>
         public BulkShapePropsCommand(
             IReadOnlyList<object> shapes, Action mutate,
             IAppCommands commands, IApplicationEvents events, IObjectFinder objectFinder,
-            string description)
+            string description, bool coalesce = true)
             : this(shapes, mutate, commands, events, objectFinder, description,
-                  $"BulkShapeProps:{string.Join(",", shapes.Select(RuntimeHelpers.GetHashCode).OrderBy(h => h))}",
+                  coalesce ? $"BulkShapeProps:{string.Join(",", shapes.Select(RuntimeHelpers.GetHashCode).OrderBy(h => h))}" : null,
                   [], [])
         {
         }
@@ -125,12 +146,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             foreach (var shape in _shapes)
             {
-                var frame = shape switch
-                {
-                    AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
-                    CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
-                    _ => null,
-                };
+                var frame = shape is ShapeSave s ? _objectFinder.GetAnimationFrameContaining(s) : null;
                 if (frame is not null) _commands.RefreshTreeNode(frame);
             }
             _commands.RefreshAnimationFrameDisplay();

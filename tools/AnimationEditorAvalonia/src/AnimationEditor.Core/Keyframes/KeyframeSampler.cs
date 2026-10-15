@@ -28,6 +28,14 @@ public static class KeyframeSampler
         return new KeyframeSample(x, y, new ResolvedFrameColor(c.Red, c.Green, c.Blue, c.Alpha, frames[frameIndex].ColorOperation));
     }
 
+    /// <summary>
+    /// The offset and size of <paramref name="shape"/> <paramref name="elapsedInFrame"/> seconds into frame
+    /// <paramref name="frameIndex"/>, glided by the shape curves stored in the chain (see
+    /// <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/>).
+    /// </summary>
+    public static KeyframeShapeValue SampleShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape) =>
+        KeyframeEvaluator.EvaluateShape(chain, frameIndex, elapsedInFrame, shape);
+
     /// <summary>Whether any frame of <paramref name="chain"/> has a curve that glides, so playback must repaint every tick.</summary>
     public static bool IsAnimated(AnimationChainSave? chain)
     {
@@ -36,6 +44,12 @@ public static class KeyframeSampler
         {
             if (!KeyframeCurve.Parse(frame.OffsetInterpolation, frame.OffsetEasing).IsSnap) return true;
             if (!KeyframeCurve.Parse(frame.ColorInterpolation, frame.ColorEasing).IsSnap) return true;
+            if (frame.ShapesSave is null) continue;
+            foreach (var shape in frame.ShapesSave.Shapes.OfType<ShapeSave>())
+            {
+                var adapter = SaveKeyframeShape.Create(shape);
+                if (!adapter.OffsetCurve.IsSnap || !adapter.SizeCurve.IsSnap) return true;
+            }
         }
         return false;
     }

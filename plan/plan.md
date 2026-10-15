@@ -49,14 +49,15 @@ Relationship to the other markdown folders:
 
 Tracking issue: [vchelaru/FlatRedBall2#1478](https://github.com/vchelaru/FlatRedBall2/issues/1478)
 
-Per-frame keyframes and easing curves for Sprite offset and color, stored in `.achx`, evaluated by the
+Per-frame keyframes and easing curves for Sprite offset and color and for each shape's offset and size, stored in `.achx`, evaluated by the
 shared runtime, and authored in the AnimationEditor.
 
 | Phase | Document | Status |
 |---|---|---|
 | 1 | `.achx` fields, shared evaluator, Sprite playback (#1479, no phase doc) | Landed |
 | 2 | Inspector keyframe diamond and curve picker (#1480, no phase doc) | Landed |
-| 3 | [Keyframe lanes under the timeline strip](1478-keyframe-interpolation/phase-03-timeline-keyframe-lanes.md) | In progress |
+| 3 | [Keyframe lanes under the timeline strip](1478-keyframe-interpolation/phase-03-timeline-keyframe-lanes.md) | Landed |
+| 4 | [Shape Offset and Size keyframes](1478-keyframe-interpolation/phase-04-shape-keyframes.md) | In progress |
 
 ### [Native .tsx / achx-push tile-animation sync hardening](1147-tsx-sync-hardening/)
 

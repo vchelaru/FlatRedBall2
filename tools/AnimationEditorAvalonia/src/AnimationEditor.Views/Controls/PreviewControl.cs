@@ -1682,18 +1682,41 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             var all = new List<PreviewShapeInfo>();
             foreach (var chain in _selectedState!.PreviewChains)
                 if (GetCurrentPlaybackFrame(chain) is { } groupFrame)
-                    all.AddRange(BuildShapeInfos(groupFrame, pinned: GroupPinnedFrame(chain) is not null));
+                {
+                    var controller = GetPlaybackController(chain);
+                    bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == chain.Frames.IndexOf(groupFrame);
+                    all.AddRange(BuildShapeInfos(groupFrame, pinned: GroupPinnedFrame(chain) is not null,
+                        playheadOnFrame ? controller!.FrameElapsed : 0));
+                }
             return all.ToArray();
         }
 
         var pinnedFrame = _selectedState!.SelectedFrame;
         var frame = pinnedFrame ?? GetCurrentPlaybackFrame();
-        return frame is null ? Array.Empty<PreviewShapeInfo>() : BuildShapeInfos(frame, pinnedFrame is not null);
+        if (frame is null) return Array.Empty<PreviewShapeInfo>();
+        // A pinned frame the playhead is not on shows its shapes at the start of the frame; otherwise they glide
+        // with the playhead, like the sprite (#1478).
+        bool playheadOnPinned = FindOwningChain(frame) is { } owner && _playback.CurrentFrameIndex == owner.Frames.IndexOf(frame);
+        return BuildShapeInfos(frame, pinnedFrame is not null, pinnedFrame is not null && !playheadOnPinned ? 0 : _playback.FrameElapsed);
     }
 
-    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned)
+    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame)
     {
         if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
+
+        // Shape offset and size glide by the curves stored on the shapes (#1478); with the default snap curve
+        // this is each shape's own value.
+        var chain = FindOwningChain(frame);
+        int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
+        KeyframeShapeValue ValueOf(ShapeSave shape)
+        {
+            if (chain is null || frameIndex < 0)
+            {
+                var own = SaveKeyframeShape.Create(shape);
+                return new KeyframeShapeValue(own.X, own.Y, own.SizeX, own.SizeY);
+            }
+            return KeyframeSampler.SampleShape(chain, frameIndex, elapsedInFrame, shape);
+        }
 
         var selectedRects   = new HashSet<AARectSave>();
         var selectedCircles  = new HashSet<CircleSave>();
@@ -1712,18 +1735,25 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         var list = new List<PreviewShapeInfo>();
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
-            list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
+        {
+            var v = ValueOf(r);
+            list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, v.X, v.Y, v.SizeX, v.SizeY,
                 selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked, IsHovered: pinned && IsHoverTarget(r)));
+        }
         foreach (var c in frame.ShapesSave!.CircleSaves)
-            list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
+        {
+            var v = ValueOf(c);
+            list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, v.X, v.Y, v.SizeX, 0f,
                 selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked, IsHovered: pinned && IsHoverTarget(c)));
+        }
         foreach (var p in frame.ShapesSave!.PolygonSaves)
         {
             int n = PolygonVertices.Count(p);
             var points = new float[n * 2];
             for (int i = 0; i < n; i++)
                 (points[i * 2], points[i * 2 + 1]) = PolygonVertices.Get(p, i);
-            list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, p.X, p.Y, 0f, 0f,
+            var v = ValueOf(p);
+            list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, v.X, v.Y, 0f, 0f,
                 selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
                 points, PolygonVertices.IsClosed(p), PolygonVertices.IsSelfIntersecting(p),
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,

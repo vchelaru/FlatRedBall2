@@ -52,3 +52,5 @@ Add them to `AnimationFrame.Shapes`. The shapes themselves on the entity are the
 ## .achx authoring
 
 Frame shapes round-trip via the `<ShapesSave>` element on each `<Frame>` (`<AARectSaves>`, `<CircleSaves>`, `<PolygonSaves>`). Rectangle dimensions in the .achx use FRB1's half-extent `ScaleX`/`ScaleY` and are doubled into `Width`/`Height` at load time. See `achx-authoring.md` for the surrounding schema.
+
+Shape offset and size can glide between frames (#1478). Per shape: `SkipOffsetKeyframe`/`OffsetInterpolation`/`OffsetEasing` (all shapes), and `SkipSizeKeyframe`/`SizeInterpolation`/`SizeEasing` (rectangles and circles; size is `ScaleX`/`ScaleY` or `Radius`). Same names and rules as the frame fields in `achx-authoring.md` (`.achj`: camelCase). Shapes match across frames by `Name` and kind; the glide runs to the next same-named shape with its keyframe on and stops where the name is missing, duplicated, or changes kind. `Sprite` applies the glide to the entity shapes it owns each update; polygon points and shape color do not glide.

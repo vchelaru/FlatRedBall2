@@ -2281,6 +2281,44 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, $"Set {name} Curve: {KeyframeCurvePicker.DisplayName(curve)}"));
         }
 
+        public void SetShapeKeyframe(IReadOnlyList<ShapeSave> shapes, ShapeKeyframeGroup group, bool isKeyframe)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var targets = shapes
+                .Where(s => !IsShapeLocked(null, s)
+                    && KeyframeInspectorState.HasGroup(group, s)
+                    && !KeyframeInspectorState.IsRunStart(s, ChainHolding(s)))
+                .ToList();
+            if (targets.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                targets.Cast<object>().ToList(),
+                () => { foreach (var s in targets) KeyframeInspectorState.SetSkip(group, s, !isKeyframe); },
+                this, _events, _objectFinder,
+                $"{(isKeyframe ? "Enable" : "Disable")} Shape {group} Keyframe", coalesce: false));
+        }
+
+        public void SetShapeKeyframeCurve(IReadOnlyList<ShapeSave> shapes, ShapeKeyframeGroup group, KeyframeCurveChoice curve)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var targets = shapes
+                .Where(s => !IsShapeLocked(null, s)
+                    && KeyframeInspectorState.HasGroup(group, s)
+                    && KeyframeInspectorState.IsEffectivelyKeyframe(group, s, ChainHolding(s)))
+                .ToList();
+            if (targets.Count == 0) return;
+            var (type, easing) = KeyframeCurvePicker.ToStored(curve);
+            _undoManager.Execute(new BulkShapePropsCommand(
+                targets.Cast<object>().ToList(),
+                () => { foreach (var s in targets) KeyframeInspectorState.SetCurve(group, s, type, easing); },
+                this, _events, _objectFinder,
+                $"Set Shape {group} Curve: {KeyframeCurvePicker.DisplayName(curve)}", coalesce: false));
+        }
+
+        private AnimationChainSave? ChainHolding(ShapeSave shape) =>
+            _objectFinder.GetAnimationFrameContaining(shape) is { } frame
+                ? _objectFinder.GetAnimationChainContaining(frame)
+                : null;
+
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
             NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH)
         {

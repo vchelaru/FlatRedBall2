@@ -1235,6 +1235,11 @@
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <TextBox x:Name="PropRectName" Grid.Column="1" FontSize="11" />
                                                 </Grid>
+                                                <TextBlock Text="Offset"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropRectOffsetKeyframe" />
                                                 <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="X" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
@@ -1249,6 +1254,11 @@
                                                                    Minimum="-10000" Maximum="10000"
                                                                    Increment="1" FormatString="0.###" />
                                                 </Grid>
+                                                <TextBlock Text="Size"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropRectSizeKeyframe" />
                                                 <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="Scale X" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
@@ -1282,6 +1292,11 @@
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <TextBox x:Name="PropCircleName" Grid.Column="1" FontSize="11" />
                                                 </Grid>
+                                                <TextBlock Text="Offset"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropCircleOffsetKeyframe" />
                                                 <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="X" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
@@ -1296,6 +1311,11 @@
                                                                    Minimum="-10000" Maximum="10000"
                                                                    Increment="1" FormatString="0.###" />
                                                 </Grid>
+                                                <TextBlock Text="Size"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropCircleSizeKeyframe" />
                                                 <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="Radius" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
@@ -1322,6 +1342,11 @@
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
                                                     <TextBox x:Name="PropPolygonName" Grid.Column="1" FontSize="11" />
                                                 </Grid>
+                                                <TextBlock Text="Offset"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropPolygonOffsetKeyframe" />
                                                 <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="X" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
