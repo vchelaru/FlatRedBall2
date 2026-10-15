@@ -158,7 +158,7 @@ git clone https://github.com/vchelaru/FlatRedBall2.git
 dotnet new frb2-desktop -n YourGameName --EnginePath ../FlatRedBall2
 ```
 
-`--EnginePath` is relative to the new `YourGameName/` solution folder, so `../FlatRedBall2` is a clone sitting next to it. The same parameter works with `frb2-multiplatform`. The generated `.csproj` files then use a `ProjectReference` to the engine's `src/FlatRedBall2.csproj` (and `src/Kni/FlatRedBall2.Kni.csproj` for the web head) in place of the `FlatRedBall2.MonoGame` / `FlatRedBall2.Kni` `PackageReference`, and the generated `.slnx` lists the engine projects. Without the parameter, the output is the NuGet-based project described above.
+`--EnginePath` must be a path relative to the new `YourGameName/` solution folder, so `../FlatRedBall2` is a clone sitting next to it. Absolute paths are not supported: the template cannot reject them, and they produce references that do not resolve. The same parameter works with `frb2-multiplatform`. The generated `.csproj` files then use a `ProjectReference` to the engine's `src/FlatRedBall2.csproj` (and `src/Kni/FlatRedBall2.Kni.csproj` for the web head) in place of the `FlatRedBall2.MonoGame` / `FlatRedBall2.Kni` `PackageReference`, and the generated `.slnx` lists the engine projects. Without the parameter, the output is the NuGet-based project described above.
 
 To switch an existing project, edit it by hand. In `YourGameName.Common.csproj`, replace
 

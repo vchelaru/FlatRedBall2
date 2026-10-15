@@ -24,7 +24,7 @@
       "isRequired": false,
       "defaultValue": "",
       "replaces": "__EnginePath0__",
-      "description": "Relative path from the new solution folder to a local FlatRedBall2 engine checkout, e.g. --EnginePath ../FlatRedBall2. When set, the game projects reference the engine source by ProjectReference instead of the NuGet package. Omit to use the NuGet package."
+      "description": "Must be a path relative to the new solution folder (absolute paths are not supported) to a local FlatRedBall2 engine checkout, e.g. --EnginePath ../FlatRedBall2 for a clone next to the project folder. When set, the game projects reference the engine source by ProjectReference instead of the NuGet package. Omit to use the NuGet package."
     },
     "EnginePathFromProject": {
       "type": "generated",
