@@ -3429,7 +3429,7 @@ public partial class MainWindow : Window
         // The keyframe lanes sit outside the cells' ScrollViewer so they must follow its scroll (#1478).
         TimelineScroll.ScrollChanged += (_, _) =>
         {
-            OffsetLane.ScrollOffset = ColorLane.ScrollOffset = TimelineScroll.Offset.X;
+            FirstLane.ScrollOffset = SecondLane.ScrollOffset = TimelineScroll.Offset.X;
         };
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
@@ -5055,7 +5055,7 @@ public partial class MainWindow : Window
         {
             // The group timeline shows no keyframe lanes (#1478).
             ApplyTimelineDockHeight(GroupTimelineAreaHeight);
-            SetKeyframeLanes(null, null, groupActive: true);
+            SetKeyframeLanes(TimelineLanePlan.None, groupActive: true);
             // Multiple chains have no single duration — keep the plain label (#623).
             TimelineHeaderLabel.Text = "TIMELINE";
             RefreshGroupTimelineTracks();
@@ -5086,10 +5086,7 @@ public partial class MainWindow : Window
         // Keyframe flags and curves are not part of the signature, so the lanes are recomputed on every
         // refresh (an O(frames) pass) from the live cell widths.
         var cellWidths = _timelineFrames.Select(f => f.Width).ToList();
-        SetKeyframeLanes(
-            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Offset, cellWidths),
-            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Color, cellWidths),
-            groupActive: false);
+        SetKeyframeLanes(TimelineLanePlanner.Build(chain, _selectedState.SelectedShapes, cellWidths), groupActive: false);
 
         int preferred = TimelineChainResolver.GetPreferredFrameIndex(
             _selectedState, _objectFinder, chain, PreviewCtrl.Playback.CurrentFrameIndex);
@@ -5107,18 +5104,23 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shows the Offset and Color keyframe lanes (null hides one) and, for the single-chain strip, sizes the
-    /// dock to the cells plus the visible lanes, so a chain with no keyframes keeps the original strip
-    /// height (#1478). The group timeline passes <paramref name="groupActive"/> and keeps its own height.
+    /// Shows the two keyframe lanes of <paramref name="plan"/> (null hides one): the Sprite's Offset and Color, or a
+    /// selected shape's Offset and Size (#1489). For the single-chain strip it sizes the dock to the cells plus the
+    /// visible lanes, so a chain with no keyframes keeps the original strip height (#1478). The group timeline
+    /// passes <paramref name="groupActive"/> and keeps its own height.
     /// </summary>
-    private void SetKeyframeLanes(KeyframeLane? offset, KeyframeLane? color, bool groupActive)
+    private void SetKeyframeLanes(TimelineLanePlan plan, bool groupActive)
     {
-        OffsetLane.Lane = offset;
-        ColorLane.Lane = color;
-        OffsetLane.IsVisible = OffsetLaneLabel.IsVisible = offset is not null;
-        ColorLane.IsVisible = ColorLaneLabel.IsVisible = color is not null;
+        FirstLane.Lane = plan.First;
+        SecondLane.Lane = plan.Second;
+        FirstLane.IsVisible = FirstLaneLabel.IsVisible = plan.First is not null;
+        SecondLane.IsVisible = SecondLaneLabel.IsVisible = plan.Second is not null;
+        FirstLaneLabel.Text = plan.FirstLabel;
+        SecondLaneLabel.Text = plan.SecondLabel;
+        ToolTip.SetTip(FirstLaneLabel, plan.FirstLabel);
+        ToolTip.SetTip(SecondLaneLabel, plan.SecondLabel);
         if (groupActive) return;
-        int lanes = (offset is null ? 0 : 1) + (color is null ? 0 : 1);
+        int lanes = (plan.First is null ? 0 : 1) + (plan.Second is null ? 0 : 1);
         ApplyTimelineDockHeight(SingleTimelineAreaHeight + lanes * KeyframeLaneBuilder.LaneHeight);
     }
 

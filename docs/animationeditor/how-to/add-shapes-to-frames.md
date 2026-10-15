@@ -51,4 +51,6 @@ A shape's position and size can glide from one frame to the next instead of chan
 
 Shapes are matched from frame to frame by name. A glide runs to the next frame that has a shape with the same name and a keyframe turned on, and stops where the name is missing, repeated in a frame, or changes shape type. A shape with no name never glides. The first frame that has a given name is always a keyframe.
 
+While one shape is selected, the timeline shows that shape's **Offset** and **Size** lanes under the frame cells in place of the frame's own lanes: a diamond at each keyframe and the curve to the next one. They cover every frame that has a shape with the same name, whichever frame's shape you selected, and leave a gap where the name is missing. Selecting several shapes shows no lanes.
+
 Polygon points and shape colors do not glide.

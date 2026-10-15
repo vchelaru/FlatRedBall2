@@ -187,7 +187,7 @@ public class KeyframeLaneBuilderTests
         chain.Frames[1].SkipOffsetKeyframe = true;
         var lane = KeyframeLaneBuilder.Build(chain, KeyframeGroup.Offset, Widths)!;
 
-        Assert.Equal(90, lane.HoldFromX);
+        Assert.Equal(new[] { new KeyframeLaneHold(90, 140) }, lane.Holds);
         Assert.Equal(140, lane.ContentWidth);
     }
 
@@ -200,7 +200,7 @@ public class KeyframeLaneBuilderTests
 
         var lane = KeyframeLaneBuilder.Build(chain, KeyframeGroup.Offset, Widths)!;
 
-        Assert.Null(lane.HoldFromX);
+        Assert.Empty(lane.Holds);
         var last = lane.Spans[^1];
         Assert.Equal(90, last.StartX);
         Assert.Equal(140, last.EndX);

@@ -6,8 +6,8 @@ using Avalonia.Media;
 namespace AnimationEditor.Views.Controls;
 
 /// <summary>
-/// One keyframe lane under the timeline cells (#1478): the easing curve of every keyframe-to-keyframe
-/// span (a stroked line over a faint fill), a dashed hold line after the last keyframe, faint ticks at
+/// One keyframe lane under the timeline cells (#1478, #1489): the easing curve of every keyframe-to-keyframe
+/// span (a stroked line over a faint fill), a dashed hold line after the last keyframe of each run, faint ticks at
 /// the frame boundaries, and an amber diamond on the left edge of each keyframe's frame. It only draws
 /// a <see cref="KeyframeLane"/>; the lane's geometry is computed by <see cref="KeyframeLaneBuilder"/>.
 /// It sits beside the cells' ScrollViewer rather than inside it so the first diamond can spill past the
@@ -109,10 +109,11 @@ public sealed class KeyframeLaneControl : Control
             context.DrawGeometry(null, curvePen, stroke);
         }
 
-        if (lane.HoldFromX is { } holdFrom && lane.ContentWidth > holdFrom)
+        var holdPen = new Pen(new SolidColorBrush(ink, 0.9), 1.25, new DashStyle(new double[] { 3, 3 }, 0));
+        foreach (var hold in lane.Holds)
         {
-            var holdPen = new Pen(new SolidColorBrush(ink, 0.9), 1.25, new DashStyle(new double[] { 3, 3 }, 0));
-            context.DrawLine(holdPen, new Point(holdFrom, top), new Point(lane.ContentWidth, top));
+            if (hold.EndX > hold.StartX)
+                context.DrawLine(holdPen, new Point(hold.StartX, top), new Point(hold.EndX, top));
         }
 
         var diamondBrush = new SolidColorBrush(amber);

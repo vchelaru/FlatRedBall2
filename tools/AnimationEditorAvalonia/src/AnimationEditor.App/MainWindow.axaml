@@ -1779,7 +1779,7 @@
                                 BorderThickness="0,1,1,0"
                                 Padding="6,0">
                             <!-- Row 0 holds the transport controls; row 1 holds the Offset/Color keyframe
-                                 lane labels (#1478), one LaneHeight each, shown only while their lane is. -->
+                                 lane labels (#1478, #1489), one LaneHeight each, shown only while their lane is. -->
                             <Grid RowDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <Button x:Name="PlayPauseBtn"
@@ -1810,13 +1810,17 @@
                                                                     Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                             </StackPanel>
                             <StackPanel Grid.Row="1">
-                                <TextBlock x:Name="OffsetLaneLabel" Text="Offset" Height="16"
+                                <!-- MaxWidth is the transport row's width: this column is Auto-sized, so a long
+                                     shape name (#1489) must trim rather than push the strip right. -->
+                                <TextBlock x:Name="FirstLaneLabel" Text="Offset" Height="16" MaxWidth="168"
                                            FontSize="9" FontWeight="SemiBold"
                                            Foreground="{DynamicResource InkDim}"
+                                           TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" IsVisible="False" />
-                                <TextBlock x:Name="ColorLaneLabel" Text="Color" Height="16"
+                                <TextBlock x:Name="SecondLaneLabel" Text="Color" Height="16" MaxWidth="168"
                                            FontSize="9" FontWeight="SemiBold"
                                            Foreground="{DynamicResource InkDim}"
+                                           TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" IsVisible="False" />
                             </StackPanel>
                             </Grid>
@@ -1896,8 +1900,8 @@
                                 </ItemsControl>
                             </ScrollViewer>
                             <StackPanel Grid.Row="1">
-                                <viewsControls:KeyframeLaneControl x:Name="OffsetLane" IsVisible="False" />
-                                <viewsControls:KeyframeLaneControl x:Name="ColorLane" IsVisible="False" />
+                                <viewsControls:KeyframeLaneControl x:Name="FirstLane" IsVisible="False" />
+                                <viewsControls:KeyframeLaneControl x:Name="SecondLane" IsVisible="False" />
                             </StackPanel>
                             </Grid>
                             </Border>

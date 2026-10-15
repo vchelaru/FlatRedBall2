@@ -28,4 +28,5 @@ the editor and is not interpolated.
 - [x] Core: `ShapeKeyframeGroup`, `ForShapes`, `SetShapeKeyframe`/`SetShapeKeyframeCurve`, sampler, clone
 - [x] Inspector: `KeyframeControl` per group in the rectangle, circle and polygon panels; read-only computed fields
 - [x] Preview draws glided shapes; docs and skills
-- [ ] Not done here: timeline lanes for shapes; dragging a shape in the preview while it glides edits stored values
+- [x] Timeline lanes for a selected shape: Offset and Size lanes replace the Sprite lanes (#1489)
+- [ ] Not done here: dragging a shape in the preview while it glides edits stored values

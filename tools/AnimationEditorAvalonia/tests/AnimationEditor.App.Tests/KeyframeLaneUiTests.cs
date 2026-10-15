@@ -67,9 +67,9 @@ public class KeyframeLaneUiTests
         var window = ShowWindow(ctx, MakeChain("Run", 4));
         try
         {
-            Assert.False(Find<KeyframeLaneControl>(window, "OffsetLane").IsVisible);
-            Assert.False(Find<KeyframeLaneControl>(window, "ColorLane").IsVisible);
-            Assert.False(Find<TextBlock>(window, "OffsetLaneLabel").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "FirstLane").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "SecondLane").IsVisible);
+            Assert.False(Find<TextBlock>(window, "FirstLaneLabel").IsVisible);
             Assert.Equal(52, Find<Grid>(window, "TimelineDockGrid").Height);
         }
         finally { window.Close(); }
@@ -82,12 +82,12 @@ public class KeyframeLaneUiTests
         var window = ShowWindow(ctx, OffsetKeyedChain());
         try
         {
-            var offset = Find<KeyframeLaneControl>(window, "OffsetLane");
+            var offset = Find<KeyframeLaneControl>(window, "FirstLane");
             Assert.True(offset.IsVisible);
             Assert.NotNull(offset.Lane);
-            Assert.True(Find<TextBlock>(window, "OffsetLaneLabel").IsVisible);
-            Assert.False(Find<KeyframeLaneControl>(window, "ColorLane").IsVisible);
-            Assert.False(Find<TextBlock>(window, "ColorLaneLabel").IsVisible);
+            Assert.True(Find<TextBlock>(window, "FirstLaneLabel").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "SecondLane").IsVisible);
+            Assert.False(Find<TextBlock>(window, "SecondLaneLabel").IsVisible);
 
             double expected = 52 + KeyframeLaneBuilder.LaneHeight;
             Assert.Equal(expected, Find<Grid>(window, "TimelineDockGrid").Height);
@@ -121,7 +121,7 @@ public class KeyframeLaneUiTests
         try
         {
             var dock = Find<Grid>(window, "TimelineDockGrid");
-            var color = Find<KeyframeLaneControl>(window, "ColorLane");
+            var color = Find<KeyframeLaneControl>(window, "SecondLane");
             Assert.False(color.IsVisible);
             Assert.Equal(52, dock.Height);
 
@@ -129,7 +129,7 @@ public class KeyframeLaneUiTests
             Dispatcher.UIThread.RunJobs();
             Assert.True(color.IsVisible);
             Assert.Equal(4, color.Lane!.KeyframeXs.Count);
-            Assert.False(Find<KeyframeLaneControl>(window, "OffsetLane").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "FirstLane").IsVisible);
             Assert.Equal(52 + KeyframeLaneBuilder.LaneHeight, dock.Height);
 
             ctx.UndoManager.Undo();
@@ -149,14 +149,14 @@ public class KeyframeLaneUiTests
         var window = ShowWindow(ctx, a, b);
         try
         {
-            Assert.True(Find<KeyframeLaneControl>(window, "OffsetLane").IsVisible);
+            Assert.True(Find<KeyframeLaneControl>(window, "FirstLane").IsVisible);
 
             ctx.SelectedState.SelectedNodes = new List<object> { a, b };
             Dispatcher.UIThread.RunJobs();
 
-            Assert.False(Find<KeyframeLaneControl>(window, "OffsetLane").IsVisible);
-            Assert.False(Find<KeyframeLaneControl>(window, "ColorLane").IsVisible);
-            Assert.False(Find<TextBlock>(window, "OffsetLaneLabel").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "FirstLane").IsVisible);
+            Assert.False(Find<KeyframeLaneControl>(window, "SecondLane").IsVisible);
+            Assert.False(Find<TextBlock>(window, "FirstLaneLabel").IsVisible);
             Assert.Equal(14 + 2.25 * 40, Find<Grid>(window, "TimelineDockGrid").Height);
         }
         finally { window.Close(); }
@@ -170,8 +170,8 @@ public class KeyframeLaneUiTests
         try
         {
             var strip = Find<ItemsControl>(window, "TimelineStrip");
-            var lane = Find<KeyframeLaneControl>(window, "OffsetLane");
-            var label = Find<TextBlock>(window, "OffsetLaneLabel");
+            var lane = Find<KeyframeLaneControl>(window, "FirstLane");
+            var label = Find<TextBlock>(window, "FirstLaneLabel");
 
             var stripOrigin = Origin(strip, window);
             var laneOrigin = Origin(lane, window);
@@ -203,7 +203,7 @@ public class KeyframeLaneUiTests
         var window = ShowWindow(ctx, chain);
         try
         {
-            foreach (var (laneName, labelName) in new[] { ("OffsetLane", "OffsetLaneLabel"), ("ColorLane", "ColorLaneLabel") })
+            foreach (var (laneName, labelName) in new[] { ("FirstLane", "FirstLaneLabel"), ("SecondLane", "SecondLaneLabel") })
             {
                 var lane = Find<KeyframeLaneControl>(window, laneName);
                 var label = Find<TextBlock>(window, labelName);
@@ -231,8 +231,8 @@ public class KeyframeLaneUiTests
             scroll.Offset = new Vector(150, 0);
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Equal(150, Find<KeyframeLaneControl>(window, "OffsetLane").ScrollOffset);
-            Assert.Equal(150, Find<KeyframeLaneControl>(window, "ColorLane").ScrollOffset);
+            Assert.Equal(150, Find<KeyframeLaneControl>(window, "FirstLane").ScrollOffset);
+            Assert.Equal(150, Find<KeyframeLaneControl>(window, "SecondLane").ScrollOffset);
         }
         finally { window.Close(); }
     }
@@ -246,7 +246,7 @@ public class KeyframeLaneUiTests
         {
             var preview = Find<PreviewControl>(window, "PreviewCtrl");
             var strip = Find<ItemsControl>(window, "TimelineStrip");
-            var lane = Find<KeyframeLaneControl>(window, "OffsetLane");
+            var lane = Find<KeyframeLaneControl>(window, "FirstLane");
 
             // The middle of frame 3's cell, pressed on the lane below it.
             var cell = strip.ContainerFromIndex(2)!;
@@ -272,7 +272,7 @@ public class KeyframeLaneUiTests
         {
             var preview = Find<PreviewControl>(window, "PreviewCtrl");
             var strip = Find<ItemsControl>(window, "TimelineStrip");
-            var lane = Find<KeyframeLaneControl>(window, "OffsetLane");
+            var lane = Find<KeyframeLaneControl>(window, "FirstLane");
 
             var firstCell = strip.ContainerFromIndex(0)!;
             var start = firstCell.TranslatePoint(new Point(firstCell.Bounds.Width / 2, 10), window)!.Value;

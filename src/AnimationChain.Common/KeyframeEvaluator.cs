@@ -228,8 +228,11 @@ public static class KeyframeEvaluator
         return !TryMatch(SaveKeyframeFrame.Create(chain)[frameIndex - 1], shape.Name, SaveKeyframeShape.KindOf(shape), out _);
     }
 
-    // The one shape in `frame` with this name, if exactly one shape has it and it has the given kind.
-    private static bool TryMatch(IKeyframeFrame frame, string name, KeyframeShapeKind kind, out IKeyframeShape match)
+    /// <summary>
+    /// The one shape in <paramref name="frame"/> with this name, when exactly one has it and it is of the given
+    /// kind. False for an empty name, a name held twice (ambiguous), or one of another kind: such a shape snaps.
+    /// </summary>
+    public static bool TryMatch(IKeyframeFrame frame, string name, KeyframeShapeKind kind, out IKeyframeShape match)
     {
         match = null!;
         if (string.IsNullOrEmpty(name)) return false;
