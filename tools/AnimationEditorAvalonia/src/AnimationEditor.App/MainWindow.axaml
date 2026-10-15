@@ -1753,6 +1753,9 @@
                                 BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="0,1,1,0"
                                 Padding="6,0">
+                            <!-- Row 0 holds the transport controls; row 1 holds the Offset/Color keyframe
+                                 lane labels (#1478), one LaneHeight each, shown only while their lane is. -->
+                            <Grid RowDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <Button x:Name="PlayPauseBtn"
                                         Height="26" Width="32"
@@ -1781,6 +1784,17 @@
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"
                                                                     Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                             </StackPanel>
+                            <StackPanel Grid.Row="1">
+                                <TextBlock x:Name="OffsetLaneLabel" Text="Offset" Height="16"
+                                           FontSize="9" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkDim}"
+                                           VerticalAlignment="Center" IsVisible="False" />
+                                <TextBlock x:Name="ColorLaneLabel" Text="Color" Height="16"
+                                           FontSize="9" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkDim}"
+                                           VerticalAlignment="Center" IsVisible="False" />
+                            </StackPanel>
+                            </Grid>
                         </Border>
 
                         <!-- Timeline strip -->
@@ -1805,7 +1819,13 @@
                                     BorderBrush="{DynamicResource LineBrush}"
                                     BorderThickness="0,0,0,0"
                                     Cursor="Hand">
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                            <!-- Cells on top; the Offset/Color keyframe lanes (#1478) below, outside the
+                                 ScrollViewer so the first diamond can spill past the strip's left edge.
+                                 Their ScrollOffset follows TimelineScroll (code-behind). Both are inside
+                                 the scrub surface, so a click or drag on a lane scrubs like one on a cell. -->
+                            <Grid RowDefinitions="*,Auto">
+                            <ScrollViewer x:Name="TimelineScroll"
+                                          HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Disabled">
                                 <ItemsControl x:Name="TimelineStrip">
                                     <ItemsControl.ItemsPanel>
@@ -1850,6 +1870,11 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
+                            <StackPanel Grid.Row="1">
+                                <viewsControls:KeyframeLaneControl x:Name="OffsetLane" IsVisible="False" />
+                                <viewsControls:KeyframeLaneControl x:Name="ColorLane" IsVisible="False" />
+                            </StackPanel>
+                            </Grid>
                             </Border>
 
                             <!-- Multi-select group preview timeline (#576): one row per selected
