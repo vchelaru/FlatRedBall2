@@ -117,25 +117,4 @@ public class PlaybackScenarioTests
         editor.Preview.SpeedMultiplier.ShouldBe(2);
     }
 
-    [AvaloniaFact]
-    public async Task InterpolateToggle_WithMixedGroup_ShowsMixed_AndClickTurnsEveryAnimationOn()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        string path = editor.WriteAchx("hero.achx",
-            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)),
-            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
-        await editor.OpenAsync(path);
-        ToggleButton toggle = editor.Control<ToggleButton>("InterpolateToggle");
-        editor.ClickRow(editor.ChainNamed("Walk"));
-        editor.Click(toggle);
-
-        editor.ClickRow(editor.ChainNamed("Run"), RawInputModifiers.Control);
-        toggle.IsChecked.ShouldBeNull("Walk is on and Run is off");
-
-        editor.Click(toggle);
-        toggle.IsChecked.ShouldBe(true);
-        editor.ClickRow(editor.ChainNamed("Run"));
-        editor.Preview.InterpolateOffsets.ShouldBe(true);
-    }
 }

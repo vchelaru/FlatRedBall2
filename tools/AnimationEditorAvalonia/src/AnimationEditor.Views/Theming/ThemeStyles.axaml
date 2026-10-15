@@ -61,7 +61,7 @@
         <Setter Property="Opacity" Value="0.35" />
     </Style>
     <!-- Toolbar/inspector text ToggleButtons (Move, Magic Wand, Grid, Onion Skin, Origin,
-         Bounding Box, Guides, Interpolate, Flip H/V/D, ...): FluentTheme's default ToggleButton
+         Bounding Box, Guides, Flip H/V/D, ...): FluentTheme's default ToggleButton
          MinHeight (~32) and vertical Padding clip text descenders (e.g. the "g" in "Magic")
          once a fixed Height="26" is applied, because the squeeze happens inside the button's
          own rounded-corner clip. Originally patched per-button (#501/#697-style); centralized
@@ -72,7 +72,7 @@
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Padding" Value="10,0"/>
     </Style>
-    <!-- Mixed state (e.g. Interpolate with a multi-select group where only some animations have it
+    <!-- Mixed state (e.g. Flip H with a multi-select where only some frames have it
          on): Fluent's indeterminate fill is nearly identical to unchecked, so outline it in the
          checked color to read as "partly on". -->
     <Style Selector="ToggleButton.toolbarToggle:indeterminate /template/ ContentPresenter#PART_ContentPresenter">

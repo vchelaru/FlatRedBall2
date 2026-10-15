@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Export;
 
-/// <summary>An animation to export and whether its offsets ease between frames (the preview's Interpolate toggle).</summary>
-public sealed record ExportSourceChain(AnimationChainSave Chain, bool Interpolate);
+/// <summary>An animation to export. Its offset and color glide by the curves stored on its frames, as in the preview.</summary>
+public sealed record ExportSourceChain(AnimationChainSave Chain);
 
-/// <summary>One animation's contribution to a composed frame: its current frame at its (possibly eased) offset.</summary>
-public sealed record ExportLayer(AnimationChainSave Chain, AnimationFrameSave Frame, float OffsetX, float OffsetY);
+/// <summary>One animation's contribution to a composed frame: its current frame at its (possibly glided) offset and color.</summary>
+public sealed record ExportLayer(
+    AnimationChainSave Chain, AnimationFrameSave Frame, float OffsetX, float OffsetY, ResolvedFrameColor Color);
 
 /// <summary>A composed frame: the layers to draw back to front, shown for <see cref="DelayTicks"/> (the format's delay unit).</summary>
 public sealed record ExportTimelineFrame(IReadOnlyList<ExportLayer> Layers, int DelayTicks);
@@ -38,11 +40,11 @@ public static class ExportTimelinePlanner
         {
             double time = (double)step / frameRate;
             var layers = new List<ExportLayer>(playable.Count);
-            foreach (var (chain, interpolate) in playable)
+            foreach (var chain in playable.Select(s => s.Chain))
             {
                 var (index, elapsed) = ChainClock.Locate(chain, time);
-                var (x, y) = OffsetInterpolator.ComputeOffset(chain, index, elapsed, interpolate);
-                layers.Add(new ExportLayer(chain, chain.Frames[index], x, y));
+                var sample = KeyframeSampler.Sample(chain, index, elapsed);
+                layers.Add(new ExportLayer(chain, chain.Frames[index], sample.OffsetX, sample.OffsetY, sample.Color));
             }
 
             if (previous is not null && SameLayers(previous, layers))
@@ -63,7 +65,8 @@ public static class ExportTimelinePlanner
     {
         for (int i = 0; i < a.Count; i++)
         {
-            if (!ReferenceEquals(a[i].Frame, b[i].Frame) || a[i].OffsetX != b[i].OffsetX || a[i].OffsetY != b[i].OffsetY)
+            if (!ReferenceEquals(a[i].Frame, b[i].Frame) || a[i].OffsetX != b[i].OffsetX || a[i].OffsetY != b[i].OffsetY
+                || a[i].Color != b[i].Color)
                 return false;
         }
         return true;

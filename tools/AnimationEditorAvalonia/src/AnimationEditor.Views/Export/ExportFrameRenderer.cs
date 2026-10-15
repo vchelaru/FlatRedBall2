@@ -127,8 +127,6 @@ internal static class ExportFrameRenderer
         int left = (int)Math.Floor(centerX - width / 2f + 0.5f);
         int top = (int)Math.Floor(centerY - height / 2f + 0.5f);
 
-        int index = layer.Chain.Frames.IndexOf(frame);
-        var color = EffectiveFrameColor.Resolve(layer.Chain.Frames, index);
-        return new Placement(layer, image, color, left, top, width, height);
+        return new Placement(layer, image, layer.Color, left, top, width, height);
     }
 }

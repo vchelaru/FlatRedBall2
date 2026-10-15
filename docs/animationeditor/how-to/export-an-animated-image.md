@@ -9,7 +9,7 @@ The AnimationEditor can save the selected animations as an animated GIF or an an
 3. Pick a frame rate, background and size, then click **Export**.
 4. Choose where to save the file.
 
-The image looks like the preview: frame offsets are applied, and the **Interpolate** setting of each animation is respected. Collision shapes, guides and the origin are not drawn.
+The image looks like the preview: frame offsets and colors are applied, including the curves that glide them between keyframes. Collision shapes, guides and the origin are not drawn.
 
 ## Several Animations
 
@@ -34,7 +34,7 @@ Choose GIF when the file has to open anywhere. Choose WebP for smooth 60 fps mot
 
 GIF stores each frame's delay in whole hundredths of a second, and browsers play a frame with a delay of 10 milliseconds or less at 100 milliseconds. That makes 50 fps (20 milliseconds per frame) the fastest usable GIF rate, so the GIF dialog offers 50, 30, 25 and 10 fps. WebP stores delays in milliseconds and also offers 60 fps.
 
-Frames that look the same as the one before them are merged into a single longer frame, so an animation without **Interpolate** produces about one frame per animation frame regardless of the frame rate.
+Frames that look the same as the one before them are merged into a single longer frame, so an animation without glide curves produces about one frame per animation frame regardless of the frame rate.
 
 ### Background
 

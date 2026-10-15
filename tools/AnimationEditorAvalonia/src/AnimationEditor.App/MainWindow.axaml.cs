@@ -193,8 +193,6 @@ public partial class MainWindow : Window
 
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
-    private bool _suppressInterpolateSync;
-    private bool _interpolateWasMixed;
     private bool _suppressGuideVisibilitySync;
 
     // Shift+Up/Down range-select (#1023): the row a range grows from. Reset to whatever
@@ -3071,14 +3069,14 @@ public partial class MainWindow : Window
     private readonly Dictionary<AnimatedImageFormat, AnimationExportOptions> _animatedExportOptions = new();
 
     /// <summary>
-    /// Exports the selected animations (stacked like the group preview, with each one's Interpolate
-    /// setting) as an animated image. Asks for options, then a path, then renders off the UI thread.
+    /// Exports the selected animations (stacked like the group preview, gliding by the curves stored
+    /// on their frames) as an animated image. Asks for options, then a path, then renders off the UI thread.
     /// </summary>
     private async Task ExportAnimatedImageAsync(AnimatedImageFormat format)
     {
         var sources = _selectedState.PreviewChains
             .Where(chain => chain.Frames.Count > 0)
-            .Select(chain => new ExportSourceChain(chain, PreviewCtrl.IsChainInterpolated(chain)))
+            .Select(chain => new ExportSourceChain(chain))
             .ToList();
         if (sources.Count == 0)
         {
@@ -3414,21 +3412,6 @@ public partial class MainWindow : Window
         // PreviewControl auto-reveals guides when a new one is added while hidden (#689);
         // resync the toolbar toggle and its visibility (only shown once a guide exists).
         PreviewCtrl.GuidesChanged += UpdateGuideToggleVisibility;
-
-        InterpolateToggle.IsCheckedChanged += (_, _) =>
-        {
-            if (_suppressInterpolateSync) return;
-            // Clicking a mixed group turns every animation on, whatever ToggleButton cycles to.
-            PreviewCtrl.SetInterpolateOffsets(_interpolateWasMixed || InterpolateToggle.IsChecked == true);
-        };
-        // PreviewControl restores each chain's own InterpolateOffsets on selection change; resync the toggle.
-        PreviewCtrl.InterpolateOffsetsChanged += isOn =>
-        {
-            _suppressInterpolateSync = true;
-            _interpolateWasMixed = isOn is null;
-            InterpolateToggle.IsChecked = isOn;
-            _suppressInterpolateSync = false;
-        };
 
         // Mirrors the Inspector's Loop checkbox (#1120) -- both read/write the same
         // AnimationChainSave.Loop through SetChainLoop, so they can never disagree. Suppressed

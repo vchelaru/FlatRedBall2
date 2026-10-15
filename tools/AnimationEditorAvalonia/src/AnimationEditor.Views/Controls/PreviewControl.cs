@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Input;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using Avalonia;
@@ -85,12 +86,6 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private bool _showOrigin;
     private bool _showUserGuides = true;
     private bool _showBoundingBox = true;
-    // Chains the user turned Interpolate on for. This is an incremental step: the toggle is kept
-    // per chain in memory for the session instead of clearing on every selection change, but it
-    // is not saved to the .achx. Persisting it to disk (possibly as a per-frame setting) may
-    // come later.
-    private readonly HashSet<AnimationChainSave> _interpolatedChains = new(ReferenceEqualityComparer.Instance);
-
     // -- Pan drag --------------------------------------------------------------
     private bool  _isPanning;
     private Point _lastMousePt;
@@ -285,54 +280,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// <summary>Fires whenever a guide is added, removed, or bulk-replaced via <see cref="SetGuides"/>.</summary>
     public event Action? GuidesChanged;
 
-    /// <summary>
-    /// Whether the previewed animations ease the sprite between consecutive frames'
-    /// <c>RelativeX/Y</c> offsets instead of snapping at each frame switch: <c>true</c> when every
-    /// previewed animation does, <c>false</c> when none do, <c>null</c> when a multi-animation group
-    /// is mixed. Preview-only: the FlatRedBall runtime always snaps, so this does not reflect
-    /// in-game behavior and is not persisted. Remembered per animation for the session.
-    /// </summary>
-    public bool? InterpolateOffsets
-    {
-        get
-        {
-            var targets = InterpolateTargets();
-            if (targets.Count == 0) return false;
-            int on = targets.Count(_interpolatedChains.Contains);
-            return on == 0 ? false : on == targets.Count ? true : null;
-        }
-    }
-
-    /// <summary>Turns Interpolate on or off for every previewed animation (the whole group in multi-select).</summary>
-    public void SetInterpolateOffsets(bool on)
-    {
-        foreach (var chain in InterpolateTargets())
-        {
-            if (on) _interpolatedChains.Add(chain);
-            else _interpolatedChains.Remove(chain);
-        }
-        InvalidateVisual();
-        InterpolateOffsetsChanged?.Invoke(InterpolateOffsets);
-    }
-
-    // The group's chains in multi-select, else the single previewed chain.
-    private List<AnimationChainSave> InterpolateTargets() =>
-        IsGroupPreviewActive ? _groupPlayback.Keys.ToList()
-        : _playback.Chain is { } chain ? new List<AnimationChainSave> { chain }
-        : new List<AnimationChainSave>();
-
-    private bool IsInterpolated(AnimationChainSave? chain) =>
-        chain is not null && _interpolatedChains.Contains(chain);
-
-    /// <summary>Whether Interpolate is on for <paramref name="chain"/>, for exports that must match the preview.</summary>
-    public bool IsChainInterpolated(AnimationChainSave chain) => IsInterpolated(chain);
-
     /// <summary>The canvas background as it is drawn now (theme or user override), packed <c>0xAARRGGBB</c>.</summary>
     public uint CanvasBackgroundArgb => (uint)_palette.Background;
-
-    /// <summary>Fired after <see cref="SetInterpolateOffsets"/> and after every selection change
-    /// (which swaps in each animation's own setting), so the toolbar toggle can resync.</summary>
-    public event Action<bool?>? InterpolateOffsetsChanged;
 
     public double SpeedMultiplier
     {
@@ -638,23 +587,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             if (GetCurrentPlaybackFrame(chain) is not { } frame) continue;
             string? texPath = _thumbnailService!.ResolveTexturePath(frame);
             _thumbnailService.GetImage(texPath);
-            var (offX, offY) = ResolveGroupLayerOffset(chain, frame);
-            layers.Add(new PreviewLayer(frame, texPath, offX, offY, ResolveColor(chain, frame)));
+            var sample = ResolveGroupLayerSample(chain, frame);
+            layers.Add(new PreviewLayer(frame, texPath, sample.OffsetX, sample.OffsetY, sample.Color));
         }
         return layers.ToArray();
     }
 
     /// <summary>
-    /// A group layer's offset: eased at its own track's playhead when its chain's Interpolate is on
-    /// (#1387), else the frame's stored offset. A pinned frame the playhead isn't on stays put.
+    /// A group layer's offset and color, glided by the stored curves at its own track's playhead (#1478).
+    /// A pinned frame the playhead isn't on shows its value at the start of the frame.
     /// </summary>
-    private (float X, float Y) ResolveGroupLayerOffset(AnimationChainSave chain, AnimationFrameSave frame)
+    private KeyframeSample ResolveGroupLayerSample(AnimationChainSave chain, AnimationFrameSave frame)
     {
+        int index = chain.Frames.IndexOf(frame);
         var controller = GetPlaybackController(chain);
-        if (controller is null || !IsInterpolated(chain)
-            || controller.CurrentFrameIndex != chain.Frames.IndexOf(frame))
-            return (frame.RelativeX, frame.RelativeY);
-        return OffsetInterpolator.ComputeOffset(chain, controller.CurrentFrameIndex, controller.FrameElapsed, true);
+        bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == index;
+        return KeyframeSampler.Sample(chain, index, playheadOnFrame ? controller!.FrameElapsed : 0);
     }
 
     /// <summary>Whether the animation is currently playing.</summary>
@@ -859,15 +807,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         _thumbnailService.GetImage(texPath);
         _thumbnailService.GetImage(onionPath);
 
-        var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
+        var frameSample = ResolveFrameSample(chain, displayFrame, selectedFrame is not null);
 
         return new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
                                   _showOrigin, _showUserGuides, _showBoundingBox, texPath, onionPath, width, height,
                                   _appState!.OffsetMultiplier,
                                   _hGuides.ToArray(), _vGuides.ToArray(),
                                   _draggedGuideIdx, _draggingHGuide,
-                                  BuildShapeInfos(), frameOffX, frameOffY,
-                                  ResolveColor(chain, displayFrame), ResolveColor(chain, onionFrame),
+                                  BuildShapeInfos(), frameSample.OffsetX, frameSample.OffsetY,
+                                  frameSample.Color, ResolveColor(chain, onionFrame),
                                   Array.Empty<PreviewLayer>(), renderScaling);
     }
 
@@ -994,11 +942,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
         _playback.FrameIndexChanged += _ => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
-        // While interpolating, repaint every tick so the eased motion is smooth, not stepped
+        // While a stored curve glides, repaint every tick so the motion is smooth, not stepped
         // to once-per-frame-switch like the snap path.
         _playback.PlaybackTicked += () =>
         {
-            if (IsInterpolated(_playback.Chain)) Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+            if (KeyframeSampler.IsAnimated(_playback.Chain)) Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         };
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
@@ -1072,31 +1020,29 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             _playback.Play();
         }
 
-        // Each animation keeps its own Interpolate setting (see _interpolatedChains); resync the toggle.
-        InterpolateOffsetsChanged?.Invoke(InterpolateOffsets);
         InvalidateVisual();
         // A new chain/frame changes the union extent → refresh the host's scrollbars.
         RaiseViewChanged();
     }
 
     /// <summary>
-    /// Resolves the (X, Y) offset for the display frame, honoring <see cref="InterpolateOffsets"/>
-    /// at the playhead's position. A pinned frame (tree selection or scrub) interpolates too when
-    /// the playhead is on it, so scrubbing shows what playback would show (#1385); a frame
-    /// selected at its start is at t = 0, which is its own stored offset.
+    /// Resolves the offset and color for the display frame from the curves stored in the chain, at the
+    /// playhead's position. A pinned frame (tree selection or scrub) glides too when the playhead is on
+    /// it, so scrubbing shows what playback would show (#1385); a pinned frame the playhead is not on
+    /// shows its value at the start of the frame, which for a keyframe is its own stored value.
     /// </summary>
-    private (float X, float Y) ResolveFrameOffset(
+    private KeyframeSample ResolveFrameSample(
         AnimationChainSave? chain, AnimationFrameSave? displayFrame, bool pinned)
     {
-        if (displayFrame is null) return (0f, 0f);
+        if (displayFrame is null) return default;
+        if (chain is null)
+            return new KeyframeSample(displayFrame.RelativeX, displayFrame.RelativeY, ResolveColor(chain, displayFrame));
 
-        bool playheadOnFrame = chain is not null
-            && _playback.CurrentFrameIndex == chain.Frames.IndexOf(displayFrame);
-        if (pinned && !playheadOnFrame)
-            return (displayFrame.RelativeX, displayFrame.RelativeY);
-
-        return OffsetInterpolator.ComputeOffset(
-            chain, _playback.CurrentFrameIndex, _playback.FrameElapsed, IsInterpolated(chain));
+        int displayIndex = chain.Frames.IndexOf(displayFrame);
+        bool playheadOnFrame = _playback.CurrentFrameIndex == displayIndex;
+        if (displayIndex < 0)
+            return new KeyframeSample(displayFrame.RelativeX, displayFrame.RelativeY, ResolveColor(chain, displayFrame));
+        return KeyframeSampler.Sample(chain, displayIndex, pinned && !playheadOnFrame ? 0 : _playback.FrameElapsed);
     }
 
     // -- Public API ------------------------------------------------------------
@@ -1840,6 +1786,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         var snap = BuildRenderSnapshot(100f, 100f);
         return (snap.FrameOffsetX, snap.FrameOffsetY);
     }
+
+    /// <summary>Test-only: returns the display-frame color the renderer would draw with for the current state.</summary>
+    internal ResolvedFrameColor GetFrameColorForTest() => BuildRenderSnapshot(100f, 100f).FrameColor;
+
+    /// <summary>Test-only: returns each group layer's drawn color, back-to-front.</summary>
+    internal ResolvedFrameColor[] GetGroupLayerColorsForTest() =>
+        BuildGroupLayers().Select(l => l.Color).ToArray();
 
     /// <summary>Test-only: returns each group layer's drawn offset, back-to-front.</summary>
     internal (float X, float Y)[] GetGroupLayerOffsetsForTest() =>
@@ -3176,7 +3129,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         int    DraggedGuideIdx,
         bool   DraggingHGuide,
         PreviewShapeInfo[] Shapes,
-        // Display-frame offset, already resolved for snap vs interpolate (see ResolveFrameOffset).
+        // Display-frame offset, already glided by the stored curves (see ResolveFrameSample).
         float  FrameOffsetX, float FrameOffsetY,
         // Sticky per-channel color for the live frame and onion frame — an omitted channel holds
         // whatever an earlier frame last set, matching runtime, rather than resetting each frame.

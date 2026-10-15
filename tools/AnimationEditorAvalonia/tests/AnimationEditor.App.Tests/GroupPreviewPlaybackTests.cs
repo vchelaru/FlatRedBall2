@@ -317,11 +317,11 @@ public class GroupPreviewPlaybackTests
     }
 
     /// <summary>
-    /// Each track honors its own chain's remembered Interpolate setting (#1387): A was turned on
-    /// while selected alone, B never was, so halfway through frame 0 only A eases toward frame 1.
+    /// Each track glides by its own chain's stored curve (#1387, #1478): A's first frame has a Linear
+    /// offset curve, B's has none, so halfway through frame 0 only A eases toward frame 1.
     /// </summary>
     [AvaloniaFact]
-    public void GroupLayers_EachTrackUsesItsOwnInterpolateSetting()
+    public void GroupLayers_EachTrackUsesItsOwnStoredCurve()
     {
         var ctx = TestHelpers.BuildServices();
         var a = MakeChain("A", 2);
@@ -333,10 +333,10 @@ public class GroupPreviewPlaybackTests
         ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(b);
 
         var ctrl = ctx.CreatePreviewControl();
+        a.Frames[0].OffsetInterpolation = "Linear";
         ctrl.PauseAutoPlayback();
         ctx.SelectedState.SelectedChain = a;
         Dispatcher.UIThread.RunJobs();
-        ctrl.SetInterpolateOffsets(true);
 
         ctx.SelectedState.SelectedNodes = new List<object> { a, b };
         Dispatcher.UIThread.RunJobs();

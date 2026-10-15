@@ -54,8 +54,9 @@ public class GifExportScenarioTests
         await editor.OpenAsync(path);
         AnimationChainSave walk = editor.ChainNamed("Walk");
         walk.Frames[1].RelativeX = 8;
+        walk.Frames[0].OffsetInterpolation = "Linear";
+        walk.Frames[1].OffsetInterpolation = "Linear"; // the chain loops, so the last frame glides back to frame 0
         editor.ClickRow(walk);
-        editor.Click(editor.Control<ToggleButton>("InterpolateToggle"));
         string gif = Path.Combine(editor.ProjectFolder, "walk.gif");
 
         await ExportAsync(editor, gif, content =>
@@ -77,7 +78,7 @@ public class GifExportScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ExportGif_WithoutInterpolate_KeepsOnlyTheAnimationsOwnFrames()
+    public async Task ExportGif_WithSnapCurves_KeepsOnlyTheAnimationsOwnFrames()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);

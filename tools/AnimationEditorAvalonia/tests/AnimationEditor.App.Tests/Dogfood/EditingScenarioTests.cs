@@ -199,15 +199,12 @@ public class EditingScenarioTests
         editor.ClickRow(editor.ChainNamed("Walk"));
         bool onionBefore = editor.Preview.ShowOnionSkin;
         bool originBefore = editor.Preview.ShowOrigin;
-        bool? interpolateBefore = editor.Preview.InterpolateOffsets;
 
         editor.Click(editor.Control<ToggleButton>("OnionSkinToggle"));
         editor.Click(editor.Control<ToggleButton>("ShowOriginCheck"));
-        editor.Click(editor.Control<ToggleButton>("InterpolateToggle"));
 
         editor.Preview.ShowOnionSkin.ShouldBe(!onionBefore);
         editor.Preview.ShowOrigin.ShouldBe(!originBefore);
-        editor.Preview.InterpolateOffsets.ShouldBe(!interpolateBefore);
     }
 
     [AvaloniaFact]
