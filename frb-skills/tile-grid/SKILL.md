@@ -25,8 +25,8 @@ private int _cols, _rows;
 private float _tileSize;
 private Vector2 _gridOrigin;       // world position of tile (0,0) center
 
-// Visual layer — one ColoredRectangleRuntime per visible tile:
-private ColoredRectangleRuntime?[,] _visuals;
+// Visual layer — one RectangleRuntime per visible tile:
+private RectangleRuntime?[,] _visuals;
 ```
 
 Always update `_tiles` first, then sync the visual. Never infer tile type from the visual's color.
@@ -44,7 +44,7 @@ _gridOrigin = new Vector2(-(_cols * _tileSize) / 2f + _tileSize / 2f,
                           -(_rows * _tileSize) / 2f + _tileSize / 2f);
 
 _tiles   = new TileType[_cols, _rows];
-_visuals = new ColoredRectangleRuntime[_cols, _rows];
+_visuals = new RectangleRuntime[_cols, _rows];
 ```
 
 `_gridOrigin` is the **center** of tile (0,0). Add `col * _tileSize` / `row * _tileSize` to get centers of other tiles.
@@ -76,17 +76,18 @@ Vector2 TileToWorld(int col, int row)
 
 ## Spawning Tile Visuals
 
-For grids up to ~4,000 tiles, spawn one `ColoredRectangleRuntime` per tile in Gum (screen-space; camera does not move these automatically). This is **Option B (canvas-space overlay)** and is separate from the world-space path described in the World ↔ Tile section above. It uses a dedicated `_uiGridOrigin` in canvas-space:
+For grids up to ~4,000 tiles, spawn one `RectangleRuntime` per tile in Gum (screen-space; camera does not move these automatically). This is **Option B (canvas-space overlay)** and is separate from the world-space path described in the World ↔ Tile section above. It uses a dedicated `_uiGridOrigin` in canvas-space:
 
 ```csharp
 private readonly Vector2 _uiGridOrigin = Vector2.Zero;
 
 void SpawnVisual(int col, int row)
 {
-    var rect = new ColoredRectangleRuntime
+    var rect = new RectangleRuntime
     {
         Width  = _tileSize,
         Height = _tileSize,
+        IsFilled = true, // RectangleRuntime is an unfilled outline by default
     };
     // This snippet is canvas-space only (UI overlay grid).
     Add(rect); // screen-space — anchored to Gum canvas
@@ -101,7 +102,7 @@ void SyncVisual(int col, int row)
     // Canvas-space placement for Gum visuals.
     rect.X = _uiGridOrigin.X + col * _tileSize;
     rect.Y = _uiGridOrigin.Y + row * _tileSize;
-    rect.Color = TileColor(_tiles[col, row]);
+    rect.FillColor = TileColor(_tiles[col, row]);
 }
 ```
 
@@ -164,7 +165,7 @@ Use integer math (column/row distances) when possible — it avoids the square r
 
 ## Performance Notes
 
-- **16,384 tiles (128×128):** Initial spawn is slow (~300–600ms for `ColoredRectangleRuntime` objects). Acceptable for city builders. If it's a problem, spawn only the visible viewport and lazy-spawn as camera pans.
+- **16,384 tiles (128×128):** Initial spawn is slow (~300–600ms for `RectangleRuntime` objects). Acceptable for city builders. If it's a problem, spawn only the visible viewport and lazy-spawn as camera pans.
 - **Per-tick full-grid scan:** Scanning all 16,384 tiles each sim tick is fast (< 1ms). Do not premature-optimize. Only cache derived data (e.g., "powered tiles" bitset) if profiling reveals it's a bottleneck.
-- **Do not use `TileShapes` for visual-only grids.** `TileShapes` is a collision structure, not a rendering structure. Use `ColoredRectangleRuntime` for programmer-art visual tiles.
-- **Entity-per-tile is expensive at this scale.** Avoid spawning a full `Entity` subclass for each tile — the per-entity overhead (factory registration, physics update, etc.) at 16k tiles adds up. Use lightweight Gum visuals or `ColoredRectangleRuntime` instead.
+- **Do not use `TileShapes` for visual-only grids.** `TileShapes` is a collision structure, not a rendering structure. Use `RectangleRuntime` for programmer-art visual tiles.
+- **Entity-per-tile is expensive at this scale.** Avoid spawning a full `Entity` subclass for each tile — the per-entity overhead (factory registration, physics update, etc.) at 16k tiles adds up. Use lightweight Gum visuals or `RectangleRuntime` instead.

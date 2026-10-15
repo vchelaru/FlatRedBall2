@@ -131,7 +131,7 @@ For a third-party API's shape (MonoGame, Gum, MonoGame.Extended, etc.): official
 
 ## Manual-Test Scratch Projects
 
-A change that needs a human to see or hear it (audio, rendering, input feel) needs a runnable harness, built without being asked. Put it under `diagnostics/manual-test/<Name>/` (gitignored as a whole — never commit/push it; this differs from a feasibility spike like `diagnostics/MusicPitchSpike`, which documents a finding and *is* committed). Give it a classic `.sln` (`dotnet new sln --format sln`) and open it yourself. You may also run the app or harness yourself. Anything that starts a browser or dev server runs in the foreground with a Bash `timeout`, at below-normal priority, never in an unattended loop.
+A change that needs a human to hear it or feel it (audio, input feel) needs a runnable harness, built without being asked. Anything visible in a single frame (rendering, layout, zoom, overlap) is not a human-only check: build the harness so it scripts the states and saves its own back-buffer PNGs to the scratchpad, then read those images yourself and report what they show. Ask the human to look only for what a still image can't show. Put it under `diagnostics/manual-test/<Name>/` (gitignored as a whole — never commit/push it; this differs from a feasibility spike like `diagnostics/MusicPitchSpike`, which documents a finding and *is* committed). Give it a classic `.sln` (`dotnet new sln --format sln`) and open it yourself. You may also run the app or harness yourself. Anything that starts a browser or dev server runs in the foreground with a Bash `timeout`, at below-normal priority, never in an unattended loop.
 
 ## Don't Infer Conventions from `samples/`
 

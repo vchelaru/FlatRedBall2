@@ -304,12 +304,17 @@ public class Camera
     /// <c>GraphicalUiElement.X/Y</c> for a Gum visual rendered through the engine's GumBatch:
     /// the batch already scales canvas units to viewport pixels, so passing pixels here would
     /// double-scale and drift on horizontal window resize.
+    /// <para>
+    /// Does not apply <see cref="Zoom"/> to the world offset: the batch's scale is
+    /// <see cref="PixelsPerUnit"/>, which already includes it, so the visible canvas is
+    /// <c>OrthogonalWidth / Zoom</c> units wide (matching <c>UiRoot</c>).
+    /// </para>
     /// </summary>
     public NumericsVector2 WorldToCanvas(NumericsVector2 worldPosition)
     {
         return new NumericsVector2(
-             (worldPosition.X - X) * Zoom + OrthogonalWidth  / 2f,
-            -(worldPosition.Y - Y) * Zoom + OrthogonalHeight / 2f);
+             (worldPosition.X - X) + OrthogonalWidth  / (2f * Zoom),
+            -(worldPosition.Y - Y) + OrthogonalHeight / (2f * Zoom));
     }
 
     /// <summary>

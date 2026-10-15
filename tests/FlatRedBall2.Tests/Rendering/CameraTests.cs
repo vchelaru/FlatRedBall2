@@ -120,12 +120,36 @@ public class CameraTests
         var w = wide.WorldToCanvas(new System.Numerics.Vector2(-330f, 240f));
         var n = narrow.WorldToCanvas(new System.Numerics.Vector2(-330f, 240f));
 
-        // Canvas X = (worldX - camX) * Zoom + orthoW/2.  Different orthoW => different canvas X,
+        // Canvas X = (worldX - camX) + orthoW / (2 * Zoom); Zoom is 1 here.  Different orthoW => different canvas X,
         // but the offset *from center* must be identical to the world offset (here -330):
         (w.X - wide.OrthogonalWidth / 2f).ShouldBe(-330f, tolerance: 0.01f);
         (n.X - narrow.OrthogonalWidth / 2f).ShouldBe(-330f, tolerance: 0.01f);
         // Y axis: pinned to design height — exact same canvas Y in both cameras.
         w.Y.ShouldBe(n.Y, tolerance: 0.01f);
+    }
+
+    [Theory]
+    [InlineData(0.5f)]
+    [InlineData(1f)]
+    [InlineData(2f)]
+    public void WorldToCanvas_ScaledByPixelsPerUnit_LandsWhereWorldToScreenDoes(float zoom)
+    {
+        // GumRenderBatch scales canvas units by PixelsPerUnit (window scale x Zoom). A world-space
+        // Gum visual therefore lands at canvas * PixelsPerUnit, which must equal the pixel that
+        // WorldToScreen gives for the same world point; zoom must not be applied a second time.
+        var camera = MakeCamera(1280, 720);
+        camera.OrthogonalWidth = 1280;
+        camera.OrthogonalHeight = 720;
+        camera.X = 50f;
+        camera.Y = -30f;
+        camera.Zoom = zoom;
+        var world = new System.Numerics.Vector2(-250f, 120f);
+
+        var canvas = camera.WorldToCanvas(world);
+        var screen = camera.WorldToScreen(world);
+
+        (canvas.X * camera.PixelsPerUnit).ShouldBe(screen.X, tolerance: 0.01f);
+        (canvas.Y * camera.PixelsPerUnit).ShouldBe(screen.Y, tolerance: 0.01f);
     }
 
     [Fact]

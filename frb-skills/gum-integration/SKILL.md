@@ -36,24 +36,23 @@ High-level controls with built-in click, hover, focus, and Tab/accessibility key
 
 Use Forms controls for menus, buttons, and any interactive element. `Label` is also the right choice for simple score/status text.
 
-### Visual Types — non-interactive rendering (`MonoGameGum.GueDeriving`)
+### Visual Types — non-interactive rendering (`Gum.GueDeriving`)
 
 Raw visual objects with no built-in input handling. Use these for non-interactive HUD elements — health bars, icons, solid-color shapes — when no Forms control fits:
 
 | Type | Use for |
 |------|---------|
 | `TextRuntime` | Text with custom `FontSize`/`FontScale` not exposed by `Label` |
-| `ColoredRectangleRuntime` | Solid-color rectangle (health bars, UI frames, heart indicators) |
+| `RectangleRuntime` | Rectangle with `FillColor`/`StrokeColor`, optional `CornerRadius`; unfilled by default, so set `IsFilled = true` for a solid fill (health bars, UI frames) |
 | `SpriteRuntime` | Textured image |
-| `ColoredCircleRuntime` | Anti-aliased filled circle (Gum.Shapes package) |
-| `RoundedRectangleRuntime` | Anti-aliased rounded rectangle, optional gradient (Gum.Shapes package) |
+| `CircleRuntime` | Anti-aliased circle; `IsFilled = true` for a fill, `StrokeColor` for an outline (Gum.Shapes package) |
 | `ArcRuntime` | Anti-aliased arc/ring segment (Gum.Shapes package) |
 
 ```csharp
-using MonoGameGum.GueDeriving;
+using Gum.GueDeriving;
 
 // Health bar fill
-var fill = new ColoredRectangleRuntime { Width = 100, Height = 12, Color = Color.Red };
+var fill = new RectangleRuntime { Width = 100, Height = 12, IsFilled = true, FillColor = Color.Red };
 fill.Anchor(Anchor.TopLeft);
 fill.X = 20; fill.Y = 20;
 Add(fill);
@@ -115,7 +114,7 @@ scoreLabel.Text = _score.ToString();
 **Option B — `TextRuntime` (low-level)**: Use only when you need `FontSize`, `FontScale`, etc. not exposed by `Label`.
 
 ```csharp
-using MonoGameGum.GueDeriving;   // TextRuntime lives here, NOT Gum.Wireframe
+using Gum.GueDeriving;   // TextRuntime lives here, NOT Gum.Wireframe
 
 var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
 Add(scoreText);
@@ -124,7 +123,7 @@ Add(scoreText);
 For `Label`, text styling still lives on the underlying `TextRuntime`. Changing `Label.Text` updates content only; change the visual for `FontSize`/`Color`/opacity:
 
 ```csharp
-using MonoGameGum.GueDeriving;
+using Gum.GueDeriving;
 
 if (scoreLabel.Visual is TextRuntime text)
 {
@@ -278,7 +277,7 @@ The API differs by type:
   label.IsVisible = false;
   label.IsVisible = true;
   ```
-- **Visual types** (`ColoredRectangleRuntime`, `TextRuntime`, `SpriteRuntime`) — use `Visible`:
+- **Visual types** (`RectangleRuntime`, `TextRuntime`, `SpriteRuntime`) — use `Visible`:
   ```csharp
   rect.Visible = false;
   rect.Visible = true;
@@ -287,8 +286,8 @@ The API differs by type:
 ## Gotchas
 
 - **"Keyboard navigation" on Forms controls means Tab/accessibility focus only — not arrow keys.** Game action menus (battle commands, pause menus) require custom logic: maintain a `_selectedIndex` int and drive selection with `WasKeyPressed(Keys.Up/Down/Left/Right)` in `Screen.CustomActivity`. Apply visual highlight by toggling a property on the selected element. Do not try to use `Button.IsFocused` or `OnKeyDown` for this — Forms focus is designed for form tab-order, not game input.
-- **Namespace**: `TextRuntime` is in `Gum.GueDeriving` (`MonoGameGum.GueDeriving.TextRuntime` is a deprecated compatibility shim). Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Shapes (`ColoredCircleRuntime`, `RoundedRectangleRuntime`, `ArcRuntime`) are in `MonoGameGum.GueDeriving` — same namespace as other visual types. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
-- **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
+- **Namespace**: `TextRuntime` is in `Gum.GueDeriving` (`MonoGameGum.GueDeriving.TextRuntime` is a deprecated compatibility shim). Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Visual types (`TextRuntime`, `RectangleRuntime`, `CircleRuntime`, `ArcRuntime`, `SpriteRuntime`) are all in `Gum.GueDeriving`; the old `ColoredRectangleRuntime`, `ColoredCircleRuntime` and `RoundedRectangleRuntime` are obsolete (use `RectangleRuntime` with `CornerRadius` for rounded corners). Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
+- **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`RectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
 - **`Label` style knobs (`FontSize`, `Color`, `Alpha`) are on `label.Visual`, not `Label` itself.** Cast to `TextRuntime` for the default visual; use `GetGraphicalUiElementByName("TextInstance")` when the project gives `Label` a custom component (see *Displaying Text* above).
 - **`Add()` upscales fonts** when the window is larger than the design canvas (`PixelsPerUnit > 1`). `TextRuntime.UseFontOversampling` (on by default, see *Overlay vs Camera UI: Rendering Quality* above) fixes this for `.ttf`-backed fonts; `AddOverlay()` is still the simplest fix for a system font name.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
