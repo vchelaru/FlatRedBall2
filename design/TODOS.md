@@ -64,9 +64,9 @@ Initial load is slow on the BlazorGL/KNI target when a Gum project references ma
 
 Still need to (a) measure actual before/after web load-time improvement from the JSON conversion on Solitaire under WASM specifically (JIT-desktop parse time doesn't predict WASM/AOT behavior), (b) measure where any remaining load time goes (Gum project load vs. runtime registration via `RegisterRuntimeType` module initializers vs. asset decode), (c) decide whether further fixes are engine-side (lazy/deferred runtime registration, parallel asset decode) or Gum-side (incremental project load), and (d) confirm WASM-specific costs separate from the same load on desktop.
 
-## SVG and Lottie support in Gum
+## Lottie support in Gum
 
-Gum currently ships with raster-only visuals (`Sprite`, `NineSlice`, `ColoredRectangle`). Vector / animated-vector formats — SVG for static UI art, Lottie for animated UI (the After Effects → Bodymovin export pipeline) — would close a real gap for UI-heavy games. Open questions: Does this belong in Gum (new runtime types alongside `Sprite`) or in FRB2 (an `IRenderable` wrapper that hosts an SVG/Lottie renderer)? Which third-party renderer? — `Svg.Skia` and `SkiaSharp.Skottie` are the obvious starting points but pull SkiaSharp into the dependency graph, which has its own desktop/WASM size implications. Confirm WASM viability before committing.
+Gum covers static vector art through its Apos.Shapes-backed SVG support, but has nothing for animated vector UI: Lottie (the After Effects → Bodymovin export pipeline). Open questions: Does this belong in Gum (a new runtime type alongside `Sprite`) or in FRB2 (an `IRenderable` wrapper that hosts a Lottie renderer)? Which third-party renderer? `SkiaSharp.Skottie` is the obvious starting point but pulls SkiaSharp into the dependency graph, which has its own desktop/WASM size implications. Confirm WASM viability before committing.
 
 ## Rive support (lower priority than Lottie)
 
@@ -101,4 +101,4 @@ This is a meaningful chunk of engine work — likely starts with the simpler spr
 
 ## Figma → Gum import path
 
-Designers want to author UI in Figma and have it appear in Gum without manual recreation. No existing converter — the open question is whether to (a) write a Figma plugin that emits `.gucx`/`.gusx` directly, (b) export Figma as SVG and rely on an SVG-import path in Gum (which depends on the SVG/Lottie work above), or (c) export Figma to Lottie and lean on the Lottie path. Each has tradeoffs in fidelity (what Figma features survive the round-trip), maintenance burden (the plugin path requires keeping up with Figma's API), and ordering (Lottie/SVG support unblocks paths b and c). Decide the strategy before estimating effort.
+Designers want to author UI in Figma and have it appear in Gum without manual recreation. No existing converter — the open question is whether to (a) write a Figma plugin that emits `.gucx`/`.gusx` directly, (b) export Figma as SVG and load it through Gum's existing SVG support, or (c) export Figma to Lottie and lean on the Lottie path (which depends on the Lottie work above). Each has tradeoffs in fidelity (what Figma features survive the round-trip), maintenance burden (the plugin path requires keeping up with Figma's API), and ordering (path b is available now; Lottie support would unblock path c). Decide the strategy before estimating effort.

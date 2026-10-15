@@ -161,7 +161,7 @@ Make suggestions even if minor. **High churn on docs and skills is expected and 
 
 ### Keeping Docs and Skills Accurate (Critical)
 
-Because churn is high, XML docs and skill files can easily become out-of-date. **If you ever encounter anything inaccurate or outdated in XML docs or skill files while working on any task, flag it immediately and fix it.** Stale guidance is worse than no guidance — it actively misleads future AI sessions.
+Because churn is high, XML docs and skill files can easily become out-of-date. **If you ever encounter anything inaccurate or outdated in XML docs or skill files while working on any task, flag it immediately and fix it, without asking first.** This includes stale entries in `design/TODOS.md`. Stale guidance is worse than no guidance — it actively misleads future AI sessions.
 
 ### Responding to Friction Points
 
