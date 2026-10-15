@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
@@ -130,6 +131,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameAlpha)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColor)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameKeyframe)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameKeyframeCurve)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFramePixelRegion)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectProps)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
@@ -395,6 +398,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameColor(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColorOperation),
             ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(new[] { Zebra(ctx).Frames[0] }, ColorOperation.Add)));
+        yield return Row(nameof(IAppCommands.SetFrameKeyframe),
+            ctx => Sync(() => ctx.AppCommands.SetFrameKeyframe(new[] { Zebra(ctx).Frames[1] }, KeyframeGroup.Offset, false)));
+        yield return Row(nameof(IAppCommands.SetFrameKeyframeCurve),
+            ctx => Sync(() => ctx.AppCommands.SetFrameKeyframeCurve(new[] { Zebra(ctx).Frames[1] }, KeyframeGroup.Color, KeyframeCurveChoice.Bounce)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
             ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16, 64, 64)));
         yield return Row(nameof(IAppCommands.SetRectProps),
