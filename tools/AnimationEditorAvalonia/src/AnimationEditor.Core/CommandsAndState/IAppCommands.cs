@@ -1,5 +1,6 @@
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
@@ -437,6 +438,20 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Edits alpha on every frame. Results clamp to 0..255; a relative edit on an unset
         /// alpha starts from the value it inherits (255 if none).</summary>
         void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha);
+
+        /// <summary>
+        /// Turns the <paramref name="group"/> keyframe on or off for every frame (#1478). A chain's first
+        /// frame is always a keyframe, so it is left alone. Other fields and the stored curve are untouched.
+        /// One undo step.
+        /// </summary>
+        void SetFrameKeyframe(IReadOnlyList<AnimationFrameSave> frames, KeyframeGroup group, bool isKeyframe);
+
+        /// <summary>
+        /// Writes the picker's (type, easing) pair for <paramref name="curve"/> on every frame that is a
+        /// keyframe of <paramref name="group"/>; frames with the keyframe off keep their stored curve.
+        /// Snap stores nothing. One undo step.
+        /// </summary>
+        void SetFrameKeyframeCurve(IReadOnlyList<AnimationFrameSave> frames, KeyframeGroup group, KeyframeCurveChoice curve);
 
         /// <summary>
         /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the

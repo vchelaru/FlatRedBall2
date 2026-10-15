@@ -9,7 +9,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Captured values of every numeric field a bulk frame-edit operation can touch
-    /// (frame length, offsets, UV coordinates). Used by <see cref="BulkFrameEditCommand"/>
+    /// (frame length, offsets, UV coordinates, color, keyframe flags and curves). Used by <see cref="BulkFrameEditCommand"/>
     /// to snapshot a frame before and after the operation.
     /// </summary>
     internal readonly record struct FrameFieldSnapshot(
@@ -18,12 +18,17 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         float RelativeX, float RelativeY,
         float Left, float Right, float Top, float Bottom,
         int? Red, int? Green, int? Blue, int? Alpha,
-        ColorOperation? ColorOperation)
+        ColorOperation? ColorOperation,
+        bool SkipOffsetKeyframe, bool SkipColorKeyframe,
+        string? OffsetInterpolation, string? OffsetEasing,
+        string? ColorInterpolation, string? ColorEasing)
     {
         public static FrameFieldSnapshot Capture(AnimationFrameSave f) =>
             new(f, f.FrameLength, f.RelativeX, f.RelativeY,
                 f.LeftCoordinate, f.RightCoordinate, f.TopCoordinate, f.BottomCoordinate,
-                f.Red, f.Green, f.Blue, f.Alpha, f.ColorOperation);
+                f.Red, f.Green, f.Blue, f.Alpha, f.ColorOperation,
+                f.SkipOffsetKeyframe, f.SkipColorKeyframe,
+                f.OffsetInterpolation, f.OffsetEasing, f.ColorInterpolation, f.ColorEasing);
 
         public void RestoreToFrame()
         {
@@ -39,6 +44,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             Frame.Blue             = Blue;
             Frame.Alpha            = Alpha;
             Frame.ColorOperation   = ColorOperation;
+            Frame.SkipOffsetKeyframe = SkipOffsetKeyframe;
+            Frame.SkipColorKeyframe  = SkipColorKeyframe;
+            Frame.OffsetInterpolation = OffsetInterpolation;
+            Frame.OffsetEasing        = OffsetEasing;
+            Frame.ColorInterpolation  = ColorInterpolation;
+            Frame.ColorEasing         = ColorEasing;
         }
     }
 

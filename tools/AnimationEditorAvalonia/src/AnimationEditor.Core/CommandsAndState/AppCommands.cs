@@ -3,6 +3,7 @@ using AnimationEditor.Core.Data;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Tiled;
@@ -2250,6 +2251,34 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 unlockedFrames, () => { foreach (var t in targets) t.Frame.Alpha = t.Alpha; },
                 this, _events, false, "Set Frame Alpha", coalesceKind: "Alpha"));
+        }
+
+        public void SetFrameKeyframe(IReadOnlyList<AnimationFrameSave> frames, KeyframeGroup group, bool isKeyframe)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var targets = frames
+                .Where(f => !IsFrameLocked(f) && !KeyframeInspectorState.IsFirstFrame(f, _objectFinder.GetAnimationChainContaining(f)))
+                .ToList();
+            if (targets.Count == 0) return;
+            string name = group == KeyframeGroup.Offset ? "Offset" : "Color";
+            _undoManager.Execute(new BulkFrameEditCommand(
+                targets, () => { foreach (var f in targets) KeyframeInspectorState.SetSkip(group, f, !isKeyframe); },
+                this, _events, false, $"{(isKeyframe ? "Enable" : "Disable")} {name} Keyframe"));
+        }
+
+        public void SetFrameKeyframeCurve(IReadOnlyList<AnimationFrameSave> frames, KeyframeGroup group, KeyframeCurveChoice curve)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var targets = frames
+                .Where(f => !IsFrameLocked(f)
+                    && KeyframeInspectorState.IsEffectivelyKeyframe(group, f, _objectFinder.GetAnimationChainContaining(f)))
+                .ToList();
+            if (targets.Count == 0) return;
+            var (type, easing) = KeyframeCurvePicker.ToStored(curve);
+            string name = group == KeyframeGroup.Offset ? "Offset" : "Color";
+            _undoManager.Execute(new BulkFrameEditCommand(
+                targets, () => { foreach (var f in targets) KeyframeInspectorState.SetCurve(group, f, type, easing); },
+                this, _events, false, $"Set {name} Curve: {KeyframeCurvePicker.DisplayName(curve)}"));
         }
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
