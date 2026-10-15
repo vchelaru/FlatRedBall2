@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--#if (EnginePath != "")
+    <ProjectReference Include="__EnginePath2__/src/Kni/FlatRedBall2.Kni.csproj" />
+    #endif-->
+    <!--#if (EnginePath == "")-->
     <PackageReference Include="FlatRedBall2.Kni" />
+    <!--#endif-->
   </ItemGroup>
 </Project>

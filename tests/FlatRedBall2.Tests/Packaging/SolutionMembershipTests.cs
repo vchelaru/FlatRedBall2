@@ -52,7 +52,12 @@ public class SolutionMembershipTests
                 var csprojDir = Path.GetDirectoryName(csprojPath)!;
                 var referencedPaths = Regex.Matches(
                         File.ReadAllText(csprojPath), @"<ProjectReference\s+Include=""([^""]+)""")
-                    .Select(match => ToPortablePath(match.Groups[1].Value));
+                    .Select(match => ToPortablePath(match.Groups[1].Value))
+                    // Templates keep an engine ProjectReference inside a conditional comment that
+                    // only exists when --EnginePath is passed; its "__EnginePathN__" placeholder
+                    // isn't a real path. TemplateEnginePathParameterTests checks the generated
+                    // solution lists those projects.
+                    .Where(path => !path.Contains("__EnginePath"));
 
                 foreach (var referencedPath in referencedPaths)
                 {

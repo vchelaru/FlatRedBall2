@@ -17,7 +17,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--#if (EnginePath != "")
+    <ProjectReference Include="__EnginePath1__/src/FlatRedBall2.csproj" />
+    #endif-->
+    <!--#if (EnginePath == "")-->
     <PackageReference Include="FlatRedBall2.MonoGame" />
+    <!--#endif-->
     <PackageReference Include="MonoGame.Framework.DesktopGL" />
   </ItemGroup>
 </Project>

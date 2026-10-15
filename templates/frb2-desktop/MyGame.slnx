@@ -1,4 +1,8 @@
 <Solution>
   <Project Path="MyGame.Desktop/MyGame.Desktop.csproj" DefaultStartup="true" />
+  <!--#if (EnginePath != "")
+  <Project Path="__EnginePath0__/src/FlatRedBall2.csproj" />
+  <Project Path="__EnginePath0__/src/AnimationChain.Common/AnimationChain.Common.csproj" />
+  #endif-->
   <Project Path="MyGame.Common/MyGame.Common.csproj" />
 </Solution>

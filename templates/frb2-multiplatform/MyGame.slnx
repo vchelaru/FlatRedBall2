@@ -1,6 +1,11 @@
 <Solution>
   <Project Path="MyGame.Desktop/MyGame.Desktop.csproj" DefaultStartup="true" />
   <Project Path="MyGame.BlazorGL/MyGame.BlazorGL.csproj" />
+  <!--#if (EnginePath != "")
+  <Project Path="__EnginePath0__/src/FlatRedBall2.csproj" />
+  <Project Path="__EnginePath0__/src/Kni/FlatRedBall2.Kni.csproj" />
+  <Project Path="__EnginePath0__/src/AnimationChain.Common/AnimationChain.Common.csproj" />
+  #endif-->
   <Project Path="MyGame.Common/MyGame.Common.csproj" />
   <Project Path="MyGame.Common/Kni/MyGame.Common.Kni.csproj" />
 </Solution>

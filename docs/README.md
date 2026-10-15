@@ -149,6 +149,33 @@ This launches a local dev server (default `https://localhost:5001`) — open the
 
 `Game1.cs` uses `#if KNI` to pick `GraphicsProfile.FL10_0` on the web target (`GraphicsProfile.HiDef` on desktop). Keep that pattern if you add any code that diverges between backends. Save data and other `System.IO.File`-based code should be gated behind `#if !KNI` since browsers have no filesystem.
 
+### Building against a local engine checkout
+
+To build your game against FlatRedBall2 source instead of the NuGet packages (for example to debug into the engine or try an unreleased fix), clone the engine and pass its relative path when you create the project:
+
+```
+git clone https://github.com/vchelaru/FlatRedBall2.git
+dotnet new frb2-desktop -n YourGameName --EnginePath ../FlatRedBall2
+```
+
+`--EnginePath` is relative to the new `YourGameName/` solution folder, so `../FlatRedBall2` is a clone sitting next to it. The same parameter works with `frb2-multiplatform`. The generated `.csproj` files then use a `ProjectReference` to the engine's `src/FlatRedBall2.csproj` (and `src/Kni/FlatRedBall2.Kni.csproj` for the web head) in place of the `FlatRedBall2.MonoGame` / `FlatRedBall2.Kni` `PackageReference`, and the generated `.slnx` lists the engine projects. Without the parameter, the output is the NuGet-based project described above.
+
+To switch an existing project, edit it by hand. In `YourGameName.Common.csproj`, replace
+
+```xml
+<PackageReference Include="FlatRedBall2.MonoGame" />
+```
+
+with a `ProjectReference` whose path is relative to that `.csproj`:
+
+```xml
+<ProjectReference Include="..\..\FlatRedBall2\src\FlatRedBall2.csproj" />
+```
+
+Do the same in `YourGameName.Common/Kni/YourGameName.Common.Kni.csproj` for `FlatRedBall2.Kni`, pointing at `src\Kni\FlatRedBall2.Kni.csproj` (that file sits one folder deeper, so it needs one more `..\`). Then add the engine projects (including `src\AnimationChain.Common\AnimationChain.Common.csproj`) to your `.slnx` so Visual Studio can restore them.
+
+If the project lives in a shared repository, the team must agree on where the engine clone lives, because the path is committed in the `.csproj` files.
+
 ## Manual setup (reference)
 
 The template above is the supported install path. If you have a reason to wire FlatRedBall2 into an existing project (e.g. you're integrating with a MonoGame project you already have), here's the minimum API surface — but note this snippet alone is **not** a complete working setup. You'll also need a configured MonoGame project (Content pipeline / MGCB tool, `Content/` folder, etc.) which the template handles for you.

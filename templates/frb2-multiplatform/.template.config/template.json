@@ -18,6 +18,32 @@
       "defaultValue": "true",
       "description": "Include starter Content assets (animation chains, base TMX, platformer/topdown configs). Pass --IncludeStarterContent false to start with an empty Content folder."
     },
+    "EnginePath": {
+      "type": "parameter",
+      "datatype": "text",
+      "isRequired": false,
+      "defaultValue": "",
+      "replaces": "__EnginePath0__",
+      "description": "Relative path from the new solution folder to a local FlatRedBall2 engine checkout, e.g. --EnginePath ../FlatRedBall2. When set, the game projects reference the engine source by ProjectReference instead of the NuGet package. Omit to use the NuGet package."
+    },
+    "EnginePathFromProject": {
+      "type": "generated",
+      "generator": "join",
+      "parameters": {
+        "symbols": [ { "type": "const", "value": "../" }, { "type": "ref", "value": "EnginePath" } ],
+        "separator": ""
+      },
+      "replaces": "__EnginePath1__"
+    },
+    "EnginePathFromKniProject": {
+      "type": "generated",
+      "generator": "join",
+      "parameters": {
+        "symbols": [ { "type": "const", "value": "../../" }, { "type": "ref", "value": "EnginePath" } ],
+        "separator": ""
+      },
+      "replaces": "__EnginePath2__"
+    },
     "namespace": {
       "type": "parameter",
       "datatype": "text",
