@@ -105,3 +105,23 @@ window.addEventListener("keydown", function (e) {
 window.addEventListener("wheel", function (e) {
     e.preventDefault();
 }, { passive: false });
+
+// Blazor's loader sets maxParallelDownloads to 1,000,000 (no throttle) and disables download
+// retry, so it requests every _framework/ file at once. A server that advertises 100 HTTP/2
+// streams (Kestrel's default) queues the overflow, and if the browser rebuilds its certificate
+// verifier meanwhile (common in a freshly launched browser), Chromium fails every queued request
+// with ERR_CERT_VERIFIER_CHANGED and the game never boots (#1467). Keep this below 100 so nothing
+// queues. Blazor.start({configureRuntime}) is the only place this can be set.
+var FRB_MAX_PARALLEL_DOWNLOADS = 50;
+
+// The page must load blazor.webassembly.js with autostart="false"; this then starts Blazor with
+// the cap. A page that still autostarts is left alone (Blazor.start would throw "already started").
+(function () {
+    var tag = document.querySelector('script[src$="blazor.webassembly.js"]');
+    if (!tag || tag.getAttribute('autostart') !== 'false') return;
+    window.Blazor.start({
+        configureRuntime: function (dotnet) {
+            dotnet.withConfig({ maxParallelDownloads: FRB_MAX_PARALLEL_DOWNLOADS });
+        }
+    }).catch(function (e) { console.error(e); });
+})();

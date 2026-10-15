@@ -495,7 +495,7 @@ public class BootScreenBehaviorTests
                 let ticks = 0, scheduled = 0;
                 const win = { addEventListener: () => {}, requestAnimationFrame: () => scheduled++, theInstance: { invokeMethod: () => ticks++ } };
                 if (skipHook) { let first = true; win.frbSkipTick = () => { const s = first; first = false; return s; }; }
-                const ctx = { window: win, document: { write: () => {} }, console };
+                const ctx = { window: win, document: { write: () => {}, querySelector: () => null }, console };
                 vm.runInNewContext(fs.readFileSync(process.env.HOST_PATH, 'utf8') + '\n;globalThis.__tick = tickJS;', ctx);
                 ctx.__tick(); ctx.__tick();
                 return { ticks, scheduled };
@@ -503,6 +503,52 @@ public class BootScreenBehaviorTests
             process.stdout.write(JSON.stringify({ withHook: run(true), withoutHook: run(false) }));", hostPath);
 
         result.ShouldBe("{\"withHook\":{\"ticks\":1,\"scheduled\":2},\"withoutHook\":{\"ticks\":2,\"scheduled\":2}}");
+    }
+
+    private const string HostStartHarness = @"
+        const vm = require('vm'); const fs = require('fs');
+        // autostart: the value of the blazor script tag's autostart attribute (null = tag has none,
+        // undefined = no tag at all).
+        const run = (autostart) => {
+            const started = [], configs = [];
+            const tag = autostart === undefined ? null : { getAttribute: (n) => (n === 'autostart' ? autostart : null) };
+            const win = { addEventListener: () => {}, requestAnimationFrame: () => {},
+                Blazor: { start: (o) => { started.push(o); return Promise.resolve(); } } };
+            const ctx = { window: win, document: { write: () => {}, querySelector: () => tag }, console };
+            vm.runInNewContext(fs.readFileSync(process.env.HOST_PATH, 'utf8'), ctx);
+            if (started.length) started[0].configureRuntime({ withConfig: (c) => configs.push(c) });
+            return { starts: started.length, configs };
+        };";
+
+    [Theory]
+    [InlineData("src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js")]
+    [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/wwwroot/frb-host.js")]
+    public void FrbHost_AutostartDisabled_StartsBlazorWithParallelDownloadsBelowKestrelStreamLimit(string relativePath)
+    {
+        // Blazor's own loader sets maxParallelDownloads to 1,000,000 and disables retry, so a dev
+        // server with 100 HTTP/2 streams queues the rest of the _framework/ burst, and a browser
+        // cert-verifier rebuild then fails every queued request (#1467). The cap must stay under 100.
+        var hostPath = Path.Combine(TemplatePackageReferenceTests.RepoRootForTests, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var result = RunNodeRaw(HostStartHarness + @"
+            const r = run('false');
+            const caps = r.configs.map((c) => c.maxParallelDownloads);
+            process.stdout.write(JSON.stringify({ starts: r.starts, capped: caps.length === 1 && caps[0] > 0 && caps[0] < 100 }));", hostPath);
+
+        result.ShouldBe("{\"starts\":1,\"capped\":true}");
+    }
+
+    [Theory]
+    [InlineData("src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js")]
+    [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/wwwroot/frb-host.js")]
+    public void FrbHost_AutostartNotDisabled_LeavesBlazorAloneInsteadOfStartingItTwice(string relativePath)
+    {
+        // A page that still lets Blazor autostart has already started it; a second Blazor.start
+        // throws "Blazor has already started".
+        var hostPath = Path.Combine(TemplatePackageReferenceTests.RepoRootForTests, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var result = RunNodeRaw(HostStartHarness + @"
+            process.stdout.write(JSON.stringify({ noAttribute: run(null).starts, noTag: run(undefined).starts }));", hostPath);
+
+        result.ShouldBe("{\"noAttribute\":0,\"noTag\":0}");
     }
 
     [Fact]

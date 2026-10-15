@@ -161,9 +161,10 @@ Reference: `templates/frb2-multiplatform/MyGame.BlazorGL`. Each sample's `.Blazo
   ```
 - **`wwwroot/index.html`** — the standard Blazor scaffold + script tags:
   ```html
-  <script src="_framework/blazor.webassembly.js"></script>
+  <script src="_framework/blazor.webassembly.js" autostart="false"></script>
   <script src="_content/FlatRedBall2.BlazorGL/frb-host.js"></script>
   ```
+  `autostart="false"` is required: `frb-host.js` calls `Blazor.start` itself to cap parallel `_framework/` downloads at 50. Blazor's default is unthrottled, and a dev server with 100 HTTP/2 streams then queues the rest, which a fresh browser can fail with `ERR_CERT_VERIFIER_CHANGED` (the boot screen shows "Failed to start"). A page that keeps autostart still works, uncapped.
   The package's `frb-host.js` defines `tickJS`, `initRenderJS`, optional hooks
   (`window.frbBeforeTick`, `window.frbAfterInit`), content prefetching via
   `content-manifest.json`, and keyboard/mouse scroll prevention for itch.io iframes.
