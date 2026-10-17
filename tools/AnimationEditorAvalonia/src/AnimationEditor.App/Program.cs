@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.App.Services;
+using AnimationEditor.Core.IO;
 using Avalonia;
 using System;
 using System.IO;
@@ -50,6 +51,11 @@ class Program
             // so requests that arrive during startup are queued in the server.
             singleInstance.StartListening();
         }
+
+        // We are booting Avalonia: start the work it doesn't need to wait for, so it runs on the
+        // thread pool while the main thread initializes the platform (see StartupWarmup).
+        StartupWarmup.Begin(AppSettingsLocation.ForApplicationDataRoot(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));
 
         // Set the Dock label BEFORE Avalonia calls [NSApplication sharedApplication]
         // (inside UsePlatformDetect). The Dock caches the process name at that point;

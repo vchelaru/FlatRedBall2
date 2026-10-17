@@ -7192,19 +7192,9 @@ public partial class MainWindow : Window
 
     private void LoadSettingsFile()
     {
-        try
-        {
-            if (SettingsFilePath.Exists())
-            {
-                var contents = File.ReadAllText(SettingsFilePath.FullPath);
-                _appSettings = JsonSerializer.Deserialize<AppSettingsModel>(contents)
-                               ?? new AppSettingsModel();
-            }
-        }
-        catch
-        {
-            _appSettings = new AppSettingsModel();
-        }
+        // Program.Main starts the read before Avalonia boots, so by now it is usually done.
+        _appSettings = Services.StartupWarmup.TakeSettings(SettingsFilePath)
+                       ?? SettingsPreload.Read(SettingsFilePath);
     }
 
     private void SaveSettingsFile()
