@@ -494,9 +494,12 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
 
     /// <summary>
     /// Adds a Gum visual to this entity in world space. The visual's screen position tracks
-    /// this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
+    /// this entity's <c>AbsoluteX/Y</c> and <c>AbsoluteRotation</c> each frame. Automatically removed when the entity is destroyed.
     /// </summary>
-    /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
+    /// <remarks>
+    /// Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.
+    /// The engine owns the visual's <c>X</c>, <c>Y</c> and <c>Rotation</c>; values you set are overwritten each frame.
+    /// </remarks>
     public void Add(GraphicalUiElement visual, Layer? layer = null)
     {
         _gumChildren.Add(visual);

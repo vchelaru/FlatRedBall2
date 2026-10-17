@@ -95,8 +95,20 @@ public class GumRenderable : IRenderable, IAttachable
                 new System.Numerics.Vector2(AbsoluteX, AbsoluteY));
             Visual.X = canvasPos.X;
             Visual.Y = canvasPos.Y;
+            ApplyParentRotation();
         }
         ((GumRenderBatch)Batch).DrawElement(Visual);
+    }
+
+    /// <summary>
+    /// Rotates the visual with its parent entity, like a Sprite or shape. Gum's <c>Rotation</c> is
+    /// degrees, counter-clockwise-positive, about the visual's origin — the same sign as
+    /// <see cref="Entity.Rotation"/>.
+    /// </summary>
+    internal void ApplyParentRotation()
+    {
+        if (Parent != null)
+            Visual.Rotation = Parent.AbsoluteRotation.Degrees;
     }
 
     /// <inheritdoc/>

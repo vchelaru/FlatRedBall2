@@ -1,4 +1,5 @@
 using System.Linq;
+using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.UI;
 using Gum.Wireframe;
@@ -283,6 +284,30 @@ public class GumHudTests
 
         screen.EntityVisualsRoot.Children.ShouldNotContain(a);
         screen.EntityVisualsRoot.Children.ShouldNotContain(b);
+    }
+
+    // Issue #1499: an entity-attached Gum visual rotates with its entity, like Sprites and shapes.
+    // Gum's Rotation is degrees, counter-clockwise-positive — the same sign as Entity.Rotation.
+
+    [Fact]
+    public void EntityAttachedGumVisual_ApplyParentRotation_VisualRotationMatchesEntityAbsoluteRotation()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+        var screen = (TestScreen)engine.CurrentScreen;
+        var parent = new Entity();
+        var child = new Entity { Parent = parent };
+        screen.Register(parent);
+        screen.Register(child);
+        var visual = new ContainerRuntime();
+        child.Add(visual);
+        parent.Rotation = Angle.FromDegrees(30f);
+        child.Rotation = Angle.FromDegrees(15f);
+
+        screen.GumRenderables[0].ApplyParentRotation();
+
+        visual.Rotation.ShouldBe(45f, 0.001f);
     }
 
     [Fact]
