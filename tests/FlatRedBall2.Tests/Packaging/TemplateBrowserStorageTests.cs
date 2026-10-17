@@ -20,6 +20,18 @@ public class TemplateBrowserStorageTests
     }
 
     [Fact]
+    public void Template_IndexPage_DrivesPerfProbeAndReportsBootFailure()
+    {
+        // The template vendors the host page, so it must carry the engine page's ?diag=perf probe
+        // (#1318) and the boot-failure report (#1319); otherwise both silently do nothing there.
+        var index = File.ReadAllText(Path.Combine(BlazorGLDir, "Pages", "Index.razor.cs"));
+
+        index.ShouldContain("PerfDiagnosticsProbe.TryCreateFromQuery(");
+        index.ShouldContain("_perfProbe?.OnTick();");
+        index.ShouldContain("InvokeBootScreen(\"frbBootFailed\"");
+    }
+
+    [Fact]
     public void Template_VendoredLocalStorageApi_MatchesPackageCopy()
     {
         // FlatRedBall2.BlazorGL is not a NuGet package, so the template vendors LocalStorageApi;

@@ -1,5 +1,6 @@
 using System;
 using FlatRedBall2;
+using FlatRedBall2.Diagnostics;
 using FlatRedBall2.IO;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -21,7 +22,11 @@ public partial class Index
 {
     [Inject] public Func<Game> GameFactory { get; set; } = default!;
 
+    /// <summary>Source of the page URL, read once for the <c>?diag=perf</c> opt-in.</summary>
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
     private Game? _game;
+    private PerfDiagnosticsProbe? _perfProbe;
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -39,12 +44,50 @@ public partial class Index
     {
         if (_game == null)
         {
+            // Before the game exists so the diagnostics are on from its first frame.
+            _perfProbe = PerfDiagnosticsProbe.TryCreateFromQuery(
+                new Uri(Navigation.Uri).Query, FlatRedBallService.Default, GetBrowserLabel,
+                Console.WriteLine, PublishToJs);
             // localStorage-backed Engine.Storage; Initialize calls this with EngineInitSettings.StorageName.
             FlatRedBallService.Default.StorageBackendFactory =
                 name => new BrowserStorageBackend(name, new LocalStorageApi());
-            _game = GameFactory();
-            _game.Run();
+            try
+            {
+                _game = GameFactory();
+                _game.Run();
+            }
+            catch (Exception ex)
+            {
+                InvokeBootScreen("frbBootFailed", $"{ex.GetType().Name}: {ex.Message}");
+                throw;
+            }
         }
-        _game.Tick();
+        _game!.Tick();
+        _perfProbe?.OnTick();
+    }
+
+    // frbBootFailed is defined by boot-screen.js, which index.html opts into with one <script> tag.
+    // Without it the first call throws once, and this reporting disables itself.
+
+    private bool _bootScreenUnavailable;
+
+    private void InvokeBootScreen(string function, params object?[] args)
+    {
+        if (_bootScreenUnavailable) return;
+        try { (JsRuntime as IJSInProcessRuntime)?.InvokeVoid(function, args); }
+        catch (JSException) { _bootScreenUnavailable = true; }
+    }
+
+    // frbDiagPlatform / frbDiagPublish live in wwwroot/frb-host.js.
+    private string? GetBrowserLabel()
+    {
+        try { return (JsRuntime as IJSInProcessRuntime)?.Invoke<string?>("frbDiagPlatform"); }
+        catch (JSException) { return null; }
+    }
+
+    private void PublishToJs(string json)
+    {
+        try { (JsRuntime as IJSInProcessRuntime)?.InvokeVoid("frbDiagPublish", json); }
+        catch (JSException) { }
     }
 }
