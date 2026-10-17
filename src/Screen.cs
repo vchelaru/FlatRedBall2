@@ -428,8 +428,17 @@ public class Screen : ILifecycleEvents
     /// </summary>
     // HasEvents = false: see comment on Camera.UiRoot. A full-canvas root that absorbs the
     // cursor would steal clicks from any entity-attached UI underneath.
+    // RaiseChildrenEventsOutsideOfBounds = true: entity visuals sit at arbitrary canvas positions
+    // (the visible canvas is OrthogonalWidth / Zoom wide, differs per camera, and is not the
+    // root's size), and Gum otherwise skips children the cursor isn't inside the parent's bounds
+    // for — which dropped clicks on entity-attached Forms controls once zoomed out (#1500).
     public GraphicalUiElement EntityVisualsRoot
-        => _entityVisualsRoot ??= new ContainerRuntime { Name = "Screen.EntityVisualsRoot", HasEvents = false };
+        => _entityVisualsRoot ??= new ContainerRuntime
+        {
+            Name = "Screen.EntityVisualsRoot",
+            HasEvents = false,
+            RaiseChildrenEventsOutsideOfBounds = true,
+        };
 
     internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, Layer? layer)
     {

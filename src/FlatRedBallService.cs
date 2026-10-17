@@ -1699,8 +1699,9 @@ public class FlatRedBallService
             CurrentScreen.OverlayRoot.Width  = pp.BackBufferWidth;
             CurrentScreen.OverlayRoot.Height = pp.BackBufferHeight;
             // Entity visuals are world-projected; their canvas position is written each frame
-            // by GumRenderable.Draw. Size their root to the back buffer so children laid out
-            // in canvas pixels are not clipped/culled by the parent's bounds.
+            // by GumRenderable.Draw, in canvas units (OrthogonalWidth / Zoom wide), not back-buffer
+            // pixels. This size is only a layout reference — cursor hit-testing does not depend on
+            // it because EntityVisualsRoot sets RaiseChildrenEventsOutsideOfBounds.
             CurrentScreen.EntityVisualsRoot.Width  = pp.BackBufferWidth;
             CurrentScreen.EntityVisualsRoot.Height = pp.BackBufferHeight;
             // PopupRoot/ModalRoot are also sized here rather than left to Gum's own

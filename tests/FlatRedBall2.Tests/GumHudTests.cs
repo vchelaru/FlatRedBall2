@@ -296,6 +296,65 @@ public class GumHudTests
         entityVisualsRoot.HasEvents.ShouldBeFalse();
     }
 
+    // Issue #1500: entity visuals are positioned in canvas units (Camera.WorldToCanvas), and the
+    // visible canvas is OrthogonalWidth / Zoom wide — wider than the root's back-buffer-pixel size
+    // once zoomed out. Gum only descends into a child while the cursor is inside the parent's
+    // bounds, so a Forms control past the root's edge stopped receiving clicks.
+
+    private sealed class FixedCameraRenderer : RenderingLibrary.Graphics.IRenderer
+    {
+        public RenderingLibrary.Camera Camera { get; } = new RenderingLibrary.Camera();
+        public System.Collections.ObjectModel.ReadOnlyCollection<RenderingLibrary.Graphics.Layer> Layers =>
+            new(new System.Collections.Generic.List<RenderingLibrary.Graphics.Layer>());
+        public RenderingLibrary.Graphics.Layer MainLayer => null!;
+        public void RenderLayer(RenderingLibrary.ISystemManagers managers, RenderingLibrary.Graphics.Layer layer, bool prerender = true) { }
+    }
+
+    private sealed class FixedCameraManagers : RenderingLibrary.ISystemManagers
+    {
+        public bool EnableTouchEvents { get; set; }
+        public RenderingLibrary.Graphics.IRenderer Renderer { get; } = new FixedCameraRenderer();
+        public void InvalidateSurface() { }
+    }
+
+    [Fact]
+    public void EntityVisualsRoot_ChildBeyondRootBounds_CursorOverChildIsDetected()
+    {
+        var screen = new TestScreen();
+        screen.AttachManagers(new FixedCameraManagers());
+        var root = (InteractiveGue)screen.EntityVisualsRoot;
+        root.Width = 100;
+        root.Height = 100;
+        var child = new ContainerRuntime { X = 500, Y = 10, Width = 100, Height = 40 };
+        root.Children.Add(child);
+        var frbCursor = new FlatRedBall2.Input.Cursor();
+        var cursor = new FlatRedBall2.Automation.AutomationGumCursor(frbCursor);
+        frbCursor.Inject(550, 30, primary: false, secondary: false);
+        frbCursor.Update(System.TimeSpan.Zero);
+        cursor.Activity(0);
+
+        root.HasCursorOver(cursor).ShouldBeTrue();
+        child.HasCursorOver(cursor).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void EntityVisualsRoot_CursorOverNothing_IsNotDetected()
+    {
+        var screen = new TestScreen();
+        screen.AttachManagers(new FixedCameraManagers());
+        var root = (InteractiveGue)screen.EntityVisualsRoot;
+        root.Width = 100;
+        root.Height = 100;
+        root.Children.Add(new ContainerRuntime { X = 500, Y = 10, Width = 100, Height = 40 });
+        var frbCursor = new FlatRedBall2.Input.Cursor();
+        var cursor = new FlatRedBall2.Automation.AutomationGumCursor(frbCursor);
+        frbCursor.Inject(300, 30, primary: false, secondary: false);
+        frbCursor.Update(System.TimeSpan.Zero);
+        cursor.Activity(0);
+
+        root.HasCursorOver(cursor).ShouldBeFalse();
+    }
+
     // Issue #824: OverlayRoot/PopupRoot/ModalRoot are registered as overlay renderables for every
     // screen regardless of whether the game ever populates them. DrawOverlay used to Begin() every
     // registered overlay unconditionally, including empty ones — and since the overlay pass always
