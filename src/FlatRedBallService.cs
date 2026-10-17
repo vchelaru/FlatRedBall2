@@ -1592,9 +1592,11 @@ public class FlatRedBallService
 
             // Gum maps the cursor through one shared camera that holds whatever the last draw pass
             // left; give each root its own pixel -> canvas mapping instead (issue #664).
-            var pp = _spriteBatch.GraphicsDevice.PresentationParameters;
-            GumInputRouting.Apply(CurrentScreen, Input.Cursor.ScreenPosition,
-                RenderingLibrary.SystemManagers.Default.Renderer.Camera, pp.BackBufferWidth, pp.BackBufferHeight);
+            var gumDevice = _spriteBatch.GraphicsDevice;
+            var pp = gumDevice.PresentationParameters;
+            gumDevice.Viewport = GumInputRouting.Apply(CurrentScreen, Input.Cursor.ScreenPosition,
+                RenderingLibrary.SystemManagers.Default.Renderer.Camera, pp.BackBufferWidth, pp.BackBufferHeight,
+                global::Gum.Forms.FormsUtilities.Cursor?.WindowPushed, _gum.PopupRoot, _gum.ModalRoot);
 
             long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
             _gum.Update(gameTime, _gumUpdateList);

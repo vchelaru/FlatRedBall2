@@ -42,14 +42,14 @@ public class GumInputRoutingTests
         new ContainerRuntime { X = x, Y = y, Width = 100, Height = 40 };
 
     /// <summary>Runs the routing for a cursor at <paramref name="px"/> and asks Gum whether it is over <paramref name="visual"/>.</summary>
-    private static bool IsOver(Screen screen, FixedCameraManagers managers, Vector2 px, GraphicalUiElement visual)
+    private static bool IsOver(Screen screen, FixedCameraManagers managers, Vector2 px, GraphicalUiElement visual, InteractiveGue? pushed = null)
     {
         var frbCursor = new FlatRedBall2.Input.Cursor();
         frbCursor.Inject((int)px.X, (int)px.Y, primary: false, secondary: false);
         frbCursor.Update(TimeSpan.Zero);
         var cursor = new AutomationGumCursor(frbCursor);
         cursor.Activity(0);
-        GumInputRouting.Apply(screen, px, managers.GumCamera, WindowW, WindowH);
+        GumInputRouting.Apply(screen, px, managers.GumCamera, WindowW, WindowH, pushed);
         return ((InteractiveGue)visual).HasCursorOver(cursor);
     }
 
@@ -186,6 +186,19 @@ public class GumInputRoutingTests
     }
 
     [Fact]
+    public void OverlayRoot_CursorOverZoomedInsetCamera_ControlIsOverAtItsWindowPixels()
+    {
+        // Overlay content is laid out in window pixels. With the shared Gum camera on the inset's
+        // mapping (cursor is over the inset), the overlay still has to resolve 1:1.
+        var (screen, managers) = NewScreen((0, 0, 1, 1, 1f), (0.58f, 0.05f, 0.40f, 0.45f, 2f));
+        var box = Box(800, 100);
+        screen.OverlayRoot.Children.Add(box);
+
+        IsOver(screen, managers, new Vector2(850, 120), box).ShouldBeTrue();
+        IsOver(screen, managers, new Vector2(900, 300), box).ShouldBeFalse();
+    }
+
+    [Fact]
     public void EntityVisual_DrawnLastUnderOtherCamera_CursorInFirstCamera_IsOverAtFirstCamerasDrawnPosition()
     {
         // An entity visual is drawn once per camera and its canvas position is rewritten on every
@@ -206,6 +219,53 @@ public class GumInputRoutingTests
         var click = new Vector2(first.Viewport.X + p.X + 50 * first.PixelsPerUnit, first.Viewport.Y + p.Y + 20 * first.PixelsPerUnit);
 
         IsOver(screen, managers, click, visual).ShouldBeTrue();
+    }
+
+    // Gum's drag/caret math (Slider, ScrollBar, TextBox) is (cursor.X - GraphicsDevice.Viewport.X) /
+    // Renderer.Camera.Zoom, read straight off the shared camera and the device viewport. Apply must
+    // leave both on the mapping of the camera the gesture belongs to, and return that viewport.
+    private static float GumCanvasX(Viewport deviceViewport, FixedCameraManagers managers, float pixelX) =>
+        (pixelX - deviceViewport.X) / managers.GumCamera.Zoom;
+
+    [Fact]
+    public void Apply_CursorOverZoomedInset_LeavesGumCameraAndViewportOnTheInsetMapping()
+    {
+        var (screen, managers) = NewScreen((0, 0, 1, 1, 1f), (0.58f, 0.05f, 0.40f, 0.45f, 2f));
+        var inset = screen.Cameras[1];
+        float pixelX = 900f;
+
+        var viewport = GumInputRouting.Apply(screen, new Vector2(pixelX, 100), managers.GumCamera, WindowW, WindowH);
+
+        GumCanvasX(viewport, managers, pixelX).ShouldBe((pixelX - inset.Viewport.X) / inset.PixelsPerUnit, 0.001f);
+    }
+
+    [Fact]
+    public void Apply_PushedControlOnInset_CursorDraggedOutsideInset_KeepsInsetMapping()
+    {
+        // Dragging a Slider thumb past the inset's edge must keep reading the inset's canvas.
+        var (screen, managers) = NewScreen((0, 0, 1, 1, 1f), (0.58f, 0.05f, 0.40f, 0.45f, 2f));
+        var inset = screen.Cameras[1];
+        var thumb = Box(20, 20);
+        inset.Add(thumb);
+        float pixelX = 400f; // well left of the inset, over the main camera
+
+        var viewport = GumInputRouting.Apply(screen, new Vector2(pixelX, 100), managers.GumCamera, WindowW, WindowH, pushed: thumb);
+
+        GumCanvasX(viewport, managers, pixelX).ShouldBe((pixelX - inset.Viewport.X) / inset.PixelsPerUnit, 0.001f);
+    }
+
+    [Fact]
+    public void UiRoot_PushedControlDraggedOutsideViewport_IsStillMappedToItsCanvas()
+    {
+        var (screen, managers) = NewScreen((0, 0, 1, 1, 1f), (0.58f, 0.05f, 0.40f, 0.45f, 2f));
+        var inset = screen.Cameras[1];
+        var spill = new ContainerRuntime { X = 600, Y = 20, Width = 200, Height = 40 }; // inset canvas is ~568 wide
+        inset.Add(spill);
+        var outside = new Vector2(inset.Viewport.X + 650 * inset.PixelsPerUnit, inset.Viewport.Y + 40 * inset.PixelsPerUnit);
+        outside.X.ShouldBeGreaterThan(inset.Viewport.X + inset.Viewport.Width);
+
+        IsOver(screen, managers, outside, spill, pushed: spill).ShouldBeTrue();
+        IsOver(screen, managers, outside, spill).ShouldBeFalse();
     }
 
     [Fact]
