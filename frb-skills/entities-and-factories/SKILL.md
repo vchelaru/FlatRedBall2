@@ -1,6 +1,6 @@
 ---
 name: entities-and-factories
-description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, generic Factory types, spawning/creating/destroying entities, entity lifecycle, Add, shape children, CustomInitialize/CustomActivity, or Engine.GetFactory. Trigger on any entity creation, destruction, or factory question."
+description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, generic Factory types, spawning/creating/destroying entities, entity lifecycle, Add, shape children, Gum visuals attached to an entity, CustomInitialize/CustomActivity, or Engine.GetFactory. Trigger on any entity creation, destruction, or factory question."
 ---
 
 # Entities and Factories in FlatRedBall2
@@ -142,6 +142,7 @@ Optional `string?` for identifying entities in tests and diagnostics. `SceneSnap
 - `references/patterns.md` — render-only shapes (`isDefaultCollision`), solid-grid factories (`IsSolidGrid`), spawning from within an entity, death effects, particles, configuring after `Create()`
 - `shapes` skill — shape types, visibility, color, render pipeline registration
 - `collision-relationships` skill — `AddCollisionRelationship` over a `Factory<T>`, `TileShapes`
+- `gum-integration` skill — `entity.Add(element)` puts Gum text or UI at the entity's world position; covers offset, origin, and draw order
 - `levels` skill — `TileMap.CreateEntities` for designer-placed entities
 
 ## Common Pitfalls
