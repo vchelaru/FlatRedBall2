@@ -24,6 +24,10 @@ dotnet run -- --frb-auto
 
 That's the entire required wiring. Entities and their public properties are auto-discovered — no per-property registration.
 
+### Hiding the window (Windows)
+
+`dotnet run -- --frb-auto --frb-auto-hide` parks the game window off-screen at the back of the z-order and hands focus back to the window beneath it, so an agent-driven run does not cover the user's work. Pass it whenever you launch the game on a person's machine. The window still renders, so screenshots work, and without the flag the window shows as usual. Focus handback is best-effort (`src/Automation/AutomationWindowParker.cs`); the flag does nothing without `--frb-auto` and is ignored on other platforms.
+
 ### Deterministic randomness
 
 When automation activates, `FlatRedBallService.Random` is replaced with a deterministic `GameRandom` so recorded NDJSON sessions reproduce exactly. Pass an explicit seed to choose which run.

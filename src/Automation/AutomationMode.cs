@@ -50,6 +50,9 @@ internal class AutomationMode
     // about isn't rendered until Draw() runs, which happens after ProcessCommand returns.
     private string? _pendingScreenshotPath;
 
+    /// <summary>Set when the game was launched with <c>--frb-auto-hide</c>; ticked every frame by the engine.</summary>
+    internal AutomationWindowParker? WindowParker { get; init; }
+
     internal AutomationMode(FlatRedBallService engine, System.IO.TextWriter? output = null, Action<string>? log = null)
     {
         _engine = engine;

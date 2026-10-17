@@ -326,22 +326,6 @@ public class GumHudTests
     // once zoomed out. Gum only descends into a child while the cursor is inside the parent's
     // bounds, so a Forms control past the root's edge stopped receiving clicks.
 
-    private sealed class FixedCameraRenderer : RenderingLibrary.Graphics.IRenderer
-    {
-        public RenderingLibrary.Camera Camera { get; } = new RenderingLibrary.Camera();
-        public System.Collections.ObjectModel.ReadOnlyCollection<RenderingLibrary.Graphics.Layer> Layers =>
-            new(new System.Collections.Generic.List<RenderingLibrary.Graphics.Layer>());
-        public RenderingLibrary.Graphics.Layer MainLayer => null!;
-        public void RenderLayer(RenderingLibrary.ISystemManagers managers, RenderingLibrary.Graphics.Layer layer, bool prerender = true) { }
-    }
-
-    private sealed class FixedCameraManagers : RenderingLibrary.ISystemManagers
-    {
-        public bool EnableTouchEvents { get; set; }
-        public RenderingLibrary.Graphics.IRenderer Renderer { get; } = new FixedCameraRenderer();
-        public void InvalidateSurface() { }
-    }
-
     [Fact]
     public void EntityVisualsRoot_ChildBeyondRootBounds_CursorOverChildIsDetected()
     {

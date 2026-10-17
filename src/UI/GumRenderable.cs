@@ -86,18 +86,27 @@ public class GumRenderable : IRenderable, IAttachable
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!Visual.Visible) return;
-        if (Parent != null)
-        {
-            // Canvas-space, not viewport pixels: GumRenderBatch's Begin matrix already scales
-            // canvas units to viewport pixels via Camera.PixelsPerUnit. Setting Visual.X/Y in
-            // pixels would double-scale and drift on horizontal resize.
-            var canvasPos = camera.WorldToCanvas(
-                new System.Numerics.Vector2(AbsoluteX, AbsoluteY));
-            Visual.X = canvasPos.X;
-            Visual.Y = canvasPos.Y;
-            ApplyParentRotation();
-        }
+        PositionForCamera(camera);
         ((GumRenderBatch)Batch).DrawElement(Visual);
+    }
+
+    /// <summary>
+    /// For an entity-attached visual, writes the canvas position and rotation it draws at under
+    /// <paramref name="camera"/>. No-op for camera HUD and overlay visuals. Draw runs this on every
+    /// camera pass, so between frames the position is the last drawn camera's; input re-runs it for
+    /// the camera under the cursor (see <see cref="GumInputRouting"/>).
+    /// </summary>
+    internal void PositionForCamera(Camera camera)
+    {
+        if (Parent == null) return;
+        // Canvas-space, not viewport pixels: GumRenderBatch's Begin matrix already scales
+        // canvas units to viewport pixels via Camera.PixelsPerUnit. Setting Visual.X/Y in
+        // pixels would double-scale and drift on horizontal resize.
+        var canvasPos = camera.WorldToCanvas(
+            new System.Numerics.Vector2(AbsoluteX, AbsoluteY));
+        Visual.X = canvasPos.X;
+        Visual.Y = canvasPos.Y;
+        ApplyParentRotation();
     }
 
     /// <summary>

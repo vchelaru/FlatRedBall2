@@ -1422,6 +1422,10 @@ public class FlatRedBallService
     /// When automation activates, <see cref="Random"/> is replaced with a deterministic
     /// <see cref="GameRandom"/> so recorded NDJSON runs reproduce exactly.
     /// </para>
+    /// <para>
+    /// Adding <c>--frb-auto-hide</c> (Windows only) also parks the game window off-screen at the back
+    /// of the z-order and returns focus to the window beneath it. The window still renders.
+    /// </para>
     /// </summary>
     /// <param name="seed">
     /// Seed for <see cref="Random"/> when automation activates. Ignored entirely when
@@ -1432,18 +1436,25 @@ public class FlatRedBallService
     [System.Diagnostics.Conditional("DEBUG")]
     public void EnableAutomationMode(int? seed = null)
     {
-        if (System.Environment.GetCommandLineArgs().Contains("--frb-auto"))
-            StartAutomationMode(seed);
+        var args = System.Environment.GetCommandLineArgs();
+        if (args.Contains("--frb-auto"))
+        {
+            var parker = Automation.AutomationWindowParker.IsHideRequested(args)
+                ? Automation.AutomationWindowParker.CreateForCurrentPlatform()
+                : null;
+            StartAutomationMode(seed, windowParker: parker);
+        }
     }
 
     /// <summary>
     /// Activates automation mode unconditionally — bypassing the --frb-auto flag check.
     /// Internal entry point for tests and any future programmatic activation path.
     /// </summary>
-    internal void StartAutomationMode(int? seed = null, System.IO.TextReader? input = null, System.IO.TextWriter? output = null)
+    internal void StartAutomationMode(int? seed = null, System.IO.TextReader? input = null, System.IO.TextWriter? output = null,
+        Automation.AutomationWindowParker? windowParker = null)
     {
         Random = new GameRandom(seed ?? 0);
-        _automationMode = new Automation.AutomationMode(this, output);
+        _automationMode = new Automation.AutomationMode(this, output) { WindowParker = windowParker };
         _automationMode.Start(input);
     }
 
@@ -1513,6 +1524,12 @@ public class FlatRedBallService
         long updateStart = System.Diagnostics.Stopwatch.GetTimestamp();
         if (_automationMode != null)
         {
+            // Before the step gate: a window waiting on its first step command must be parked too.
+            if (_automationMode.WindowParker is { } parker)
+            {
+                parker.Tick();
+                Automation.AutomationWindowParker.ForceActive(_game);
+            }
             if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
             {
                 // An armed screenshot still needs one draw to capture — suppressing every
@@ -1568,24 +1585,16 @@ public class FlatRedBallService
             // called here — layout is the Draw loop's responsibility (it sets each root's
             // Width/Height each frame; Gum gates internally on equality and triggers its own
             // UpdateLayout when dims change).
-            _gumUpdateList.Clear();
-            // EntityVisualsRoot has the lowest cursor priority (first): entity-attached visuals lose
-            // to HUD elements (per-camera UiRoots) and to the overlay (OverlayRoot, last) on overlap,
-            // matching the visual stacking. OverlayRoot is now the unified GumService.Root, so
-            // AddToRoot()/AddOverlay() content is covered by the single OverlayRoot add at the end —
-            // no separate _gum.Root entry (it would be a duplicate).
-            _gumUpdateList.Add(CurrentScreen.EntityVisualsRoot);
-            for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
-            {
-                var camera = CurrentScreen.Cameras[i];
-                _gumUpdateList.Add(camera.UiRoot);
-                // Popup/modal roots after this camera's UiRoot so an open popup/modal gets cursor
-                // priority over the HUD beneath it (later in the list = higher priority), and modal
-                // after popup so it wins over an open popup.
-                _gumUpdateList.Add(camera.PopupRoot);
-                _gumUpdateList.Add(camera.ModalRoot);
-            }
-            _gumUpdateList.Add(CurrentScreen.OverlayRoot);
+            // Priority order (EntityVisualsRoot lowest, OverlayRoot highest) lives in BuildUpdateList.
+            // OverlayRoot is the unified GumService.Root, so AddToRoot()/AddOverlay() content is
+            // covered by it — no separate _gum.Root entry (it would be a duplicate).
+            GumInputRouting.BuildUpdateList(CurrentScreen, _gumUpdateList);
+
+            // Gum maps the cursor through one shared camera that holds whatever the last draw pass
+            // left; give each root its own pixel -> canvas mapping instead (issue #664).
+            var pp = _spriteBatch.GraphicsDevice.PresentationParameters;
+            GumInputRouting.Apply(CurrentScreen, Input.Cursor.ScreenPosition,
+                RenderingLibrary.SystemManagers.Default.Renderer.Camera, pp.BackBufferWidth, pp.BackBufferHeight);
 
             long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
             _gum.Update(gameTime, _gumUpdateList);
