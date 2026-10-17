@@ -13,6 +13,12 @@ namespace FlatRedBall2.Utilities;
 /// <see cref="ApplyWaylandFallback"/> must be called at the very top of <c>Program.cs</c>,
 /// before constructing the game. Calling it later (e.g. from <c>CustomInitialize</c>) has
 /// no effect, since SDL has already picked a video driver by then.
+/// <para>
+/// Limits the fallback can't cover: SDL2 on Wayland needs <c>libdecor</c> for window borders and
+/// a titlebar, otherwise the window is borderless (Wayland still succeeds, so there is no X11
+/// fallback), and fractional-scaling compositors can rescale the window because MonoGame/SDL2
+/// HiDPI support on Wayland is imperfect.
+/// </para>
 /// </remarks>
 public static class LinuxVideoDriver
 {

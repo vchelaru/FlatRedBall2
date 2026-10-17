@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FlatRedBall2.Tests.Packaging;
 
-public class TemplateBrowserStorageTests
+public class TemplateHostWiringTests
 {
     private static string BlazorGLDir => Path.Combine(
         TemplatePackageReferenceTests.RepoRootForTests, "templates", "frb2-multiplatform", "MyGame.BlazorGL");
@@ -29,6 +29,22 @@ public class TemplateBrowserStorageTests
         index.ShouldContain("PerfDiagnosticsProbe.TryCreateFromQuery(");
         index.ShouldContain("_perfProbe?.OnTick();");
         index.ShouldContain("InvokeBootScreen(\"frbBootFailed\"");
+    }
+
+    [Theory]
+    [InlineData("frb2-desktop")]
+    [InlineData("frb2-multiplatform")]
+    public void Template_DesktopProgram_AppliesWaylandFallbackBeforeConstructingGame(string template)
+    {
+        // SDL picks its video driver inside the Game constructor, so the call must come first.
+        var program = File.ReadAllText(Path.Combine(
+            TemplatePackageReferenceTests.RepoRootForTests, "templates", template, "MyGame.Desktop", "Program.cs"));
+
+        var fallback = program.IndexOf("LinuxVideoDriver.ApplyWaylandFallback();");
+        var construct = program.IndexOf("new GameNamespace.Game1()");
+
+        fallback.ShouldBeGreaterThanOrEqualTo(0);
+        construct.ShouldBeGreaterThan(fallback);
     }
 
     [Fact]
