@@ -98,9 +98,11 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj -r ${{ matrix.rid }}
+        run: dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj -r ${{ matrix.rid }} -p:PublishReadyToRun=true
 
-      - name: Publish (${{ matrix.rid }}, self-contained single-file)
+      # ReadyToRun (precompiled native code) cuts startup roughly in half. Release publishes only;
+      # Debug builds and plain `dotnet build` stay JIT-only.
+      - name: Publish (${{ matrix.rid }}, self-contained single-file, ReadyToRun)
         run: >
           dotnet publish
           tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
@@ -109,6 +111,7 @@ jobs:
           --self-contained
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishReadyToRun=true
           -p:Version=${{ needs.meta.outputs.version }}
           -o dist/publish
 
@@ -191,7 +194,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publish Windows updater build
+      - name: Publish Windows updater build (ReadyToRun)
         run: >
           dotnet publish
           tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
@@ -199,8 +202,20 @@ jobs:
           -r win-x64
           --self-contained
           -p:PublishSingleFile=false
+          -p:PublishReadyToRun=true
           -p:Version=${{ needs.meta.outputs.version }}
           -o dist/velopack/publish
+
+      # Fails the release if the folder vpk packs is IL-only (a ReadyToRun image has a
+      # ManagedNativeHeader; an IL-only assembly has none).
+      - name: Verify published assembly is ReadyToRun
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path dist/velopack/publish/AnimationEditor.dll).Path
+          $pe = [System.Reflection.PortableExecutable.PEReader]::new([System.IO.File]::OpenRead($path))
+          $size = $pe.PEHeaders.CorHeader.ManagedNativeHeaderDirectory.Size
+          $pe.Dispose()
+          if ($size -eq 0) { throw "AnimationEditor.dll is not ReadyToRun-compiled" }
 
       - name: Install Velopack CLI
         shell: pwsh
