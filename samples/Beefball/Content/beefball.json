@@ -1,0 +1,42 @@
+{
+  "player": {
+    "radius": 16,
+    "acceleration": 340,
+    "drag": 1,
+    "dashSpeed": 600,
+    "dashCooldownSeconds": 2,
+    "mass": 1,
+    "cooldownIndicatorRadius": 11
+  },
+  "puck": {
+    "radius": 6,
+    "drag": 0.4,
+    "mass": 0.3
+  },
+  "collision": {
+    "wallElasticity": 1,
+    "playerPlayerElasticity": 1,
+    "playerPuckElasticity": 1
+  },
+  "match": {
+    "scoreToWin": 5,
+    "goalPauseSeconds": 1.5
+  },
+  "glow": {
+    "strength": 1,
+    "layers": [
+      { "scale": 1.4, "alpha": 0.14 },
+      { "scale": 2.2, "alpha": 0.07 }
+    ]
+  },
+  "palette": {
+    "background": "#04050b",
+    "team1": "#35f0ff",
+    "team2": "#ff3ea5",
+    "puck": "#ff6a3d",
+    "puckCore": "#fff1e8",
+    "trailEnd": "#ff2a3a",
+    "playerBody": "#0a0d1c",
+    "text": "#e9f3ff"
+  }
+}
