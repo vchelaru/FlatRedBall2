@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -1215,23 +1216,11 @@ public class Screen : ILifecycleEvents
         IRenderBatch? currentBatch = null;
         IRenderable? previousRenderable = null;
 
+        BakeGumRenderTargets(GumRenderablesToBake(activeCamera), activeCamera);
+
         foreach (var renderable in RenderList)
         {
-            if (renderable is IAttachable attachable && attachable.Parent != null
-                && !attachable.Parent.IsAbsoluteVisible)
-                continue;
-
-            // Per-camera HUD ownership: a GumRenderable bound to one camera (or marked as overlay)
-            // must not be drawn under any other camera's transform. Overlay renderables are drawn
-            // in a separate post-camera pass by FlatRedBallService.
-            if (renderable is GumRenderable gum && !gum.ShouldDrawForCamera(activeCamera))
-                continue;
-
-            // Skip entirely — not just the Draw() call — so an invisible renderable (e.g. a
-            // collision-only shape with IsVisible=false by default) never forces a batch
-            // transition against its visible neighbors. Checking visibility only inside Draw()
-            // is too late: the Begin/End decision above already happened by then.
-            if (!renderable.IsVisible)
+            if (!IsDrawnForCamera(renderable, activeCamera))
                 continue;
 
             var batch = renderable.Batch;
@@ -1254,6 +1243,40 @@ public class Screen : ILifecycleEvents
         EndBatch(currentBatch, spriteBatch, diagnostics);
     }
 
+    // The per-renderable gates for a camera pass, shared by Draw and the render-target bake so the bake
+    // covers exactly the Gum roots Draw is about to draw.
+    private static bool IsDrawnForCamera(IRenderable renderable, Camera activeCamera)
+    {
+        if (renderable is IAttachable attachable && attachable.Parent != null
+            && !attachable.Parent.IsAbsoluteVisible)
+            return false;
+
+        // Per-camera HUD ownership: a GumRenderable bound to one camera (or marked as overlay)
+        // must not be drawn under any other camera's transform. Overlay renderables are drawn
+        // in a separate post-camera pass by FlatRedBallService.
+        if (renderable is GumRenderable gum && !gum.ShouldDrawForCamera(activeCamera))
+            return false;
+
+        // Skip entirely — not just the Draw() call — so an invisible renderable (e.g. a
+        // collision-only shape with IsVisible=false by default) never forces a batch
+        // transition against its visible neighbors. Checking visibility only inside Draw()
+        // is too late: the Begin/End decision above already happened by then.
+        return renderable.IsVisible;
+    }
+
+    // Gum's GumBatch path never bakes IsRenderTarget containers (vchelaru/Gum#6134), so the bake runs
+    // here, before the pass's first Begin and outside any open SpriteBatch.
+    internal IEnumerable<GumRenderable> GumRenderablesToBake(Camera activeCamera) =>
+        RenderList.OfType<GumRenderable>().Where(r => IsDrawnForCamera(r, activeCamera));
+
+    internal IEnumerable<GumRenderable> GumOverlayRenderablesToBake() =>
+        _gumRenderables.Where(r => r.IsOverlay && HasOverlayContent(r) && r.IsVisible);
+
+    private readonly GumRenderTargetBaker _gumRenderTargetBaker = new();
+
+    private void BakeGumRenderTargets(IEnumerable<GumRenderable> renderables, Camera camera) =>
+        _gumRenderTargetBaker.Bake(renderables, camera);
+
     // Ends the active batch and, when diagnostics are enabled, records its self-reported
     // IRenderBatch.InternalDrawCallCount as this frame's RenderDiagnostics total — GPU draw
     // calls issued by a foreign renderer (Gum, Apos.Shapes) that FRB's own batch-break tracking
@@ -1271,6 +1294,8 @@ public class Screen : ILifecycleEvents
     // sort against world-space content; their order among themselves matches insertion order.
     internal void DrawOverlay(SpriteBatch spriteBatch, RenderDiagnostics diagnostics, Camera overlayCamera)
     {
+        BakeGumRenderTargets(GumOverlayRenderablesToBake(), overlayCamera);
+
         IRenderBatch? currentBatch = null;
         foreach (var renderable in _gumRenderables)
         {
