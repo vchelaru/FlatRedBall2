@@ -20,7 +20,7 @@
     <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
   <!--
     Everything the Glue editor authors lives in this one folder, so copying it needs one rule and no

@@ -21,7 +21,7 @@ The only relevant question is "is this the right design?" — never "will this b
 
 ## Key Files
 
-- Main project: `src/Kni/FlatRedBall2.Kni.csproj` (KNI; `nkast.Xna.Framework*` versions pinned in the root `Directory.Packages.props`)
+- Main project: `src/FlatRedBall2.csproj` (KNI; `nkast.Xna.Framework*` versions pinned in the root `Directory.Packages.props`)
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
 - Sample catalog, by skill (with gaps): `design/SAMPLES.md`
@@ -48,7 +48,7 @@ design write-ups here — those go in `design/*.md`. Game design documents stay 
 ## Build & Test
 
 ```
-dotnet build src/Kni/FlatRedBall2.Kni.csproj
+dotnet build src/FlatRedBall2.csproj
 dotnet test tests/FlatRedBall2.Tests/
 ```
 

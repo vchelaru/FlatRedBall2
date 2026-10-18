@@ -21,7 +21,7 @@
 
     <!-- Kni\AnimationChain.KNI.csproj compiles this directory's source explicitly (its own
          EnableDefaultCompileItems is off) rather than sharing this project's own default glob —
-         see the comment atop src/Kni/FlatRedBall2.Kni.csproj for why they can't share a folder. -->
+         two SDK projects sharing one folder hit an MSBuild parallel-build race (#966). -->
     <DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 

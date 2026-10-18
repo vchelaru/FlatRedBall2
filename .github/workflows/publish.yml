@@ -104,13 +104,13 @@ jobs:
           exit 1
 
       - name: Restore dependencies
-        run: dotnet restore src/Kni/FlatRedBall2.Kni.csproj
+        run: dotnet restore src/FlatRedBall2.csproj
 
       # The csproj hardcodes its PackageId, so no -p:PackageId override is needed (a global
       # override would also propagate to the AnimationChain.Common ProjectReference).
       - name: Build and Pack (FlatRedBall2.Kni)
         run: >
-          dotnet pack src/Kni/FlatRedBall2.Kni.csproj
+          dotnet pack src/FlatRedBall2.csproj
           -c Release
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out

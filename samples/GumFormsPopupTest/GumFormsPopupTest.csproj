@@ -20,6 +20,6 @@
     <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
 </Project>

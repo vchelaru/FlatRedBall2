@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="../../src/Kni/FlatRedBall2.Kni.csproj" />
+  <Project Path="../../src/FlatRedBall2.csproj" />
   <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="GlueLoaderScratch.csproj" />
 </Solution>

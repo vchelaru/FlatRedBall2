@@ -9,7 +9,7 @@ description: "Adding a KNI BlazorGL (Blazor WebAssembly / browser) head to a Fla
 
 ## One engine, one Common
 
-Both heads run on KNI and reference the same engine (`src/Kni/FlatRedBall2.Kni.csproj` / NuGet `FlatRedBall2.Kni`). There is no backend switch: Game1 and all game code are shared verbatim, and branch at runtime on `OperatingSystem.IsBrowser()` only where a browser genuinely differs.
+Both heads run on KNI and reference the same engine (`src/FlatRedBall2.csproj` / NuGet `FlatRedBall2.Kni`). There is no backend switch: Game1 and all game code are shared verbatim, and branch at runtime on `OperatingSystem.IsBrowser()` only where a browser genuinely differs.
 
 ## Project layout
 

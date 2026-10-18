@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!--
-    The engine project. It lives in this Kni\ subfolder but compiles the whole src\ tree (see the
-    Compile item below).
-  -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>FlatRedBall2.Kni</AssemblyName>
+    <!-- Sibling projects live in subfolders of src\; keep their sources out of the engine assembly. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**</DefaultItemExcludes>
     <!--
       Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
       of the eventual NuGet package. CS1591 ("missing XML comment for publicly visible type
@@ -33,16 +31,6 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
-  <!--
-    Compiles the parent directory's source instead of this project's own — EnableDefaultCompileItems
-    is off above, so this is the only source list. Excludes keep the sibling projects' sources and
-    bin/obj (and this folder itself) out of the engine assembly.
-  -->
-  <ItemGroup>
-    <Compile Include="..\**\*.cs"
-             Exclude="..\obj\**;..\bin\**;..\Kni\**;..\FlatRedBall2.BlazorGL\**;..\AnimationChain.MonoGame\**;..\AnimationChain.Common\**;..\Animation.Content\**;..\AnimationEditorCommon\**" />
-  </ItemGroup>
-
   <!-- Backend-agnostic packages -->
   <ItemGroup>
     <PackageReference Include="AsepriteDotNet" />
@@ -57,7 +45,7 @@
     AnimationEditor (Avalonia) reference the .achx format without pulling in the engine at all.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
+    <ProjectReference Include="AnimationChain.Common\AnimationChain.Common.csproj" />
   </ItemGroup>
 
   <!-- StbTrueType is the only pure-managed KernSmith rasterizer backend, so it's the only one that
@@ -99,6 +87,6 @@
     `new Effect(graphicsDevice, bytes)`.
   -->
   <ItemGroup>
-    <EmbeddedResource Include="..\Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
+    <EmbeddedResource Include="Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
   </ItemGroup>
 </Project>

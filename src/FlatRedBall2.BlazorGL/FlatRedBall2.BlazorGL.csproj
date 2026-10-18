@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Kni\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\FlatRedBall2.csproj" />
   </ItemGroup>
 
   <!-- Ship the targets file (auto-imported by consumers) and the KNI streamProcessor2.js it serves -->

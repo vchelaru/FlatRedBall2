@@ -31,7 +31,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Reuse the engine suite's shared-device fixture instead of forking it. -->

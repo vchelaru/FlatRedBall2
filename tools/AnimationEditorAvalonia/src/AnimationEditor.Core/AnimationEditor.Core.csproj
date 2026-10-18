@@ -15,7 +15,7 @@
 
   <!--
     Only the .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave,
-    ColorOperation, etc.) is referenced, not the full engine (src/Kni/FlatRedBall2.Kni.csproj).
+    ColorOperation, etc.) is referenced, not the full engine (src/FlatRedBall2.csproj).
     That project pulls in KNI, which this editor (Avalonia) doesn't need.
   -->
   <ItemGroup>

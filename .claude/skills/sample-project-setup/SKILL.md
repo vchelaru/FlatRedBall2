@@ -42,7 +42,7 @@ The minimal `.csproj` (KNI desktop, SDL2/OpenGL):
     <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
 </Project>
 ```
@@ -57,7 +57,7 @@ A sibling solution file lets the user open the sample in VS / Rider without load
 
 ```xml
 <Solution>
-  <Project Path="../../src/Kni/FlatRedBall2.Kni.csproj" />
+  <Project Path="../../src/FlatRedBall2.csproj" />
   <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="YourSample.csproj" />
 </Solution>

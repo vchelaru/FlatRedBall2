@@ -22,7 +22,7 @@
 
     Published as its own NuGet package (FlatRedBall.AnimationChain.Common) in lockstep with
     FlatRedBall2.Kni, see .github/workflows/publish.yml. This is required
-    because src/Kni/FlatRedBall2.Kni.csproj's ProjectReference to this project causes `dotnet pack` to
+    because src/FlatRedBall2.csproj's ProjectReference to this project causes `dotnet pack` to
     auto-generate a dependency on FlatRedBall.AnimationChain.Common in the FlatRedBall2.Kni nuspec;
     that dependency must resolve to a real, matching-version package on nuget.org, so this project
     is published in the same workflow run, sharing the same version, before FlatRedBall2 itself.
@@ -52,7 +52,7 @@
     <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
-    <!-- SourceLink and Symbols (matches src/Kni/FlatRedBall2.Kni.csproj) -->
+    <!-- SourceLink and Symbols (matches src/FlatRedBall2.csproj) -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

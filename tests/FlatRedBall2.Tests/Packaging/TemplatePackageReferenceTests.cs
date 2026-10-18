@@ -59,7 +59,7 @@ public class TemplatePackageReferenceTests
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir != null)
             {
-                if (File.Exists(Path.Combine(dir.FullName, "src", "Kni", "FlatRedBall2.Kni.csproj")))
+                if (File.Exists(Path.Combine(dir.FullName, "src", "FlatRedBall2.csproj")))
                 {
                     return dir.FullName;
                 }

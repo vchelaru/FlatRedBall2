@@ -103,7 +103,7 @@ Project setup:
 - Project directory: samples/auto/<ProjectName>/
 - Project name: AutoEval<GameName>Sample
 - The .csproj must reference the engine via ProjectReference:
-  <ProjectReference Include="..\..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+  <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
 - Create a .slnx solution file that includes both the sample and engine projects.
 - Do NOT read existing samples, unit tests, or any code outside src/ and your own project. Simulate an end user with only the engine source, XML docs, and skill files.
 

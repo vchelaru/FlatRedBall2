@@ -62,7 +62,7 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
         var common = File.ReadAllText(Path.Combine(output, "Game.Common", "Game.Common.csproj"));
         common.ShouldNotContain("FlatRedBall2.Kni\"");
         ProjectReferences(Path.Combine(output, "Game.Common", "Game.Common.csproj"))
-            .ShouldContain("../../FlatRedBall2/src/Kni/FlatRedBall2.Kni.csproj");
+            .ShouldContain("../../FlatRedBall2/src/FlatRedBall2.csproj");
 
         foreach (var file in TextFiles(output))
         {
@@ -86,7 +86,7 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
         var repoRoot = TemplatePackageReferenceTests.RepoRootForTests;
 
         var closure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pending = new Stack<string>(new[] { "src/Kni/FlatRedBall2.Kni.csproj" });
+        var pending = new Stack<string>(new[] { "src/FlatRedBall2.csproj" });
         while (pending.Count > 0)
         {
             var relative = pending.Pop();

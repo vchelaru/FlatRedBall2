@@ -3,8 +3,7 @@
     KNI backend build of AnimationChain — see ..\AnimationChain.MonoGame.csproj for the MonoGame
     sibling. This file lives in its own Kni\ subfolder rather than next to it: two SDK projects
     sharing one physical directory (globbing the same .cs files under different references) hits
-    a real MSBuild parallel-build race — see the comment atop src/Kni/FlatRedBall2.Kni.csproj for
-    the full explanation and how it was confirmed (#966).
+    a real MSBuild parallel-build race (#966).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -29,8 +28,8 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
-  <!-- Compiles the parent directory's source instead of this project's own — see
-       src/Kni/FlatRedBall2.Kni.csproj for why. -->
+  <!-- Compiles the parent directory's source instead of this project's own folder (see the
+       header comment). -->
   <ItemGroup>
     <Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />
   </ItemGroup>
