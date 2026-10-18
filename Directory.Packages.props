@@ -51,8 +51,8 @@
     <PackageVersion Include="KernSmith.MonoGameGum" Version="2026.10.18.4-preview.4" />
     <PackageVersion Include="KernSmith.KniGum" Version="2026.10.18.4-preview.4" />
     <!-- Rasterizer backend package, pinned to the same version as the core KernSmith package
-         KernSmith.KniGum depends on transitively (2026.10.18.4-preview.4 -> KernSmith 0.21.0). -->
-    <PackageVersion Include="KernSmith.Rasterizers.StbTrueType" Version="0.21.0" />
+         KernSmith.KniGum depends on transitively (2026.10.18.4-preview.4 -> KernSmith 0.24.0). -->
+    <PackageVersion Include="KernSmith.Rasterizers.StbTrueType" Version="0.24.0" />
     <PackageVersion Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1" />
     <PackageVersion Include="MonoGame.Content.Builder.Task" Version="3.8.5.1" />
     <PackageVersion Include="MonoGame.Extended" Version="6.0.0" />
@@ -73,7 +73,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.*" />
     <PackageVersion Include="Shouldly" Version="4.*" />
-    <PackageVersion Include="StbImageSharp" Version="2.30.15" />
+    <PackageVersion Include="StbImageSharp" Version="2.30.16" />
     <PackageVersion Include="StbImageWriteSharp" Version="1.16.7" />
     <PackageVersion Include="xunit" Version="2.9.*" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.*" />
