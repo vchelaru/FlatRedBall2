@@ -15,12 +15,8 @@ public class Game1 : Game
     {
         _graphics = new GraphicsDeviceManager(this);
         // Apos.Shapes (used transitively by FlatRedBall2 shape rendering) needs SM 4.0+.
-        // MonoGame tops out at HiDef; KNI needs FL10_0 for the equivalent profile.
-#if KNI
+        // KNI's FL10_0 profile provides it; the Reach default crashes at startup.
         _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
 

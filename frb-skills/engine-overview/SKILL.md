@@ -5,7 +5,7 @@ description: "Engine overview for FlatRedBall2. Start here for any game developm
 
 # FlatRedBall2 Engine Overview
 
-FlatRedBall2 is a 2D game engine built on MonoGame. It provides physics, collision, rendering, input, and UI (via Gum) out of the box. Game code creates Screens, Entities, and wires them together.
+FlatRedBall2 is a 2D game engine built on KNI (an XNA-compatible framework for desktop and the browser). It provides physics, collision, rendering, input, and UI (via Gum) out of the box. Game code creates Screens, Entities, and wires them together.
 
 ## What the Engine Does Automatically
 
@@ -40,7 +40,7 @@ Each frame runs in this order:
 
 ## Bootstrapping a Game
 
-`Game1.cs` wires the MonoGame loop to FRB: `FlatRedBallService.Default.Initialize<TScreen>(this)` in `Initialize` (sizes the window, initializes, starts the screen — or `Initialize(this, "…gluj")` to boot a whole Glue project), then `Update`/`Draw` each frame. The complete template — including the `GraphicsProfile.HiDef` setup that crashes at startup if omitted — lives in `sample-project-setup`; don't hand-roll it.
+`Game1.cs` wires the XNA `Game` loop to FRB: `FlatRedBallService.Default.Initialize<TScreen>(this)` in `Initialize` (sizes the window, initializes, starts the screen — or `Initialize(this, "…gluj")` to boot a whole Glue project), then `Update`/`Draw` each frame. The complete template — including the `GraphicsProfile.FL10_0` setup that crashes at startup if omitted — lives in `sample-project-setup`; don't hand-roll it.
 
 ## Key Design Rules
 
@@ -78,7 +78,7 @@ public class GameScreen : Screen
 | Property | Type | Purpose |
 |----------|------|---------|
 | `Input` | `InputManager` | Keyboard, cursor, gamepads |
-| `Content` | `ContentLoader` | Load textures, fonts via `.mgcb` pipeline |
+| `Content` | `ContentLoader` | Load textures, fonts via the `.mgcb` (xnb) pipeline |
 | `Random` | `GameRandom` | Seeded random with helpers (`Between`, `RadialVector2`) |
 | `Time` | `TimeManager` | Frame timing, async delays |
 | `Audio` | `AudioManager` | Load/play `SoundEffect` and `Song`, music, volume (see `audio`) |

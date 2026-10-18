@@ -40,7 +40,7 @@ jobs:
   # Both AnimationChain.MonoGame and AnimationChain.KNI now ProjectReference AnimationChain.Common
   # (see src/AnimationChain.MonoGame/AnimationChain.MonoGame.csproj), which auto-generates a matching
   # NuGet <dependency> at pack time -- that dependency must resolve to a real, matching-version
-  # package on nuget.org, same lockstep requirement FlatRedBall2.MonoGame/Kni already have on it in
+  # package on nuget.org, same lockstep requirement FlatRedBall2.Kni already has on it in
   # .github/workflows/publish.yml. Publish AnimationChain.Common here too (this workflow runs
   # independently of publish.yml) before packing the AnimationChain packages.
   publish-animationchain-common:

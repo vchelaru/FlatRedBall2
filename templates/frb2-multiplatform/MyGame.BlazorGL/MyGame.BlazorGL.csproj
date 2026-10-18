@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MyGame.Common\Kni\MyGame.Common.Kni.csproj" />
+    <ProjectReference Include="..\MyGame.Common\MyGame.Common.csproj" />
   </ItemGroup>
 
   <!--

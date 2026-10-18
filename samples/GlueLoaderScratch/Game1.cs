@@ -19,11 +19,7 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-#if KNI
         _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
     }

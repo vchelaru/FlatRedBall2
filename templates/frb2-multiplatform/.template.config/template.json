@@ -1,7 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/template",
   "author": "FlatRedBall2",
-  "classifications": ["Games", "MonoGame", "KNI", "Blazor", "FlatRedBall2"],
+  "classifications": ["Games", "KNI", "Blazor", "FlatRedBall2"],
   "identity": "FlatRedBall2.Templates.Multiplatform",
   "name": "FlatRedBall2 Multiplatform Game (Desktop + Web)",
   "shortName": "frb2-multiplatform",
@@ -34,15 +34,6 @@
         "separator": ""
       },
       "replaces": "__EnginePath1__"
-    },
-    "EnginePathFromKniProject": {
-      "type": "generated",
-      "generator": "join",
-      "parameters": {
-        "symbols": [ { "type": "const", "value": "../../" }, { "type": "ref", "value": "EnginePath" } ],
-        "separator": ""
-      },
-      "replaces": "__EnginePath2__"
     },
     "namespace": {
       "type": "parameter",

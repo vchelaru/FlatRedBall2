@@ -19,9 +19,7 @@ using Gum.GueDeriving;
 using Gum.Wireframe;
 using KernSmith;
 using KernSmith.Gum;
-#if KNI
 using KernSmith.Rasterizers.StbTrueType;
-#endif
 using Gum;
 using MonoGameAndGum.Renderables;
 using Microsoft.Xna.Framework.Content;
@@ -566,7 +564,7 @@ public class FlatRedBallService
         // KernSmith generates BitmapFonts in memory for any (family, size, style)
         // combination — TextRuntime / DrawString resolve fonts without requiring
         // pre-baked .fnt files in Content/FontCache/. Slots into Gum's font lookup
-        // cascade as IInMemoryFontCreator. Same wiring for both MonoGame and KNI.
+        // cascade as IInMemoryFontCreator.
         //
         // Must run BEFORE _gum.Initialize below: TextRuntime's constructor eagerly resolves
         // Font/FontSize, so any TextRuntime Gum constructs while loading the project needs
@@ -574,7 +572,6 @@ public class FlatRedBallService
         // lookup and fails (issue #1000 follow-up).
         StartupTiming.BeginPhase("Font rasterizer setup");
         var fontRasterizerBackend = ResolveFontRasterizerBackend(IsBrowserHost);
-#if KNI
         if (fontRasterizerBackend == RasterizerBackend.StbTrueType)
         {
             // StbTrueType's reflection-based backend auto-discovery is trimmed away under
@@ -583,7 +580,6 @@ public class FlatRedBallService
             // gum-kernsmith-integrations skill, "Rasterizer backend gotcha (wasm/AOT)").
             RuntimeHelpers.RunClassConstructor(typeof(StbTrueTypeRasterizer).TypeHandle);
         }
-#endif
         CustomSetPropertyOnRenderable.InMemoryFontCreator =
             new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend);
         // Rebuilds each visible TextRuntime's font at its zoomed size instead of stretching the
@@ -1059,8 +1055,6 @@ public class FlatRedBallService
             _graphicsManager.PreferredBackBufferHeight = mode.Height;
             _graphicsManager.IsFullScreen = true;
             _graphicsManager.ApplyChanges();
-            if (_game != null)
-                SetWindowPosition(Point.Zero);
         }
         else
         {
@@ -1085,27 +1079,10 @@ public class FlatRedBallService
             if (_game != null)
             {
                 _game.Window.AllowUserResizing = source.AllowUserResizing;
-
-                // Re-center the window. When entering fullscreen we set Position = (0,0);
-                // without a reset the title bar stays above the visible screen area and the
-                // window appears borderless even though it is not.
-                var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
-                int cx = (display.Width  - _graphicsManager.PreferredBackBufferWidth)  / 2;
-                int cy = (display.Height - _graphicsManager.PreferredBackBufferHeight) / 2;
-                SetWindowPosition(new Point(System.Math.Max(0, cx), System.Math.Max(30, cy)));
             }
         }
 
         DisplaySettings.WindowMode = source.WindowMode;
-    }
-
-    // GameWindow.Position is a MonoGame-only API; KNI's GameWindow has no equivalent, so on KNI the
-    // window stays wherever the platform placed it. Goes away with the MonoGame engine build.
-    private void SetWindowPosition(Point position)
-    {
-#if !KNI
-        _game!.Window.Position = position;
-#endif
     }
 
     // Factory registry — populated automatically when a Factory<T> is constructed

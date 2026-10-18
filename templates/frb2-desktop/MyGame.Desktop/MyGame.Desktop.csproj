@@ -8,15 +8,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>GameNamespace</RootNamespace>
-    <MonoGamePlatform>DesktopGL</MonoGamePlatform>
+    <KniPlatform>DesktopGL</KniPlatform>
   </PropertyGroup>
 
   <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
-       FlatRedBall2.MonoGame; its shader is embedded in the assembly, so it needs no
+       FlatRedBall2.Kni; its shader is embedded in the assembly, so it needs no
        content-pipeline wiring. -->
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
-    <PackageReference Include="MonoGame.Content.Builder.Task" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,7 +30,7 @@
   </ItemGroup>
 
   <!-- Link Common's raw runtime-loaded assets (achx, tmx, tsx, json, png) into the
-       Desktop output's Content/ folder. Content.mgcb is handled by MonoGame.Content.Builder.Task. -->
+       Desktop output's Content/ folder. -->
   <ItemGroup>
     <Content Include="..\MyGame.Common\Content\**\*.*"
              Exclude="..\MyGame.Common\Content\**\*.mgcb;..\MyGame.Common\Content\bin\**;..\MyGame.Common\Content\obj\**"

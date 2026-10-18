@@ -4,23 +4,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>PlatformKing</RootNamespace>
-    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
-    <!-- Kni\PlatformKing.Common.Kni.csproj compiles this directory's source explicitly rather
-         than sharing this project's own default glob — see the comment atop
-         src/Kni/FlatRedBall2.Kni.csproj for why they can't share a folder. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 
-  <!--
-    MonoGame/desktop backend build of Common. Kni\PlatformKing.Common.Kni.csproj is the
-    KNI/browser sibling — see src/FlatRedBall2.csproj for why these are two sibling single-TFM
-    files instead of one multi-targeted project.
-  -->
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
+    <ProjectReference Include="..\..\..\src\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
 </Project>

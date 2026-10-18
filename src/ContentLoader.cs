@@ -171,15 +171,12 @@ public class ContentLoader
     }
 
     /// <summary>
-    /// Unloads a single asset previously loaded through the MonoGame content pipeline (no-op on KNI,
-    /// where <c>UnloadAsset</c> is unsupported). Does not affect file-loaded textures tracked via
-    /// <see cref="TryReload"/> — those persist until <see cref="UnloadAll"/>.
+    /// Currently a no-op: KNI's <c>ContentManager</c> has no <c>UnloadAsset</c> yet (upstream
+    /// kniEngine/kni#2739). Pipeline-loaded assets are released by <see cref="UnloadAll"/>, as are
+    /// file-loaded textures tracked via <see cref="TryReload"/>.
     /// </summary>
     public void Unload(string path)
     {
-#if !KNI
-        _contentManager?.UnloadAsset(path);
-#endif
     }
 
     /// <summary>

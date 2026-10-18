@@ -1,13 +1,13 @@
 ---
 name: sample-project-setup
-description: "Sample Project Setup for FlatRedBall2. Use when creating a new sample project, setting up a .csproj, configuring MonoGame content pipeline, or troubleshooting 'Cannot find a manifest file' / 'dotnet-mgcb does not exist' build errors. Covers the complete checklist for new sample projects."
+description: "Sample Project Setup for FlatRedBall2. Use when creating a new sample project, setting up a .csproj or .slnx, or wiring the KNI content pipeline. Covers the checklist for new sample projects."
 ---
 
 # Sample Project Setup
 
 > **See `content-boundary` skill first.** New projects should scaffold placeholder content files (TMX, Gum, coefficients JSON) rather than hardcoding content in C#. Set the project up so the human can drop in real art, levels, and UI without recompiling.
 
-How to create a new sample project (`.csproj`) under `samples/`. Follow this checklist exactly — two of these steps are easy to forget and cause hard-to-diagnose build failures.
+How to create a new sample project (`.csproj`) under `samples/`. Follow this checklist exactly.
 
 > **Do not read existing sample files to verify these templates.** The content below is authoritative. Only read source files if something fails and you have a specific reason to doubt the template.
 
@@ -17,7 +17,7 @@ How to create a new sample project (`.csproj`) under `samples/`. Follow this che
 
 ### 1. Create the directory and `.csproj`
 
-Copy the structure from an existing sample (e.g., `AnimationChainSample`). The minimal `.csproj`:
+The minimal `.csproj` (KNI desktop, SDL2/OpenGL):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -29,109 +29,49 @@ Copy the structure from an existing sample (e.g., `AnimationChainSample`). The m
     <TieredCompilation>false</TieredCompilation>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <KniPlatform>DesktopGL</KniPlatform>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
-    <PackageReference Include="MonoGame.Content.Builder.Task" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
+    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
 </Project>
 ```
 
-No `Version` attribute on either `PackageReference` — the repo uses NuGet Central Package Management, so every version is pinned once in the root `Directory.Packages.props`. If restore complains a package has no version, add it there instead of on the `PackageReference`.
+No `Version` attribute on any `PackageReference` — the repo uses NuGet Central Package Management, so every version is pinned once in the root `Directory.Packages.props`. If restore complains a package has no version, add it there.
 
 Do **not** pin `Apos.Shapes` — version flows transitively from the engine. Its shader is embedded in the assembly, so it needs no content-pipeline wiring.
 
 ### 1b. Add `YourSample.slnx` (REQUIRED — easy to forget)
 
-A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. Minimal content — the sample csproj, the engine csproj, and the engine's `AnimationChain.Common` dependency:
-
-> **Anti-precedent warning.** Roughly a third of the existing samples in `samples/auto/` are missing this file — that's drift, not the rule. If you scaffolded a new project by copying a sibling sample, the `.slnx` may not be there to copy. Add it from the template below; do not infer the pattern from the directory listing of one neighbor.
-
+A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. List the sample, the engine, and the engine's `AnimationChain.Common` dependency:
 
 ```xml
 <Solution>
-  <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../src/Kni/FlatRedBall2.Kni.csproj" />
   <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="YourSample.csproj" />
 </Solution>
 ```
 
-Include `AnimationChain.Common` even though the sample never references it directly: `FlatRedBall2.csproj` project-references it, and IDE solution restore (Rider/VS) needs every project in the reference graph. Omit it and the solution fails to restore with `NU1105: Unable to find project information for ...AnimationChain.Common.csproj`. The `dotnet` CLI follows the `ProjectReference` transitively, so a `dotnet build`/`run` of the csproj hides the gap — the error only surfaces when someone opens the `.slnx`.
+Include `AnimationChain.Common` even though the sample never references it directly: the engine project-references it, and IDE solution restore needs every project in the reference graph. Omit it and the solution fails to restore with `NU1105`; `dotnet build` hides the gap because the CLI follows `ProjectReference` transitively.
 
-### 2. Add `.config/dotnet-tools.json` (REQUIRED — easy to forget)
+Samples with a BlazorGL head also list `FlatRedBall2.BlazorGL`. Don't infer the layout from a neighbor that lacks a `.slnx`; use this template. `SolutionMembershipTests` fails if a referenced project isn't a member.
 
-Without this file, the first build fails with **"Cannot find a manifest file"** / **"dotnet-mgcb does not exist"**, even though other samples build fine (they have the file already).
+### 2. Content pipeline (only if the project builds XNBs)
 
-Copy from any existing sample:
-```
-samples/AnimationChainSample/.config/dotnet-tools.json  →  samples/YourSample/.config/dotnet-tools.json
-```
+Raw assets (PNG, JSON, TMX, OGG, `.achx`) need no pipeline: put them under `Content/` and copy them to the output with `<Content Include=... CopyToOutputDirectory="PreserveNewest" />`. A head that really needs XNBs adds `nkast.Xna.Framework.Content.Pipeline.Builder` and an explicit `<KniContentReference Include="Content/Content.mgcb" />`. The builder does not discover `.mgcb` files on its own, so without that item it silently builds nothing. Output lands in `Content/bin/DesktopGL/` and is copied beside the exe.
 
-Content (do not modify versions):
-```json
-{
-  "version": 1,
-  "isRoot": true,
-  "tools": {
-    "dotnet-mgcb": {
-      "version": "3.8.5.1",
-      "commands": ["mgcb"]
-    },
-    "dotnet-mgcb-editor": {
-      "version": "3.8.5.1",
-      "commands": ["mgcb-editor"]
-    },
-    "dotnet-mgcb-editor-linux": {
-      "version": "3.8.5.1",
-      "commands": ["mgcb-editor-linux"]
-    },
-    "dotnet-mgcb-editor-windows": {
-      "version": "3.8.5.1",
-      "commands": ["mgcb-editor-windows"]
-    },
-    "dotnet-mgcb-editor-mac": {
-      "version": "3.8.5.1",
-      "commands": ["mgcb-editor-mac"]
-    }
-  }
-}
-```
-
-Then restore the tool (once per project directory):
-```
-cd samples/YourSample
-dotnet tool restore
-```
-
-### 3. Add `Content/Content.mgcb` (REQUIRED — easy to forget)
-
-`MonoGame.Content.Builder.Task` needs this file to drive the content pipeline for any textures, fonts, or audio the project loads via `ContentManager`. Without it, that content fails to build.
-
-Create `Content/Content.mgcb` in the project directory with this minimal content:
-
-```
-#----------------------------- Global Properties ----------------------------#
-
-/outputDir:bin/$(Platform)
-/intermediateDir:obj/$(Platform)
-/platform:DesktopGL
-/config:
-/profile:Reach
-/compress:False
-
-#-------------------------------- References --------------------------------#
-
-
-#---------------------------------- Content ---------------------------------#
-
-```
-
-Even a project with no custom content yet should keep this file present — `MonoGame.Content.Builder.Task` expects it, and it's one less thing to add later.
-
-### 4. Ask about Gum mode (REQUIRED — do not skip)
+### 3. Ask about Gum mode (REQUIRED — do not skip)
 
 Before writing any game code, ask the user:
 
@@ -142,7 +82,7 @@ Before writing any game code, ask the user:
 
 Then invoke the `gumcli` skill and follow its instructions for the chosen mode before writing any screen or entity code.
 
-### 5. Add `Program.cs` and `Game1.cs`
+### 4. Add `Program.cs` and `Game1.cs`
 
 ```csharp
 // Program.cs
@@ -155,12 +95,8 @@ public Game1()
     _graphics = new GraphicsDeviceManager(this);
     // REQUIRED — Apos.Shapes needs SM 4.0+. Default GraphicsProfile is Reach (SM 2.0),
     // which crashes at startup with "Shader model 4.0 is not supported by the current
-    // graphics profile 'Reach'". MonoGame tops out at HiDef; KNI uses FL10_0.
-#if KNI
+    // graphics profile 'Reach'".
     _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-    _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
     Content.RootDirectory = "Content";  // REQUIRED for ContentManager.Load of textures/fonts/audio
     IsMouseVisible = true;              // set to false only for keyboard/gamepad-only games
 }
@@ -185,16 +121,8 @@ protected override void Draw(GameTime gt)
 }
 ```
 
-### 6. Build
+### 5. Build
 
 ```
 dotnet build samples/YourSample/YourSample.csproj
 ```
-
----
-
-## Why the Tools File Is Needed
-
-`MonoGame.Content.Builder.Task` invokes `mgcb` as a local dotnet tool to build any MonoGame content. Local tools require a manifest file (`.config/dotnet-tools.json`) to locate the tool. Existing samples work because their manifests are already present and `dotnet tool restore` was run when the repo was first set up.
-
-A new project directory has no manifest, so the content build fails. The fix is to add the manifest (identical to all other samples) and run `dotnet tool restore` once.

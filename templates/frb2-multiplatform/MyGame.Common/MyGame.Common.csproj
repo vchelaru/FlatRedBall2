@@ -1,28 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!--
-      MonoGame/desktop backend build of Common. Kni\MyGame.Common.Kni.csproj is the KNI/browser
-      sibling — two sibling single-TFM files rather than one project multi-targeting
-      net8.0/net10.0, since both backends now target net10.0 and a single project can't list the
-      same TFM twice to pick different package sets. It lives in its own Kni\ subfolder rather
-      than next to this file — two SDK projects sharing one physical directory hits a real
-      MSBuild parallel-build race. See the multiplatform-conversion skill for the full rationale.
-    -->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>GameNamespace</RootNamespace>
-    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
     <!--#if (EnginePath != "")
-    <ProjectReference Include="__EnginePath1__/src/FlatRedBall2.csproj" />
+    <ProjectReference Include="__EnginePath1__/src/Kni/FlatRedBall2.Kni.csproj" />
     #endif-->
     <!--#if (EnginePath == "")-->
-    <PackageReference Include="FlatRedBall2.MonoGame" />
+    <PackageReference Include="FlatRedBall2.Kni" />
     <!--#endif-->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
   </ItemGroup>
 </Project>

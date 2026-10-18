@@ -6,7 +6,7 @@
   -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <!-- FlatRedBall2.MonoGame is pinned to "*-*" (any prerelease) — CPM blocks floating
+    <!-- FlatRedBall2.Kni is pinned to "*-*" (any prerelease) — CPM blocks floating
          PackageVersion entries by default. -->
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
     <!-- NU1507 recommends NuGet package source mapping whenever CPM is combined with more
@@ -15,8 +15,14 @@
     <NoWarn>$(NoWarn);NU1507</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="FlatRedBall2.MonoGame" Version="*-*" />
-    <PackageVersion Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1" />
-    <PackageVersion Include="MonoGame.Content.Builder.Task" Version="3.8.5.1" />
+    <PackageVersion Include="FlatRedBall2.Kni" Version="*-*" />
+    <PackageVersion Include="nkast.Xna.Framework" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Content" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Graphics" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Audio" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Media" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Input" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Xna.Framework.Game" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Kni.Platform.SDL2.GL" Version="4.3.9001" />
   </ItemGroup>
 </Project>

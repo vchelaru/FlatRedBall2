@@ -8,7 +8,7 @@ runtime (`AnimationChain<TFrame>`, `AnimationChainList<TFrame>`, `AnimationPlaye
 Pure C#, no MonoGame/KNI dependency — a renderer only has to close the generic runtime types over
 its own texture handle type.
 
-Most users should install `FlatRedBall2.MonoGame` or `FlatRedBall2.Kni` instead; both reference
+Most users should install `FlatRedBall2.Kni` instead; it references
 this package automatically and provide the runtime bridge that turns these types into playable
 animations backed by real textures. For the minimal DIY path -- raw MonoGame, no engine, no
 `FlatRedBall.AnimationChain.MonoGame` -- see `samples/AnimationChainCommonSample`.

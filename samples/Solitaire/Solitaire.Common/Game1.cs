@@ -13,12 +13,8 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        // Apos.Shapes needs SM 4.0+. MonoGame tops out at HiDef; KNI needs FL10_0 for equivalent.
-#if KNI
+        // Apos.Shapes needs SM 4.0+; KNI's FL10_0 profile provides it. The Reach default crashes at startup.
         _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
 
@@ -36,7 +32,7 @@ public class Game1 : Game
     protected override void Initialize()
     {
         base.Initialize();
-        // Path is relative to the MonoGame Content root; do NOT prepend "Content/".
+        // Path is relative to the Content root; do NOT prepend "Content/".
         // Gum 2026.6 selects loose vs. bundle purely from the extension (no sibling probing),
         // so this must match the deployed artifact. The build defines GUM_BUNDLE when
         // UseGumPackage=true (the default) — see Solitaire.GumPackage.targets.

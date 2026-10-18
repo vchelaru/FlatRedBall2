@@ -54,10 +54,8 @@
     BeforeTargets="AssignTargetPaths" hook ensures the .gumpkg exists
     before Content items are resolved into the build. Inputs/Outputs
     keep the target incremental — pack only re-runs when something in
-    the Gum project changed. Every other importer (Common.Kni, Desktop,
-    BlazorGL) gets the .gumpkg through EnsureGumPackage below, not through
-    its ProjectReference chain: BlazorGL's chain is Common.Kni only and
-    never builds Common.
+    the Gum project changed. Every other importer (Desktop, BlazorGL) gets
+    the .gumpkg through EnsureGumPackage below rather than packing itself.
   -->
   <ItemGroup Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' == 'Solitaire.Common'">
     <GumPackInputs Include="$(GumProjectDir)**\*.*" Exclude="$(GumPackageFile)" />

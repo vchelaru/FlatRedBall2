@@ -66,7 +66,7 @@ dotnet new frb2-desktop -n YourGameName
 This creates a `YourGameName/` folder with two projects inside:
 
 - `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
-- `YourGameName.Desktop/` — the desktop entry point that references `Common` and configures MonoGame.
+- `YourGameName.Desktop/` — the desktop entry point that references `Common` (KNI, SDL2/OpenGL).
 
 > **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. See [Multi-platform (Desktop + Web)](#multi-platform-desktop--web) below.
 
@@ -103,11 +103,8 @@ For web projects, keep the template's `wwwroot/Content/.gitignore` (that folder 
 
 ```
 cd YourGameName/YourGameName.Desktop
-dotnet tool restore
 dotnet run
 ```
-
-> **Why `cd YourGameName.Desktop`?** `dotnet tool restore` installs the MGCB content pipeline tool, and the tool manifest (`.config/dotnet-tools.json`) only lives in that subdirectory. Running `dotnet tool restore` from the solution root silently does nothing.
 
 A window opens showing "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
 
@@ -134,8 +131,8 @@ Same `--namespace` override as `frb2-desktop` above applies here too.
 
 This produces three projects sharing one `Common`:
 
-- `YourGameName.Common/` — game code, shipped as two `net10.0` projects: one for the MonoGame/desktop backend, and one for the KNI/web backend in a `Kni/` subfolder (`YourGameName.Common/Kni/YourGameName.Common.Kni.csproj`) that compiles the same source.
-- `YourGameName.Desktop/` — desktop entry point (MonoGame, `net10.0`).
+- `YourGameName.Common/` — game code (`net10.0`), shared by both heads.
+- `YourGameName.Desktop/` — desktop entry point (KNI SDL2/OpenGL, `net10.0`).
 - `YourGameName.BlazorGL/` — Blazor WebAssembly entry point (KNI, `net10.0`). Contains its own `App.razor`, `Pages/Index.razor`, `wwwroot/frb-host.js`, etc. — edit them freely; they're yours.
 
 Run the desktop head as before. To run the web head:
@@ -147,7 +144,7 @@ dotnet run
 
 This launches a local dev server (default `https://localhost:5001`) — open the URL and the game runs in the browser canvas. Apos.Shapes' shader is embedded directly in the package assembly, so neither Wine nor a shader compiler is needed on macOS/Linux.
 
-`Game1.cs` uses `#if KNI` to pick `GraphicsProfile.FL10_0` on the web target (`GraphicsProfile.HiDef` on desktop). Keep that pattern if you add any code that diverges between backends. Save data and other `System.IO.File`-based code should be gated behind `#if !KNI` since browsers have no filesystem.
+`Game1.cs` is identical on both heads (it sets `GraphicsProfile.FL10_0`). Code that differs between desktop and web can branch at runtime on `OperatingSystem.IsBrowser()`. Browsers have no filesystem, so route save data through `Engine.Storage` and content reads through `TitleContainer` rather than `System.IO.File`.
 
 ### Building against a local engine checkout
 
@@ -158,36 +155,34 @@ git clone https://github.com/vchelaru/FlatRedBall2.git
 dotnet new frb2-desktop -n YourGameName --EnginePath ../FlatRedBall2
 ```
 
-`--EnginePath` must be a path relative to the new `YourGameName/` solution folder, so `../FlatRedBall2` is a clone sitting next to it. Absolute paths are not supported: the template cannot reject them, and they produce references that do not resolve. The same parameter works with `frb2-multiplatform`. The generated `.csproj` files then use a `ProjectReference` to the engine's `src/FlatRedBall2.csproj` (and `src/Kni/FlatRedBall2.Kni.csproj` for the web head) in place of the `FlatRedBall2.MonoGame` / `FlatRedBall2.Kni` `PackageReference`, and the generated `.slnx` lists the engine projects. Without the parameter, the output is the NuGet-based project described above.
+`--EnginePath` must be a path relative to the new `YourGameName/` solution folder, so `../FlatRedBall2` is a clone sitting next to it. Absolute paths are not supported: the template cannot reject them, and they produce references that do not resolve. The same parameter works with `frb2-multiplatform`. The generated `.csproj` files then use a `ProjectReference` to the engine's `src/Kni/FlatRedBall2.Kni.csproj` in place of the `FlatRedBall2.Kni` `PackageReference`, and the generated `.slnx` lists the engine projects. Without the parameter, the output is the NuGet-based project described above.
 
 To switch an existing project, edit it by hand. In `YourGameName.Common.csproj`, replace
 
 ```xml
-<PackageReference Include="FlatRedBall2.MonoGame" />
+<PackageReference Include="FlatRedBall2.Kni" />
 ```
 
 with a `ProjectReference` whose path is relative to that `.csproj`:
 
 ```xml
-<ProjectReference Include="..\..\FlatRedBall2\src\FlatRedBall2.csproj" />
+<ProjectReference Include="..\..\FlatRedBall2\src\Kni\FlatRedBall2.Kni.csproj" />
 ```
 
-Do the same in `YourGameName.Common/Kni/YourGameName.Common.Kni.csproj` for `FlatRedBall2.Kni`, pointing at `src\Kni\FlatRedBall2.Kni.csproj` (that file sits one folder deeper, so it needs one more `..\`). Then add the engine projects (including `src\AnimationChain.Common\AnimationChain.Common.csproj`) to your `.slnx` so Visual Studio can restore them.
+Then add the engine projects (including `src\AnimationChain.Common\AnimationChain.Common.csproj`) to your `.slnx` so Visual Studio can restore them.
 
 If the project lives in a shared repository, the team must agree on where the engine clone lives, because the path is committed in the `.csproj` files.
 
 ## Manual setup (reference)
 
-The template above is the supported install path. If you have a reason to wire FlatRedBall2 into an existing project (e.g. you're integrating with a MonoGame project you already have), here's the minimum API surface — but note this snippet alone is **not** a complete working setup. You'll also need a configured MonoGame project (Content pipeline / MGCB tool, `Content/` folder, etc.) which the template handles for you.
+The template above is the supported install path. If you have a reason to wire FlatRedBall2 into an existing project (e.g. you're integrating with a KNI or XNA-style project you already have), here's the minimum API surface — but note this snippet alone is **not** a complete working setup. You'll also need a configured KNI desktop project (SDL2.GL platform package, `Content/` folder, etc.) which the template handles for you.
 
 Inside an existing .NET project directory (one that already contains a `.csproj`):
 
 1. Install the NuGet package:
 
    ```
-   dotnet add package FlatRedBall2.MonoGame   # desktop (.NET 10)
-   # or
-   dotnet add package FlatRedBall2.Kni        # browser / Blazor WASM (.NET 10)
+   dotnet add package FlatRedBall2.Kni        # desktop and browser / Blazor WASM (.NET 10)
    ```
 
    > Running `dotnet add package` outside a project folder fails with `Could not find any project in <directory>` — it needs a `.csproj` in the working directory.
@@ -260,7 +255,7 @@ See the `samples/` directory for complete working examples.
 
 ## Troubleshooting
 
-**`FileNotFoundException: Could not load file or assembly 'MonoGame.Framework, ...'`** — usually a stale package restore where a referenced project resolved a different MonoGame version than what's copied to the output folder. Try this first:
+**`FileNotFoundException: Could not load file or assembly 'Xna.Framework...'`** — usually a stale package restore where a referenced project resolved a different KNI version than what's copied to the output folder. Try this first:
 
 ```
 dotnet clean

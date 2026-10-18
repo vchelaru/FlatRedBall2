@@ -30,7 +30,7 @@ See the `shapes` skill for all shape types and visual properties.
 
 ## Sprites and Textures
 
-Load textures via MonoGame's content pipeline and render them with `Sprite`.
+Load textures via the XNA content pipeline (KNI) and render them with `Sprite`.
 
 ### Loading a Texture
 
@@ -44,7 +44,7 @@ var bear = Engine.Content.Load<Texture2D>("Content/Bear.png");
 ```
 
 `Load<Texture2D>` routes on the presence of a file extension:
-- **Bare name** → MonoGame's xnb pipeline (requires a `.mgcb` entry). Not hot-reloadable.
+- **Bare name** → the xnb pipeline (requires a `.mgcb` entry). Not hot-reloadable.
 - **Path with extension** → loaded directly from disk via `Texture2D.FromFile`, tracked for hot-reload. Requires the file to be copied to the build output (see Content Pipeline Setup below or use a `<Content Include="Content/*.png" CopyToOutputDirectory="PreserveNewest" />` item).
 
 ### Creating a Sprite
@@ -107,7 +107,9 @@ sprite.Destroy();   // removes from parent entity
 
 To use textures, you need a `Content/Content.mgcb` file in your sample project.
 
-**Which project owns it?** The flat `samples/*` layout keeps the `.mgcb` in the single game project (shown below). The `frb2-desktop` / `frb2-multiplatform` **templates** split into `*.Common` + `*.Desktop`: there the `.mgcb` and its pipeline source files live in the **`.Desktop` head** — only the head runs `MonoGame.Content.Builder.Task`, so a mgcb added to `Common` is silently never built. `Common/Content` holds raw, runtime-loaded assets (png-with-extension, tmx, achx, audio), which are linked into the head's output. See `multiplatform-conversion`.
+**Which project owns it?** The flat `samples/*` layout keeps the `.mgcb` in the single game project (shown below). The `frb2-desktop` / `frb2-multiplatform` **templates** split into `*.Common` + `*.Desktop`: there the `.mgcb` and its pipeline source files live in the **`.Desktop` head**, because only the head runs the content builder, so a mgcb added to `Common` is silently never built. `Common/Content` holds raw, runtime-loaded assets (png-with-extension, tmx, achx, audio), which are linked into the head's output. See `multiplatform-conversion`.
+
+The templates ship no `.mgcb`. To build XNBs, add `nkast.Xna.Framework.Content.Pipeline.Builder` and `<KniContentReference Include="Content/Content.mgcb" />` to the head's `.csproj`; the builder does not find `.mgcb` files by itself. Output goes to `Content/bin/DesktopGL/` and is copied beside the exe.
 
 ### 1. Create the Content directory and `.mgcb` file
 

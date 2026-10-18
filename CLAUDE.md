@@ -21,7 +21,7 @@ The only relevant question is "is this the right design?" — never "will this b
 
 ## Key Files
 
-- Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL, version pinned in the root `Directory.Packages.props`)
+- Main project: `src/Kni/FlatRedBall2.Kni.csproj` (KNI; `nkast.Xna.Framework*` versions pinned in the root `Directory.Packages.props`)
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
 - Sample catalog, by skill (with gaps): `design/SAMPLES.md`
@@ -48,7 +48,7 @@ design write-ups here — those go in `design/*.md`. Game design documents stay 
 ## Build & Test
 
 ```
-dotnet build src/FlatRedBall2.csproj
+dotnet build src/Kni/FlatRedBall2.Kni.csproj
 dotnet test tests/FlatRedBall2.Tests/
 ```
 
@@ -91,8 +91,8 @@ Invoke these with the Skill tool when working on specific topics:
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
 - `shaders` — Custom .fx shaders, precompiled XNBs, Wine/libmojoshader setup, version guard
 - `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
-- `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
-- `multiplatform-conversion` — Convert a single-target desktop sample into a dual-target desktop + KNI BlazorGL (web/WASM) project
+- `sample-project-setup` — How to create a new sample `.csproj` (KNI desktop head, Common project, content pipeline)
+- `multiplatform-conversion` — Add a KNI BlazorGL (web/WASM) head to a desktop sample
 - `desktop-distribution` — Self-contained per-RID publish profiles and the macOS .app layout
 
 ## Key Architecture Decisions

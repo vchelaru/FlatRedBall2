@@ -4,7 +4,6 @@
   <Project Path="../tests/AnimationChain.Common.Tests/AnimationChain.Common.Tests.csproj" />
   <Project Path="../tests/AnimationChain.MonoGame.Tests/AnimationChain.MonoGame.Tests.csproj" />
   <Project Path="../tests/AnimationChain.KNI.Tests/AnimationChain.KNI.Tests.csproj" />
-  <Project Path="FlatRedBall2.csproj" />
   <Project Path="AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
   <Project Path="Kni/FlatRedBall2.Kni.csproj" />

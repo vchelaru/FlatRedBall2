@@ -18,7 +18,7 @@ public class TemplatePackageReferenceTests
 
         Regex.IsMatch(csproj, @"<PackageReference\s+Include=""Apos\.Shapes""")
             .ShouldBeFalse(
-                "Desktop templates must not pin Apos.Shapes; version flows transitively from FlatRedBall2.MonoGame.");
+                "Desktop templates must not pin Apos.Shapes; version flows transitively from FlatRedBall2.Kni.");
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class TemplatePackageReferenceTests
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir != null)
             {
-                if (File.Exists(Path.Combine(dir.FullName, "src", "FlatRedBall2.csproj")))
+                if (File.Exists(Path.Combine(dir.FullName, "src", "Kni", "FlatRedBall2.Kni.csproj")))
                 {
                     return dir.FullName;
                 }

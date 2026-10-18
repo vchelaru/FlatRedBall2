@@ -1,18 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    This is the KNI/browser backend build of the engine — see ..\FlatRedBall2.csproj for the
-    MonoGame/desktop backend and why these are two sibling single-TFM files instead of one
-    multi-targeted project.
-
-    This file lives in its own Kni\ subfolder rather than next to FlatRedBall2.csproj: two SDK
-    projects sharing one physical directory (globbing the same .cs files under different
-    DefineConstants/references) hits a real MSBuild parallel-build race — concurrent build nodes
-    can cross-contaminate which backend's types end up in which compiled assembly, even with
-    distinct BaseOutputPath/BaseIntermediateOutputPath. Confirmed via `dotnet build
-    src/FlatRedBall2.slnx` and templates/frb2-multiplatform's MyGame.slnx: `-m:1` (no
-    parallelism) always succeeds, default parallel builds fail intermittently depending on the
-    solution's project-graph shape (#966). Physical separation removes the race at its root
-    instead of trying to out-configure it.
+    The engine project. It lives in this Kni\ subfolder but compiles the whole src\ tree (see the
+    Compile item below).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -30,7 +19,7 @@
 
     <!-- NuGet Metadata -->
     <Authors>Victor Chelaru</Authors>
-    <Description>A modern, lightweight 2D game engine built on KNI (Blazor WebAssembly + future mobile targets).</Description>
+    <Description>A modern, lightweight 2D game engine built on KNI (desktop and Blazor WebAssembly).</Description>
     <PackageId>FlatRedBall2.Kni</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
@@ -42,14 +31,12 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
   </PropertyGroup>
 
   <!--
-    Compiles the parent directory's source (the shared engine code) instead of this project's
-    own — EnableDefaultCompileItems is off above, so this is the only source list. Excludes
-    mirror ..\FlatRedBall2.csproj's own DefaultItemExcludes, plus the sibling backend's own
-    bin/obj (a plain **/*.cs from here would otherwise reach into them) and this folder itself.
+    Compiles the parent directory's source instead of this project's own — EnableDefaultCompileItems
+    is off above, so this is the only source list. Excludes keep the sibling projects' sources and
+    bin/obj (and this folder itself) out of the engine assembly.
   -->
   <ItemGroup>
     <Compile Include="..\**\*.cs"
@@ -66,18 +53,17 @@
 
   <!--
     The .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave, ColorOperation,
-    etc.) has no MonoGame dependency, so it lives in its own project. This lets tooling like the
-    AnimationEditor (Avalonia, not MonoGame) reference the .achx format without pulling in
-    MonoGame.Framework.DesktopGL at all.
+    etc.) has no XNA-framework dependency, so it lives in its own project. This lets tooling like the
+    AnimationEditor (Avalonia) reference the .achx format without pulling in the engine at all.
   -->
   <ItemGroup>
     <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
   </ItemGroup>
 
   <!-- StbTrueType is the only pure-managed KernSmith rasterizer backend, so it's the only one that
-       works on BlazorGL/wasm (KernSmith.KniGum only brings in the native FreeType backend). Not
-       needed by desktop-KNI, but the KNI backend is a single shared assembly across both, so it
-       ships here unconditionally rather than trying to split by RuntimeIdentifier. -->
+       works on BlazorGL/wasm (KernSmith.KniGum only brings in the native FreeType backend). Desktop
+       doesn't need it, but the engine is a single assembly for both, so it ships unconditionally
+       rather than trying to split by RuntimeIdentifier. -->
   <ItemGroup>
     <PackageReference Include="KernSmith.Rasterizers.StbTrueType" />
   </ItemGroup>
@@ -109,8 +95,8 @@
   <!--
     Precompiled ColorOperation.Add pixel shader (see src/Shaders/AddColor.fx for HLSL source).
     Compiled once via ShadowDusk.Compiler (Target=OpenGL, Mgfx v10 container - see the
-    `shadowdusk` skill) since this library has no content pipeline of its own; the same bytes
-    load on both the MonoGame and KNI backends via `new Effect(graphicsDevice, bytes)`.
+    `shadowdusk` skill) since this library has no content pipeline of its own; loaded via
+    `new Effect(graphicsDevice, bytes)`.
   -->
   <ItemGroup>
     <EmbeddedResource Include="..\Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />

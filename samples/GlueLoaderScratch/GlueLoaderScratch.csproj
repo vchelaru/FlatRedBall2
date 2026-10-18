@@ -7,13 +7,20 @@
     <TieredCompilation>false</TieredCompilation>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <KniPlatform>DesktopGL</KniPlatform>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
-    <PackageReference Include="MonoGame.Content.Builder.Task" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
+    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
   <!--
     Everything the Glue editor authors lives in this one folder, so copying it needs one rule and no
@@ -24,10 +31,5 @@
   <ItemGroup>
     <Content Include="Content\FrbEditor\**\*.*" CopyToOutputDirectory="PreserveNewest" />
     <None Remove="Content\FrbEditor\**\*.*" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="Content\obj\**" />
-    <EmbeddedResource Remove="Content\obj\**" />
-    <None Remove="Content\obj\**" />
   </ItemGroup>
 </Project>

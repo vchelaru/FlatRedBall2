@@ -55,7 +55,7 @@ public class ShapesBatch : IRenderBatch
             throw new NotSupportedException(
                 "Too many shapes for GraphicsProfile.Reach (16-bit index buffer limit exceeded). " +
                 "Either reduce the number of visible shapes (e.g. clean up off-screen tiles) or " +
-                "switch to HiDef: set graphics.GraphicsProfile = GraphicsProfile.HiDef " +
+                "set graphics.GraphicsProfile = GraphicsProfile.FL10_0 " +
                 "in your Game1 constructor before Initialize().",
                 ex);
         }

@@ -36,7 +36,6 @@ public class TemplateNamespaceParameterTests
     [InlineData("templates/frb2-desktop/MyGame.Common/Screens/GameScreen.cs", "namespace GameNamespace.Screens;")]
     [InlineData("templates/frb2-desktop/MyGame.Desktop/Program.cs", "new GameNamespace.Game1()")]
     [InlineData("templates/frb2-multiplatform/MyGame.Common/MyGame.Common.csproj", "<RootNamespace>GameNamespace</RootNamespace>")]
-    [InlineData("templates/frb2-multiplatform/MyGame.Common/Kni/MyGame.Common.Kni.csproj", "<RootNamespace>GameNamespace</RootNamespace>")]
     [InlineData("templates/frb2-multiplatform/MyGame.Desktop/MyGame.Desktop.csproj", "<RootNamespace>GameNamespace</RootNamespace>")]
     [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/MyGame.BlazorGL.csproj", "<RootNamespace>GameNamespace.BlazorGL</RootNamespace>")]
     [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/Program.cs", "namespace GameNamespace.BlazorGL")]

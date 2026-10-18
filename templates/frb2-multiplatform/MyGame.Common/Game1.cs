@@ -13,13 +13,9 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        // Apos.Shapes needs SM 4.0+. MonoGame's top profile is HiDef; KNI's equivalent is FL10_0.
-        // The Reach default (SM 2.0) crashes at runtime with "Shader model 4.0 is not supported."
-#if KNI
+        // Apos.Shapes needs SM 4.0+, which KNI's FL10_0 profile provides. The Reach default (SM 2.0)
+        // crashes at runtime with "Shader model 4.0 is not supported."
         _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
     }

@@ -37,7 +37,7 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
         }
 
         var common = File.ReadAllText(Path.Combine(output, "Game.Common", "Game.Common.csproj"));
-        common.ShouldContain(@"<PackageReference Include=""FlatRedBall2.MonoGame"" />");
+        common.ShouldContain(@"<PackageReference Include=""FlatRedBall2.Kni"" />");
 
         foreach (var csproj in Directory.GetFiles(output, "*.csproj", SearchOption.AllDirectories))
         {
@@ -60,16 +60,9 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
         var output = _fixture.Generate(template, EnginePath);
 
         var common = File.ReadAllText(Path.Combine(output, "Game.Common", "Game.Common.csproj"));
-        common.ShouldNotContain("FlatRedBall2.MonoGame\"");
+        common.ShouldNotContain("FlatRedBall2.Kni\"");
         ProjectReferences(Path.Combine(output, "Game.Common", "Game.Common.csproj"))
-            .ShouldContain("../../FlatRedBall2/src/FlatRedBall2.csproj");
-
-        if (template == "frb2-multiplatform")
-        {
-            var kniPath = Path.Combine(output, "Game.Common", "Kni", "Game.Common.Kni.csproj");
-            File.ReadAllText(kniPath).ShouldNotContain("FlatRedBall2.Kni\"");
-            ProjectReferences(kniPath).ShouldContain("../../../FlatRedBall2/src/Kni/FlatRedBall2.Kni.csproj");
-        }
+            .ShouldContain("../../FlatRedBall2/src/Kni/FlatRedBall2.Kni.csproj");
 
         foreach (var file in TextFiles(output))
         {
@@ -85,15 +78,15 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
     // ProjectReference closure. Computed from the real engine csproj files so this fails if the
     // engine gains a project the template would then dangle on.
     [Theory]
-    [InlineData("frb2-desktop", "src/FlatRedBall2.csproj")]
-    [InlineData("frb2-multiplatform", "src/FlatRedBall2.csproj", "src/Kni/FlatRedBall2.Kni.csproj")]
-    public void EnginePathSet_SolutionListsEveryEngineProjectInTheReferenceClosure(string template, params string[] engineRoots)
+    [InlineData("frb2-desktop")]
+    [InlineData("frb2-multiplatform")]
+    public void EnginePathSet_SolutionListsEveryEngineProjectInTheReferenceClosure(string template)
     {
         var output = _fixture.Generate(template, EnginePath);
         var repoRoot = TemplatePackageReferenceTests.RepoRootForTests;
 
         var closure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pending = new Stack<string>(engineRoots);
+        var pending = new Stack<string>(new[] { "src/Kni/FlatRedBall2.Kni.csproj" });
         while (pending.Count > 0)
         {
             var relative = pending.Pop();

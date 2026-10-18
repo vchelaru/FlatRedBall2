@@ -24,7 +24,7 @@ jobs:
           fi
 
           # Query NuGet for the latest version of the primary package
-          VERSIONS=$(curl -sf https://api.nuget.org/v3-flatcontainer/flatredball2.monogame/index.json | jq -r '.versions[-1]')
+          VERSIONS=$(curl -sf https://api.nuget.org/v3-flatcontainer/flatredball2.kni/index.json | jq -r '.versions[-1]')
           if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "null" ]; then
             echo "::error::Could not fetch latest version from NuGet"
             exit 1
@@ -67,20 +67,12 @@ jobs:
         run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   # Depends on publish-animationchain-common so FlatRedBall.AnimationChain.Common is already on
-  # nuget.org (matching this same resolved version) before FlatRedBall2.MonoGame/Kni's auto-generated
+  # nuget.org (matching this same resolved version) before FlatRedBall2.Kni's auto-generated
   # dependency on it needs to resolve. See src/AnimationChain.Common/AnimationChain.Common.csproj
   # for why this dependency exists at all.
   publish:
     needs: [resolve-version, publish-animationchain-common]
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - packageId: FlatRedBall2.MonoGame
-            csproj: src/FlatRedBall2.csproj
-          - packageId: FlatRedBall2.Kni
-            csproj: src/Kni/FlatRedBall2.Kni.csproj
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,7 +82,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # nuget.org indexing lags a push by a few seconds; a consumer restoring FlatRedBall2.MonoGame/Kni
+      # nuget.org indexing lags a push by a few seconds; a consumer restoring FlatRedBall2.Kni
       # right after this job finishes needs FlatRedBall.AnimationChain.Common to already be resolvable
       # at this exact version, not just pushed. `needs: publish-animationchain-common` only guarantees
       # the push happened first, not that it's indexed yet.
@@ -112,17 +104,13 @@ jobs:
           exit 1
 
       - name: Restore dependencies
-        run: dotnet restore ${{ matrix.csproj }}
+        run: dotnet restore src/Kni/FlatRedBall2.Kni.csproj
 
-      # FlatRedBall2.csproj and FlatRedBall2.Kni.csproj each hardcode their own PackageId, so
-      # packing them plainly (no -p:PackageId override) can't hit the "Ambiguous project name"
-      # collision that motivated the old FlatRedBallDependencyPackageId indirection: that
-      # indirection existed only because a single multi-targeted FlatRedBall2.csproj needed one
-      # `dotnet pack` invocation per backend, packed via -p:PackageId global overrides that also
-      # propagated (wrongly) to the AnimationChain.Common ProjectReference.
-      - name: Build and Pack (${{ matrix.packageId }})
+      # The csproj hardcodes its PackageId, so no -p:PackageId override is needed (a global
+      # override would also propagate to the AnimationChain.Common ProjectReference).
+      - name: Build and Pack (FlatRedBall2.Kni)
         run: >
-          dotnet pack ${{ matrix.csproj }}
+          dotnet pack src/Kni/FlatRedBall2.Kni.csproj
           -c Release
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out

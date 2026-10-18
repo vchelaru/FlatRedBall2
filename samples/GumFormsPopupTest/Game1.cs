@@ -12,7 +12,7 @@ public class Game1 : Game
     {
         _graphics = new GraphicsDeviceManager(this);
         // Apos.Shapes needs SM 4.0+ — default Reach profile crashes at startup.
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
+        _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
         Content.RootDirectory = "Content";
         IsMouseVisible = true; // popup close-on-outside-click is a mouse test
         FlatRedBall2.FlatRedBallService.Default.PrepareWindow<TestScreen>(_graphics);

@@ -37,7 +37,7 @@ Usings: `System.IO`, `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.M
 
 ### MGCB pipeline — for MP3 or compressed formats
 
-Needed only when the direct path's format limits bite. The `.mgcb` lives in the **`.Desktop` head**, not `Common`: `MonoGame.Content.Builder.Task` runs only on the head, so a mgcb added to `Common` is silently never built. Put the `#begin` entry *and* the source file under `Desktop/Content/`. See `multiplatform-conversion` for the content-split rationale.
+Needed only when the direct path's format limits bite. The `.mgcb` lives in the **`.Desktop` head**, not `Common`: only a head that references `nkast.Xna.Framework.Content.Pipeline.Builder` and declares `<KniContentReference Include="Content/Content.mgcb" />` builds XNBs, so a mgcb added to `Common` is silently never built. Put the `#begin` entry *and* the source file under `Desktop/Content/`. See `multiplatform-conversion` for the content-split rationale.
 
 ```
 #begin Audio/song.mp3
@@ -111,7 +111,7 @@ Engine.Audio.MusicEnabled = false; // pauses current song immediately; true resu
 
 - **Music does not stop automatically on screen transition** — call `Engine.Audio.StopSong()` in `CustomDestroy`, or music keeps playing into the next screen.
 - **`Song.FromUri` only works with OGG** — on DesktopGL (NVorbis), `Song.FromUri` fails at runtime with MP3. Use the MGCB pipeline and `Engine.Content.Load<Song>` for MP3 files.
-- **`Load<>` name drops the source extension** — `Load<Song>("Audio/song")`, not `"Audio/song.ogg"`. Passing the extension makes MonoGame look for `song.ogg.xnb` (the pipeline builds `song.xnb`) and throws `FileNotFoundException`. The `.mgcb` defining it must be in the `.Desktop` head, not `Common`.
+- **`Load<>` name drops the source extension** — `Load<Song>("Audio/song")`, not `"Audio/song.ogg"`. Passing the extension makes the content manager look for `song.ogg.xnb` (the pipeline builds `song.xnb`) and throws `FileNotFoundException`. The `.mgcb` defining it must be in the `.Desktop` head, not `Common`.
 - **Track SoundEffect only when loaded via `FromStream`** — call `Engine.Content.Track(sfx)` when using `SoundEffect.FromStream` so it is disposed on screen transition. MGCB-loaded assets (`Engine.Content.Load<SoundEffect>`) are disposed automatically by the ContentLoader — do not call `Track` for those.
 - **Per-frame dedup in collision handlers** — `Play(sfx)` in a `CollisionOccurred` handler is safe to call unconditionally; it fires at most once per frame regardless of how many pairs collide (unless `playAlways: true`).
 - **Looping sounds are not stopped on screen change** — keep the `SoundHandle` and call `Stop()` in `CustomDestroy`.

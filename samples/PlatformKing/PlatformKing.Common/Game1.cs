@@ -13,12 +13,8 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        // Apos.Shapes needs SM 4.0+. MonoGame tops out at HiDef; KNI needs FL10_0 for equivalent.
-#if KNI
+        // Apos.Shapes needs SM 4.0+; KNI's FL10_0 profile provides it. The Reach default crashes at startup.
         _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
-#else
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
-#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
         // 426x240 design resolution — pixel-art scale comes from window-vs-resolution.

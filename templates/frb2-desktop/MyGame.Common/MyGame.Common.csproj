@@ -7,11 +7,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!--#if (EnginePath != "")
-    <ProjectReference Include="__EnginePath1__/src/FlatRedBall2.csproj" />
+    <ProjectReference Include="__EnginePath1__/src/Kni/FlatRedBall2.Kni.csproj" />
     #endif-->
     <!--#if (EnginePath == "")-->
-    <PackageReference Include="FlatRedBall2.MonoGame" />
+    <PackageReference Include="FlatRedBall2.Kni" />
     <!--#endif-->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
   </ItemGroup>
 </Project>

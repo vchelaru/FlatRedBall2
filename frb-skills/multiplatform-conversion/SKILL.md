@@ -1,17 +1,15 @@
 ---
 name: multiplatform-conversion
-description: "Converting a single-target FlatRedBall2 desktop sample into a dual-target desktop + KNI BlazorGL (Blazor WebAssembly / browser) project. Use when the user mentions web deployment, browser/WASM/itch.io targets, KNI, or asks to add web support to an existing game, or hits a browser-only failure (JSImport, user activation, AOT publish). Assumes you already have a working desktop sample — see sample-project-setup for the desktop bootstrap."
+description: "Adding a KNI BlazorGL (Blazor WebAssembly / browser) head to a FlatRedBall2 desktop project. Use when the user mentions web deployment, browser/WASM/itch.io targets, KNI, or asks to add web support to an existing game, or hits a browser-only failure (JSImport, user activation, AOT publish). Assumes you already have a working desktop sample — see sample-project-setup for the desktop bootstrap."
 ---
 
-# Multi-Platform Conversion (Desktop + KNI BlazorGL)
+# Multi-Platform (Desktop + KNI BlazorGL)
 
 > References: `templates/frb2-multiplatform/` (minimal — proves the wiring, not the content story) and `samples/PlatformKing/` (content-rich — TMX, JSON, PNG animations). Read PlatformKing first when porting any non-trivial game.
 
-## Backend selection is by which project file you reference
+## One engine, one Common
 
-`src/FlatRedBall2.csproj` (MonoGame/desktop) and `src/Kni/FlatRedBall2.Kni.csproj` (KNI/browser) are single-TFM (`net10.0`) project files, not one multi-targeted project — see the comment atop either file for why. Consumers pick a backend by which file they `ProjectReference`/which NuGet package (`FlatRedBall2.MonoGame` vs `FlatRedBall2.Kni`) they install, not by TFM. This is the linchpin — every gotcha below comes from wiring the wrong file/package to the wrong head.
-
-The KNI file lives in its own `Kni\` subfolder, not next to the MonoGame one: two SDK projects globbing the same physical directory hit a real MSBuild parallel-build race (confirmed — `-m:1` always succeeds, default parallel builds fail intermittently depending on the solution's project-graph shape). Physical separation removes the race at its root; see the comment atop `FlatRedBall2.Kni.csproj` for the full story.
+Both heads run on KNI and reference the same engine (`src/Kni/FlatRedBall2.Kni.csproj` / NuGet `FlatRedBall2.Kni`). There is no backend switch: Game1 and all game code are shared verbatim, and branch at runtime on `OperatingSystem.IsBrowser()` only where a browser genuinely differs.
 
 ## Project layout
 
@@ -19,9 +17,8 @@ Projects, mirroring `templates/frb2-multiplatform/`:
 
 ```
 GameName/
-  GameName.Common/            net10.0   game code + Content/ — MonoGame build (see below)
-  GameName.Common/Kni/        net10.0   KNI build, same source, own subfolder
-  GameName.Desktop/           net10.0   Program.cs, MonoGame
+  GameName.Common/            net10.0   game code + Content/, one csproj, default globbing
+  GameName.Desktop/           net10.0   Program.cs, KNI SDL2.GL
   GameName.BlazorGL/          net10.0   Blazor WASM host
   GameName.slnx
 ```
@@ -32,34 +29,21 @@ The `Game` subclass (Game1) lives in `Common` so both heads instantiate the same
 
 Assets belong in `Common/Content/` by default. Only move to platform-specific folders if they won't work elsewhere (e.g., platform-specific UI sizes, backend-incompatible shader variants). Most art, audio, and data stay in `Common/` so both Desktop and BlazorGL draw from a single source — no duplication.
 
-## Common — two single-TFM csproj files, KNI in its own subfolder
+## Common
 
-Desktop and BlazorGL both now target `net10.0`, so a single Common project can no longer pick the backend by `Condition="'$(TargetFramework)' == ..."` — both heads would match the same condition. Splitting into two files that share a directory isn't safe either (the MSBuild parallel-build race above). Instead:
+One `GameName.Common.csproj`: `net10.0`, default compile items, the `nkast.Xna.Framework*` packages the game code uses, and a `ProjectReference` (or `FlatRedBall2.Kni` package) to the engine. Both heads reference it. See `samples/PlatformKing/PlatformKing.Common/` (minimal) and `samples/Solitaire/Solitaire.Common/` (Gum content items).
 
-- `GameName.Common.csproj` (MonoGame) stays where it is, default compile items, references `FlatRedBall2.csproj`/`FlatRedBall2.MonoGame`. Add `<DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>` so its own glob never reaches into the subfolder below.
-- `GameName.Common\Kni\GameName.Common.Kni.csproj` (KNI) sets `<EnableDefaultCompileItems>false</EnableDefaultCompileItems>` and explicitly compiles the parent's source: `<Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />`. References `..\..\..\src\Kni\FlatRedBall2.Kni.csproj`/`FlatRedBall2.Kni`.
-- `GameName.Desktop.csproj` references the plain file; `GameName.BlazorGL.csproj` references the one in `Kni\`.
+Desktop head: `<KniPlatform>DesktopGL</KniPlatform>` plus `nkast.Xna.Framework*` and `nkast.Kni.Platform.SDL2.GL`. BlazorGL head: `<KniPlatform>BlazorGL</KniPlatform>` plus `nkast.Kni.Platform.Blazor.GL` (below).
 
-See `samples/Solitaire/Solitaire.Common/` for a working example, including how its Gum content-copy `<Content Include>` items pick up `Link` metadata once the source path (`..\Content\...`) no longer matches the project's own directory.
-
-**Landmine: list every `ProjectReference` target as its own `<Project Path>` in the `.slnx`.** Visual Studio's IDE-hosted NuGet restore only walks `ProjectReference`s among projects that are themselves listed as solution members — a project that exists on disk and is correctly referenced but missing from the `.slnx` builds fine via `dotnet build`/CLI `msbuild` (both walk the full reference closure regardless of solution membership) but fails with NU1105 ("not part of the current solution") the moment someone opens the `.slnx` in Visual Studio. So `GameName.slnx` needs `GameName.Common\Kni\GameName.Common.Kni.csproj` listed explicitly alongside `GameName.Common.csproj`, not just the projects a human would think of as "the heads." `tests/FlatRedBall2.Tests/Packaging/SolutionMembershipTests.cs` checks this for every `.slnx` in this repo; there's no equivalent check for a downstream game project, so verify it by hand when scaffolding one.
+**Landmine: list every `ProjectReference` target as its own `<Project Path>` in the `.slnx`.** Visual Studio's IDE-hosted NuGet restore only walks `ProjectReference`s among projects that are themselves listed as solution members — a project that exists on disk and is correctly referenced but missing from the `.slnx` builds fine via `dotnet build`/CLI `msbuild` (both walk the full reference closure regardless of solution membership) but fails with NU1105 ("not part of the current solution") the moment someone opens the `.slnx` in Visual Studio. So list the engine projects (`FlatRedBall2.Kni`, `AnimationChain.Common`, and `FlatRedBall2.BlazorGL` for a BlazorGL head) alongside the game's own. `tests/FlatRedBall2.Tests/Packaging/SolutionMembershipTests.cs` checks this for every `.slnx` in this repo; there's no equivalent check for a downstream game project, so verify it by hand when scaffolding one.
 
 No `Version` attribute — the repo uses NuGet Central Package Management, so versions are pinned once in `Directory.Packages.props`, not per `PackageReference`.
 
-Common must NOT add `MonoGame.Content.Builder.Task` — that belongs on the heads that drive content compilation. `Apos.Shapes` needs no content-pipeline wiring at all — its shader is embedded in the assembly.
+`Apos.Shapes` needs no content-pipeline wiring at all — its shader is embedded in the assembly.
 
-## Backend-conditional code
+## GraphicsProfile
 
-Each file sets its own `KNI` / `MONOGAME` define unconditionally (no `Condition` needed — the file itself is the condition):
-
-```xml
-<DefineConstants>$(DefineConstants);KNI</DefineConstants>
-```
-
-The two known places `#if KNI` is needed today:
-
-- **`GraphicsProfile`** — Apos.Shapes ships SM 4.0+ shaders. MonoGame's top profile is `HiDef`. KNI's equivalent is `FL10_0`, which doesn't exist on MonoGame. The `Reach` default (SM 2.0) crashes at runtime with "Shader model 4.0 is not supported."
-- **Anywhere a backend exposes a type the other doesn't.** Stay vigilant; most XNA surface is shared.
+Apos.Shapes ships SM 4.0+ shaders, so Game1 must set `GraphicsProfile.FL10_0`. The `Reach` default (SM 2.0) crashes at runtime with "Shader model 4.0 is not supported."
 
 ## Two canvas patterns — pick one before writing Game1
 
@@ -73,7 +57,7 @@ Stretch-to-viewport (canvas fills the browser) and fixed-size canvas (matches th
 
 Canvas fills the browser; the engine pillarbox/letterboxes the design world to its locked aspect ratio inside the canvas. Reference: `samples/ShmupSpace`, `samples/PlatformKing`.
 
-- **Game1**: identical code on Desktop and KNI — set `ResolutionWidth/Height`, `PreferredWindowWidth/Height`, `AllowUserResizing = true`, all on `DisplaySettings`. The engine ignores `PreferredWindowWidth/Height` on KNI (the canvas DOM owns sizing) so no `#if KNI` is needed.
+- **Game1**: identical code on Desktop and BlazorGL — set `ResolutionWidth/Height`, `PreferredWindowWidth/Height`, `AllowUserResizing = true`, all on `DisplaySettings`. The engine ignores `PreferredWindowWidth/Height` in the browser (the canvas DOM owns sizing).
 - **Holder + canvas markup**: ships from the `FlatRedBall2.BlazorGL` package's `Pages/Index.razor` — fills viewport via `position: fixed; top: 0; left: 0; right: 0; bottom: 0`. No per-sample Razor needed.
 - **Body CSS** (`wwwroot/index.html`): `margin: 0; overflow: hidden;` — no flex centering needed.
 - **JS**: ships from the package as `_content/FlatRedBall2.BlazorGL/frb-host.js` (referenced via one `<script>` tag in `index.html`). Defines `initRenderJS` and `tickJS`; sets canvas buffer once from holder size.
@@ -118,13 +102,13 @@ using var reader = new StreamReader(stream);
 var json = reader.ReadToEnd();
 ```
 
-This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings go through `Engine.Storage`, not `File`: same code on both platforms, no `#if !KNI`. See the `persistence` skill.
+This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings go through `Engine.Storage`, not `File`: same code on both platforms. See the `persistence` skill.
 
 ## Content pipeline — single source of truth in Common
 
 Keep `Content/` in `Common`. Both heads consume it without duplication.
 
-**Desktop** uses MGCB. Link Common's raw runtime-loaded assets (TMX, JSON, animation PNGs — anything not built to XNB) into the Desktop output's `Content/` folder:
+**Desktop**: link Common's raw runtime-loaded assets (TMX, JSON, animation PNGs — anything not built to XNB) into the Desktop output's `Content/` folder:
 
 ```xml
 <Content Include="..\GameName.Common\Content\Tiled\**"
@@ -132,7 +116,7 @@ Keep `Content/` in `Common`. Both heads consume it without duplication.
          CopyToOutputDirectory="PreserveNewest" />
 ```
 
-`MonoGameContentReference` is project-local; Desktop needs its own minimal `Content/Content.mgcb` (see `sample-project-setup`).
+Only a head that builds XNBs needs a `.mgcb`; see `content-and-assets`.
 
 **BlazorGL** is the trap. `<Content Link="wwwroot\…">` copies to `bin/.../wwwroot/` but the file is **not** registered as a static web asset, so the dev server returns 404. Files must land in the project's **physical** `wwwroot/Content/` directory before the static-web-asset manifest is gathered. Use a `<Copy>` target:
 

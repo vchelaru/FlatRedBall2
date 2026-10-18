@@ -8,7 +8,7 @@ First off, thank you for considering contributing to FlatRedBall2!
 If you find a bug, please open an issue and include:
 - A clear description of the problem.
 - Steps to reproduce the bug.
-- Which backend you are using (MonoGame or Kni).
+- Which head you are running (Desktop or BlazorGL).
 
 ### Submitting Pull Requests
 1. **Fork** the repository.

@@ -21,9 +21,9 @@
     type directly — see samples/AnimationChainCommonSample.
 
     Published as its own NuGet package (FlatRedBall.AnimationChain.Common) in lockstep with
-    FlatRedBall2.MonoGame/FlatRedBall2.Kni, see .github/workflows/publish.yml. This is required
-    because src/FlatRedBall2.csproj's ProjectReference to this project causes `dotnet pack` to
-    auto-generate a dependency on FlatRedBall.AnimationChain.Common in the FlatRedBall2.* nuspec;
+    FlatRedBall2.Kni, see .github/workflows/publish.yml. This is required
+    because src/Kni/FlatRedBall2.Kni.csproj's ProjectReference to this project causes `dotnet pack` to
+    auto-generate a dependency on FlatRedBall.AnimationChain.Common in the FlatRedBall2.Kni nuspec;
     that dependency must resolve to a real, matching-version package on nuget.org, so this project
     is published in the same workflow run, sharing the same version, before FlatRedBall2 itself.
   -->
@@ -44,7 +44,7 @@
       AnimationFrameSave) and a generic, renderer-agnostic playback runtime (AnimationChain&lt;TFrame&gt;,
       AnimationChainList&lt;TFrame&gt;, AnimationPlayer&lt;TFrame&gt;) used by FlatRedBall2 and the
       FlatRedBall AnimationEditor. Pure C#, no MonoGame/KNI dependency. Most users should install
-      FlatRedBall2.MonoGame or FlatRedBall2.Kni instead, which reference this package automatically.
+      FlatRedBall2.Kni instead, which references this package automatically.
     </Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -52,7 +52,7 @@
     <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
-    <!-- SourceLink and Symbols (matches src/FlatRedBall2.csproj) -->
+    <!-- SourceLink and Symbols (matches src/Kni/FlatRedBall2.Kni.csproj) -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -76,9 +76,6 @@
       <_Parameter1>AnimationChain.Common.Tests</_Parameter1>
     </AssemblyAttribute>
     <!-- FrameEventRange: the engine's Sprite shares AnimationPlayer's frame-event semantics. -->
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>FlatRedBall2</_Parameter1>
-    </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>FlatRedBall2.Kni</_Parameter1>
     </AssemblyAttribute>

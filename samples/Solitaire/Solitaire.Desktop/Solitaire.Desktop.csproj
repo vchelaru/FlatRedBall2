@@ -8,14 +8,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Solitaire</RootNamespace>
+    <KniPlatform>DesktopGL</KniPlatform>
   </PropertyGroup>
 
   <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
        the engine; its shader is embedded in the assembly, so it needs no content-pipeline
        wiring. -->
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" />
-    <PackageReference Include="MonoGame.Content.Builder.Task" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
   </ItemGroup>
 
   <ItemGroup>

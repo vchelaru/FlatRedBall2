@@ -13,7 +13,7 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
+        _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
     }
