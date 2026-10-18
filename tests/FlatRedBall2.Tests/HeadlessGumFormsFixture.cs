@@ -56,6 +56,10 @@ public sealed class HeadlessGumFormsFixture : IDisposable
 
     public HeadlessGumFormsFixture()
     {
+        // KNI's native gamepad poll, which InitializeDefaults triggers, crashes the host unless SDL
+        // has been initialized by a Game first.
+        _ = SharedGameHost.Game;
+
         _previousService = IGumService.Default;
         _previousCursor = FormsUtilities.Cursor;
         _previousKeyboard = FormsUtilities.Keyboard;

@@ -348,12 +348,15 @@ public sealed class GlueContentSource
                     break;
 
                 case ".ogg":
-                    // Song.FromUri is OGG-only on DesktopGL and needs a real file:// URI rather than
-                    // a stream, so — unlike every other case here — it bypasses StreamProvider and
-                    // resolves straight against the output content root. Desktop-only for the same
-                    // reason wildcard expansion is: no browser equivalent exists.
-                    _assets[instanceName] = Song.FromUri(
-                        instanceName, new Uri(Path.GetFullPath(Path.Combine(_outputContentRoot, path))));
+                    // Song.FromUri needs a real file:// URI rather than a stream, so — unlike every
+                    // other case here — it bypasses StreamProvider and resolves straight against the
+                    // output content root. Desktop-only for the same reason wildcard expansion is: no
+                    // browser equivalent exists. KNI's Song.FromUri does not touch the file until it
+                    // plays, so a missing file is reported here instead of at playback.
+                    string oggPath = Path.GetFullPath(Path.Combine(_outputContentRoot, path));
+                    if (!File.Exists(oggPath))
+                        throw new FileNotFoundException($"'{file.Name}' was not found under the output content root.", oggPath);
+                    _assets[instanceName] = Song.FromUri(instanceName, new Uri(oggPath));
                     break;
 
                 default:

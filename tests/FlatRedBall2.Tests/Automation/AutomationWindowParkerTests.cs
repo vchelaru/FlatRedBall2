@@ -88,6 +88,32 @@ public class AutomationWindowParkerTests
 
     private sealed class FakeUserGame : FakeGameWithPlatform { }
 
+    // KNI's real shape: Game.IsActive forwards to a private Strategy property, and the strategy's
+    // IsActive has no setter at all -- only a private backing field that focus events write.
+    private sealed class FakeStrategy
+    {
+        private bool _isActive;
+        public bool IsActive => _isActive;
+    }
+
+    private class FakeGameWithStrategy
+    {
+        private FakeStrategy Strategy { get; } = new();
+        public bool IsActive => Strategy.IsActive;
+    }
+
+    private sealed class FakeKniUserGame : FakeGameWithStrategy { }
+
+    [Fact]
+    public void ForceActive_StrategyIsActiveWithOnlyABackingField_MarksItActive()
+    {
+        var game = new FakeKniUserGame();
+
+        AutomationWindowParker.ForceActive(game).ShouldBeTrue();
+
+        game.IsActive.ShouldBeTrue();
+    }
+
     [Fact]
     public void ForceActive_ReadOnlyIsActiveBackedByPlatform_MarksPlatformActive()
     {

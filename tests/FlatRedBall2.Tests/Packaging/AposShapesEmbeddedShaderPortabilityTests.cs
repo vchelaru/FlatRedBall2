@@ -27,9 +27,9 @@ public class AposShapesEmbeddedShaderPortabilityTests
     public void EmbeddedOpenGLShader_DoesNotCallBareTrunc()
     {
         var assembly = typeof(ShapeBatch).Assembly;
-        using var stream = assembly.GetManifestResourceStream("Apos.Shapes.apos-shapes.ogl.mgfx")
+        using var stream = assembly.GetManifestResourceStream("Apos.Shapes.apos-shapes.knifx")
             ?? throw new InvalidOperationException(
-                "Apos.Shapes.dll no longer embeds a resource named 'apos-shapes.ogl.mgfx' -- " +
+                "Apos.Shapes.KNI.dll no longer embeds a resource named 'apos-shapes.knifx' -- " +
                 "update this test's resource name to match the current package.");
         using var reader = new StreamReader(stream, Encoding.Latin1);
         var glsl = reader.ReadToEnd();

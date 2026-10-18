@@ -24,6 +24,84 @@ public sealed class SharedGame : Game
 }
 
 /// <summary>
+/// Owns the one <see cref="SharedGame"/> for the test process. Creating it initializes SDL, which KNI's
+/// native gamepad poll needs: Gum polls gamepads in <c>FormsUtilities.InitializeDefaults</c>, and doing
+/// that before any Game exists is an access violation that kills the test host. So every fixture that
+/// touches Gum or a device goes through here first.
+/// </summary>
+internal static class SharedGameHost
+{
+    private static readonly Lazy<SharedGame?> Instance = new(Create);
+
+    private static bool _deviceCreated;
+
+    /// <summary>The game, or null when this machine cannot provide one (headless, no driver).</summary>
+    public static SharedGame? Game => Instance.Value;
+
+    /// <summary>
+    /// Creates the graphics device (and its GL context) on first call. Kept apart from the game so the
+    /// context belongs to the thread that runs the device-using tests, not to whichever fixture happened
+    /// to touch <see cref="Game"/> first; KNI refuses device calls from any other thread.
+    /// </summary>
+    public static SharedGame? EnsureDevice()
+    {
+        var game = Game;
+        if (game is null || _deviceCreated)
+            return game;
+
+        try
+        {
+            game.RunOneFrame();
+
+            // A hidden test window never gains focus, so Game.IsActive stays false. Gum skips all Forms
+            // input while inactive, and KNI's Tick sleeps each frame when inactive.
+            global::FlatRedBall2.Automation.AutomationWindowParker.ForceActive(game);
+            _deviceCreated = true;
+            return game;
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
+            return null;
+        }
+    }
+
+    private static SharedGame? Create()
+    {
+        // SDL's Cocoa backend sets the app main menu during video init, and AppKit asserts when that
+        // happens off the main thread. xUnit runs fixtures on a worker thread, so on macOS this is a
+        // native abort of the whole test host (crash-reporter popup), which the catch below cannot
+        // intercept. Report "no device" instead, same as a headless agent.
+        if (OperatingSystem.IsMacOS())
+            return null;
+
+        SharedGame? game = null;
+        try
+        {
+            game = new SharedGame();
+
+            // The manager has to exist before RunOneFrame (see EnsureDevice), which is what actually
+            // creates the device — without entering a message loop, which a test host cannot pump.
+            _ = new GraphicsDeviceManager(game)
+            {
+                PreferredBackBufferWidth = 64,
+                PreferredBackBufferHeight = 64,
+                // Apos.Shapes needs shader model 4.0+; KNI's default Reach profile rejects it.
+                GraphicsProfile = GraphicsProfile.FL10_0,
+            };
+            return game;
+        }
+        catch (Exception e)
+        {
+            // No display, no driver, or a headless agent. Tests check IsAvailable and skip.
+            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
+            game?.Dispose();
+            return null;
+        }
+    }
+}
+
+/// <summary>
 /// A real <see cref="GraphicsDevice"/> for tests that genuinely need one — loading a texture, or
 /// anything else that cannot be faked.
 /// </summary>
@@ -40,39 +118,14 @@ public sealed class GraphicsDeviceFixture : IDisposable
 
     public GraphicsDeviceFixture()
     {
-        // SDL's Cocoa backend sets the app main menu during video init, and AppKit asserts when that
-        // happens off the main thread. xUnit runs fixtures on a worker thread, so on macOS this is a
-        // native abort of the whole test host (crash-reporter popup), which the catch below cannot
-        // intercept. Report "no device" instead, same as a headless agent.
-        if (OperatingSystem.IsMacOS())
+        _game = SharedGameHost.EnsureDevice();
+        if (_game is null)
             return;
 
-        try
-        {
-            _game = new SharedGame();
-
-            // The manager has to exist before RunOneFrame, which is what actually creates the
-            // device — without entering a message loop, which a test host cannot pump.
-            _ = new GraphicsDeviceManager(_game)
-            {
-                PreferredBackBufferWidth = 64,
-                PreferredBackBufferHeight = 64,
-            };
-
-            _game.RunOneFrame();
-            GraphicsDevice = _game.GraphicsDevice;
-
-            var content = new ContentLoader();
-            content.Initialize(_game.Content, GraphicsDevice);
-            ContentLoader = content;
-        }
-        catch (Exception e)
-        {
-            // No display, no driver, or a headless agent. Tests check IsAvailable and skip.
-            System.Diagnostics.Debug.WriteLine($"[tests] No graphics device available: {e.Message}");
-            _game?.Dispose();
-            _game = null;
-        }
+        GraphicsDevice = _game.GraphicsDevice;
+        var content = new ContentLoader();
+        content.Initialize(_game.Content, GraphicsDevice);
+        ContentLoader = content;
     }
 
     /// <summary>
@@ -90,7 +143,8 @@ public sealed class GraphicsDeviceFixture : IDisposable
     /// <summary>Whether tests needing a real device can run here.</summary>
     public bool IsAvailable => GraphicsDevice is not null;
 
-    public void Dispose() => _game?.Dispose();
+    // The game is owned by SharedGameHost for the whole process; other fixtures still need it.
+    public void Dispose() { }
 }
 
 /// <summary>Shares one <see cref="GraphicsDeviceFixture"/> across every test class that opts in.</summary>

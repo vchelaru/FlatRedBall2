@@ -5,6 +5,7 @@ using FlatRedBall2.Content;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
 using FlatRedBall2.IO;
+using Microsoft.Xna.Framework.Media;
 using Shouldly;
 using Xunit;
 
@@ -160,17 +161,33 @@ public class GlueContentRootTests : IDisposable
     public void Load_OggReferencedFile_OpensTheFileUnderTheOutputContentRoot()
     {
         // Song.FromUri takes a real file:// URI rather than a stream, so it bypasses StreamProvider and
-        // must be rooted explicitly. The placeholder is not valid Vorbis: reaching it means a decode
-        // error, while looking in the wrong folder means a file or directory not-found exception.
+        // must be rooted explicitly. KNI's Song.FromUri does not read the file until it plays, so a
+        // clean load of the placeholder (not valid Vorbis) proves the file was found under the root.
         Directory.CreateDirectory(Path.Combine(_output, "Music"));
         File.WriteAllText(Path.Combine(_output, "Music", "Theme.ogg"), "not vorbis");
         var save = new EntitySave { Name = @"Entities\Thing" };
         save.ReferencedFiles.Add(new ReferencedFileSave { Name = "Music/Theme.ogg", LoadedAtRuntime = true });
         var diagnostics = new List<GlueLoadDiagnostic>();
 
-        new GlueContentSource(new ContentLoader(), string.Empty, outputContentRoot: _output)
-            .Load(save, diagnostics);
+        var source = new GlueContentSource(new ContentLoader(), string.Empty, outputContentRoot: _output);
+        source.Load(save, diagnostics);
 
-        diagnostics.ShouldHaveSingleItem().Message.ShouldNotContain("NotFoundException");
+        diagnostics.ShouldBeEmpty();
+        source.Get<Song>("Theme").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Load_OggReferencedFile_MissingUnderTheOutputContentRoot_WarnsItWasNotFound()
+    {
+        // KNI's Song.FromUri never reads the file at load, so the loader checks for it itself.
+        var save = new EntitySave { Name = @"Entities\Thing" };
+        save.ReferencedFiles.Add(new ReferencedFileSave { Name = "Music/Gone.ogg", LoadedAtRuntime = true });
+        var diagnostics = new List<GlueLoadDiagnostic>();
+
+        var source = new GlueContentSource(new ContentLoader(), string.Empty, outputContentRoot: _output);
+        source.Load(save, diagnostics);
+
+        diagnostics.ShouldHaveSingleItem().Message.ShouldContain("Gone.ogg");
+        source.Get<Song>("Gone").ShouldBeNull();
     }
 }

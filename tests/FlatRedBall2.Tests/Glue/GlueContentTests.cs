@@ -225,11 +225,10 @@ public class GlueContentTests
     public void Load_OggReferencedFile_ReachesSongFromUriRatherThanTheSilentDefault()
     {
         // No vendored fixture decodes to real audio (constructing a valid Vorbis bitstream by hand
-        // isn't practical), so the fixture is a placeholder file that fails to decode. That still
-        // proves the .ogg branch is reached — Song.FromUri reads the container eagerly and throws a
-        // container/codec-specific ArgumentException, caught and reported same as any other asset,
-        // rather than the extension silently falling into the old default: case with no diagnostic
-        // at all.
+        // isn't practical), so the fixture is a placeholder file. KNI's Song.FromUri does not read
+        // the container until it plays, so the placeholder still yields a Song. That proves the .ogg
+        // branch is reached rather than the extension silently falling into the old default: case,
+        // which would leave no asset at all.
         var source = SourceFor("DoorsDemo");
         if (source is null)
             return;
@@ -240,8 +239,8 @@ public class GlueContentTests
         var entity = new GlueEntity { Save = save, Content = source };
         entity.BuildObjects();
 
-        entity.BuildDiagnostics.ShouldContain(d =>
-            d.Severity == GlueDiagnosticSeverity.Warning && d.Message.Contains("Theme.ogg"));
+        entity.BuildDiagnostics.ShouldBeEmpty();
+        source.Get<Song>("Theme").ShouldNotBeNull();
     }
 
     [Fact]

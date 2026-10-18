@@ -66,7 +66,8 @@ internal sealed class AutomationWindowParker
             return false;
         if (TrySetIsActive(game))
             return true;
-        var platform = GetNonPublicMember(game, "Platform");
+        // MonoGame names the internal object "Platform"; KNI names it "Strategy".
+        var platform = GetNonPublicMember(game, "Platform") ?? GetNonPublicMember(game, "Strategy");
         return platform != null && TrySetIsActive(platform);
     }
 
@@ -84,6 +85,13 @@ internal sealed class AutomationWindowParker
             if (setter != null)
             {
                 setter.Invoke(target, new object[] { true });
+                return true;
+            }
+            // KNI's strategy exposes a getter only; focus events write this private backing field.
+            var field = type.GetField("_isActive", Declared);
+            if (field != null && field.FieldType == typeof(bool))
+            {
+                field.SetValue(target, true);
                 return true;
             }
         }
