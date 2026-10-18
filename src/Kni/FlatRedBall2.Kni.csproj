@@ -53,7 +53,7 @@
   -->
   <ItemGroup>
     <Compile Include="..\**\*.cs"
-             Exclude="..\IO\FileStorageBackend.cs;..\obj\**;..\bin\**;..\Kni\**;..\FlatRedBall2.BlazorGL\**;..\AnimationChain.MonoGame\**;..\AnimationChain.Common\**;..\Animation.Content\**;..\AnimationEditorCommon\**" />
+             Exclude="..\obj\**;..\bin\**;..\Kni\**;..\FlatRedBall2.BlazorGL\**;..\AnimationChain.MonoGame\**;..\AnimationChain.Common\**;..\Animation.Content\**;..\AnimationEditorCommon\**" />
   </ItemGroup>
 
   <!-- Backend-agnostic packages -->

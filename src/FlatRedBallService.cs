@@ -364,6 +364,19 @@ public class FlatRedBallService
         isBrowser ? RasterizerBackend.StbTrueType : null;
 
     /// <summary>
+    /// True when the engine runs inside a browser: no real filesystem, and the page's canvas owns the
+    /// back-buffer size. Every platform decision keys off this, never off which graphics backend the
+    /// engine was compiled against. Settable so tests can exercise the browser branch.
+    /// </summary>
+    internal bool IsBrowserHost { get; set; } = OperatingSystem.IsBrowser();
+
+    /// <summary>
+    /// Gum can hand the content hook paths with one or more leading separators (<c>"/Content/..."</c>,
+    /// <c>"//Content/..."</c>); <c>TitleContainer.OpenStream</c> rejects those as rooted.
+    /// </summary>
+    internal static string ToTitleContainerPath(string path) => path.TrimStart('/', '\\');
+
+    /// <summary>
     /// Reads <see cref="EngineInitSettings.UseFontOversampling"/>, defaulting to <c>false</c> when no
     /// settings were given. Extracted as a pure function so the opt-in default is testable without a
     /// real <c>GraphicsDevice</c>.
@@ -527,36 +540,17 @@ public class FlatRedBallService
 
         StartupTiming.EndPhase();
 
-#if KNI
-        // KNI/Blazor has no real filesystem — content lives behind TitleContainer (HTTP on
-        // BlazorGL, AssetManager on Android, NSBundle on iOS). Gum's FileManager only auto-
-        // routes to TitleContainer on Android/iOS; on every other KNI target we install the
-        // hook explicitly so Gum reads (loose .gumx, .gumpkg, textures, fonts, CSV/RESX)
-        // resolve against deployed content. Compose with any pre-existing host hook so we
-        // don't clobber a game that has set up its own asset bundling.
-        if (ToolsUtilities.FileManager.CustomGetStreamFromFile == null)
+        // A browser has no real filesystem — content lives behind TitleContainer (HTTP on BlazorGL).
+        // Gum's FileManager reads from disk by default, so install the hook explicitly so Gum reads
+        // (loose .gumx, .gumpkg, textures, fonts, CSV/RESX) resolve against deployed content. Every
+        // other host keeps Gum's own routing: desktop reads absolute paths from disk (TitleContainer
+        // rejects them), and Android/iOS already route to TitleContainer. Compose with any
+        // pre-existing host hook so we don't clobber a game that has set up its own asset bundling.
+        if (IsBrowserHost && ToolsUtilities.FileManager.CustomGetStreamFromFile == null)
         {
-            // TitleContainer.OpenStream rejects paths with a leading '/' or '\' as rooted, but
-            // Gum's FileManager.MakeAbsolute can produce strings like "/Content/GumProject/..."
-            // when normalizing relative input against RelativeDirectory. Strip the leading
-            // separator so the host doesn't see a "rooted" path it refuses to open.
             ToolsUtilities.FileManager.CustomGetStreamFromFile = path =>
-            {
-                // Strip ALL leading separators — Gum's path normalization on WASM can
-                // produce "/Content/..." or even "//Content/..." in some code paths.
-                int trim = 0;
-                while (trim < path.Length && (path[trim] == '/' || path[trim] == '\\'))
-                {
-                    trim++;
-                }
-                if (trim > 0)
-                {
-                    path = path.Substring(trim);
-                }
-                return Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
-            };
+                Microsoft.Xna.Framework.TitleContainer.OpenStream(ToTitleContainerPath(path));
         }
-#endif
 
         // A Glue project names its own Gum project, but only after it has been read — and Gum will
         // not work with a project it did not load itself (assigning ObjectFinder.GumProjectSave
@@ -579,7 +573,7 @@ public class FlatRedBallService
         // InMemoryFontCreator already registered, or it falls through to the on-disk FontCache
         // lookup and fails (issue #1000 follow-up).
         StartupTiming.BeginPhase("Font rasterizer setup");
-        var fontRasterizerBackend = ResolveFontRasterizerBackend(OperatingSystem.IsBrowser());
+        var fontRasterizerBackend = ResolveFontRasterizerBackend(IsBrowserHost);
 #if KNI
         if (fontRasterizerBackend == RasterizerBackend.StbTrueType)
         {
@@ -1046,14 +1040,17 @@ public class FlatRedBallService
     {
         if (_graphicsManager == null) return;
 
-#if KNI
-        // Browser host (KNI BlazorGL): the canvas DOM owns the back-buffer size; touching
-        // PreferredBackBufferWidth/Height would fight the canvas. OS window position is meaningless.
-        // We still propagate AllowUserResizing in case the host honors it.
-        if (_game != null)
-            _game.Window.AllowUserResizing = source.AllowUserResizing;
-        DisplaySettings.WindowMode = source.WindowMode;
-#else
+        if (IsBrowserHost)
+        {
+            // The canvas DOM owns the back-buffer size; touching PreferredBackBufferWidth/Height
+            // would fight the canvas. OS window position is meaningless.
+            // We still propagate AllowUserResizing in case the host honors it.
+            if (_game != null)
+                _game.Window.AllowUserResizing = source.AllowUserResizing;
+            DisplaySettings.WindowMode = source.WindowMode;
+            return;
+        }
+
         if (source.WindowMode == Rendering.WindowMode.FullscreenBorderless)
         {
             _graphicsManager.HardwareModeSwitch = false;
@@ -1063,7 +1060,7 @@ public class FlatRedBallService
             _graphicsManager.IsFullScreen = true;
             _graphicsManager.ApplyChanges();
             if (_game != null)
-                _game.Window.Position = Point.Zero;
+                SetWindowPosition(Point.Zero);
         }
         else
         {
@@ -1095,11 +1092,19 @@ public class FlatRedBallService
                 var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
                 int cx = (display.Width  - _graphicsManager.PreferredBackBufferWidth)  / 2;
                 int cy = (display.Height - _graphicsManager.PreferredBackBufferHeight) / 2;
-                _game.Window.Position = new Point(System.Math.Max(0, cx), System.Math.Max(30, cy));
+                SetWindowPosition(new Point(System.Math.Max(0, cx), System.Math.Max(30, cy)));
             }
         }
 
         DisplaySettings.WindowMode = source.WindowMode;
+    }
+
+    // GameWindow.Position is a MonoGame-only API; KNI's GameWindow has no equivalent, so on KNI the
+    // window stays wherever the platform placed it. Goes away with the MonoGame engine build.
+    private void SetWindowPosition(Point position)
+    {
+#if !KNI
+        _game!.Window.Position = position;
 #endif
     }
 
@@ -1169,13 +1174,12 @@ public class FlatRedBallService
 
     private void ApplyWindowSettings<T>(GraphicsDeviceManager graphics) where T : Screen, new()
     {
-#if KNI
         // Browser host: the canvas DOM owns the back-buffer size. Setting
         // PreferredBackBufferWidth/Height here clamps the buffer before the canvas can drive it,
         // producing the cursor-coordinate offset bug that motivated the externally-managed escape
-        // hatch. Skip entirely on KNI; the browser canvas is sized by index.html / Index.razor.
-        _ = graphics;
-#else
+        // hatch. Skip entirely in the browser; the canvas is sized by index.html / Index.razor.
+        if (IsBrowserHost) return;
+
         var settings = new T().PreferredDisplaySettings ?? DisplaySettings;
         if (settings.WindowMode == Rendering.WindowMode.FullscreenBorderless)
         {
@@ -1190,7 +1194,6 @@ public class FlatRedBallService
             graphics.PreferredBackBufferWidth  = settings.PreferredWindowWidth.Value;
             graphics.PreferredBackBufferHeight = settings.PreferredWindowHeight!.Value;
         }
-#endif
     }
 
     private void ApplyCameraSettings(Camera camera, int windowWidth, int windowHeight)
@@ -1322,13 +1325,12 @@ public class FlatRedBallService
             Storage.Backend = factory(name);
             return;
         }
-#if !KNI
+        // A browser without a factory (a host that does not use FlatRedBall2.BlazorGL) stays in-memory,
+        // with IsPersistent false, so a web build can never write to the WASM virtual file system by accident.
+        if (IsBrowserHost) return;
+
         Storage.Backend = new IO.FileStorageBackend(
             settings!.StorageRootDirectory ?? IO.FileStorageBackend.DefaultRoot(name));
-#endif
-        // KNI without a factory (a host that does not use FlatRedBall2.BlazorGL) stays in-memory, with
-        // IsPersistent false. FileStorageBackend is not compiled into the KNI assembly, so a web build can
-        // never write to the WASM virtual file system by accident.
     }
 
     /// <summary>

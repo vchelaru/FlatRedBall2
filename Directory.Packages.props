@@ -69,6 +69,7 @@
     <PackageVersion Include="nkast.Xna.Framework.XR" Version="4.3.9001" />
     <PackageVersion Include="nkast.Xna.Framework.Content.Pipeline.Builder" Version="4.3.9001" />
     <PackageVersion Include="nkast.Kni.Platform.Blazor.GL" Version="4.3.9001" />
+    <PackageVersion Include="nkast.Kni.Platform.SDL2.GL" Version="4.3.9001" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.*" />

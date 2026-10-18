@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Spike for #1514: desktop head on KNI (SDL2.GL) instead of MonoGame DesktopGL. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <TieredCompilation>false</TieredCompilation>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Solitaire</RootNamespace>
+    <KniPlatform>DesktopGL</KniPlatform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Solitaire.Common\Kni\Solitaire.Common.Kni.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Solitaire.GumPackage.targets" />
+
+  <ItemGroup Condition="'$(UseGumPackage)' != 'true'">
+    <Content Include="..\Solitaire.Common\Content\GumProject\**\*.*"
+             Exclude="..\Solitaire.Common\Content\GumProject\**\*.gumpkg"
+             Link="Content\GumProject\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseGumPackage)' == 'true'">
+    <Content Include="..\Solitaire.Common\Content\GumProject\GumProject.gumpkg"
+             Link="Content\GumProject\GumProject.gumpkg"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
