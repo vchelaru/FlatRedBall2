@@ -8,6 +8,12 @@ namespace FlatRedBall2.GoldenImage;
 /// <summary>Renders a <see cref="Screen"/> to an offscreen target and reads the pixels back.</summary>
 public static class OffscreenRenderer
 {
+    // PreserveContents because the default (DiscardContents) wipes the target each time it is re-bound.
+    // Gum's render-target bake binds another target mid-draw and restores this one afterwards, which
+    // would erase everything drawn so far. The real back buffer keeps its contents the same way.
+    private static RenderTarget2D NewTarget(GraphicsDevice device, int width, int height) =>
+        new(device, width, height, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+
     /// <summary>
     /// Draws <paramref name="screen"/> through the engine's real <c>Screen.Draw</c> path.
     /// </summary>
@@ -22,7 +28,7 @@ public static class OffscreenRenderer
         GraphicsDevice device, Screen screen, int width, int height,
         float cameraX = 0f, float cameraY = 0f, Color? background = null)
     {
-        using var target = new RenderTarget2D(device, width, height);
+        using var target = NewTarget(device, width, height);
         using var spriteBatch = new SpriteBatch(device);
 
         var camera = new Camera { X = cameraX, Y = cameraY };
@@ -53,7 +59,7 @@ public static class OffscreenRenderer
     public static PixelImage RenderCameras(
         GraphicsDevice device, Screen screen, int width, int height, Color? background = null)
     {
-        using var target = new RenderTarget2D(device, width, height);
+        using var target = NewTarget(device, width, height);
         using var spriteBatch = new SpriteBatch(device);
 
         var full = new Viewport(0, 0, width, height);

@@ -81,6 +81,12 @@ public sealed class GoldenFactAttribute : FactAttribute
     public GoldenFactAttribute() => Skip = GoldenEnvironment.SkipReason;
 }
 
+/// <summary>The <see cref="TheoryAttribute"/> counterpart of <see cref="GoldenFactAttribute"/>.</summary>
+public sealed class GoldenTheoryAttribute : TheoryAttribute
+{
+    public GoldenTheoryAttribute() => Skip = GoldenEnvironment.SkipReason;
+}
+
 public static class GoldenDevice
 {
     /// <summary>
