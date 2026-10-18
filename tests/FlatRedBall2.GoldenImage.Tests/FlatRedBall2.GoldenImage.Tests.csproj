@@ -11,7 +11,14 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="MonoGame.Framework.DesktopGL">
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.SDL2.GL">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Shouldly" />
@@ -24,7 +31,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
+    <ProjectReference Include="..\..\src\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Reuse the engine suite's shared-device fixture instead of forking it. -->
