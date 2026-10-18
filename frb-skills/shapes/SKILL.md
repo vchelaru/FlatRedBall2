@@ -80,6 +80,7 @@ For shapes added directly to the screen (not via `entity.Add`), also call `Remov
 - **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
 - **Shape position looks wrong** — Y+ is up (see `physics-and-movement`). In platformers, entity origin = feet, so offset shapes upward by `Height/2` (see `platformer-movement` skill).
 - **Polygon not rotating** — use `Polygon`, not `AARect`.
+- **Large translucent filled shapes can show horizontal scanline streaks.** Seen with stacked `Circle`s, `Polygon`s, and `AARect` strips hundreds of pixels wide (cause not found); small glow layers around a 6–30 px object stayed clean. For a big soft wash, use one Gum `CircleRuntime` with a radial gradient (recipe in `gum-integration` Gotchas).
 
 ## TileShapes
 

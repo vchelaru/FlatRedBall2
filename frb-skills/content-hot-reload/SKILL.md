@@ -101,7 +101,7 @@ Use when the change invalidates references the game holds.
 - **Structural TMX changes** — layers added/removed, map resized, object layer modified.
 - **Anything you're unsure about** — restart is always safe; in-place can leave dangling refs.
 
-`RestartMode.HotReload` triggers `SaveHotReloadState` / `RestoreHotReloadState` so the player doesn't snap back to spawn. See the `screens` skill for the recipe.
+`RestartMode.HotReload` triggers `SaveHotReloadState` / `RestoreHotReloadState` so the player doesn't snap back to spawn. See the `screens` skill for the recipe. Saving only positions is not enough when the screen has a state machine (goal pause, win screen): a reload mid-state restores entities that contradict the state, such as a puck inside a goal while play is live. Save and restore the state value and its timers alongside the positions.
 
 ## Source root detection
 

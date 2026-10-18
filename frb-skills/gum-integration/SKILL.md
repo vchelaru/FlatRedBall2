@@ -304,6 +304,10 @@ The API differs by type:
 - **For Gum behavior/API questions, check `Gum/docs/` in the sibling `Gum` repo checkout before grepping Gum source.** `Gum.MonoGame` ships as a compiled NuGet package with no source; the sibling repo (usually cloned alongside `FlatRedBall2` under the same GitHub root) has both `docs/` and source, and the docs usually answer it faster. Fall back to source only when the docs don't cover the specific mechanism.
 - **A system font family name (`Font = "Arial"`) is a portability trap** — present on your Windows dev machine, absent on Linux/macOS/mobile, and always absent on BlazorGL/WASM. A missing font fails silently, falling back to KernSmith's embedded 18px placeholder. Ship a project-relative `.ttf` instead — set `Font` to a path ending in `.ttf` (e.g. `"Fonts/MyFont.ttf"`) and it's read directly, no `RegisterFont` call needed; see `gum-packaging` for bundling it.
 
+- **Radial-gradient circle (soft glow or wash).** On a `CircleRuntime` set `IsFilled = true`, `StrokeWidth = 0` (the default draws a white outline), `UseGradient = true`, `GradientType = GradientType.Radial` (`Gum.Managers`), and `GradientOuterRadius` to the radius. `GradientX1`/`GradientY1` default to the top-left corner, so set both to the radius to center the gradient in a `Width = Height = 2 × radius` circle. The center color is `FillColor`; the rim color is `Color2` (use alpha 0 to fade out).
+- **`using RenderingLibrary.Graphics;` makes `Layer` ambiguous.** `HorizontalAlignment`/`VerticalAlignment` live there, and so does a `Layer` that collides with `FlatRedBall2.Rendering.Layer`. Alias the one you use, e.g. `using Layer = FlatRedBall2.Rendering.Layer;`.
+- **Gum runtime types need `SystemManagers.Default`, which only a real `Game` creates.** `new FlatRedBallService().Start<Screen>()` with no `Game` throws `InvalidOperationException` as soon as a screen constructs a `CircleRuntime` or `TextRuntime`, so a headless boot check works only for screens without Gum visuals.
+
 For headed screenshot diagnostics (zoom sweeps, overlays, full-frame vs smart-crop capture), use the `render-diagnostics` skill.
 
 ## Zoom-Safe Screen-Space Layout Rule
