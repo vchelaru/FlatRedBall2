@@ -1,3 +1,4 @@
+using Beefball.Entities;
 using FlatRedBall2;
 using FlatRedBall2.Collision;
 using Gum.GueDeriving;
@@ -11,6 +12,7 @@ namespace Beefball.Screens;
 public class TitleScreen : Screen
 {
     private BeefballConfig _config = null!;
+    private Factory<GlowOrb> _orbs = null!;
     private TextRuntime _prompt = null!;
     private float _time;
 
@@ -20,6 +22,7 @@ public class TitleScreen : Screen
         var palette = _config.Palette;
         Camera.BackgroundColor = palette.Background;
 
+        _orbs = new Factory<GlowOrb>(this);
         BuildDecor();
 
         var hud = new Layer("UI");
@@ -54,7 +57,7 @@ public class TitleScreen : Screen
         Add(UiText.Make(line2, 16, Visuals.WithAlpha(text, 0.5f), x, 658f), layer);
     }
 
-    /// <summary>Two paddles and a puck between the title and the prompt, drawn with the same stacked-glow trick as the game.</summary>
+    /// <summary>Two paddles and a puck between the title and the prompt, with the same gradient glows as the game.</summary>
     private void BuildDecor()
     {
         var palette = _config.Palette;
@@ -78,14 +81,13 @@ public class TitleScreen : Screen
 
     private void AddOrb(float x, float y, float radius, Color color, Color inner, bool withBody)
     {
-        foreach (var layer in _config.Glow.Layers)
+        _orbs.Create(o =>
         {
-            Add(new Circle
-            {
-                X = x, Y = y, Radius = radius * layer.Scale * 1.15f, IsFilled = true, IsVisible = true,
-                Color = Visuals.WithAlpha(color, layer.Alpha * _config.Glow.Strength), Z = -10f,
-            });
-        }
+            o.GlowColor = color;
+            o.BodyRadius = radius;
+            o.Config = withBody ? _config.Glow.Player : _config.Glow.Puck;
+            o.Strength = _config.Glow.Strength;
+        }).Position = new System.Numerics.Vector2(x, y);
 
         if (withBody)
         {

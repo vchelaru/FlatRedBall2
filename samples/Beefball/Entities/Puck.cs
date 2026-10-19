@@ -10,8 +10,6 @@ public class Puck : Entity
     private const float TrailSpacing = 3.5f;
     private const float MinTrailSpeed = 30f;
     private const float MaxTrailJump = 60f;
-    /// <summary>The puck is small, so its glow is sized from a larger virtual radius to stay visible.</summary>
-    private const float GlowRadiusFactor = 1.9f;
 
     public BeefballConfig Config { get; set; } = null!;
     public Circle Body { get; private set; } = null!;
@@ -25,7 +23,7 @@ public class Puck : Entity
         var palette = Config.Palette;
         Drag = p.Drag;
 
-        Visuals.AddGlow(this, Config, palette.Puck, p.Radius * GlowRadiusFactor, z: -0.5f);
+        Visuals.AddRadialGlow(this, Config.Glow.Puck, Config.Glow.Strength, palette.Puck, p.Radius);
 
         Body = new Circle
         {

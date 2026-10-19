@@ -20,7 +20,7 @@ public partial class GameScreen : Screen
     private const float P2StartX = 180f;
 
     private BeefballConfig _config = null!;
-    private ArenaVisuals _arena = null!;
+    private ArenaGlow _arenaGlow = null!;
 
     private Factory<Wall> _walls = null!;
     private Factory<GoalBlocker> _blockers = null!;
@@ -52,7 +52,7 @@ public partial class GameScreen : Screen
         _config = BeefballConfig.Load();
         Camera.BackgroundColor = _config.Palette.Background;
 
-        _arena = new ArenaVisuals(this, _config);
+        new ArenaVisuals(this, _config);
         // Dims the arena behind the win banner so the text stays readable over the players.
         _winVeil = new AARect
         {
@@ -69,6 +69,7 @@ public partial class GameScreen : Screen
         _trail = new Factory<TrailDot>(this).EnablePooling().Prewarm(40);
         _sparks = new Factory<Spark>(this).EnablePooling().Prewarm(60);
         _rings = new Factory<HitRing>(this).EnablePooling().Prewarm(4);
+        _arenaGlow = new Factory<ArenaGlow>(this).Create(g => g.Config = _config);
         _washFactory = new Factory<GoalWash>(this);
         for (int i = 0; i < 2; i++)
         {
@@ -297,7 +298,7 @@ public partial class GameScreen : Screen
         _puck.Tween(v => _puck.Y = v, _puck.Y, 0f, TimeSpan.FromSeconds(0.3), InterpolationType.Cubic, Easing.Out);
 
         var scorerColor = _config.Palette.TeamColor(scorer);
-        this.Tween(v => _arena.SetPocketPulse(pocket, v), 1f, 0f, TimeSpan.FromSeconds(1.3),
+        this.Tween(v => _arenaGlow.SetPocketPulse(pocket, v), 1f, 0f, TimeSpan.FromSeconds(1.3),
             InterpolationType.Cubic, Easing.Out);
         this.Tween(v => _washes[pocket].Set(scorerColor, 0.32f * v * _config.Glow.Strength), 1f, 0f, TimeSpan.FromSeconds(1.4),
             InterpolationType.Quadratic, Easing.Out);

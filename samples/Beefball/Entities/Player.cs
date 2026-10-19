@@ -35,7 +35,7 @@ public class Player : Entity
         var palette = Config.Palette;
         Drag = p.Drag;
 
-        Visuals.AddGlow(this, Config, TeamColor, p.Radius, z: -0.5f);
+        Visuals.AddRadialGlow(this, Config.Glow.Player, Config.Glow.Strength, TeamColor, p.Radius);
 
         Body = new Circle
         {

@@ -34,6 +34,12 @@ public sealed class ScreenshotDriver
         _steps.Enqueue(Shot(8, "02_rally_trail"));
         _steps.Enqueue(Shot(20, "03_rally_hit"));
         _steps.Enqueue(Shot(5, "03b_rally_after"));
+        // Glow is Gum content in world space, so it has to follow camera zoom and a bigger window.
+        _steps.Enqueue(Act(5, (e, _) => Gs(e).Camera.Zoom = 1.6f));
+        _steps.Enqueue(Shot(4, "07_zoom_1_6"));
+        _steps.Enqueue(Act(2, (e, _) => { Gs(e).Camera.Zoom = 1f; e.ApplyWindowSettings(new FlatRedBall2.Rendering.DisplaySettings { PreferredWindowWidth = 1500, PreferredWindowHeight = 1110 }); }));
+        _steps.Enqueue(Shot(6, "08_window_1500x1110"));
+        _steps.Enqueue(Act(2, (e, _) => e.ApplyWindowSettings(new FlatRedBall2.Rendering.DisplaySettings { PreferredWindowWidth = Arena.ResolutionWidth, PreferredWindowHeight = Arena.ResolutionHeight })));
         _steps.Enqueue(Act(60, (e, _) => { Gs(e).StageScores(2, 1); Gs(e).StageGoal(1); }));
         _steps.Enqueue(Shot(18, "04_goal_pop"));
         _steps.Enqueue(Shot(40, "05_goal_settled"));

@@ -75,18 +75,26 @@ public sealed class MatchConfig
 
 public sealed class GlowConfig
 {
-    /// <summary>Global multiplier on every glow layer alpha. 0 turns glow off.</summary>
+    /// <summary>Global multiplier on every glow alpha. 0 turns glow off.</summary>
     public float Strength { get; set; } = 1f;
-    public List<GlowLayerConfig> Layers { get; set; } = new()
-    {
-        new GlowLayerConfig { Scale = 1.4f, Alpha = 0.14f },
-        new GlowLayerConfig { Scale = 2.2f, Alpha = 0.07f },
-    };
+    public RadialGlowConfig Player { get; set; } = new() { RadiusScale = 2.6f, Alpha = 0.24f };
+    public RadialGlowConfig Puck { get; set; } = new() { RadiusScale = 5f, Alpha = 0.40f };
+    public LineGlowConfig Wall { get; set; } = new() { Width = 30f, Alpha = 0.20f };
+    /// <summary>Alpha at the back wall of an idle goal pocket; it fades to nothing at the mouth.</summary>
+    public float PocketAlpha { get; set; } = 0.14f;
 }
 
-public sealed class GlowLayerConfig
+/// <summary>A radial glow: outer radius is the object radius times <see cref="RadiusScale"/>.</summary>
+public sealed class RadialGlowConfig
 {
-    public float Scale { get; set; }
+    public float RadiusScale { get; set; }
+    public float Alpha { get; set; }
+}
+
+/// <summary>A glow strip along a wall: <see cref="Width"/> world units each side, fading out from <see cref="Alpha"/>.</summary>
+public sealed class LineGlowConfig
+{
+    public float Width { get; set; }
     public float Alpha { get; set; }
 }
 

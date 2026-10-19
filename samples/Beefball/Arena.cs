@@ -45,4 +45,24 @@ public static class Arena
         foreach (float side in new[] { -1f, 1f })
             yield return (side * (HalfWidth + thickness / 2f), 0f, thickness, 2f * GoalHalfHeight);
     }
+
+    /// <summary>
+    /// The visible neon wall segments (x1, y1, x2, y2), horizontal or vertical: top and bottom runs,
+    /// the wall pieces either side of each goal mouth, and the three sides of each goal pocket.
+    /// </summary>
+    public static IEnumerable<(float X1, float Y1, float X2, float Y2)> NeonLines()
+    {
+        yield return (-HalfWidth, HalfHeight, HalfWidth, HalfHeight);
+        yield return (-HalfWidth, -HalfHeight, HalfWidth, -HalfHeight);
+        foreach (float side in new[] { -1f, 1f })
+        {
+            float w = side * HalfWidth;
+            float back = side * (HalfWidth + PocketDepth);
+            yield return (w, GoalHalfHeight, w, HalfHeight);
+            yield return (w, -HalfHeight, w, -GoalHalfHeight);
+            yield return (w, GoalHalfHeight, back, GoalHalfHeight);
+            yield return (w, -GoalHalfHeight, back, -GoalHalfHeight);
+            yield return (back, -GoalHalfHeight, back, GoalHalfHeight);
+        }
+    }
 }

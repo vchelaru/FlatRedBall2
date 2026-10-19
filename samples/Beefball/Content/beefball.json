@@ -24,10 +24,10 @@
   },
   "glow": {
     "strength": 1,
-    "layers": [
-      { "scale": 1.4, "alpha": 0.14 },
-      { "scale": 2.2, "alpha": 0.07 }
-    ]
+    "player": { "radiusScale": 2.6, "alpha": 0.24 },
+    "puck": { "radiusScale": 5, "alpha": 0.4 },
+    "wall": { "width": 30, "alpha": 0.2 },
+    "pocketAlpha": 0.14
   },
   "palette": {
     "background": "#04050b",
