@@ -1340,7 +1340,7 @@ public class FlatRedBallService
     // ValidateConfiguredGumFontFiles. Swapped in tests so the emitted report can be asserted
     // without depending on the test run being a Debug build.
     internal Action<string> StartupReportWriter { get; set; } =
-        static message => System.Diagnostics.Debug.WriteLine(message);
+        static message => { if (OperatingSystem.IsBrowser()) Console.WriteLine(message); else System.Diagnostics.Debug.WriteLine(message); };
 
     private bool _hasEmittedStartupReport;
 
