@@ -381,6 +381,69 @@ public class FlatRedBallService
     /// Gum can hand the content hook paths with one or more leading separators (<c>"/Content/..."</c>,
     /// <c>"//Content/..."</c>); <c>TitleContainer.OpenStream</c> rejects those as rooted.
     /// </summary>
+    private void ProbeGumStages(Game game, string gumProjectFile)
+    {
+        var t0 = ProbeFlags.Now();
+        StartupTiming.BeginPhase("A Gum.Initialize no project (reg types, SystemManagers, Forms defaults)");
+        _gum.Initialize(game, global::Gum.Forms.DefaultVisualsVersion.Newest);
+        StartupTiming.EndPhase();
+
+        // Wrap the host hook so any fetch that reaches it is timed.
+        var inner = ToolsUtilities.FileManager.CustomGetStreamFromFile;
+        ToolsUtilities.FileManager.CustomGetStreamFromFile = p =>
+        {
+            var t = ProbeFlags.Now();
+            var st = inner(p);
+            ProbeFlags.Log($"hook fetch {p} {ProbeFlags.Ms(t):F1}ms");
+            return st;
+        };
+
+        StartupTiming.BeginPhase("B1 GumBundleLoader.Resolve (fetch+brotli+tar)");
+        var res = global::Gum.Bundle.GumBundleLoader.Resolve(gumProjectFile);
+        StartupTiming.EndPhase();
+
+        StartupTiming.BeginPhase("B2 GumProjectSave.Load (parse project+elements)");
+        var project = global::Gum.DataTypes.GumProjectSave.Load(res.ResolvedGumxPath, out var loadResult);
+        StartupTiming.EndPhase();
+
+        global::Gum.Managers.ObjectFinder.Self.GumProjectSave = project;
+        StartupTiming.BeginPhase("B3 RegisterExtendedDefaultStates");
+        global::Gum.Managers.StandardElementsManager.Self.RegisterExtendedDefaultStates();
+        StartupTiming.EndPhase();
+
+        StartupTiming.BeginPhase("B4 gumProject.Initialize (element init)");
+        global::Gum.DataTypes.GumProjectSaveExtensionMethods.Initialize(project);
+        StartupTiming.EndPhase();
+
+        StartupTiming.BeginPhase("B5 RegisterFromFileFormRuntimeDefaults");
+        global::Gum.Forms.FormsUtilities.RegisterFromFileFormRuntimeDefaults();
+        StartupTiming.EndPhase();
+
+        var abs = ToolsUtilities.FileManager.IsRelative(gumProjectFile) ? ToolsUtilities.FileManager.MakeAbsolute(gumProjectFile) : gumProjectFile;
+        ToolsUtilities.FileManager.RelativeDirectory = ToolsUtilities.FileManager.GetDirectory(abs);
+
+        StartupTiming.BeginPhase("B6 LoadAnimations");
+        global::Gum.GumAnimationLoader.LoadAnimations(res.FileProvider, res.UsedBundle);
+        StartupTiming.EndPhase();
+        ProbeFlags.AfterScreen = () =>
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                var a = ProbeFlags.Now();
+                var r2 = global::Gum.Bundle.GumBundleLoader.Resolve(abs);
+                var rm = ProbeFlags.Ms(a);
+                a = ProbeFlags.Now();
+                var p2 = global::Gum.DataTypes.GumProjectSave.Load(r2.ResolvedGumxPath, out var lr2);
+                var lm = ProbeFlags.Ms(a);
+                a = ProbeFlags.Now();
+                global::Gum.DataTypes.GumProjectSaveExtensionMethods.Initialize(p2);
+                var im = ProbeFlags.Ms(a);
+                ProbeFlags.Log($"warm{i} Resolve {rm:F1}ms"); ProbeFlags.Log($"warm{i} Load {lm:F1}ms"); ProbeFlags.Log($"warm{i} Initialize {im:F1}ms");
+            }
+        };
+        ProbeFlags.Log($"stages total {ProbeFlags.Ms(t0):F1}ms; elements: screens {project.Screens.Count} comps {project.Components.Count} std {project.StandardElements.Count} beh {project.Behaviors.Count}");
+    }
+
     internal static string ToTitleContainerPath(string path) => path.TrimStart('/', '\\');
 
     /// <summary>
@@ -592,7 +655,9 @@ public class FlatRedBallService
             RuntimeHelpers.RunClassConstructor(typeof(StbTrueTypeRasterizer).TypeHandle);
         }
         CustomSetPropertyOnRenderable.InMemoryFontCreator =
-            new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend);
+            ProbeFlags.Has("fonts")
+                ? new ProbeFontCreator(new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend))
+                : new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend);
         // Rebuilds each visible TextRuntime's font at its zoomed size instead of stretching the
         // baked bitmap, fixing blur under Camera.Zoom and window resize (issue #1000). Opt-in via
         // EngineInitSettings.UseFontOversampling (default false, matching Gum's own default) rather
@@ -609,10 +674,15 @@ public class FlatRedBallService
             // RegisterRuntimeType module initializers fire while the project loads, so there is no
             // engine-side seam between the two.
             StartupTiming.BeginPhase("Gum project load");
+            if (ProbeFlags.Has("stages"))
+                ProbeGumStages(game, gumProjectFile);
+            else
+            {
             _gum.Initialize(game, gumProjectFile);
 #pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
             _gum.LoadAnimations();
 #pragma warning restore CS0618 // Type or member is obsolete
+            }
             // After the project is loaded (its filter is known) and before any screen texture loads.
             // A game that switches to Linear filtering in code can set this back to true before Start.
             global::RenderingLibrary.Graphics.Renderer.BleedTransparentTextureEdgesOnLoad =

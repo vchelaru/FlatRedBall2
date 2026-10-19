@@ -66,8 +66,14 @@ public class GameScreen : Screen
 
     public override void CustomInitialize()
     {
+        var T = Engine.StartupTiming;
+        T.BeginPhase("S1 new GameScreenGum");
         _gum = new GameScreenGum();
+        T.EndPhase();
+        T.BeginPhase("S2 Add(_gum)");
         Add(_gum);
+        T.EndPhase();
+        T.BeginPhase("S3 slot setup");
 
         // Tag each foundation slot with the suit it accepts so the placeholder
         // shows the expected target. Order matches GameState.Foundations:
@@ -92,11 +98,20 @@ public class GameScreen : Screen
         _cardFactory = new Factory<CardEntity>(this);
         _state = new GameState();
         _state.Deal(new Random());
+        T.EndPhase();
 
+        T.BeginPhase("S4 SpawnAllCardEntities (52 cards)");
         SpawnAllCardEntities();
+        T.EndPhase();
+        FlatRedBall2.ProbeFlags.Log($"cards: newCardGum total {Solitaire.Entities.CardEntity.NewGumMs:F1}ms, Add(gum) total {Solitaire.Entities.CardEntity.AddGumMs:F1}ms, ApplyModel total {Solitaire.Entities.CardEntity.ApplyMs:F1}ms, n={Solitaire.Entities.CardEntity.N}");
+        T.BeginPhase("S5 RebuildVisuals");
         RebuildVisuals();
+        T.EndPhase();
 
+        T.BeginPhase("S6 BuildWinOverlay");
         BuildWinOverlay();
+        T.EndPhase();
+        T.BeginPhase("S7 WatchContent+hooks");
 
         // Iteration aid: any change under Content/ restarts the screen so updated
         // textures, animations, and tilemaps pick up immediately. Same-dimension PNG
@@ -116,17 +131,23 @@ public class GameScreen : Screen
         // writes to a property, mark it user-set; the patcher skips dirty properties. That's
         // a meaningful chunk of Gum work, deferred for now.
         Engine.GumHotReloadCompleted += HandleGumHotReloadCompleted;
+        T.EndPhase();
     }
 
     private void BuildWinOverlay()
     {
+        var T = Engine.StartupTiming;
         _topUiLayer = new Layer("TopUI");
         Layers.Add(_topUiLayer);
 
+        T.BeginPhase("S6a new WinOverlayGum");
         _winOverlay = new Solitaire.Components.WinOverlayGum();
+        T.EndPhase();
         _winOverlay.ButtonStandardInstance.Click += (_, _) => StartNewGame();
 
+        T.BeginPhase("S6b Add(_winOverlay)");
         Add(_winOverlay, _topUiLayer);
+        T.EndPhase();
         _winOverlay.IsVisible = false;
     }
 

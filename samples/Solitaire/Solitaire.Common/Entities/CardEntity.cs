@@ -33,9 +33,14 @@ public class CardEntity : Entity
         }
     }
 
+    public static double NewGumMs, AddGumMs, ApplyMs; public static int N;
+
     public override void CustomInitialize()
     {
+        var t0 = FlatRedBall2.ProbeFlags.Now();
         _gum = new CardGum();
+        var dt = FlatRedBall2.ProbeFlags.Ms(t0); NewGumMs += dt; N++;
+        if (N <= 3 || N >= 50) FlatRedBall2.ProbeFlags.Log($"card#{N:D2} new CardGum {dt:F1}ms");
         // The entity is positioned by its center, but Gum's default origin is
         // top-left. Re-anchor the visual to its center on this instance so the
         // entity's X/Y matches the visual's geometric center. Authored on the
@@ -43,12 +48,16 @@ public class CardEntity : Entity
         // a property of the card itself.
         _gum.Visual.XOrigin = HorizontalAlignment.Center;
         _gum.Visual.YOrigin = VerticalAlignment.Center;
+        var t1 = FlatRedBall2.ProbeFlags.Now();
         Add(_gum);
+        AddGumMs += FlatRedBall2.ProbeFlags.Ms(t1);
 
         HitBox = new AARect { Width = Width, Height = Height };
         Add(HitBox);
 
+        var t2 = FlatRedBall2.ProbeFlags.Now();
         ApplyModel();
+        ApplyMs += FlatRedBall2.ProbeFlags.Ms(t2);
     }
 
     private void ApplyModel()

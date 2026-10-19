@@ -50,6 +50,7 @@ public partial class Index
     {
         if (_game == null)
         {
+            FlatRedBall2.ProbeFlags.Query = new Uri(Navigation.Uri).Query;
             // Before the game exists so the diagnostics are on from its first frame.
             _perfProbe = PerfDiagnosticsProbe.TryCreateFromQuery(
                 new Uri(Navigation.Uri).Query, FlatRedBallService.Default, GetBrowserLabel,
