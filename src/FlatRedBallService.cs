@@ -643,7 +643,8 @@ public class FlatRedBallService
         // process, which is every game and every test that reuses its Game. Two live devices would
         // leave this bound to the first; the fix for that belongs in Gum's UninitializePlatform,
         // which already resets its sibling renderers.
-        if (!ShapeRenderer.Self.IsInitialized)
+        // Skipped on Android: it builds Apos.Shapes' ShapeBatch, whose shader fails to load there.
+        if (!OperatingSystem.IsAndroid() && !ShapeRenderer.Self.IsInitialized)
             ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
         StartupTiming.EndPhase();
 
