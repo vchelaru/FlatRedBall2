@@ -44,6 +44,12 @@ See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct
 - **A fixed timestep is required on every platform, browser included; never turn it off.** `Game.IsFixedTimeStep` defaults to `true` on both MonoGame and KNI, and the engine never changes it. Setting it to `false` for smoother per-frame updates in the browser turns one long frame into one large physics and collision step, which lets fast objects tunnel through each other.
 - **Browsers are not comparable to each other.** Large Chromium-vs-Firefox frame-time ratios on the same build are normal, so one browser's number is not evidence about the other. Across browsers, compare counts such as `DrawCalls` and `Sprites`, not phase milliseconds.
 
+## Measuring headlessly
+
+- `tools/measure-web.ps1` serves a built web head and prints the page console from headless Chrome, for example `pwsh tools/measure-web.ps1 -Query '?diag=perf&frames=300' -StopPattern '\[frb-diag\]'`. It serves `--no-build`, so build first (twice after clearing `wwwroot/Content`). Use it instead of hand-rolling a browser run. It enforces one at a time, below-normal priority and a hard time cap.
+- A fresh profile means a cold shader cache. Pass `-ProfileDir` to a persistent folder for warm-cache numbers.
+- `-Angle swiftshader` is software GL: it inflates GPU and draw time but not managed CPU time, and `frames=` must stay small there.
+
 ## Dropped clicks and first-frame stalls
 
 - **A click that "didn't register" is usually a frame that hadn't drawn yet.** Before changing input handling, timestamp the input against the frame: a capture-phase `pointerdown` listener logging `event.timeStamp`, next to a `Console.WriteLine` from game code, shows whether the input arrived during a long frame. Remove the probe before measuring anything else.
