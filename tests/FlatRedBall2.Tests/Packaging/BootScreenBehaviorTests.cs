@@ -564,10 +564,10 @@ public class BootScreenBehaviorTests
         const vm = require('vm'); const fs = require('fs');
         // autostart: the value of the blazor script tag's autostart attribute (null = tag has none,
         // undefined = no tag at all).
-        const run = (autostart) => {
+        const run = (autostart, search = '') => {
             const started = [], configs = [];
             const tag = autostart === undefined ? null : { getAttribute: (n) => (n === 'autostart' ? autostart : null) };
-            const win = { addEventListener: () => {}, requestAnimationFrame: () => {},
+            const win = { addEventListener: () => {}, requestAnimationFrame: () => {}, location: { search },
                 Blazor: { start: (o) => { started.push(o); return Promise.resolve(); } } };
             const ctx = { window: win, document: { write: () => {}, querySelector: () => tag }, console };
             vm.runInNewContext(fs.readFileSync(process.env.HOST_PATH, 'utf8'), ctx);
@@ -590,6 +590,21 @@ public class BootScreenBehaviorTests
             process.stdout.write(JSON.stringify({ starts: r.starts, capped: caps.length === 1 && caps[0] > 0 && caps[0] < 100 }));", hostPath);
 
         result.ShouldBe("{\"starts\":1,\"capped\":true}");
+    }
+
+    [Theory]
+    [InlineData("src/FlatRedBall2.BlazorGL/wwwroot/frb-host.js")]
+    [InlineData("templates/frb2-multiplatform/MyGame.BlazorGL/wwwroot/frb-host.js")]
+    public void FrbHost_AutostartDisabled_TurnsDebuggerSupportOffUnlessTheUrlAsksForIt(string relativePath)
+    {
+        // The dev server's runtime config has debugLevel -1 (debugger support), which makes interpreted
+        // code 2-6x slower, start-up included. The host defaults it off; ?debug brings it back.
+        var hostPath = Path.Combine(TemplatePackageReferenceTests.RepoRootForTests, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var result = RunNodeRaw(HostStartHarness + @"
+            const level = (search) => run('false', search).configs[0].debugLevel;
+            process.stdout.write(JSON.stringify([level(''), level('?debug'), level('?x=1&debug'), level('?debugger=1')]));", hostPath);
+
+        result.ShouldBe("[0,-1,-1,0]");
     }
 
     [Theory]

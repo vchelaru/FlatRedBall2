@@ -119,9 +119,16 @@ var FRB_MAX_PARALLEL_DOWNLOADS = 50;
 (function () {
     var tag = document.querySelector('script[src$="blazor.webassembly.js"]');
     if (!tag || tag.getAttribute('autostart') !== 'false') return;
+    // debugLevel -1 (the dev-server default) turns on debugger support in the .NET runtime, which makes
+    // interpreted code roughly twice as slow to start. Default it off; add ?debug to the page URL to
+    // get breakpoints back.
+    var debugging = /[?&]debug(=|&|$)/.test(window.location.search);
     window.Blazor.start({
         configureRuntime: function (dotnet) {
-            dotnet.withConfig({ maxParallelDownloads: FRB_MAX_PARALLEL_DOWNLOADS });
+            dotnet.withConfig({
+                maxParallelDownloads: FRB_MAX_PARALLEL_DOWNLOADS,
+                debugLevel: debugging ? -1 : 0
+            });
         }
     }).catch(function (e) { console.error(e); });
 })();
