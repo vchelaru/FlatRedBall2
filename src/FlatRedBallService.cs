@@ -358,6 +358,15 @@ public class FlatRedBallService
     /// run in a browser. Extracted as a pure function so the selection logic is testable without a
     /// real <c>GraphicsDevice</c> or browser environment.
     /// </summary>
+    /// <summary>
+    /// Whether Gum should bleed neighbor color into transparent texels as it loads textures. That only
+    /// prevents dark fringes under Linear filtering; under Point it changes nothing and costs a full
+    /// GetData/SetData per texture (about 3 s for Solitaire's sprite sheet in the browser's interpreter).
+    /// Mirrors Gum's own rule that the project filter string <c>"Linear"</c> means linear filtering.
+    /// </summary>
+    internal static bool ShouldBleedTransparentTextureEdges(string? projectTextureFilter) =>
+        string.Equals(projectTextureFilter, "Linear", StringComparison.OrdinalIgnoreCase);
+
     internal static RasterizerBackend? ResolveFontRasterizerBackend(bool isBrowser) =>
         isBrowser ? RasterizerBackend.StbTrueType : null;
 
@@ -525,7 +534,9 @@ public class FlatRedBallService
         _whitePixel.SetData(new[] { Color.White });
         SynchronizationContext.SetSynchronizationContext(_syncContext);
         Content.Initialize(game.Content, game.GraphicsDevice);
+        StartupTiming.BeginPhase("Shape batch init");
         ShapesBatch.Instance.Initialize(game.GraphicsDevice);
+        StartupTiming.EndPhase();
 
         var bounds = game.Window.ClientBounds;
         ApplyCameraSettings(Camera, bounds.Width, bounds.Height);
@@ -602,6 +613,10 @@ public class FlatRedBallService
 #pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
             _gum.LoadAnimations();
 #pragma warning restore CS0618 // Type or member is obsolete
+            // After the project is loaded (its filter is known) and before any screen texture loads.
+            // A game that switches to Linear filtering in code can set this back to true before Start.
+            global::RenderingLibrary.Graphics.Renderer.BleedTransparentTextureEdgesOnLoad =
+                ShouldBleedTransparentTextureEdges(global::Gum.Managers.ObjectFinder.Self.GumProjectSave?.TextureFilter);
             StartupTiming.EndPhase();
         }
         else
