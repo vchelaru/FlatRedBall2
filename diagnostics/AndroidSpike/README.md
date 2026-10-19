@@ -8,15 +8,22 @@ Needs the `android` workload (`dotnet workload install android`), a device with 
 dotnet build -t:Run -f net10.0-android
 ```
 
-## Findings (Android 12, OpenGL ES 3.2 phone)
+## Findings
+
+Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB PowerVR GE8300 phone
+(Android 12).
 
 - Raw KNI (`nkast.Kni.Platform.Android.GL`): boots, renders, delivers touch.
 - `MainActivity` needs `ScreenOrientation = FullSensor`, or `AndroidGameActivity.OnCreate` throws.
 - `GraphicsProfile.FL10_0` is rejected by the Android backend; the spike uses `HiDef`. The engine's
   own templates request `FL10_0` (for Apos.Shapes), so Android templates need `HiDef`.
-- Apos.Shapes' `ShapeBatch` constructor logs "This effect is for an older version of KNI and needs to
-  be rebuilt" and then hangs the app. Both the engine's `ShapesBatch` and Gum's `ShapeRenderer`
-  created it at startup, so nothing rendered. `ShapesBatch` is now lazy and Gum's `ShapeRenderer`
-  init is skipped on Android. Result: background and Gum labels render; shapes do not.
-- Not yet checked: touch through the engine `Cursor`, content loading, audio, Gum controls that draw
-  shapes (rounded buttons).
+- The engine renders on the Motorola: Gum label, Gum rounded rectangle, engine `Circle` shapes, and
+  touch through `Engine.Input.Cursor`.
+- "This effect is for an older version of KNI" in logcat is only a warning: Apos.Shapes' knifx is
+  format v11 and KNI reads v12. It still loads.
+- `new ShapeBatch(...)` compiles Apos.Shapes' large shader on the GPU driver. That takes about 1.4 s
+  on the Motorola but about 142 s on the PowerVR phone, which Android kills as an ANR (5 s). The
+  engine's `ShapesBatch` creates it lazily on first use, but Gum's `ShapeRenderer.Initialize` still
+  builds one at startup, so the old phone cannot start the engine at all.
+- Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
+- Not yet checked: content loading, audio.
