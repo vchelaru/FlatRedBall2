@@ -21,9 +21,11 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   touch through `Engine.Input.Cursor`.
 - "This effect is for an older version of KNI" in logcat is only a warning: Apos.Shapes' knifx is
   format v11 and KNI reads v12. It still loads.
-- `new ShapeBatch(...)` compiles Apos.Shapes' large shader on the GPU driver. That takes about 1.4 s
-  on the Motorola but about 142 s on the PowerVR phone, which Android kills as an ANR (5 s). The
-  engine's `ShapesBatch` creates it lazily on first use, but Gum's `ShapeRenderer.Initialize` still
-  builds one at startup, so the old phone cannot start the engine at all.
+- `new ShapeBatch(...)` compiles Apos.Shapes' shader on the GPU driver. The fragment shader's GLSL is
+  436,712 characters. Compiling it directly with `glCompileShader` (bypassing KNI) takes about 142 s on
+  the PowerVR GE8300 phone (143 s again on a second compile, so the driver does not cache it) and about
+  1.4 s on the Motorola. KNI's own GLSL to GLSL ES 3.00 regex conversion is only ~110 ms. Android kills
+  the app after 5 s (ANR). The engine's `ShapesBatch` creates the batch lazily on first use, but Gum's
+  `ShapeRenderer.Initialize` still builds one at startup, so the old phone cannot start the engine.
 - Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
 - Not yet checked: content loading, audio.
