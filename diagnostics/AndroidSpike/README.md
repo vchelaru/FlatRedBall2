@@ -27,6 +27,14 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   1.4 s on the Motorola. KNI's own GLSL to GLSL ES 3.00 regex conversion is only ~110 ms. Android kills
   the app after 5 s (ANR). The engine's `ShapesBatch` creates the batch lazily on first use, but Gum's
   `ShapeRenderer.Initialize` still builds one at startup, so the old phone cannot start the engine.
+- Source-level tricks do not fix the first compile. The GLSL is one `main()` of 7,283 lines (the 437K
+  characters are mostly indentation: 18 nesting levels), 732 `if`s, 107 `texture()` reads, two
+  16-iteration loops with dependent texture reads, one 8-iteration loop. Fragment compile times on
+  the PowerVR phone (baseline ~142 s): `#pragma optimize(off)` 142 s; `mediump` instead of `highp`
+  143 s; both 143 s; raw GLSL ES 1.00 text 142 s; single-pass `_spvonce` loops as `do/while(false)`
+  143 s; constant-folding-proof loop bounds to stop unrolling 98 s (-31%); `texture()` replaced by a
+  constant 81 s (-43%, shader no longer renders). So loops and texture reads are part of it, but the rest
+  is general code volume that this driver and CPU are slow at.
 - A saved program binary fixes repeat launches. On the PowerVR phone, `glGetProgramBinary` after the
   first compile and link gave a 368,599-byte binary (1 supported format, 37168). On the next launch
   `glProgramBinary` loaded it in 5 ms and linked fine, versus ~151 s to compile. The binary is
