@@ -27,5 +27,11 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   1.4 s on the Motorola. KNI's own GLSL to GLSL ES 3.00 regex conversion is only ~110 ms. Android kills
   the app after 5 s (ANR). The engine's `ShapesBatch` creates the batch lazily on first use, but Gum's
   `ShapeRenderer.Initialize` still builds one at startup, so the old phone cannot start the engine.
+- A saved program binary fixes repeat launches. On the PowerVR phone, `glGetProgramBinary` after the
+  first compile and link gave a 368,599-byte binary (1 supported format, 37168). On the next launch
+  `glProgramBinary` loaded it in 5 ms and linked fine, versus ~151 s to compile. The binary is
+  specific to the GPU and driver, so it can't be shipped in the app. It must be produced on the device
+  on first run, keyed by `GL_RENDERER`/`GL_VERSION`, with a recompile fallback if loading fails. KNI
+  doesn't do this today; it compiles in `ConcreteShader.CreateShader` and links at first draw.
 - Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
 - Not yet checked: content loading, audio.
