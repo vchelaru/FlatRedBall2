@@ -74,7 +74,9 @@ public class ContentLoader
     /// Loads content by path. Extension-based routing:
     /// <list type="bullet">
     /// <item><description><c>Load&lt;Texture2D&gt;("Content/ship.png")</c> (has extension) —
-    /// loads the PNG directly from disk via <c>Texture2D.FromFile</c> and tracks
+    /// loads the PNG directly from disk, premultiplies its alpha (on every platform, so it
+    /// matches sprite blending; Gum is straight alpha, so pass Gum images through
+    /// <c>SourceFile</c> instead of sharing this texture) and tracks
     /// it for hot-reload via <see cref="TryReload"/>. Second call with the same path
     /// returns the cached instance.</description></item>
     /// <item><description><c>Load&lt;Texture2D&gt;("ship_0001")</c> (no extension) — goes
@@ -207,7 +209,7 @@ public class ContentLoader
             throw new InvalidOperationException("ContentLoader not initialized.");
         using var stream = StreamProvider(path);
         var texture = Texture2D.FromStream(_graphicsDevice, stream);
-        PremultiplyIfNeeded(texture);
+        Premultiply(texture);
         return texture;
     }
 
@@ -221,21 +223,19 @@ public class ContentLoader
             return false;
         var buffer = new Color[incoming.Width * incoming.Height];
         incoming.GetData(buffer);
-        if (OperatingSystem.IsBrowser())
-            PremultiplyAlpha(buffer);
+        PremultiplyAlpha(buffer);
         existing.SetData(buffer);
         return true;
     }
 
-    // KNI BlazorGL's Texture2D.FromStream returns raw unpremultiplied RGBA (browser image
-    // decode), but the engine renders with BlendState.AlphaBlend which expects premultiplied
-    // alpha — without this pass, antialiased PNG edges blend their full RGB and show as a
-    // light halo. DesktopGL's FromStream already premultiplies internally, so we'd
-    // double-premultiply and darken edges if we did this unconditionally.
-    private static void PremultiplyIfNeeded(Texture2D texture)
+    // No backend's Texture2D.FromStream premultiplies (measured: MonoGame DesktopGL 3.8.5.1,
+    // KNI SDL2.GL and BlazorGL all return straight alpha), but the engine renders with
+    // BlendState.AlphaBlend, which expects premultiplied alpha. Without this pass antialiased
+    // edges are too bright and fully transparent texels add their stored color as light.
+    // Swap for FromStream(..., DefaultColorProcessors.PremultiplyAlpha) once KNI ships
+    // kniEngine/kni#2740, which avoids this GetData/SetData round trip.
+    private static void Premultiply(Texture2D texture)
     {
-        if (!OperatingSystem.IsBrowser())
-            return;
         var buffer = new Color[texture.Width * texture.Height];
         texture.GetData(buffer);
         PremultiplyAlpha(buffer);
