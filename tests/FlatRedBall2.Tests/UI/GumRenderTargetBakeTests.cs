@@ -62,4 +62,63 @@ public class GumRenderTargetBakeTests
 
         screen.GumOverlayRenderablesToBake().Select(r => r.Visual).ShouldNotContain(hud);
     }
+
+    // The bake walks the whole Gum tree twice per camera pass (and Gum's Draw walks it again), so a scene
+    // with no render targets must skip it: that is every frame of a card board, a HUD, a menu.
+    [Fact]
+    public void ContainsRenderTarget_PlainTree_ReturnsFalse()
+    {
+        var root = new ContainerRuntime();
+        var child = new ContainerRuntime();
+        root.Children.Add(child);
+        child.Children.Add(new ContainerRuntime());
+
+        GumRenderTargetBaker.ContainsRenderTarget(new[] { root }).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ContainsRenderTarget_NestedRenderTargetContainer_ReturnsTrue()
+    {
+        var root = new ContainerRuntime();
+        var child = new ContainerRuntime();
+        root.Children.Add(child);
+        child.Children.Add(new ContainerRuntime { IsRenderTarget = true });
+
+        GumRenderTargetBaker.ContainsRenderTarget(new[] { root }).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ContainsRenderTarget_RenderTargetRootItself_ReturnsTrue()
+    {
+        var root = new ContainerRuntime { IsRenderTarget = true };
+
+        GumRenderTargetBaker.ContainsRenderTarget(new[] { root }).ShouldBeTrue();
+    }
+
+    // Gum bakes an invisible container when a visible sprite references it, so an invisible render target
+    // must not be skipped on visibility alone.
+    [Fact]
+    public void ContainsRenderTarget_InvisibleRenderTargetContainer_ReturnsTrue()
+    {
+        var root = new ContainerRuntime();
+        root.Children.Add(new ContainerRuntime { IsRenderTarget = true, Visible = false });
+
+        GumRenderTargetBaker.ContainsRenderTarget(new[] { root }).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ContainsRenderTarget_SpriteReferencingRenderTarget_ReturnsTrue()
+    {
+        var source = new ContainerRuntime { IsRenderTarget = true };
+        var root = new ContainerRuntime();
+        root.Children.Add(new SpriteRuntime { RenderTargetTextureSource = source });
+
+        GumRenderTargetBaker.ContainsRenderTarget(new[] { root }).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ContainsRenderTarget_NoRoots_ReturnsFalse()
+    {
+        GumRenderTargetBaker.ContainsRenderTarget(System.Array.Empty<Gum.Wireframe.GraphicalUiElement>()).ShouldBeFalse();
+    }
 }
