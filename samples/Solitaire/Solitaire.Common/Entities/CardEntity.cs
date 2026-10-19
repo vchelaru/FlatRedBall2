@@ -18,6 +18,7 @@ public class CardEntity : Entity
 
     private CardGum _gum = null!;
     private Card? _model;
+    private readonly AppliedStateCache<CardGum.Facing> _appliedFacing = new();
     private Tweener? _moveTween;
     private CancellationTokenSource? _pendingHideCts;
 
@@ -36,6 +37,7 @@ public class CardEntity : Entity
     public override void CustomInitialize()
     {
         _gum = new CardGum();
+        _appliedFacing.Invalidate();
         // The entity is positioned by its center, but Gum's default origin is
         // top-left. Re-anchor the visual to its center on this instance so the
         // entity's X/Y matches the visual's geometric center. Authored on the
@@ -82,18 +84,27 @@ public class CardEntity : Entity
             _ => CardGum.Rank.Ace,
         };
 
-        _gum.FacingState = _model.IsFaceUp ? CardGum.Facing.Up : CardGum.Facing.Down;
+        ApplyFacing();
+    }
+
+    // Re-applying a Gum state costs 1-1.6 ms on web, and RebuildVisuals refreshes all 52
+    // cards per click; skip it when the facing hasn't changed. _gum.FacingState is only
+    // written here, so the cache is only invalidated when _gum is recreated.
+    private void ApplyFacing()
+    {
+        var facing = _model!.IsFaceUp ? CardGum.Facing.Up : CardGum.Facing.Down;
+        _appliedFacing.Apply(facing, f => _gum.FacingState = f);
     }
 
     /// <summary>
-    /// Re-applies only the Facing state from the model. Cheaper than re-assigning
-    /// <see cref="Model"/>, which re-runs all three categories (Suit, Rank, Facing)
-    /// every call.
+    /// Re-applies only the Facing state from the model, and only when it differs from the
+    /// last applied one. Cheaper than re-assigning <see cref="Model"/>, which re-runs all
+    /// three categories (Suit, Rank, Facing) every call.
     /// </summary>
     public void RefreshFacing()
     {
         if (_gum is null || _model is null) return;
-        _gum.FacingState = _model.IsFaceUp ? CardGum.Facing.Up : CardGum.Facing.Down;
+        ApplyFacing();
     }
 
     // Lifted Z while a card is sliding to its destination — keeps the moving card on top
