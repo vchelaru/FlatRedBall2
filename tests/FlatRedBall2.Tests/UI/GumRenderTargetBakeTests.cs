@@ -121,4 +121,36 @@ public class GumRenderTargetBakeTests
     {
         GumRenderTargetBaker.ContainsRenderTarget(System.Array.Empty<Gum.Wireframe.GraphicalUiElement>()).ShouldBeFalse();
     }
+
+    // Bake must not call Gum's PreRenderRoots at all for a scene with no render targets, and must
+    // still call it (with the roots) when one is present.
+    [Fact]
+    public void Bake_NoRenderTargets_SkipsPreRender()
+    {
+        var screen = new TestScreen();
+        var hud = new ContainerRuntime();
+        hud.Children.Add(new ContainerRuntime());
+        screen.Add(hud);
+        int calls = 0;
+        var baker = new GumRenderTargetBaker((_, _, _) => calls++);
+
+        baker.Bake(screen.GumRenderablesToBake(screen.Cameras[0]), screen.Cameras[0]);
+
+        calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Bake_WithRenderTarget_PreRendersTheRoots()
+    {
+        var screen = new TestScreen();
+        var hud = new ContainerRuntime();
+        hud.Children.Add(new ContainerRuntime { IsRenderTarget = true });
+        screen.Add(hud);
+        var bakedRoots = new System.Collections.Generic.List<Gum.Wireframe.GraphicalUiElement>();
+        var baker = new GumRenderTargetBaker((_, _, roots) => bakedRoots.AddRange(roots));
+
+        baker.Bake(screen.GumRenderablesToBake(screen.Cameras[0]), screen.Cameras[0]);
+
+        bakedRoots.ShouldContain(hud);
+    }
 }
