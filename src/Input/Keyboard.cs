@@ -14,7 +14,8 @@ public class Keyboard : IKeyboard
 {
     private KeyboardState _current;
     private KeyboardState _previous;
-    private bool _hasInjection;
+    // Set by automation mode at startup (or by the first injection): hardware is never read again.
+    private bool _injectedOnly;
     private readonly HashSet<Keys> _injectedKeys = new();
 
     // Keys held at the moment SuppressHeldReleases() was called (e.g. a screen transition) — each
@@ -26,7 +27,7 @@ public class Keyboard : IKeyboard
 
     internal void InjectKey(Keys key, bool down)
     {
-        _hasInjection = true;
+        _injectedOnly = true;
         if (down) _injectedKeys.Add(key);
         else _injectedKeys.Remove(key);
     }
@@ -43,13 +44,19 @@ public class Keyboard : IKeyboard
             _heldAtSuppression.Add(key);
     }
 
+    internal void UseInjectedInputOnly() => _injectedOnly = true;
+
     // Called once per frame by InputManager before entity/screen logic runs.
-    internal void Update()
+    internal void Update() =>
+        Update(_injectedOnly ? default : Microsoft.Xna.Framework.Input.Keyboard.GetState());
+
+    // Test seam: hardwareState stands in for Keyboard.GetState(), and is ignored once input is injected-only.
+    internal void Update(KeyboardState hardwareState)
     {
         _previous = _current;
-        _current = _hasInjection
+        _current = _injectedOnly
             ? new KeyboardState(_injectedKeys.ToArray())
-            : Microsoft.Xna.Framework.Input.Keyboard.GetState();
+            : hardwareState;
 
         _releaseSuppressedThisFrame.Clear();
         if (_heldAtSuppression.Count > 0)

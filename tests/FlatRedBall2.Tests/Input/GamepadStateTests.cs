@@ -15,6 +15,7 @@ internal sealed class FakeGamepadPlatform : IGamepadPlatform
     public Vector2 LeftStick { get; set; }
     public Vector2 RightStick { get; set; }
     public float LeftTrigger { get; set; }
+    public Buttons Buttons { get; set; }
     public GamePadDeadZone? LastDeadZone { get; private set; }
     public List<(int Index, float Left, float Right)> Vibrations { get; } = new();
     public bool VibrationResult { get; set; } = true;
@@ -26,7 +27,7 @@ internal sealed class FakeGamepadPlatform : IGamepadPlatform
         return new GamePadState(
             new GamePadThumbSticks(LeftStick, RightStick),
             new GamePadTriggers(LeftTrigger, 0f),
-            new GamePadButtons(0),
+            new GamePadButtons(Buttons),
             new GamePadDPad());
     }
 

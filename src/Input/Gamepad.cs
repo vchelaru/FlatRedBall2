@@ -25,6 +25,9 @@ public class Gamepad : IGamepad
     private Vector2 _leftStick, _rightStick;
     private bool _isConnected;
     private float? _deadzone;
+    // _injectedOnly: never read the platform (set by automation startup).
+    // _hasInjection: something was injected, so the pad reports as connected.
+    private bool _injectedOnly;
     private bool _hasInjection;
     private Buttons _injectedButtons;
     private float _leftStickX, _leftStickY, _rightStickX, _rightStickY, _leftTrigger, _rightTrigger;
@@ -89,6 +92,9 @@ public class Gamepad : IGamepad
                 _heldAtSuppression.Add(button);
     }
 
+    // A pad that is injected-only and never injected into reads as disconnected with zeroed state.
+    internal void UseInjectedInputOnly() => _injectedOnly = true;
+
     internal void InjectButton(Buttons button, bool down)
     {
         _hasInjection = true;
@@ -119,6 +125,11 @@ public class Gamepad : IGamepad
                 new GamePadButtons(_injectedButtons),
                 new GamePadDPad());
             _isConnected = true;
+        }
+        else if (_injectedOnly)
+        {
+            _current = default;
+            _isConnected = false;
         }
         else
         {

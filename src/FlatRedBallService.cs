@@ -1417,6 +1417,10 @@ public class FlatRedBallService
     /// <see cref="GameRandom"/> so recorded NDJSON runs reproduce exactly.
     /// </para>
     /// <para>
+    /// Real keyboard, mouse, touch and gamepad input is ignored for the whole session; only injected
+    /// input drives the game, even while the window has focus.
+    /// </para>
+    /// <para>
     /// Adding <c>--frb-auto-hide</c> (Windows only) also parks the game window off-screen at the back
     /// of the z-order and returns focus to the window beneath it. The window still renders.
     /// </para>
@@ -1448,6 +1452,7 @@ public class FlatRedBallService
         Automation.AutomationWindowParker? windowParker = null)
     {
         Random = new GameRandom(seed ?? 0);
+        Input.UseInjectedInputOnly();
         _automationMode = new Automation.AutomationMode(this, output) { WindowParker = windowParker };
         _automationMode.Start(input);
     }
