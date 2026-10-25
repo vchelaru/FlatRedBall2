@@ -71,6 +71,20 @@ public class InputManager
             gp.SuppressHeldReleases();
     }
 
+    /// <summary>
+    /// Stops every device (keyboard, mouse, touch, gamepads) from reading real hardware, so injected
+    /// state is the only input. Called when automation mode starts: an automated run must not react
+    /// to the person at the machine, and on SDL2 the mouse reports global button state even while
+    /// the window is unfocused.
+    /// </summary>
+    internal void UseInjectedInputOnly()
+    {
+        _keyboard.UseInjectedInputOnly();
+        _cursor.UseInjectedInputOnly();
+        foreach (var gp in _gamepads)
+            gp.UseInjectedInputOnly();
+    }
+
     internal void InjectKey(Keys key, bool down) => _keyboard.InjectKey(key, down);
     internal void InjectGamepadButton(int playerIndex, Buttons button, bool down) => _gamepads[playerIndex].InjectButton(button, down);
     internal void InjectGamepadAxis(int playerIndex, GamepadAxis axis, float value) => _gamepads[playerIndex].InjectAxis(axis, value);

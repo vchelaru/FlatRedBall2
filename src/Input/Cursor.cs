@@ -38,10 +38,10 @@ public class Cursor : ICursor
     private Vector2 _touchScreenPos;
     private bool _touchAvailable = true;
 
-    // Synthetic state from automation injection. Once enabled, the live mouse is ignored and
-    // touch polling is skipped — the cursor reads exclusively from these fields. Sticky across
-    // frames; Inject() updates them in place.
-    private bool _hasInjection;
+    // Synthetic state from automation injection. Once _injectedOnly is set (at automation startup,
+    // or by the first Inject), the live mouse is ignored and touch polling is skipped — the cursor
+    // reads exclusively from these fields. Sticky across frames; Inject() updates them in place.
+    private bool _injectedOnly;
     private int _injectedX;
     private int _injectedY;
     private ButtonState _injectedPrimary = ButtonState.Released;
@@ -70,13 +70,13 @@ public class Cursor : ICursor
     }
 
     /// <summary>
-    /// Called by automation mode to override the live mouse. Once any value is injected the
-    /// cursor reads exclusively from injected state — touch and real mouse polling stop. The
-    /// values persist across frames; subsequent calls update them in place.
+    /// Called by automation mode to set the cursor's position and buttons. The cursor then reads
+    /// exclusively from injected state (see <see cref="UseInjectedInputOnly"/>). The values persist
+    /// across frames; subsequent calls update them in place.
     /// </summary>
     internal void Inject(int screenX, int screenY, bool primary, bool secondary)
     {
-        _hasInjection = true;
+        _injectedOnly = true;
         _injectedX = screenX;
         _injectedY = screenY;
         _injectedPrimary = primary ? ButtonState.Pressed : ButtonState.Released;
@@ -96,23 +96,26 @@ public class Cursor : ICursor
     // cursor injection without exposing the cameras list publicly.
     internal Camera? PrimaryCamera => _cameras != null && _cameras.Count > 0 ? _cameras[0] : null;
 
+    /// <summary>
+    /// Stops reading the real mouse and touch panel for good; until something is injected the
+    /// cursor sits at (0,0) with no buttons down. Automation mode calls this at startup.
+    /// </summary>
+    internal void UseInjectedInputOnly() => _injectedOnly = true;
+
     // Called once per frame by InputManager before entity/screen logic runs.
-    internal void Update(TimeSpan realTimeSinceStart)
+    internal void Update(TimeSpan realTimeSinceStart) =>
+        Update(_injectedOnly ? default : Mouse.GetState(), realTimeSinceStart);
+
+    // Test seam: hardwareState stands in for Mouse.GetState(), and is ignored once input is injected-only.
+    internal void Update(MouseState hardwareState, TimeSpan realTimeSinceStart)
     {
-        var state = _hasInjection
-            // Hold the wheel at its last real value so injection never reports a spurious scroll.
+        _previousMouse = _currentMouse;
+        _currentMouse = _injectedOnly
+            // Hold the wheel at its last value so injection never reports a spurious scroll.
             ? new MouseState(_injectedX, _injectedY, _currentMouse.ScrollWheelValue,
                 _injectedPrimary, ButtonState.Released, _injectedSecondary,
                 ButtonState.Released, ButtonState.Released)
-            : Mouse.GetState();
-        Update(state, realTimeSinceStart);
-    }
-
-    // Test seam: lets unit tests drive mouse-derived properties without a real GameWindow.
-    internal void Update(MouseState mouseState, TimeSpan realTimeSinceStart)
-    {
-        _previousMouse = _currentMouse;
-        _currentMouse = mouseState;
+            : hardwareState;
 
         // ScrollWheelValue is cumulative since startup, so the first frame has no baseline.
         _scrollWheelDelta = _hasUpdated
@@ -123,9 +126,9 @@ public class Cursor : ICursor
         _touchActivePrev = _touchActive;
         _touchActive = false;
 
-        // Skip touch polling once injection is active — automation drives the cursor exclusively
+        // Skip touch polling while injected-only — automation drives the cursor exclusively
         // through the synthetic mouse state, and TouchPanel.GetState() requires a real window.
-        if (_touchAvailable && !_hasInjection)
+        if (_touchAvailable && !_injectedOnly)
             UpdateTouch();
 
         UpdateActiveCamera();

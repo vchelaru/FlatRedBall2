@@ -76,13 +76,13 @@ A `step count:N` produces one response per frame (N total), each carrying the re
 
 ### Input injection
 
-Synthetic state replaces MonoGame hardware polling. The injected state persists across frames until explicitly changed — send `"down":false` to clear.
+Synthetic state replaces MonoGame hardware polling from the moment automation starts: real keyboard, mouse, touch and gamepads never reach the game, so a person cannot play the window alongside the agent. Until a device gets its first injection it reads idle, and a gamepad nobody injected into reports disconnected. The injected state persists across frames until explicitly changed — send `"down":false` to clear.
 
 Key names resolve via `Enum.Parse<Keys>()` — use MonoGame's `Keys` enum names verbatim (`Space`, `W`, `Left`, `LeftShift`). Same for gamepad buttons (`Buttons` enum) and axes (`GamepadAxis` enum: `LeftStickX`, `LeftStickY`, `RightStickX`, `RightStickY`, `LeftTrigger`, `RightTrigger`).
 
 Input commands produce no response — query if you need confirmation. `WasKeyPressed` style inputs require the down state to span at least one stepped frame between the down and up commands; combine `input down:true` → `step` → `input down:false` to register a press.
 
-Cursor injection takes screen pixels by default (origin top-left, Y+ down) or world coordinates with `"space":"world"`. World-space injection back-projects through the primary camera; use screen coordinates when camera choice must be explicit. Button states are sticky until the next cursor command. After cursor injection starts, real mouse and touch input are ignored for the rest of the session.
+Cursor injection takes screen pixels by default (origin top-left, Y+ down) or world coordinates with `"space":"world"`. World-space injection back-projects through the primary camera; use screen coordinates when camera choice must be explicit. Button states are sticky until the next cursor command.
 
 The injected cursor also drives Gum Forms. Each frame automation installs its own Gum cursor and keyboard through `FormsUtilities.SetCursor`/`SetKeyboard`, so a `cursor` command hovers, pushes, clicks and focuses real controls through Gum's normal handling. Click a control in three stepped frames: `cursor` at the position with the button up → `step` → same position with `"primary":true` → `step` → `"primary":false` → `step`. Gum raises `Click` on the release frame; holding across extra steps is one push, not one per frame.
 
