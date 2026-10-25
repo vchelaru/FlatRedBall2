@@ -16,11 +16,10 @@ public class PlaybackController
 {
     private double _animTime;
     private int _currentFrameIndex;
-    // Position in the chain's PingPong/Reverse visit sequence (PlaybackOrder); _currentFrameIndex is the frame it shows.
-    private int _currentVisitIndex;
     private AnimationChainSave? _chain;
 
-    private double _frameStartTime;
+    // Forward seconds into the current frame (see PlaybackTimeline): falls while Reverse/PingPong plays it mirrored.
+    private double _frameElapsed;
 
     // ── Public state ──────────────────────────────────────────────────────────
 
@@ -31,19 +30,17 @@ public class PlaybackController
     public int CurrentFrameIndex => _currentFrameIndex;
 
     /// <summary>
-    /// Whether the current frame is playing backward: the chain's <see cref="AnimationChainSave.Reverse"/>, or the
-    /// back half of a <see cref="AnimationChainSave.PingPong"/> cycle (#1538). Sample keyframe curves with it.
+    /// Accumulated playback time in seconds into the current cycle: wraps at the chain's total time, or twice that under
+    /// <see cref="AnimationChainSave.PingPong"/> (#1538, see <see cref="PlaybackTimeline"/>).
     /// </summary>
-    public bool IsBackward => _chain is { Frames.Count: > 0 } chain && Visit(chain, _currentVisitIndex).IsBackward;
-
-    /// <summary>Accumulated playback time in seconds (wraps at one pass of the chain, a full round trip under PingPong).</summary>
     public double AnimTime => _animTime;
 
     /// <summary>
-    /// Elapsed time within the current frame, in seconds. Resets to zero each time
-    /// the frame advances or <see cref="Reset"/> is called.
+    /// Forward seconds into the current frame: where the frame is on the chain's forward timeline, which is what
+    /// keyframe curves are sampled at and where the timeline playhead sits. It rises as the frame plays forward and
+    /// falls while <see cref="AnimationChainSave.Reverse"/> or PingPong's mirrored half plays it backward.
     /// </summary>
-    public double FrameElapsed => _animTime - _frameStartTime;
+    public double FrameElapsed => _frameElapsed;
 
     /// <summary>
     /// When <c>false</c>, <see cref="Advance"/> is a no-op so the animation is paused.
@@ -130,7 +127,7 @@ public class PlaybackController
 
         if (!Loop && _chain is not null && _chain.Frames.Count > 0)
         {
-            double totalTime = PassLength(_chain);
+            double totalTime = CycleLength(_chain);
             if (totalTime > 0 && _animTime >= totalTime)
                 Reset();
         }
@@ -151,9 +148,7 @@ public class PlaybackController
     /// Jumps playback to <paramref name="frameIndex"/> at <paramref name="fraction"/> of the way
     /// through that frame (0 = its start, 1 = its end), without changing <see cref="IsPlaying"/>.
     /// Used by timeline scrubbing, which seeks while paused. Index and fraction are clamped to
-    /// valid ranges; a no-op when no chain is set. Under PingPong/Reverse it seeks to the first time
-    /// the frame is shown. <paramref name="fraction"/> is through time; a timeline click measures left to right
-    /// across the cell, so use <see cref="SeekToCell"/> for that. Fires <see cref="FrameIndexChanged"/> if the
+    /// valid ranges; a no-op when no chain is set. Fires <see cref="FrameIndexChanged"/> if the
     /// frame changed and always fires <see cref="PlaybackTicked"/>.
     /// </summary>
     public void SeekToFrame(int frameIndex, double fraction = 0)
@@ -164,20 +159,15 @@ public class PlaybackController
         int idx = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
         double frac = Math.Clamp(fraction, 0.0, 1.0);
 
-        int visits = PlaybackOrder.VisitCount(chain.Frames.Count, chain.Loop, chain.PingPong);
         double start = 0;
-        int visit = 0;
-        for (; visit < visits; visit++)
-        {
-            int frame = Visit(chain, visit).FrameIndex;
-            if (frame == idx) break;
-            start += FrameLength(chain.Frames[frame]);
-        }
-        _currentVisitIndex = visit;
+        for (int i = 0; i < idx; i++)
+            start += FrameLength(chain.Frames[i]);
 
-        // Set _frameStartTime before events so FrameElapsed is correct inside handlers.
-        _frameStartTime = start;
-        _animTime = start + frac * FrameLength(chain.Frames[idx]);
+        // The fraction is through the frame's forward time (left to right on the timeline), whichever direction plays
+        // there; the first cycle time showing it is the seek target. Set before events so handlers see it.
+        double forward = start + frac * FrameLength(chain.Frames[idx]);
+        _animTime = PlaybackTimeline.ToCycleTime(forward, ForwardLength(chain), chain.Reverse);
+        _frameElapsed = frac * FrameLength(chain.Frames[idx]);
 
         if (idx != _currentFrameIndex)
         {
@@ -189,37 +179,16 @@ public class PlaybackController
     }
 
     /// <summary>
-    /// Timeline scrubbing: seeks to <paramref name="frameIndex"/> at <paramref name="cellFraction"/> across its cell (0 = left
-    /// edge). A frame that plays backward (#1538) runs from its cell's right edge, so the fraction is mirrored into time;
-    /// otherwise this is <see cref="SeekToFrame"/>.
-    /// </summary>
-    public void SeekToCell(int frameIndex, double cellFraction)
-    {
-        var chain = _chain;
-        if (chain is null || chain.Frames.Count == 0) return;
-        int idx = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
-        int visits = PlaybackOrder.VisitCount(chain.Frames.Count, chain.Loop, chain.PingPong);
-        bool backward = false;
-        for (int v = 0; v < visits; v++)
-        {
-            var visit = Visit(chain, v);
-            if (visit.FrameIndex != idx) continue;
-            backward = visit.IsBackward;
-            break;
-        }
-        SeekToFrame(idx, backward ? 1 - Math.Clamp(cellFraction, 0, 1) : cellFraction);
-    }
-
-    /// <summary>
-    /// Reset time to zero and the frame to the first one shown (frame 0, or the last frame under Reverse) without
-    /// changing the active chain.
+    /// Reset time to the start of the cycle without changing the active chain: frame 0, or the end of the last frame
+    /// under <see cref="AnimationChainSave.Reverse"/>.
     /// </summary>
     public void Reset()
     {
         _animTime = 0;
-        _frameStartTime = 0;
-        _currentVisitIndex = 0;
-        _currentFrameIndex = _chain is { Frames.Count: > 0 } chain ? Visit(chain, 0).FrameIndex : 0;
+        _currentFrameIndex = 0;
+        _frameElapsed = 0;
+        if (_chain is { Frames.Count: > 0 } chain)
+            (_currentFrameIndex, _frameElapsed) = Locate(chain, 0);
         FrameIndexChanged?.Invoke(_currentFrameIndex);
         PlaybackTicked?.Invoke();
     }
@@ -236,7 +205,7 @@ public class PlaybackController
         var chain = _chain;
         if (chain is null || chain.Frames.Count <= 1) return;
 
-        double totalTime = PassLength(chain);
+        double totalTime = CycleLength(chain);
         if (totalTime <= 0) return;
 
         _animTime += deltaSeconds * SpeedMultiplier;
@@ -245,23 +214,8 @@ public class PlaybackController
         if (reachedEnd)
             _animTime = Loop ? _animTime % totalTime : totalTime;
 
-        int visits = PlaybackOrder.VisitCount(chain.Frames.Count, chain.Loop, chain.PingPong);
-        double t = 0;
-        int newVisit = visits - 1;
-        int newIdx = Visit(chain, newVisit).FrameIndex;
-        double newFrameStart = totalTime - FrameLength(chain.Frames[newIdx]);
-        for (int v = 0; v < visits; v++)
-        {
-            int frame = Visit(chain, v).FrameIndex;
-            double fl = FrameLength(chain.Frames[frame]);
-            if (_animTime < t + fl) { newVisit = v; newIdx = frame; newFrameStart = t; break; }
-            t += fl;
-        }
-        _currentVisitIndex = newVisit;
-
-        // Update _frameStartTime before events so FrameElapsed is already correct
-        // when FrameIndexChanged and PlaybackTicked handlers run.
-        _frameStartTime = newFrameStart;
+        // Update FrameElapsed before events so it is already correct when FrameIndexChanged and PlaybackTicked handlers run.
+        (int newIdx, _frameElapsed) = Locate(chain, _animTime);
 
         if (newIdx != _currentFrameIndex)
         {
@@ -276,10 +230,23 @@ public class PlaybackController
         if (reachedEnd && !Loop) Pause();
     }
 
-    private static PlaybackVisit Visit(AnimationChainSave chain, int visitIndex) =>
-        PlaybackOrder.VisitAt(visitIndex, chain.Frames.Count, chain.PingPong, chain.Reverse);
+    // Reverse and PingPong mirror the forward timeline (PlaybackTimeline); a time on a frame boundary shows the frame
+    // being entered, as the editor always has.
+    private static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double cycleTime)
+    {
+        var at = PlaybackTimeline.Locate(chain.Frames, FrameLength, cycleTime, chain.PingPong, chain.Reverse,
+            boundaryEntersNextFrame: true);
+        return (at.FrameIndex, at.ElapsedInFrame);
+    }
 
-    private static double PassLength(AnimationChainSave chain) => Rendering.ChainClock.TotalLength(chain);
+    private static double ForwardLength(AnimationChainSave chain)
+    {
+        double total = 0;
+        foreach (var f in chain.Frames) total += FrameLength(f);
+        return total;
+    }
+
+    private static double CycleLength(AnimationChainSave chain) => PlaybackTimeline.CycleLength(ForwardLength(chain), chain.PingPong);
 
     // Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
     internal static double FrameLength(AnimationFrameSave frame) =>

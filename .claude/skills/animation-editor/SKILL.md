@@ -110,7 +110,7 @@ the two gestures onto one shared size-preserving helper again — see
 
 ## Keyframe curves: Transform and Color play what the file stores
 
-**Backward playback (Reverse, PingPong's back half) is a direction flag, not a reordered chain.** `PlaybackController.IsBackward` / `ChainClock.LocateVisit` report it; pass it to every `KeyframeSampler` call that uses the playhead's elapsed time, and to `KeyframeLaneBuilder.Build(..., backward)`, whose backward lanes put keyframes on cell right edges. A backward frame's playhead runs right to left, so timeline clicks go through `PlaybackController.SeekToCell`, not `SeekToFrame`.
+**Reverse and PingPong never reach the evaluator.** `PlaybackController` and `ChainClock` map their time onto the forward timeline with `PlaybackTimeline` (AnimationChain.Common), and `FrameElapsed` is forward time into the frame. Sampling, the keyframe lanes, the playhead and `SeekToFrame` all work in forward time, so none of them needs a direction.
 
 The preview and the GIF/WebP export sample a chain through `KeyframeSampler` (`AnimationEditor.Core/Keyframes/`), which wraps the shared `KeyframeEvaluator`; there is no per-session Interpolate toggle. The inspector's diamond and eight-icon picker are `KeyframeControl` (`AnimationEditor.Views/Controls/`), mapped to stored (type, easing) names by `KeyframeCurvePicker`. A stored curve outside the eight reads as "nothing selected" and is never rewritten except by an explicit pick. A frame with its keyframe off ignores its own values, so edits to those fields go only to frames that are keyframes, and the read-only fields show `KeyframeInspectorState.DisplayOffset`/`DisplayColor`.
 

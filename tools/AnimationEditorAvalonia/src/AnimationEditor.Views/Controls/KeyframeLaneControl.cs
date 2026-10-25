@@ -8,8 +8,7 @@ namespace AnimationEditor.Views.Controls;
 /// <summary>
 /// One keyframe lane under the timeline cells (#1478, #1489): the easing curve of every keyframe-to-keyframe
 /// span (a stroked line over a faint fill), a solid hold line after the last keyframe of each run, faint ticks at
-/// the frame boundaries, and an amber diamond where each keyframe's value is reached (its frame's left edge, or its
-/// right edge for backward playback, #1538). It only draws
+/// the frame boundaries, and an amber diamond on the left edge of each keyframe's frame. It only draws
 /// a <see cref="KeyframeLane"/>; the lane's geometry is computed by <see cref="KeyframeLaneBuilder"/>.
 /// It sits beside the cells' ScrollViewer rather than inside it so the first diamond can spill past the
 /// strip's left edge, and follows the scroll through <see cref="ScrollOffset"/>.
@@ -86,7 +85,7 @@ public sealed class KeyframeLaneControl : Control
         {
             double width = span.EndX - span.StartX;
             if (width <= 0) continue;
-            var points = KeyframeLaneBuilder.CurvePoints(span.Curve, CurveSteps, span.Backward, span.TStart, span.TEnd)
+            var points = KeyframeLaneBuilder.CurvePoints(span.Curve, CurveSteps)
                 .Select(p => new Point(span.StartX + p.T * width, bottom - p.Progress * (bottom - top)))
                 .ToList();
 

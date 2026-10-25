@@ -42,9 +42,9 @@ public static class ExportTimelinePlanner
             var layers = new List<ExportLayer>(playable.Count);
             foreach (var chain in playable.Select(s => s.Chain))
             {
-                var at = ChainClock.LocateVisit(chain, time);
-                var sample = KeyframeSampler.Sample(chain, at.FrameIndex, at.Elapsed, at.IsBackward);
-                layers.Add(new ExportLayer(chain, chain.Frames[at.FrameIndex], sample.OffsetX, sample.OffsetY, sample.Color));
+                var (index, elapsed) = ChainClock.Locate(chain, time);
+                var sample = KeyframeSampler.Sample(chain, index, elapsed);
+                layers.Add(new ExportLayer(chain, chain.Frames[index], sample.OffsetX, sample.OffsetY, sample.Color));
             }
 
             if (previous is not null && SameLayers(previous, layers))

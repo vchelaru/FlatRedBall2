@@ -64,81 +64,75 @@ public readonly record struct KeyframeColor(int? Red, int? Green, int? Blue, int
 /// looping chain's last keyframe glides back to the first. With the default (snap) curve the result is
 /// exactly the frame's own value, so files without interpolation evaluate as they always did.
 /// <para>
-/// <b>Backward playback</b> (#1538: Reverse, and PingPong's backward half; pass <c>backward: true</c> for a
-/// <see cref="PlaybackVisit.IsBackward"/> visit). Showing frame N glides from N's value toward the previous
-/// keyframe's, arriving when that frame starts showing, so entering a keyframe always shows its own value in either
-/// direction. The segment between keyframes J &lt; K is governed by <b>J's curve</b> (the one that drives J to K going
-/// forward), played time-reversed: the value at backward progress p equals the forward value at progress 1 - p, so
-/// the backward path retraces the forward one exactly (an Ease Out going forward is slow leaving K and fast arriving
-/// at J going backward). K's own curve is not used, because it describes K's way to the <em>next</em> keyframe, not
-/// to J. Snap holds the displayed keyframe K until J's frame starts showing. A looping, backward-playing chain glides
-/// from frame 0 across the loop point to the last keyframe, under the last keyframe's curve; a non-looping one (and
-/// any ping-pong, which turns around instead of wrapping) holds frame 0.
+/// The evaluator only knows the forward timeline. Reverse and PingPong (#1538) play that timeline mirrored, so a
+/// player maps its own time to a forward time with <see cref="PlaybackTimeline"/> and evaluates there. The
+/// <see cref="AnimationChainSave"/> overloads glide across the loop point only when
+/// <see cref="PlaybackTimeline.GlidesAcrossLoop"/> says so (a ping-pong turns around instead of wrapping).
 /// </para>
 /// </summary>
 public static class KeyframeEvaluator
 {
+    private static bool GlidesAcrossLoop(AnimationChainSave chain) => PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
+
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>
-    /// of an editor-side chain. Frames with no length use 0.1 (the editor's playback default). Glides wrap
-    /// across the loop point only for a looping chain that is not <see cref="AnimationChainSave.PingPong"/>.
-    /// Pass <paramref name="backward"/> when the frame is playing backward (see the class remarks).
+    /// of an editor-side chain. Frames with no length use 0.1 (the editor's playback default).
     /// </summary>
-    public static (float X, float Y) EvaluateOffset(AnimationChainSave chain, int frameIndex, double elapsedInFrame, bool backward = false)
-        => EvaluateOffset(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, backward);
+    public static (float X, float Y) EvaluateOffset(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
+        => EvaluateOffset(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
-    /// <summary>The color channels to display, same contract as <see cref="EvaluateOffset(AnimationChainSave, int, double, bool)"/>.</summary>
-    public static KeyframeColor EvaluateColor(AnimationChainSave chain, int frameIndex, double elapsedInFrame, bool backward = false)
-        => EvaluateColor(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, backward);
-
-    private static bool GlidesAcrossLoop(AnimationChainSave chain) => PlaybackOrder.GlidesAcrossLoop(chain.Loop, chain.PingPong);
+    /// <summary>The color channels to display, same contract as <see cref="EvaluateOffset(AnimationChainSave, int, double)"/>.</summary>
+    public static KeyframeColor EvaluateColor(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
+        => EvaluateColor(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>.
     /// An empty list yields (0, 0); an out-of-range index clamps. Back curves (Anticipate, Overshoot)
-    /// swing past the start/end values and the result is not clamped. <paramref name="loop"/> means glides wrap
-    /// across the loop point (<see cref="PlaybackOrder.GlidesAcrossLoop"/>); <paramref name="backward"/> evaluates
-    /// the frame as playing backward (see the class remarks).
+    /// swing past the start/end values and the result is not clamped.
     /// </summary>
     public static (float X, float Y) EvaluateOffset<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, bool backward = false)
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame)
         where TFrame : IKeyframeFrame
     {
         if (frames.Count == 0) return (0f, 0f);
         frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
 
-        Resolve(frames, loop, frameIndex, elapsedInFrame, backward, static f => f.SkipOffsetKeyframe,
-            static f => f.OffsetCurve, out int a, out int b, out float eased);
+        FindSegment(frames, loop, frameIndex, elapsedInFrame, static f => f.SkipOffsetKeyframe,
+            out int start, out int end, out float t);
 
-        var from = frames[a];
-        if (b < 0) return (from.RelativeX, from.RelativeY);
-        var to = frames[b];
+        // Snap holds even at t == 1: the next keyframe takes over only when playback moves onto its frame.
+        var from = frames[start];
+        if (end < 0 || from.OffsetCurve.IsSnap) return (from.RelativeX, from.RelativeY);
+
+        float eased = from.OffsetCurve.Evaluate(t);
+        var to = frames[end];
         return (Lerp(from.RelativeX, to.RelativeX, eased), Lerp(from.RelativeY, to.RelativeY, eased));
     }
 
     /// <summary>
     /// The color channels to display, same contract as
-    /// <see cref="EvaluateOffset{TFrame}(IReadOnlyList{TFrame}, bool, int, double, bool)"/>. Each channel
+    /// <see cref="EvaluateOffset{TFrame}(IReadOnlyList{TFrame}, bool, int, double)"/>. Each channel
     /// glides independently; a channel unset at one end counts as the operation's identity (255, or 0
     /// for Add) and a channel unset at both stays <c>null</c>. Results round away from zero. Back
     /// curves (Anticipate, Overshoot) swing past the end values, and the result is returned unclamped
     /// (channels can go below 0 or above 255); the renderer clamps at draw time.
     /// </summary>
     public static KeyframeColor EvaluateColor<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, bool backward = false)
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame)
         where TFrame : IKeyframeFrame
     {
         if (frames.Count == 0) return default;
         frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
 
-        Resolve(frames, loop, frameIndex, elapsedInFrame, backward, static f => f.SkipColorKeyframe,
-            static f => f.ColorCurve, out int a, out int b, out float eased);
+        FindSegment(frames, loop, frameIndex, elapsedInFrame, static f => f.SkipColorKeyframe,
+            out int start, out int end, out float t);
 
-        var from = frames[a];
-        if (b < 0)
+        var from = frames[start];
+        if (end < 0 || from.ColorCurve.IsSnap)
             return new KeyframeColor(from.Red, from.Green, from.Blue, from.Alpha);
 
-        var to = frames[b];
+        float eased = from.ColorCurve.Evaluate(t);
+        var to = frames[end];
         int fromIdentity = EffectiveFrameColor.ChannelDefault(from.ColorOperation);
         int toIdentity = EffectiveFrameColor.ChannelDefault(to.ColorOperation);
         return new KeyframeColor(
@@ -169,91 +163,6 @@ public static class KeyframeEvaluator
         t = Progress(frames, start, end, frameIndex, elapsedInFrame);
     }
 
-    // The value is Lerp(frames[a], frames[b], eased); b < 0 means hold frames[a]. Applies the curve and its
-    // direction, so callers only lerp.
-    private static void Resolve<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, bool backward,
-        Func<TFrame, bool> isSkipped, Func<TFrame, KeyframeCurve> curveOf, out int a, out int b, out float eased)
-        where TFrame : IKeyframeFrame
-    {
-        eased = 0f;
-        if (!backward)
-        {
-            FindSegment(frames, loop, frameIndex, elapsedInFrame, isSkipped, out a, out b, out float t);
-            // Snap holds even at t == 1: the next keyframe takes over only when playback moves onto its frame.
-            if (b < 0 || curveOf(frames[a]).IsSnap) { b = -1; return; }
-            eased = curveOf(frames[a]).Evaluate(t);
-            return;
-        }
-
-        FindSegmentBackward(frames, loop, frameIndex, elapsedInFrame, isSkipped, out int shown, out int previous, out float p);
-        // The earlier keyframe's curve owns the segment, retraced: backward progress p is forward progress 1 - p.
-        if (previous < 0 || curveOf(frames[previous]).IsSnap) { a = shown; b = -1; return; }
-        a = previous;
-        b = shown;
-        eased = curveOf(frames[previous]).Evaluate(1f - p);
-    }
-
-    // Backward counterpart of FindSegment: `shown` is the keyframe whose value playback left most recently (the
-    // nearest keyframe at or after frameIndex, or frame 0 across the loop point), `previous` the keyframe it glides
-    // back to (-1 = hold `shown`), `p` the linear progress from `shown` toward `previous`.
-    private static void FindSegmentBackward<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame,
-        Func<TFrame, bool> isSkipped, out int shown, out int previous, out float p)
-        where TFrame : IKeyframeFrame
-    {
-        int n = frames.Count;
-        p = 0f;
-        previous = -1;
-
-        shown = frameIndex;
-        while (shown < n && shown > 0 && isSkipped(frames[shown])) shown++;
-        if (shown >= n)
-        {
-            if (!loop)
-            {
-                // Past the last keyframe of a non-looping chain: it holds, as it does going forward.
-                shown = frameIndex;
-                while (shown > 0 && isSkipped(frames[shown])) shown--;
-                return;
-            }
-            shown = 0;
-        }
-
-        if (shown > 0)
-        {
-            previous = shown - 1;
-            while (previous > 0 && isSkipped(frames[previous])) previous--;
-        }
-        else
-        {
-            if (!loop) return;
-            previous = n - 1;
-            while (previous > 0 && isSkipped(frames[previous])) previous--;
-            // A looping chain with one keyframe has nothing to glide to.
-            if (previous == 0) { previous = -1; return; }
-        }
-        p = BackwardProgress(frames, shown, previous, frameIndex, elapsedInFrame);
-    }
-
-    // Linear progress through a backward segment, which shows frames shown, shown-1, ..., previous+1 (cyclically,
-    // so frame 0 then the last frames for the loop-point segment), at `elapsedInFrame` into `frameIndex`.
-    private static float BackwardProgress<TFrame>(IReadOnlyList<TFrame> frames, int shown, int previous, int frameIndex, double elapsedInFrame)
-        where TFrame : IKeyframeFrame
-    {
-        int n = frames.Count;
-        double duration = 0, position = elapsedInFrame;
-        bool reached = false;
-        for (int i = shown; i != previous; i = (i - 1 + n) % n)
-        {
-            double length = frames[i].DurationSeconds;
-            duration += length;
-            if (i == frameIndex) reached = true;
-            else if (!reached) position += length;
-        }
-        return duration > 0 ? (float)Math.Clamp(position / duration, 0.0, 1.0) : 0f;
-    }
-
     // ---- Shapes (#1478) -------------------------------------------------------------------------
 
     /// <summary>
@@ -265,8 +174,7 @@ public static class KeyframeEvaluator
     /// own skip flag and curve; the first frame of a run of frames holding the name is always a keyframe.
     /// A shape that is not in the frame returns its own values. Back curves swing past the endpoints.
     /// </summary>
-    public static KeyframeShapeValue EvaluateShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape,
-        bool backward = false)
+    public static KeyframeShapeValue EvaluateShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape)
     {
         var frames = SaveKeyframeFrame.Create(chain);
         frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
@@ -278,16 +186,15 @@ public static class KeyframeEvaluator
                     adapter = saved;
                     break;
                 }
-        return EvaluateShape(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter, backward);
+        return EvaluateShape(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter);
     }
 
     /// <summary>
-    /// Same contract as <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave, bool)"/> over any frame
+    /// Same contract as <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> over any frame
     /// list. <paramref name="shape"/> is looked up in frame <paramref name="frameIndex"/> by name and kind.
     /// </summary>
     public static KeyframeShapeValue EvaluateShape<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape,
-        bool backward = false)
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape)
         where TFrame : IKeyframeFrame
     {
         var own = new KeyframeShapeValue(shape.X, shape.Y, shape.SizeX, shape.SizeY);
@@ -295,23 +202,25 @@ public static class KeyframeEvaluator
         frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
         if (!TryMatch(frames[frameIndex], shape.Name, shape.Kind, out var current)) return own;
 
-        ResolveShape(frames, loop, frameIndex, elapsedInFrame, current, backward, static s => s.SkipOffsetKeyframe,
-            static s => s.OffsetCurve, out var offsetHold, out var offsetFrom, out var offsetTo, out float offsetEased);
-        ResolveShape(frames, loop, frameIndex, elapsedInFrame, current, backward, static s => s.SkipSizeKeyframe,
-            static s => s.SizeCurve, out var sizeHold, out var sizeFrom, out var sizeTo, out float sizeEased);
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipOffsetKeyframe,
+            out var offsetFrom, out var offsetTo, out float offsetT);
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipSizeKeyframe,
+            out var sizeFrom, out var sizeTo, out float sizeT);
 
-        float x = offsetHold.X, y = offsetHold.Y;
-        if (offsetTo is not null)
+        float x = offsetFrom.X, y = offsetFrom.Y;
+        if (offsetTo is not null && !offsetFrom.OffsetCurve.IsSnap)
         {
-            x = Lerp(offsetFrom.X, offsetTo.X, offsetEased);
-            y = Lerp(offsetFrom.Y, offsetTo.Y, offsetEased);
+            float eased = offsetFrom.OffsetCurve.Evaluate(offsetT);
+            x = Lerp(offsetFrom.X, offsetTo.X, eased);
+            y = Lerp(offsetFrom.Y, offsetTo.Y, eased);
         }
 
-        float sizeX = sizeHold.SizeX, sizeY = sizeHold.SizeY;
-        if (sizeTo is not null)
+        float sizeX = sizeFrom.SizeX, sizeY = sizeFrom.SizeY;
+        if (sizeTo is not null && !sizeFrom.SizeCurve.IsSnap)
         {
-            sizeX = Lerp(sizeFrom.SizeX, sizeTo.SizeX, sizeEased);
-            sizeY = Lerp(sizeFrom.SizeY, sizeTo.SizeY, sizeEased);
+            float eased = sizeFrom.SizeCurve.Evaluate(sizeT);
+            sizeX = Lerp(sizeFrom.SizeX, sizeTo.SizeX, eased);
+            sizeY = Lerp(sizeFrom.SizeY, sizeTo.SizeY, eased);
         }
 
         return new KeyframeShapeValue(x, y, sizeX, sizeY);
@@ -320,13 +229,12 @@ public static class KeyframeEvaluator
     /// <summary>
     /// The points of <paramref name="polygon"/> (a polygon of frame <paramref name="frameIndex"/>)
     /// <paramref name="elapsedInFrame"/> into that frame (#1484). Points are their own keyframe group, matched across
-    /// frames like <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave, bool)"/> (by name and kind, the first
+    /// frames like <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> (by name and kind, the first
     /// frame of a run is always a keyframe). Point i glides to point i of the next points keyframe; when the counts
     /// differ the glide snaps and the earlier keyframe's points hold until the next frame plays. Back curves swing past
     /// the endpoints. A polygon that is not in the frame returns its own points.
     /// </summary>
-    public static IReadOnlyList<Vector2> EvaluateShapePoints(AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon,
-        bool backward = false)
+    public static IReadOnlyList<Vector2> EvaluateShapePoints(AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon)
     {
         var frames = SaveKeyframeFrame.Create(chain);
         frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
@@ -338,16 +246,15 @@ public static class KeyframeEvaluator
                     adapter = saved;
                     break;
                 }
-        return EvaluateShapePoints(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter, backward);
+        return EvaluateShapePoints(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter);
     }
 
     /// <summary>
-    /// Same contract as <see cref="EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave, bool)"/> over any frame
+    /// Same contract as <see cref="EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/> over any frame
     /// list. Returns the keyframe's own list (no copy) whenever nothing glides.
     /// </summary>
     public static IReadOnlyList<Vector2> EvaluateShapePoints<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape,
-        bool backward = false)
+        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape shape)
         where TFrame : IKeyframeFrame
     {
         var own = shape.Points;
@@ -355,15 +262,15 @@ public static class KeyframeEvaluator
         frameIndex = Math.Clamp(frameIndex, 0, frames.Count - 1);
         if (!TryMatch(frames[frameIndex], shape.Name, shape.Kind, out var current)) return own;
 
-        ResolveShape(frames, loop, frameIndex, elapsedInFrame, current, backward, static s => s.SkipPointsKeyframe,
-            static s => s.PointsCurve, out var hold, out var from, out var to, out float eased);
+        FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, static s => s.SkipPointsKeyframe,
+            out var from, out var to, out float t);
 
-        if (to is null) return hold.Points;
         var fromPoints = from.Points;
+        if (to is null || from.PointsCurve.IsSnap) return fromPoints;
         var toPoints = to.Points;
-        // Differing counts snap: the keyframe playback left most recently holds.
-        if (fromPoints.Count != toPoints.Count) return hold.Points;
+        if (fromPoints.Count != toPoints.Count) return fromPoints;
 
+        float eased = from.PointsCurve.Evaluate(t);
         var result = new Vector2[fromPoints.Count];
         for (int i = 0; i < result.Length; i++)
             result[i] = new Vector2(Lerp(fromPoints[i].X, toPoints[i].X, eased), Lerp(fromPoints[i].Y, toPoints[i].Y, eased));
@@ -447,101 +354,6 @@ public static class KeyframeEvaluator
         // Nothing to glide to: the name stops, a non-looping chain ends, or a looping run holds one keyframe.
         if (end < 0 || end == start) { to = null; return; }
         t = Progress(frames, start, end, frameIndex, elapsedInFrame);
-    }
-
-    // Shape counterpart of Resolve. Gliding: Lerp(from, to, eased). Not gliding (`to` null): show `hold`, the
-    // keyframe playback left most recently (forward: the controlling keyframe; backward: the displayed one).
-    private static void ResolveShape<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame, IKeyframeShape current,
-        bool backward, Func<IKeyframeShape, bool> isSkipped, Func<IKeyframeShape, KeyframeCurve> curveOf,
-        out IKeyframeShape hold, out IKeyframeShape from, out IKeyframeShape? to, out float eased)
-        where TFrame : IKeyframeFrame
-    {
-        eased = 0f;
-        if (!backward)
-        {
-            FindShapeSegment(frames, loop, frameIndex, elapsedInFrame, current, isSkipped, out from, out to, out float t);
-            hold = from;
-            if (to is null || curveOf(from).IsSnap) { to = null; return; }
-            eased = curveOf(from).Evaluate(t);
-            return;
-        }
-
-        FindShapeSegmentBackward(frames, loop, frameIndex, elapsedInFrame, current, isSkipped,
-            out var shown, out var previous, out float p);
-        hold = shown;
-        from = shown;
-        to = null;
-        if (previous is null || curveOf(previous).IsSnap) return;
-        from = previous;
-        to = shown;
-        eased = curveOf(previous).Evaluate(1f - p);
-    }
-
-    // Backward counterpart of FindShapeSegment, by the same name-run rules: `shown` is the keyframe at or after
-    // frameIndex within the run (frame 0 across the loop point), `previous` the keyframe before it (null = hold).
-    private static void FindShapeSegmentBackward<TFrame>(
-        IReadOnlyList<TFrame> frames, bool loop, int frameIndex, double elapsedInFrame,
-        IKeyframeShape current, Func<IKeyframeShape, bool> isSkipped,
-        out IKeyframeShape shown, out IKeyframeShape? previous, out float p)
-        where TFrame : IKeyframeFrame
-    {
-        string name = current.Name;
-        var kind = current.Kind;
-        int n = frames.Count;
-        p = 0f;
-        previous = null;
-
-        // The first frame of a run of frames holding the name is always a keyframe.
-        bool IsKeyframe(int i, IKeyframeShape s) => !isSkipped(s) || i == 0 || !TryMatch(frames[i - 1], name, kind, out _);
-
-        int shownIndex = frameIndex;
-        shown = current;
-        while (!IsKeyframe(shownIndex, shown))
-        {
-            int next = shownIndex + 1;
-            if (next >= n)
-            {
-                if (!loop) { shown = HoldEarlier(frames, frameIndex, current, isSkipped); return; }
-                next = 0;
-            }
-            if (!TryMatch(frames[next], name, kind, out var nextShape)) { shown = HoldEarlier(frames, frameIndex, current, isSkipped); return; }
-            shownIndex = next;
-            shown = nextShape;
-        }
-
-        int previousIndex = shownIndex - 1;
-        if (previousIndex < 0)
-        {
-            if (!loop) return;
-            previousIndex = n - 1;
-        }
-        while (previousIndex != shownIndex && previousIndex >= 0)
-        {
-            if (!TryMatch(frames[previousIndex], name, kind, out var candidate)) return;
-            if (IsKeyframe(previousIndex, candidate))
-            {
-                previous = candidate;
-                p = BackwardProgress(frames, shownIndex, previousIndex, frameIndex, elapsedInFrame);
-                return;
-            }
-            previousIndex--;
-        }
-    }
-
-    // Past a run's last keyframe with no keyframe after it: that keyframe holds, as it does going forward.
-    private static IKeyframeShape HoldEarlier<TFrame>(IReadOnlyList<TFrame> frames, int frameIndex, IKeyframeShape current,
-        Func<IKeyframeShape, bool> isSkipped)
-        where TFrame : IKeyframeFrame
-    {
-        int start = frameIndex;
-        var held = current;
-        while (start > 0 && isSkipped(held) && TryMatch(frames[start - 1], current.Name, current.Kind, out var earlier))
-        {
-            start--;
-            held = earlier;
-        }
-        return held;
     }
 
     // Linear progress through the segment from `start` to `end` (end == 0 means the loop wrap, which

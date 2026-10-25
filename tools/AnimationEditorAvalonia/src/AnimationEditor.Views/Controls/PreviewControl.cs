@@ -377,7 +377,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         if (_groupPlayback.TryGetValue(chain, out var controller))
         {
             controller.Pause();
-            controller.SeekToCell(frameIndex, fraction);
+            controller.SeekToFrame(frameIndex, fraction);
             PinTrackSelection(chain);
         }
         InvalidateVisual();
@@ -602,9 +602,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         int index = chain.Frames.IndexOf(frame);
         var controller = GetPlaybackController(chain);
         bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == index;
-        return playheadOnFrame
-            ? KeyframeSampler.Sample(chain, index, controller!.FrameElapsed, controller.IsBackward)
-            : KeyframeSampler.Sample(chain, index, 0);
+        return KeyframeSampler.Sample(chain, index, playheadOnFrame ? controller!.FrameElapsed : 0);
     }
 
     /// <summary>Whether the animation is currently playing.</summary>
@@ -687,7 +685,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     public void ScrubToFrame(int frameIndex, double fraction)
     {
         _playback.Pause();
-        _playback.SeekToCell(frameIndex, fraction);
+        _playback.SeekToFrame(frameIndex, fraction);
         var chain = _selectedState!.SelectedChain;
         if (chain is not null && frameIndex >= 0 && frameIndex < chain.Frames.Count)
         {
@@ -1051,9 +1049,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         bool playheadOnFrame = _playback.CurrentFrameIndex == displayIndex;
         if (displayIndex < 0)
             return new KeyframeSample(displayFrame.RelativeX, displayFrame.RelativeY, ResolveColor(chain, displayFrame));
-        return pinned && !playheadOnFrame
-            ? KeyframeSampler.Sample(chain, displayIndex, 0)
-            : KeyframeSampler.Sample(chain, displayIndex, _playback.FrameElapsed, _playback.IsBackward);
+        return KeyframeSampler.Sample(chain, displayIndex, pinned && !playheadOnFrame ? 0 : _playback.FrameElapsed);
     }
 
     // -- Public API ------------------------------------------------------------
@@ -1697,7 +1693,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                     var controller = GetPlaybackController(chain);
                     bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == chain.Frames.IndexOf(groupFrame);
                     all.AddRange(BuildShapeInfos(groupFrame, pinned: GroupPinnedFrame(chain) is not null,
-                        playheadOnFrame ? controller!.FrameElapsed : 0, playheadOnFrame && controller!.IsBackward));
+                        playheadOnFrame ? controller!.FrameElapsed : 0));
                 }
             return all.ToArray();
         }
@@ -1708,12 +1704,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // A pinned frame the playhead is not on shows its shapes at the start of the frame; otherwise they glide
         // with the playhead, like the sprite (#1478).
         bool playheadOnPinned = FindOwningChain(frame) is { } owner && _playback.CurrentFrameIndex == owner.Frames.IndexOf(frame);
-        bool followsPlayhead = pinnedFrame is null || playheadOnPinned;
-        return BuildShapeInfos(frame, pinnedFrame is not null, followsPlayhead ? _playback.FrameElapsed : 0,
-            followsPlayhead && _playback.IsBackward);
+        return BuildShapeInfos(frame, pinnedFrame is not null, pinnedFrame is not null && !playheadOnPinned ? 0 : _playback.FrameElapsed);
     }
 
-    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame, bool backward)
+    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame)
     {
         if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
 
@@ -1728,7 +1722,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 var own = SaveKeyframeShape.Create(shape);
                 return new KeyframeShapeValue(own.X, own.Y, own.SizeX, own.SizeY);
             }
-            return KeyframeSampler.SampleShape(chain, frameIndex, elapsedInFrame, shape, backward);
+            return KeyframeSampler.SampleShape(chain, frameIndex, elapsedInFrame, shape);
         }
 
         var selectedRects   = new HashSet<AARectSave>();
@@ -1764,7 +1758,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             // The vertices glide by the polygon's stored points curve (#1484); with the default snap curve they are its own.
             var sampled = chain is null || frameIndex < 0
                 ? SaveKeyframeShape.Create(p).Points
-                : KeyframeSampler.SampleShapePoints(chain, frameIndex, elapsedInFrame, p, backward);
+                : KeyframeSampler.SampleShapePoints(chain, frameIndex, elapsedInFrame, p);
             int n = PolygonVertices.Count(sampled);
             var points = new float[n * 2];
             for (int i = 0; i < n; i++)

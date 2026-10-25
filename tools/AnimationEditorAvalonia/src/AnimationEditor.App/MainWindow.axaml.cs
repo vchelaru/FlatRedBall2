@@ -3488,11 +3488,6 @@ public partial class MainWindow : Window
 
     private void OnPlaybackTicked()
     {
-        // PingPong flips direction mid-playback; the keyframe lanes follow it (#1538).
-        if (PreviewCtrl.Playback.IsBackward != _keyframeLanesBackward
-            && ReferenceEquals(PreviewCtrl.Playback.Chain, TimelineChainResolver.GetChain(_selectedState, _objectFinder)))
-            RefreshKeyframeLanes();
-
         if (_selectedState.SelectedFrame is not null)
             return;
 
@@ -3506,8 +3501,9 @@ public partial class MainWindow : Window
         // Move the playhead at a constant PixelsPerSecond rate.
         // For clamped cells (shorter than natural proportional width) the playhead parks
         // at the right edge until the frame advances rather than speeding up.
-        _timelineFrames[idx].ScrubberOffset = TimelineBuilder.PlayheadOffset(
-            elapsed, _timelineEffectivePps, travelWidth, PreviewCtrl.Playback.IsBackward);
+        // FrameElapsed is forward time, so under Reverse/PingPong the playhead runs back across the cell (#1538).
+        double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
+        _timelineFrames[idx].ScrubberOffset = offset;
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────
@@ -5093,7 +5089,8 @@ public partial class MainWindow : Window
 
         // Keyframe flags and curves are not part of the signature, so the lanes are recomputed on every
         // refresh (an O(frames) pass) from the live cell widths.
-        RefreshKeyframeLanes(chain);
+        var cellWidths = _timelineFrames.Select(f => f.Width).ToList();
+        SetKeyframeLanes(TimelineLanePlanner.Build(chain, _selectedState.SelectedShapes, cellWidths), groupActive: false);
 
         int preferred = TimelineChainResolver.GetPreferredFrameIndex(
             _selectedState, _objectFinder, chain, PreviewCtrl.Playback.CurrentFrameIndex);
@@ -5101,23 +5098,6 @@ public partial class MainWindow : Window
         // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
         // sub-frame offset instead of snapping to the cell's left edge (#432).
         ApplyScrubberOffsetFromPlayback(preferred);
-    }
-
-    // Whether the lanes on screen were built for backward playback (#1538), so a ping-pong turnaround rebuilds them.
-    private bool _keyframeLanesBackward;
-
-    private void RefreshKeyframeLanes() => RefreshKeyframeLanes(TimelineChainResolver.GetChain(_selectedState, _objectFinder));
-
-    private void RefreshKeyframeLanes(AnimationChainSave? chain)
-    {
-        if (_selectedState.PreviewChains.Count >= 2) return; // the group timeline shows no lanes
-        // The lanes follow the playing direction; a chain the preview isn't playing shows its starting direction.
-        _keyframeLanesBackward = ReferenceEquals(PreviewCtrl.Playback.Chain, chain)
-            ? PreviewCtrl.Playback.IsBackward
-            : chain?.Reverse == true;
-        var cellWidths = _timelineFrames.Select(f => f.Width).ToList();
-        SetKeyframeLanes(TimelineLanePlanner.Build(chain, _selectedState.SelectedShapes, cellWidths, _keyframeLanesBackward),
-            groupActive: false);
     }
 
     private void ApplyTimelineDockHeight(double dockHeight)
@@ -5177,8 +5157,7 @@ public partial class MainWindow : Window
         if (frameIndex < 0 || frameIndex >= _timelineFrames.Count) return;
         double elapsed = PreviewCtrl.Playback.FrameElapsed;
         double travelWidth = Math.Max(0, _timelineFrames[frameIndex].Width - TimelineFrameVm.PlayheadWidth);
-        bool backward = PreviewCtrl.Playback.CurrentFrameIndex == frameIndex && PreviewCtrl.Playback.IsBackward;
-        _timelineFrames[frameIndex].ScrubberOffset = TimelineBuilder.PlayheadOffset(elapsed, _timelineEffectivePps, travelWidth, backward);
+        _timelineFrames[frameIndex].ScrubberOffset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
     }
 
     // ── Multi-select group preview timeline (#576) ──────────────────────────────
@@ -5277,7 +5256,7 @@ public partial class MainWindow : Window
                 track.Frames[i].IsCurrent = i == idx;
 
             double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
-            track.Frames[idx].ScrubberOffset = TimelineBuilder.PlayheadOffset(playback.FrameElapsed, sharedPps, travelWidth, playback.IsBackward);
+            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * sharedPps, travelWidth);
         }
     }
 

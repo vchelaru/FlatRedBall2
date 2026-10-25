@@ -151,7 +151,7 @@ public abstract class ShapeSave : Frb1ShapeData
     /// When <c>true</c>, this shape is not an <b>offset keyframe</b> in its frame: its own <see cref="X"/>/<see cref="Y"/>
     /// and <see cref="OffsetInterpolation"/> are ignored, and the previous offset keyframe of the same-named shape
     /// glides across it. The first frame of a run of frames that hold the name is always a keyframe. Written only
-    /// when <c>true</c>. See <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave, bool)"/>.
+    /// when <c>true</c>. See <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/>.
     /// </summary>
     public bool SkipOffsetKeyframe;
 

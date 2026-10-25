@@ -23,14 +23,14 @@ public class AnimationChain<TFrame> : List<TFrame> where TFrame : AnimationFrame
     public bool Loop { get; set; } = true;
 
     /// <summary>
-    /// Whether this chain bounces back and forth by default (A B C B A...; see
+    /// Whether this chain plays forward and then mirrored by default (see
     /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.PingPong"/>). Seeds
     /// <see cref="AnimationPlayer{TFrame}.IsPingPong"/> when the chain starts playing; overridable per instance afterward.
     /// </summary>
     public bool PingPong { get; set; }
 
     /// <summary>
-    /// Whether this chain plays backward by default, starting on its last frame (see
+    /// Whether this chain plays its timeline mirrored (backward) by default (see
     /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.Reverse"/>). Seeds
     /// <see cref="AnimationPlayer{TFrame}.IsReversed"/> when the chain starts playing; overridable per instance afterward.
     /// </summary>

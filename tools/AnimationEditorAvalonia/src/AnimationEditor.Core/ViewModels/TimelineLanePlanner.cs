@@ -20,10 +20,8 @@ public static class TimelineLanePlanner
     /// <param name="chain">The chain on the strip, or <c>null</c>.</param>
     /// <param name="selectedShapes">The selected shapes (<c>ISelectedState.SelectedShapes</c>).</param>
     /// <param name="cellWidths">The strip's cell widths, one per frame.</param>
-    /// <param name="backward">Draw the lanes for backward playback (#1538: Reverse, or PingPong's backward half).</param>
     public static TimelineLanePlan Build(
-        AnimationChainSave? chain, IReadOnlyList<object> selectedShapes, IReadOnlyList<double> cellWidths,
-        bool backward = false)
+        AnimationChainSave? chain, IReadOnlyList<object> selectedShapes, IReadOnlyList<double> cellWidths)
     {
         if (chain is null || selectedShapes.Count > 1) return TimelineLanePlan.None;
 
@@ -33,15 +31,15 @@ public static class TimelineLanePlanner
             // A polygon has no size, so its Points lane takes the second slot.
             if (shape is PolygonSave)
                 return new TimelineLanePlan(
-                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths, backward), $"{shape.Name} Offset",
-                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Points, cellWidths, backward), $"{shape.Name} Points");
+                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths), $"{shape.Name} Offset",
+                    KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Points, cellWidths), $"{shape.Name} Points");
             return new TimelineLanePlan(
-                KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths, backward), $"{shape.Name} Offset",
-                KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Size, cellWidths, backward), $"{shape.Name} Size");
+                KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Offset, cellWidths), $"{shape.Name} Offset",
+                KeyframeLaneBuilder.BuildShape(chain, shape, ShapeKeyframeGroup.Size, cellWidths), $"{shape.Name} Size");
         }
 
         return new TimelineLanePlan(
-            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Offset, cellWidths, backward), "Offset",
-            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Color, cellWidths, backward), "Color");
+            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Offset, cellWidths), "Offset",
+            KeyframeLaneBuilder.Build(chain, KeyframeGroup.Color, cellWidths), "Color");
     }
 }

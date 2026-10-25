@@ -29,19 +29,20 @@ public class AnimationChainSave
     public bool Loop = true;
 
     /// <summary>
-    /// When <c>true</c>, playback bounces: forward to the last frame, then backward, without repeating the end
-    /// frames at the turnaround (A B C B A B C...). One forward-and-back trip is one loop; with <see cref="Loop"/>
-    /// off the chain plays one round trip and stops on the frame it started on. Defaults to <c>false</c> and is
-    /// written only when <c>true</c>, so readers that predate it (Gum, FRB1) fall back to plain looping. Seeds the
-    /// runtime's per-instance flag the same way <see cref="Loop"/> does (see e.g. <c>Sprite.IsPingPong</c>).
+    /// When <c>true</c>, each cycle plays the chain's forward timeline and then the same timeline mirrored, so a cycle
+    /// is twice the chain's length, the end frames show for twice their length across the turnaround, and keyframe
+    /// glides play backward on the way back. With <see cref="Loop"/> off one full cycle plays, then it stops. Defaults
+    /// to <c>false</c> and is written only when <c>true</c>, so readers that predate it (Gum, FRB1) fall back to plain
+    /// playback. Seeds the runtime's per-instance flag the same way <see cref="Loop"/> does (see e.g.
+    /// <c>Sprite.IsPingPong</c>). The mapping is <see cref="PlaybackTimeline"/>.
     /// </summary>
     public bool PingPong;
 
     /// <summary>
-    /// When <c>true</c>, playback starts on the last frame and runs backward; with <see cref="PingPong"/> it goes
-    /// backward first, then forward. Keyframe curves play time-reversed (see <see cref="KeyframeEvaluator"/>).
-    /// Defaults to <c>false</c>, written only when <c>true</c>, and seeds the runtime's per-instance flag the same
-    /// way <see cref="Loop"/> does (see e.g. <c>Sprite.IsReversed</c>).
+    /// When <c>true</c>, playback shows the chain's forward timeline mirrored: time t shows forward time T - t, so it
+    /// starts at the end of the last frame and keyframe glides play backward. With <see cref="PingPong"/> the mirrored
+    /// half comes first. Defaults to <c>false</c>, written only when <c>true</c>, and seeds the runtime's per-instance
+    /// flag the same way <see cref="Loop"/> does (see e.g. <c>Sprite.IsReversed</c>).
     /// </summary>
     public bool Reverse;
 }

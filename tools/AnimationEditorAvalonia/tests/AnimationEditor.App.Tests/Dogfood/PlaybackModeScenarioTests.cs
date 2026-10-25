@@ -80,18 +80,20 @@ public class PlaybackModeScenarioTests
         editor.Control<CheckBox>("PropChainReverse").IsChecked.ShouldBe(true);
         AnimationEditorHarness.ReadSaved(path).AnimationChains.First(c => c.Name == "A").Reverse.ShouldBeTrue();
 
+        // The forward timeline mirrored: it starts at the end of the last frame.
         editor.Preview.Playback.Reset();
         editor.Preview.Playback.CurrentFrameIndex.ShouldBe(2);
-        editor.Preview.Playback.IsBackward.ShouldBeTrue();
+        editor.Preview.Playback.FrameElapsed.ShouldBe(0.1, 1e-6);
         editor.Preview.Playback.Play();
         editor.Preview.Playback.Advance(0.15);
         editor.Preview.Playback.CurrentFrameIndex.ShouldBe(1);
+        editor.Preview.Playback.FrameElapsed.ShouldBe(0.05, 1e-6);
     }
 
     [AvaloniaFact]
-    public async Task ScrubbingABackwardFrame_PutsThePlayheadWhereTheClickWas()
+    public async Task ScrubbingAReverseChain_PutsThePlayheadWhereTheClickWas()
     {
-        // A backward frame's playhead runs right to left, so a click near a cell's right edge is near the frame's start.
+        // The timeline is the forward timeline under Reverse too, so a click 95% across shows that forward time.
         var (editor, _) = await OpenTwoChainsAsync();
         using var __ = editor;
         AnimationChainSave a = editor.ChainNamed("A");
@@ -103,11 +105,11 @@ public class PlaybackModeScenarioTests
         editor.ClickAt(editor.PointIn(surface, surface.Bounds.Width * 0.95, surface.Bounds.Height / 2));
 
         editor.Preview.Playback.CurrentFrameIndex.ShouldBe(2);
-        editor.Preview.Playback.FrameElapsed.ShouldBeLessThan(0.05);
+        editor.Preview.Playback.FrameElapsed.ShouldBeGreaterThan(0.05);
     }
 
     [AvaloniaFact]
-    public async Task PingPongTurnaround_RedrawsTheKeyframeLaneBackward()
+    public async Task PingPongChain_KeyframeLaneHoldsTheLastKeyframeInsteadOfWrapping()
     {
         var (editor, _) = await OpenTwoChainsAsync();
         using var __ = editor;
@@ -119,13 +121,10 @@ public class PlaybackModeScenarioTests
         }
         a.PingPong = true;
         editor.ClickRow(a);
-        if (editor.Preview.IsPlaying) editor.Press(Key.Space);
-        var lane = editor.Control<AnimationEditor.Views.Controls.KeyframeLaneControl>("FirstLane");
 
-        editor.Preview.Playback.SeekToFrame(0);
-        lane.Lane!.Spans.ShouldAllBe(s => !s.Backward);
+        var lane = editor.Control<AnimationEditor.Views.Controls.KeyframeLaneControl>("FirstLane").Lane!;
 
-        editor.Preview.Playback.SeekToFrame(2); // the last frame starts the backward half
-        lane.Lane!.Spans.ShouldAllBe(s => s.Backward);
+        lane.Spans.Count.ShouldBe(2);
+        lane.Holds.Count.ShouldBe(1);
     }
 }

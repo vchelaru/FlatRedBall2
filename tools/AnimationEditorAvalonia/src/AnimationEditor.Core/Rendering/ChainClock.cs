@@ -4,13 +4,10 @@ using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Rendering;
 
-/// <summary>Where a chain's playback is at one instant: the frame shown, how far into it, and whether it plays backward.</summary>
-public readonly record struct ChainClockPosition(int FrameIndex, double Elapsed, bool IsBackward);
-
 /// <summary>
 /// Stateless counterpart of <see cref="PlaybackController"/>: which frame a chain shows at an
-/// absolute time, using the same frame lengths, looping, hold-at-end, and PingPong/Reverse visit order
-/// (<see cref="PlaybackOrder"/>) rules.
+/// absolute time, using the same frame lengths, looping, hold-at-end, and Reverse/PingPong mirroring
+/// (<see cref="PlaybackTimeline"/>) rules.
 /// </summary>
 public static class ChainClock
 {
@@ -19,56 +16,35 @@ public static class ChainClock
     private const double BoundaryTolerance = 1e-6;
 
     /// <summary>
-    /// Length of one pass of the chain in seconds (unset lengths count as 0.1s): the sum of its frames, or under
-    /// <see cref="AnimationChainSave.PingPong"/> the whole round trip.
+    /// Length of one cycle in seconds (unset lengths count as 0.1s): the sum of the chain's frames, or twice that under
+    /// <see cref="AnimationChainSave.PingPong"/>.
     /// </summary>
     public static double TotalLength(AnimationChainSave chain)
     {
         double total = 0;
-        int visits = PlaybackOrder.VisitCount(chain.Frames.Count, chain.Loop, chain.PingPong);
-        for (int v = 0; v < visits; v++)
-            total += PlaybackController.FrameLength(chain.Frames[Visit(chain, v).FrameIndex]);
-        return total;
+        foreach (var frame in chain.Frames)
+            total += PlaybackController.FrameLength(frame);
+        return PlaybackTimeline.CycleLength(total, chain.PingPong);
     }
 
     /// <summary>
-    /// The frame showing <paramref name="time"/> seconds after the chain starts, and how far into
-    /// that frame the time is. A looping chain wraps; a non-looping chain holds its last visit.
+    /// The frame showing <paramref name="time"/> seconds after the chain starts, and the forward seconds into
+    /// that frame to sample it at. A looping chain wraps; a non-looping chain holds its end.
     /// The chain must have at least one frame.
     /// </summary>
     public static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double time)
     {
-        var at = LocateVisit(chain, time);
-        return (at.FrameIndex, at.Elapsed);
-    }
-
-    /// <summary>Same as <see cref="Locate"/>, also reporting whether the frame is playing backward.</summary>
-    public static ChainClockPosition LocateVisit(AnimationChainSave chain, double time)
-    {
         double total = TotalLength(chain);
-        int visits = PlaybackOrder.VisitCount(chain.Frames.Count, chain.Loop, chain.PingPong);
-        var lastVisit = Visit(chain, visits - 1);
-
         double local = time + BoundaryTolerance;
+        bool atEnd = local >= total && !chain.Loop;
         if (local >= total)
-        {
-            if (!chain.Loop)
-                return new(lastVisit.FrameIndex, PlaybackController.FrameLength(chain.Frames[lastVisit.FrameIndex]), lastVisit.IsBackward);
-            local %= total;
-        }
+            local = chain.Loop ? local % total : total;
 
-        double start = 0;
-        for (int v = 0; v < visits; v++)
-        {
-            var visit = Visit(chain, v);
-            double length = PlaybackController.FrameLength(chain.Frames[visit.FrameIndex]);
-            if (local < start + length)
-                return new(visit.FrameIndex, Math.Max(0, local - start - BoundaryTolerance), visit.IsBackward);
-            start += length;
-        }
-        return new(lastVisit.FrameIndex, PlaybackController.FrameLength(chain.Frames[lastVisit.FrameIndex]), lastVisit.IsBackward);
+        var at = PlaybackTimeline.Locate(chain.Frames, PlaybackController.FrameLength, local, chain.PingPong, chain.Reverse,
+            boundaryEntersNextFrame: true);
+        // Undo the nudge on the sampled position, in the direction the timeline plays.
+        double elapsed = atEnd ? at.ElapsedInFrame
+            : at.IsBackward ? at.ElapsedInFrame + BoundaryTolerance : at.ElapsedInFrame - BoundaryTolerance;
+        return (at.FrameIndex, Math.Clamp(elapsed, 0, PlaybackController.FrameLength(chain.Frames[at.FrameIndex])));
     }
-
-    private static PlaybackVisit Visit(AnimationChainSave chain, int visitIndex) =>
-        PlaybackOrder.VisitAt(visitIndex, chain.Frames.Count, chain.PingPong, chain.Reverse);
 }
