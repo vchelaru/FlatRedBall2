@@ -23,8 +23,9 @@ public static class KeyframeSampler
         frameIndex = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
 
         var frames = SaveKeyframeFrame.Create(chain);
-        var (x, y) = KeyframeEvaluator.EvaluateOffset(frames, chain.Loop, frameIndex, elapsedInFrame);
-        var c = KeyframeEvaluator.EvaluateColor(frames, chain.Loop, frameIndex, elapsedInFrame);
+        bool wraps = PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
+        var (x, y) = KeyframeEvaluator.EvaluateOffset(frames, wraps, frameIndex, elapsedInFrame);
+        var c = KeyframeEvaluator.EvaluateColor(frames, wraps, frameIndex, elapsedInFrame);
         return new KeyframeSample(x, y, new ResolvedFrameColor(c.Red, c.Green, c.Blue, c.Alpha, frames[frameIndex].ColorOperation));
     }
 

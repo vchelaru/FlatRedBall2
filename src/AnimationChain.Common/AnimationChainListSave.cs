@@ -212,6 +212,8 @@ public class AnimationChainListSave
                 Name = (string?)chainEl.Element("Name") ?? string.Empty,
                 IsLocked = BoolEl(chainEl, "Locked"),
                 Loop = BoolEl(chainEl, "Loop", true),
+                PingPong = BoolEl(chainEl, "PingPong"),
+                Reverse = BoolEl(chainEl, "Reverse"),
             };
 
             foreach (var frameEl in chainEl.Elements("Frame"))
@@ -364,6 +366,10 @@ public class AnimationChainListSave
                 chainObj["locked"] = true;
             if (!chain.Loop)
                 chainObj["loop"] = false;
+            if (chain.PingPong)
+                chainObj["pingPong"] = true;
+            if (chain.Reverse)
+                chainObj["reverse"] = true;
             chainsArray.Add((JsonNode)chainObj);
         }
         root["animationChains"] = chainsArray;
@@ -488,6 +494,11 @@ public class AnimationChainListSave
             // resolves back to true, keeping every pre-existing .achx a no-op diff.
             if (!chain.Loop)
                 chainEl.Add(new XElement("Loop", "false"));
+            // PingPong and Reverse (#1538) default to false and are written only when true, for the same reason.
+            if (chain.PingPong)
+                chainEl.Add(new XElement("PingPong", "true"));
+            if (chain.Reverse)
+                chainEl.Add(new XElement("Reverse", "true"));
             foreach (var frame in chain.Frames)
                 chainEl.Add(WriteFrame(frame));
             root.Add(chainEl);
@@ -940,6 +951,8 @@ public class AnimationChainListSave
                     Name = chainObj["name"]?.GetValue<string>() ?? string.Empty,
                     IsLocked = BoolProp(chainObj, "locked"),
                     Loop = BoolProp(chainObj, "loop", true),
+                    PingPong = BoolProp(chainObj, "pingPong"),
+                    Reverse = BoolProp(chainObj, "reverse"),
                 };
 
                 if (chainObj["frames"] is JsonArray framesArray)

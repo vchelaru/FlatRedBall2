@@ -53,7 +53,7 @@ public static class AnimationChainListSaveExtensions
 
         foreach (var chainSave in save.AnimationChains)
         {
-            var chain = new AnimationChain { Name = chainSave.Name, Loop = chainSave.Loop };
+            var chain = new AnimationChain { Name = chainSave.Name, Loop = chainSave.Loop, PingPong = chainSave.PingPong, Reversed = chainSave.Reverse };
             var colors = EffectiveFrameColor.ResolveAll(chainSave.Frames);
 
             for (int i = 0; i < chainSave.Frames.Count; i++)

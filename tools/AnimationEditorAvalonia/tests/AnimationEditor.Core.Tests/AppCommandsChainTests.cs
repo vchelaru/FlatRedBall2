@@ -401,6 +401,20 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_PingPongReverseChain_CopyKeepsBoth()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Bob", 2);
+        source.PingPong = true;
+        source.Reverse = true;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipH: false);
+
+        Assert.True(copy!.PingPong);
+        Assert.True(copy.Reverse);
+    }
+
+    [Fact]
     public void DuplicateChain_CreatesDeepCopyWithAllFrames()
     {
         var ctx = TestHelpers.SetupFreshAcls();

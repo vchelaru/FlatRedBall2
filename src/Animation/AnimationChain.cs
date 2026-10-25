@@ -23,6 +23,20 @@ public class AnimationChain : List<AnimationFrame>
     /// </summary>
     public bool Loop { get; set; } = true;
 
+    /// <summary>
+    /// Whether this chain plays forward and then mirrored by default (see
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.PingPong"/>). Seeds
+    /// <see cref="FlatRedBall2.Rendering.Sprite.IsPingPong"/> when the chain starts playing; overridable per instance afterward.
+    /// </summary>
+    public bool PingPong { get; set; }
+
+    /// <summary>
+    /// Whether this chain plays its timeline mirrored (backward) by default (see
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.Reverse"/>). Seeds
+    /// <see cref="FlatRedBall2.Rendering.Sprite.IsReversed"/> when the chain starts playing; overridable per instance afterward.
+    /// </summary>
+    public bool Reversed { get; set; }
+
     /// <summary>Total duration of the animation (sum of all frame lengths).</summary>
     public TimeSpan TotalLength
     {

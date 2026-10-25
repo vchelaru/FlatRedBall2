@@ -3424,6 +3424,9 @@ public partial class MainWindow : Window
             if (chains.Count == 0 || LoopToggle.IsChecked is not { } loop) return;
             _appCommands.SetChainsLoop(chains, loop);
         };
+        // PingPong and Reverse (#1538) work the same way, mirroring the Inspector's checkboxes.
+        PingPongToggle.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PingPongToggle, _appCommands.SetChainsPingPong);
+        ReverseToggle.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(ReverseToggle, _appCommands.SetChainsReverse);
 
         TimelineStrip.ItemsSource = _timelineFrames;
         // The keyframe lanes sit outside the cells' ScrollViewer so they must follow its scroll (#1478).
@@ -3498,6 +3501,7 @@ public partial class MainWindow : Window
         // Move the playhead at a constant PixelsPerSecond rate.
         // For clamped cells (shorter than natural proportional width) the playhead parks
         // at the right edge until the frame advances rather than speeding up.
+        // FrameElapsed is forward time, so under Reverse/PingPong the playhead runs back across the cell (#1538).
         double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
         _timelineFrames[idx].ScrubberOffset = offset;
     }
@@ -5622,6 +5626,8 @@ public partial class MainWindow : Window
         PropChainName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyChainName(); };
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
+        PropChainPingPong.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PropChainPingPong, _appCommands.SetChainsPingPong);
+        PropChainReverse.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PropChainReverse, _appCommands.SetChainsReverse);
         PropChainTsxOwnerInput.ValueChanged += (_, _) => ApplyChainTsxOwnerTileId();
         PropChainTsxOwnerSyncButton.Click += (_, _) => SyncChainTsxOwnerTileIdToFirstFrame();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -6018,6 +6024,8 @@ public partial class MainWindow : Window
                 // Checked only when every selected chain loops; indeterminate when they disagree.
                 var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
                 PropChainLoop.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
+                PropChainPingPong.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
+                PropChainReverse.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
             }
             // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
             // tile to own. Re-reads on every refresh (not just selection change) so an edit made
@@ -6055,6 +6063,8 @@ public partial class MainWindow : Window
             {
                 var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
                 LoopToggle.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
+                PingPongToggle.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
+                ReverseToggle.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
             }
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
@@ -6071,6 +6081,8 @@ public partial class MainWindow : Window
             // A Tiled tile animation always loops: Loop (#1120) has no tsx representation.
             PropChainLoop.IsEnabled = !_projectManager.IsNativeTsxProject;
             LoopToggle.IsEnabled    = !_projectManager.IsNativeTsxProject;
+            PropChainPingPong.IsEnabled = PropChainReverse.IsEnabled = !_projectManager.IsNativeTsxProject;
+            PingPongToggle.IsEnabled = ReverseToggle.IsEnabled = !_projectManager.IsNativeTsxProject;
 
             // Disable (not just visually leave typeable) whichever panel is showing when its
             // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled
@@ -6455,6 +6467,22 @@ public partial class MainWindow : Window
     /// The animations a chain-level inspector field (Locked, Loop) applies to: every selected
     /// animation, or the primary one when nothing is multi-selected.
     /// </summary>
+    // A PingPong/Reverse checkbox or toggle (#1538) sets its flag on every selected chain, as one undo step.
+    private void ApplyChainPlaybackMode(ToggleButton source, Action<IReadOnlyList<AnimationChainSave>, bool> set)
+    {
+        if (_suppressPropRefresh) return;
+        var chains = ChainsForChainProperties();
+        if (chains.Count == 0 || source.IsChecked is not { } value) return;
+        set(chains, value);
+    }
+
+    // Checked when every selected chain has the flag, unchecked when none does, indeterminate when they disagree.
+    private bool? SharedChainFlag(AnimationChainSave selectedChain, Func<AnimationChainSave, bool> flag)
+    {
+        var states = _selectedState.SelectedChains.Select(flag).Append(flag(selectedChain)).Distinct().ToList();
+        return states.Count > 1 ? null : states[0];
+    }
+
     private List<AnimationChainSave> ChainsForChainProperties()
     {
         var chains = _selectedState.SelectedChains;

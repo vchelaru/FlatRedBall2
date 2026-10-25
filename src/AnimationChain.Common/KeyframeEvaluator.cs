@@ -63,19 +63,27 @@ public readonly record struct KeyframeColor(int? Red, int? Green, int? Blue, int
 /// independent. The first frame is always a keyframe; a non-looping chain's last keyframe holds; a
 /// looping chain's last keyframe glides back to the first. With the default (snap) curve the result is
 /// exactly the frame's own value, so files without interpolation evaluate as they always did.
+/// <para>
+/// The evaluator only knows the forward timeline. Reverse and PingPong (#1538) play that timeline mirrored, so a
+/// player maps its own time to a forward time with <see cref="PlaybackTimeline"/> and evaluates there. The
+/// <see cref="AnimationChainSave"/> overloads glide across the loop point only when
+/// <see cref="PlaybackTimeline.GlidesAcrossLoop"/> says so (a ping-pong turns around instead of wrapping).
+/// </para>
 /// </summary>
 public static class KeyframeEvaluator
 {
+    private static bool GlidesAcrossLoop(AnimationChainSave chain) => PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
+
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>
     /// of an editor-side chain. Frames with no length use 0.1 (the editor's playback default).
     /// </summary>
     public static (float X, float Y) EvaluateOffset(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
-        => EvaluateOffset(SaveKeyframeFrame.Create(chain), chain.Loop, frameIndex, elapsedInFrame);
+        => EvaluateOffset(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
     /// <summary>The color channels to display, same contract as <see cref="EvaluateOffset(AnimationChainSave, int, double)"/>.</summary>
     public static KeyframeColor EvaluateColor(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
-        => EvaluateColor(SaveKeyframeFrame.Create(chain), chain.Loop, frameIndex, elapsedInFrame);
+        => EvaluateColor(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>.
@@ -178,7 +186,7 @@ public static class KeyframeEvaluator
                     adapter = saved;
                     break;
                 }
-        return EvaluateShape(frames, chain.Loop, frameIndex, elapsedInFrame, adapter);
+        return EvaluateShape(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter);
     }
 
     /// <summary>
@@ -238,7 +246,7 @@ public static class KeyframeEvaluator
                     adapter = saved;
                     break;
                 }
-        return EvaluateShapePoints(frames, chain.Loop, frameIndex, elapsedInFrame, adapter);
+        return EvaluateShapePoints(frames, GlidesAcrossLoop(chain), frameIndex, elapsedInFrame, adapter);
     }
 
     /// <summary>

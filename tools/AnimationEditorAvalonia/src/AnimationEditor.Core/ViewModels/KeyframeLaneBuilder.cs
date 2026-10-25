@@ -60,6 +60,8 @@ public static class KeyframeLaneBuilder
         int count = chain.Frames.Count;
         var edges = new double[count + 1];
         for (int i = 0; i < count; i++) edges[i + 1] = edges[i] + cellWidths[i];
+        // The lane is the forward timeline, which Reverse and PingPong only mirror (#1538); a ping-pong never wraps.
+        bool wraps = PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
 
         var keyframes = new List<int>();
         for (int i = 0; i < count; i++)
@@ -73,7 +75,7 @@ public static class KeyframeLaneBuilder
         for (int k = 0; k < keyframes.Count; k++)
         {
             bool isLast = k == keyframes.Count - 1;
-            if (isLast && !chain.Loop) break;
+            if (isLast && !wraps) break;
             int from = keyframes[k];
             double endX = isLast ? edges[count] : edges[keyframes[k + 1]];
             var (type, easing) = KeyframeInspectorState.GetCurve(group, chain.Frames[from]);
@@ -87,7 +89,7 @@ public static class KeyframeLaneBuilder
         return new KeyframeLane(
             keyframes.Select(i => edges[i]).ToList(),
             spans,
-            chain.Loop ? Array.Empty<KeyframeLaneHold>() : new[] { new KeyframeLaneHold(lastX, edges[count]) },
+            wraps ? Array.Empty<KeyframeLaneHold>() : new[] { new KeyframeLaneHold(lastX, edges[count]) },
             edges[count],
             edges.Skip(1).ToList());
     }
@@ -124,6 +126,7 @@ public static class KeyframeLaneBuilder
 
         var edges = new double[count + 1];
         for (int i = 0; i < count; i++) edges[i + 1] = edges[i] + cellWidths[i];
+        bool wraps = PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
 
         var keyframeXs = new List<double>();
         var spans = new List<KeyframeLaneSpan>();
@@ -151,7 +154,7 @@ public static class KeyframeLaneBuilder
                     spans.Add(new KeyframeLaneSpan(edges[from], edges[keyframes[k + 1]], SpanCurve(group, match[from]!, match[keyframes[k + 1]]!)));
                     valuesDiffer |= ValuesDiffer(group, match[from]!, match[keyframes[k + 1]]!);
                 }
-                else if (runEnd == count - 1 && chain.Loop && match[0] is not null && from != 0)
+                else if (runEnd == count - 1 && wraps && match[0] is not null && from != 0)
                 {
                     spans.Add(new KeyframeLaneSpan(edges[from], edges[count], SpanCurve(group, match[from]!, match[0]!)));
                 }
