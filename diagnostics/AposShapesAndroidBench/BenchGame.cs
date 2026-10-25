@@ -16,6 +16,9 @@ namespace AposShapesAndroidBench;
 //   gl    - glCompileShader + COMPILE_STATUS on every GLSL shader in the .knifx, directly
 //           through GLES20, in file order. Driver compile only, no KNI.
 //   glrev - gl in reverse order, to tell a variant's own cost from a slowdown over the run.
+//   stock / v0 / v012 - new Effect from the shipped knifx (all 16 techniques) or from a rebuild
+//           keeping only Shapes0 or Shapes0-2 (Variants/), then new ShapeBatch(effect), then a
+//           grid of shapes, each in its own Begin/End so every shape's first draw is timed.
 // The work runs on the first Update after one plain frame has been drawn.
 public class BenchGame : Game
 {
@@ -50,9 +53,12 @@ public class BenchGame : Game
             case "split": RunSplit(); break;
             case "gl": RunGl(reverse: false); break;
             case "glrev": RunGl(reverse: true); break;
+            case "stock":
+            case "v0":
+            case "v012": RunVariants(); break;
             default: RunBatch(); break;
         }
-        Bench.Log($"[{_mode}] work total: {total.ElapsedMilliseconds} ms");
+        Bench.Log($"[{_mode}] work total: {total.ElapsedMilliseconds} ms, {Android.OS.SystemClock.ElapsedRealtime() - Android.OS.Process.StartElapsedRealtime} ms after process start");
     }
 
     private void RunBatch()
@@ -73,6 +79,50 @@ public class BenchGame : Game
         sw.Restart();
         _batch = new ShapeBatch(GraphicsDevice, Content, effect);
         Bench.Log($"[split] new ShapeBatch(effect) remainder: {sw.ElapsedMilliseconds} ms");
+    }
+
+    private void RunVariants()
+    {
+        var sw = Stopwatch.StartNew();
+        byte[] bytes = _mode == "stock" ? Bench.ReadKnifx(out _) : Bench.ReadVariant($"apos-{_mode}.knifx.gz");
+        Bench.Log($"[{_mode}] read+decompress ({bytes.Length} bytes): {sw.ElapsedMilliseconds} ms");
+        sw.Restart();
+        var effect = new Effect(GraphicsDevice, bytes);
+        Bench.Log($"[{_mode}] new Effect ({effect.Techniques.Count} techniques): {sw.ElapsedMilliseconds} ms");
+        sw.Restart();
+        // warmup defaults to true: Warmup(ShapeFeatures.None) draws one Shapes0 circle and presents.
+        _batch = new ShapeBatch(GraphicsDevice, effect);
+        Bench.Log($"[{_mode}] new ShapeBatch(effect), incl. Warmup(None): {sw.ElapsedMilliseconds} ms");
+    }
+
+    // Shapes for the variant modes, with the technique each needs (dashes bit 0, fill gradient bit 1).
+    private static readonly (string name, int technique, Action<ShapeBatch, Vector2, float> draw)[] Shapes =
+    {
+        ("filled circle", 0, (b, c, r) => b.FillCircle(c, r, Color.OrangeRed)),
+        ("outlined circle", 0, (b, c, r) => b.BorderCircle(c, r, Color.White, 6f)),
+        ("filled+bordered rect", 0, (b, c, r) => b.DrawRectangle(c - new Vector2(r), new Vector2(r * 2), Color.SeaGreen, Color.White, 4f, default(CornerRadii))),
+        ("rounded rect", 0, (b, c, r) => b.FillRectangle(c - new Vector2(r), new Vector2(r * 2), Color.Gold, new CornerRadii(r / 3f))),
+        ("line", 0, (b, c, r) => b.FillLine(c - new Vector2(r), c + new Vector2(r), 5f, Color.Black)),
+        ("dashed circle", 1, (b, c, r) => b.BorderCircle(c, r, Color.Yellow, 6f, dash: new DashStyle(12f, 8f))),
+        ("gradient circle", 2, (b, c, r) => b.FillCircle(c, r, new Gradient(c - new Vector2(r), Color.Red, c + new Vector2(r), Color.Blue))),
+        ("dashed gradient circle", 3, (b, c, r) => b.BorderCircle(c, r, new Gradient(c - new Vector2(r), Color.Lime, c + new Vector2(r), Color.Magenta), 8f, dash: new DashStyle(12f, 8f))),
+    };
+
+    private void DrawShapeGrid()
+    {
+        var vp = GraphicsDevice.Viewport;
+        int cols = vp.Width > vp.Height ? 4 : 2, rows = (Shapes.Length + cols - 1) / cols;
+        float cw = vp.Width / (float)cols, ch = vp.Height / (float)rows, r = MathF.Min(cw, ch) * 0.35f;
+        for (int i = 0; i < Shapes.Length; i++)
+        {
+            var c = new Vector2(cw * (i % cols + 0.5f), ch * (i / cols + 0.5f));
+            var sw = Stopwatch.StartNew();
+            _batch!.Begin();
+            Shapes[i].draw(_batch, c, r);
+            _batch.End();
+            if (_circleDraws < 2)
+                Bench.Log($"[{_mode}] draw #{_circleDraws + 1} {Shapes[i].name} (Shapes{Shapes[i].technique}): {sw.ElapsedMilliseconds} ms");
+        }
     }
 
     private void RunGl(bool reverse)
@@ -114,7 +164,9 @@ public class BenchGame : Game
     {
         var sw = Stopwatch.StartNew();
         GraphicsDevice.Clear(Color.CornflowerBlue);
-        if (_batch != null)
+        if (_batch != null && _mode is "stock" or "v0" or "v012")
+            DrawShapeGrid();
+        else if (_batch != null)
         {
             var vp = GraphicsDevice.Viewport;
             _batch.Begin();
@@ -129,7 +181,7 @@ public class BenchGame : Game
         }
         _circleDraws++;
         if (_circleDraws <= 2)
-            Bench.Log($"[{_mode}] circle draw #{_circleDraws}: {sw.ElapsedMilliseconds} ms");
+            Bench.Log($"[{_mode}] circle draw #{_circleDraws}: {sw.ElapsedMilliseconds} ms (whole Draw)");
     }
 }
 
@@ -148,6 +200,15 @@ static class Bench
         using Stream s = name.EndsWith(".gz") ? new GZipStream(raw, CompressionMode.Decompress) : raw;
         using var ms = new MemoryStream();
         s.CopyTo(ms);
+        return ms.ToArray();
+    }
+
+    public static byte[] ReadVariant(string resource)
+    {
+        using var raw = typeof(Bench).Assembly.GetManifestResourceStream(resource)!;
+        using var gz = new GZipStream(raw, CompressionMode.Decompress);
+        using var ms = new MemoryStream();
+        gz.CopyTo(ms);
         return ms.ToArray();
     }
 

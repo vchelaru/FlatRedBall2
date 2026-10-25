@@ -17,4 +17,9 @@
     <PackageReference Include="nkast.Kni.Platform.Android.GL" />
     <PackageReference Include="Apos.Shapes.KNI" VersionOverride="$(AposVer)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- 0.9.1's shader with only some techniques kept; see Variants/make-variants.py. -->
+    <EmbeddedResource Include="Variants/*.knifx.gz" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
