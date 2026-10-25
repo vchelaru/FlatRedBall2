@@ -26,23 +26,25 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   PowerVR phone (the driver does not cache it across compiles) and about 1.4 s on the Motorola, past
   Android's 5 s ANR limit on the old phone. Gum's `ShapeRenderer.Initialize` builds a `ShapeBatch` at
   startup, so this cost can't be deferred.
-- Apos.Shapes 0.9.1 (Gum 2026.10.25.3-preview.8), Motorola, Debug build, three cold launches. The
-  spike logs these under the `FRBSPIKE` logcat tag:
+- Apos.Shapes 0.9.1 (Gum 2026.10.25.3-preview.8), Debug build, cold launches (three on the Motorola,
+  two on the PowerVR phone). The spike logs these under the `FRBSPIKE` logcat tag:
 
-  | Phase | Time |
-  |---|---|
-  | Process start to `OnCreate` | ~210 ms |
-  | `OnCreate` to `Game.Initialize` | ~530 ms |
-  | First `new ShapeBatch` | ~2.2 s (same on every launch) |
-  | First `ShapeBatch` draw (program link) | 2-4 ms |
-  | A second `ShapeBatch` in the same process | 75 ms |
-  | `FlatRedBallService.Initialize` (ShapeRenderer already done) | ~820 ms |
-  | First `Draw` | ~82 ms |
-  | `OnCreate` to second frame drawn | ~3.6-3.7 s |
+  | Phase | Motorola | PowerVR GE8300 |
+  |---|---|---|
+  | Process start to `OnCreate` | ~210 ms | ~595 ms |
+  | `OnCreate` to `Game.Initialize` | ~530 ms | ~1.6 s |
+  | Gum `ShapeRenderer.Initialize` (first `ShapeBatch`) | ~2.2 s | 342 s, 339 s |
+  | `FlatRedBallService.Initialize` (ShapeRenderer already done) | ~820 ms | 3.5-5.0 s |
+  | First `Draw` | ~82 ms | ~295 ms |
+  | `OnCreate` to second frame drawn | ~3.6-3.7 s | 349 s, 345 s |
+  | Clean build / incremental / uninstall then `-t:Install` | 28 s / 10 s / 24 s | - / - / 33 s |
 
-  The 2.2 s is not split into driver compile versus managed work (0.9.1 no longer embeds the GLSL as
-  plain text, and Gum now requires Apos.Shapes >= 0.9.1, so 0.8.6 can't be swapped in to compare).
-- Build times, Motorola: clean build 28 s, incremental 10 s, uninstall then `-t:Install` 24 s.
+  On the Motorola, `MeasureStandaloneShapeBatch` split this further: the first `new ShapeBatch` is
+  the whole 2.2 s, its first draw (program link) 2-4 ms, and a second `ShapeBatch` in the same process
+  75 ms. The PowerVR phone still ANRs at 5 s; after "Wait" it renders and takes touch. 0.9.1 is slower
+  than 0.8.6's ~142 s raw compile there, and the cost doesn't drop on a second launch. Not yet split
+  into driver compile versus managed work: 0.9.1 doesn't embed the GLSL as plain text, and Gum now
+  requires Apos.Shapes >= 0.9.1, so 0.8.6 can't be swapped in to compare.
 - Source-level tricks did not fix the 0.8.6 first compile on the PowerVR phone (baseline ~142 s):
   `#pragma optimize(off)`, `mediump`, GLSL ES 1.00, and single-pass loop rewrites changed nothing;
   stopping loop unrolling saved 31%; replacing `texture()` with a constant saved 43% but broke rendering.
@@ -53,4 +55,4 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
 - `RectangleRuntime.Color` is obsolete and sets the stroke; the fill comes from `FillColor`
   (default white). Use `FillColor` with `IsFilled = true`.
 - Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
-- Not yet checked: Apos.Shapes 0.9.1 on the PowerVR phone, content loading, audio.
+- Not yet checked: content loading, audio.

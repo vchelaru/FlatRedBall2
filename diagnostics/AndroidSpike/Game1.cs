@@ -16,7 +16,7 @@ public class Game1 : Game
 
     // Builds and draws a throwaway Apos.Shapes ShapeBatch before Gum's, to split shader compile and
     // program link from the rest of ShapeRenderer.Initialize. Costs a second shader compile.
-    private const bool MeasureStandaloneShapeBatch = true;
+    private const bool MeasureStandaloneShapeBatch = false;
 
     public Game1(Stopwatch sinceActivityStart)
     {
