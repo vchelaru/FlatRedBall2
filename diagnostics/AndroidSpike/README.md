@@ -21,25 +21,36 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   touch through `Engine.Input.Cursor`.
 - "This effect is for an older version of KNI" in logcat is only a warning: Apos.Shapes' knifx is
   format v11 and KNI reads v12. It still loads.
-- `new ShapeBatch(...)` compiles Apos.Shapes' shader on the GPU driver. The fragment shader's GLSL is
-  436,712 characters. Compiling it directly with `glCompileShader` (bypassing KNI) takes about 142 s on
-  the PowerVR GE8300 phone (143 s again on a second compile, so the driver does not cache it) and about
-  1.4 s on the Motorola. KNI's own GLSL to GLSL ES 3.00 regex conversion is only ~110 ms. Android kills
-  the app after 5 s (ANR). The engine's `ShapesBatch` creates the batch lazily on first use, but Gum's
-  `ShapeRenderer.Initialize` still builds one at startup, so the old phone cannot start the engine.
-- Source-level tricks do not fix the first compile. The GLSL is one `main()` of 7,283 lines (the 437K
-  characters are mostly indentation: 18 nesting levels), 732 `if`s, 107 `texture()` reads, two
-  16-iteration loops with dependent texture reads, one 8-iteration loop. Fragment compile times on
-  the PowerVR phone (baseline ~142 s): `#pragma optimize(off)` 142 s; `mediump` instead of `highp`
-  143 s; both 143 s; raw GLSL ES 1.00 text 142 s; single-pass `_spvonce` loops as `do/while(false)`
-  143 s; constant-folding-proof loop bounds to stop unrolling 98 s (-31%); `texture()` replaced by a
-  constant 81 s (-43%, shader no longer renders). So loops and texture reads are part of it, but the rest
-  is general code volume that this driver and CPU are slow at.
-- A saved program binary fixes repeat launches. On the PowerVR phone, `glGetProgramBinary` after the
-  first compile and link gave a 368,599-byte binary (1 supported format, 37168). On the next launch
-  `glProgramBinary` loaded it in 5 ms and linked fine, versus ~151 s to compile. The binary is
-  specific to the GPU and driver, so it can't be shipped in the app. It must be produced on the device
-  on first run, keyed by `GL_RENDERER`/`GL_VERSION`, with a recompile fallback if loading fails. KNI
-  doesn't do this today; it compiles in `ConcreteShader.CreateShader` and links at first draw.
+- `new ShapeBatch(...)` compiles Apos.Shapes' shader on the GPU driver. With Apos.Shapes 0.8.6 the
+  fragment shader's GLSL was 436,712 characters, and `glCompileShader` alone took about 142 s on the
+  PowerVR phone (the driver does not cache it across compiles) and about 1.4 s on the Motorola, past
+  Android's 5 s ANR limit on the old phone. Gum's `ShapeRenderer.Initialize` builds a `ShapeBatch` at
+  startup, so this cost can't be deferred.
+- Apos.Shapes 0.9.1 (Gum 2026.10.25.3-preview.8), Motorola, Debug build, three cold launches. The
+  spike logs these under the `FRBSPIKE` logcat tag:
+
+  | Phase | Time |
+  |---|---|
+  | Process start to `OnCreate` | ~210 ms |
+  | `OnCreate` to `Game.Initialize` | ~530 ms |
+  | First `new ShapeBatch` | ~2.2 s (same on every launch) |
+  | First `ShapeBatch` draw (program link) | 2-4 ms |
+  | A second `ShapeBatch` in the same process | 75 ms |
+  | `FlatRedBallService.Initialize` (ShapeRenderer already done) | ~820 ms |
+  | First `Draw` | ~82 ms |
+  | `OnCreate` to second frame drawn | ~3.6-3.7 s |
+
+  The 2.2 s is not split into driver compile versus managed work (0.9.1 no longer embeds the GLSL as
+  plain text, and Gum now requires Apos.Shapes >= 0.9.1, so 0.8.6 can't be swapped in to compare).
+- Build times, Motorola: clean build 28 s, incremental 10 s, uninstall then `-t:Install` 24 s.
+- Source-level tricks did not fix the 0.8.6 first compile on the PowerVR phone (baseline ~142 s):
+  `#pragma optimize(off)`, `mediump`, GLSL ES 1.00, and single-pass loop rewrites changed nothing;
+  stopping loop unrolling saved 31%; replacing `texture()` with a constant saved 43% but broke rendering.
+- A saved program binary fixes repeat launches. On the PowerVR phone, with 0.8.6, `glGetProgramBinary`
+  gave a 368,599-byte binary that `glProgramBinary` loaded in 5 ms on the next launch, versus ~151 s
+  to compile. The binary is specific to the GPU and driver, so it must be produced on the device on
+  first run, keyed by `GL_RENDERER`/`GL_VERSION`, with a recompile fallback. KNI doesn't do this today.
+- With Gum 2026.10.25.3-preview.8 the spike's purple `RectangleRuntime` draws a white fill with a
+  purple outline. Not investigated.
 - Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
-- Not yet checked: content loading, audio.
+- Not yet checked: Apos.Shapes 0.9.1 on the PowerVR phone, content loading, audio.
