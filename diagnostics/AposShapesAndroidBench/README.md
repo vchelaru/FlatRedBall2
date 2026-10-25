@@ -132,20 +132,6 @@ Inferred, not checked:
 - The APK reinstall invalidating the cache (the old first-launch outlier) suggests the cache key
   includes the APK build.
 
-## Draft upstream issue (Apos.Shapes, not filed)
+## Upstream issue
 
-> **0.9.x shader variants make first `ShapeBatch` 2.4x slower to create on Android GL ES**
->
-> Bare KNI 4.3.9001 Android app, Release, only Apos.Shapes.KNI referenced. Time for
-> `new ShapeBatch(GraphicsDevice, ...)` on a cold launch:
->
-> | | 0.8.6 | 0.9.1 |
-> |---|---|---|
-> | PowerVR Rogue GE8300 (Android 12) | 142 s | 339 s |
-> | Mali-G615 MC2 (Android 16) | 1.29 s | 2.17 s |
->
-> Almost all of it is `glCompileShader`. 0.9.1's GL effect has 16 fragment-shader variants
-> (2.82 M chars of GLSL) where 0.8.6 had one (437 K chars). The compile happens when the effect
-> loads (the first draw afterwards takes ~20 ms), though a typical app draws few of the variants. On PowerVR the eight variants with the extra
-> texture sampling take 41-73 s each. Could the variants compile lazily, on the first draw that
-> needs them? The PowerVR driver has no shader cache, so every launch pays the full cost.
+Filed as https://github.com/Apostolique/Apos.Shapes/issues/40.
