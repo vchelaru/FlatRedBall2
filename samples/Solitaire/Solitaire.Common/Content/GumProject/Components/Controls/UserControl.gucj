@@ -8,78 +8,26 @@
         {
           "Name": "Background.ColorCategoryState",
           "Type": "ColorCategory",
-          "StandardizedName": null,
-          "Category": null,
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "Primary",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": "Primary"
         },
         {
           "Name": "Background.Parent",
           "Type": "string",
-          "StandardizedName": null,
-          "Category": null,
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": ""
         },
         {
           "Name": "Background.StyleCategoryState",
           "Type": "StyleCategory",
-          "StandardizedName": null,
-          "Category": null,
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "Panel",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": "Panel"
         },
         {
           "Name": "State",
           "Type": "State",
-          "StandardizedName": null,
           "Category": "States and Visibility",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         }
       ],
       "VariableLists": []
@@ -89,16 +37,12 @@
   "Instances": [
     {
       "Name": "Background",
-      "BaseType": "NineSlice",
-      "DefinedByBase": false,
-      "Locked": false,
-      "IsSlot": false
+      "BaseType": "NineSlice"
     }
   ],
   "Events": [],
   "Behaviors": [
     {
-      "ProjectName": null,
       "BehaviorName": "UserControlBehavior"
     }
   ],

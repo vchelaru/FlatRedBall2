@@ -8,40 +8,14 @@
         {
           "Name": "ChildrenLayout",
           "Type": "ChildrenLayout",
-          "StandardizedName": null,
-          "Category": null,
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 1,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 1
         },
         {
           "Name": "State",
           "Type": "State",
-          "StandardizedName": null,
           "Category": "States and Visibility",
-          "ExposedAsName": null,
-          "SetsValue": false,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "Default",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": "Default"
         }
       ],
       "VariableLists": []
@@ -52,7 +26,6 @@
   "Events": [],
   "Behaviors": [
     {
-      "ProjectName": null,
       "BehaviorName": "StackPanelBehavior"
     }
   ],

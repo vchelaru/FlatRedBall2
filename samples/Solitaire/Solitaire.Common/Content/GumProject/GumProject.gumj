@@ -60,553 +60,423 @@
     {
       "Name": "GameScreenGum",
       "ElementType": 0,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "TestScreen",
       "ElementType": 0,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     }
   ],
   "ComponentReferences": [
     {
       "Name": "CardGum",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonClose",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonConfirm",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonDeny",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonIcon",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonStandard",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonStandardIcon",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ButtonTab",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/CheckBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ComboBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/DialogBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ItemsControl",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Keyboard",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/KeyboardKey",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Label",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ListBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ListBoxItem",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Menu",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/MenuItem",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Panel",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/PasswordBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/RadioButton",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ScrollBar",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/ScrollViewer",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/SettingsView",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Slider",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/SplitterStandard",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/StackPanel",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/TextBox",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Toast",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/TreeView",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/TreeViewItem",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/TreeViewToggle",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/UserControl",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Controls/Window",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/CautionLines",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/Divider",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/DividerHorizontal",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/DividerVertical",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/Icon",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/PercentBar",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/PercentBarIcon",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Elements/VerticalLines",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "FoundationSlot",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Styles",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "WinOverlayGum",
       "ElementType": 1,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     }
   ],
   "StandardElementReferences": [
     {
       "Name": "Arc",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Canvas",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Circle",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "ColoredCircle",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "ColoredRectangle",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Component",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Container",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Line",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "LottieAnimation",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "NineSlice",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Polygon",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Rectangle",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "RoundedRectangle",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Sprite",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Svg",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     },
     {
       "Name": "Text",
       "ElementType": 2,
-      "LinkType": 0,
-      "Link": null
+      "LinkType": 0
     }
   ],
   "BehaviorReferences": [
     {
-      "Name": "ButtonBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ButtonBehavior"
     },
     {
-      "Name": "CheckBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "CheckBoxBehavior"
     },
     {
-      "Name": "ComboBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ComboBoxBehavior"
     },
     {
-      "Name": "DialogBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "DialogBoxBehavior"
     },
     {
-      "Name": "InputDeviceSelectionItemBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "InputDeviceSelectionItemBehavior"
     },
     {
-      "Name": "InputDeviceSelectorBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "InputDeviceSelectorBehavior"
     },
     {
-      "Name": "ItemsControlBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ItemsControlBehavior"
     },
     {
-      "Name": "LabelBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "LabelBehavior"
     },
     {
-      "Name": "ListBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ListBoxBehavior"
     },
     {
-      "Name": "ListBoxItemBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ListBoxItemBehavior"
     },
     {
-      "Name": "MenuBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "MenuBehavior"
     },
     {
-      "Name": "MenuItemBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "MenuItemBehavior"
     },
     {
-      "Name": "OnScreenKeyboardBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "OnScreenKeyboardBehavior"
     },
     {
-      "Name": "PanelBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "PanelBehavior"
     },
     {
-      "Name": "PasswordBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "PasswordBoxBehavior"
     },
     {
-      "Name": "PlayerJoinViewBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "PlayerJoinViewBehavior"
     },
     {
-      "Name": "PlayerJoinViewItemBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "PlayerJoinViewItemBehavior"
     },
     {
-      "Name": "RadioButtonBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "RadioButtonBehavior"
     },
     {
-      "Name": "ScrollBarBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ScrollBarBehavior"
     },
     {
-      "Name": "ScrollViewerBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ScrollViewerBehavior"
     },
     {
-      "Name": "SettingsViewBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "SettingsViewBehavior"
     },
     {
-      "Name": "SliderBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "SliderBehavior"
     },
     {
-      "Name": "SplitterBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "SplitterBehavior"
     },
     {
-      "Name": "StackPanelBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "StackPanelBehavior"
     },
     {
-      "Name": "TextBoxBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "TextBoxBehavior"
     },
     {
-      "Name": "ToastBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ToastBehavior"
     },
     {
-      "Name": "ToggleBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "ToggleBehavior"
     },
     {
-      "Name": "TreeViewBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "TreeViewBehavior"
     },
     {
-      "Name": "TreeViewItemBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "TreeViewItemBehavior"
     },
     {
-      "Name": "UserControlBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "UserControlBehavior"
     },
     {
-      "Name": "WindowBehavior",
-      "SourcePath": null,
-      "DefaultImplementationOverride": null
+      "Name": "WindowBehavior"
     }
   ],
   "SinglePixelTextureFile": "",
-  "SinglePixelTextureTop": null,
-  "SinglePixelTextureLeft": null,
-  "SinglePixelTextureRight": null,
-  "SinglePixelTextureBottom": null,
   "CustomProperties": []
 }

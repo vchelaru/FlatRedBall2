@@ -1,6 +1,5 @@
 {
   "Name": "ColoredRectangle",
-  "BaseType": null,
   "States": [
     {
       "Name": "Default",
@@ -8,534 +7,188 @@
         {
           "Name": "Alpha",
           "Type": "int",
-          "StandardizedName": null,
           "Category": "Rendering",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 255,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 255
         },
         {
           "Name": "Blend",
           "Type": "Blend",
-          "StandardizedName": null,
           "Category": "Rendering",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "Blue",
           "Type": "int",
-          "StandardizedName": null,
           "Category": "Rendering",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 255,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 255
         },
         {
           "Name": "ColorCategoryState",
-          "Type": "ColorCategory",
-          "StandardizedName": null,
-          "Category": null,
-          "ExposedAsName": null,
-          "SetsValue": false,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "Type": "ColorCategory"
         },
         {
           "Name": "ExposeChildrenEvents",
           "Type": "bool",
-          "StandardizedName": null,
           "Category": "Behavior",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
           "ValueAsBool": false
         },
         {
           "Name": "Green",
           "Type": "int",
-          "StandardizedName": null,
           "Category": "Rendering",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 255,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 255
         },
         {
           "Name": "Guide",
           "Type": "string",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "HasEvents",
           "Type": "bool",
-          "StandardizedName": null,
           "Category": "Behavior",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
           "ValueAsBool": false
         },
         {
           "Name": "Height",
           "Type": "float",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": 50,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsFloat": 50
         },
         {
           "Name": "HeightUnits",
           "Type": "DimensionUnitType",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "IgnoredByParentSize",
           "Type": "bool",
-          "StandardizedName": null,
           "Category": "Parent",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
           "ValueAsBool": false
         },
         {
           "Name": "MaxHeight",
           "Type": "float?",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "MaxWidth",
           "Type": "float?",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "MinHeight",
           "Type": "float?",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "MinWidth",
           "Type": "float?",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "Parent",
           "Type": "string",
-          "StandardizedName": null,
           "Category": "Parent",
-          "ExposedAsName": null,
-          "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "SetsValue": true
         },
         {
           "Name": "Red",
           "Type": "int",
-          "StandardizedName": null,
           "Category": "Rendering",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 255,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 255
         },
         {
           "Name": "Rotation",
           "Type": "float",
-          "StandardizedName": null,
           "Category": "Flip and Rotation",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": 0,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsFloat": 0
         },
         {
           "Name": "State",
           "Type": "State",
-          "StandardizedName": null,
           "Category": "States and Visibility",
-          "ExposedAsName": null,
-          "SetsValue": false,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "Default",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": "Default"
         },
         {
           "Name": "Visible",
           "Type": "bool",
-          "StandardizedName": null,
           "Category": "States and Visibility",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
           "ValueAsBool": true
         },
         {
           "Name": "Width",
           "Type": "float",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": 50,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsFloat": 50
         },
         {
           "Name": "WidthUnits",
           "Type": "DimensionUnitType",
-          "StandardizedName": null,
           "Category": "Dimensions",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "X",
           "Type": "float",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": 0,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsFloat": 0
         },
         {
           "Name": "XOrigin",
           "Type": "HorizontalAlignment",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "XUnits",
           "Type": "PositionUnitType",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "Y",
           "Type": "float",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": 0,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsFloat": 0
         },
         {
           "Name": "YOrigin",
           "Type": "VerticalAlignment",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 0,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 0
         },
         {
           "Name": "YUnits",
           "Type": "PositionUnitType",
-          "StandardizedName": null,
           "Category": "Position",
-          "ExposedAsName": null,
           "SetsValue": true,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": null,
-          "ValueAsFloat": null,
-          "ValueAsInt": 1,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsInt": 1
         }
       ],
       "VariableLists": [
@@ -543,15 +196,7 @@
           "Name": "VariableReferences",
           "Type": "string",
           "Category": "References",
-          "IsFile": false,
-          "IsHiddenInPropertyGrid": false,
-          "StringValues": [],
-          "FloatValues": null,
-          "IntValues": null,
-          "LongValues": null,
-          "DoubleValues": null,
-          "BoolValues": null,
-          "Vector2Values": null
+          "StringValues": []
         }
       ]
     }
@@ -566,79 +211,31 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
-              "Category": null,
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 0,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 0
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
-              "Category": null,
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 0,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 0
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
-              "Category": null,
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 0,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 0
             }
           ],
           "VariableLists": [
             {
               "Name": "VariableReferences",
               "Type": "string",
-              "Category": null,
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Black.Red",
                 "Green = Components/Styles.Black.Green",
                 "Blue = Components/Styles.Black.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -648,59 +245,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 80,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 80
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 70,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 70
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 70,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 70
             }
           ],
           "VariableLists": [
@@ -708,19 +269,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.DarkGray.Red",
                 "Green = Components/Styles.DarkGray.Green",
                 "Blue = Components/Styles.DarkGray.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -730,59 +283,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 130,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 130
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 130,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 130
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 130,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 130
             }
           ],
           "VariableLists": [
@@ -790,19 +307,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Gray.Red",
                 "Green = Components/Styles.Gray.Green",
                 "Blue = Components/Styles.Gray.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -812,59 +321,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 170,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 170
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 170,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 170
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 170,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 170
             }
           ],
           "VariableLists": [
@@ -872,19 +345,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.LightGray.Red",
                 "Green = Components/Styles.LightGray.Green",
                 "Blue = Components/Styles.LightGray.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -894,59 +359,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 255,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 255
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 255,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 255
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 255,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 255
             }
           ],
           "VariableLists": [
@@ -954,19 +383,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.White.Red",
                 "Green = Components/Styles.White.Green",
                 "Blue = Components/Styles.White.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -976,59 +397,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 137,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 137
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 120,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 120
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 4,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 4
             }
           ],
           "VariableLists": [
@@ -1036,19 +421,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.PrimaryDark.Red",
                 "Green = Components/Styles.PrimaryDark.Green",
                 "Blue = Components/Styles.PrimaryDark.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1058,59 +435,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 177,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 177
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 159,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 159
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 6,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 6
             }
           ],
           "VariableLists": [
@@ -1118,19 +459,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Primary.Red",
                 "Green = Components/Styles.Primary.Green",
                 "Blue = Components/Styles.Primary.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1140,59 +473,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 193,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 193
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 180,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 180
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 74,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 74
             }
           ],
           "VariableLists": [
@@ -1200,19 +497,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.PrimaryLight.Red",
                 "Green = Components/Styles.PrimaryLight.Green",
                 "Blue = Components/Styles.PrimaryLight.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1222,59 +511,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 48,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 48
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 167,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 167
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 62,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 62
             }
           ],
           "VariableLists": [
@@ -1282,19 +535,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Success.Red",
                 "Green = Components/Styles.Success.Green",
                 "Blue = Components/Styles.Success.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1304,59 +549,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 25,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 25
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 171,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 171
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 232,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 232
             }
           ],
           "VariableLists": [
@@ -1364,19 +573,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Warning.Red",
                 "Green = Components/Styles.Warning.Green",
                 "Blue = Components/Styles.Warning.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1386,59 +587,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 41,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 41
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 18,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 18
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 212,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 212
             }
           ],
           "VariableLists": [
@@ -1446,19 +611,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Danger.Red",
                 "Green = Components/Styles.Danger.Green",
                 "Blue = Components/Styles.Danger.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         },
@@ -1468,59 +625,23 @@
             {
               "Name": "Blue",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 138,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 138
             },
             {
               "Name": "Green",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 48,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 48
             },
             {
               "Name": "Red",
               "Type": "int",
-              "StandardizedName": null,
               "Category": "Rendering",
-              "ExposedAsName": null,
               "SetsValue": true,
-              "IsFile": false,
-              "IsFont": false,
-              "IsHiddenInPropertyGrid": false,
-              "IsCustomVariable": false,
-              "Description": null,
-              "ValueAsString": null,
-              "ValueAsFloat": null,
-              "ValueAsInt": 140,
-              "ValueAsLong": null,
-              "ValueAsDouble": null,
-              "ValueAsBool": null
+              "ValueAsInt": 140
             }
           ],
           "VariableLists": [
@@ -1528,19 +649,11 @@
               "Name": "VariableReferences",
               "Type": "string",
               "Category": "References",
-              "IsFile": false,
-              "IsHiddenInPropertyGrid": false,
               "StringValues": [
                 "Red = Components/Styles.Accent.Red",
                 "Green = Components/Styles.Accent.Green",
                 "Blue = Components/Styles.Accent.Blue"
-              ],
-              "FloatValues": null,
-              "IntValues": null,
-              "LongValues": null,
-              "DoubleValues": null,
-              "BoolValues": null,
-              "Vector2Values": null
+              ]
             }
           ]
         }
