@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using Apos.Shapes;
@@ -27,11 +28,13 @@ public class AposShapesEmbeddedShaderPortabilityTests
     public void EmbeddedOpenGLShader_DoesNotCallBareTrunc()
     {
         var assembly = typeof(ShapeBatch).Assembly;
-        using var stream = assembly.GetManifestResourceStream("Apos.Shapes.apos-shapes.knifx")
+        // Gzipped since Apos.Shapes 0.9.0.
+        using var stream = assembly.GetManifestResourceStream("Apos.Shapes.apos-shapes.knifx.gz")
             ?? throw new InvalidOperationException(
-                "Apos.Shapes.KNI.dll no longer embeds a resource named 'apos-shapes.knifx' -- " +
+                "Apos.Shapes.KNI.dll no longer embeds a resource named 'apos-shapes.knifx.gz' -- " +
                 "update this test's resource name to match the current package.");
-        using var reader = new StreamReader(stream, Encoding.Latin1);
+        using var gzip = new GZipStream(stream, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzip, Encoding.Latin1);
         var glsl = reader.ReadToEnd();
 
         BareTrunc.IsMatch(glsl).ShouldBeFalse(

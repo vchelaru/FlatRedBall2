@@ -21,7 +21,7 @@ using KernSmith;
 using KernSmith.Gum;
 using KernSmith.Rasterizers.StbTrueType;
 using Gum;
-using MonoGameAndGum.Renderables;
+using Gum.Renderables;
 using Microsoft.Xna.Framework.Content;
 
 namespace FlatRedBall2;
