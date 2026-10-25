@@ -41,10 +41,13 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
 
   On the Motorola, `MeasureStandaloneShapeBatch` split this further: the first `new ShapeBatch` is
   the whole 2.2 s, its first draw (program link) 2-4 ms, and a second `ShapeBatch` in the same process
-  75 ms. The PowerVR phone still ANRs at 5 s; after "Wait" it renders and takes touch. 0.9.1 is slower
-  than 0.8.6's ~142 s raw compile there, and the cost doesn't drop on a second launch. Not yet split
-  into driver compile versus managed work: 0.9.1 doesn't embed the GLSL as plain text, and Gum now
-  requires Apos.Shapes >= 0.9.1, so 0.8.6 can't be swapped in to compare.
+  75 ms. The PowerVR phone still ANRs at 5 s; after "Wait" it renders and takes touch. The cost
+  doesn't drop on a second launch.
+- Correction: the 0.8.6 numbers above (raw `glCompileShader` of the extracted GLSL) and these 0.9.1
+  numbers (end-to-end through Gum) were measured differently. `../AposShapesAndroidBench` measures
+  both versions the same way in a bare KNI app: `new ShapeBatch` takes 142 s (0.8.6) versus 339 s
+  (0.9.1) on the PowerVR phone and 1.29 s versus 2.17 s on the Motorola. 0.9.1 regressed, and the
+  time is GPU driver compile of its 16 fragment-shader variants, not managed work.
 - Source-level tricks did not fix the 0.8.6 first compile on the PowerVR phone (baseline ~142 s):
   `#pragma optimize(off)`, `mediump`, GLSL ES 1.00, and single-pass loop rewrites changed nothing;
   stopping loop unrolling saved 31%; replacing `texture()` with a constant saved 43% but broke rendering.
