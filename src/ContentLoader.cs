@@ -10,7 +10,7 @@ using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 namespace FlatRedBall2;
 
 /// <summary>
-/// Per-screen content loader. Wraps MonoGame's <see cref="ContentManager"/> with extension-based
+/// Per-screen content loader. Wraps KNI's <see cref="ContentManager"/> with extension-based
 /// routing so <c>Load&lt;Texture2D&gt;("ship.png")</c> bypasses the XNB pipeline and loads PNG
 /// files directly from disk; tracked PNG textures additionally support in-place hot-reload via
 /// <see cref="TryReload"/>.
@@ -22,7 +22,7 @@ namespace FlatRedBall2;
 /// </summary>
 public class ContentLoader
 {
-    private ContentManager? _contentManager;
+    private UnloadableContentManager? _contentManager;
     private GraphicsDevice? _graphicsDevice;
     private readonly List<IDisposable> _tracked = new();
 
@@ -64,7 +64,7 @@ public class ContentLoader
         TextureReloader = DefaultTextureReloader;
     }
 
-    internal void Initialize(ContentManager contentManager, GraphicsDevice graphicsDevice)
+    internal void Initialize(UnloadableContentManager contentManager, GraphicsDevice graphicsDevice)
     {
         _contentManager = contentManager;
         _graphicsDevice = graphicsDevice;
@@ -80,9 +80,9 @@ public class ContentLoader
     /// it for hot-reload via <see cref="TryReload"/>. Second call with the same path
     /// returns the cached instance.</description></item>
     /// <item><description><c>Load&lt;Texture2D&gt;("ship_0001")</c> (no extension) — goes
-    /// through MonoGame's compiled xnb pipeline. Not tracked for hot-reload (xnb is a
+    /// through KNI's compiled xnb pipeline. Not tracked for hot-reload (xnb is a
     /// build artifact and can't be reloaded at runtime).</description></item>
-    /// <item><description>Any other <c>T</c> — delegates to the MonoGame content pipeline.</description></item>
+    /// <item><description>Any other <c>T</c> — delegates to the KNI content pipeline.</description></item>
     /// </list>
     /// <para>
     /// <b>Cannot load JSON or save data.</b> JSON has no XNB representation; attempting
@@ -173,12 +173,21 @@ public class ContentLoader
     }
 
     /// <summary>
-    /// Currently a no-op: KNI's <c>ContentManager</c> has no <c>UnloadAsset</c> yet (upstream
-    /// kniEngine/kni#2739). Pipeline-loaded assets are released by <see cref="UnloadAll"/>, as are
-    /// file-loaded textures tracked via <see cref="TryReload"/>.
+    /// Disposes one asset previously loaded through <see cref="Load{T}"/> with the same
+    /// <paramref name="path"/> and drops it from the cache, so the next <c>Load</c> returns a
+    /// fresh instance. Does nothing if the path isn't loaded. External references inside a
+    /// pipeline asset (e.g. a model's textures) are cached separately and stay loaded.
+    /// Any object still holding the unloaded asset holds a disposed instance.
     /// </summary>
     public void Unload(string path)
     {
+        if (Path.HasExtension(path)
+            && _textureRegistry.Remove(CanonicalizeSlashes(path), out var texture))
+        {
+            texture?.Dispose();
+            return;
+        }
+        _contentManager?.UnloadAsset(path);
     }
 
     /// <summary>

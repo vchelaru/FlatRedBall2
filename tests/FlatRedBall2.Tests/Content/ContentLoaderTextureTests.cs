@@ -18,6 +18,20 @@ public class ContentLoaderTextureTests
     // registry bookkeeping (call counts, arguments, return values).
 
     [Fact]
+    public void Unload_TextureWithExtension_NextLoadCallsLoaderAgain()
+    {
+        var svc = new ContentLoader();
+        int loadCount = 0;
+        svc.TextureLoader = _ => { loadCount++; return null!; };
+        svc.Load<Texture2D>("Content/ship.png");
+
+        svc.Unload("Content/ship.png");
+        svc.Load<Texture2D>("Content/ship.png");
+
+        loadCount.ShouldBe(2);
+    }
+
+    [Fact]
     public void TryReload_PathNotRegistered_ReturnsFalse()
     {
         var svc = new ContentLoader();

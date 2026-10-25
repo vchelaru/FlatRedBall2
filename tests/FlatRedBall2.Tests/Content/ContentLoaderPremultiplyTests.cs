@@ -29,7 +29,7 @@ public class ContentLoaderPremultiplyTests
         if (!_fixture.IsAvailable)
             return null;
         var loader = new ContentLoader();
-        loader.Initialize(_fixture.Game!.Content, _fixture.GraphicsDevice!);
+        loader.Initialize(new UnloadableContentManager(_fixture.Game!.Services, _fixture.Game.Content.RootDirectory), _fixture.GraphicsDevice!);
         loader.StreamProvider = _ => new MemoryStream(png);
         return loader;
     }
