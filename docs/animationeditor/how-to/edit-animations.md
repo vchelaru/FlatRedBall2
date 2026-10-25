@@ -76,6 +76,12 @@ To turn looping on or off, click the **Loop** checkbox in the **Inspector** tab,
 
 <figure><img src="../../.gitbook/assets/edit-animations-loop.png" alt="Loop checkbox in the Inspector and the loop button next to the timeline"><figcaption></figcaption></figure>
 
+## Play Back and Forth, or Backward
+
+**Ping-Pong** plays an animation forward and then backward (frames 1 2 3 2 1 2 3...), without repeating the first and last frames. **Reverse** starts on the last frame and plays backward. Turn either on with its checkbox in the **Inspector** tab or its button next to the timeline. With both on, the animation plays backward first, then forward.
+
+With **Loop** off, a ping-pong animation plays one round trip and stops on the frame it started on. Frame interpolation plays backward too, so a glide retraces its forward path. Runtimes that don't support these settings play the animation forward as usual.
+
 ## Lock an Animation
 
 Locked animations prevent accidental editing. To lock an animation, hover over the animation in the list and click the lock icon.

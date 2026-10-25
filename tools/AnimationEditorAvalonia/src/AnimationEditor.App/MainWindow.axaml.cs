@@ -3424,6 +3424,9 @@ public partial class MainWindow : Window
             if (chains.Count == 0 || LoopToggle.IsChecked is not { } loop) return;
             _appCommands.SetChainsLoop(chains, loop);
         };
+        // PingPong and Reverse (#1538) work the same way, mirroring the Inspector's checkboxes.
+        PingPongToggle.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PingPongToggle, _appCommands.SetChainsPingPong);
+        ReverseToggle.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(ReverseToggle, _appCommands.SetChainsReverse);
 
         TimelineStrip.ItemsSource = _timelineFrames;
         // The keyframe lanes sit outside the cells' ScrollViewer so they must follow its scroll (#1478).
@@ -3485,6 +3488,11 @@ public partial class MainWindow : Window
 
     private void OnPlaybackTicked()
     {
+        // PingPong flips direction mid-playback; the keyframe lanes follow it (#1538).
+        if (PreviewCtrl.Playback.IsBackward != _keyframeLanesBackward
+            && ReferenceEquals(PreviewCtrl.Playback.Chain, TimelineChainResolver.GetChain(_selectedState, _objectFinder)))
+            RefreshKeyframeLanes();
+
         if (_selectedState.SelectedFrame is not null)
             return;
 
@@ -3498,8 +3506,8 @@ public partial class MainWindow : Window
         // Move the playhead at a constant PixelsPerSecond rate.
         // For clamped cells (shorter than natural proportional width) the playhead parks
         // at the right edge until the frame advances rather than speeding up.
-        double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
-        _timelineFrames[idx].ScrubberOffset = offset;
+        _timelineFrames[idx].ScrubberOffset = TimelineBuilder.PlayheadOffset(
+            elapsed, _timelineEffectivePps, travelWidth, PreviewCtrl.Playback.IsBackward);
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────
@@ -5085,8 +5093,7 @@ public partial class MainWindow : Window
 
         // Keyframe flags and curves are not part of the signature, so the lanes are recomputed on every
         // refresh (an O(frames) pass) from the live cell widths.
-        var cellWidths = _timelineFrames.Select(f => f.Width).ToList();
-        SetKeyframeLanes(TimelineLanePlanner.Build(chain, _selectedState.SelectedShapes, cellWidths), groupActive: false);
+        RefreshKeyframeLanes(chain);
 
         int preferred = TimelineChainResolver.GetPreferredFrameIndex(
             _selectedState, _objectFinder, chain, PreviewCtrl.Playback.CurrentFrameIndex);
@@ -5094,6 +5101,23 @@ public partial class MainWindow : Window
         // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
         // sub-frame offset instead of snapping to the cell's left edge (#432).
         ApplyScrubberOffsetFromPlayback(preferred);
+    }
+
+    // Whether the lanes on screen were built for backward playback (#1538), so a ping-pong turnaround rebuilds them.
+    private bool _keyframeLanesBackward;
+
+    private void RefreshKeyframeLanes() => RefreshKeyframeLanes(TimelineChainResolver.GetChain(_selectedState, _objectFinder));
+
+    private void RefreshKeyframeLanes(AnimationChainSave? chain)
+    {
+        if (_selectedState.PreviewChains.Count >= 2) return; // the group timeline shows no lanes
+        // The lanes follow the playing direction; a chain the preview isn't playing shows its starting direction.
+        _keyframeLanesBackward = ReferenceEquals(PreviewCtrl.Playback.Chain, chain)
+            ? PreviewCtrl.Playback.IsBackward
+            : chain?.Reverse == true;
+        var cellWidths = _timelineFrames.Select(f => f.Width).ToList();
+        SetKeyframeLanes(TimelineLanePlanner.Build(chain, _selectedState.SelectedShapes, cellWidths, _keyframeLanesBackward),
+            groupActive: false);
     }
 
     private void ApplyTimelineDockHeight(double dockHeight)
@@ -5153,7 +5177,8 @@ public partial class MainWindow : Window
         if (frameIndex < 0 || frameIndex >= _timelineFrames.Count) return;
         double elapsed = PreviewCtrl.Playback.FrameElapsed;
         double travelWidth = Math.Max(0, _timelineFrames[frameIndex].Width - TimelineFrameVm.PlayheadWidth);
-        _timelineFrames[frameIndex].ScrubberOffset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
+        bool backward = PreviewCtrl.Playback.CurrentFrameIndex == frameIndex && PreviewCtrl.Playback.IsBackward;
+        _timelineFrames[frameIndex].ScrubberOffset = TimelineBuilder.PlayheadOffset(elapsed, _timelineEffectivePps, travelWidth, backward);
     }
 
     // ── Multi-select group preview timeline (#576) ──────────────────────────────
@@ -5252,7 +5277,7 @@ public partial class MainWindow : Window
                 track.Frames[i].IsCurrent = i == idx;
 
             double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
-            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * sharedPps, travelWidth);
+            track.Frames[idx].ScrubberOffset = TimelineBuilder.PlayheadOffset(playback.FrameElapsed, sharedPps, travelWidth, playback.IsBackward);
         }
     }
 
@@ -5622,6 +5647,8 @@ public partial class MainWindow : Window
         PropChainName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyChainName(); };
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
+        PropChainPingPong.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PropChainPingPong, _appCommands.SetChainsPingPong);
+        PropChainReverse.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PropChainReverse, _appCommands.SetChainsReverse);
         PropChainTsxOwnerInput.ValueChanged += (_, _) => ApplyChainTsxOwnerTileId();
         PropChainTsxOwnerSyncButton.Click += (_, _) => SyncChainTsxOwnerTileIdToFirstFrame();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -6018,6 +6045,8 @@ public partial class MainWindow : Window
                 // Checked only when every selected chain loops; indeterminate when they disagree.
                 var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
                 PropChainLoop.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
+                PropChainPingPong.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
+                PropChainReverse.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
             }
             // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
             // tile to own. Re-reads on every refresh (not just selection change) so an edit made
@@ -6055,6 +6084,8 @@ public partial class MainWindow : Window
             {
                 var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
                 LoopToggle.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
+                PingPongToggle.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
+                ReverseToggle.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
             }
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
@@ -6071,6 +6102,8 @@ public partial class MainWindow : Window
             // A Tiled tile animation always loops: Loop (#1120) has no tsx representation.
             PropChainLoop.IsEnabled = !_projectManager.IsNativeTsxProject;
             LoopToggle.IsEnabled    = !_projectManager.IsNativeTsxProject;
+            PropChainPingPong.IsEnabled = PropChainReverse.IsEnabled = !_projectManager.IsNativeTsxProject;
+            PingPongToggle.IsEnabled = ReverseToggle.IsEnabled = !_projectManager.IsNativeTsxProject;
 
             // Disable (not just visually leave typeable) whichever panel is showing when its
             // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled
@@ -6455,6 +6488,22 @@ public partial class MainWindow : Window
     /// The animations a chain-level inspector field (Locked, Loop) applies to: every selected
     /// animation, or the primary one when nothing is multi-selected.
     /// </summary>
+    // A PingPong/Reverse checkbox or toggle (#1538) sets its flag on every selected chain, as one undo step.
+    private void ApplyChainPlaybackMode(ToggleButton source, Action<IReadOnlyList<AnimationChainSave>, bool> set)
+    {
+        if (_suppressPropRefresh) return;
+        var chains = ChainsForChainProperties();
+        if (chains.Count == 0 || source.IsChecked is not { } value) return;
+        set(chains, value);
+    }
+
+    // Checked when every selected chain has the flag, unchecked when none does, indeterminate when they disagree.
+    private bool? SharedChainFlag(AnimationChainSave selectedChain, Func<AnimationChainSave, bool> flag)
+    {
+        var states = _selectedState.SelectedChains.Select(flag).Append(flag(selectedChain)).Distinct().ToList();
+        return states.Count > 1 ? null : states[0];
+    }
+
     private List<AnimationChainSave> ChainsForChainProperties()
     {
         var chains = _selectedState.SelectedChains;

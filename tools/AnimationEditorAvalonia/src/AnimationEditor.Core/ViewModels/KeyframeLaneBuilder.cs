@@ -4,8 +4,14 @@ using FlatRedBall2.AnimationEditorCommon;
 namespace AnimationEditor.Core.ViewModels;
 
 /// <summary>One keyframe-to-next-keyframe stretch of a lane, in the timeline strip's content pixels.</summary>
-/// <param name="Curve">The starting keyframe's curve, the one the evaluator uses for the whole stretch.</param>
-public readonly record struct KeyframeLaneSpan(double StartX, double EndX, KeyframeCurve Curve);
+/// <param name="Curve">The earlier keyframe's curve, the one the evaluator uses for the whole stretch in either direction.</param>
+/// <param name="Backward">Played right to left (#1538): the value leaves the right keyframe and arrives at the left one.
+/// The curve's shape over x is the same as forward (the backward glide retraces it); only snap differs, holding the right value.</param>
+/// <param name="TStart">Where in the curve (0..1, left keyframe to right) this piece starts; a backward glide across the
+/// loop point is split into two pieces at the strip's ends.</param>
+/// <param name="TEnd">Where in the curve this piece ends.</param>
+public readonly record struct KeyframeLaneSpan(double StartX, double EndX, KeyframeCurve Curve,
+    bool Backward = false, double TStart = 0, double TEnd = 1);
 
 /// <summary>A stretch where a keyframe's value is held with nothing after it to glide to (drawn as a flat solid line).</summary>
 public readonly record struct KeyframeLaneHold(double StartX, double EndX);
@@ -52,7 +58,8 @@ public static class KeyframeLaneBuilder
     /// <see cref="EffectiveFrameColor"/>. <paramref name="cellWidths"/> are the strip's cell widths, one
     /// per frame; a span's x range is the sum of the widths it covers.
     /// </summary>
-    public static KeyframeLane? Build(AnimationChainSave? chain, KeyframeGroup group, IReadOnlyList<double> cellWidths)
+    public static KeyframeLane? Build(AnimationChainSave? chain, KeyframeGroup group, IReadOnlyList<double> cellWidths,
+        bool backward = false)
     {
         if (chain is null || chain.Frames.Count == 0 || cellWidths.Count < chain.Frames.Count)
             return null;
@@ -60,6 +67,7 @@ public static class KeyframeLaneBuilder
         int count = chain.Frames.Count;
         var edges = new double[count + 1];
         for (int i = 0; i < count; i++) edges[i + 1] = edges[i] + cellWidths[i];
+        bool wraps = PlaybackOrder.GlidesAcrossLoop(chain.Loop, chain.PingPong);
 
         var keyframes = new List<int>();
         for (int i = 0; i < count; i++)
@@ -69,27 +77,62 @@ public static class KeyframeLaneBuilder
         }
         if (keyframes.Count < 2) return null;
 
-        var spans = new List<KeyframeLaneSpan>();
-        for (int k = 0; k < keyframes.Count; k++)
+        KeyframeCurve CurveAt(int frame)
         {
-            bool isLast = k == keyframes.Count - 1;
-            if (isLast && !chain.Loop) break;
-            int from = keyframes[k];
-            double endX = isLast ? edges[count] : edges[keyframes[k + 1]];
-            var (type, easing) = KeyframeInspectorState.GetCurve(group, chain.Frames[from]);
-            spans.Add(new KeyframeLaneSpan(edges[from], endX, KeyframeCurve.Parse(type, easing)));
+            var (type, easing) = KeyframeInspectorState.GetCurve(group, chain.Frames[frame]);
+            return KeyframeCurve.Parse(type, easing);
+        }
+
+        var spans = new List<KeyframeLaneSpan>();
+        var holds = new List<KeyframeLaneHold>();
+        IReadOnlyList<double> keyframeXs;
+        if (!backward)
+        {
+            for (int k = 0; k < keyframes.Count; k++)
+            {
+                bool isLast = k == keyframes.Count - 1;
+                if (isLast && !wraps) break;
+                int from = keyframes[k];
+                double endX = isLast ? edges[count] : edges[keyframes[k + 1]];
+                spans.Add(new KeyframeLaneSpan(edges[from], endX, CurveAt(from)));
+            }
+            if (!wraps) holds.Add(new KeyframeLaneHold(edges[keyframes[^1]], edges[count]));
+            keyframeXs = keyframes.Select(i => edges[i]).ToList();
+        }
+        else
+        {
+            // Showing frame N glides back to the previous keyframe, arriving when that frame starts: the span between
+            // keyframes J < K covers cells J+1..K, and K's value is reached at its cell's right edge.
+            for (int k = 1; k < keyframes.Count; k++)
+                spans.Add(new KeyframeLaneSpan(edges[keyframes[k - 1] + 1], edges[keyframes[k] + 1], CurveAt(keyframes[k - 1]), Backward: true));
+            int last = keyframes[^1];
+            if (wraps)
+                AddBackwardWrap(spans, edges, count, last, CurveAt(last));
+            else
+            {
+                holds.Add(new KeyframeLaneHold(edges[0], edges[1]));
+                // Cells after the last keyframe show it, as they do going forward.
+                if (last < count - 1) holds.Add(new KeyframeLaneHold(edges[last + 1], edges[count]));
+            }
+            keyframeXs = keyframes.Select(i => edges[i + 1]).ToList();
         }
 
         bool inUse = spans.Any(sp => !sp.Curve.IsSnap) || ValuesDiffer(chain, group, keyframes);
         if (!inUse) return null;
 
-        double lastX = edges[keyframes[^1]];
-        return new KeyframeLane(
-            keyframes.Select(i => edges[i]).ToList(),
-            spans,
-            chain.Loop ? Array.Empty<KeyframeLaneHold>() : new[] { new KeyframeLaneHold(lastX, edges[count]) },
-            edges[count],
-            edges.Skip(1).ToList());
+        return new KeyframeLane(keyframeXs, spans, holds, edges[count], edges.Skip(1).ToList());
+    }
+
+    // The backward glide from frame 0 across the loop point to the last keyframe L shows cell 0, then cells L+1..end:
+    // one curve split into two pieces, the strip's right end (L+1..end, from L's side) and its left cell (frame 0).
+    private static void AddBackwardWrap(List<KeyframeLaneSpan> spans, double[] edges, int count, int last, KeyframeCurve curve)
+    {
+        double first = edges[1] - edges[0];
+        double tail = edges[count] - edges[last + 1];
+        double split = first + tail > 0 ? tail / (first + tail) : 0;
+        if (tail > 0)
+            spans.Add(new KeyframeLaneSpan(edges[last + 1], edges[count], curve, Backward: true, TStart: 0, TEnd: split));
+        spans.Add(new KeyframeLaneSpan(edges[0], edges[1], curve, Backward: true, TStart: split, TEnd: 1));
     }
 
     /// <summary>
@@ -105,7 +148,8 @@ public static class KeyframeLaneBuilder
     /// some span glides. <paramref name="cellWidths"/> are the strip's cell widths, one per frame.
     /// </summary>
     public static KeyframeLane? BuildShape(
-        AnimationChainSave? chain, ShapeSave? shape, ShapeKeyframeGroup group, IReadOnlyList<double> cellWidths)
+        AnimationChainSave? chain, ShapeSave? shape, ShapeKeyframeGroup group, IReadOnlyList<double> cellWidths,
+        bool backward = false)
     {
         if (chain is null || shape is null || chain.Frames.Count == 0 || cellWidths.Count < chain.Frames.Count) return null;
         if (!KeyframeInspectorState.HasGroup(group, shape)) return null;
@@ -124,6 +168,11 @@ public static class KeyframeLaneBuilder
 
         var edges = new double[count + 1];
         for (int i = 0; i < count; i++) edges[i + 1] = edges[i] + cellWidths[i];
+        bool wraps = PlaybackOrder.GlidesAcrossLoop(chain.Loop, chain.PingPong);
+        int? wrapTo = backward && wraps && match[0] is not null && match[count - 1] is not null
+            ? WrapTarget(match, count, group)
+            : null;
+        if (wrapTo == 0) wrapTo = null; // one keyframe spanning the whole chain: nothing to glide to
 
         var keyframeXs = new List<double>();
         var spans = new List<KeyframeLaneSpan>();
@@ -141,24 +190,51 @@ public static class KeyframeLaneBuilder
             for (int i = runStart + 1; i <= runEnd; i++)
                 if (!IsSkipped(group, match[i]!)) keyframes.Add(i);
 
-            for (int k = 0; k < keyframes.Count; k++)
+            if (!backward)
             {
-                int from = keyframes[k];
-                keyframeXs.Add(edges[from]);
-                bool isLast = k == keyframes.Count - 1;
-                if (!isLast)
+                for (int k = 0; k < keyframes.Count; k++)
                 {
-                    spans.Add(new KeyframeLaneSpan(edges[from], edges[keyframes[k + 1]], SpanCurve(group, match[from]!, match[keyframes[k + 1]]!)));
-                    valuesDiffer |= ValuesDiffer(group, match[from]!, match[keyframes[k + 1]]!);
+                    int from = keyframes[k];
+                    keyframeXs.Add(edges[from]);
+                    bool isLast = k == keyframes.Count - 1;
+                    if (!isLast)
+                    {
+                        spans.Add(new KeyframeLaneSpan(edges[from], edges[keyframes[k + 1]], SpanCurve(group, match[from]!, match[keyframes[k + 1]]!)));
+                        valuesDiffer |= ValuesDiffer(group, match[from]!, match[keyframes[k + 1]]!);
+                    }
+                    else if (runEnd == count - 1 && wraps && match[0] is not null && from != 0)
+                    {
+                        spans.Add(new KeyframeLaneSpan(edges[from], edges[count], SpanCurve(group, match[from]!, match[0]!)));
+                    }
+                    else
+                    {
+                        holds.Add(new KeyframeLaneHold(edges[from], edges[runEnd + 1]));
+                    }
                 }
-                else if (runEnd == count - 1 && chain.Loop && match[0] is not null && from != 0)
+            }
+            else
+            {
+                // Backward (#1538): the span between keyframes J < K covers cells J+1..K, K is reached at its right edge.
+                for (int k = 0; k < keyframes.Count; k++)
                 {
-                    spans.Add(new KeyframeLaneSpan(edges[from], edges[count], SpanCurve(group, match[from]!, match[0]!)));
+                    int to = keyframes[k];
+                    keyframeXs.Add(edges[to + 1]);
+                    if (k > 0)
+                    {
+                        int from = keyframes[k - 1];
+                        spans.Add(new KeyframeLaneSpan(edges[from + 1], edges[to + 1], SpanCurve(group, match[from]!, match[to]!), Backward: true));
+                        valuesDiffer |= ValuesDiffer(group, match[from]!, match[to]!);
+                    }
                 }
+                // A run's first cell holds going backward, unless it is frame 0 and glides across the loop point to the
+                // last keyframe of the run that ends the chain; that glide also covers the cells after that keyframe.
+                if (runStart == 0 && wrapTo is int target)
+                    AddBackwardWrap(spans, edges, count, target, SpanCurve(group, match[target]!, match[0]!));
                 else
-                {
-                    holds.Add(new KeyframeLaneHold(edges[from], edges[runEnd + 1]));
-                }
+                    holds.Add(new KeyframeLaneHold(edges[runStart], edges[runStart + 1]));
+                int last = keyframes[^1];
+                bool tailWraps = runEnd == count - 1 && wrapTo is not null;
+                if (!tailWraps && last < runEnd) holds.Add(new KeyframeLaneHold(edges[last + 1], edges[runEnd + 1]));
             }
 
             for (int i = runStart; i <= runEnd; i++) ticks.Add(edges[i + 1]);
@@ -167,6 +243,16 @@ public static class KeyframeLaneBuilder
 
         bool inUse = valuesDiffer || spans.Any(sp => !sp.Curve.IsSnap);
         return inUse ? new KeyframeLane(keyframeXs, spans, holds, edges[count], ticks) : null;
+    }
+
+    // The last keyframe of the run that ends the chain: where a backward glide from frame 0 across the loop arrives.
+    private static int WrapTarget(IKeyframeShape?[] match, int count, ShapeKeyframeGroup group)
+    {
+        int runStart = count - 1;
+        while (runStart > 0 && match[runStart - 1] is not null) runStart--;
+        for (int i = count - 1; i > runStart; i--)
+            if (!IsSkipped(group, match[i]!)) return i;
+        return runStart;
     }
 
     private static bool IsSkipped(ShapeKeyframeGroup group, IKeyframeShape shape) => group switch
@@ -238,19 +324,27 @@ public static class KeyframeLaneBuilder
     /// <summary>
     /// The polyline of <paramref name="curve"/> over one span: <c>T</c> is 0..1 across the span's width and
     /// <c>Progress</c> the eased value (0 at the left keyframe, 1 at the next; Back and Bounce leave 0..1
-    /// in between). Snap is flat, then jumps at the end, rather than sampled. Uses the shared
-    /// <see cref="KeyframeCurve.Evaluate"/>, so it is exactly what playback does.
+    /// in between). Snap is flat, then jumps at the end, rather than sampled; played <paramref name="backward"/> it
+    /// holds the right keyframe and jumps at the left edge instead. A glide's shape is the same either way, since
+    /// backward playback retraces it. <paramref name="tStart"/>..<paramref name="tEnd"/> is the part of the curve the
+    /// span draws (a piece of a split span). Uses the shared <see cref="KeyframeCurve.Evaluate"/>, so it is exactly
+    /// what playback does.
     /// </summary>
-    public static IReadOnlyList<(double T, double Progress)> CurvePoints(KeyframeCurve curve, int steps)
+    public static IReadOnlyList<(double T, double Progress)> CurvePoints(KeyframeCurve curve, int steps,
+        bool backward = false, double tStart = 0, double tEnd = 1)
     {
-        if (curve.IsSnap) return new (double, double)[] { (0, 0), (1, 0), (1, 1) };
+        if (curve.IsSnap)
+        {
+            if (!backward) return new (double, double)[] { (0, 0), (1, 0), (1, 1) };
+            return tStart <= 0 ? new (double, double)[] { (0, 0), (0, 1), (1, 1) } : new (double, double)[] { (0, 1), (1, 1) };
+        }
 
         steps = Math.Max(1, steps);
         var points = new (double, double)[steps + 1];
         for (int i = 0; i <= steps; i++)
         {
             double t = (double)i / steps;
-            points[i] = (t, curve.Evaluate((float)t));
+            points[i] = (t, curve.Evaluate((float)(tStart + t * (tEnd - tStart))));
         }
         return points;
     }

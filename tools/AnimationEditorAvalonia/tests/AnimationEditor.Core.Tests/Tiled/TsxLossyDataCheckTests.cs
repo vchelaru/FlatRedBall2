@@ -83,6 +83,19 @@ public class TsxLossyDataCheckTests
         Assert.Contains("loop", warning);
     }
 
+    [Fact]
+    public void Warnings_PingPongOrReverseChain_NamesThem()
+    {
+        var chain = CleanChain("Bob");
+        chain.PingPong = true;
+        chain.Reverse = true;
+
+        var warning = Assert.Single(TsxLossyDataCheck.Warnings(WithChain(chain)));
+
+        Assert.Contains("ping-pong", warning);
+        Assert.Contains("reverse", warning);
+    }
+
     // One warning per chain, however many frames or kinds of data it carries.
     [Fact]
     public void Warnings_SeveralKindsAcrossFrames_OneWarningPerChain()

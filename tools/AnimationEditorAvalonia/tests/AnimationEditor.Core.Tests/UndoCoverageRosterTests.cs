@@ -155,6 +155,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetChainsLocked)]              = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainLoop)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.SetChainsLoop)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetChainsPingPong)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetChainsReverse)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrameEvent)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameEvent)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.RemoveFrameEvent)]             = Category.MutatingUndoable,
@@ -474,6 +476,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetChainLoop(Zebra(ctx), false)));
         yield return Row(nameof(IAppCommands.SetChainsLoop),
             ctx => Sync(() => ctx.AppCommands.SetChainsLoop(new[] { Zebra(ctx), Alpha(ctx) }, false)));
+        yield return Row(nameof(IAppCommands.SetChainsPingPong),
+            ctx => Sync(() => ctx.AppCommands.SetChainsPingPong(new[] { Zebra(ctx), Alpha(ctx) }, true)));
+        yield return Row(nameof(IAppCommands.SetChainsReverse),
+            ctx => Sync(() => ctx.AppCommands.SetChainsReverse(new[] { Zebra(ctx) }, true)));
         yield return Row(nameof(IAppCommands.AddFrameEvent),
             ctx => Sync(() => ctx.AppCommands.AddFrameEvent(Zebra(ctx).Frames[0], "Added")));
         yield return Row(nameof(IAppCommands.SetFrameEvent),

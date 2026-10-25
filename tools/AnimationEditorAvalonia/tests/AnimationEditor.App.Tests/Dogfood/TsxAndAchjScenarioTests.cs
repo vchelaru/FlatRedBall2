@@ -214,6 +214,8 @@ public class TsxAndAchjScenarioTests
         grid.IsChecked.ShouldBe(true, "a tileset's grid is its tile size and cannot be turned off");
         editor.Control<Control>("PropChainTsxOwnerSection").IsVisible.ShouldBeTrue();
         editor.Control<CheckBox>("PropChainLoop").IsEnabled.ShouldBeFalse();
+        editor.Control<CheckBox>("PropChainPingPong").IsEnabled.ShouldBeFalse();
+        editor.Control<ToggleButton>("ReverseToggle").IsEnabled.ShouldBeFalse();
         editor.Expand(chain);
         editor.ClickRow(chain.Frames[0]);
         editor.Control<Control>("PropTransformSection").IsVisible.ShouldBeFalse();

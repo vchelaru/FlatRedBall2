@@ -134,6 +134,27 @@ namespace AnimationEditor.Core.CommandsAndState
                 : new CompositeCommand(commands, loop ? $"Enable loop on {commands.Length} animations" : $"Disable loop on {commands.Length} animations"));
         }
 
+        public void SetChainsPingPong(IReadOnlyList<AnimationChainSave> chains, bool pingPong) =>
+            SetChainsPlaybackMode(chains, ChainPlaybackMode.PingPong, pingPong);
+
+        public void SetChainsReverse(IReadOnlyList<AnimationChainSave> chains, bool reverse) =>
+            SetChainsPlaybackMode(chains, ChainPlaybackMode.Reverse, reverse);
+
+        private void SetChainsPlaybackMode(IReadOnlyList<AnimationChainSave> chains, ChainPlaybackMode mode, bool value)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var commands = chains
+                .Distinct()
+                .Where(c => SetChainPlaybackModeCommand.Get(c, mode) != value)
+                .Select(c => (IUndoableCommand)new SetChainPlaybackModeCommand(c, mode, value, this, _events))
+                .ToArray();
+            if (commands.Length == 0) return;
+            _undoManager.Execute(commands.Length == 1
+                ? commands[0]
+                : new CompositeCommand(commands,
+                    $"{(value ? "Enable" : "Disable")} {SetChainPlaybackModeCommand.Label(mode)} on {commands.Length} animations"));
+        }
+
         public string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId)
         {
             var command = new SetChainTsxOwnerTileIdCommand(chain, tileId, _pm, this, _events);

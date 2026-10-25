@@ -40,6 +40,7 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `PlayAnimation(AnimationChain chain)` | — | Play a specific chain directly |
 | `Animate` | `false` | Auto-managed. **Do not write to express idle state** — see Gotchas |
 | `IsLooping` | seeded from `AnimationChain.Loop` on `PlayAnimation` | overridable per-instance after `PlayAnimation` — set it before that and it gets reseeded |
+| `IsPingPong`, `IsReversed` | seeded from `AnimationChain.PingPong`/`Reversed` the same way | Ping-pong plays A B C B A B… (ends not repeated); one round trip is one `AnimationLooped`, and with `IsLooping` off it stops back on the first frame shown. Reversed starts on the last frame. Keyframe curves play time-reversed on backward frames (see `KeyframeEvaluator` remarks) |
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends |

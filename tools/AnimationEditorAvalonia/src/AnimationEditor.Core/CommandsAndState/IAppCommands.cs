@@ -232,6 +232,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Sets Loop on every chain whose value differs, as one undo step.</summary>
         void SetChainsLoop(IReadOnlyList<AnimationChainSave> chains, bool loop);
 
+        /// <summary>Sets <see cref="AnimationChainSave.PingPong"/> on every chain whose value differs, as one undo step (#1538).</summary>
+        void SetChainsPingPong(IReadOnlyList<AnimationChainSave> chains, bool pingPong);
+
+        /// <summary>Sets <see cref="AnimationChainSave.Reverse"/> on every chain whose value differs, as one undo step (#1538).</summary>
+        void SetChainsReverse(IReadOnlyList<AnimationChainSave> chains, bool reverse);
+
         /// <summary>
         /// Explicitly overrides which Tiled tile id <paramref name="chain"/>'s <c>&lt;animation&gt;</c>
         /// is written to on the next save (issue #1182) -- e.g. an Inspector field the user typed

@@ -189,6 +189,7 @@
 | PL03 | Stop / reset animation | Returns to first frame |
 | PL04 | Speed multiplier | Scales playback speed |
 | PL05 | Loop animation | Wraps from last frame back to first |
+| PL05b | Ping-Pong / Reverse (#1538) | Per-chain `PropChainPingPong`/`PropChainReverse` checkboxes and `PingPongToggle`/`ReverseToggle`; playback follows `PlaybackOrder`, backward frames sample curves reversed, and the keyframe lanes redraw for the current direction |
 | PL06 | Preview flip H/V | Applies chain-level flip to preview |
 | PL07 | Onion skin | When a single frame is pinned, renders the previous frame at 50% alpha behind it; wraps index for the first frame; toggled by `OnionSkinToggle` |
 | PL08a | Origin crosshair overlay | Toggles a fixed crosshair through world origin (0,0) over the preview canvas; controlled by `ShowOriginCheck` |

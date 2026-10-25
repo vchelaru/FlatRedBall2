@@ -51,7 +51,10 @@ public static class AnimationCloneHelper
 
     public static AnimationChainSave CloneChain(AnimationChainSave source)
     {
-        var copy = new AnimationChainSave { Name = source.Name, Loop = source.Loop, IsLocked = source.IsLocked };
+        var copy = new AnimationChainSave
+        {
+            Name = source.Name, Loop = source.Loop, PingPong = source.PingPong, Reverse = source.Reverse, IsLocked = source.IsLocked,
+        };
         foreach (var frame in source.Frames)
             copy.Frames.Add(CloneFrame(frame));
         return copy;

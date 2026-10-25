@@ -102,6 +102,17 @@ public static class TimelineBuilder
     /// <summary>Formats a duration in seconds for display, e.g. <c>1.5</c> → <c>"1.50s"</c>.</summary>
     public static string FormatSeconds(float seconds) => $"{seconds:0.00}s";
 
+    /// <summary>
+    /// The playhead's offset into its cell, <paramref name="elapsed"/> seconds into the frame at
+    /// <paramref name="pixelsPerSecond"/>, parked at <paramref name="travelWidth"/> when the cell is shorter than its
+    /// natural width. A frame playing <paramref name="backward"/> (#1538) runs from the cell's right edge to its left.
+    /// </summary>
+    public static double PlayheadOffset(double elapsed, double pixelsPerSecond, double travelWidth, bool backward)
+    {
+        double travelled = Math.Min(elapsed * pixelsPerSecond, travelWidth);
+        return backward ? travelWidth - travelled : travelled;
+    }
+
     public static List<TimelineFrameVm> BuildFrameItems(AnimationChainSave? chain) =>
         BuildFrameItems(chain, ComputeEffectivePixelsPerSecond(chain));
 

@@ -922,6 +922,15 @@
                                                 <CheckBox x:Name="PropChainLoop"
                                                           Content="Loop"
                                                           AutomationProperties.AutomationId="prop-chain-loop" />
+                                                <!-- #1538: bounce back and forth / play backward. Stored only when on. -->
+                                                <CheckBox x:Name="PropChainPingPong"
+                                                          Content="Ping-Pong"
+                                                          ToolTip.Tip="Play forward, then backward (A B C B A...)"
+                                                          AutomationProperties.AutomationId="prop-chain-pingpong" />
+                                                <CheckBox x:Name="PropChainReverse"
+                                                          Content="Reverse"
+                                                          ToolTip.Tip="Start on the last frame and play backward"
+                                                          AutomationProperties.AutomationId="prop-chain-reverse" />
                                             </StackPanel>
                                         </Border>
 
@@ -1806,6 +1815,28 @@
                                               ToolTip.Tip="Loop playback (mirrors the selected chain's Loop property)">
                                     <svg:Svg Width="14" Height="14"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </ToggleButton>
+                                <ToggleButton x:Name="PingPongToggle"
+                                              Classes="toolbarToggle"
+                                              Height="26" Width="32"
+                                              Foreground="{DynamicResource Ink}"
+                                              VerticalAlignment="Center"
+                                              ToolTip.Tip="Ping-pong: play forward, then backward (mirrors the selected chain's Ping-Pong property)">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPingPong.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </ToggleButton>
+                                <ToggleButton x:Name="ReverseToggle"
+                                              Classes="toolbarToggle"
+                                              Height="26" Width="32"
+                                              Foreground="{DynamicResource Ink}"
+                                              VerticalAlignment="Center"
+                                              ToolTip.Tip="Reverse: play backward from the last frame (mirrors the selected chain's Reverse property)">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPlayReverse.svg"
                                              CurrentColor="{DynamicResource IconInk}"
                                              VerticalAlignment="Center" HorizontalAlignment="Center" />
                                 </ToggleButton>

@@ -63,9 +63,13 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
         var chain = OpenTsx();
 
         _ctx.AppCommands.SetChainLoop(chain, false);
+        _ctx.AppCommands.SetChainsPingPong(new[] { chain }, true);
+        _ctx.AppCommands.SetChainsReverse(new[] { chain }, true);
         _ctx.AppCommands.FlipChainHorizontally(chain);
 
         Assert.True(chain.Loop);
+        Assert.False(chain.PingPong);
+        Assert.False(chain.Reverse);
         Assert.All(chain.Frames, f => Assert.False(f.FlipHorizontal));
         Assert.False(_ctx.UndoManager.CanUndo);
     }
