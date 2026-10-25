@@ -6,8 +6,11 @@
 // during initial parse is the supported mechanism for sync-ordered script insertion;
 // browsers warn only when called from cross-origin parser-blocking scripts (not us).
 
+// The shim list matches KNI's own BlazorGL template index.html. XHR is required: KNI's TitleContainer
+// reads every content file through nkXHR. A console "404" that names XHR.<v>.js is only the script that
+// issued the request (usually Gum's optional Content/Shader.xnb probe), not the shim itself failing.
 (function () {
-    var v = '8.0.11';
+    var v = '10.0.3';
     var shims = [
         ['nkast.Wasm.JSInterop', 'JSObject'],
         ['nkast.Wasm.Dom',       'Window'],
@@ -32,10 +35,16 @@
 // Pattern B).
 function tickJS() {
     if (typeof window.frbBeforeTick === 'function') window.frbBeforeTick();
-    try {
-        window.theInstance.invokeMethod('TickDotNet');
-    } catch (e) {
-        console.error('TickDotNet exception:', e);
+    // Optional hook (boot-screen.js): true skips this frame's tick, so the page paints once
+    // before the first tick's synchronous engine init blocks the thread.
+    var skip = false;
+    try { skip = typeof window.frbSkipTick === 'function' && window.frbSkipTick() === true; } catch (e) { }
+    if (!skip) {
+        try {
+            window.theInstance.invokeMethod('TickDotNet');
+        } catch (e) {
+            console.error('TickDotNet exception:', e);
+        }
     }
     window.requestAnimationFrame(tickJS);
 }
@@ -69,6 +78,21 @@ window.initRenderJS = function (instance) {
     window.requestAnimationFrame(tickJS);
 };
 
+// Perf diagnostics opt-in: opening the page with ?diag=perf (optionally &frames=N, default 300)
+// makes the engine print one "[frb-diag] {json}" console line after N frames and set
+// window.__frbDiag to the parsed object. Called from the host page's C# when it is enabled.
+window.frbDiagPlatform = function () {
+    var ua = navigator.userAgent, m;
+    if ((m = /Firefox\/([\d.]+)/.exec(ua))) return 'Firefox ' + m[1];
+    if ((m = /Edg\/([\d.]+)/.exec(ua))) return 'Edge ' + m[1];
+    if ((m = /Chrome\/([\d.]+)/.exec(ua))) return 'Chrome ' + m[1];
+    if ((m = /Version\/([\d.]+).*Safari/.exec(ua))) return 'Safari ' + m[1];
+    return ua;
+};
+window.frbDiagPublish = function (json) {
+    window.__frbDiag = JSON.parse(json);
+};
+
 // Prevent arrow keys, space, and mouse wheel from scrolling the page (e.g. inside an
 // itch.io iframe). Games that need these events can override by removing these listeners.
 window.addEventListener("keydown", function (e) {
@@ -78,3 +102,30 @@ window.addEventListener("keydown", function (e) {
 window.addEventListener("wheel", function (e) {
     e.preventDefault();
 }, { passive: false });
+
+// Blazor's loader sets maxParallelDownloads to 1,000,000 (no throttle) and disables download
+// retry, so it requests every _framework/ file at once. A server that advertises 100 HTTP/2
+// streams (Kestrel's default) queues the overflow, and if the browser rebuilds its certificate
+// verifier meanwhile (common in a freshly launched browser), Chromium fails every queued request
+// with ERR_CERT_VERIFIER_CHANGED and the game never boots (#1467). Keep this below 100 so nothing
+// queues. Blazor.start({configureRuntime}) is the only place this can be set.
+var FRB_MAX_PARALLEL_DOWNLOADS = 50;
+
+// The page must load blazor.webassembly.js with autostart="false"; this then starts Blazor with
+// the cap. A page that still autostarts is left alone (Blazor.start would throw "already started").
+(function () {
+    var tag = document.querySelector('script[src$="blazor.webassembly.js"]');
+    if (!tag || tag.getAttribute('autostart') !== 'false') return;
+    // debugLevel -1 (the dev-server default) turns on debugger support in the .NET runtime, which makes
+    // interpreted code roughly twice as slow to start. Default it off; add ?debug to the page URL to
+    // get breakpoints back.
+    var debugging = /[?&]debug(=|&|$)/.test(window.location.search);
+    window.Blazor.start({
+        configureRuntime: function (dotnet) {
+            dotnet.withConfig({
+                maxParallelDownloads: FRB_MAX_PARALLEL_DOWNLOADS,
+                debugLevel: debugging ? -1 : 0
+            });
+        }
+    }).catch(function (e) { console.error(e); });
+})();
