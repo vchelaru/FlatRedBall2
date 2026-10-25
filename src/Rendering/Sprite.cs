@@ -9,6 +9,9 @@ using FlatRedBall2.Rendering.Batches;
 using KeyframeColor = FlatRedBall2.AnimationEditorCommon.KeyframeColor;
 using KeyframeEvaluator = FlatRedBall2.AnimationEditorCommon.KeyframeEvaluator;
 using KeyframeShapeValue = FlatRedBall2.AnimationEditorCommon.KeyframeShapeValue;
+using FrameEventRange = FlatRedBall2.AnimationEditorCommon.FrameEventRange;
+using PlaybackOrder = FlatRedBall2.AnimationEditorCommon.PlaybackOrder;
+using PlaybackVisit = FlatRedBall2.AnimationEditorCommon.PlaybackVisit;
 
 namespace FlatRedBall2.Rendering;
 
@@ -50,6 +53,8 @@ public class Sprite : IRenderable, IAttachable
     private AnimationChainList? _animationChains;
     private int _currentChainIndex = -1;
     private int _currentFrameIndex;
+    // Position in the PingPong/Reverse visit sequence (PlaybackOrder); _currentFrameIndex is the frame it shows.
+    private int _currentVisitIndex;
     private double _timeIntoAnimation;
     // Offset and color at the current playback time, keyframe-interpolated (#1478). Recomputed by
     // ApplyCurrentFrame; equal to the current frame's own values unless the .achx stores a curve.
@@ -365,6 +370,22 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public bool IsLooping { get; set; } = true;
 
+    /// <summary>
+    /// Whether the current animation bounces: forward to the last frame, then backward, without repeating the end
+    /// frames (A B C B A...). One round trip is one loop (<see cref="AnimationLooped"/> fires once per trip); when
+    /// <see cref="IsLooping"/> is <c>false</c> it plays one round trip, stops on the frame it started on, and fires
+    /// <see cref="AnimationFinished"/>. Seeded from <see cref="AnimationChain.PingPong"/> like <see cref="IsLooping"/>;
+    /// set it afterward to override per instance.
+    /// </summary>
+    public bool IsPingPong { get; set; }
+
+    /// <summary>
+    /// Whether the current animation plays backward, starting on its last frame (with <see cref="IsPingPong"/>:
+    /// backward, then forward). Keyframe curves (offset, color, shapes) play time-reversed. Seeded from
+    /// <see cref="AnimationChain.Reversed"/> like <see cref="IsLooping"/>; set it afterward to override per instance.
+    /// </summary>
+    public bool IsReversed { get; set; }
+
     /// <summary>Multiplier applied to animation playback speed. Default is <c>1f</c> (normal speed).</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
@@ -384,12 +405,13 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public AnimationFrame? CurrentFrame { get; private set; }
 
-    /// <summary>Fired when a non-looping animation reaches its last frame.</summary>
+    /// <summary>Fired when a non-looping animation reaches its end: its last frame, or under <see cref="IsReversed"/>/<see cref="IsPingPong"/> the last frame it visits.</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
     /// Fired when a looping animation wraps from its last frame back toward its first (FRB1
-    /// <c>JustCycled</c>). Non-looping chains never raise it; use <see cref="AnimationFinished"/>.
+    /// <c>JustCycled</c>); under <see cref="IsPingPong"/>, once per full forward-and-back trip. Non-looping chains
+    /// never raise it; use <see cref="AnimationFinished"/>.
     /// <list type="bullet">
     /// <item>Raised at most once per update, even when a large delta spans several loops.</item>
     /// <item>A single-frame looping chain "loops" each time its frame length elapses.</item>
@@ -425,13 +447,14 @@ public class Sprite : IRenderable, IAttachable
     /// Raised for each <see cref="AnimationFrame.Events"/> entry when playback enters its frame, so
     /// game code reacts by event name instead of by frame index. Frame entry is defined as:
     /// <list type="bullet">
-    /// <item><see cref="PlayAnimation(string)"/> switching to a chain enters frame 0 and raises its
-    /// events immediately, before returning. Re-playing the chain that is already playing raises nothing.</item>
+    /// <item><see cref="PlayAnimation(string)"/> switching to a chain enters its first shown frame (frame 0, or the
+    /// last frame under <see cref="IsReversed"/>) and raises its events immediately, before returning. Re-playing the chain that is already playing raises nothing.</item>
     /// <item>A large delta (low FPS, a hitch, high <see cref="AnimationSpeed"/>) still raises the events
     /// of every frame it skipped over, in playback order, ending with the frame it lands on.</item>
     /// <item>A looping chain re-enters frame 0 on each wrap. A delta spanning more than one full loop
     /// raises each frame's events once, not once per loop.</item>
     /// <item>On a non-looping chain, the last frame's events are raised before <see cref="AnimationFinished"/>.</item>
+    /// <item>Under <see cref="IsPingPong"/>/<see cref="IsReversed"/>, every frame visit raises, in either direction.</item>
     /// </list>
     /// During the handler, <see cref="CurrentFrame"/> is the frame playback landed on, which may be
     /// later than the frame that owns the event. A handler that switches animation stops the rest of
@@ -454,10 +477,8 @@ public class Sprite : IRenderable, IAttachable
             {
                 if (_currentChainIndex == i) return;
                 _currentChainIndex = i;
-                _currentFrameIndex = 0;
-                _timeIntoAnimation = 0;
                 Animate = true;
-                IsLooping = _animationChains[i].Loop;
+                StartChain(_animationChains[i]);
                 ApplyCurrentFrame();
                 RaiseFrameZeroEvents();
                 return;
@@ -481,10 +502,8 @@ public class Sprite : IRenderable, IAttachable
                 {
                     if (_currentChainIndex == i) return;
                     _currentChainIndex = i;
-                    _currentFrameIndex = 0;
-                    _timeIntoAnimation = 0;
                     Animate = true;
-                    IsLooping = chain.Loop;
+                    StartChain(chain);
                     ApplyCurrentFrame();
                     RaiseFrameZeroEvents();
                     return;
@@ -497,13 +516,25 @@ public class Sprite : IRenderable, IAttachable
         tempList.Add(chain);
         _animationChains = tempList;
         _currentChainIndex = 0;
-        _currentFrameIndex = 0;
-        _timeIntoAnimation = 0;
         Animate = true;
-        IsLooping = chain.Loop;
+        StartChain(chain);
         ApplyCurrentFrame();
         RaiseFrameZeroEvents();
     }
+
+    // Seeds the per-instance playback flags from the chain and rewinds to its first visit.
+    private void StartChain(AnimationChain chain)
+    {
+        IsLooping = chain.Loop;
+        IsPingPong = chain.PingPong;
+        IsReversed = chain.Reversed;
+        _timeIntoAnimation = 0;
+        _currentVisitIndex = 0;
+        _currentFrameIndex = chain.Count > 0 ? Visit(chain, 0).FrameIndex : 0;
+    }
+
+    private PlaybackVisit Visit(AnimationChain chain, int visitIndex) =>
+        PlaybackOrder.VisitAt(visitIndex, chain.Count, IsPingPong, IsReversed);
 
     internal void AnimateSelf(double deltaSeconds)
     {
@@ -515,10 +546,11 @@ public class Sprite : IRenderable, IAttachable
         _timeIntoAnimation += deltaSeconds * AnimationSpeed;
 
         // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
-        double totalLength = chain.TotalLength.TotalSeconds;
+        double totalLength = PlaybackOrder.PassLength(chain, IsLooping, IsPingPong, IsReversed);
         if (totalLength <= 0) return;
 
         int previousFrameIndex = _currentFrameIndex;
+        int previousVisitIndex = _currentVisitIndex;
         int wraps = 0;
         bool finished = false;
         if (IsLooping)
@@ -539,18 +571,8 @@ public class Sprite : IRenderable, IAttachable
             }
         }
 
-        // Find frame index from accumulated time
-        double t = _timeIntoAnimation;
-        _currentFrameIndex = chain.Count - 1; // default to last frame
-        for (int i = 0; i < chain.Count; i++)
-        {
-            t -= chain[i].FrameLength.TotalSeconds;
-            if (t <= 0)
-            {
-                _currentFrameIndex = i;
-                break;
-            }
-        }
+        _currentVisitIndex = PlaybackOrder.VisitAtTime(chain, IsLooping, IsPingPong, IsReversed, _timeIntoAnimation, out _);
+        _currentFrameIndex = Visit(chain, _currentVisitIndex).FrameIndex;
 
         ApplyCurrentFrame();
 
@@ -561,7 +583,7 @@ public class Sprite : IRenderable, IAttachable
             if (playbackVersion != _playbackVersion) return;
         }
 
-        if (!RaiseEnteredFrameEvents(chain, previousFrameIndex, wraps)) return;
+        if (!RaiseEnteredFrameEvents(chain, previousVisitIndex, wraps)) return;
         if (wraps > 0)
         {
             AnimationLooped?.Invoke();
@@ -579,17 +601,18 @@ public class Sprite : IRenderable, IAttachable
         if (playbackVersion != _playbackVersion) return;
         var chain = _animationChains![_currentChainIndex];
         if (chain.Count > 0)
-            RaiseEvents(chain[0], playbackVersion);
+            RaiseEvents(chain[_currentFrameIndex], playbackVersion);
     }
 
     // Returns false once a handler has switched animation.
-    private bool RaiseEnteredFrameEvents(AnimationChain chain, int previousFrameIndex, int wraps)
+    private bool RaiseEnteredFrameEvents(AnimationChain chain, int previousVisitIndex, int wraps)
     {
         if (FrameEventRaised == null) return true;
-        var (start, length) = FlatRedBall2.AnimationEditorCommon.FrameEventRange.Get(previousFrameIndex, _currentFrameIndex, wraps, chain.Count);
+        int visits = PlaybackOrder.VisitCount(chain.Count, IsLooping, IsPingPong);
+        var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
         int playbackVersion = _playbackVersion;
         for (int j = 0; j < length; j++)
-            if (!RaiseEvents(chain[(start + j) % chain.Count], playbackVersion))
+            if (!RaiseEvents(chain[Visit(chain, (start + j) % visits).FrameIndex], playbackVersion))
                 return false;
         return true;
     }
@@ -618,18 +641,20 @@ public class Sprite : IRenderable, IAttachable
         _sourceRectangle = frame.SourceRectangle;
         int index = System.Math.Clamp(_currentFrameIndex, 0, chain.Count - 1);
         double frameStart = 0;
-        for (int i = 0; i < index; i++)
-            frameStart += chain[i].FrameLength.TotalSeconds;
+        for (int v = 0; v < _currentVisitIndex; v++)
+            frameStart += chain[Visit(chain, v).FrameIndex].FrameLength.TotalSeconds;
         double elapsed = System.Math.Max(0, _timeIntoAnimation - frameStart);
+        bool backward = Visit(chain, _currentVisitIndex).IsBackward;
+        bool glideWraps = PlaybackOrder.GlidesAcrossLoop(IsLooping, IsPingPong);
 
         // Evaluates the offset and color at the current playback time. With the default snap curve these
         // are exactly the current frame's own values.
-        _frameOffset = KeyframeEvaluator.EvaluateOffset(chain, IsLooping, index, elapsed);
-        _frameColor = KeyframeEvaluator.EvaluateColor(chain, IsLooping, index, elapsed);
+        _frameOffset = KeyframeEvaluator.EvaluateOffset(chain, glideWraps, index, elapsed, backward);
+        _frameColor = KeyframeEvaluator.EvaluateColor(chain, glideWraps, index, elapsed, backward);
         ApplyFrameProperties(frame, _frameControlledProperties);
         RecalculateDimensions();
 
-        ReconcileShapes(frame, chain, index, elapsed);
+        ReconcileShapes(frame, chain, index, elapsed, glideWraps, backward);
     }
 
     // Writes only the groups in `groups` from the frame onto the sprite.
@@ -654,7 +679,8 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    private void ReconcileShapes(AnimationFrame frame, AnimationChain chain, int frameIndex, double elapsedInFrame)
+    private void ReconcileShapes(AnimationFrame frame, AnimationChain chain, int frameIndex, double elapsedInFrame,
+        bool glideWraps, bool backward)
     {
         if (_animationChains == null) return;
 
@@ -687,9 +713,9 @@ public class Sprite : IRenderable, IAttachable
             if (entry != null)
             {
                 var points = entry is AnimationPolygonFrame
-                    ? KeyframeEvaluator.EvaluateShapePoints(chain, IsLooping, frameIndex, elapsedInFrame, entry)
+                    ? KeyframeEvaluator.EvaluateShapePoints(chain, glideWraps, frameIndex, elapsedInFrame, entry, backward)
                     : null;
-                ApplyShapeEntry(name, entry, KeyframeEvaluator.EvaluateShape(chain, IsLooping, frameIndex, elapsedInFrame, entry), points);
+                ApplyShapeEntry(name, entry, KeyframeEvaluator.EvaluateShape(chain, glideWraps, frameIndex, elapsedInFrame, entry, backward), points);
             }
             else
                 DisableCollisionIfPresent(name);

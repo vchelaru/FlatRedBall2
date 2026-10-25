@@ -16,6 +16,8 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private readonly AnimationChainList<TFrame> _chains;
     private int _currentChainIndex = -1;
     private int _currentFrameIndex;
+    // Position in the PingPong/Reverse visit sequence (PlaybackOrder); _currentFrameIndex is the frame it shows.
+    private int _currentVisitIndex;
     private double _timeIntoAnimation;
     // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
     private int _playbackVersion;
@@ -41,7 +43,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public (float X, float Y) CurrentOffset =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateOffset(chain, IsLooping, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateOffset(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain), IsCurrentFrameBackward)
             : (0f, 0f);
 
     /// <summary>
@@ -51,7 +53,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public KeyframeColor CurrentColor =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateColor(chain, IsLooping, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateColor(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain), IsCurrentFrameBackward)
             : default;
 
     /// <summary>The currently playing <see cref="AnimationChain{TFrame}"/>, or <c>null</c> if none.</summary>
@@ -62,7 +64,17 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     public string? CurrentChainName => CurrentChain?.Name;
 
     /// <summary>
-    /// Current frame index within <see cref="CurrentChain"/>.
+    /// Whether the current frame is playing backward (<see cref="IsReversed"/>, or the back half of a
+    /// <see cref="IsPingPong"/> cycle). Keyframe curves play time-reversed while it is.
+    /// </summary>
+    public bool IsCurrentFrameBackward =>
+        CurrentChain is { Count: > 0 } chain && Visit(chain, _currentVisitIndex).IsBackward;
+
+    private bool GlidesAcrossLoop => PlaybackOrder.GlidesAcrossLoop(IsLooping, IsPingPong);
+
+    /// <summary>
+    /// Current frame index within <see cref="CurrentChain"/>. Setting it seeks to the first time the frame is shown
+    /// in the <see cref="IsPingPong"/>/<see cref="IsReversed"/> playback order.
     /// </summary>
     /// <exception cref="InvalidOperationException">No non-empty chain is active.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Value is outside the current chain's frame range.</exception>
@@ -75,8 +87,20 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             if ((uint)value >= (uint)chain.Count)
                 throw new ArgumentOutOfRangeException(nameof(value));
 
+            int count = PlaybackOrder.VisitCount(chain.Count, IsLooping, IsPingPong);
+            double start = 0;
+            for (int v = 0; v < count; v++)
+            {
+                int frame = Visit(chain, v).FrameIndex;
+                if (frame == value)
+                {
+                    _currentVisitIndex = v;
+                    break;
+                }
+                start += chain[frame].FrameLength.TotalSeconds;
+            }
             _currentFrameIndex = value;
-            _timeIntoAnimation = GetTimeAtFrameStart(chain, value);
+            _timeIntoAnimation = start;
         }
     }
 
@@ -110,15 +134,31 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public bool IsLooping { get; set; } = true;
 
+    /// <summary>
+    /// When <c>true</c>, playback bounces: forward to the last frame, then backward, without repeating the end frames
+    /// (A B C B A...). One round trip is one loop; when <see cref="IsLooping"/> is <c>false</c> it plays one round trip
+    /// and finishes on the frame it started on. Seeded from <see cref="AnimationChain{TFrame}.PingPong"/> by
+    /// <see cref="Play(string)"/> like <see cref="IsLooping"/>; set it afterward to override per instance.
+    /// </summary>
+    public bool IsPingPong { get; set; }
+
+    /// <summary>
+    /// When <c>true</c>, playback starts on the last frame and runs backward (with <see cref="IsPingPong"/>: backward,
+    /// then forward). Seeded from <see cref="AnimationChain{TFrame}.Reversed"/> by <see cref="Play(string)"/> like
+    /// <see cref="IsLooping"/>; set it afterward to override per instance.
+    /// </summary>
+    public bool IsReversed { get; set; }
+
     /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
-    /// <summary>Raised once when a non-looping animation reaches its last frame.</summary>
+    /// <summary>Raised once when a non-looping animation reaches its end (its last visit under <see cref="IsPingPong"/>/<see cref="IsReversed"/>).</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
-    /// Raised for each <see cref="AnimationFrameBase.Events"/> entry when playback enters its frame:
-    /// <see cref="Play(string)"/> switching chains enters frame 0 immediately; a large
+    /// Raised for each <see cref="AnimationFrameBase.Events"/> entry when playback enters its frame, in either
+    /// direction (a ping-pong raises a frame's events on the way out and on the way back):
+    /// <see cref="Play(string)"/> switching chains enters the first frame shown immediately; a large
     /// <see cref="Update"/> delta raises every skipped frame's events in order, ending with the frame
     /// it lands on; a loop wrap re-enters frame 0, and a delta spanning more than one loop raises
     /// each frame once; a non-looping chain's last-frame events are raised before
@@ -146,9 +186,9 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             {
                 if (_currentChainIndex == i) return; // already playing — no restart
                 _currentChainIndex = i;
-                ResetPlaybackPosition();
                 Animate = true;
-                IsLooping = _chains[i].Loop;
+                SeedFrom(_chains[i]);
+                ResetPlaybackPosition();
                 RaiseFrameZeroEvents();
                 return;
             }
@@ -169,9 +209,9 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             {
                 if (_currentChainIndex == i) return;
                 _currentChainIndex = i;
-                ResetPlaybackPosition();
                 Animate = true;
-                IsLooping = chain.Loop;
+                SeedFrom(chain);
+                ResetPlaybackPosition();
                 RaiseFrameZeroEvents();
                 return;
             }
@@ -211,10 +251,10 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
 
         _timeIntoAnimation += elapsed.TotalSeconds * AnimationSpeed;
 
-        double totalLength = chain.TotalLength.TotalSeconds;
+        double totalLength = PassLength(chain);
         if (totalLength <= 0) return;
 
-        int previousFrameIndex = _currentFrameIndex;
+        int previousVisitIndex = _currentVisitIndex;
         int wraps = 0;
         bool finished = false;
         if (IsLooping)
@@ -240,9 +280,10 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         int playbackVersion = _playbackVersion;
         if (FrameEventRaised != null)
         {
-            var (start, length) = FrameEventRange.Get(previousFrameIndex, _currentFrameIndex, wraps, chain.Count);
+            int visits = PlaybackOrder.VisitCount(chain.Count, IsLooping, IsPingPong);
+            var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
             for (int j = 0; j < length; j++)
-                if (!RaiseEvents(chain[(start + j) % chain.Count], playbackVersion))
+                if (!RaiseEvents(chain[Visit(chain, (start + j) % visits).FrameIndex], playbackVersion))
                     break;
         }
         if (finished && playbackVersion == _playbackVersion)
@@ -254,8 +295,21 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         _playbackVersion++;
         var chain = _chains[_currentChainIndex];
         if (chain.Count > 0)
-            RaiseEvents(chain[0], _playbackVersion);
+            RaiseEvents(chain[_currentFrameIndex], _playbackVersion);
     }
+
+    private void SeedFrom(AnimationChain<TFrame> chain)
+    {
+        IsLooping = chain.Loop;
+        IsPingPong = chain.PingPong;
+        IsReversed = chain.Reversed;
+    }
+
+    private PlaybackVisit Visit(AnimationChain<TFrame> chain, int visitIndex) =>
+        PlaybackOrder.VisitAt(visitIndex, chain.Count, IsPingPong, IsReversed);
+
+    private double PassLength(AnimationChain<TFrame> chain) =>
+        PlaybackOrder.PassLength(chain, IsLooping, IsPingPong, IsReversed);
 
     // Returns false once a handler has switched chain, so the caller stops raising the old chain's events.
     private bool RaiseEvents(TFrame frame, int playbackVersion)
@@ -271,8 +325,11 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
 
     private void ResetPlaybackPosition()
     {
-        _currentFrameIndex = 0;
+        _currentVisitIndex = 0;
         _timeIntoAnimation = 0;
+        _currentFrameIndex = _currentChainIndex >= 0 && _chains[_currentChainIndex].Count > 0
+            ? Visit(_chains[_currentChainIndex], 0).FrameIndex
+            : 0;
     }
 
     private AnimationChain<TFrame> RequireCurrentPlayableChain()
@@ -289,11 +346,12 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
 
     private void SeekToTime(AnimationChain<TFrame> chain, double seconds)
     {
-        double totalLength = chain.TotalLength.TotalSeconds;
+        double totalLength = PassLength(chain);
         if (totalLength <= 0)
         {
             _timeIntoAnimation = 0;
-            _currentFrameIndex = 0;
+            _currentVisitIndex = 0;
+            _currentFrameIndex = Visit(chain, 0).FrameIndex;
             return;
         }
 
@@ -306,28 +364,15 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
 
     private void UpdateFrameIndexFromTime(AnimationChain<TFrame> chain)
     {
-        // Find the frame at the current accumulated time.
-        double t = _timeIntoAnimation;
-        _currentFrameIndex = chain.Count - 1; // default to last if time overshoots
-        for (int i = 0; i < chain.Count; i++)
-        {
-            t -= chain[i].FrameLength.TotalSeconds;
-            if (t <= 0)
-            {
-                _currentFrameIndex = i;
-                break;
-            }
-        }
+        _currentVisitIndex = PlaybackOrder.VisitAtTime(chain, IsLooping, IsPingPong, IsReversed, _timeIntoAnimation, out _);
+        _currentFrameIndex = Visit(chain, _currentVisitIndex).FrameIndex;
     }
 
     private double ElapsedInCurrentFrame(AnimationChain<TFrame> chain)
-        => Math.Max(0, _timeIntoAnimation - GetTimeAtFrameStart(chain, _currentFrameIndex));
-
-    private static double GetTimeAtFrameStart(AnimationChain<TFrame> chain, int frameIndex)
     {
-        double time = 0;
-        for (int i = 0; i < frameIndex; i++)
-            time += chain[i].FrameLength.TotalSeconds;
-        return time;
+        double start = 0;
+        for (int v = 0; v < _currentVisitIndex; v++)
+            start += chain[Visit(chain, v).FrameIndex].FrameLength.TotalSeconds;
+        return Math.Max(0, _timeIntoAnimation - start);
     }
 }

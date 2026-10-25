@@ -31,7 +31,7 @@ public static class KeyframeSampler
     /// <summary>
     /// The offset and size of <paramref name="shape"/> <paramref name="elapsedInFrame"/> seconds into frame
     /// <paramref name="frameIndex"/>, glided by the shape curves stored in the chain (see
-    /// <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/>).
+    /// <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave, bool)"/>).
     /// </summary>
     public static KeyframeShapeValue SampleShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape) =>
         KeyframeEvaluator.EvaluateShape(chain, frameIndex, elapsedInFrame, shape);
@@ -39,7 +39,7 @@ public static class KeyframeSampler
     /// <summary>
     /// The points of <paramref name="polygon"/> <paramref name="elapsedInFrame"/> seconds into frame
     /// <paramref name="frameIndex"/>, glided by the points curves stored in the chain (see
-    /// <see cref="KeyframeEvaluator.EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/>).
+    /// <see cref="KeyframeEvaluator.EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave, bool)"/>).
     /// </summary>
     public static IReadOnlyList<System.Numerics.Vector2> SampleShapePoints(
         AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon) =>

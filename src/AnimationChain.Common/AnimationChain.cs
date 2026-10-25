@@ -22,6 +22,20 @@ public class AnimationChain<TFrame> : List<TFrame> where TFrame : AnimationFrame
     /// </summary>
     public bool Loop { get; set; } = true;
 
+    /// <summary>
+    /// Whether this chain bounces back and forth by default (A B C B A...; see
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.PingPong"/>). Seeds
+    /// <see cref="AnimationPlayer{TFrame}.IsPingPong"/> when the chain starts playing; overridable per instance afterward.
+    /// </summary>
+    public bool PingPong { get; set; }
+
+    /// <summary>
+    /// Whether this chain plays backward by default, starting on its last frame (see
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.Reverse"/>). Seeds
+    /// <see cref="AnimationPlayer{TFrame}.IsReversed"/> when the chain starts playing; overridable per instance afterward.
+    /// </summary>
+    public bool Reversed { get; set; }
+
     /// <summary>Total duration of the animation (sum of all frame lengths).</summary>
     public TimeSpan TotalLength
     {
