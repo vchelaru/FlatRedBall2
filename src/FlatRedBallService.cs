@@ -533,7 +533,7 @@ public class FlatRedBallService
         _whitePixel = new Texture2D(game.GraphicsDevice, 1, 1);
         _whitePixel.SetData(new[] { Color.White });
         SynchronizationContext.SetSynchronizationContext(_syncContext);
-        Content.Initialize(game.Content, game.GraphicsDevice);
+        Content.Initialize(new UnloadableContentManager(game.Services, game.Content.RootDirectory), game.GraphicsDevice);
         StartupTiming.BeginPhase("Shape batch init");
         ShapesBatch.Instance.Initialize(game.GraphicsDevice);
         StartupTiming.EndPhase();
@@ -948,7 +948,7 @@ public class FlatRedBallService
         {
             // Each screen gets its own ContentLoader so UnloadAll() only disposes that screen's
             // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
-            screen.ContentLoader.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
+            screen.ContentLoader.Initialize(new UnloadableContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
 
             var bounds = _game.Window.ClientBounds;
             for (int i = 0; i < screen.Cameras.Count; i++)

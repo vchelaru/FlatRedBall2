@@ -124,7 +124,7 @@ public sealed class GraphicsDeviceFixture : IDisposable
 
         GraphicsDevice = _game.GraphicsDevice;
         var content = new ContentLoader();
-        content.Initialize(_game.Content, GraphicsDevice);
+        content.Initialize(new UnloadableContentManager(_game.Services, _game.Content.RootDirectory), GraphicsDevice);
         ContentLoader = content;
     }
 
