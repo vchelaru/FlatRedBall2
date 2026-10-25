@@ -50,7 +50,7 @@ Tested on a Motorola Edge 2025 (Android 16, Mali, 7.6 GB RAM) and an old 1.8 GB 
   gave a 368,599-byte binary that `glProgramBinary` loaded in 5 ms on the next launch, versus ~151 s
   to compile. The binary is specific to the GPU and driver, so it must be produced on the device on
   first run, keyed by `GL_RENDERER`/`GL_VERSION`, with a recompile fallback. KNI doesn't do this today.
-- With Gum 2026.10.25.3-preview.8 the spike's purple `RectangleRuntime` draws a white fill with a
-  purple outline. Not investigated.
+- `RectangleRuntime.Color` is obsolete and sets the stroke; the fill comes from `FillColor`
+  (default white). Use `FillColor` with `IsFilled = true`.
 - Shapes default to `IsVisible = false` and `IsFilled = false`; set both to see one.
 - Not yet checked: Apos.Shapes 0.9.1 on the PowerVR phone, content loading, audio.

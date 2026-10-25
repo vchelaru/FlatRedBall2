@@ -20,7 +20,7 @@ public class GameScreen : Screen
         Add(label);
 
         // A Gum shape (draws through Gum's own ShapeRenderer), distinct from the engine Circles below.
-        var gumRect = new RectangleRuntime { Width = 500, Height = 160, CornerRadius = 50, IsFilled = true, Color = Color.Purple };
+        var gumRect = new RectangleRuntime { Width = 500, Height = 160, CornerRadius = 50, IsFilled = true, FillColor = Color.Purple, StrokeWidth = 0 };
         gumRect.Anchor(Anchor.Bottom);
         Add(gumRect);
 
