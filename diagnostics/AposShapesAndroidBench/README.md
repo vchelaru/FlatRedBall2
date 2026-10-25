@@ -61,7 +61,7 @@ Verified:
   Debug run was skipped for that reason.
 - **The driver cache barely helps the full shader**: PowerVR keeps a per-app cache across launches
   (see below), but for 0.9.1's full shader it only cuts 435 s to 339 s, and 0.8.6 from 144 s to 142 s.
-  at all. The PowerVR driver doesn't cache within a process: recompiling identical 0.8.6 fragment text took another 146 s.
+  The PowerVR driver doesn't cache within a process: recompiling identical 0.8.6 fragment text took another 146 s.
 - **Why 0.9.1 is slower**: the `.knifx` went from one 437 K-char fragment shader to 16 variants
   totalling 2.82 M chars, each stored twice. On PowerVR, variants 0-7 compile in 1.7-25 s each
   (~80 s total) and variants 8-15 in 41-73 s each (~430 s total), the same in either order, so the
