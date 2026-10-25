@@ -86,6 +86,8 @@ Cursor injection takes screen pixels by default (origin top-left, Y+ down) or wo
 
 The injected cursor also drives Gum Forms. Each frame automation installs its own Gum cursor and keyboard through `FormsUtilities.SetCursor`/`SetKeyboard`, so a `cursor` command hovers, pushes, clicks and focuses real controls through Gum's normal handling. Click a control in three stepped frames: `cursor` at the position with the button up → `step` → same position with `"primary":true` → `step` → `"primary":false` → `step`. Gum raises `Click` on the release frame; holding across extra steps is one push, not one per frame.
 
+Automation keeps `Game.IsActive` true every frame (`FlatRedBallService.TickAutomationWindow`), so injected input reaches Gum whether or not the window has OS focus, and several automated clients can run side by side.
+
 Text goes to the focused Gum control — click it with a `cursor` command first (sequence above) or nothing receives it. `text` rejects control characters with an error rather than dropping them, so Enter/Tab/Backspace go through `input type:key`. Injected keys never repeat: one down/up pair is one keystroke however many frames it spans.
 
 ## Querying Entities (Zero Config)

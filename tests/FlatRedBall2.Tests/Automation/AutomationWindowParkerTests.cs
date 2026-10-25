@@ -147,6 +147,18 @@ public class AutomationWindowParkerTests
     }
 
     [Fact]
+    public void TickAutomationWindow_WithoutParker_MarksUnfocusedGameActive()
+    {
+        // A plain --frb-auto run is unfocused whenever another window has focus: a second automated
+        // client launched after it, or the user's own app. Its injected clicks must still reach Gum.
+        var game = new FakeKniUserGame();
+
+        FlatRedBallService.TickAutomationWindow(parker: null, game);
+
+        game.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
     public void ForceActive_NoIsActiveProperty_DoesNothingAndDoesNotThrow()
     {
         AutomationWindowParker.ForceActive(new FakeGameWithoutIsActive()).ShouldBeFalse();

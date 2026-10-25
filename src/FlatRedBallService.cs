@@ -1508,6 +1508,14 @@ public class FlatRedBallService
         GlueProjectFile = null;
     }
 
+    // Every automation frame, parked or not: a window loses focus to the user's app or to another
+    // automated client, and Gum would then drop every injected click.
+    internal static void TickAutomationWindow(Automation.AutomationWindowParker? parker, object? game)
+    {
+        parker?.Tick();
+        Automation.AutomationWindowParker.ForceActive(game);
+    }
+
     /// <summary>
     /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
     /// polling, content hot-reload, time accumulation, async continuations, and the active
@@ -1519,11 +1527,7 @@ public class FlatRedBallService
         if (_automationMode != null)
         {
             // Before the step gate: a window waiting on its first step command must be parked too.
-            if (_automationMode.WindowParker is { } parker)
-            {
-                parker.Tick();
-                Automation.AutomationWindowParker.ForceActive(_game);
-            }
+            TickAutomationWindow(_automationMode.WindowParker, _game);
             if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
             {
                 // An armed screenshot still needs one draw to capture — suppressing every

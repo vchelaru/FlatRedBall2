@@ -53,11 +53,12 @@ internal sealed class AutomationWindowParker
 
     /// <summary>
     /// Marks <paramref name="game"/> active even though its window is unfocused. Gum skips all Forms
-    /// input while <c>Game.IsActive</c> is false, and giving focus back to the user's window is what
-    /// makes it false, so a hidden run would otherwise ignore every injected click. MonoGame's
-    /// <c>Game.IsActive</c> is read-only; the flag lives on its internal <c>Platform</c> object, which
-    /// window focus events write, hence reflection. Runs only under <c>--frb-auto-hide</c>. Returns
-    /// whether a setter was found and called.
+    /// input while <c>Game.IsActive</c> is false, and any automated window can lose focus (to the
+    /// user's app, to a second automated client, or by <c>--frb-auto-hide</c> handing it back), so an
+    /// unfocused run would otherwise ignore every injected click. MonoGame's <c>Game.IsActive</c> is
+    /// read-only; the flag lives on its internal <c>Platform</c> object, which window focus events
+    /// write, hence reflection. Runs every frame of any <c>--frb-auto</c> run. Returns whether a
+    /// setter was found and called.
     /// </summary>
 #pragma warning disable IL2075 // Intentional reflection; automation mode is compiled out of Release consumer builds and never runs under AOT.
     internal static bool ForceActive(object? game)
