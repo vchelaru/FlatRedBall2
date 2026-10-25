@@ -1,5 +1,5 @@
 {
-  "FontRanges": "32-126,160-255",
+  "FontRanges": "32-126",
   "FontSpacingVertical": 1,
   "FontSpacingHorizontal": 1,
   "UseFontCharacterFile": false,
