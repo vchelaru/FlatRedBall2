@@ -8,21 +8,8 @@
         {
           "Name": "State",
           "Type": "State",
-          "StandardizedName": null,
           "Category": "States and Visibility",
-          "ExposedAsName": null,
-          "SetsValue": false,
-          "IsFile": false,
-          "IsFont": false,
-          "IsHiddenInPropertyGrid": false,
-          "IsCustomVariable": false,
-          "Description": null,
-          "ValueAsString": "Default",
-          "ValueAsFloat": null,
-          "ValueAsInt": null,
-          "ValueAsLong": null,
-          "ValueAsDouble": null,
-          "ValueAsBool": null
+          "ValueAsString": "Default"
         }
       ],
       "VariableLists": []
@@ -33,7 +20,6 @@
   "Events": [],
   "Behaviors": [
     {
-      "ProjectName": null,
       "BehaviorName": "PanelBehavior"
     }
   ],
