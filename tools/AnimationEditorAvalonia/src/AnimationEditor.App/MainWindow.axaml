@@ -997,13 +997,13 @@
                                                             <TextBlock Text="X" VerticalAlignment="Center"
                                                                        Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
                                                             <NumericUpDown x:Name="PropPixelX" Grid.Column="1" MinWidth="66"
-                                                                           Minimum="-16384" Maximum="16384" Increment="1" />
+                                                                           Increment="1" />
                                                         </Grid>
                                                         <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                             <TextBlock Text="Y" VerticalAlignment="Center"
                                                                        Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
                                                             <NumericUpDown x:Name="PropPixelY" Grid.Column="1" MinWidth="66"
-                                                                           Minimum="-16384" Maximum="16384" Increment="1" />
+                                                                           Increment="1" />
                                                         </Grid>
                                                     </WrapPanel>
                                                     <WrapPanel>
@@ -1011,13 +1011,13 @@
                                                             <TextBlock Text="W" VerticalAlignment="Center"
                                                                        Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
                                                             <NumericUpDown x:Name="PropPixelW" Grid.Column="1" MinWidth="66"
-                                                                           Minimum="1" Maximum="16384" Increment="1" />
+                                                                           Minimum="1" Increment="1" />
                                                         </Grid>
                                                         <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                             <TextBlock Text="H" VerticalAlignment="Center"
                                                                        Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
                                                             <NumericUpDown x:Name="PropPixelH" Grid.Column="1" MinWidth="66"
-                                                                           Minimum="1" Maximum="16384" Increment="1" />
+                                                                           Minimum="1" Increment="1" />
                                                         </Grid>
                                                     </WrapPanel>
                                                 </StackPanel>

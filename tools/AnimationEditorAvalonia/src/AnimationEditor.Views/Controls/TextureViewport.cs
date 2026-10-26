@@ -406,6 +406,13 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     /// </summary>
     public event Action<float>? ZoomChanged;
 
+    /// <summary>
+    /// Raised with a user-facing message when an image file could not be shown for a reason the
+    /// user can act on, such as being too large to decode (#1552). Not raised for a missing or
+    /// corrupt file, which callers report their own way.
+    /// </summary>
+    public event Action<string>? TextureLoadError;
+
     /// <summary>Fired when the user finishes a pan gesture (pointer released after drag).</summary>
     public event Action<float, float>? PanChanged;
 
@@ -565,7 +572,10 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         BeginTextureSwap(norm, casePreserved);
 
         if (casePreserved != null && File.Exists(casePreserved))
-            return InstallDecodedTexture(SkiaFileDecoder.DecodeFile(casePreserved), norm!);
+        {
+            var decodedSync = SkiaFileDecoder.DecodeFile(casePreserved, out string? decodeError);
+            return InstallDecodedTexture(decodedSync, norm!, decodeError);
+        }
 
         // casePreserved == null means filePath was empty: an intentional clear (success).
         // A non-empty path that isn't on disk is a load failure.
@@ -603,7 +613,11 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
 
         // Read + decode off the UI thread: the file read for a large sheet is itself worth moving
         // off the UI thread.
-        var decoded = await Task.Run(() => SkiaFileDecoder.DecodeFile(casePreserved));
+        var (decoded, decodeError) = await Task.Run(() =>
+        {
+            var bitmap = SkiaFileDecoder.DecodeFile(casePreserved, out string? error);
+            return (bitmap, error);
+        });
 
         if (loadId != _textureLoadId)
         {
@@ -612,7 +626,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
             return false;
         }
 
-        return InstallDecodedTexture(decoded, norm!);
+        return InstallDecodedTexture(decoded, norm!, decodeError);
     }
 
     // Saves the leaving texture's camera, sets the new identity, and blanks the current image so the
@@ -637,7 +651,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     // Installs an already-decoded bitmap as the current texture and restores/centers the camera for
     // `norm`. Assumes BeginTextureSwap already set the identity and blanked the old image. Returns
     // false (clearing identity) when `decoded` is null — a decode failure (#479).
-    private bool InstallDecodedTexture(SKBitmap? decoded, string norm)
+    private bool InstallDecodedTexture(SKBitmap? decoded, string norm, string? decodeError = null)
     {
         if (decoded == null)
         {
@@ -647,6 +661,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
             _loadedTexturePath = null;
             _loadedTexturePathCasePreserved = null;
             OnTextureLoaded(_bitmap);
+            if (decodeError != null) TextureLoadError?.Invoke(decodeError);
             return false;
         }
 

@@ -1510,6 +1510,9 @@ public partial class MainWindow : Window
         WireframeCtrl.ChainRegionChanged     += OnChainRegionChanged;
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
+        // An image too big to decode (#1552); every texture load path raises it, so no call site checks.
+        WireframeCtrl.TextureLoadError += ShowErrorBanner;
+        PngPane.TextureLoadError += ShowErrorBanner;
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
