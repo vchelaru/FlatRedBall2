@@ -99,7 +99,7 @@ public class AnimationChainListSave
         using var stream = streamProvider(filePath);
         var result = IsJsonPath(filePath)
             ? ParseJson(JsonNode.Parse(stream)!.AsObject())
-            : ParseXml(XDocument.Load(stream));
+            : ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
         result.FileName = filePath;
         return result;
     }
@@ -137,7 +137,7 @@ public class AnimationChainListSave
     private static AnimationChainListSave FromXmlString(string xml)
     {
         using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xml));
-        return ParseXml(XDocument.Load(stream));
+        return ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
     }
 
     // A leading UTF-8 BOM (0xEF 0xBB 0xBF) decodes to the single char U+FEFF. StreamReader/
@@ -199,11 +199,11 @@ public class AnimationChainListSave
 
         var tmu = root.Element("TimeMeasurementUnit");
         if (tmu != null)
-            result.TimeMeasurementUnit = Enum.Parse<TimeMeasurementUnit>(tmu.Value);
+            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu.Value, "TimeMeasurementUnit", XmlContext(tmu, null));
 
         var ct = root.Element("CoordinateType");
         if (ct != null)
-            result.CoordinateType = Enum.Parse<TextureCoordinateType>(ct.Value);
+            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct.Value, "CoordinateType", XmlContext(ct, null));
 
         foreach (var chainEl in root.Elements("AnimationChain"))
         {
@@ -217,7 +217,7 @@ public class AnimationChainListSave
             };
 
             foreach (var frameEl in chainEl.Elements("Frame"))
-                chain.Frames.Add(ParseFrame(frameEl));
+                chain.Frames.Add(ParseFrame(frameEl, $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
 
             result.AnimationChains.Add(chain);
         }
@@ -713,7 +713,7 @@ public class AnimationChainListSave
     private static string FloatStr(float value)
         => value.ToString("R", CultureInfo.InvariantCulture);
 
-    private static AnimationFrameSave ParseFrame(XElement el)
+    private static AnimationFrameSave ParseFrame(XElement el, string location)
     {
         var frame = new AnimationFrameSave();
         frame.TextureName = (string?)el.Element("TextureName") ?? string.Empty;
@@ -731,7 +731,7 @@ public class AnimationChainListSave
         frame.Green = IntElNullable(el, "Green");
         frame.Blue = IntElNullable(el, "Blue");
         frame.Alpha = IntElNullable(el, "Alpha");
-        frame.ColorOperation = ColorOperationEl(el, "ColorOperation");
+        frame.ColorOperation = ColorOperationEl(el, "ColorOperation", location);
         frame.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
         frame.SkipColorKeyframe = BoolEl(el, "SkipColorKeyframe");
         frame.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
@@ -922,10 +922,33 @@ public class AnimationChainListSave
         return el != null ? int.Parse(el.Value, CultureInfo.InvariantCulture) : null;
     }
 
-    private static ColorOperation? ColorOperationEl(XElement parent, string name)
+    private static ColorOperation? ColorOperationEl(XElement parent, string name, string location)
     {
         var el = parent.Element(name);
-        return el != null ? Enum.Parse<ColorOperation>(el.Value) : null;
+        return el != null ? ParseEnum<ColorOperation>(el.Value, name, XmlContext(el, location)) : null;
+    }
+
+    // Prefixes the element's line number when the document was loaded with SetLineInfo.
+    private static string? XmlContext(XElement el, string? location)
+    {
+        var info = (IXmlLineInfo)el;
+        if (!info.HasLineInfo()) return location;
+        return location == null ? $"Line {info.LineNumber}" : $"Line {info.LineNumber}: {location}";
+    }
+
+    // Enum.TryParse accepts exactly what Enum.Parse accepts (names, numbers), so valid files read
+    // the same as before; only the failure message changes (#1548).
+    private static TEnum ParseEnum<TEnum>(string value, string propertyName, string? location) where TEnum : struct, Enum
+    {
+        if (Enum.TryParse<TEnum>(value, out var result))
+            return result;
+
+        var names = Enum.GetNames<TEnum>();
+        var expected = names.Length == 1
+            ? names[0]
+            : string.Join(", ", names, 0, names.Length - 1) + " or " + names[^1];
+        var prefix = location == null ? string.Empty : location + ": ";
+        throw new InvalidDataException($"{prefix}{propertyName} '{value}' isn't valid (expected {expected}).");
     }
 
     private static AnimationChainListSave ParseJson(JsonObject root)
@@ -936,10 +959,10 @@ public class AnimationChainListSave
             result.FileRelativeTextures = frt.GetValue<bool>();
 
         if (root["timeMeasurementUnit"] is JsonValue tmu)
-            result.TimeMeasurementUnit = Enum.Parse<TimeMeasurementUnit>(tmu.GetValue<string>()!);
+            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu.GetValue<string>()!, "TimeMeasurementUnit", null);
 
         if (root["coordinateType"] is JsonValue ct)
-            result.CoordinateType = Enum.Parse<TextureCoordinateType>(ct.GetValue<string>()!);
+            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct.GetValue<string>()!, "CoordinateType", null);
 
         if (root["animationChains"] is JsonArray chainsArray)
         {
@@ -957,7 +980,7 @@ public class AnimationChainListSave
 
                 if (chainObj["frames"] is JsonArray framesArray)
                     foreach (var frameNode in framesArray)
-                        chain.Frames.Add(ParseFrameJson(frameNode!.AsObject()));
+                        chain.Frames.Add(ParseFrameJson(frameNode!.AsObject(), $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
 
                 result.AnimationChains.Add(chain);
             }
@@ -969,7 +992,7 @@ public class AnimationChainListSave
         return result;
     }
 
-    private static AnimationFrameSave ParseFrameJson(JsonObject el)
+    private static AnimationFrameSave ParseFrameJson(JsonObject el, string location)
     {
         var frame = new AnimationFrameSave
         {
@@ -988,7 +1011,7 @@ public class AnimationChainListSave
             Green = IntPropNullable(el, "green"),
             Blue = IntPropNullable(el, "blue"),
             Alpha = IntPropNullable(el, "alpha"),
-            ColorOperation = ColorOperationProp(el, "colorOperation"),
+            ColorOperation = ColorOperationProp(el, "colorOperation", location),
             SkipOffsetKeyframe = BoolProp(el, "skipOffsetKeyframe"),
             SkipColorKeyframe = BoolProp(el, "skipColorKeyframe"),
             OffsetInterpolation = StringProp(el, "offsetInterpolation"),
@@ -1102,6 +1125,6 @@ public class AnimationChainListSave
     private static int? IntPropNullable(JsonObject parent, string name) =>
         parent[name] is JsonValue v ? v.GetValue<int>() : null;
 
-    private static ColorOperation? ColorOperationProp(JsonObject parent, string name) =>
-        parent[name] is JsonValue v ? Enum.Parse<ColorOperation>(v.GetValue<string>()!) : null;
+    private static ColorOperation? ColorOperationProp(JsonObject parent, string name, string location) =>
+        parent[name] is JsonValue v ? ParseEnum<ColorOperation>(v.GetValue<string>()!, "ColorOperation", location) : null;
 }
