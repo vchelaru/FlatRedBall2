@@ -162,5 +162,23 @@ Test-Case 'cleanup: lock file and work dir are removed when the run fails' {
     } finally { Remove-Item -LiteralPath $site -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+Test-Case 'cleanup steps: a throwing step warns and does not skip the steps after it' {
+    $ran = [Collections.Generic.List[string]]::new()
+    Invoke-CleanupSteps @(
+        @{ Name = 'kill';   Action = { $ran.Add('kill'); throw 'ps blew up' } }
+        @{ Name = 'lock';   Action = { $ran.Add('lock') } }
+        @{ Name = 'tmp';    Action = { $ran.Add('tmp') } }
+    ) -WarningVariable w -WarningAction SilentlyContinue
+    Assert-Equal 'kill lock tmp' ($ran -join ' ')
+    Assert-True ("$w" -match 'kill' -and "$w" -match 'ps blew up') 'expected a warning naming the step and cause'
+}
+Test-Case 'cleanup steps: measure-web.ps1 runs its whole finally block through Invoke-CleanupSteps' {
+    $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'measure-web.ps1'), [ref]$null, [ref]$null)
+    $try = $ast.FindAll({ param($n) $n -is [Management.Automation.Language.TryStatementAst] }, $true) | Where-Object { $_.Finally } | Select-Object -First 1
+    $statements = @($try.Finally.Statements)
+    Assert-Equal 1 $statements.Count
+    Assert-True ($statements[0].Extent.Text -match '^Invoke-CleanupSteps') 'finally must only call Invoke-CleanupSteps'
+}
+
 if ($script:failures) { Write-Host "$script:failures failed"; exit 1 }
 Write-Host 'all passed'

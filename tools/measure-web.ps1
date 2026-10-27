@@ -170,11 +170,15 @@ try {
     if ($OutFile) { $captured | Set-Content -LiteralPath $OutFile }
 }
 finally {
-    Stop-Owned -RootPids $started.ToArray() -Profile $ProfileDir -ProjectDir $projectDir
-    [void](Set-ProcessPriorityBestEffort ([Diagnostics.Process]::GetCurrentProcess()) $oldPriority)
-    if ($ownsProfile) { Remove-Item -LiteralPath $ProfileDir -Recurse -Force -ErrorAction SilentlyContinue }
-    if ($KeepLogs) { Write-Host "raw logs kept in $work" } else { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
-    $lock = ConvertFrom-LockFile $lockPath
-    if ($lock -and $lock.pid -eq $PID) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+    Invoke-CleanupSteps @(
+        @{ Name = 'stop processes'; Action = { Stop-Owned -RootPids $started.ToArray() -Profile $ProfileDir -ProjectDir $projectDir } }
+        @{ Name = 'restore priority'; Action = { [void](Set-ProcessPriorityBestEffort ([Diagnostics.Process]::GetCurrentProcess()) $oldPriority) } }
+        @{ Name = 'remove profile'; Action = { if ($ownsProfile) { Remove-Item -LiteralPath $ProfileDir -Recurse -Force -ErrorAction SilentlyContinue } } }
+        @{ Name = 'remove work dir'; Action = { if ($KeepLogs) { Write-Host "raw logs kept in $work" } else { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue } } }
+        @{ Name = 'remove lock file'; Action = {
+            $lock = ConvertFrom-LockFile $lockPath
+            if ($lock -and $lock.pid -eq $PID) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+        } }
+    )
 }
 exit $exitCode

@@ -149,3 +149,13 @@ function Get-HiddenWindowArguments {
     param([bool]$OnWindows = ($env:OS -eq 'Windows_NT'))
     if ($OnWindows) { @{ WindowStyle = 'Hidden' } } else { @{} }
 }
+
+# Runs cleanup steps (@{ Name; Action }) independently: one that throws only warns, so it can never
+# skip the steps after it (killing processes must not prevent removing the lock file and temp dirs).
+function Invoke-CleanupSteps {
+    param([Parameter(Mandatory)][hashtable[]]$Steps)
+    foreach ($step in $Steps) {
+        try { & $step.Action }
+        catch { Write-Warning "Cleanup step '$($step.Name)' failed: $($_.Exception.Message)" }
+    }
+}
