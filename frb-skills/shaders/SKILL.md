@@ -39,4 +39,4 @@ For OpenGL/WebGL/DirectX targets, **`ShadowDusk`** compiles cross-platform witho
 
 ### KNI Backend
 
-Shader compilation is not supported on macOS or Linux with the KNI backend. KNI projects must have their shaders compiled on Windows.
+ShadowDusk compiles for KNI on any OS, as `.mgfx` (v10) or experimental `.knifx` (v11, `--target-runtime kni-knifx`). KNI 4.3.9001 reads format v12, so both are expected to print the harmless "effect is for an older version of KNI" notice at startup (not confirmed by running KNI); no v12 output from ShadowDusk has been found.
