@@ -28,14 +28,24 @@ public class AposShapesEmbeddedShaderPortabilityTests
     public void EmbeddedOpenGLShader_DoesNotCallBareTrunc()
     {
         var assembly = typeof(ShapeBatch).Assembly;
-        // Gzipped since Apos.Shapes 0.9.0.
-        using var stream = assembly.GetManifestResourceStream("Apos.Shapes.apos-shapes.knifx.gz")
-            ?? throw new InvalidOperationException(
-                "Apos.Shapes.KNI.dll no longer embeds a resource named 'apos-shapes.knifx.gz' -- " +
-                "update this test's resource name to match the current package.");
-        using var gzip = new GZipStream(stream, CompressionMode.Decompress);
-        using var reader = new StreamReader(gzip, Encoding.Latin1);
-        var glsl = reader.ReadToEnd();
+        // Gzipped since Apos.Shapes 0.9.0; one resource per shader technique ("apos-shapes.N.knifx.gz")
+        // since 0.9.3. The dx11 .mgfx.gz holds no GLSL.
+        var names = Array.FindAll(assembly.GetManifestResourceNames(),
+            n => n.StartsWith("Apos.Shapes.apos-shapes.", StringComparison.Ordinal) && n.EndsWith(".knifx.gz", StringComparison.Ordinal));
+        if (names.Length == 0)
+            throw new InvalidOperationException(
+                "Apos.Shapes.KNI.dll no longer embeds resources named 'apos-shapes.*.knifx.gz' -- " +
+                "update this test's resource names to match the current package.");
+
+        var sb = new StringBuilder();
+        foreach (var name in names)
+        {
+            using var stream = assembly.GetManifestResourceStream(name)!;
+            using var gzip = new GZipStream(stream, CompressionMode.Decompress);
+            using var reader = new StreamReader(gzip, Encoding.Latin1);
+            sb.Append(reader.ReadToEnd());
+        }
+        var glsl = sb.ToString();
 
         BareTrunc.IsMatch(glsl).ShouldBeFalse(
             "The embedded OpenGL shader calls trunc(), a GLSL 1.30/ES 3.00 builtin absent from the " +

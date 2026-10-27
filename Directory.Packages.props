@@ -31,8 +31,9 @@
     <!-- 0.7.8 shipped ~10 hours before ShadowDusk fixed a trunc() lowering bug in its GLSL
          rewriter (Apos.Shapes #34) that crashed any shape draw on macOS DesktopGL — see
          AposShapesEmbeddedShaderPortabilityTests and issue #853. Keep at or above the first
-         fixed release (0.7.9). -->
-    <AposShapesVersion>0.9.1</AposShapesVersion>
+         fixed release (0.7.9). 0.9.3 ships each of the 16 shader techniques as its own .knifx on KNI GL
+         backends so only the one a draw needs compiles (Apos.Shapes #40, issue #1524). -->
+    <AposShapesVersion>0.9.3</AposShapesVersion>
   </PropertyGroup>
 
   <ItemGroup>
