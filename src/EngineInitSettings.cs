@@ -65,6 +65,15 @@ public class EngineInitSettings
     public bool UseFontOversampling { get; init; } = false;
 
     /// <summary>
+    /// Whether Gum draws in premultiplied alpha, matching the engine's own sprites. On by default: Gum
+    /// premultiplies the textures and font atlases it loads and blends with <c>BlendState.AlphaBlend</c>,
+    /// so transparent edges never show dark fringes under Linear filtering. Set false to keep Gum's
+    /// straight-alpha pipeline. Applied during <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>;
+    /// it cannot be changed afterwards, because textures and fonts already loaded are not converted.
+    /// </summary>
+    public bool UsePremultipliedGumAlpha { get; init; } = true;
+
+    /// <summary>
     /// A stable name for this game's saved data, required to use <see cref="FlatRedBallService.Storage"/>:
     /// it names the save folder on desktop and the key namespace in browser storage on web. Leaving it unset makes the
     /// first storage call throw <see cref="InvalidOperationException"/>, on every platform. Letters,

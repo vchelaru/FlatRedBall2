@@ -581,6 +581,10 @@ public class FlatRedBallService
         // Font/FontSize, so any TextRuntime Gum constructs while loading the project needs
         // InMemoryFontCreator already registered, or it falls through to the on-disk FontCache
         // lookup and fails (issue #1000 follow-up).
+        // Before the font creator is registered and before Gum loads anything: Gum only premultiplies
+        // textures and font atlases created after this is set.
+        global::RenderingLibrary.Graphics.Renderer.UsePremultipliedAlpha = settings?.UsePremultipliedGumAlpha ?? true;
+
         StartupTiming.BeginPhase("Font rasterizer setup");
         var fontRasterizerBackend = ResolveFontRasterizerBackend(IsBrowserHost);
         if (fontRasterizerBackend == RasterizerBackend.StbTrueType)
@@ -615,6 +619,7 @@ public class FlatRedBallService
 #pragma warning restore CS0618 // Type or member is obsolete
             // After the project is loaded (its filter is known) and before any screen texture loads.
             // A game that switches to Linear filtering in code can set this back to true before Start.
+            // Gum ignores it while UsePremultipliedAlpha is on; it only matters for the straight-alpha opt-out.
             global::RenderingLibrary.Graphics.Renderer.BleedTransparentTextureEdgesOnLoad =
                 ShouldBleedTransparentTextureEdges(global::Gum.Managers.ObjectFinder.Self.GumProjectSave?.TextureFilter);
             StartupTiming.EndPhase();
