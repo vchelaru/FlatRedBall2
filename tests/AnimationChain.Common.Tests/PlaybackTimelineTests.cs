@@ -52,8 +52,8 @@ public class PlaybackTimelineTests
 
     private static readonly double[] Lengths = { 0.6, 0.6 };
 
-    private static PlaybackPosition At(double cycleTime, bool pingPong, bool reverse, bool entersNext = false) =>
-        PlaybackTimeline.Locate(Lengths, static l => l, cycleTime, pingPong, reverse, entersNext);
+    private static PlaybackPosition At(double cycleTime, bool pingPong, bool reverse) =>
+        PlaybackTimeline.Locate(Lengths, static l => l, cycleTime, pingPong, reverse);
 
     [Theory]
     // cycleTime, pingPong, reverse, frame, elapsed (forward seconds into the frame)
@@ -76,17 +76,15 @@ public class PlaybackTimelineTests
     }
 
     [Fact]
-    public void Locate_OnAFrameBoundary_RuntimesHoldTheFrameBeingLeft_EditorShowsTheNewOne()
+    public void Locate_OnAFrameBoundary_ShowsTheFrameBeingEntered()
     {
-        // Binary-exact 0.5s frames so the boundaries are exact. Forward at 0.5: leaving A. Backward at 1.5 (forward 0.5): leaving B.
+        // Binary-exact 0.5s frames so the boundaries are exact. Forward at 0.5: entering B. Backward at 1.5 (forward 0.5): entering A.
         double[] halves = { 0.5, 0.5 };
-        int FrameAt(double t, bool entersNext) =>
-            PlaybackTimeline.Locate(halves, static l => l, t, pingPong: true, reverse: false, entersNext).FrameIndex;
+        int FrameAt(double t) =>
+            PlaybackTimeline.Locate(halves, static l => l, t, pingPong: true, reverse: false).FrameIndex;
 
-        FrameAt(0.5, entersNext: false).ShouldBe(0);
-        FrameAt(0.5, entersNext: true).ShouldBe(1);
-        FrameAt(1.5, entersNext: false).ShouldBe(1);
-        FrameAt(1.5, entersNext: true).ShouldBe(0);
+        FrameAt(0.5).ShouldBe(1);
+        FrameAt(1.5).ShouldBe(0);
     }
 
     [Fact]

@@ -347,8 +347,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     }
 
     private PlaybackPosition Locate(AnimationChain<TFrame> chain) =>
-        PlaybackTimeline.Locate(chain, static f => f.FrameLength.TotalSeconds, _timeIntoAnimation, IsPingPong, IsReversed,
-            boundaryEntersNextFrame: false);
+        PlaybackTimeline.Locate(chain, static f => f.FrameLength.TotalSeconds, _timeIntoAnimation, IsPingPong, IsReversed);
 
     private void UpdateFrameIndexFromTime(AnimationChain<TFrame> chain)
     {

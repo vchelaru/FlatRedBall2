@@ -59,11 +59,11 @@ public static class PlaybackTimeline
     public static bool GlidesAcrossLoop(bool loop, bool pingPong) => loop && !pingPong;
 
     /// <summary>
-    /// <see cref="Map"/> plus the frame shown. A time exactly on a frame boundary shows the frame playback is leaving
-    /// unless <paramref name="boundaryEntersNextFrame"/> (the runtimes hold the old frame; the AnimationEditor shows the new one).
+    /// <see cref="Map"/> plus the frame shown. A time exactly on a frame boundary shows the frame playback enters, in
+    /// playback order (forward: the later frame; backward: the earlier one), matching FRB1.
     /// </summary>
     public static PlaybackPosition Locate<TFrame>(IReadOnlyList<TFrame> frames, Func<TFrame, double> length,
-        double cycleTime, bool pingPong, bool reverse, bool boundaryEntersNextFrame)
+        double cycleTime, bool pingPong, bool reverse)
     {
         int n = frames.Count;
         if (n == 0) return default;
@@ -72,14 +72,14 @@ public static class PlaybackTimeline
 
         var point = Map(cycleTime, total, pingPong, reverse);
         double f = point.ForwardTime;
-        // Going forward the frame being left is the earlier one, going backward the later one.
-        bool strict = point.IsBackward != boundaryEntersNextFrame;
+        // On a boundary, going forward enters the later frame and going backward the earlier one.
+        bool backward = point.IsBackward;
         int frame = n - 1;
         double start = 0;
         for (int i = 0; i < n; i++)
         {
             double end = start + length(frames[i]);
-            if (strict ? f < end : f <= end)
+            if (backward ? f <= end : f < end)
             {
                 frame = i;
                 break;

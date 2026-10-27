@@ -143,4 +143,54 @@ public class AnimationPlayerDirectionTests
 
         player.CurrentFrameIndex.ShouldBe(1);
     }
+
+    // Three binary-exact 0.5s frames (T = 1.5) so every boundary below is hit exactly.
+    private static AnimationChain<TestFrame> HalfSecondChain(bool pingPong, bool reverse)
+    {
+        var chain = new AnimationChain<TestFrame> { Name = "c", PingPong = pingPong, Reversed = reverse };
+        for (int i = 0; i < 3; i++)
+        {
+            var frame = new TestFrame { FrameLength = TimeSpan.FromSeconds(0.5) };
+            frame.Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = i.ToString() });
+            chain.Add(frame);
+        }
+        return chain;
+    }
+
+    [Theory]
+    // cycleTime, pingPong, reverse, frame: an exact boundary shows the frame playback enters, in playback order (#1551).
+    [InlineData(0.5, false, false, 1)]   // forward
+    [InlineData(1.0, false, false, 2)]
+    [InlineData(1.0, true, false, 2)]    // ping-pong, entering the last frame
+    [InlineData(1.5, true, false, 2)]    // turnaround: the last frame stays
+    [InlineData(2.0, true, false, 1)]    // on the way back
+    [InlineData(2.5, true, false, 0)]
+    [InlineData(3.0, true, false, 0)]    // wrap: the first frame stays
+    [InlineData(0.0, false, true, 2)]    // Reverse starts on the last frame
+    [InlineData(0.5, false, true, 1)]
+    [InlineData(1.0, false, true, 0)]
+    [InlineData(0.0, true, true, 2)]     // PingPong + Reverse
+    [InlineData(0.5, true, true, 1)]
+    [InlineData(1.5, true, true, 0)]
+    [InlineData(2.0, true, true, 1)]
+    public void ExactBoundary_EntersTheNextFrameInPlaybackOrder(double seconds, bool pingPong, bool reverse, int frame)
+    {
+        var player = Play(HalfSecondChain(pingPong, reverse));
+
+        player.Update(TimeSpan.FromSeconds(seconds));
+
+        player.CurrentFrameIndex.ShouldBe(frame);
+    }
+
+    [Fact]
+    public void ExactBoundary_PingPong_TurnaroundAndWrapRaiseNoFrameEvents()
+    {
+        var player = Play(HalfSecondChain(pingPong: true, reverse: false));
+        var events = new List<string>();
+        player.FrameEventRaised += e => events.Add(e.Name);
+
+        for (int i = 0; i < 12; i++) player.Update(TimeSpan.FromSeconds(0.5)); // two 3s cycles, landing on every boundary
+
+        events.ShouldBe(new List<string> { "1", "2", "1", "0", "1", "2", "1", "0" });
+    }
 }
