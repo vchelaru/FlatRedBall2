@@ -5,6 +5,7 @@ $script:AngleBackends = @{
     d3d11       = @('--use-gl=angle', '--use-angle=d3d11')
     swiftshader = @('--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader')
     gl          = @('--use-gl=angle', '--use-angle=gl')
+    metal       = @('--use-gl=angle', '--use-angle=metal')
 }
 
 # Chrome flags for a headless run whose console output lands on stderr.
@@ -12,7 +13,7 @@ function Get-BrowserArguments {
     param(
         [Parameter(Mandatory)][string]$Url,
         [Parameter(Mandatory)][string]$ProfileDir,
-        [ValidateSet('d3d11', 'swiftshader', 'gl')][string]$Angle = 'd3d11'
+        [ValidateSet('d3d11', 'swiftshader', 'gl', 'metal')][string]$Angle = 'd3d11'
     )
     @(
         '--headless=new'
@@ -119,4 +120,32 @@ function Get-ProcessTreeIds {
 function ConvertTo-QuotedArgument {
     param([string[]]$Arguments)
     $Arguments | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+}
+
+# `ps` arguments that list every process as "pid ppid command". The BSD form is the only one that
+# works on both macOS (BSD ps rejects `-e` with `args=`) and Linux (procps accepts it too).
+function Get-PsArguments { @('-axo', 'pid=,ppid=,command=') }
+
+# Parses `ps -axo pid=,ppid=,command=` output into ProcessId / ParentProcessId / CommandLine objects.
+function ConvertFrom-PsOutput {
+    param([string[]]$Lines)
+    foreach ($line in $Lines) {
+        if ($line -match '^\s*(\d+)\s+(\d+)\s+(.*)$') {
+            [pscustomobject]@{ ProcessId = [int]$Matches[1]; ParentProcessId = [int]$Matches[2]; CommandLine = $Matches[3] }
+        }
+    }
+}
+
+# Sets a process priority, warning instead of throwing when the OS refuses (macOS denies lowering
+# priority of the current process). Returns whether the change took effect.
+function Set-ProcessPriorityBestEffort {
+    param([Parameter(Mandatory)]$Process, [Parameter(Mandatory)]$Priority)
+    try { $Process.PriorityClass = $Priority; return $true }
+    catch { Write-Warning "Could not set process priority to ${Priority}: $($_.Exception.Message)"; return $false }
+}
+
+# Start-Process splat for hiding the child's window. pwsh on macOS/Linux rejects -WindowStyle.
+function Get-HiddenWindowArguments {
+    param([bool]$OnWindows = ($env:OS -eq 'Windows_NT'))
+    if ($OnWindows) { @{ WindowStyle = 'Hidden' } } else { @{} }
 }

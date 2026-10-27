@@ -47,7 +47,7 @@ See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct
 ## Measuring headlessly
 
 - `tools/measure-web.ps1` serves a built web head and prints the page console from headless Chrome, for example `pwsh tools/measure-web.ps1 -Query '?diag=perf&frames=300' -StopPattern '\[frb-diag\]'`. It serves `--no-build`, so build first (twice after clearing `wwwroot/Content`). After a package version change, delete the head's `bin/` and `obj/` before building: an incremental build can keep the old package's `.wasm` in `_framework`, so the run measures the old version. Use it instead of hand-rolling a browser run. It enforces one at a time, below-normal priority and a hard time cap.
-- A fresh profile means a cold shader cache. Pass `-ProfileDir` to a persistent folder for warm-cache numbers.
+- A fresh profile means a cold shader cache on Windows. Pass `-ProfileDir` to a persistent folder for warm-cache numbers. On macOS use `-Angle metal` for the real GPU; the Metal shader cache is system-wide, so a fresh profile does not make a run cold there. Use `-Angle swiftshader` for repeatable cold runs on a Mac.
 - `-Angle swiftshader` is software GL: it inflates GPU and draw time but not managed CPU time, and `frames=` must stay small there.
 
 ## Dropped clicks and first-frame stalls
