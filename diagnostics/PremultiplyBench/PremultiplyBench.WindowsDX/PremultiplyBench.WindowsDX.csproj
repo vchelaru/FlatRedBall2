@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <KniPlatform>Windows</KniPlatform>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Kni.Platform.WinForms.DX11" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PremultiplyBench.Common\PremultiplyBench.Common.csproj" />
+  </ItemGroup>
+</Project>
