@@ -70,11 +70,19 @@
                 </Button>
                 <Button x:Name="ErrorBannerCopyBtn" x:FieldModifier="Public"
                         DockPanel.Dock="Right"
-                        Content="Copy"
-                        Height="22"
-                        Padding="8,0"
+                        Width="24" Height="22"
                         Margin="10,0,0,0"
-                        VerticalAlignment="Top" />
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Top"
+                        ToolTip.Tip="Copy message"
+                        AutomationProperties.Name="Copy message">
+                    <Path Width="10" Height="10" Stretch="Uniform"
+                          Fill="#E8B0A8"
+                          Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
+                </Button>
                 <TextBlock DockPanel.Dock="Left"
                            Text="⚠"
                            FontSize="15"
@@ -148,12 +156,20 @@
                               Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
                     </Button>
                     <Button x:Name="ToastCopyBtn" x:FieldModifier="Public"
-                            DockPanel.Dock="Right"
-                            Content="Copy"
-                            Height="22"
-                            Padding="8,0"
-                            Margin="0,0,4,0"
-                            VerticalAlignment="Top" />
+                        DockPanel.Dock="Right"
+                        Width="28" Height="22"
+                        Margin="0,0,2,0"
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        VerticalAlignment="Top"
+                        ToolTip.Tip="Copy message"
+                        AutomationProperties.Name="Copy message">
+                    <Path Width="10" Height="10" Stretch="Uniform"
+                          Fill="{DynamicResource InkMid}"
+                          Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
+                </Button>
                     <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
                             DockPanel.Dock="Right"
                             Content="Retry"
