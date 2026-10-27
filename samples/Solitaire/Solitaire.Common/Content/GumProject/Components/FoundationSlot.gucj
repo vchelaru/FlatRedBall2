@@ -90,18 +90,6 @@
           "ValueAsBool": false
         },
         {
-          "Name": "Background1.StrokeDashLength",
-          "Type": "float",
-          "SetsValue": true,
-          "ValueAsFloat": 2
-        },
-        {
-          "Name": "Background1.StrokeGapLength",
-          "Type": "float",
-          "SetsValue": true,
-          "ValueAsFloat": 2
-        },
-        {
           "Name": "Background1.StrokeWidth",
           "Type": "float",
           "SetsValue": true,
