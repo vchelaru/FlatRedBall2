@@ -76,21 +76,21 @@ MediaTek MT8766, PowerVR Rogue GE8300, OpenGL ES 3.2, Android 12 (Phh-Treble GSI
 | 2048 | 532.04 | 218.97 | 30.30 | 7.40 | 751.00 | 562.34 |
 | 4096 | 1873.75 | 877.02 | 119.53 | 28.18 | 2750.77 | 1993.28 |
 
-### Android (fast device)
+### Android (fast device): Motorola Edge 2025, MediaTek MT6878, Mali-G615 MC2, Android 16
 
-_Not run yet._ Attach the device and run:
-
-```
-pwsh diagnostics/PremultiplyBench/run-android.ps1 -Serial <adb serial> -Label fast
-```
-
-It builds Release, installs, runs, and pulls `results/results-Android-fast.md`/`.csv`. Paste the summary rows here.
+| Size | FromStream | CPU premul | GPU new RT −sync | GPU pooled −sync | CPU path | GPU path |
+|---|---|---|---|---|---|---|
+| 32 | 1.27 | 0.01 | 0.59 | 0.37 | 1.28 | 1.87 |
+| 128 | 2.50 | 0.12 | 0.50 | 0.35 | 2.62 | 3.00 |
+| 512 | 17.04 | 1.95 | 0.62 | 0.36 | 18.99 | 17.66 |
+| 2048 | 200.42 | 30.82 | 2.86 | 0.83 | 231.25 | 203.28 |
+| 4096 | 768.24 | 122.88 | 10.67 | 3.73 | 891.12 | 778.90 |
 
 ## Conclusion
 
 - **The GPU premultiply step is faster from 512x512 up on every platform**, and the gap grows with size: at 2048, 1.4–30 ms on the GPU vs 11–219 ms on the CPU.
 - **Below that the CPU wins.** At 32 and 128 the CPU loop costs 0.02–0.85 ms, less than the fixed cost of creating an RT and issuing a draw (0.4–1.9 ms). 512 is roughly the crossover; on desktop and web the two paths are within 0.1–0.2 ms there.
-- **Decode dominates either way.** FromStream is 68–90% of the CPU path's total, so at 4096 the end-to-end saving from the GPU route is 5% (DesktopGL), 10% (web), 25% (DX11) and 28% (slow Android).
+- **Decode dominates either way.** FromStream is 68–90% of the CPU path's total, so at 4096 the end-to-end saving from the GPU route is 5% (DesktopGL), 10% (web), 13% (fast Android), 25% (DX11) and 28% (slow Android).
 - **RT allocation is most of the GPU cost on GL.** From 2048 up, a pooled RT is 2–4x cheaper than a new one on DesktopGL and Android. On DX11 it barely matters.
 - **On the CPU thread the GPU draw is nearly free** if nothing waits on it (submit-only 0.002–1.3 ms), so in a game loop the GPU path costs even less than the synced numbers show.
 
