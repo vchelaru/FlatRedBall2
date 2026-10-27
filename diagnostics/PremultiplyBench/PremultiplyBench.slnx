@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
+  <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
+  <Project Path="PremultiplyBench.Common/PremultiplyBench.Common.csproj" />
+  <Project Path="PremultiplyBench.DesktopGL/PremultiplyBench.DesktopGL.csproj" />
+  <Project Path="PremultiplyBench.WindowsDX/PremultiplyBench.WindowsDX.csproj" />
+  <Project Path="PremultiplyBench.BlazorGL/PremultiplyBench.BlazorGL.csproj" />
+  <Project Path="PremultiplyBench.Android/PremultiplyBench.Android.csproj" />
+</Solution>

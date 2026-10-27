@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <RootNamespace>PremultiplyBench</RootNamespace>
+    <AssemblyName>PremultiplyBench</AssemblyName>
+    <KniPlatform>Android</KniPlatform>
+    <ApplicationId>com.flatredball.premultiplybench</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+    <AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
+    <TrimMode>partial</TrimMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Devices" />
+    <PackageReference Include="nkast.Xna.Framework.Storage" />
+    <PackageReference Include="nkast.Kni.Platform.Android.GL" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PremultiplyBench.Common\PremultiplyBench.Common.csproj" />
+  </ItemGroup>
+</Project>
