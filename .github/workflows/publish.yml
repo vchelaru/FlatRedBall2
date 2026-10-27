@@ -82,7 +82,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # nuget.org indexing lags a push by a few seconds; a consumer restoring FlatRedBall2.Kni
+      # nuget.org indexing lags a push, sometimes by more than 10 minutes; a consumer restoring FlatRedBall2.Kni
       # right after this job finishes needs FlatRedBall.AnimationChain.Common to already be resolvable
       # at this exact version, not just pushed. `needs: publish-animationchain-common` only guarantees
       # the push happened first, not that it's indexed yet.
@@ -91,16 +91,16 @@ jobs:
           VERSION="${{ needs.resolve-version.outputs.version }}"
           VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
           URL="https://api.nuget.org/v3-flatcontainer/flatredball.animationchain.common/$VERSION_LOWER/flatredball.animationchain.common.$VERSION_LOWER.nupkg"
-          for i in $(seq 1 40); do
+          for i in $(seq 1 120); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
             if [ "$STATUS" = "200" ]; then
               echo "FlatRedBall.AnimationChain.Common $VERSION is resolvable on NuGet."
               exit 0
             fi
-            echo "Attempt $i/40: got HTTP $STATUS for $URL, waiting 15s..."
+            echo "Attempt $i/120: got HTTP $STATUS for $URL, waiting 15s..."
             sleep 15
           done
-          echo "::error::FlatRedBall.AnimationChain.Common $VERSION never became resolvable on NuGet after 10 minutes."
+          echo "::error::FlatRedBall.AnimationChain.Common $VERSION never became resolvable on NuGet after 30 minutes."
           exit 1
 
       - name: Restore dependencies
