@@ -16,7 +16,7 @@ Plain KNI 4.3.9001, no FlatRedBall2 engine. The web head borrows `FlatRedBall2.B
   5. GPU premultiply of an already-uploaded texture: `SpriteBatch` draw into a `RenderTarget2D` with `BlendState { ColorSource = SourceAlpha, ColorDest = Zero, AlphaSource = One, AlphaDest = Zero }`, then a 1-pixel `GetData` to wait for the GPU. Variants: (a) new RT each time, (b) pooled RT, (c) pooled RT with no wait (CPU-thread submit cost), (s) the bare 1-pixel `GetData` on a finished RT, which is subtracted as "-sync".
 - **Totals:** both paths decode and upload, so CPU path = (1) + (3) and GPU path = (1) + (5a − sync). The brief said "GPU path = upload + 5"; that leaves out the decode the GPU path also needs, so it would make the GPU path look ~10x cheaper than it is.
 - **Correctness:** at 512x512, CPU-premultiplied bytes vs GPU RT readback: max diff 0 on DesktopGL, DX11 and web, 1 on Android. All within ±1 (PASS).
-- **Builds:** Release everywhere. Web is `dotnet publish -c Release -p:RunAOTCompilation=true` (WASM AOT), run in headless Chrome 156 with ANGLE on D3D11 (real GPU) through `tools/measure-web.ps1`.
+- **Builds:** Release everywhere. Web was run twice, `dotnet publish -c Release` with `-p:RunAOTCompilation=true` (WASM AOT) and with `=false` (interpreter),, run in headless Chrome 156 with ANGLE on D3D11 (real GPU) through `tools/measure-web.ps1`.
 
 ## Results (median ms)
 
@@ -51,6 +51,18 @@ Machine for desktop and web: AMD Ryzen 7 260, NVIDIA GeForce RTX 5060 Laptop GPU
 | 512 | 9.20 | 0.70 | 1.00 | 0.60 | 9.90 | 10.20 |
 | 2048 | 91.50 | 11.10 | 1.70 | 0.20 | 102.60 | 93.20 |
 | 4096 | 369.10 | 44.90 | 4.90 | 1.00 | 414.00 | 374.00 |
+
+### BlazorGL (WASM interpreter, no AOT, headless Chrome, ANGLE D3D11)
+
+Same Release publish with `-p:RunAOTCompilation=false`. Decode is ~8x and the CPU premultiply loop ~4.7x slower than AOT; the GPU step is unchanged, so the GPU route wins by more here.
+
+| Size | FromStream | CPU premul | GPU premul, new RT −sync | GPU premul, pooled RT −sync | CPU path | GPU path |
+|---|---|---|---|---|---|---|
+| 32 | 0.55 | 0.00 | 0.90 | 0.40 | 0.55 | 1.45 |
+| 128 | 5.90 | 0.20 | 1.15 | 0.35 | 6.10 | 7.05 |
+| 512 | 72.40 | 3.30 | 1.20 | 0.40 | 75.70 | 73.60 |
+| 2048 | 716.70 | 52.30 | 2.70 | 0.40 | 769.00 | 719.40 |
+| 4096 | 3025.50 | 210.00 | 4.50 | 1.00 | 3235.50 | 3030.00 |
 
 ### Android (slow device)
 
