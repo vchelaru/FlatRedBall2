@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using System;
 using System.Threading;
@@ -23,9 +24,20 @@ public partial class EditorNotificationOverlay : UserControl
     internal bool IsErrorBannerHovered { get; set; }
     internal bool IsItemDeletedHovered { get; set; }
 
+    /// <summary>Writes text to the clipboard. Defaults to the host window's clipboard; tests replace it.</summary>
+    internal Func<string, Task> ClipboardWriter { get; set; }
+
     public EditorNotificationOverlay()
     {
         InitializeComponent();
+        ClipboardWriter = async text =>
+        {
+            IClipboard? clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is not null)
+                await clipboard.SetTextAsync(text);
+        };
+        ToastCopyBtn.Click += async (_, _) => await ClipboardWriter(ToastMessage.Text ?? string.Empty);
+        ErrorBannerCopyBtn.Click += async (_, _) => await ClipboardWriter(ErrorBannerText.Text ?? string.Empty);
         ToastDismissBtn.Click += (_, _) => HideToast();
         ToastRetryBtn.Click += (_, _) =>
         {

@@ -19,6 +19,33 @@ public class EditorNotificationOverlayTests
         Assert.Equal("Save failed", overlay.ErrorBannerText.Text);
     }
 
+    // #1549: error text must be copyable so reporting one does not need a screenshot.
+    [AvaloniaFact]
+    public void ToastCopyButton_CopiesToastMessage()
+    {
+        var overlay = new EditorNotificationOverlay();
+        string? copied = null;
+        overlay.ClipboardWriter = text => { copied = text; return System.Threading.Tasks.Task.CompletedTask; };
+        overlay.ShowToast("Could not load 'X.achx': bad xml");
+
+        overlay.ToastCopyBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal("Could not load 'X.achx': bad xml", copied);
+    }
+
+    [AvaloniaFact]
+    public void ErrorBannerCopyButton_CopiesBannerText()
+    {
+        var overlay = new EditorNotificationOverlay();
+        string? copied = null;
+        overlay.ClipboardWriter = text => { copied = text; return System.Threading.Tasks.Task.CompletedTask; };
+        overlay.ShowErrorBanner("Save failed: disk full");
+
+        overlay.ErrorBannerCopyBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal("Save failed: disk full", copied);
+    }
+
     [AvaloniaFact]
     public void ShowItemDeleted_MakesUndoToastVisibleWithLabel()
     {
