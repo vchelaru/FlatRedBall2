@@ -14,10 +14,6 @@ public class Game1 : Game
     private int _drawCount;
     private bool _firstUpdateLogged;
 
-    // Builds and draws a throwaway Apos.Shapes ShapeBatch before Gum's, to split shader compile and
-    // program link from the rest of ShapeRenderer.Initialize. Costs a second shader compile.
-    private const bool MeasureStandaloneShapeBatch = false;
-
     public Game1(Stopwatch sinceActivityStart)
     {
         _sinceActivityStart = sinceActivityStart;
@@ -36,20 +32,8 @@ public class Game1 : Game
         base.Initialize();
         Timing.Log($"Game.Initialize start, {_sinceActivityStart.ElapsedMilliseconds} ms after OnCreate");
 
-        // Done here, before the engine, so its cost (it builds an Apos.Shapes ShapeBatch and so
-        // compiles the shader) is timed on its own. The engine skips it when already initialized.
+        // Done before the engine so its cost is timed on its own. The engine skips it when already initialized.
         var sw = Stopwatch.StartNew();
-        if (MeasureStandaloneShapeBatch)
-        {
-            var batch = new Apos.Shapes.ShapeBatch(GraphicsDevice);
-            Timing.Log($"Standalone new ShapeBatch: {sw.ElapsedMilliseconds} ms");
-            sw.Restart();
-            batch.Begin();
-            batch.FillCircle(Vector2.Zero, 10, Color.White);
-            batch.End();
-            Timing.Log($"Standalone ShapeBatch first draw (program link): {sw.ElapsedMilliseconds} ms");
-            sw.Restart();
-        }
         ShapeRenderer.Self.Initialize(GraphicsDevice, Content);
         Timing.Log($"Gum ShapeRenderer.Initialize: {sw.ElapsedMilliseconds} ms");
 

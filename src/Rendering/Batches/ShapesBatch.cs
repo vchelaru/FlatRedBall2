@@ -20,8 +20,8 @@ public class ShapesBatch : IRenderBatch
 
     // Called by FlatRedBallService.Initialize. Apos.Shapes' shader is embedded in its
     // assembly (0.7.2+), so no ContentManager / content pipeline is involved. The ShapeBatch
-    // itself is created on first use: its constructor compiles every shader variant up front,
-    // which can take minutes on slow Android GPUs, so a game that never draws a shape must not pay for it.
+    // itself is created on first use, so a game that never draws a shape never loads the shader or
+    // allocates its buffers.
     internal void Initialize(GraphicsDevice graphicsDevice)
     {
         _graphicsDevice = graphicsDevice;
