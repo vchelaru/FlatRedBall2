@@ -31,6 +31,9 @@ public class ShapesBatch : IRenderBatch
 
     internal bool IsShapeBatchCreated => _shapeBatch != null;
 
+    // Test seam: ShapeBatch's constructor needs a real GraphicsDevice, which headless runs don't have.
+    internal Func<GraphicsDevice, ShapeBatch> CreateShapeBatch { get; set; } = device => new ShapeBatch(device);
+
     // Exposed so shape Draw() methods can issue primitives directly.
     // Only valid between Begin() and End().
     internal ShapeBatch Shapes
@@ -42,7 +45,7 @@ public class ShapesBatch : IRenderBatch
                 throw new InvalidOperationException(
                     "ShapesBatch.Instance has not been initialized. Call FlatRedBallService.Initialize() first.");
             }
-            return _shapeBatch ??= new ShapeBatch(_graphicsDevice!);
+            return _shapeBatch ??= CreateShapeBatch(_graphicsDevice!);
         }
     }
 
