@@ -18,9 +18,13 @@
 .PARAMETER StopPattern  Regex; stop as soon as a console line matches (e.g. '\[frb-diag\]'). Without it, runs to -RunSeconds.
 .PARAMETER RunSeconds   How long to let the page run once the server is up. Default 30.
 .PARAMETER TimeoutSeconds  Hard cap on the whole script, server startup included. Default 120.
-.PARAMETER Angle        d3d11 (real GPU), swiftshader (software GL; inflates GPU time, not managed CPU time), gl.
+.PARAMETER Angle        d3d11 (real GPU, Windows), metal (real GPU, macOS), swiftshader (software GL on any OS;
+                        inflates GPU time, not managed CPU time), gl.
 .PARAMETER ProfileDir   Browser profile. Default: fresh temp dir (cold shader cache), deleted afterwards.
                         Pass a persistent dir to measure with a warm shader cache; it is kept.
+                        macOS caveat: the Metal shader cache is system-wide, so a fresh profile does NOT make
+                        the next `-Angle metal` run cold. Use swiftshader for repeatable cold runs on a Mac.
+                        macOS also refuses to lower the script's priority; it only warns there.
 .PARAMETER OutFile      Also write the captured console lines here.
 .PARAMETER BrowserPath  Chrome/Edge executable; auto-detected otherwise.
 .PARAMETER Port         Local port. Default 5199.
@@ -36,7 +40,7 @@ param(
     [string]$StopPattern,
     [int]$RunSeconds = 30,
     [int]$TimeoutSeconds = 120,
-    [ValidateSet('d3d11', 'swiftshader', 'gl')][string]$Angle = 'd3d11',
+    [ValidateSet('d3d11', 'swiftshader', 'gl', 'metal')][string]$Angle = 'd3d11',
     [string]$ProfileDir,
     [string]$OutFile,
     [string]$BrowserPath,
@@ -57,11 +61,7 @@ function Get-ProcessTable {
             [pscustomobject]@{ ProcessId = [int]$_.ProcessId; ParentProcessId = [int]$_.ParentProcessId; CommandLine = $_.CommandLine }
         }
     } else {
-        ps -eo pid=, ppid=, args= | ForEach-Object {
-            if ($_ -match '^\s*(\d+)\s+(\d+)\s+(.*)$') {
-                [pscustomobject]@{ ProcessId = [int]$Matches[1]; ParentProcessId = [int]$Matches[2]; CommandLine = $Matches[3] }
-            }
-        }
+        ConvertFrom-PsOutput (& ps (Get-PsArguments))
     }
 }
 
@@ -114,6 +114,7 @@ $serverErr = Join-Path $work 'server.err'
 $browserOut = Join-Path $work 'browser.out'
 $browserErr = Join-Path $work 'browser.err'
 
+$hidden = Get-HiddenWindowArguments
 $started = [Collections.Generic.List[int]]::new()
 $oldPriority = [Diagnostics.Process]::GetCurrentProcess().PriorityClass
 $captured = [Collections.Generic.List[string]]::new()
@@ -122,14 +123,14 @@ try {
     @{ pid = $PID; profileDir = $ProfileDir; projectDir = $projectDir; port = $Port } | ConvertTo-Json | Set-Content -LiteralPath $lockPath
 
     # Children inherit this, which covers the browser's GPU/renderer processes spawned immediately.
-    [Diagnostics.Process]::GetCurrentProcess().PriorityClass = 'BelowNormal'
+    [void](Set-ProcessPriorityBestEffort ([Diagnostics.Process]::GetCurrentProcess()) 'BelowNormal')
 
     if ($StaticDir) {
         $serverArgs = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'serve-static.ps1'), '-Root', $StaticDir, '-Port', $Port)
-        $server = Start-Process pwsh -ArgumentList (ConvertTo-QuotedArgument $serverArgs) -PassThru -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr
+        $server = Start-Process pwsh -ArgumentList (ConvertTo-QuotedArgument $serverArgs) -PassThru @hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr
     } else {
         $serverArgs = @('run', '--project', $Project, '--no-build', '--no-launch-profile', '--', '--urls', $serverUrl)
-        $server = Start-Process dotnet -ArgumentList (ConvertTo-QuotedArgument $serverArgs) -PassThru -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr
+        $server = Start-Process dotnet -ArgumentList (ConvertTo-QuotedArgument $serverArgs) -PassThru @hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr
     }
     $started.Add($server.Id)
 
@@ -169,11 +170,15 @@ try {
     if ($OutFile) { $captured | Set-Content -LiteralPath $OutFile }
 }
 finally {
-    Stop-Owned -RootPids $started.ToArray() -Profile $ProfileDir -ProjectDir $projectDir
-    [Diagnostics.Process]::GetCurrentProcess().PriorityClass = $oldPriority
-    if ($ownsProfile) { Remove-Item -LiteralPath $ProfileDir -Recurse -Force -ErrorAction SilentlyContinue }
-    if ($KeepLogs) { Write-Host "raw logs kept in $work" } else { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
-    $lock = ConvertFrom-LockFile $lockPath
-    if ($lock -and $lock.pid -eq $PID) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+    Invoke-CleanupSteps @(
+        @{ Name = 'stop processes'; Action = { Stop-Owned -RootPids $started.ToArray() -Profile $ProfileDir -ProjectDir $projectDir } }
+        @{ Name = 'restore priority'; Action = { [void](Set-ProcessPriorityBestEffort ([Diagnostics.Process]::GetCurrentProcess()) $oldPriority) } }
+        @{ Name = 'remove profile'; Action = { if ($ownsProfile) { Remove-Item -LiteralPath $ProfileDir -Recurse -Force -ErrorAction SilentlyContinue } } }
+        @{ Name = 'remove work dir'; Action = { if ($KeepLogs) { Write-Host "raw logs kept in $work" } else { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue } } }
+        @{ Name = 'remove lock file'; Action = {
+            $lock = ConvertFrom-LockFile $lockPath
+            if ($lock -and $lock.pid -eq $PID) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+        } }
+    )
 }
 exit $exitCode
