@@ -16,7 +16,7 @@ Plain KNI 4.3.9001, no FlatRedBall2 engine. The web head borrows `FlatRedBall2.B
   5. GPU premultiply of an already-uploaded texture: `SpriteBatch` draw into a `RenderTarget2D` with `BlendState { ColorSource = SourceAlpha, ColorDest = Zero, AlphaSource = One, AlphaDest = Zero }`, then a 1-pixel `GetData` to wait for the GPU. Variants: (a) new RT each time, (b) pooled RT, (c) pooled RT with no wait (CPU-thread submit cost), (s) the bare 1-pixel `GetData` on a finished RT, which is subtracted as "-sync".
 - **Totals:** both paths decode and upload, so CPU path = (1) + (3) and GPU path = (1) + (5a − sync). The brief said "GPU path = upload + 5"; that leaves out the decode the GPU path also needs, so it would make the GPU path look ~10x cheaper than it is.
 - **Correctness:** at 512x512, CPU-premultiplied bytes vs GPU RT readback: max diff 0 on DesktopGL, DX11 and web, 1 on Android. All within ±1 (PASS).
-- **Builds:** Release everywhere. Web was run twice, `dotnet publish -c Release` with `-p:RunAOTCompilation=true` (WASM AOT) and with `=false` (interpreter),, run in headless Chrome 156 with ANGLE on D3D11 (real GPU) through `tools/measure-web.ps1`.
+- **Builds:** Release everywhere. Web was run twice, `dotnet publish -c Release` with `-p:RunAOTCompilation=true` (WASM AOT) and with `=false` (interpreter), run in headless Chrome 156 with ANGLE on D3D11 (real GPU) through `tools/measure-web.ps1`.
 
 ## Results (median ms)
 
@@ -88,9 +88,9 @@ MediaTek MT8766, PowerVR Rogue GE8300, OpenGL ES 3.2, Android 12 (Phh-Treble GSI
 
 ## Conclusion
 
-- **The GPU premultiply step is faster from 512x512 up on every platform**, and the gap grows with size: at 2048, 1.4–30 ms on the GPU vs 11–219 ms on the CPU.
-- **Below that the CPU wins.** At 32 and 128 the CPU loop costs 0.02–0.85 ms, less than the fixed cost of creating an RT and issuing a draw (0.4–1.9 ms). 512 is roughly the crossover; on desktop and web the two paths are within 0.1–0.2 ms there.
-- **Decode dominates either way.** FromStream is 68–90% of the CPU path's total, so at 4096 the end-to-end saving from the GPU route is 5% (DesktopGL), 10% (web), 13% (fast Android), 25% (DX11) and 28% (slow Android).
+- **The GPU premultiply step wins from 512x512 on DX11, both Android devices and the web interpreter, and from 2048x2048 on DesktopGL and web AOT.** The gap grows with size: at 2048, 1.4–30 ms on the GPU vs 11–219 ms on the CPU.
+- **Below that the CPU wins.** At 32 and 128 the CPU loop costs 0.00–0.85 ms, less than the fixed cost of creating an RT and issuing a draw (0.4–1.9 ms). 512 is the crossover: CPU is marginally faster on DesktopGL (7.74 vs 7.80 ms path total) and web AOT (9.90 vs 10.20 ms), GPU is ahead on DX11, Android and the web interpreter. With a pooled RT the GPU step is already faster at 512 everywhere.
+- **Decode dominates either way.** FromStream is 68–94% of the CPU path's total at 4096, so at 4096 the end-to-end saving from the GPU route is 5% (DesktopGL), 10% (web AOT), 6% (web interpreter), 13% (fast Android), 25% (DX11) and 28% (slow Android).
 - **RT allocation is most of the GPU cost on GL.** From 2048 up, a pooled RT is 2–4x cheaper than a new one on DesktopGL and Android. On DX11 it barely matters.
 - **On the CPU thread the GPU draw is nearly free** if nothing waits on it (submit-only 0.002–1.3 ms), so in a game loop the GPU path costs even less than the synced numbers show.
 
