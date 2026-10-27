@@ -185,8 +185,8 @@ public class GlueOwnedListTests
         screen.GetList("BulletList").Count(e => e == spawned).ShouldBe(1);
     }
 
-    // The documented rule: a list typed with the most base entity (Enemy, which has no base) reaches
-    // its own factory and every descendant's, each holding its own reference.
+    // A list typed with the most base entity (Enemy) reaches its own factory and every descendant's,
+    // each holding its own reference.
     [Fact]
     public void ListsToAddTo_ByDefault_MostBaseTypedList_ReachesEveryDescendant()
     {
@@ -240,10 +240,10 @@ public class GlueOwnedListTests
         screen.GetList("EnemyList").ShouldContain(enemy);
     }
 
-    // The chain below is Enemy > Zombie > Boss. A list typed with the in-between Zombie reaches only
-    // Zombie's own factory; one typed with the most derived Boss reaches only Boss.
+    // The chain below is Enemy > Zombie > Boss. A list typed with the in-between Zombie reaches its own
+    // factory and every derived one (Boss), but not the base (Enemy): FRB1's generator behavior.
     [Fact]
-    public void ListsToAddTo_ByDefault_InBetweenTypedList_ReachesOnlyThatEntity()
+    public void ListsToAddTo_ByDefault_InBetweenTypedList_ReachesItselfAndEveryDescendant()
     {
         var project = LoadBaseTyped();
         RetypeEnemyList(project, @"Entities\Zombie");
@@ -251,12 +251,26 @@ public class GlueOwnedListTests
         var list = screen.GetList("EnemyList");
 
         project.ListsToAddTo(@"Entities\Zombie").ShouldBe(new[] { list });
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { list });
         project.ListsToAddTo(@"Entities\Enemy").ShouldBeEmpty();
-        project.ListsToAddTo(@"Entities\Boss").ShouldBeEmpty();
-        project.CreateEntity(@"Entities\Boss", screen);
+        project.CreateEntity(@"Entities\Enemy", screen);
         list.ShouldBeEmpty();
         var zombie = project.CreateEntity(@"Entities\Zombie", screen);
-        list.ShouldBe(new[] { zombie });
+        var boss = project.CreateEntity(@"Entities\Boss", screen);
+        list.ShouldBe(new[] { zombie, boss });
+    }
+
+    // Elder derives from Boss derives from Zombie: a Zombie list reaches two levels down, not just children.
+    [Fact]
+    public void ListsToAddTo_ByDefault_InBetweenTypedList_ReachesDescendantsAtEveryDepth()
+    {
+        var project = LoadBaseTyped();
+        RetypeEnemyList(project, @"Entities\Zombie");
+        var (_, screen) = Start(project);
+        var list = screen.GetList("EnemyList");
+
+        project.ListsToAddTo(@"Entities\Boss").ShouldBe(new[] { list });
+        project.ListsToAddTo(@"Entities\Elder").ShouldBe(new[] { list });
     }
 
     [Fact]

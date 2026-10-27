@@ -33,6 +33,9 @@
       "Name": "Entities\\Boss"
     },
     {
+      "Name": "Entities\\Elder"
+    },
+    {
       "Name": "Entities\\Target"
     }
   ],

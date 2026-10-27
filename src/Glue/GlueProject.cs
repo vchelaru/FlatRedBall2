@@ -370,11 +370,8 @@ public sealed class GlueProject
     /// Returns the entities it registered the list for.
     /// </summary>
     /// <remarks>
-    /// The rule follows FRB1's documentation, on purpose. A list always reaches its own entity's
-    /// factory. It reaches the factories of derived entities, at any depth, only when its entity is the
-    /// most base one (it has no base entity), so a list typed with an in-between entity does not reach
-    /// the entities below it. FRB1's code generator instead reaches every descendant of any list type;
-    /// that is treated as an FRB1 bug and is not copied.
+    /// A list reaches its own entity's factory and the factories of every derived entity at any depth,
+    /// whether or not its entity has a base. This matches FRB1's code generator.
     /// </remarks>
     internal List<string> AssociateList(string listEntityName, GlueEntityList list)
     {
@@ -384,20 +381,13 @@ public sealed class GlueProject
         if (listType?.Name is null)
             return registered;
 
-        bool reachesDescendants = listType.BaseEntity is null;
-
         foreach (var entity in _entities.Values)
         {
             if (entity.Name is null || !entity.CreatedByOtherEntities || entity.IsAbstract)
                 continue;
 
-            bool isListType = string.Equals(entity.Name, listType.Name, StringComparison.OrdinalIgnoreCase);
-
-            if (!isListType &&
-                !(reachesDescendants && SelfAndAncestors(entity).Contains(listType.Name, StringComparer.OrdinalIgnoreCase)))
-            {
+            if (!SelfAndAncestors(entity).Contains(listType.Name, StringComparer.OrdinalIgnoreCase))
                 continue;
-            }
 
             AddDestination(entity.Name, list);
             registered.Add(entity.Name);
