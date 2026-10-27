@@ -534,8 +534,7 @@ public class Sprite : IRenderable, IAttachable
     }
 
     private FlatRedBall2.AnimationEditorCommon.PlaybackPosition Locate(AnimationChain chain) =>
-        PlaybackTimeline.Locate(chain, static f => f.FrameLength.TotalSeconds, _timeIntoAnimation, IsPingPong, IsReversed,
-            boundaryEntersNextFrame: false);
+        PlaybackTimeline.Locate(chain, static f => f.FrameLength.TotalSeconds, _timeIntoAnimation, IsPingPong, IsReversed);
 
     private void LocateCurrentFrame(AnimationChain chain)
     {

@@ -231,11 +231,10 @@ public class PlaybackController
     }
 
     // Reverse and PingPong mirror the forward timeline (PlaybackTimeline); a time on a frame boundary shows the frame
-    // being entered, as the editor always has.
+    // being entered, the same rule every runtime uses.
     private static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double cycleTime)
     {
-        var at = PlaybackTimeline.Locate(chain.Frames, FrameLength, cycleTime, chain.PingPong, chain.Reverse,
-            boundaryEntersNextFrame: true);
+        var at = PlaybackTimeline.Locate(chain.Frames, FrameLength, cycleTime, chain.PingPong, chain.Reverse);
         return (at.FrameIndex, at.ElapsedInFrame);
     }
 

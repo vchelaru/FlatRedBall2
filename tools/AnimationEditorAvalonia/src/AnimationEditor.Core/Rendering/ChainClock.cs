@@ -40,8 +40,7 @@ public static class ChainClock
         if (local >= total)
             local = chain.Loop ? local % total : total;
 
-        var at = PlaybackTimeline.Locate(chain.Frames, PlaybackController.FrameLength, local, chain.PingPong, chain.Reverse,
-            boundaryEntersNextFrame: true);
+        var at = PlaybackTimeline.Locate(chain.Frames, PlaybackController.FrameLength, local, chain.PingPong, chain.Reverse);
         // Undo the nudge on the sampled position, in the direction the timeline plays.
         double elapsed = atEnd ? at.ElapsedInFrame
             : at.IsBackward ? at.ElapsedInFrame + BoundaryTolerance : at.ElapsedInFrame - BoundaryTolerance;
