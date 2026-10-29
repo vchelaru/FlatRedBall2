@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
 
@@ -44,10 +45,15 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public bool Do() { Toggle(); return true; }
         public void Undo() => Toggle();
 
+        private static FlipPose PoseOf(AnimationFrameSave frame) =>
+            new(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, frame.RelativeX, frame.RelativeY);
+
         private void Toggle()
         {
+            var changes = new List<FrameFlipChange>(_frames.Count);
             foreach (var frame in _frames)
             {
+                var before = PoseOf(frame);
                 switch (_axis)
                 {
                     case FlipAxis.Horizontal:
@@ -85,7 +91,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                         else
                             ShapeFlip.Mirror(shape, _axis == FlipAxis.Horizontal, _axis == FlipAxis.Vertical);
                     }
+                changes.Add(new FrameFlipChange(frame, before, PoseOf(frame)));
             }
+            _events.RaiseFramesFlipped(changes);
             _refresh();
             _events.RaiseAnimationChainsChanged();
         }

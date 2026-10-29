@@ -809,14 +809,24 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
         var frameSample = ResolveFrameSample(chain, displayFrame, selectedFrame is not null);
 
+        (float a, float b, float c, float d)? flipMatrix = null;
+        float flipDx = 0f, flipDy = 0f;
+        var activeFlip = _flips.Find(f => ReferenceEquals(f.Change.Frame, displayFrame));
+        if (activeFlip is not null)
+        {
+            float t = Math.Clamp((float)(activeFlip.Elapsed / FlipTransition.DurationSeconds), 0f, 1f);
+            flipMatrix = FlipTransition.Matrix(activeFlip.Change.Before, activeFlip.Change.After, t);
+            (flipDx, flipDy) = FlipTransition.OffsetDelta(activeFlip.Change.Before, activeFlip.Change.After, t);
+        }
+
         return new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
                                   _showOrigin, _showUserGuides, _showBoundingBox, texPath, onionPath, width, height,
                                   _appState!.OffsetMultiplier,
                                   _hGuides.ToArray(), _vGuides.ToArray(),
                                   _draggedGuideIdx, _draggingHGuide,
-                                  BuildShapeInfos(), frameSample.OffsetX, frameSample.OffsetY,
+                                  BuildShapeInfos(), frameSample.OffsetX + flipDx, frameSample.OffsetY + flipDy,
                                   frameSample.Color, ResolveColor(chain, onionFrame),
-                                  Array.Empty<PreviewLayer>(), renderScaling);
+                                  Array.Empty<PreviewLayer>(), renderScaling, flipMatrix);
     }
 
     // -- Injected services -----------------------------------------------------
@@ -910,6 +920,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // Content edits change the union extent, hence the scrollbar range — refresh alongside the repaint.
         _events.AnimationChainsChanged                         += () => Dispatcher.UIThread.InvokeAsync(() => { InvalidateVisual(); RaiseViewChanged(); });
         _events.AchxLoaded                                     += _ => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
+        // Registered synchronously: the repaint the flip triggers must already see the old pose.
+        _events.FramesFlipped                                  += OnFramesFlipped;
         _appCommands.RefreshAnimationFrameDisplayRequested     += () => Dispatcher.UIThread.InvokeAsync(() => { InvalidateVisual(); RaiseViewChanged(); });
     }
 
@@ -961,6 +973,50 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         _timer.Start();
     }
 
+    // -- Flip animation --------------------------------------------------------
+
+    // A flip changes the model at once; the preview then plays FlipTransition from the old pose so
+    // the user sees which way the sprite turned. Only the frame on screen animates.
+    private sealed class ActiveFlip
+    {
+        public FrameFlipChange Change;
+        public double Elapsed;
+    }
+
+    private readonly List<ActiveFlip> _flips = new();
+
+    /// <summary>True while a flip animation is playing for the frame on screen.</summary>
+    public bool IsFlipAnimating => _flips.Count > 0;
+
+    private void OnFramesFlipped(IReadOnlyList<FrameFlipChange> changes)
+    {
+        if (IsGroupPreviewActive) return;
+        var shown = _selectedState!.SelectedFrame ?? CurrentPlaybackFrame();
+        foreach (var change in changes)
+        {
+            if (!ReferenceEquals(change.Frame, shown)) continue;
+            _flips.RemoveAll(f => ReferenceEquals(f.Change.Frame, change.Frame));
+            _flips.Add(new ActiveFlip { Change = change });
+        }
+        if (_flips.Count > 0) InvalidateVisual();
+    }
+
+    private AnimationFrameSave? CurrentPlaybackFrame()
+    {
+        var chain = _selectedState!.SelectedChain;
+        if (chain is null || chain.Frames.Count == 0) return null;
+        return chain.Frames[Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1)];
+    }
+
+    /// <summary>Moves every running flip animation forward by <paramref name="seconds"/> and drops the finished ones. Called by the tick timer; tests call it directly.</summary>
+    internal void AdvanceFlipAnimation(double seconds)
+    {
+        if (_flips.Count == 0) return;
+        foreach (var flip in _flips) flip.Elapsed += seconds;
+        _flips.RemoveAll(f => f.Elapsed >= FlipTransition.DurationSeconds);
+        InvalidateVisual();
+    }
+
     // -- Timer -----------------------------------------------------------------
 
     private void OnTimerTick(object? sender, EventArgs e)
@@ -969,6 +1025,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // a resume from crediting the whole paused span as one huge delta.
         double delta = _clock.Tick();
         double clamped = Math.Min(delta, MaxTickSeconds);
+
+        AdvanceFlipAnimation(clamped);
 
         // Only advance when the whole chain is playing (no specific frame pinned)
         if (_selectedState!.SelectedFrame is null)
@@ -3179,7 +3237,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         // INSTEAD of Frame/OnionFrame. Empty for the ordinary single-selection render path.
         PreviewLayer[] GroupLayers,
         // Logical-to-device scale (display scaling) used to snap the sprite to whole device pixels.
-        float RenderScaling);
+        float RenderScaling,
+        // Mid-flip squash/stretch for Frame (see FlipTransition); null when it is not animating.
+        (float a, float b, float c, float d)? FrameFlipMatrix = null);
 
     /// <summary>One composited chain in a multi-select group preview (#576) — its current frame,
     /// resolved texture path, and its own resting RelativeX/Y offset and effective color.</summary>
@@ -3312,7 +3372,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             {
                 float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
                 float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
+                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu, s.FrameFlipMatrix);
             }
         }
 
@@ -3601,7 +3661,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     internal static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, ResolvedFrameColor color, SKImage img,
         float cx, float cy, float zoom, float alpha, bool showOutline = true, float? snapRenderScaling = null,
-        GRContext? gpuContext = null)
+        GRContext? gpuContext = null, (float a, float b, float c, float d)? flipMatrixOverride = null)
     {
         var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
 
@@ -3635,11 +3695,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             ? new SKSamplingOptions(SKFilterMode.Nearest)
             : new SKSamplingOptions(SKFilterMode.Linear);
 
-        bool flip = FlipScaleCalculator.IsFlipped(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
+        bool flip = flipMatrixOverride is not null
+            || FlipScaleCalculator.IsFlipped(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
+        SKMatrix matrix = SKMatrix.Identity;
         if (flip)
         {
             canvas.Save();
-            var matrix = ComputeFlipMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, cx, cy);
+            matrix = flipMatrixOverride is { } m
+                ? ComputeFlipMatrix(m, cx, cy)
+                : ComputeFlipMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, cx, cy);
             canvas.Concat(in matrix);
         }
 
@@ -3668,15 +3732,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
         if (!showOutline) return;
 
-        var outlineDst = ComputeOutlineDst(dst, frame.FlipDiagonal, cx, cy);
-
         using var op = new SKPaint
         {
             Color       = EditorColors.FrameBoundingBox.WithAlpha((byte)(200 * alpha)),
             StrokeWidth = 1f,
             IsStroke    = true
         };
-        canvas.DrawRect(outlineDst, op);
+
+        if (flipMatrixOverride is not null)
+        {
+            // Mid-flip the outline follows the squashing sprite. Its corners are mapped by hand so
+            // the 1 px stroke keeps its width instead of being squashed with the canvas.
+            var corners = new[]
+            {
+                matrix.MapPoint(dst.Left, dst.Top), matrix.MapPoint(dst.Right, dst.Top),
+                matrix.MapPoint(dst.Right, dst.Bottom), matrix.MapPoint(dst.Left, dst.Bottom),
+            };
+            for (int i = 0; i < corners.Length; i++)
+                canvas.DrawLine(corners[i], corners[(i + 1) % corners.Length], op);
+            return;
+        }
+
+        canvas.DrawRect(ComputeOutlineDst(dst, frame.FlipDiagonal, cx, cy), op);
     }
 
     /// <summary>
@@ -3686,11 +3763,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// can't express the diagonal case (off-diagonal coefficients), so the matrix is built
     /// directly. Exposed (internal) for unit testing via <c>SKMatrix.MapPoint</c>.
     /// </summary>
-    internal static SKMatrix ComputeFlipMatrix(bool flipHorizontal, bool flipVertical, bool flipDiagonal, float cx, float cy)
-    {
-        var (a, b, c, d) = FlipScaleCalculator.ComputeMatrix(flipHorizontal, flipVertical, flipDiagonal);
-        return new SKMatrix(a, b, cx - a * cx - b * cy, c, d, cy - c * cx - d * cy, 0, 0, 1);
-    }
+    internal static SKMatrix ComputeFlipMatrix(bool flipHorizontal, bool flipVertical, bool flipDiagonal, float cx, float cy) =>
+        ComputeFlipMatrix(FlipScaleCalculator.ComputeMatrix(flipHorizontal, flipVertical, flipDiagonal), cx, cy);
+
+    /// <summary>The pivoted transform for a 2x2 matrix that is already resolved (a mid-flip blend).</summary>
+    internal static SKMatrix ComputeFlipMatrix((float a, float b, float c, float d) m, float cx, float cy) =>
+        new SKMatrix(m.a, m.b, cx - m.a * cx - m.b * cy, m.c, m.d, cy - m.c * cx - m.d * cy, 0, 0, 1);
 
     /// <summary>
     /// Returns the outline rect to draw (in untransformed canvas space, after the flip

@@ -34,6 +34,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         event Action FitFrameToViewRequested;
 
+        /// <summary>
+        /// Fired after frames' flip flags flip (a flip command, its undo, or its redo), before
+        /// <see cref="AnimationChainsChanged"/>. The model already holds the new pose; the preview uses
+        /// this to animate from the old one.
+        /// </summary>
+        event Action<System.Collections.Generic.IReadOnlyList<FrameFlipChange>> FramesFlipped;
+
+        void RaiseFramesFlipped(System.Collections.Generic.IReadOnlyList<FrameFlipChange> changes);
         void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);
         void RaiseAnimationChainsChanged();

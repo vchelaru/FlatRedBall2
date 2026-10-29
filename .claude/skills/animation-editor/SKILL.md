@@ -108,6 +108,10 @@ a-cell is how that gets sized down without dragging edge handles by hand. Don't 
 the two gestures onto one shared size-preserving helper again — see
 `GridPlacementCalculator`'s doc comment for why that was tried and reverted.
 
+## Flipping a frame animates the preview, never the data
+
+`FlipCommand` changes the flags and offset at once, then raises `IApplicationEvents.FramesFlipped` with each frame's before and after `FlipPose`. `PreviewControl` plays `FlipTransition` (`AnimationEditor.Core/Rendering/`) from the old pose: a straight blend of the two flip matrices, which squashes the sprite flat on its mirror axis halfway through, plus a slide of the offset. Only the frame on screen animates, export always draws the final pose, and tests step it with `AdvanceFlipAnimation` instead of waiting on the timer.
+
 ## Keyframe curves: Transform and Color play what the file stores
 
 **Reverse and PingPong never reach the evaluator.** `PlaybackController` and `ChainClock` map their time onto the forward timeline with `PlaybackTimeline` (AnimationChain.Common), and `FrameElapsed` is forward time into the frame. Sampling, the keyframe lanes, the playhead and `SeekToFrame` all work in forward time, so none of them needs a direction.
