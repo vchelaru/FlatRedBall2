@@ -274,6 +274,10 @@ public partial class MainWindow : Window
 
         NumericExpressionInput.Install();
         InitializeComponent();
+        TimelineResizeHandle.PointerPressed += OnTimelineResizePressed;
+        TimelineResizeHandle.PointerMoved += OnTimelineResizeMoved;
+        TimelineResizeHandle.PointerReleased += (_, e) => { _timelineDragging = false; e.Pointer.Capture(null); };
+        TimelineResizeHandle.PointerCaptureLost += (_, _) => _timelineDragging = false;
         InitializeTabTrees();
 
         if (_useMacOSChrome)
@@ -5044,6 +5048,24 @@ public partial class MainWindow : Window
     // of space. More chains scroll within GroupTimelineScrubHost's ScrollViewer.
     private const double GroupTimelineAreaHeight = 14 + 2.25 * 40;
 
+    private void OnTimelineResizePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(TimelineResizeHandle).Properties.IsLeftButtonPressed) return;
+        _timelineDragging = true;
+        _timelineDragStartY = e.GetPosition(this).Y;
+        _timelineDragStartHeight = TimelineDockGrid.Height;
+        e.Pointer.Capture(TimelineResizeHandle);
+        e.Handled = true;
+    }
+
+    private void OnTimelineResizeMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_timelineDragging) return;
+        double wanted = _timelineDragStartHeight + (_timelineDragStartY - e.GetPosition(this).Y);
+        _userTimelineHeight = TimelineDockHeight.ClampDrag(wanted, PreviewCtrl.Bounds.Height);
+        ApplyTimelineDockHeight(_timelineDefaultHeight, _timelineNeededHeight);
+    }
+
     private void RefreshTimelineStrip()
     {
         // Multi-select group preview (#576): 2+ whole chains selected swaps the single-row strip
@@ -5061,7 +5083,8 @@ public partial class MainWindow : Window
         if (groupActive)
         {
             // The group timeline shows no keyframe lanes (#1478).
-            ApplyTimelineDockHeight(GroupTimelineAreaHeight);
+            ApplyTimelineDockHeight(
+                GroupTimelineAreaHeight, 14 + _selectedState.PreviewChains.Count * GroupTimelineRowHeight);
             SetKeyframeLanes(TimelineLanePlan.None, groupActive: true);
             // Multiple chains have no single duration — keep the plain label (#623).
             TimelineHeaderLabel.Text = "TIMELINE";
@@ -5103,8 +5126,22 @@ public partial class MainWindow : Window
         ApplyScrubberOffsetFromPlayback(preferred);
     }
 
-    private void ApplyTimelineDockHeight(double dockHeight)
+    // Each group track row's height, see the ChainTimelineTrackVm DataTemplate.
+    private const double GroupTimelineRowHeight = 40;
+
+    // Height the user dragged the dock to (#1575); null until the first drag.
+    private double? _userTimelineHeight;
+    private double _timelineDefaultHeight = SingleTimelineAreaHeight;
+    private double _timelineNeededHeight = SingleTimelineAreaHeight;
+    private double _timelineDragStartY;
+    private double _timelineDragStartHeight;
+    private bool _timelineDragging;
+
+    private void ApplyTimelineDockHeight(double defaultHeight, double? neededHeight = null)
     {
+        _timelineDefaultHeight = defaultHeight;
+        _timelineNeededHeight = neededHeight ?? defaultHeight;
+        double dockHeight = TimelineDockHeight.Resolve(_timelineDefaultHeight, _timelineNeededHeight, _userTimelineHeight);
         TimelineDockGrid.Height = dockHeight;
         PreviewVScroll.Margin = new Avalonia.Thickness(0, 0, 0, dockHeight);
         PreviewHScroll.Margin = new Avalonia.Thickness(0, 0, 0, dockHeight);
