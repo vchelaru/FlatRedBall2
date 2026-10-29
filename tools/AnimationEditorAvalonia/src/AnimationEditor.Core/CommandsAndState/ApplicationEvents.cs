@@ -18,6 +18,10 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action<string>? AchxDeletedOnDisk;
         public event Action<string>? AchxReloadedFromDisk;
         public event Action? FitFrameToViewRequested;
+        public event Action<System.Collections.Generic.IReadOnlyList<FrameFlipChange>>? FramesFlipped;
+
+        public void RaiseFramesFlipped(System.Collections.Generic.IReadOnlyList<FrameFlipChange> changes) =>
+            FramesFlipped?.Invoke(changes);
 
         public void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle) =>
             AfterAxisAlignedRectangleChanged?.Invoke(rectangle);
