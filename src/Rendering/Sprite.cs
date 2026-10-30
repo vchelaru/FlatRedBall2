@@ -9,6 +9,7 @@ using FlatRedBall2.Rendering.Batches;
 using KeyframeColor = FlatRedBall2.AnimationEditorCommon.KeyframeColor;
 using KeyframeEvaluator = FlatRedBall2.AnimationEditorCommon.KeyframeEvaluator;
 using KeyframeShapeValue = FlatRedBall2.AnimationEditorCommon.KeyframeShapeValue;
+using FrameFlipTransform = FlatRedBall2.AnimationEditorCommon.FrameFlipTransform;
 using FrameEventRange = FlatRedBall2.AnimationEditorCommon.FrameEventRange;
 using PlaybackTimeline = FlatRedBall2.AnimationEditorCommon.PlaybackTimeline;
 
@@ -885,20 +886,11 @@ public class Sprite : IRenderable, IAttachable
     // upright); FlipHorizontal is purely additive and unaffected by the Y-flip.
     internal (float rotation, SpriteEffects effects) ComputeDrawTransform()
     {
-        bool effectiveFlipVertical = (Batch?.FlipsY ?? true) ^ FlipVertical;
-
-        if (FlipDiagonal)
-        {
-            float rotation = RenderRotationRadians + (effectiveFlipVertical ? -MathHelper.PiOver2 : MathHelper.PiOver2);
-            var effects = (FlipHorizontal == effectiveFlipVertical) ? SpriteEffects.FlipVertically : SpriteEffects.None;
-            return (rotation, effects);
-        }
-        else
-        {
-            var effects = effectiveFlipVertical ? SpriteEffects.FlipVertically : SpriteEffects.None;
-            if (FlipHorizontal) effects |= SpriteEffects.FlipHorizontally;
-            return (RenderRotationRadians, effects);
-        }
+        var flip = FrameFlipTransform.Compute(FlipHorizontal, FlipVertical, FlipDiagonal, flipsY: Batch?.FlipsY ?? true);
+        var effects = SpriteEffects.None;
+        if (flip.FlipHorizontally) effects |= SpriteEffects.FlipHorizontally;
+        if (flip.FlipVertically)   effects |= SpriteEffects.FlipVertically;
+        return (RenderRotationRadians + flip.RotationOffsetRadians, effects);
     }
 
     // The vertex color handed to SpriteBatch.Draw: Color, plus the frame's multiply color/alpha when

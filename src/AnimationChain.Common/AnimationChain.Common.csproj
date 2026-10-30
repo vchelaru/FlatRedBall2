@@ -79,5 +79,12 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>FlatRedBall2.Kni</_Parameter1>
     </AssemblyAttribute>
+    <!-- FrameFlipTransform: shared by the standalone DrawAnimation extension in each backend variant. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AnimationChain.MonoGame</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AnimationChain.KNI</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>
