@@ -25,6 +25,11 @@ public static class SpriteBatchExtensions
     /// count toward height — offset those frames in the editor if shoes do not sit on the
     /// last row of the cell.
     /// </para>
+    /// <para>
+    /// <b>Diagonal flip:</b> <see cref="AnimationFrameBase.FlipDiagonal"/> is drawn as a quarter-turn
+    /// about <paramref name="origin"/> plus a mirror, so the frame's footprint swaps width and height
+    /// around that pivot. <c>RelativeX</c>/<c>RelativeY</c> remain screen-space offsets.
+    /// </para>
     /// </summary>
     /// <param name="spriteBatch">Must be between <see cref="SpriteBatch.Begin"/> and <see cref="SpriteBatch.End"/>.</param>
     /// <param name="player">The player whose <see cref="AnimationPlayer{TFrame}.CurrentFrame"/> will be drawn.</param>
@@ -67,9 +72,7 @@ public static class SpriteBatchExtensions
         var frame = player.CurrentFrame;
         if (frame?.Texture == null) return;
 
-        var effects = SpriteEffects.None;
-        if (frame.FlipHorizontal) effects |= SpriteEffects.FlipHorizontally;
-        if (frame.FlipVertical)   effects |= SpriteEffects.FlipVertically;
+        var (rotation, effects) = ResolveFlipTransform(frame);
 
         var drawPos = new Vector2(
             position.X + frame.RelativeX * scale,
@@ -89,7 +92,7 @@ public static class SpriteBatchExtensions
 
             spriteBatch.End();
             spriteBatch.Begin(effect: effect);
-            spriteBatch.Draw(frame.Texture, drawPos, sourceRectangle, drawColor, 0f, resolvedOrigin, scale, effects, layerDepth);
+            spriteBatch.Draw(frame.Texture, drawPos, sourceRectangle, drawColor, rotation, resolvedOrigin, scale, effects, layerDepth);
             spriteBatch.End();
             spriteBatch.Begin();
             return;
@@ -100,11 +103,26 @@ public static class SpriteBatchExtensions
             drawPos,
             sourceRectangle,
             drawColor,
-            0f,
+            rotation,
             resolvedOrigin,
             scale,
             effects,
             layerDepth);
+    }
+
+    /// <summary>
+    /// The rotation and <see cref="SpriteEffects"/> <see cref="DrawAnimation"/> hands to
+    /// <see cref="SpriteBatch.Draw(Texture2D, Vector2, Rectangle?, Color, float, Vector2, float, SpriteEffects, float)"/>
+    /// for <paramref name="frame"/>'s flip flags. <see cref="AnimationFrameBase.FlipDiagonal"/> becomes a
+    /// quarter-turn about the origin plus a mirror, since <see cref="SpriteEffects"/> has no transpose.
+    /// </summary>
+    internal static (float rotation, SpriteEffects effects) ResolveFlipTransform(AnimationFrame frame)
+    {
+        var flip = FrameFlipTransform.Compute(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, flipsY: false);
+        var effects = SpriteEffects.None;
+        if (flip.FlipHorizontally) effects |= SpriteEffects.FlipHorizontally;
+        if (flip.FlipVertically)   effects |= SpriteEffects.FlipVertically;
+        return (flip.RotationOffsetRadians, effects);
     }
 
     /// <summary>Resolves the base tint <see cref="DrawAnimation"/> uses when <c>color</c> is omitted.</summary>
