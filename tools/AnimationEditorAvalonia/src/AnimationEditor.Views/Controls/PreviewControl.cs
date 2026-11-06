@@ -195,6 +195,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private AnimationFrameSave[]? _draggingChainFrames;
     private float[]? _chainFrameStartX;
     private float[]? _chainFrameStartY;
+    // Whole-animation grabs also carry the animations' shapes (#1583); frame-level grabs never do.
+    private (ShapeSave Shape, AnimationFrameSave Frame)[]? _chainShapes;
+    private float[]? _chainShapeStartX;
+    private float[]? _chainShapeStartY;
 
     // -- Public properties -----------------------------------------------------
 
@@ -1311,15 +1315,52 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
-        _draggingChainFrames = scope.Frames;
-        _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
-        _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
-        for (int i = 0; i < _draggingChainFrames.Length; i++)
-        {
-            _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX[i] + worldDx);
-            _draggingChainFrames[i].RelativeY = SnapToPixel(_chainFrameStartY[i] + worldDy);
-        }
+        BeginChainDrag(scope);
+        ApplyChainDrag(worldDx, worldDy);
         CommitChainDrag();
+    }
+
+    /// <summary>Captures the start offsets of everything <paramref name="scope"/> will move.</summary>
+    private void BeginChainDrag(SpriteDragScope scope)
+    {
+        _draggingChainFrames = scope.Frames;
+        _chainFrameStartX    = scope.Frames.Select(f => f.RelativeX).ToArray();
+        _chainFrameStartY    = scope.Frames.Select(f => f.RelativeY).ToArray();
+        _chainShapes         = scope.Shapes;
+        _chainShapeStartX    = scope.Shapes.Select(s => s.Shape.X).ToArray();
+        _chainShapeStartY    = scope.Shapes.Select(s => s.Shape.Y).ToArray();
+    }
+
+    /// <summary>Places every dragged frame and shape at its start offset plus the world-space delta.</summary>
+    private void ApplyChainDrag(float dx, float dy)
+    {
+        for (int i = 0; i < _draggingChainFrames!.Length; i++)
+        {
+            _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX![i] + dx);
+            _draggingChainFrames[i].RelativeY = SnapToPixel(_chainFrameStartY![i] + dy);
+        }
+        for (int i = 0; i < _chainShapes!.Length; i++)
+        {
+            _chainShapes[i].Shape.X = SnapToPixel(_chainShapeStartX![i] + dx);
+            _chainShapes[i].Shape.Y = SnapToPixel(_chainShapeStartY![i] + dy);
+        }
+    }
+
+    /// <summary>Puts every dragged frame and shape back at its start offset and ends the drag.</summary>
+    private void RestoreChainDrag()
+    {
+        ApplyChainDrag(0, 0);
+        ClearChainDrag();
+    }
+
+    private void ClearChainDrag()
+    {
+        _draggingChainFrames = null;
+        _chainFrameStartX    = null;
+        _chainFrameStartY    = null;
+        _chainShapes         = null;
+        _chainShapeStartX    = null;
+        _chainShapeStartY    = null;
     }
 
     /// <summary>Test-only: same drag as <see cref="SimulateChainDrag"/>; kept as a second name for tests of the multi-frame scope.</summary>
@@ -2337,16 +2378,23 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                     frame, _chainFrameStartX[i], _chainFrameStartY![i], newX, newY));
         }
 
-        if (snapshots.Count > 0)
+        var shapeSnapshots = new List<MoveShapesCommand.ShapeSnapshot>();
+        for (int i = 0; i < _chainShapes!.Length; i++)
         {
-            _undoManager!.Record(new MoveFrameOffsetBulkCommand(snapshots, _appCommands!, _events!));
+            var (shape, owner) = _chainShapes[i];
+            if (MathF.Abs(shape.X - _chainShapeStartX![i]) <= eps && MathF.Abs(shape.Y - _chainShapeStartY![i]) <= eps) continue;
+            shapeSnapshots.Add(new MoveShapesCommand.ShapeSnapshot(
+                owner, shape, _chainShapeStartX![i], _chainShapeStartY![i], shape.X, shape.Y));
+        }
+
+        if (snapshots.Count > 0 || shapeSnapshots.Count > 0)
+        {
+            _undoManager!.Record(new MoveFrameOffsetBulkCommand(snapshots, _appCommands!, _events!, shapeSnapshots));
             _events!.RaiseAnimationChainsChanged();
             _appCommands!.SaveCurrentAnimationChainList();
         }
 
-        _draggingChainFrames = null;
-        _chainFrameStartX    = null;
-        _chainFrameStartY    = null;
+        ClearChainDrag();
     }
 
     /// <summary>
@@ -2569,7 +2617,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     }
 
     /// <summary>What a sprite grab moves: <see cref="Frames"/>, and whether it is the lone-selected-frame case.</summary>
-    private readonly record struct SpriteDragScope(AnimationFrameSave[] Frames, bool IsSingleFrame);
+    private readonly record struct SpriteDragScope(AnimationFrameSave[] Frames, bool IsSingleFrame, (ShapeSave Shape, AnimationFrameSave Frame)[] Shapes);
 
     /// <summary>
     /// Resolves a sprite grab at (<paramref name="px"/>, <paramref name="py"/>), item by item rather
@@ -2584,6 +2632,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private SpriteDragScope? ResolveSpriteDragScope(float px, float py, bool requireHit = true)
     {
         var moves = new List<AnimationFrameSave>();
+        var shapesToMove = new List<(ShapeSave Shape, AnimationFrameSave Frame)>();
         bool hit = !requireHit;
 
         var chains = SelectedChainsForSpriteDrag();
@@ -2591,6 +2640,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         {
             if (chain.IsLocked) continue;
             moves.AddRange(chain.Frames);
+            foreach (var chainFrame in chain.Frames)
+                foreach (var shape in chainFrame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [])
+                    // Offset edits go only to keyframes; the rest inherit and follow on their own.
+                    if (KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, shape, chain))
+                        shapesToMove.Add((shape, chainFrame));
             if (!hit && GetCurrentPlaybackFrame(chain) is { } shown && HitTestFrameFootprint(shown, px, py))
                 hit = true;
         }
@@ -2605,7 +2659,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         }
 
         if (!hit || moves.Count == 0) return null;
-        return new SpriteDragScope(moves.Distinct().ToArray(), chains.Count == 0 && selectedFrames.Count == 1);
+        return new SpriteDragScope(moves.Distinct().ToArray(), chains.Count == 0 && selectedFrames.Count == 1, shapesToMove.Distinct().ToArray());
     }
 
     /// <summary>
@@ -2748,14 +2802,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         }
         else if (_draggingChainFrames is { } frames)
         {
-            for (int i = 0; i < frames.Length; i++)
-            {
-                frames[i].RelativeX = _chainFrameStartX![i];
-                frames[i].RelativeY = _chainFrameStartY![i];
-            }
-            _draggingChainFrames = null;
-            _chainFrameStartX    = null;
-            _chainFrameStartY    = null;
+            RestoreChainDrag();
             FrameLiveUpdated?.Invoke(frames[0]);
         }
         else if (_draggedGuideIdx >= 0)
@@ -2975,10 +3022,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             }
             else
             {
-                _draggingChainFrames = scope.Frames;
-                _chainFrameStartX    = scope.Frames.Select(f => f.RelativeX).ToArray();
-                _chainFrameStartY    = scope.Frames.Select(f => f.RelativeY).ToArray();
-                _frameDragAnchor     = pos;
+                BeginChainDrag(scope);
+                _frameDragAnchor = pos;
             }
             e.Pointer.Capture(this);
         }
@@ -3060,11 +3105,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
             (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-            for (int i = 0; i < _draggingChainFrames.Length; i++)
-            {
-                _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX![i] + dx);
-                _draggingChainFrames[i].RelativeY = SnapToPixel(_chainFrameStartY![i] + dy);
-            }
+            ApplyChainDrag(dx, dy);
             InvalidateVisual();
             // Param is unused by MainWindow.OnFrameLiveUpdated (only drives a display refresh),
             // so any frame in the chain satisfies the event's signature.
