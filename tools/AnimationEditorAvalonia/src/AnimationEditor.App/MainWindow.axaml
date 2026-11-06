@@ -1691,6 +1691,21 @@
                                     <TextBlock Text="Onion Skin" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
+                            <ToggleButton x:Name="ShowShapesCheck"
+                                          Classes="toolbarToggle"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="4,0,0,0"
+                                          IsChecked="True"
+                                          ToolTip.Tip="Show collision shapes (view only, not saved)">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Shapes" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
                             <ToggleButton x:Name="ShowOriginCheck"
                                           Classes="toolbarToggle"
                                           Foreground="{DynamicResource Ink}"

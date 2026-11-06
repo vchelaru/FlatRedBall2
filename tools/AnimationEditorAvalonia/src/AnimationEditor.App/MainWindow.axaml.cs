@@ -3401,6 +3401,10 @@ public partial class MainWindow : Window
         OnionSkinToggle.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOnionSkin = OnionSkinToggle.IsChecked == true;
 
+        ShowShapesCheck.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.ShowShapes = ShowShapesCheck.IsChecked == true;
+        PreviewCtrl.ShowShapesChanged += () => ShowShapesCheck.IsChecked = PreviewCtrl.ShowShapes;
+
         ShowOriginCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
 
