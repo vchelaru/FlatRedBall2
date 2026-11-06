@@ -83,6 +83,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
+    private bool _showShapes = true;
     private bool _showOrigin;
     private bool _showUserGuides = true;
     private bool _showBoundingBox = true;
@@ -246,6 +247,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         get => _showOnionSkin;
         set { _showOnionSkin = value; InvalidateVisual(); }
     }
+
+    /// <summary>
+    /// Whether collision shapes are drawn and editable in the preview. View-only (never saved). While off, every
+    /// shape gesture is inert (hit-test, handles, vertices, drag). Selecting a shape turns it back on.
+    /// </summary>
+    public bool ShowShapes
+    {
+        get => _showShapes;
+        set
+        {
+            if (_showShapes == value) return;
+            _showShapes = value;
+            // A hidden shape must not stay selected (its inspector fields would still edit it): fall back to its frame.
+            if (!value && _selectedState?.SelectedShape is { } selected && FindOwningFrame(selected) is { } owner)
+                _selectedState.SelectedFrame = owner;
+            InvalidateVisual();
+            ShowShapesChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Raised when <see cref="ShowShapes"/> changes, so the toolbar toggle can follow.</summary>
+    public event Action? ShowShapesChanged;
 
     /// <summary>Toggles the origin crosshair overlay — unrelated to user-placed guides, see <see cref="ShowUserGuides"/>.</summary>
     public bool ShowOrigin
@@ -885,7 +908,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     private bool IsFrameLocked(AnimationFrameSave? frame) => FindOwningChain(frame)?.IsLocked == true;
 
-    private bool IsShapeLocked(object? shape) => IsFrameLocked(FindOwningFrame(shape));
+    // Hidden shapes are inert exactly like locked ones, so no drag/resize/vertex gesture can edit what isn't drawn.
+    private bool IsShapeLocked(object? shape) => !_showShapes || IsFrameLocked(FindOwningFrame(shape));
 
     // A polygon's vertices take no gestures while its chain is locked or its Points keyframe is off: a skipped
     // frame's own points are ignored by playback, so a drag there would edit data nothing reads (#1484).
@@ -1062,6 +1086,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
     private void OnSelectionChanged()
     {
+        // Picking a shape (tree, add, paste) means the user wants to see it.
+        if (!_showShapes && _selectedState!.SelectedShape is not null) ShowShapes = true;
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         SyncGroupPlayback();
         LogSelectionPerf($"      PreviewControl.SyncGroupPlayback: {sw.ElapsedMilliseconds}ms");
@@ -1781,6 +1808,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// </summary>
     private PreviewShapeInfo[] BuildShapeInfos()
     {
+        if (!_showShapes) return Array.Empty<PreviewShapeInfo>();
         if (IsGroupPreviewActive)
         {
             // Group mode: every track's shapes follow that track's own playhead (the singular
@@ -2070,7 +2098,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private List<object> ShapesUnder(float px, float py)
     {
         var result = new List<object>();
-        if (px < RulerSize || py < RulerSize) return result;
+        if (!_showShapes || px < RulerSize || py < RulerSize) return result;
 
         float cx = GetCenterX();
         float cy = GetCenterY();
@@ -2405,7 +2433,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private HandleKind HitTestShapeHandle(float px, float py)
     {
         var sel = _selectedState!.SelectedShape;
-        if (sel is null || (_selectedState!.SelectedFrame is null && !IsGroupPreviewActive)) return HandleKind.None;
+        if (!_showShapes || sel is null || (_selectedState!.SelectedFrame is null && !IsGroupPreviewActive)) return HandleKind.None;
         if (px < RulerSize || py < RulerSize) return HandleKind.None;
 
         float cx = GetCenterX();
@@ -2565,7 +2593,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private bool TrySelectShapeAt(float px, float py)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame?.ShapesSave is null) return false;
+        if (!_showShapes || frame?.ShapesSave is null) return false;
         if (px < RulerSize || py < RulerSize) return false;
 
         float cx = GetCenterX();
