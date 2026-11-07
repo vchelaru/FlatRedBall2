@@ -68,6 +68,7 @@ public partial class MainWindow
         private bool _wired;
         private SequenceDocument? _document;
         private bool _refreshing;
+        private bool _restoringZoom;
         private List<SequenceListItem> _items = new();
 
         private readonly SequenceClock _clock = new();
@@ -149,6 +150,7 @@ public partial class MainWindow
             if (tab.UndoSnapshot != null)
                 _window._undoManager.RestoreSnapshot(tab.UndoSnapshot);
             Refresh();
+            RestoreZoom();
             return Task.FromResult(true);
         }
 
@@ -344,6 +346,7 @@ public partial class MainWindow
                 ShowPlayhead();
             };
             w.SequenceTimelineZoom.Attach(w.SequenceTimeline);
+            w.SequenceTimeline.ZoomChanged += _ => RememberZoom();
             Controls.TimelineScrollBinder.Attach(w.SequenceTimeline, w.SequenceTimelineHScroll, w.SequenceTimelineVScroll);
 
             var preview = w.SequencePreview;
@@ -651,6 +654,9 @@ public partial class MainWindow
 
         private void Detach()
         {
+            // A wheel zoom still easing toward its preset is remembered where it was heading, for this document.
+            if (_document != null)
+                _window.SequenceTimeline.SettleZoomAnimation();
             if (_document != null)
                 _document.Changed -= Refresh;
             _document = null;
@@ -677,6 +683,34 @@ public partial class MainWindow
             if (SequenceSelectionMemory.Remember(_window._appSettings.SelectedSequences, _document.Path.Standardized,
                     SequenceNames(_document), _document.SelectedSequence))
                 _window.SaveSettingsFile();
+        }
+
+        // The timeline zoom persists per .seqj file as a whole percent (#1665). View state again: no undo entry, the file
+        // is not touched. Every zoom path (wheel, +/-, typed value) raises ZoomChanged; a wheel ease raises it every tick,
+        // so only the settled zoom is stored, and the settings are written only when the stored percent changed.
+        private void RememberZoom()
+        {
+            var timeline = _window.SequenceTimeline;
+            if (_restoringZoom || _document is null || timeline.IsZoomAnimating) return;
+            if (TimelineZoomMemory.Remember(_window._appSettings.TimelineZooms, _document.Path.Standardized, timeline.Zoom * 100.0))
+                _window.SaveSettingsFile();
+        }
+
+        // Applies the file's remembered zoom without easing. Open, tab restore, back/forward and tab switches all come
+        // through LoadAsync, and the one timeline control is shared by every .seqj tab, so each load sets its own zoom.
+        private void RestoreZoom()
+        {
+            if (_document is null) return;
+            _restoringZoom = true;
+            try
+            {
+                _window.SequenceTimeline.RestoreZoomPercent(
+                    TimelineZoomMemory.PercentToRestore(_window._appSettings.TimelineZooms, _document.Path.Standardized));
+            }
+            finally
+            {
+                _restoringZoom = false;
+            }
         }
 
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>

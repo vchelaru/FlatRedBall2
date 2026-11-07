@@ -262,6 +262,23 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Sets the zoom a file opens at (#1665): instantly, with no ease, and never past the timeline limits. The view start
+    /// is kept within the shown sequence, since the zoom and the sequence may both differ from what it was scrolled for.
+    /// Call it after <see cref="Show"/>.
+    /// </summary>
+    public void RestoreZoomPercent(int percent)
+    {
+        _zoomAnimator.Cancel();
+        ClearHover();
+        Viewport.SetPixelsPerSecond(TimelineViewport.DefaultPixelsPerSecond * percent / 100.0);
+        double view = Math.Max(0, Bounds.Width - TimelineViewport.HeaderWidth) / Viewport.PixelsPerSecond;
+        double furthest = Math.Max(0, SequenceLength + TimelineScrollBars.EndMarginPixels / Viewport.PixelsPerSecond - view);
+        if (Viewport.ScrollSeconds > furthest) Viewport.SetScrollSeconds(furthest);
+        ZoomChanged?.Invoke(Zoom * 100f);
+        InvalidateVisual();
+    }
+
     private SequenceSave? Sequence =>
         _document is { } document && _sequenceIndex >= 0 && _sequenceIndex < document.Save.Sequences.Count
             ? document.Save.Sequences[_sequenceIndex]
