@@ -65,6 +65,10 @@ public class LibraryChipOutlineTests
         int right = left + (int)Math.Round(chip.Bounds.Width) - 1;
         var pixels = Read(frame);
 
+        // The outline itself is drawn: midway along the top and bottom edges the stroke is clearly red.
+        Assert.True(pixels((left + right) / 2, top) > 60, "no accent outline along the top edge");
+        Assert.True(pixels((left + right) / 2, bottom) > 60, "no accent outline along the bottom edge");
+
         // Redness is high where the accent outline shows and ~0 on the grey fills. The unfixed corner differs by ~140, the antialiased seam by ~40.
         for (int dy = 0; dy < CornerPixels; dy++)
         for (int dx = 0; dx < CornerPixels; dx++)

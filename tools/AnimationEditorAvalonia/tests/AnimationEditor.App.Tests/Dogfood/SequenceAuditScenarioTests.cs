@@ -137,10 +137,13 @@ public class SequenceAuditScenarioTests
         editor.ClickTab("hero.achx");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
 
-        // Playback must not carry on behind the hidden tab. (Removing Hide's explicit StopPlayback does not fail this:
-        // the first tick on a detached, zero-length sequence stops the clock anyway.)
+        // Playback must not carry on behind the hidden tab.
         Timeline(editor).Playhead.ShouldBe(0);
         IsPlaying(editor).ShouldBeFalse();
+        // The first tick on the detached, zero-length sequence would stop the clock too, so the two checks above pass
+        // without Hide's own StopPlayback. Its readout tells them apart: Hide stops while the 1 s sequence is still
+        // attached, while a tick after detaching would write "0.00 s".
+        editor.Control<TextBlock>("SequenceTimeText").Text.ShouldBe("0.00 s / 1.00 s");
     }
 
     [AvaloniaFact]
