@@ -101,6 +101,12 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public Dictionary<string, List<string>> CollapsedImageFolders { get; set; } = new();
 
+        /// <summary>
+        /// Sources collapsed in a <c>.seqj</c> tab's library, keyed by the <c>.seqj</c> file's
+        /// <see cref="FilePath.Standardized"/> path; each value lists sources as written in that file.
+        /// </summary>
+        public Dictionary<string, List<string>> CollapsedLibrarySources { get; set; } = new();
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

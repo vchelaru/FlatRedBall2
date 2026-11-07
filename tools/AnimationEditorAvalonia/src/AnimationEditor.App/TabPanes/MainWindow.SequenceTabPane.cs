@@ -245,11 +245,12 @@ public partial class MainWindow
                 if (e != null && TimelinePoint(e) is { } point)
                     w.SequenceTimeline.DropChip(chip, point);
             };
-            w.SequenceRenameItem.Click += (_, _) => _ = RenameSelectedAsync();
-            w.SequenceDeleteItem.Click += (_, _) => DeleteSelected();
+            // Tunnel, so the menu is built before the ContextMenu's own handler opens it.
+            w.SequenceList.AddHandler(Control.ContextRequestedEvent, OnSequenceListContextRequested, RoutingStrategies.Tunnel);
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+            w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
             w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
 
             _timer.Tick += (_, _) => OnTick();
@@ -300,6 +301,36 @@ public partial class MainWindow
             w.SequenceTimeline.ClearSelection();
             ShowInspector();
             BringInspectorForward();
+        }
+
+        /// <summary>
+        /// Fills the menu from what was hit: a sequence row offers Rename and Delete, blank space only Add Sequence.
+        /// A right-click on a row has already selected it, so Rename and Delete act on the row that was hit.
+        /// </summary>
+        private void OnSequenceListContextRequested(object? sender, ContextRequestedEventArgs e)
+        {
+            var w = _window;
+            if (w.SequenceList.ContextMenu is not { } menu) return;
+            bool onSequence = e.Source is Visual source && source.FindAncestorOfType<ListBoxItem>(includeSelf: true) is not null;
+            menu.Items.Clear();
+            var groups = SequenceListMenuLayout.For(onSequence);
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (i > 0) menu.Items.Add(new Separator());
+                foreach (var command in groups[i])
+                {
+                    var (header, onClick) = command switch
+                    {
+                        SequenceListMenuCommand.Rename => ("Rename…", (Action)(() => _ = RenameSelectedAsync())),
+                        SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
+                        SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
+                        _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
+                    };
+                    var item = new MenuItem { Header = header };
+                    item.Click += (_, _) => onClick();
+                    menu.Items.Add(item);
+                }
+            }
         }
 
         /// <summary>Double-clicking a sequence swaps its name for the same inline box the ANIMATIONS tree uses.</summary>
@@ -472,6 +503,17 @@ public partial class MainWindow
             _document = null;
         }
 
+        // Collapsed sources persist per .seqj file. They are view state, so no undo entry and the file is not touched.
+        private void StoreCollapsedSources()
+        {
+            if (_document is null) return;
+            var key = _document.Path.Standardized;
+            var keys = _window.SequenceLibrary.CollapsedSources.Keys;
+            if (keys.Count == 0) _window._appSettings.CollapsedLibrarySources.Remove(key);
+            else _window._appSettings.CollapsedLibrarySources[key] = keys.ToList();
+            _window.SaveSettingsFile();
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
@@ -490,6 +532,9 @@ public partial class MainWindow
                 _refreshing = false;
             }
             _document.SelectedSequence = selected;
+            // The settings copy is current after every toggle, so reloading it on each refresh is safe.
+            _window.SequenceLibrary.CollapsedSources.Load(
+                _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
             _window.SequenceLibrary.Show(_document);
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
             // An undo or redo can change which sequence is selected without the list raising a selection change.

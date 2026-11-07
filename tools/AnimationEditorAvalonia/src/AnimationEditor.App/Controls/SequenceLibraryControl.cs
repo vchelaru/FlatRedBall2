@@ -3,10 +3,12 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -29,6 +31,7 @@ public sealed class SequenceLibraryControl : UserControl
     private readonly Dictionary<string, Control> _headers = new();
     private SequenceDocument? _document;
     private string? _shownKey;
+    private readonly Dictionary<string, Action> _groupApply = new(StringComparer.OrdinalIgnoreCase);
 
     public SequenceLibraryControl()
     {
@@ -63,6 +66,21 @@ public sealed class SequenceLibraryControl : UserControl
     }
 
     public ThumbnailService? Thumbnails { get; set; }
+
+    /// <summary>
+    /// The sources whose chips are hidden. View state the host persists: toggling it never touches the document.
+    /// </summary>
+    public CollapsedSourceSet CollapsedSources { get; } = new();
+
+    /// <summary>True when <paramref name="source"/> is shown with its chips hidden.</summary>
+    public bool IsCollapsed(string source) => CollapsedSources.IsCollapsed(source);
+
+    /// <summary>Collapses or expands <paramref name="source"/>, as a click on its chevron or title does.</summary>
+    public void ToggleSource(string source)
+    {
+        CollapsedSources.Toggle(source);
+        if (_groupApply.TryGetValue(source, out var apply)) apply();
+    }
 
     /// <summary>Raised with the local paths of files dropped on the library. Marks the drop handled.</summary>
     public event Action<IReadOnlyList<string>>? FilesDropped;
@@ -107,7 +125,13 @@ public sealed class SequenceLibraryControl : UserControl
     public void Show(SequenceDocument? document)
     {
         string key = document is null ? "" : string.Join("\n", document.Save.Sources);
-        if (ReferenceEquals(document, _document) && key == _shownKey) return;
+        if (document is not null) CollapsedSources.Prune(document.Save.Sources);
+        if (ReferenceEquals(document, _document) && key == _shownKey)
+        {
+            // The host may have loaded another collapsed set for the same document.
+            foreach (var apply in _groupApply.Values) apply();
+            return;
+        }
         _document = document;
         _shownKey = key;
         Sources = document is null ? Array.Empty<LibrarySource>() : SequenceLibrary.Build(document);
@@ -118,6 +142,7 @@ public sealed class SequenceLibraryControl : UserControl
     {
         _groups.Children.Clear();
         _chips.Clear();
+        _groupApply.Clear();
         _headers.Clear();
         if (_document is null) return;
         if (Sources.Count == 0)
@@ -141,7 +166,7 @@ public sealed class SequenceLibraryControl : UserControl
     {
         var name = new TextBlock
         {
-            Text = source.IsMissing ? $"⚠ {source.Source}" : source.Source,
+            Text = source.IsMissing ? $"⚠ {SourceTitle.Format(source.Source)}" : SourceTitle.Format(source.Source),
             FontWeight = FontWeight.SemiBold, FontSize = 12,
             TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
         };
@@ -163,22 +188,55 @@ public sealed class SequenceLibraryControl : UserControl
         Avalonia.Automation.AutomationProperties.SetName(remove, $"Remove {source.Source}");
         remove.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
 
-        // A transparent background makes the whole row hit-testable, so a right-click anywhere on it opens the menu.
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), Background = Brushes.Transparent };
+        // A transparent background makes the whole row hit-testable, so a click anywhere on it toggles and a right-click opens the menu.
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"), Background = Brushes.Transparent };
         var definition = new MenuItem { Header = "Go to Definition", IsEnabled = !source.IsMissing };
         definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(new SequenceChainReferenceSave { Source = source.Source });
         var removeItem = new MenuItem { Header = "Remove Source" };
         removeItem.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
         header.ContextMenu = new ContextMenu { Items = { definition, removeItem } };
         _headers[source.Source] = header;
+        Control toggle;
+        Path? chevron = null;
+        if (!source.IsMissing)
+        {
+            // Same chevron the Animations tree draws (the Fluent TreeViewItem geometries, tinted like its rows).
+            chevron = new Path
+            {
+                Width = 10, Height = 10, Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            };
+            BindResource(chevron, Shape.FillProperty, "TreeViewItemForeground");
+            var button = new Button
+            {
+                Content = chevron, Width = 20, Padding = new Thickness(0, 2), Background = Brushes.Transparent,
+                VerticalAlignment = VerticalAlignment.Center, Focusable = true,
+            };
+            button.Click += (_, _) => ToggleSource(source.Source);
+            toggle = button;
+            header.PointerPressed += (_, e) =>
+            {
+                // The remove button is inside the header and has its own click.
+                if (!e.GetCurrentPoint(header).Properties.IsLeftButtonPressed || IsWithin(e.Source, remove)) return;
+                ToggleSource(source.Source);
+                e.Handled = true;
+            };
+        }
+        else
+        {
+            toggle = new Panel { Width = 20 };
+        }
+        header.Children.Add(toggle);
+        Grid.SetColumn(name, 1);
         header.Children.Add(name);
-        Grid.SetColumn(detail, 1);
+        Grid.SetColumn(detail, 2);
         header.Children.Add(detail);
-        Grid.SetColumn(remove, 2);
+        Grid.SetColumn(remove, 3);
         header.Children.Add(remove);
 
         var group = new StackPanel { Spacing = 6 };
         group.Children.Add(header);
+        Control chipsPanel = new WrapPanel { IsVisible = false };
         if (source.Chips.Count > 0)
         {
             var chips = new WrapPanel();
@@ -189,9 +247,28 @@ public sealed class SequenceLibraryControl : UserControl
                 chips.Children.Add(view);
             }
             group.Children.Add(chips);
+            chipsPanel = chips;
         }
+
+        void Apply()
+        {
+            bool collapsed = IsCollapsed(source.Source);
+            chipsPanel.IsVisible = !collapsed && source.Chips.Count > 0;
+            if (chevron is not null)
+            {
+                BindResource(chevron, Path.DataProperty, collapsed ? "TreeViewItemCollapsedChevronPathData" : "TreeViewItemExpandedChevronPathData");
+                string verb = collapsed ? "Expand" : "Collapse";
+                ToolTip.SetTip(toggle, $"{verb} {source.Source}");
+                Avalonia.Automation.AutomationProperties.SetName(toggle, $"{verb} {source.Source}");
+            }
+        }
+        Apply();
+        _groupApply[source.Source] = Apply;
         return group;
     }
+
+    private static bool IsWithin(object? candidate, Visual ancestor) =>
+        candidate is Visual visual && (ReferenceEquals(visual, ancestor) || ancestor.IsVisualAncestorOf(visual));
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
