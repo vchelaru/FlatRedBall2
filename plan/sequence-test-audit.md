@@ -1,6 +1,6 @@
 # Sequence mode test audit
 
-Snapshot, 2026-11-07, against main at 4b0e1972. Not maintained: re-run the mutations before trusting it later.
+Snapshot, 2026-11-07. Mutations ran against main at 4b0e1972; the new tests were re-run green after merging main at 87764749 (which brought #1597, #1608, #1609, #1610, #1611, not audited here). Not maintained: re-run the mutations before trusting it later.
 
 ## Verdict
 
@@ -37,15 +37,14 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 ## Bugs
 
 1. **A `.seqj` with a wrong-typed field crashes the open path.** `{ "sequences": [ { "name": 5 } ] }` throws `InvalidOperationException` from `SequenceListSave.ReadSequence` (`GetValue<string>` on a number). `SequenceTabPane.LoadAsync` only catches `IOException`, `UnauthorizedAccessException` and `JsonException`, so the exception escapes `OpenAsync` instead of showing the "Could not open" banner. The same applies to `x`, `y`, `z`, `start`, `loops` and the booleans. Repro: write that file into a project and open it; a corrupt-JSON file is handled, this is not. Fix: wrap the typed reads and throw `JsonException`.
-2. **Not a bug, a doc gap:** `SequenceListSave.IsFromNewerVersion` says it "tells the UI to warn", but nothing in the UI reads it.
-3. **Known, in flight (#1608):** Delete with the sequence list focused and nothing selected on the timeline does nothing.
+2. **Fixed meanwhile, not a finding:** the doc gap that nothing surfaced `IsFromNewerVersion` (now #1610), and Delete with only a sequence selected doing nothing (now #1608).
 
 ## Not testable headlessly
 
 | Surface | Extracted core | Could still be extracted |
 |---|---|---|
 | OS drag-drop of files into the library | `SequenceDocument.AddSources`; the test raises the same DragEvent the OS would | none |
-| Chip drag cursor, timeline edge cursor (#1597, #1609, open) | `TimelineDropPlan`, `TimelineLayout.HitTest` | the cursor choice per hit part |
+| Chip drag cursor, timeline edge cursor (#1597, #1609, merged after the mutation runs, not audited) | `TimelineDropPlan`, `TimelineLayout.HitTest`, `TimelineCursor` | n/a |
 | Timeline, preview and chip pixels | `TimelineLayout`, `TimelineDropPlan`, `SequenceScene`; chip outline has a pixel test | `TickStep` and ruler label formatting in `SequenceTimelineControl.Render` |
 | Playback tick clamp (`MaxTickSeconds` in `SequenceTabPane.OnTick`) | `SequenceClock`, `TickClock` | the clamp itself (A26 is open) |
 | Status bar "Auto Save Failed" for a .seqj | `SequenceDocument.SaveError` (tested) | `SequenceTabPane.Status` label choice (not mutation-run) |
