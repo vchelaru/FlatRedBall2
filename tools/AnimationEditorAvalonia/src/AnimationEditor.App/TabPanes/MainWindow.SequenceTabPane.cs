@@ -253,6 +253,12 @@ public partial class MainWindow
             // Tunnel, so the menu is built before the ContextMenu's own handler opens it.
             w.SequenceList.AddHandler(Control.ContextRequestedEvent, OnSequenceListContextRequested, RoutingStrategies.Tunnel);
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
+            w.SequenceLibrary.AutoplayAll = w._appSettings.LibraryAutoplayAll;
+            w.SequenceLibrary.AutoplayAllToggled += on =>
+            {
+                w._appSettings.LibraryAutoplayAll = on;
+                w.SaveSettingsFile();
+            };
             w.SequenceTimeline.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
