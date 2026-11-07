@@ -149,12 +149,13 @@ public sealed class SequenceDocument
 
     /// <summary>
     /// Where <paramref name="reference"/>'s chain is defined: the absolute path of its source file, or an error message
-    /// when the source can't be read or has no such chain. Exactly one of the two is non-null.
+    /// when the source can't be read or has no such chain. Exactly one of the two is non-null. A reference with an
+    /// empty <see cref="SequenceChainReferenceSave.Chain"/> locates just the source file.
     /// </summary>
     public (string? Path, string? Error) LocateDefinition(SequenceChainReferenceSave reference)
     {
         if (IsSourceMissing(reference.Source)) return (null, $"{reference.Source} is missing or could not be read.");
-        if (FindChain(reference) is null) return (null, $"{reference.Source} has no chain named \"{reference.Chain}\".");
+        if (reference.Chain.Length > 0 && FindChain(reference) is null) return (null, $"{reference.Source} has no chain named \"{reference.Chain}\".");
         return (SourcePath(reference.Source).FullPath, null);
     }
 

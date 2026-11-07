@@ -26,6 +26,7 @@ public sealed class SequenceLibraryControl : UserControl
     private readonly StackPanel _groups = new() { Margin = new Thickness(8), Spacing = 12 };
     private readonly Border _frame = new() { BorderThickness = new Thickness(1) };
     private readonly Dictionary<(string Source, string Chain), LibraryChipView> _chips = new();
+    private readonly Dictionary<string, Control> _headers = new();
     private SequenceDocument? _document;
     private string? _shownKey;
 
@@ -70,6 +71,12 @@ public sealed class SequenceLibraryControl : UserControl
     public event Action<string>? RemoveSourceRequested;
 
     /// <summary>
+    /// Raised by a "Go to Definition" menu item. A chip sends its source and chain; a source's header sends the source
+    /// alone (empty <see cref="SequenceChainReferenceSave.Chain"/>), so the host opens the file without selecting a chain.
+    /// </summary>
+    public event Action<SequenceChainReferenceSave>? GoToDefinitionRequested;
+
+    /// <summary>
     /// Raised on each pointer move while a chip is dragged. The drag stays inside the window (pointer capture, not OS
     /// drag-drop), so the host reads the position against whatever control it drops on.
     /// </summary>
@@ -77,6 +84,8 @@ public sealed class SequenceLibraryControl : UserControl
 
     /// <summary>Raised when a chip drag ends: with the release, or null when the drag was cancelled.</summary>
     public event Action<LibraryChip, PointerEventArgs?>? ChipDragEnded;
+
+    internal void RaiseGoToDefinition(SequenceChainReferenceSave reference) => GoToDefinitionRequested?.Invoke(reference);
 
     internal void RaiseChipDragMoved(LibraryChip chip, PointerEventArgs e) => ChipDragMoved?.Invoke(chip, e);
 
@@ -87,6 +96,9 @@ public sealed class SequenceLibraryControl : UserControl
 
     /// <summary>The chip for <paramref name="chain"/> of <paramref name="source"/>, or null when it isn't shown.</summary>
     public LibraryChipView? ChipFor(string source, string chain) => _chips.GetValueOrDefault((source, chain));
+
+    /// <summary>The header row of <paramref name="source"/>, or null when it isn't shown.</summary>
+    public Control? HeaderFor(string source) => _headers.GetValueOrDefault(source);
 
     /// <summary>
     /// Shows <paramref name="document"/>'s sources. Rebuilds the chips only when the document or its source list changed,
@@ -106,6 +118,7 @@ public sealed class SequenceLibraryControl : UserControl
     {
         _groups.Children.Clear();
         _chips.Clear();
+        _headers.Clear();
         if (_document is null) return;
         if (Sources.Count == 0)
         {
@@ -150,7 +163,14 @@ public sealed class SequenceLibraryControl : UserControl
         Avalonia.Automation.AutomationProperties.SetName(remove, $"Remove {source.Source}");
         remove.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
 
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
+        // A transparent background makes the whole row hit-testable, so a right-click anywhere on it opens the menu.
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), Background = Brushes.Transparent };
+        var definition = new MenuItem { Header = "Go to Definition", IsEnabled = !source.IsMissing };
+        definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(new SequenceChainReferenceSave { Source = source.Source });
+        var removeItem = new MenuItem { Header = "Remove Source" };
+        removeItem.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
+        header.ContextMenu = new ContextMenu { Items = { definition, removeItem } };
+        _headers[source.Source] = header;
         header.Children.Add(name);
         Grid.SetColumn(detail, 1);
         header.Children.Add(detail);
@@ -235,6 +255,11 @@ public sealed class LibraryChipView : Border
         SequenceLibraryControl.BindResource(this, BorderBrushProperty, "LineBrush");
         SequenceLibraryControl.BindResource(this, BackgroundProperty, "BgRail");
         ToolTip.SetTip(this, chip.Chain.Name);
+        var definition = new MenuItem { Header = "Go to Definition" };
+        definition.Click += (_, _) => _library.RaiseGoToDefinition(
+            new SequenceChainReferenceSave { Source = chip.Source, Chain = chip.Chain.Name });
+        var menu = new ContextMenu { Items = { definition } };
+        ContextMenu = menu;
 
         // The thumbnail's square corners would paint over the outline's rounded top corners (ClipToBounds clips to the
         // outer radius, which still leaves the stroke exposed), so it takes the inner radius: outer 5 minus the 1px border.
