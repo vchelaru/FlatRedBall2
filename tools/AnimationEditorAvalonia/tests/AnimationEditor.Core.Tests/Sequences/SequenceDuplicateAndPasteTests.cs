@@ -48,7 +48,8 @@ public class SequenceDuplicateAndPasteTests
         using var dir = new TestHelpers.TempDir();
         var first = Sequence("Idle", "hero.achx");
         first.UnknownProperties["note"] = "keep";
-        first.Tracks[0].UnknownProperties["visible"] = false;
+        first.Tracks[0].Visible = false;
+        first.Tracks[0].UnknownProperties["tag"] = "boss";
         first.Tracks[0].Chains[0].UnknownProperties["tint"] = new JsonObject { ["r"] = 1 };
         string path = WriteSeqj(dir.Path, "boss.seqj", SaveWith(new[] { "hero.achx" }, first, Sequence("Attack", "hero.achx")));
         var document = SequenceDocument.Load(path);

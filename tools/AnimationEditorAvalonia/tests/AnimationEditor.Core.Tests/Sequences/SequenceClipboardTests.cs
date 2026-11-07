@@ -50,7 +50,8 @@ public class SequenceClipboardTests
     public void TryRead_OfWhatWriteMade_GivesTheSequenceBack()
     {
         var sequence = SequenceUsing("hero.achx");
-        sequence.Tracks[0].UnknownProperties["visible"] = false;
+        sequence.Tracks[0].Visible = false;
+        sequence.Tracks[0].UnknownProperties["tag"] = "boss";
         sequence.UnknownProperties["note"] = "keep me";
 
         SequenceClipboard.TryRead(SequenceClipboard.Write(sequence, @"C:\game\anims"), out var content, out var error).ShouldBeTrue();
@@ -63,7 +64,8 @@ public class SequenceClipboardTests
         read.UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep me");
         var track = read.Tracks.Single();
         (track.Name, track.X, track.Y, track.Z, track.FlipHorizontal).ShouldBe(("Body", 3f, -2f, 1, true));
-        track.UnknownProperties["visible"]!.GetValue<bool>().ShouldBeFalse();
+        track.Visible.ShouldBeFalse();
+        track.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         var chain = track.Chains.Single();
         (chain.Source, chain.Chain, chain.Start, chain.Loops).ShouldBe(("C:/game/anims/hero.achx", "Walk", 0.5, 2f));
     }
@@ -104,15 +106,18 @@ public class SequenceClipboardTests
     {
         var original = SequenceUsing("hero.achx");
         original.UnknownProperties["note"] = "keep";
-        original.Tracks[0].UnknownProperties["visible"] = false;
+        original.Tracks[0].Visible = false;
+        original.Tracks[0].UnknownProperties["tag"] = "boss";
         original.Tracks[0].Chains[0].UnknownProperties["tint"] = new JsonObject { ["r"] = 1 };
 
         var clone = SequenceClipboard.Clone(original);
         clone.Tracks[0].Chains[0].Start = 99;
-        clone.Tracks[0].UnknownProperties["visible"] = true;
+        clone.Tracks[0].Visible = true;
+        clone.Tracks[0].UnknownProperties["tag"] = "other";
 
         original.Tracks[0].Chains[0].Start.ShouldBe(0.5);
-        original.Tracks[0].UnknownProperties["visible"]!.GetValue<bool>().ShouldBeFalse();
+        original.Tracks[0].Visible.ShouldBeFalse();
+        original.Tracks[0].UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         clone.UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep");
         clone.Tracks[0].Chains[0].UnknownProperties["tint"]!["r"]!.GetValue<int>().ShouldBe(1);
         (clone.Name, clone.Loop, clone.Tracks[0].X, clone.Tracks[0].FlipHorizontal).ShouldBe(("Idle", true, 3f, true));

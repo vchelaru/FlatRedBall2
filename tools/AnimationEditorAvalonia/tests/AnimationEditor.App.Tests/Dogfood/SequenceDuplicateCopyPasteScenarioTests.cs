@@ -36,7 +36,8 @@ public class SequenceDuplicateCopyPasteScenarioTests
         var idle = new SequenceSave { Name = "Idle", Loop = true };
         var body = new SequenceTrackSave { Name = "Body", X = 5, Y = -3, Z = 2, FlipHorizontal = true };
         body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Loops = 3 });
-        body.UnknownProperties["visible"] = false;
+        body.Visible = false;
+        body.UnknownProperties["tag"] = "boss";
         idle.Tracks.Add(body);
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         save.Sequences.Add(idle);
@@ -113,7 +114,8 @@ public class SequenceDuplicateCopyPasteScenarioTests
         (copy.Loop, copy.Tracks.Count).ShouldBe((true, 1));
         var track = copy.Tracks[0];
         (track.X, track.Y, track.Z, track.FlipHorizontal).ShouldBe((5f, -3f, 2, true));
-        track.UnknownProperties["visible"]!.GetValue<bool>().ShouldBeFalse();
+        track.Visible.ShouldBeFalse();
+        track.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         (track.Chains[0].Source, track.Chains[0].Chain, track.Chains[0].Start, track.Chains[0].Loops).ShouldBe(("hero.achx", "Walk", 0.5, 3f));
         copy.Name = original.Name;
         SequenceClipboard.Write(copy, "C:/x").ShouldBe(SequenceClipboard.Write(original, "C:/x"));
