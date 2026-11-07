@@ -54,6 +54,9 @@ public sealed class SequenceDocument
     /// <summary>Raised after any edit, undo or redo.</summary>
     public event Action? Changed;
 
+    /// <summary>The tracks hidden in the preview. View state: never saved in the file or recorded in the undo history.</summary>
+    public HiddenTrackSet HiddenTracks { get; } = new();
+
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
     /// <exception cref="System.Text.Json.JsonException">The file is not a valid <c>.seqj</c>.</exception>
     public static SequenceDocument Load(string path) => new(path, SequenceListSave.FromFile(path));
@@ -137,7 +140,8 @@ public sealed class SequenceDocument
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
         Edit(undo, $"Rename Sequence '{oldName}' to '{name}'", save => save.Sequences[index].Name = name,
-            selectBefore: index, selectAfter: index);
+            selectBefore: index, selectAfter: index,
+            carryViewState: done => HiddenTracks.RenameSequence(done ? oldName : name, done ? name : oldName));
         return null;
     }
 
@@ -223,7 +227,9 @@ public sealed class SequenceDocument
         if (name == oldName) return null;
         if (tracks.Where((_, i) => i != track).Any(t => t.Name == name))
             return $"A track named \"{name}\" already exists.";
-        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name);
+        string owner = Save.Sequences[sequence].Name;
+        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name,
+            carryViewState: done => HiddenTracks.RenameTrack(owner, done ? oldName : name, done ? name : oldName));
         return null;
     }
 
@@ -317,7 +323,8 @@ public sealed class SequenceDocument
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
-    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null)
+    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
+        Action<bool>? carryViewState = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -327,7 +334,7 @@ public sealed class SequenceDocument
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
         if (selectBefore is null && selectAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter));
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, carryViewState));
     }
 
     /// <summary>
@@ -349,6 +356,8 @@ public sealed class SequenceDocument
         Save = SequenceListSave.FromJsonString(json);
         if (selectedSequence is { } selected) SelectedSequence = selected;
         LoadMissingSources();
+        // View state follows renames first (see SnapshotCommand), then forgets what the restored file no longer has.
+        HiddenTracks.Prune(Save);
         SaveToDisk();
         Changed?.Invoke();
     }
@@ -377,17 +386,23 @@ public sealed class SequenceDocument
     }
 
     // selectBefore and selectAfter are the selected sequence once undone and once done; null leaves the selection alone.
+    // carryViewState moves view state (hidden tracks) along with a rename: true when done or redone, false when undone.
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
-        int? selectBefore = null, int? selectAfter = null) : IUndoableCommand
+        int? selectBefore = null, int? selectAfter = null, Action<bool>? carryViewState = null) : IUndoableCommand
     {
         public string Description => description;
 
         public bool Do()
         {
+            carryViewState?.Invoke(true);
             document.Restore(after, selectAfter);
             return true;
         }
 
-        public void Undo() => document.Restore(before, selectBefore);
+        public void Undo()
+        {
+            carryViewState?.Invoke(false);
+            document.Restore(before, selectBefore);
+        }
     }
 }

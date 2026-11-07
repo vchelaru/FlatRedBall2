@@ -168,4 +168,69 @@ public class SequenceDocumentAuditTests
         document.SaveError.ShouldBeNull();
         File.Exists(seqj).ShouldBeTrue();
     }
+
+    [Fact]
+    public void HiddenTracks_ToggleLeavesTheFileUndoHistoryAndSaveUntouched()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        byte[] before = File.ReadAllBytes(document.Path.FullPath);
+        string json = document.Save.ToJsonString();
+
+        document.HiddenTracks.Toggle("Idle", "Body");
+
+        document.HiddenTracks.IsHidden("Idle", "Body").ShouldBeTrue();
+        undo.CanUndo.ShouldBeFalse();
+        File.ReadAllBytes(document.Path.FullPath).ShouldBe(before);
+        document.Save.ToJsonString().ShouldBe(json);
+    }
+
+    [Fact]
+    public void RenameTrack_CarriesTheHiddenState_AndUndoAndRedoCarryItBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.HiddenTracks.Toggle("Idle", "Body");
+
+        document.RenameTrack(undo, 0, 0, "Torso");
+        bool afterRename = document.HiddenTracks.IsHidden("Idle", "Torso");
+        undo.Undo();
+        bool afterUndo = document.HiddenTracks.IsHidden("Idle", "Body");
+        undo.Redo();
+
+        afterRename.ShouldBeTrue();
+        afterUndo.ShouldBeTrue();
+        document.HiddenTracks.Entries.Select(e => (e.Sequence, e.Track)).ShouldBe(new[] { ("Idle", "Torso") });
+    }
+
+    [Fact]
+    public void RenameSequence_CarriesTheHiddenState_AndUndoCarriesItBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.HiddenTracks.Toggle("Idle", "Body");
+
+        document.RenameSequence(undo, 0, "Charge");
+        bool afterRename = document.HiddenTracks.IsHidden("Charge", "Body");
+        undo.Undo();
+
+        afterRename.ShouldBeTrue();
+        document.HiddenTracks.IsHidden("Idle", "Body").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DeleteTrack_PrunesItsHiddenState()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        document.HiddenTracks.Toggle("Idle", "Body");
+        document.HiddenTracks.Toggle("Idle", "Arms");
+
+        document.DeleteTrack(new UndoManager(), 0, 0);
+
+        document.HiddenTracks.Entries.Select(e => e.Track).ShouldBe(new[] { "Arms" });
+    }
 }

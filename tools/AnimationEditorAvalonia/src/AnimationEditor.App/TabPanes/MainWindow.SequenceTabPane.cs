@@ -125,6 +125,11 @@ public partial class MainWindow
                     return Task.FromResult(false);
                 }
                 _documents[tab.Path] = document;
+                var opened = document;
+                opened.HiddenTracks.Load(_window._appSettings.HiddenSequenceTracks.GetValueOrDefault(opened.Path.Standardized));
+                opened.HiddenTracks.Changed += () => OnHiddenTracksChanged(opened);
+                // Forget what the file no longer has (renamed or deleted outside the editor); persists if it dropped any.
+                opened.HiddenTracks.Prune(opened.Save);
                 // The one place a document is created (open, restore and back/forward all come through here), and
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
@@ -433,7 +438,7 @@ public partial class MainWindow
             var w = _window;
             double time = _clock.Time;
             w.SequenceTimeline.Playhead = time;
-            w.SequencePreview.Composite = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time);
+            w.SequencePreview.Composite = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time, _document.HiddenTracks);
             w.SequenceTimeText.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.00} s / {1:0.00} s",
                 time, w.SequenceTimeline.SequenceLength);
             w.SequencePlayIcon.Path = _clock.IsPlaying
@@ -517,6 +522,18 @@ public partial class MainWindow
             if (keys.Count == 0) _window._appSettings.CollapsedLibrarySources.Remove(key);
             else _window._appSettings.CollapsedLibrarySources[key] = keys.ToList();
             _window.SaveSettingsFile();
+        }
+
+        // Hidden tracks persist per .seqj file like the collapsed sources: view state, so no undo entry and the file is untouched.
+        private void OnHiddenTracksChanged(SequenceDocument document)
+        {
+            var settings = _window._appSettings.HiddenSequenceTracks;
+            var key = document.Path.Standardized;
+            var entries = document.HiddenTracks.Entries;
+            if (entries.Count == 0) settings.Remove(key);
+            else settings[key] = entries.Select(e => new HiddenTrackEntry { Sequence = e.Sequence, Track = e.Track }).ToList();
+            _window.SaveSettingsFile();
+            if (document == _document) ShowPlayhead();
         }
 
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>

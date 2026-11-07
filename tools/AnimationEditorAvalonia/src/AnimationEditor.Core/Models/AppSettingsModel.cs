@@ -107,6 +107,12 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public Dictionary<string, List<string>> CollapsedLibrarySources { get; set; } = new();
 
+        /// <summary>
+        /// Tracks hidden in a <c>.seqj</c> tab's preview, keyed by the <c>.seqj</c> file's
+        /// <see cref="FilePath.Standardized"/> path (#1637). View state: the file itself never records it.
+        /// </summary>
+        public Dictionary<string, List<Sequences.HiddenTrackEntry>> HiddenSequenceTracks { get; set; } = new();
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

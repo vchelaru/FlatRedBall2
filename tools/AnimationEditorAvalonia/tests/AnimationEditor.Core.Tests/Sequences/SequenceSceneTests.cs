@@ -135,4 +135,31 @@ public class SequenceSceneTests
 
         SequenceScene.At(document, 0, 0).Single().FlipMatrix.ShouldBeNull();
     }
+
+    [Fact]
+    public void At_AHiddenTrack_IsLeftOut_AndTheOtherTrackStays()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir,
+            Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1)),
+            Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
+        var hidden = new HiddenTrackSet();
+        hidden.Toggle("Attack", "Fx");
+
+        SequenceScene.At(document, 0, 0.1, hidden).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
+    }
+
+    [Fact]
+    public void At_EveryTrackHidden_IsEmpty()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir,
+            Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1)),
+            Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
+        var hidden = new HiddenTrackSet();
+        hidden.Toggle("Attack", "Fx");
+        hidden.Toggle("Attack", "Body");
+
+        SequenceScene.At(document, 0, 0.1, hidden).ShouldBeEmpty();
+    }
 }
