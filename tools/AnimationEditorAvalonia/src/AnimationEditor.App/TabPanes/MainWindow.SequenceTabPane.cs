@@ -253,6 +253,12 @@ public partial class MainWindow
             // Tunnel, so the menu is built before the ContextMenu's own handler opens it.
             w.SequenceList.AddHandler(Control.ContextRequestedEvent, OnSequenceListContextRequested, RoutingStrategies.Tunnel);
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
+            w.SequenceLibrary.AutoplayAll = w._appSettings.LibraryAutoplayAll;
+            w.SequenceLibrary.AutoplayAllToggled += on =>
+            {
+                w._appSettings.LibraryAutoplayAll = on;
+                w.SaveSettingsFile();
+            };
             w.SequenceTimeline.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
@@ -328,7 +334,8 @@ public partial class MainWindow
                 {
                     var (header, onClick) = command switch
                     {
-                        SequenceListMenuCommand.Rename => ("Rename…", (Action)(() => _ = RenameSelectedAsync())),
+                        SequenceListMenuCommand.CopyQualifiedName => ("Copy Qualified Name", (Action)CopyQualifiedName),
+                        SequenceListMenuCommand.Rename => ("Rename…", () => _ = RenameSelectedAsync()),
                         SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
                         SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
@@ -338,6 +345,13 @@ public partial class MainWindow
                     menu.Items.Add(item);
                 }
             }
+        }
+
+        /// <summary>Copies "<c>Name in path/to/File.seqj</c>" for the selected sequence, the same text the ANIMATIONS tree copies for a chain.</summary>
+        private void CopyQualifiedName()
+        {
+            if (_document is { } document && CurrentSequence is { } sequence)
+                _window.CopyTextToClipboard(QualifiedName.Format(document.Path.FullPath, sequence.Name));
         }
 
         /// <summary>Double-clicking a sequence swaps its name for the same inline box the ANIMATIONS tree uses.</summary>
