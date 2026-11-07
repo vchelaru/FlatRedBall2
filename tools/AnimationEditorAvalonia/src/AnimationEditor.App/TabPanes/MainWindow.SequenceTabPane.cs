@@ -225,8 +225,8 @@ public partial class MainWindow
                 if (e != null && TimelinePoint(e) is { } point)
                     w.SequenceTimeline.DropChip(chip, point);
             };
-            w.SequenceRenameItem.Click += (_, _) => _ = RenameSelectedAsync();
-            w.SequenceDeleteItem.Click += (_, _) => DeleteSelected();
+            // Tunnel, so the menu is built before the ContextMenu's own handler opens it.
+            w.SequenceList.AddHandler(Control.ContextRequestedEvent, OnSequenceListContextRequested, RoutingStrategies.Tunnel);
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
@@ -279,6 +279,36 @@ public partial class MainWindow
             w.SequenceTimeline.ClearSelection();
             ShowInspector();
             BringInspectorForward();
+        }
+
+        /// <summary>
+        /// Fills the menu from what was hit: a sequence row offers Rename and Delete, blank space only Add Sequence.
+        /// A right-click on a row has already selected it, so Rename and Delete act on the row that was hit.
+        /// </summary>
+        private void OnSequenceListContextRequested(object? sender, ContextRequestedEventArgs e)
+        {
+            var w = _window;
+            if (w.SequenceList.ContextMenu is not { } menu) return;
+            bool onSequence = e.Source is Visual source && source.FindAncestorOfType<ListBoxItem>(includeSelf: true) is not null;
+            menu.Items.Clear();
+            var groups = SequenceListMenuLayout.For(onSequence);
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (i > 0) menu.Items.Add(new Separator());
+                foreach (var command in groups[i])
+                {
+                    var (header, onClick) = command switch
+                    {
+                        SequenceListMenuCommand.Rename => ("Rename…", (Action)(() => _ = RenameSelectedAsync())),
+                        SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
+                        SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
+                        _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
+                    };
+                    var item = new MenuItem { Header = header };
+                    item.Click += (_, _) => onClick();
+                    menu.Items.Add(item);
+                }
+            }
         }
 
         /// <summary>Double-clicking a sequence swaps its name for the same inline box the ANIMATIONS tree uses.</summary>
