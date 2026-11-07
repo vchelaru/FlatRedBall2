@@ -141,6 +141,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             SetSelection(null, null);
     }
 
+    /// <summary>True while a chain is being moved or resized and the change is not yet an undo entry.</summary>
+    public bool IsDraggingChain => _drag is DragKind.Move or DragKind.Edge;
+
     /// <summary>Whether track <paramref name="track"/> of the shown sequence is hidden: its <see cref="SequenceTrackSave.Visible"/> is false.</summary>
     public bool IsTrackHidden(int track) =>
         Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && !sequence.Tracks[track].Visible;
