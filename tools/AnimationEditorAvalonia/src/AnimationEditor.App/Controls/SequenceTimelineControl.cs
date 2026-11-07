@@ -67,7 +67,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ClipToBounds = true;
         ContextMenu = _menu;
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
-        ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        ActualThemeVariantChanged += (_, _) =>
+        {
+            ClearThemeCaches();
+            InvalidateVisual();
+        };
         Viewport.Changed += () => ViewChanged?.Invoke();
     }
 
@@ -646,7 +650,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     // ── Drawing ──────────────────────────────────────────────────────────────
 
-    public override void Render(DrawingContext context)
+    public override void Render(DrawingContext context) =>
+        Diagnostics.Frame(context, DrawTimeline, TimelineViewport.HeaderWidth + 6, TimelineViewport.RulerHeight + 6);
+
+    private void DrawTimeline(DrawingContext context)
     {
         var size = Bounds.Size;
         context.FillRectangle(Brush("BgCanvas"), new Rect(size));
@@ -673,8 +680,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     DrawDropRow(context, new Rect(header, top, lanes.Width, laneHeight));
             }
             for (double t = firstTick; Viewport.XAt(t) < size.Width; t += step)
+            {
+                Stats.GridLines++;
                 context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
+            }
 
+            Stats.Blocks = _blocks.Count;
             foreach (var block in _blocks)
             {
                 DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
@@ -727,10 +738,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 }
                 if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
                     DrawDropRow(context, new Rect(0, top, header, laneHeight));
-                var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
-                text.MaxTextWidth = header - 16;
-                text.Trimming = TextTrimming.CharacterEllipsis;
-                text.MaxLineCount = 1;
+                var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, header - 16);
                 context.DrawText(text, new Point(8, top + (laneHeight - text.Height) / 2));
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
@@ -753,6 +761,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 double x = Snap(Viewport.XAt(t));
                 context.DrawLine(tick, new Point(x, ruler - 7), new Point(x, ruler));
+                Stats.RulerLabels++;
                 context.DrawText(Text(TimelineRuler.FormatTick(t, step), 10, Brush("InkMid")), new Point(x + 3, 3));
             }
         }
@@ -761,11 +770,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void DrawBlock(DrawingContext context, TimelineBlock block, bool selected)
     {
+        if (!TimelineCulling.IsBlockVisible(Viewport, block, Bounds.Width, Bounds.Height)) return;
         double top = Viewport.LaneTop(block.Track);
         double left = Viewport.XAt(block.Start);
         double pps = Viewport.PixelsPerSecond;
         var body = new Rect(left, top + TimelineLayout.BodyTop, Math.Max(1, block.Played * pps),
             TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
+        Stats.BlocksIssued++;
+        if (body.Right > TimelineViewport.HeaderWidth && body.Left < Bounds.Width) Stats.BlocksVisible++;
 
         if (block.IsCut)
         {
@@ -808,10 +820,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             label += $"  ×{block.Reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
-            var text = Text(label, 11, Brush("Ink"));
-            text.MaxTextWidth = Math.Max(1, body.Width - 12);
-            text.MaxLineCount = 1;
-            text.Trimming = TextTrimming.CharacterEllipsis;
+            var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, Math.Max(1, body.Width - 12));
             // A missing chain has no filmstrip, so its label centers in the whole block.
             double strip = block.IsMissing ? body.Height : TimelineLayout.LabelHeight;
             context.DrawText(text, new Point(body.X + 6, body.Y + (strip - text.Height) / 2));
@@ -876,7 +885,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawText(label, new Point(pill.X + 5, pill.Y + (pill.Height - label.Height) / 2));
     }
 
-    private static void DrawHatched(DrawingContext context, Rect rect, IBrush brush, double opacity)
+    private void DrawHatched(DrawingContext context, Rect rect, IBrush brush, double opacity)
     {
         if (rect.Width <= 0 || rect.Height <= 0) return;
         var pen = new Pen(brush, 1) { };
@@ -884,21 +893,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         using (context.PushClip(rect))
         {
             for (double x = rect.Left - rect.Height; x < rect.Right; x += 5)
+            {
+                Stats.HatchLines++;
                 context.DrawLine(pen, new Point(x, rect.Bottom), new Point(x + rect.Height, rect.Top));
+            }
         }
     }
 
     private static double Snap(double x) => Math.Round(x) + 0.5;
-
-    // The theme tokens live in ThemeDictionaries, which a lookup without the theme variant never searches.
-    private IBrush Brush(string key) =>
-        (this.TryFindResource(key, ActualThemeVariant, out var value) ? value : null) switch
-        {
-            IBrush brush => brush,
-            Color color => new SolidColorBrush(color),
-            _ => Brushes.Gray,
-        };
-
-    private static FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal) =>
-        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, weight), size, brush);
 }

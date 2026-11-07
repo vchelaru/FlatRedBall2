@@ -42,6 +42,9 @@ internal sealed class FilmstripRenderer
 
     public ThumbnailService? Thumbnails { get; set; }
 
+    /// <summary>The frame's work counters, set by the control before each draw; null counts nothing.</summary>
+    public TimelineFrameStats? Stats { get; set; }
+
     /// <summary>Forgets the laid-out cells: the document or the chain data behind them may have changed.</summary>
     public void Invalidate()
     {
@@ -98,6 +101,7 @@ internal sealed class FilmstripRenderer
         IReadOnlyList<FilmstripCell> cells, Rect film, double minX, double maxX, double scaling, Pen boundary, IBrush numberBrush)
     {
         if (cells.Count == 0) return;
+        if (Stats is { } counted) counted.Cells += cells.Count;
         var info = InfoFor(document, source, chain);
         int first = FirstVisible(cells, minX - film.X);
         for (int i = first; i < cells.Count; i++)
@@ -107,6 +111,12 @@ internal sealed class FilmstripRenderer
             if (left > maxX) break;
             double right = Math.Max(left + 1, Math.Round(film.X + cell.X + cell.Width));
             var rect = new Rect(left, film.Y, right - left, film.Height);
+            if (Stats is { } stats)
+            {
+                stats.CellsIssued++;
+                stats.Clips++;
+                if (right > minX && left < maxX) stats.CellsVisible++;
+            }
             using (context.PushClip(rect))
             {
                 DrawSprite(context, chain, info, cell, rect, scaling);
@@ -129,6 +139,7 @@ internal sealed class FilmstripRenderer
         var bitmap = Thumbnails.GetFrameThumbnail(info.Paths[cell.Frame], info.Plain[cell.Frame], info.Colors[cell.Frame],
             diagonal ? target : MaxBitmapSide, diagonal ? MaxBitmapSide : target);
         if (bitmap is null) return;
+        if (Stats is { } drawn) drawn.Images++;
 
         double bitmapWidth = bitmap.PixelSize.Width / scaling;
         double bitmapHeight = bitmap.PixelSize.Height / scaling;

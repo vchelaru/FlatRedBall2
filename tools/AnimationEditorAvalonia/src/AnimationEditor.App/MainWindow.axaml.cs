@@ -3203,6 +3203,7 @@ public partial class MainWindow : Window
     {
         WireframeCtrl.DiagnosticsEnabled = on;
         PreviewCtrl.DiagnosticsEnabled   = on;
+        SequenceTimeline.DiagnosticsEnabled = on;
     }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)
