@@ -102,6 +102,30 @@ public class SequenceTimelineTests
     }
 
     [Fact]
+    public void ActiveAt_BeforeTheFirstStart_ReturnsNull()
+    {
+        // Hidden before the first chain on purpose: this is how a sprite appears partway through a sequence.
+        var walk = Ref("Walk", start: 0.4);
+        var track = new SequenceTrackSave { Chains = { walk } };
+
+        SequenceTimeline.ActiveAt(track, 0, _ => 2, out _).ShouldBeNull();
+        SequenceTimeline.ActiveAt(track, 0.39, _ => 2, out _).ShouldBeNull();
+        SequenceTimeline.ActiveAt(track, 0.4, _ => 2, out _).ShouldBe(walk);
+    }
+
+    [Fact]
+    public void ActiveAt_AfterTheLastChainEnds_ReturnsNull()
+    {
+        // Hidden after the last chain on purpose: this is how a sprite disappears partway through a sequence.
+        var walk = Ref("Walk", start: 1);
+        var track = new SequenceTrackSave { Chains = { walk } };
+
+        SequenceTimeline.ActiveAt(track, 2.9, _ => 2, out _).ShouldBe(walk);
+        SequenceTimeline.ActiveAt(track, 3, _ => 2, out _).ShouldBeNull();
+        SequenceTimeline.ActiveAt(track, 10, _ => 2, out _).ShouldBeNull();
+    }
+
+    [Fact]
     public void Length_AMissingChainCutsTheOneBeforeIt_AndNoChainsIsZero()
     {
         var long_ = Ref("Long", start: 0, loops: 10);

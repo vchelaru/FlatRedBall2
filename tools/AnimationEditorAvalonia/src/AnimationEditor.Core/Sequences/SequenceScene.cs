@@ -53,7 +53,8 @@ public static class SequenceScene
     /// <summary>
     /// The sprite of every track with a chain playing at <paramref name="time"/> in sequence
     /// <paramref name="sequenceIndex"/>, back to front: by Z, equal Z in track order. A track with no chain playing, or
-    /// whose chain is missing or empty, is left out (its sprite is hidden).
+    /// whose chain is missing or empty, is left out (its sprite is hidden). A track is hidden before its first chain and
+    /// after its last one on purpose: this is how a sprite appears or disappears partway through a sequence.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time)
     {
