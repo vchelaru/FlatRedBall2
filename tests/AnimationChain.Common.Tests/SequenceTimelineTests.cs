@@ -139,48 +139,24 @@ public class SequenceTimelineTests
     }
 
     [Fact]
-    public void LoopsForEdgeDrag_BeforeTheStart_NeverShrinksBelowTheMinimum()
+    public void LoopsForEdge_BeforeTheStart_NeverShrinksBelowTheMinimum()
     {
-        SequenceTimeline.LoopsForEdgeDrag(start: 2, edgeTime: 1, cycleLength: 1, nextStart: null, magnetSeconds: 0.05)
-            .ShouldBe(SequenceTimeline.MinimumLoops);
-        SequenceTimeline.LoopsForEdgeDrag(start: 2, edgeTime: 2, cycleLength: 1, nextStart: null, magnetSeconds: 0.05)
-            .ShouldBe(SequenceTimeline.MinimumLoops);
+        SequenceTimeline.LoopsForEdge(start: 2, edgeTime: 1, cycleLength: 1).ShouldBe(SequenceTimeline.MinimumLoops);
+        SequenceTimeline.LoopsForEdge(start: 2, edgeTime: 2, cycleLength: 1).ShouldBe(SequenceTimeline.MinimumLoops);
+        SequenceTimeline.MinimumEdge(start: 2, cycleLength: 4).ShouldBe(2 + 4 * SequenceTimeline.MinimumLoops, 1e-6);
     }
 
     [Fact]
-    public void LoopsForEdgeDrag_NoCycleToMeasure_ReturnsOne()
+    public void LoopsForEdge_NoCycleToMeasure_ReturnsOne()
     {
-        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 5, cycleLength: 0, nextStart: null, magnetSeconds: 0.05).ShouldBe(1);
+        SequenceTimeline.LoopsForEdge(start: 0, edgeTime: 5, cycleLength: 0).ShouldBe(1);
     }
 
     [Fact]
-    public void LoopsForEdgeDrag_CycleAndNextChainBothInReach_PullsToTheNearerOne()
+    public void LoopsForEdge_IsFreeAndNeverMagnetic()
     {
-        // Cycle 1 s from 0: whole cycle at 2.0, next chain at 2.04, edge dragged to 2.01, magnet 0.05.
-        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 2.01, cycleLength: 1, nextStart: 2.04, magnetSeconds: 0.05)
-            .ShouldBe(2f, 1e-5f);
-        // Edge at 2.035: the next chain is the nearer.
-        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 2.035, cycleLength: 1, nextStart: 2.04, magnetSeconds: 0.05)
-            .ShouldBe(2.04f, 1e-5f);
-    }
-
-    [Fact]
-    public void LoopsForEdgeDrag_NextChainStartingTogether_IsNotAMagnet()
-    {
-        // A tie (next starts where this one does) has no edge to snap to: 0.4 s of a 4 s cycle stays 0.1 loops.
-        SequenceTimeline.LoopsForEdgeDrag(start: 1, edgeTime: 1.4, cycleLength: 4, nextStart: 1, magnetSeconds: 1)
-            .ShouldBe(0.1f, 1e-5f);
-    }
-
-    [Theory]
-    // edge time, expected loops (cycle 1 s, start 0, magnet 0.05 s, next chain at 2.5 s)
-    [InlineData(1.7, 1.7)]
-    [InlineData(2.04, 2.0)]   // within the magnet: pulled to a whole cycle
-    [InlineData(2.53, 2.5)]   // within the magnet: pulled to the next chain's start
-    [InlineData(3.6, 3.6)]    // past the next chain: allowed, the overlap is cut at playback
-    public void LoopsForEdgeDrag_FreeWithMagnetsAtCyclesAndNextChain(double edgeTime, double expected)
-    {
-        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime, cycleLength: 1, nextStart: 2.5, magnetSeconds: 0.05)
-            .ShouldBe((float)expected, 1e-5f);
+        // Snapping lives in TimelineSnap: 2.04 s on a 1 s cycle is 2.04 loops here, and past a next chain is allowed.
+        SequenceTimeline.LoopsForEdge(start: 0, edgeTime: 2.04, cycleLength: 1).ShouldBe(2.04f, 1e-5f);
+        SequenceTimeline.LoopsForEdge(start: 1, edgeTime: 1.4, cycleLength: 4).ShouldBe(0.1f, 1e-5f);
     }
 }

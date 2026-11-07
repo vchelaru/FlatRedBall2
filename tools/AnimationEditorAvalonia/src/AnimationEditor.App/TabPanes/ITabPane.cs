@@ -76,6 +76,18 @@ internal interface ITabPane
     void DeleteSelection();
 
     /// <summary>
+    /// The Ctrl+C hotkey and Edit &gt; Copy: copies what is selected in this kind's document. Only called while
+    /// <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>; does nothing when this kind has nothing to copy now.
+    /// </summary>
+    void CopySelection();
+
+    /// <summary>The Ctrl+V hotkey and Edit &gt; Paste, the counterpart of <see cref="CopySelection"/>.</summary>
+    void PasteSelection();
+
+    /// <summary>Whether Edit &gt; Copy and Paste are enabled while this kind is active.</summary>
+    bool CanCopyPaste { get; }
+
+    /// <summary>
     /// The Space hotkey: plays or pauses this kind's preview. Only called while <see cref="Accepts"/> takes
     /// <see cref="HotkeyScope.Document"/>.
     /// </summary>

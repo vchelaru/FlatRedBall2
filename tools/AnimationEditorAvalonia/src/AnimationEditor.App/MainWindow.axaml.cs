@@ -2566,9 +2566,9 @@ public partial class MainWindow : Window
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         MenuSettings.Click += OnSettingsClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
-        MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
+        MenuCopy.Click          += (_, _) => ActivePane.CopySelection();
         MenuCut.Click           += (_, _) => _ = HandleCutAsync();
-        MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
+        MenuPaste.Click         += (_, _) => ActivePane.PasteSelection();
         MenuDuplicate.Click     += (_, _) => HandleDuplicate();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
@@ -2635,15 +2635,20 @@ public partial class MainWindow : Window
     // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
     private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory];
 
+    // Copy and Paste are enabled by the active pane (ITabPane.CanCopyPaste), not by scope: a sequence tab takes them
+    // only while its list is the focused surface.
+    private MenuItem[] PaneEnabledMenuItems => [MenuCopy, MenuPaste];
+
     private readonly List<(MenuItem Item, HotkeyScope Scope)> _scopedMenuItems = new();
 
     private void CollectScopedMenuItems(IEnumerable<object?> items)
     {
         var appScoped = AppScopedMenuItems;
         var documentScoped = DocumentScopedMenuItems;
+        var paneEnabled = PaneEnabledMenuItems;
         foreach (var item in items.OfType<MenuItem>())
         {
-            if (appScoped.Contains(item)) continue;
+            if (appScoped.Contains(item) || paneEnabled.Contains(item)) continue;
             if (item.Items.OfType<MenuItem>().Any())
                 CollectScopedMenuItems(item.Items);
             else
@@ -2660,6 +2665,7 @@ public partial class MainWindow : Window
         foreach (var (item, scope) in _scopedMenuItems)
             item.IsEnabled = _visiblePane.Accepts(scope);
         bool documentActive = _visiblePane.Accepts(HotkeyScope.Document);
+        MenuCopy.IsEnabled = MenuPaste.IsEnabled = _visiblePane.CanCopyPaste;
         MenuUndo.IsEnabled = documentActive && _undoManager.CanUndo;
         MenuRedo.IsEnabled = documentActive && _undoManager.CanRedo;
     }
@@ -7363,7 +7369,9 @@ public partial class MainWindow : Window
                 Id = "copy", Description = "Copy", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("C", Command) },
                 ShouldSkip = IsTextInputFocused,
-                Action = () => _ = HandleCopyAsync(),
+                // Each tab kind copies its own selection: a sequence tab copies a sequence, never from the hidden achx.
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.CopySelection(),
             },
             new()
             {
@@ -7377,7 +7385,8 @@ public partial class MainWindow : Window
                 Id = "paste", Description = "Paste", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("V", Command) },
                 ShouldSkip = IsTextInputFocused,
-                Action = () => _ = HandlePasteAsync(),
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.PasteSelection(),
             },
             new()
             {

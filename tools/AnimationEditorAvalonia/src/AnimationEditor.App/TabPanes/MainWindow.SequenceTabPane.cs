@@ -10,6 +10,7 @@ using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -113,6 +114,11 @@ public partial class MainWindow
 
         public Task<bool> LoadAsync(TabEntry tab, TabLoad load)
         {
+            if (_documents.TryGetValue(tab.Path, out var known))
+            {
+                // A source edited in its own tab (or on disk) while this tab was away: read it again before showing.
+                known.ReloadChangedSources();
+            }
             if (!_documents.TryGetValue(tab.Path, out var document))
             {
                 try
@@ -186,9 +192,7 @@ public partial class MainWindow
             if (SequenceListHasFocus)
             {
                 DeleteSelected();
-                // Rebuilding the list drops its focus once the old row is gone; lay it out now and take it back.
-                _window.SequenceList.UpdateLayout();
-                _window.SequenceList.ContainerFromIndex(_window.SequenceList.SelectedIndex)?.Focus();
+                FocusSelectedRow();
             }
             else
             {
@@ -199,6 +203,63 @@ public partial class MainWindow
         private bool SequenceListHasFocus =>
             _window.FocusManager?.GetFocusedElement() is Visual focused
             && (focused == _window.SequenceList || _window.SequenceList.IsVisualAncestorOf(focused));
+
+        // Opening a menu moves the keyboard focus onto its item, so Edit > Copy and Paste ask where the focus was just
+        // before the menu took it. Hotkeys never see a menu item focused and read the live focus.
+        private bool _listFocusedBeforeMenu;
+
+        private bool ListIsClipboardSurface =>
+            _document is not null && (SequenceListHasFocus || (FocusIsInMenu && _listFocusedBeforeMenu));
+
+        private bool FocusIsInMenu =>
+            _window.FocusManager?.GetFocusedElement() is Visual focused
+            && (focused is MenuItem || focused.FindAncestorOfType<MenuItem>() is not null);
+
+        /// <summary>
+        /// Ctrl+C and Edit &gt; Copy put the selected sequence on the clipboard as JSON when the sequence list is the focused
+        /// surface. With the timeline focused they do nothing here: copying chains and tracks is a separate feature.
+        /// </summary>
+        public void CopySelection()
+        {
+            if (!ListIsClipboardSurface || _document is not { } document || CurrentSequence is null) return;
+            _window.CopyTextToClipboard(document.CopySequence(SequenceIndex));
+        }
+
+        /// <summary>
+        /// Ctrl+V and Edit &gt; Paste read a copied sequence from the clipboard and insert it after the selected one. Text
+        /// that is not a sequence is ignored without a word; a damaged copy shows the error banner.
+        /// </summary>
+        public void PasteSelection()
+        {
+            if (!ListIsClipboardSurface || _document is not { } document) return;
+            _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
+        }
+
+        public bool CanCopyPaste => ListIsClipboardSurface;
+
+        private async Task PasteAsync(SequenceDocument document)
+        {
+            if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard) return;
+            string? text = await clipboard.TryGetTextAsync();
+            if (document != _document) return;
+            if (!SequenceClipboard.TryRead(text, out var content, out var error))
+            {
+                if (error is not null) _window.ShowErrorBanner(error);
+                return;
+            }
+            var result = document.PasteSequence(_window._undoManager, content!);
+            // The pasted sequence starts from its beginning.
+            StopPlayback();
+            if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
+            FocusSelectedRow();
+        }
+
+        // Rebuilding the list drops its focus once the old rows are gone; lay it out now and take it back so the keys keep working.
+        private void FocusSelectedRow()
+        {
+            _window.SequenceList.UpdateLayout();
+            _window.SequenceList.ContainerFromIndex(_window.SequenceList.SelectedIndex)?.Focus();
+        }
 
         public void TogglePlayback()
         {
@@ -236,16 +297,18 @@ public partial class MainWindow
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
             w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
+            // Edit > Copy and Paste follow the focus, so they are re-evaluated whenever it moves.
+            w.AddHandler(InputElement.GotFocusEvent, OnWindowGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
             w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
-            w.SequenceTimeline.ContentChanged += ShowInspector;
+            w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
-                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e), e.KeyModifiers.HasFlag(KeyModifiers.Alt));
                 w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(chip, TimelinePoint(e));
             };
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
@@ -312,6 +375,13 @@ public partial class MainWindow
                 w.SidebarTabs.SelectedItem = w.InspectorTab;
         }
 
+        private void OnWindowGotFocus(object? sender, RoutedEventArgs e)
+        {
+            if (_window._visiblePane != this) return;
+            if (!FocusIsInMenu) _listFocusedBeforeMenu = SequenceListHasFocus;
+            _window.UpdateDocumentMenuItems();
+        }
+
         private void OnSequenceListPressed(object? sender, PointerPressedEventArgs e)
         {
             var w = _window;
@@ -342,6 +412,7 @@ public partial class MainWindow
                     {
                         SequenceListMenuCommand.CopyQualifiedName => ("Copy Qualified Name", (Action)CopyQualifiedName),
                         SequenceListMenuCommand.Rename => ("Rename…", () => _ = RenameSelectedAsync()),
+                        SequenceListMenuCommand.DuplicateSequence => ("Duplicate Sequence", DuplicateSelected),
                         SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
                         SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
@@ -393,6 +464,26 @@ public partial class MainWindow
         {
             var w = _window;
             w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack);
+        }
+
+        /// <summary>
+        /// The one path from what the sequence says to what every view shows. The timeline rebuilds from the document
+        /// after each edit, undo, redo, load and sequence switch, and on every step of a chain drag, and raises
+        /// <see cref="SequenceTimelineControl.ContentChanged"/> each time; the inspector, the Loop toggle, the playhead
+        /// and the preview all follow from here, so none needs its own call after an edit.
+        /// </summary>
+        private void OnTimelineContentChanged()
+        {
+            var w = _window;
+            ShowInspector();
+            // Hiding the tab empties the timeline after detaching; the stopped readout stays as it was.
+            if (_document is null) return;
+            w.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
+            // An edit can shorten the sequence under the playhead. A drag step does not move it: Escape restores the
+            // length, and the playhead should be where the user left it.
+            if (!w.SequenceTimeline.IsDraggingChain)
+                _clock.Seek(_clock.Time, w.SequenceTimeline.SequenceLength);
+            ShowPlayhead();
         }
 
         /// <summary>Opens the reference's source file as a tab and selects its chain there (none when the chain is empty). A missing source or chain shows the error banner instead.</summary>
@@ -502,8 +593,44 @@ public partial class MainWindow
 
         private void AddSequence()
         {
-            if (_document is null) return;
-            _document.AddSequence(_window._undoManager);
+            if (_document is not { } document) return;
+            string name = document.AddSequence(_window._undoManager);
+            // The new sequence starts from its beginning.
+            StopPlayback();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it. Posted so a
+            // closing menu has handed focus back first and cannot take it from the box.
+            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Scrolls the sequence called <paramref name="name"/> into view and swaps its name for the inline box, with the
+        /// text selected. Does nothing when the document or the list has moved on since the sequence was added.
+        /// </summary>
+        private void BeginRenameNewSequence(SequenceDocument document, string name)
+        {
+            var list = _window.SequenceList;
+            int index = _items.FindIndex(item => item.Name == name);
+            if (document != _document || index < 0 || index != list.SelectedIndex) return;
+            list.ScrollIntoView(index);
+            list.UpdateLayout();
+            if (list.ContainerFromIndex(index) is not ListBoxItem container) return;
+            _items[index].IsEditing = true;
+            container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(name);
+        }
+
+        /// <summary>
+        /// Inserts a copy of the selected sequence right after it and opens the copy's name for editing in place, the way
+        /// Add Sequence does.
+        /// </summary>
+        private void DuplicateSelected()
+        {
+            if (_document is not { } document || CurrentSequence is null) return;
+            string name = document.DuplicateSequence(_window._undoManager, SequenceIndex);
+            // The copy starts from its beginning.
+            StopPlayback();
+            // Name it right away: the copy's name is selected, so typing replaces it and Escape keeps it. Posted so a
+            // closing menu has handed focus back first and cannot take it from the box.
+            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
         }
 
         private async Task RenameSelectedAsync()
@@ -575,13 +702,8 @@ public partial class MainWindow
             _window.SequenceLibrary.CollapsedSources.Load(
                 _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
             _window.SequenceLibrary.Show(_document);
+            // Rebuilding the timeline raises ContentChanged, which refreshes the inspector, Loop toggle, playhead and preview.
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
-            // An undo or redo can change which sequence is selected without the list raising a selection change.
-            ShowInspector();
-            _window.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
-            // An edit can shorten the sequence under the playhead.
-            _clock.Seek(_clock.Time, _window.SequenceTimeline.SequenceLength);
-            ShowPlayhead();
             _window.UpdateStatusBar();
         }
     }

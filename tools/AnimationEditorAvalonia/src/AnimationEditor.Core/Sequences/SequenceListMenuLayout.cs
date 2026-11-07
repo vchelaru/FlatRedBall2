@@ -7,13 +7,14 @@ public enum SequenceListMenuCommand
 {
     CopyQualifiedName,
     Rename,
+    DuplicateSequence,
     Delete,
     AddSequence,
 }
 
 /// <summary>
 /// Which commands the SEQUENCES list's menu offers for what was right-clicked, as groups the view separates with
-/// a divider. Copy Qualified Name, Rename and Delete act on a sequence, so blank space never offers them.
+/// a divider. Copy Qualified Name, Rename, Duplicate Sequence and Delete act on a sequence, so blank space never offers them.
 /// </summary>
 public static class SequenceListMenuLayout
 {
@@ -22,7 +23,7 @@ public static class SequenceListMenuLayout
             ? new IReadOnlyList<SequenceListMenuCommand>[]
             {
                 new[] { SequenceListMenuCommand.CopyQualifiedName },
-                new[] { SequenceListMenuCommand.Rename, SequenceListMenuCommand.Delete },
+                new[] { SequenceListMenuCommand.Rename, SequenceListMenuCommand.DuplicateSequence, SequenceListMenuCommand.Delete },
                 new[] { SequenceListMenuCommand.AddSequence },
             }
             :new IReadOnlyList<SequenceListMenuCommand>[]

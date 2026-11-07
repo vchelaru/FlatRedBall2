@@ -9,7 +9,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Copy Qualified Name,
-/// Rename, Delete and Add Sequence; blank space offers only Add Sequence. (The popup is not part of the headless back-buffer, so the
+/// Rename, Duplicate Sequence, Delete and Add Sequence; blank space offers only Add Sequence. (The popup is not part of the headless back-buffer, so the
 /// menus are checked by their items rather than by screenshot.)
 /// </summary>
 public class SequenceListMenuScenarioTests
@@ -50,7 +50,7 @@ public class SequenceListMenuScenarioTests
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
         List(editor).SelectedIndex.ShouldBe(1);
-        Headers(List(editor)).ShouldBe(new[] { "Copy Qualified Name", "-", "Rename…", "Delete", "-", "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Copy Qualified Name", "-", "Rename…", "Duplicate Sequence", "Delete", "-", "Add Sequence" });
     }
 
     [AvaloniaFact]
@@ -77,7 +77,7 @@ public class SequenceListMenuScenarioTests
         Headers(List(editor)).Count.ShouldBe(1);
         List(editor).ContextMenu!.Close();
         editor.RightClick(List(editor).ContainerFromIndex(0)!);
-        Headers(List(editor)).Count.ShouldBe(6);
+        Headers(List(editor)).Count.ShouldBe(7);
         List(editor).ContextMenu!.Close();
         RightClickBlankSpace(editor);
         Headers(List(editor)).ShouldBe(new[] { "Add Sequence" });

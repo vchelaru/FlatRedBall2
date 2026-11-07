@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Sequences;
+using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
 
@@ -124,5 +125,44 @@ public class TimelineDropPlanTests
 
         plan.Start.ShouldBe(0);
         plan.TimeLabel.ShouldBe("0 s");
+    }
+
+    [Fact]
+    public void For_NearAnotherChainsEnd_StartsExactlyThere_AndNamesTheTarget()
+    {
+        var viewport = new TimelineViewport();
+        var targets = new[] { new SnapTarget(1.5, SnapKind.ChainEdge, Track: 0, Chain: 0) };
+        var (x, y) = Point(viewport, 1.5 + 4 / viewport.PixelsPerSecond, row: 1);
+
+        var plan = TimelineDropPlan.For(viewport, ViewWidth, 2, x, y, cycleLength: 0.5, targets);
+
+        plan.Start.ShouldBe(1.5, 1e-9);
+        plan.Snapped!.Value.Time.ShouldBe(1.5);
+    }
+
+    [Fact]
+    public void For_TheGhostsEndNearAnotherChainsStart_SnapsItsEnd()
+    {
+        var viewport = new TimelineViewport();
+        var targets = new[] { new SnapTarget(2.0, SnapKind.ChainEdge, 0, 0) };
+        var (x, y) = Point(viewport, 1.53, row: 1);
+
+        // A 0.5 s ghost at 1.53 ends at 2.03: its end is pulled to 2.0, so it starts at 1.5.
+        var plan = TimelineDropPlan.For(viewport, ViewWidth, 2, x, y, cycleLength: 0.5, targets);
+
+        plan.Start.ShouldBe(1.5, 1e-9);
+    }
+
+    [Fact]
+    public void For_Bypass_IgnoresTargetsAndTheGrid()
+    {
+        var viewport = new TimelineViewport();
+        var targets = new[] { new SnapTarget(1.5, SnapKind.ChainEdge, 0, 0) };
+        var (x, y) = Point(viewport, 1.5 + 4 / viewport.PixelsPerSecond, row: 1);
+
+        var plan = TimelineDropPlan.For(viewport, ViewWidth, 2, x, y, cycleLength: 0.5, targets, bypass: true);
+
+        plan.Start.ShouldBe(1.5 + 4 / viewport.PixelsPerSecond, 1e-9);
+        plan.Snapped.ShouldBeNull();
     }
 }

@@ -716,14 +716,14 @@ internal sealed class AnimationEditorHarness : IDisposable
     }
 
     /// <summary>Presses at <paramref name="from"/> and moves to <paramref name="to"/>, leaving the button down. Finish with <see cref="DragMove"/> and <see cref="DragRelease"/>.</summary>
-    public void DragHold(Point from, Point to)
+    public void DragHold(Point from, Point to, RawInputModifiers modifiers = RawInputModifiers.None)
     {
-        Window.MouseMove(from, RawInputModifiers.None);
-        Window.MouseDown(from, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseMove(from, modifiers);
+        Window.MouseDown(from, MouseButton.Left, modifiers);
         for (int step = 1; step <= 4; step++)
         {
             double t = step / 4.0;
-            Window.MouseMove(new Point(from.X + (to.X - from.X) * t, from.Y + (to.Y - from.Y) * t), RawInputModifiers.LeftMouseButton);
+            Window.MouseMove(new Point(from.X + (to.X - from.X) * t, from.Y + (to.Y - from.Y) * t), modifiers | RawInputModifiers.LeftMouseButton);
         }
         Layout();
     }
@@ -763,16 +763,16 @@ internal sealed class AnimationEditorHarness : IDisposable
     }
 
     /// <summary>Moves the held button to <paramref name="to"/>.</summary>
-    public void DragMove(Point to)
+    public void DragMove(Point to, RawInputModifiers modifiers = RawInputModifiers.None)
     {
-        Window.MouseMove(to, RawInputModifiers.LeftMouseButton);
+        Window.MouseMove(to, modifiers | RawInputModifiers.LeftMouseButton);
         Layout();
     }
 
     /// <summary>Releases the held button at <paramref name="to"/>.</summary>
-    public void DragRelease(Point to)
+    public void DragRelease(Point to, RawInputModifiers modifiers = RawInputModifiers.None)
     {
-        Window.MouseUp(to, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(to, MouseButton.Left, modifiers);
         Layout();
     }
 

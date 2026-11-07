@@ -26,17 +26,22 @@ public sealed class SequenceDocument
     private const string DefaultSequenceName = "Sequence";
     private const string DefaultTrackName = "Track";
 
-    // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private int? _trackToSelect;
 
+    // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
+
+    // What each source's file looked like when it was read, so a later change to the file is seen.
+    private readonly Dictionary<string, FileStamp> _stamps = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length);
 
     private SequenceDocument(string path, SequenceListSave save)
     {
         Path = new FilePath(path);
         Save = save;
         SelectedSequence = save.Sequences.Count > 0 ? 0 : -1;
-        LoadMissingSources();
+        SyncSources();
     }
 
     public FilePath Path { get; }
@@ -54,12 +59,23 @@ public sealed class SequenceDocument
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
 
-    /// <summary>Raised after any edit, undo or redo.</summary>
+    /// <summary>Raised after any edit, undo, redo or source reload.</summary>
     public event Action? Changed;
 
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
     /// <exception cref="System.Text.Json.JsonException">The file is not a valid <c>.seqj</c>.</exception>
     public static SequenceDocument Load(string path) => new(path, SequenceListSave.FromFile(path));
+
+    /// <summary>
+    /// Re-reads every source whose file changed since it was loaded (or could not be read and now can), and raises
+    /// <see cref="Changed"/> when any did. Returns whether any did.
+    /// </summary>
+    public bool ReloadChangedSources()
+    {
+        if (!SyncSources()) return false;
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>True when <paramref name="source"/> is missing or could not be read.</summary>
     public bool IsSourceMissing(string source) => SourceChains(source) is null;
@@ -124,10 +140,76 @@ public sealed class SequenceDocument
     /// <summary>Adds an empty sequence with a name no other sequence uses. Returns that name.</summary>
     public string AddSequence(IUndoManager undo)
     {
-        string name = UniqueName(DefaultSequenceName);
+        string name = NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
         Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }),
             selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
+    }
+
+    /// <summary>
+    /// Inserts a deep copy of the sequence at <paramref name="index"/> right after it, with the next free name, and selects
+    /// it, as one undo entry. Returns the new name.
+    /// </summary>
+    public string DuplicateSequence(IUndoManager undo, int index)
+    {
+        string original = Save.Sequences[index].Name;
+        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name), original);
+        Edit(undo, $"Duplicate Sequence '{original}'", save =>
+        {
+            var copy = SequenceClipboard.Clone(save.Sequences[index]);
+            copy.Name = name;
+            save.Sequences.Insert(index + 1, copy);
+        }, selectBefore: index, selectAfter: index + 1);
+        return name;
+    }
+
+    /// <summary>The clipboard text for the sequence at <paramref name="index"/> (see <see cref="SequenceClipboard"/>).</summary>
+    public string CopySequence(int index) =>
+        SequenceClipboard.Write(Save.Sequences[index], Path.GetDirectoryContainingThis().FullPath);
+
+    /// <summary>
+    /// Pastes a copied sequence after the selected one (at the end when none is selected) with a free name, and selects it.
+    /// The sources it uses join this file's source list when not already there, all as one undo entry.
+    /// </summary>
+    public SequencePasteResult PasteSequence(IUndoManager undo, SequenceClipboardContent content)
+    {
+        int selected = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count ? SelectedSequence : Save.Sequences.Count - 1;
+        int insertAt = selected + 1;
+        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name),
+            string.IsNullOrWhiteSpace(content.Sequence.Name) ? DefaultSequenceName : content.Sequence.Name.Trim());
+        var errors = new List<string>();
+        var folder = Path.GetDirectoryContainingThis();
+        Edit(undo, $"Paste Sequence '{name}'", save =>
+        {
+            var pasted = SequenceClipboard.Clone(content.Sequence);
+            pasted.Name = name;
+            // Each source as this file writes it, keyed by where it points, so a source already listed (in any case) is reused.
+            var listed = new Dictionary<FilePath, string>();
+            foreach (string source in save.Sources)
+                listed.TryAdd(SourcePath(source), source);
+            var refused = new HashSet<FilePath>();
+            foreach (var reference in pasted.Tracks.SelectMany(track => track.Chains).Where(reference => reference.Source.Length > 0))
+            {
+                var file = new FilePath(SequenceClipboard.AbsolutePath(folder.FullPath, reference.Source));
+                if (!listed.TryGetValue(file, out string? written))
+                {
+                    written = file.RelativeTo(folder);
+                    if (file.Extension is not ("achx" or "achj") || file == Path)
+                    {
+                        // Kept as a reference the library shows as missing; only the library entry is refused.
+                        if (refused.Add(file)) errors.Add($"{file.NoPath} can't be a source. Only .achx and .achj files can.");
+                    }
+                    else
+                    {
+                        save.Sources.Add(written);
+                        listed[file] = written;
+                    }
+                }
+                reference.Source = written;
+            }
+            save.Sequences.Insert(insertAt, pasted);
+        }, selectBefore: SelectedSequence, selectAfter: insertAt);
+        return new SequencePasteResult(name, errors);
     }
 
     /// <summary>Renames the sequence at <paramref name="index"/>. Returns why it was refused, or null.</summary>
@@ -196,7 +278,7 @@ public sealed class SequenceDocument
             Edit(undo, $"Add '{chain}' to '{trackName}'", save => save.Sequences[sequence].Tracks[index].Chains.Add(reference));
             return;
         }
-        string name = UniqueTrackName(Save.Sequences[sequence], chain);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -210,7 +292,7 @@ public sealed class SequenceDocument
     /// </summary>
     public string AddTrack(IUndoManager undo, int sequence)
     {
-        string name = UniqueTrackName(Save.Sequences[sequence], DefaultTrackName);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -362,24 +444,6 @@ public sealed class SequenceDocument
         }
     }
 
-    private static string UniqueTrackName(SequenceSave sequence, string baseName)
-    {
-        var used = sequence.Tracks.Select(t => t.Name).ToHashSet();
-        if (!used.Contains(baseName)) return baseName;
-        int suffix = 2;
-        while (used.Contains($"{baseName} {suffix}")) suffix++;
-        return $"{baseName} {suffix}";
-    }
-
-    private string UniqueName(string baseName)
-    {
-        var used = Save.Sequences.Select(s => s.Name).ToHashSet();
-        if (!used.Contains(baseName)) return baseName;
-        int suffix = 2;
-        while (used.Contains($"{baseName} {suffix}")) suffix++;
-        return $"{baseName} {suffix}";
-    }
-
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
         int? trackBefore = null, int? trackAfter = null)
@@ -414,7 +478,7 @@ public sealed class SequenceDocument
         Save = SequenceListSave.FromJsonString(json);
         if (selectedSequence is { } selected) SelectedSequence = selected;
         _trackToSelect = selectedTrack;
-        LoadMissingSources();
+        SyncSources();
         SaveToDisk();
         Changed?.Invoke();
     }
@@ -422,10 +486,21 @@ public sealed class SequenceDocument
     private FilePath SourcePath(string source) =>
         new(System.IO.Path.Combine(Path.GetDirectoryContainingThis().FullPath, source));
 
-    private void LoadMissingSources()
+    /// <summary>Reads every source in the file whose own file is new or differs from when it was last read. Returns whether any was read.</summary>
+    private bool SyncSources()
     {
-        foreach (var source in Save.Sources.Where(s => !_sources.ContainsKey(s)))
-            _sources[source] = TryLoad(SourcePath(source).FullPath);
+        bool any = false;
+        foreach (var source in Save.Sources)
+        {
+            string full = SourcePath(source).FullPath;
+            var info = new FileInfo(full);
+            var stamp = info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
+            if (_stamps.TryGetValue(source, out var known) && known == stamp) continue;
+            _sources[source] = TryLoad(full);
+            _stamps[source] = stamp;
+            any = true;
+        }
+        return any;
     }
 
     private static AnimationChainListSave? TryLoad(string absolutePath)
