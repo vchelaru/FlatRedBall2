@@ -22,6 +22,12 @@ public class DragCursorsTests
     }
 
     [Fact]
+    public void StockCursorId_ReorderIsSizeNS()
+    {
+        DragCursors.StockCursorId(TimelineCursor.Reorder).ShouldBe(32645);
+    }
+
+    [Fact]
     public void StockCursorId_PanIsSizeAll()
     {
         DragCursors.StockCursorId(TimelineCursor.Pan).ShouldBe(32646);

@@ -8,6 +8,9 @@ public enum TimelineCursor
     /// <summary>West-east double arrow: a chain's right edge can be dragged to change its loop count.</summary>
     ResizeHorizontal,
 
+    /// <summary>North-south double arrow: a track header is being dragged to another lane.</summary>
+    Reorder,
+
     /// <summary>Four-way arrow: the timeline is being panned by a middle-button drag.</summary>
     Pan,
 }

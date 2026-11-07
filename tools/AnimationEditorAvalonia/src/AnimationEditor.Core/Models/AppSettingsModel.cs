@@ -107,6 +107,12 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public Dictionary<string, List<string>> CollapsedLibrarySources { get; set; } = new();
 
+        /// <summary>
+        /// True when a <c>.seqj</c> tab's library plays every chip's chain at once (#1622) instead of only the hovered one.
+        /// One setting for all files: it is how the user likes to browse, not a property of any one sequence file.
+        /// </summary>
+        public bool LibraryAutoplayAll { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

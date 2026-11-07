@@ -85,7 +85,7 @@
                                                                Minimum="-100000" Maximum="100000" Increment="1" FormatString="0" />
                         </Grid>
                         <TextBlock Classes="note"
-                                   Text="Relative to the entity origin, Y up. Higher z-order draws on top." />
+                                   Text="Relative to the entity origin, Y up. Higher z-order draws on top; equal values draw in lane order, the lower lane in front. Drag a track header to reorder." />
                     </StackPanel>
                 </Border>
 
