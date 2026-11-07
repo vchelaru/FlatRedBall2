@@ -20,7 +20,7 @@ internal readonly record struct TabStatus(string SaveLabel, IBrush? SaveBrush, s
 
 /// <summary>
 /// One tab kind's share of <see cref="MainWindow"/>: the pane it shows, how a tab of that kind is
-/// loaded, left and closed, and what the status bar, title and hotkeys do while it is active.
+/// loaded, left and closed, and what the status bar, title, hotkeys and menu items do while it is active.
 /// <see cref="MainWindow"/> keeps one per <see cref="TabKind"/> and routes tab lifecycle through
 /// <c>PaneFor</c> instead of branching on the kind. Panes stay alive for the window's lifetime and
 /// are shown and hidden, never rebuilt.
@@ -57,8 +57,11 @@ internal interface ITabPane
     /// <summary>The file the title bar names while this kind is active, or null for none.</summary>
     string? TitlePath(TabEntry? tab);
 
-    /// <summary>Whether <paramref name="hotkey"/> fires while this kind is active.</summary>
-    bool Accepts(HotkeyDefinition hotkey);
+    /// <summary>
+    /// Whether hotkeys and menu items of <paramref name="scope"/> act while this kind is active.
+    /// Document-scoped menu items are disabled while it returns false.
+    /// </summary>
+    bool Accepts(HotkeyScope scope);
 
     /// <summary>Whether the tab's context menu offers Detach to New Window.</summary>
     bool CanDetach { get; }

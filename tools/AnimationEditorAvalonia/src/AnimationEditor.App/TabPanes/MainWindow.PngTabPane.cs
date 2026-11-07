@@ -11,7 +11,7 @@ public partial class MainWindow
     /// <summary>
     /// A <c>.png</c> tab (issue #604): a read-only image preview with its git history in the
     /// sidebar. It has no document, undo history or companion file, so it captures nothing on
-    /// leave and only app-wide hotkeys fire while it is active.
+    /// leave and only app-wide hotkeys and menu items work while it is active.
     /// </summary>
     private sealed class PngTabPane : ITabPane
     {
@@ -109,7 +109,7 @@ public partial class MainWindow
 
         public string? TitlePath(TabEntry? tab) => tab?.Path.FullPath;
 
-        public bool Accepts(HotkeyDefinition hotkey) => hotkey.Scope == HotkeyScope.App;
+        public bool Accepts(HotkeyScope scope) => scope == HotkeyScope.App;
 
         // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.
         public bool CanDetach => false;

@@ -144,7 +144,7 @@ public partial class MainWindow
 
         public string? TitlePath(TabEntry? tab) => _window._projectManager.FileName;
 
-        public bool Accepts(HotkeyDefinition hotkey) => true;
+        public bool Accepts(HotkeyScope scope) => true;
 
         public bool CanDetach => true;
 
