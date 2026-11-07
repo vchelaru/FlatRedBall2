@@ -97,6 +97,8 @@ public class SequenceTimelineScrollBarScenarioTests
         Point point = editor.PointIn(timeline, TimelineViewport.HeaderWidth + 200, timeline.Viewport.LaneTop(0) + 10);
 
         editor.Wheel(point, 4, RawInputModifiers.Control);
+        timeline.SettleZoomAnimation();
+        editor.Layout();
 
         bar.ViewportSize.ShouldBeLessThan(viewBefore);
         bar.GetVisualDescendants().OfType<Thumb>().First().Bounds.Width.ShouldBeLessThan(thumbBefore);

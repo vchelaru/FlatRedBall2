@@ -1,15 +1,18 @@
 using System;
 
-namespace AnimationEditor.App.Controls;
-
+namespace AnimationEditor.Core.Rendering;
 
 /// <summary>
 /// Pure helper that steps a zoom percentage to the next or previous entry in a
-/// preset list.  Shared by <see cref="WireframeControl"/>, <see cref="PreviewControl"/>,
-/// and <see cref="MainWindow"/> so all three use identical stepping logic.
+/// preset list. Every zoom surface (wireframe, preview, PNG diff, sequence timeline) steps through
+/// <see cref="Presets"/> with this one function, so they all behave the same.
 /// </summary>
-internal static class ZoomPresetStepper
+public static class ZoomPresetStepper
 {
+    /// <summary>Zoom presets (percent) the +/- buttons and mouse-wheel step through, ascending.</summary>
+    public static readonly int[] Presets =
+        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
+
     /// <summary>Tolerance used when snapping <paramref name="currentPct"/> to a preset value.</summary>
     private const float Epsilon = 0.01f;
 
@@ -25,7 +28,7 @@ internal static class ZoomPresetStepper
     /// <param name="currentPct">Current zoom as a percentage (e.g. 100 for 100 %).</param>
     /// <param name="presets">Sorted ascending array of preset percentages.  Must not be empty.</param>
     /// <param name="direction">+1 for zoom-in (step up), −1 for zoom-out (step down).</param>
-    internal static int StepToNextPreset(float currentPct, int[] presets, int direction)
+    public static int StepToNextPreset(float currentPct, int[] presets, int direction)
     {
         // Snap float drift: if currentPct is within epsilon of a preset, treat it as exact.
         foreach (var p in presets)
@@ -50,4 +53,12 @@ internal static class ZoomPresetStepper
             return presets[0];
         }
     }
+
+    /// <summary>
+    /// <see cref="StepToNextPreset"/> on a zoom factor (1.0 = 100%), with the result clamped to
+    /// [<paramref name="minZoom"/>, <paramref name="maxZoom"/>]. A preset past a limit lands on the limit, so
+    /// the limit is the last notch. Shared by <c>ZoomAnimator</c> and anything else that steps a zoom factor.
+    /// </summary>
+    public static float StepZoom(float zoom, int direction, int[] presets, float minZoom, float maxZoom) =>
+        Math.Clamp(StepToNextPreset(zoom * 100f, presets, direction) / 100f, minZoom, maxZoom);
 }
