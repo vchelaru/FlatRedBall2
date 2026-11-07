@@ -105,6 +105,52 @@ public class SequenceTimelineScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DraggingAChipOverALane_HighlightsThatTrack_AndLeavingClearsIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body"), Track("Head"));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        var chip = Chip(editor, "Walk");
+
+        editor.DragHold(editor.CenterOf(chip), At(editor, 1, 3.0));
+
+        timeline.DropTargetTrack.ShouldBe(1);
+        timeline.DropPreview!.Value.Kind.ShouldBe(TimelineDropKind.Track);
+        editor.DragMove(At(editor, 0, 3.0));
+        timeline.DropTargetTrack.ShouldBe(0);
+        editor.DragMove(editor.PointIn(chip, chip.Bounds.Width / 2, chip.Bounds.Height + 30));
+        timeline.DropTargetTrack.ShouldBeNull();
+        timeline.DropPreview.ShouldBeNull();
+        editor.DragRelease(editor.PointIn(chip, chip.Bounds.Width / 2, chip.Bounds.Height + 30));
+        SavedTrack(boss, 0).Chains.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAChipOverTheNewTrackRow_PreviewsTheDropTime_AndTheDropLandsThere()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body"));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        var target = At(editor, 1, 0.87);
+
+        editor.DragHold(editor.CenterOf(Chip(editor, "Run")), target);
+
+        timeline.DropTargetTrack.ShouldBeNull();
+        timeline.IsDropTargetNewTrack.ShouldBeTrue();
+        var preview = timeline.DropPreview!.Value;
+        preview.Kind.ShouldBe(TimelineDropKind.NewTrack);
+        preview.Start.ShouldBe(0.85, 1e-9);
+        preview.TimeLabel.ShouldBe("0.85 s");
+        preview.Length.ShouldBe(0.2, 1e-6);
+        editor.DragRelease(target);
+
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].Chains.Single().Start.ShouldBe(preview.Start, 1e-9);
+        timeline.IsDropTargetNewTrack.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
     public async Task DraggingAChain_MovesItInTimeAsOneUndoStep_AndCtrlZPutsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
