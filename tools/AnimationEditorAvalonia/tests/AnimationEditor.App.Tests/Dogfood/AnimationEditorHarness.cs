@@ -728,6 +728,40 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
+    /// <summary>Presses the middle button at <paramref name="from"/> and moves to <paramref name="to"/>, leaving it down. Finish with <see cref="MiddleDragMove"/> and <see cref="MiddleRelease"/>.</summary>
+    public void MiddleDragHold(Point from, Point to)
+    {
+        Window.MouseMove(from, RawInputModifiers.None);
+        Window.MouseDown(from, MouseButton.Middle, RawInputModifiers.None);
+        for (int step = 1; step <= 4; step++)
+        {
+            double t = step / 4.0;
+            Window.MouseMove(new Point(from.X + (to.X - from.X) * t, from.Y + (to.Y - from.Y) * t), RawInputModifiers.MiddleMouseButton);
+        }
+        Layout();
+    }
+
+    /// <summary>Moves the held middle button to <paramref name="to"/>.</summary>
+    public void MiddleDragMove(Point to)
+    {
+        Window.MouseMove(to, RawInputModifiers.MiddleMouseButton);
+        Layout();
+    }
+
+    /// <summary>Releases the middle button at <paramref name="to"/>.</summary>
+    public void MiddleRelease(Point to)
+    {
+        Window.MouseUp(to, MouseButton.Middle, RawInputModifiers.None);
+        Layout();
+    }
+
+    /// <summary>Presses the middle button at <paramref name="from"/>, moves through a few points to <paramref name="to"/>, and releases.</summary>
+    public void MiddleDrag(Point from, Point to)
+    {
+        MiddleDragHold(from, to);
+        MiddleRelease(to);
+    }
+
     /// <summary>Moves the held button to <paramref name="to"/>.</summary>
     public void DragMove(Point to)
     {
