@@ -14,7 +14,7 @@ public sealed partial class SequenceTimelineControl
     // Past this many laid-out texts the cache starts over, so a long session of zooming can't grow it without bound.
     private const int MaxCachedTexts = 2048;
 
-    private readonly record struct TextKey(string Text, double Size, IBrush Brush, FontWeight Weight, double MaxWidth);
+    private readonly record struct TextKey(string Text, double Size, IBrush Brush, FontWeight Weight, double MaxWidth, bool Mono);
 
     private readonly Dictionary<string, IBrush> _brushes = new();
     private readonly Dictionary<TextKey, FormattedText> _texts = new();
@@ -41,22 +41,22 @@ public sealed partial class SequenceTimelineControl
         return brush;
     }
 
-    /// <summary>A single line of text. The result is shared: draw it, don't change it.</summary>
-    private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal) =>
-        CachedText(text, size, brush, weight, double.PositiveInfinity);
+    /// <summary>A single line of text; <paramref name="mono"/> uses the mono font, for a number that changes while it is on screen. The result is shared: draw it, don't change it.</summary>
+    private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal, bool mono = false) =>
+        CachedText(text, size, brush, weight, double.PositiveInfinity, mono);
 
     /// <summary>One line trimmed with an ellipsis to <paramref name="maxWidth"/>. The result is shared: draw it, don't change it.</summary>
     private FormattedText TrimmedText(string text, double size, IBrush brush, FontWeight weight, double maxWidth) =>
-        CachedText(text, size, brush, weight, maxWidth);
+        CachedText(text, size, brush, weight, maxWidth, mono: false);
 
-    private FormattedText CachedText(string text, double size, IBrush brush, FontWeight weight, double maxWidth)
+    private FormattedText CachedText(string text, double size, IBrush brush, FontWeight weight, double maxWidth, bool mono)
     {
         Stats.Texts++;
-        var key = new TextKey(text, size, brush, weight, maxWidth);
+        var key = new TextKey(text, size, brush, weight, maxWidth, mono);
         if (_texts.TryGetValue(key, out var cached)) return cached;
         Stats.TextsCreated++;
         var created = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, weight), size, brush);
+            new Typeface(mono && this.TryFindResource("MonoFont", ActualThemeVariant, out var font) && font is FontFamily family ? family : FontFamily.Default, FontStyle.Normal, weight), size, brush);
         if (!double.IsPositiveInfinity(maxWidth))
         {
             created.MaxTextWidth = maxWidth;

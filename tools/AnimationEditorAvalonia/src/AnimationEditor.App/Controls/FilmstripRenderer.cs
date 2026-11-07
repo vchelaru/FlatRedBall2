@@ -37,10 +37,39 @@ internal sealed class FilmstripRenderer
     private readonly record struct LayoutKey(AnimationChainSave Chain, double Played, double PixelsPerSecond, double Height);
 
     private readonly ConditionalWeakTable<AnimationChainSave, ChainInfo> _infos = new();
-    private readonly Dictionary<LayoutKey, IReadOnlyList<FilmstripCell>> _layouts = new();
+    // The texture paths a layout was sized from, so a texture changing on disk drops only the layouts that used it.
+    private readonly record struct Layout(IReadOnlyList<FilmstripCell> Cells, string?[] Paths);
+
+    private readonly Dictionary<LayoutKey, Layout> _layouts = new();
     private readonly Dictionary<(int Number, IBrush Brush), FormattedText> _numbers = new();
 
-    public ThumbnailService? Thumbnails { get; set; }
+    private ThumbnailService? _thumbnails;
+
+    /// <summary>Raised when a texture changed on disk and the cells laid out from it were dropped, so the owner repaints.</summary>
+    public event Action? TextureChanged;
+
+    public ThumbnailService? Thumbnails
+    {
+        get => _thumbnails;
+        set
+        {
+            if (_thumbnails is { } old) old.PathInvalidated -= OnPathInvalidated;
+            _thumbnails = value;
+            if (value is not null) value.PathInvalidated += OnPathInvalidated;
+        }
+    }
+
+    // A frame's cell size is its region of the texture in pixels, so a new texture size changes every cell drawn from it.
+    private void OnPathInvalidated(string path)
+    {
+        List<LayoutKey>? stale = null;
+        foreach (var (key, layout) in _layouts)
+            if (Array.Exists(layout.Paths, p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+                (stale ??= new()).Add(key);
+        if (stale is null) return;
+        foreach (var key in stale) _layouts.Remove(key);
+        TextureChanged?.Invoke();
+    }
 
     /// <summary>The frame's work counters, set by the control before each draw; null counts nothing.</summary>
     public TimelineFrameStats? Stats { get; set; }
@@ -55,12 +84,13 @@ internal sealed class FilmstripRenderer
     public IReadOnlyList<FilmstripCell> CellsFor(SequenceDocument document, string source, AnimationChainSave chain, double played, double pixelsPerSecond, double height)
     {
         var key = new LayoutKey(chain, played, pixelsPerSecond, height);
-        if (_layouts.TryGetValue(key, out var cached)) return cached;
+        if (_layouts.TryGetValue(key, out var cached)) return cached.Cells;
+        var paths = InfoFor(document, source, chain).Paths;
         var frames = FilmstripLayout.FramesOf(chain, frame =>
             Thumbnails?.GetBitmap(document.ResolveTexturePath(source, frame)) is { } bitmap ? (bitmap.Width, bitmap.Height) : null);
         var cells = FilmstripLayout.Cells(frames, chain.PingPong, chain.Reverse, played, pixelsPerSecond, height);
         if (_layouts.Count >= MaxCachedLayouts) _layouts.Clear();
-        _layouts[key] = cells;
+        _layouts[key] = new Layout(cells, paths);
         return cells;
     }
 

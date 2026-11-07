@@ -3,6 +3,7 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -19,7 +20,8 @@ namespace AnimationEditor.App.Controls;
 
 /// <summary>
 /// A <c>.seqj</c> tab's library: each source as a titled group of chain chips. A chip shows its chain's first frame
-/// and plays while hovered. Files dropped on it are reported through <see cref="FilesDropped"/> and chip drags through
+/// and plays while hovered, or all of them play while <see cref="AutoplayAll"/> is on. One timer animates every playing
+/// chip. Files dropped on it are reported through <see cref="FilesDropped"/> and chip drags through
 /// <see cref="ChipDragMoved"/>/<see cref="ChipDragEnded"/>; the host decides what to add, so this control never edits
 /// the document.
 /// </summary>
@@ -32,6 +34,11 @@ public sealed class SequenceLibraryControl : UserControl
     private SequenceDocument? _document;
     private string? _shownKey;
     private readonly Dictionary<string, Action> _groupApply = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ToggleButton _autoplayToggle = new();
+    private readonly DispatcherTimer _playbackTimer = new() { Interval = TimeSpan.FromSeconds(1 / 30.0) };
+    private readonly Stopwatch _playbackClock = new();
+    private bool _autoplayAll;
+    private bool _attached;
 
     public SequenceLibraryControl()
     {
@@ -41,7 +48,39 @@ public sealed class SequenceLibraryControl : UserControl
             VerticalAlignment = VerticalAlignment.Center,
         };
         BindResource(title, TextBlock.ForegroundProperty, "InkMid");
-        var header = new Border { Height = 36, BorderThickness = new Thickness(0, 0, 0, 1), Child = title };
+        _autoplayToggle.Classes.Add("toolbarToggle");
+        // The ▶ character falls back to another font, whose taller line box pushed a text label up, so the play mark is
+        // a drawn triangle (PathIcon takes the button's foreground in every state) and only "All" is text.
+        _autoplayToggle.Content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                new PathIcon { Data = Geometry.Parse("M0,0 L8,4 L0,8 Z"), Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center },
+                new TextBlock { Text = "All", VerticalAlignment = VerticalAlignment.Center },
+            },
+        };
+        _autoplayToggle.VerticalContentAlignment = VerticalAlignment.Center;
+        _autoplayToggle.FontSize = 11;
+        _autoplayToggle.Height = 22;
+        _autoplayToggle.Padding = new Thickness(8, 0);
+        _autoplayToggle.Margin = new Thickness(0, 0, 8, 0);
+        _autoplayToggle.VerticalAlignment = VerticalAlignment.Center;
+        ToolTip.SetTip(_autoplayToggle, "Play every chip's chain at once, not just the hovered one");
+        Avalonia.Automation.AutomationProperties.SetName(_autoplayToggle, "Play all chips");
+        _autoplayToggle.IsCheckedChanged += (_, _) =>
+        {
+            bool on = _autoplayToggle.IsChecked == true;
+            if (on == _autoplayAll) return;
+            _autoplayAll = on;
+            RefreshPlayback();
+            AutoplayAllToggled?.Invoke(on);
+        };
+        Grid.SetColumn(_autoplayToggle, 1);
+        var headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        headerRow.Children.Add(title);
+        headerRow.Children.Add(_autoplayToggle);
+        var header = new Border { Height = 36, BorderThickness = new Thickness(0, 0, 0, 1), Child = headerRow };
         BindResource(header, Border.BackgroundProperty, "BgRail");
         BindResource(header, Border.BorderBrushProperty, "LineBrush");
         DockPanel.SetDock(header, Dock.Top);
@@ -63,6 +102,21 @@ public sealed class SequenceLibraryControl : UserControl
         AddHandler(DragDrop.DragLeaveEvent, (_, _) => ClearDropHighlight());
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
+        _playbackTimer.Tick += (_, _) => TickPlayingChips();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _attached = true;
+        RefreshPlayback();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _attached = false;
+        RefreshPlayback();
     }
 
     public ThumbnailService? Thumbnails { get; set; }
@@ -75,11 +129,67 @@ public sealed class SequenceLibraryControl : UserControl
     /// <summary>True when <paramref name="source"/> is shown with its chips hidden.</summary>
     public bool IsCollapsed(string source) => CollapsedSources.IsCollapsed(source);
 
+    /// <summary>
+    /// True when every chip plays at once instead of only the hovered one. Setting it moves the header toggle without
+    /// raising <see cref="AutoplayAllToggled"/>, which is for the user's clicks.
+    /// </summary>
+    public bool AutoplayAll
+    {
+        get => _autoplayAll;
+        set
+        {
+            if (_autoplayAll == value) return;
+            _autoplayAll = value;
+            _autoplayToggle.IsChecked = value;
+            RefreshPlayback();
+        }
+    }
+
+    /// <summary>Raised when the user flips the header's play-all toggle, with its new state, so the host can remember it.</summary>
+    public event Action<bool>? AutoplayAllToggled;
+
+    /// <summary>True while the one timer that animates the playing chips is running.</summary>
+    public bool IsPlaybackTimerRunning => _playbackTimer.IsEnabled;
+
+    /// <summary>
+    /// Starts or stops each chip from <see cref="LibraryChipPlayback.ShouldPlay"/>, and runs the shared timer only while
+    /// some chip plays. A library that is not on screen plays nothing.
+    /// </summary>
+    internal void RefreshPlayback()
+    {
+        double now = _playbackTimer.IsEnabled ? _playbackClock.Elapsed.TotalSeconds : 0;
+        bool any = false;
+        foreach (var ((source, _), chip) in _chips)
+        {
+            bool play = _attached && LibraryChipPlayback.ShouldPlay(_autoplayAll, chip.IsHovered, IsCollapsed(source), chip.Chip.Chain.Frames.Count);
+            chip.SetPlaying(play, now);
+            any |= play;
+        }
+        if (!any)
+        {
+            _playbackTimer.Stop();
+            _playbackClock.Reset();
+        }
+        else if (!_playbackTimer.IsEnabled)
+        {
+            _playbackClock.Restart();
+            _playbackTimer.Start();
+        }
+    }
+
+    private void TickPlayingChips()
+    {
+        double now = _playbackClock.Elapsed.TotalSeconds;
+        foreach (var chip in _chips.Values)
+            if (chip.IsPlaying) chip.Tick(now);
+    }
+
     /// <summary>Collapses or expands <paramref name="source"/>, as a click on its chevron or title does.</summary>
     public void ToggleSource(string source)
     {
         CollapsedSources.Toggle(source);
         if (_groupApply.TryGetValue(source, out var apply)) apply();
+        RefreshPlayback();
     }
 
     /// <summary>Raised with the local paths of files dropped on the library. Marks the drop handled.</summary>
@@ -136,6 +246,7 @@ public sealed class SequenceLibraryControl : UserControl
         {
             // The host may have loaded another collapsed set for the same document.
             foreach (var apply in _groupApply.Values) apply();
+            RefreshPlayback();
             return;
         }
         _document = document;
@@ -150,6 +261,7 @@ public sealed class SequenceLibraryControl : UserControl
         _chips.Clear();
         _groupApply.Clear();
         _headers.Clear();
+        RefreshPlayback();
         if (_document is null) return;
         if (Sources.Count == 0)
         {
@@ -166,6 +278,7 @@ public sealed class SequenceLibraryControl : UserControl
 
         foreach (var source in Sources)
             _groups.Children.Add(BuildGroup(source));
+        RefreshPlayback();
     }
 
     private Control BuildGroup(LibrarySource source)
@@ -194,10 +307,22 @@ public sealed class SequenceLibraryControl : UserControl
         Avalonia.Automation.AutomationProperties.SetName(remove, $"Remove {source.Source}");
         remove.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
 
+        // The source alone (no chain) opens the file without selecting anything; the menu item and the button share it.
+        void OpenSource() => GoToDefinitionRequested?.Invoke(new SequenceChainReferenceSave { Source = source.Source });
+        var open = new Button
+        {
+            Content = "↗", FontSize = 11, Padding = new Thickness(5, 1), Background = Brushes.Transparent,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        BindResource(open, Button.ForegroundProperty, "InkMid");
+        ToolTip.SetTip(open, "Open in tab");
+        Avalonia.Automation.AutomationProperties.SetName(open, $"Open {source.Source} in tab");
+        open.Click += (_, _) => OpenSource();
+
         // A transparent background makes the whole row hit-testable, so a click anywhere on it toggles and a right-click opens the menu.
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"), Background = Brushes.Transparent };
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto"), Background = Brushes.Transparent };
         var definition = new MenuItem { Header = "Go to Definition", IsEnabled = !source.IsMissing };
-        definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(new SequenceChainReferenceSave { Source = source.Source });
+        definition.Click += (_, _) => OpenSource();
         var removeItem = new MenuItem { Header = "Remove Source" };
         removeItem.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
         header.ContextMenu = new ContextMenu { Items = { definition, removeItem } };
@@ -222,8 +347,8 @@ public sealed class SequenceLibraryControl : UserControl
             toggle = button;
             header.PointerPressed += (_, e) =>
             {
-                // The remove button is inside the header and has its own click.
-                if (!e.GetCurrentPoint(header).Properties.IsLeftButtonPressed || IsWithin(e.Source, remove)) return;
+                // The open and remove buttons are inside the header and have their own clicks.
+                if (!e.GetCurrentPoint(header).Properties.IsLeftButtonPressed || IsWithin(e.Source, remove) || IsWithin(e.Source, open)) return;
                 ToggleSource(source.Source);
                 e.Handled = true;
             };
@@ -237,7 +362,12 @@ public sealed class SequenceLibraryControl : UserControl
         header.Children.Add(name);
         Grid.SetColumn(detail, 2);
         header.Children.Add(detail);
-        Grid.SetColumn(remove, 3);
+        if (!source.IsMissing)
+        {
+            Grid.SetColumn(open, 3);
+            header.Children.Add(open);
+        }
+        Grid.SetColumn(remove, 4);
         header.Children.Add(remove);
 
         var group = new StackPanel { Spacing = 6 };
@@ -304,7 +434,8 @@ public sealed class SequenceLibraryControl : UserControl
 }
 
 /// <summary>
-/// One chain in the library: its first frame and its name. Plays the chain, looped, while the pointer is over it.
+/// One chain in the library: its first frame and its name. The library plays the chain, looped, while the pointer is
+/// over it or while play-all is on; the chip only shows the frame it is told to.
 /// </summary>
 public sealed class LibraryChipView : Border
 {
@@ -323,8 +454,7 @@ public sealed class LibraryChipView : Border
     private ChipDragGhost? _ghost;
     private readonly ResolvedFrameColor[] _colors;
     private readonly Image _image = new() { Stretch = Stretch.None };
-    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1 / 30.0) };
-    private readonly Stopwatch _elapsed = new();
+    private double _startedAt;
 
     internal LibraryChipView(LibraryChip chip, SequenceDocument document, ThumbnailService? thumbnails, SequenceLibraryControl library)
     {
@@ -363,11 +493,20 @@ public sealed class LibraryChipView : Border
         stack.Children.Add(name);
         Child = stack;
 
-        _clock.Tick += (_, _) => ShowFrameAt(_elapsed.Elapsed.TotalSeconds);
-        PointerEntered += (_, _) => StartPlaying();
-        PointerExited += (_, _) => StopPlaying();
-        DetachedFromVisualTree += (_, _) => StopPlaying();
+        PointerEntered += (_, _) => SetHovered(true);
+        PointerExited += (_, _) => SetHovered(false);
+        AttachedToVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated += OnTextureChanged; };
+        DetachedFromVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated -= OnTextureChanged; };
         ShowFrame(0);
+    }
+
+    // The thumbnail service dropped a texture that changed on disk; the chip is holding an image cropped from the old one.
+    private void OnTextureChanged(string path)
+    {
+        if (FrameIndex < 0 || FrameIndex >= Chip.Chain.Frames.Count) return;
+        string? shown = _document.ResolveTexturePath(Chip.Source, Chip.Chain.Frames[FrameIndex]);
+        if (string.Equals(shown, path, StringComparison.OrdinalIgnoreCase))
+            ShowFrame(FrameIndex, force: true);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -439,22 +578,31 @@ public sealed class LibraryChipView : Border
     /// <summary>The frame the chip is showing.</summary>
     public int FrameIndex { get; private set; } = -1;
 
-    public bool IsPlaying => _clock.IsEnabled;
+    /// <summary>True while the library is animating this chip.</summary>
+    public bool IsPlaying { get; private set; }
 
-    private void StartPlaying()
+    /// <summary>True while the pointer is over the chip.</summary>
+    internal bool IsHovered { get; private set; }
+
+    private void SetHovered(bool hovered)
     {
-        if (Chip.Chain.Frames.Count < 2) return;
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, "Accent");
-        _elapsed.Restart();
-        _clock.Start();
+        IsHovered = hovered;
+        // A chain with one frame has nothing to play, so hovering it gives no highlight either.
+        SequenceLibraryControl.BindResource(this, BorderBrushProperty, hovered && Chip.Chain.Frames.Count >= 2 ? "Accent" : "LineBrush");
+        _library.RefreshPlayback();
     }
 
-    private void StopPlaying()
+    /// <summary>Starts or stops the chip. <paramref name="now"/> is the library clock's time, so a started chip begins on its first frame.</summary>
+    internal void SetPlaying(bool playing, double now)
     {
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, "LineBrush");
-        _clock.Stop();
-        ShowFrame(0);
+        if (playing == IsPlaying) return;
+        IsPlaying = playing;
+        if (playing) _startedAt = now;
+        else ShowFrame(0);
     }
+
+    /// <summary>Shows the frame due at the library clock's time <paramref name="now"/>.</summary>
+    internal void Tick(double now) => ShowFrameAt(now - _startedAt);
 
     private void ShowFrameAt(double seconds)
     {
@@ -463,10 +611,10 @@ public sealed class LibraryChipView : Border
         ShowFrame(ChainClock.Locate(Chip.Chain, cycle > 0 ? seconds % cycle : 0).FrameIndex);
     }
 
-    private void ShowFrame(int index)
+    private void ShowFrame(int index, bool force = false)
     {
         var frames = Chip.Chain.Frames;
-        if (index == FrameIndex || index >= frames.Count) return;
+        if ((index == FrameIndex && !force) || index >= frames.Count) return;
         FrameIndex = index;
         var frame = frames[index];
         _image.Source = _thumbnails?.GetFrameThumbnail(
