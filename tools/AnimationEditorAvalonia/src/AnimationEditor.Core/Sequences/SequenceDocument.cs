@@ -183,33 +183,186 @@ public sealed class SequenceDocument
         {
             var pasted = SequenceClipboard.Clone(content.Sequence);
             pasted.Name = name;
-            // Each source as this file writes it, keyed by where it points, so a source already listed (in any case) is reused.
-            var listed = new Dictionary<FilePath, string>();
-            foreach (string source in save.Sources)
-                listed.TryAdd(SourcePath(source), source);
-            var refused = new HashSet<FilePath>();
-            foreach (var reference in pasted.Tracks.SelectMany(track => track.Chains).Where(reference => reference.Source.Length > 0))
-            {
-                var file = new FilePath(SequenceClipboard.AbsolutePath(folder.FullPath, reference.Source));
-                if (!listed.TryGetValue(file, out string? written))
-                {
-                    written = file.RelativeTo(folder);
-                    if (file.Extension is not ("achx" or "achj") || file == Path)
-                    {
-                        // Kept as a reference the library shows as missing; only the library entry is refused.
-                        if (refused.Add(file)) errors.Add($"{file.NoPath} can't be a source. Only .achx and .achj files can.");
-                    }
-                    else
-                    {
-                        save.Sources.Add(written);
-                        listed[file] = written;
-                    }
-                }
-                reference.Source = written;
-            }
+            MergeSources(save, pasted.Tracks.SelectMany(track => track.Chains), folder, errors);
             save.Sequences.Insert(insertAt, pasted);
         }, selectBefore: SelectedSequence, selectAfter: insertAt);
         return new SequencePasteResult(name, errors);
+    }
+
+    /// <summary>The clipboard text for the given chains of <paramref name="sequence"/>, in document order (see <see cref="TimelineClipboard"/>).</summary>
+    public string CopyChains(int sequence, IReadOnlyList<TimelineChainId> chains)
+    {
+        var tracks = Save.Sequences[sequence].Tracks;
+        var ordered = chains.Distinct().OrderBy(id => id.Track).ThenBy(id => id.Chain).ToList();
+        return TimelineClipboard.WriteChains(ordered.Select(id => tracks[id.Track].Chains[id.Chain]).ToList(),
+            ordered.Count > 0 ? tracks[ordered[0].Track].Name : string.Empty, Path.GetDirectoryContainingThis().FullPath);
+    }
+
+    /// <summary>The clipboard text for the given tracks of <paramref name="sequence"/>, top lane first.</summary>
+    public string CopyTracks(int sequence, IReadOnlyList<int> tracks) =>
+        TimelineClipboard.WriteTracks(tracks.Distinct().OrderBy(track => track).Select(track => Save.Sequences[sequence].Tracks[track]).ToList(),
+            Path.GetDirectoryContainingThis().FullPath);
+
+    /// <summary>
+    /// Pastes copied chains onto track <paramref name="selectedTrack"/> of <paramref name="sequence"/>, the earliest at
+    /// <paramref name="time"/> seconds and the rest keeping their distance from it. With no valid selected track they go onto
+    /// the track named like the first copied chain's, or a new track of that name (made free) when there is none. The sources
+    /// they use join this file's source list when not already there, all as one undo entry.
+    /// </summary>
+    public TimelinePasteResult PasteChains(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack, double time)
+    {
+        if (content.Chains.Count == 0) return TimelinePasteResult.Empty;
+        var tracks = Save.Sequences[sequence].Tracks;
+        int? existing = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected
+            : tracks.FindIndex(track => track.Name == content.TrackName) is >= 0 and var named ? named : null;
+        string newName = NameGenerator.Unique(tracks.Select(t => t.Name), string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName);
+        int target = existing ?? tracks.Count;
+        int firstIndex = existing is { } index ? tracks[index].Chains.Count : 0;
+        string targetName = existing is { } found ? tracks[found].Name : newName;
+        string description = content.Chains.Count == 1
+            ? $"Paste '{content.Chains[0].Chain}' on '{targetName}'"
+            : $"Paste {Plural.Format(content.Chains.Count, "chain")}";
+        var errors = new List<string>();
+        var folder = Path.GetDirectoryContainingThis();
+        Edit(undo, description, save =>
+        {
+            var destination = save.Sequences[sequence].Tracks;
+            if (existing is null) destination.Add(new SequenceTrackSave { Name = newName, Z = destination.Count });
+            var pasted = TimelineClipboard.CloneChains(content.Chains);
+            MergeSources(save, pasted, folder, errors);
+            foreach (var chain in pasted) chain.Start += Math.Max(0, time);
+            destination[target].Chains.AddRange(pasted);
+        });
+        return new TimelinePasteResult(Enumerable.Range(firstIndex, content.Chains.Count).Select(i => new TimelineChainId(target, i)).ToList(),
+            Array.Empty<int>(), errors);
+    }
+
+    /// <summary>
+    /// Pastes copied tracks into <paramref name="sequence"/> right after track <paramref name="afterTrack"/> (at the end when
+    /// it is null or not a track), each with a free name. Their sources join this file's source list as
+    /// <see cref="PasteChains"/> does, all as one undo entry.
+    /// </summary>
+    public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? afterTrack)
+    {
+        if (content.Tracks.Count == 0) return TimelinePasteResult.Empty;
+        var tracks = Save.Sequences[sequence].Tracks;
+        int insertAt = afterTrack is { } after && after >= 0 && after < tracks.Count ? after + 1 : tracks.Count;
+        var used = tracks.Select(t => t.Name).ToList();
+        var names = new List<string>();
+        foreach (var track in content.Tracks)
+        {
+            string name = NameGenerator.ForCopy(used, string.IsNullOrWhiteSpace(track.Name) ? DefaultTrackName : track.Name.Trim());
+            names.Add(name);
+            used.Add(name);
+        }
+        string description = names.Count == 1 ? $"Paste Track '{names[0]}'" : $"Paste {Plural.Format(names.Count, "track")}";
+        var errors = new List<string>();
+        var folder = Path.GetDirectoryContainingThis();
+        Edit(undo, description, save =>
+        {
+            var pasted = TimelineClipboard.CloneTracks(content.Tracks);
+            for (int i = 0; i < pasted.Count; i++) pasted[i].Name = names[i];
+            MergeSources(save, pasted.SelectMany(track => track.Chains), folder, errors);
+            save.Sequences[sequence].Tracks.InsertRange(insertAt, pasted);
+        }, trackBefore: afterTrack, trackAfter: insertAt);
+        return new TimelinePasteResult(Array.Empty<TimelineChainId>(), Enumerable.Range(insertAt, names.Count).ToList(), errors);
+    }
+
+    /// <summary>
+    /// Copies the given chains onto the tracks they are on, shifted so the earliest copy starts at the latest end of the
+    /// selection (a missing chain counts as <see cref="TimelineLayout.MissingLength"/> long): they land right after what was
+    /// selected and keep their distances from each other. One undo entry.
+    /// </summary>
+    public TimelinePasteResult DuplicateChains(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains)
+    {
+        var ids = chains.Distinct().OrderBy(id => id.Track).ThenBy(id => id.Chain).ToList();
+        if (ids.Count == 0) return TimelinePasteResult.Empty;
+        var tracks = Save.Sequences[sequence].Tracks;
+        var blocks = TimelineLayout.Blocks(Save.Sequences[sequence], CycleLength);
+        var selected = ids.Select(id => blocks.First(block => block.Track == id.Track && block.Chain == id.Chain)).ToList();
+        double shift = TimelineDuplicate.Shift(selected);
+        string description = ids.Count == 1
+            ? $"Duplicate '{tracks[ids[0].Track].Chains[ids[0].Chain].Chain}'"
+            : $"Duplicate {Plural.Format(ids.Count, "chain")}";
+        // Copies are appended to their track in order, so each lands after the chains the track has now and the copies before it.
+        var appended = new Dictionary<int, int>();
+        var made = new List<TimelineChainId>();
+        foreach (var id in ids)
+        {
+            int already = appended.GetValueOrDefault(id.Track);
+            made.Add(new TimelineChainId(id.Track, tracks[id.Track].Chains.Count + already));
+            appended[id.Track] = already + 1;
+        }
+        Edit(undo, description, save =>
+        {
+            var destination = save.Sequences[sequence].Tracks;
+            foreach (var id in ids)
+            {
+                var copy = TimelineClipboard.CloneChains(new[] { destination[id.Track].Chains[id.Chain] })[0];
+                copy.Start += shift;
+                destination[id.Track].Chains.Add(copy);
+            }
+        });
+        return new TimelinePasteResult(made, Array.Empty<int>(), Array.Empty<string>());
+    }
+
+    /// <summary>Copies the given tracks, with their chains, as a block right below the lowest of them, each with a free name. One undo entry.</summary>
+    public TimelinePasteResult DuplicateTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks)
+    {
+        var indices = tracks.Distinct().OrderBy(track => track).ToList();
+        if (indices.Count == 0) return TimelinePasteResult.Empty;
+        var existing = Save.Sequences[sequence].Tracks;
+        int insertAt = indices[^1] + 1;
+        var used = existing.Select(t => t.Name).ToList();
+        var names = new List<string>();
+        foreach (int index in indices)
+        {
+            string name = NameGenerator.ForCopy(used, existing[index].Name);
+            names.Add(name);
+            used.Add(name);
+        }
+        string description = indices.Count == 1 ? $"Duplicate Track '{existing[indices[0]].Name}'" : $"Duplicate {Plural.Format(indices.Count, "track")}";
+        Edit(undo, description, save =>
+        {
+            var destination = save.Sequences[sequence].Tracks;
+            var copies = TimelineClipboard.CloneTracks(indices.Select(index => destination[index]).ToList());
+            for (int i = 0; i < copies.Count; i++) copies[i].Name = names[i];
+            destination.InsertRange(insertAt, copies);
+        }, trackBefore: indices[0], trackAfter: insertAt);
+        return new TimelinePasteResult(Array.Empty<TimelineChainId>(), Enumerable.Range(insertAt, names.Count).ToList(), Array.Empty<string>());
+    }
+
+    /// <summary>
+    /// Points each pasted reference at its source as <paramref name="save"/> writes it, and lists a source the file does not
+    /// have yet. The references' sources arrive as absolute paths. A source already listed (in any case) is reused, a file that
+    /// can't be a source (another type, or this file) is kept as a reference the library shows as missing and reported once in
+    /// <paramref name="errors"/>. Shared by every paste, so they agree on what a pasted source becomes.
+    /// </summary>
+    private void MergeSources(SequenceListSave save, IEnumerable<SequenceChainReferenceSave> references, FilePath folder, List<string> errors)
+    {
+        // Each source as this file writes it, keyed by where it points.
+        var listed = new Dictionary<FilePath, string>();
+        foreach (string source in save.Sources)
+            listed.TryAdd(SourcePath(source), source);
+        var refused = new HashSet<FilePath>();
+        foreach (var reference in references.Where(reference => reference.Source.Length > 0))
+        {
+            var file = new FilePath(SequenceClipboard.AbsolutePath(folder.FullPath, reference.Source));
+            if (!listed.TryGetValue(file, out string? written))
+            {
+                written = file.RelativeTo(folder);
+                if (file.Extension is not ("achx" or "achj") || file == Path)
+                {
+                    if (refused.Add(file)) errors.Add($"{file.NoPath} can't be a source. Only .achx and .achj files can.");
+                }
+                else
+                {
+                    save.Sources.Add(written);
+                    listed[file] = written;
+                }
+            }
+            reference.Source = written;
+        }
     }
 
     /// <summary>Renames the sequence at <paramref name="index"/>. Returns why it was refused, or null.</summary>

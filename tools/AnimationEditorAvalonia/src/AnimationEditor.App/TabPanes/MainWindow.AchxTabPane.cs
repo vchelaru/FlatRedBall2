@@ -166,6 +166,10 @@ public partial class MainWindow
 
         public void PasteSelection() => _ = _window.HandlePasteAsync();
 
+        public void CutSelection() => _ = _window.HandleCutAsync();
+
+        public void DuplicateSelection() => _window.HandleDuplicate();
+
         public bool CanCopyPaste => true;
 
         public void TogglePlayback() => _window.PreviewCtrl.TogglePlayPause();

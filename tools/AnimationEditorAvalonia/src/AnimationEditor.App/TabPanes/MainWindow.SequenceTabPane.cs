@@ -206,38 +206,108 @@ public partial class MainWindow
             _window.FocusManager?.GetFocusedElement() is Visual focused
             && (focused == _window.SequenceList || _window.SequenceList.IsVisualAncestorOf(focused));
 
-        // Opening a menu moves the keyboard focus onto its item, so Edit > Copy and Paste ask where the focus was just
-        // before the menu took it. Hotkeys never see a menu item focused and read the live focus.
-        private bool _listFocusedBeforeMenu;
+        // Opening a menu moves the keyboard focus onto its item, so Edit > Copy and Paste ask which surface held the focus
+        // just before the menu took it. Hotkeys never see a menu item focused and read the live focus.
+        private ClipboardSurface _surfaceBeforeMenu;
 
-        private bool ListIsClipboardSurface =>
-            _document is not null && (SequenceListHasFocus || (FocusIsInMenu && _listFocusedBeforeMenu));
+        private enum ClipboardSurface { None, List, Timeline }
+
+        /// <summary>
+        /// Where Copy, Cut, Paste and Duplicate act: the sequence list when it holds the focus, the timeline when it does,
+        /// else nowhere. The same last-clicked-surface idea as <see cref="DeleteSelection"/>; clicking a list row or the
+        /// timeline moves the focus there, so the two never both apply.
+        /// </summary>
+        private ClipboardSurface Surface =>
+            _document is null ? ClipboardSurface.None
+            : FocusIsInMenu ? _surfaceBeforeMenu
+            : LiveSurface;
+
+        private ClipboardSurface LiveSurface =>
+            SequenceListHasFocus ? ClipboardSurface.List
+            : TimelineHasFocus ? ClipboardSurface.Timeline
+            : ClipboardSurface.None;
+
+        private bool TimelineHasFocus =>
+            _window.FocusManager?.GetFocusedElement() is Visual focused
+            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused));
 
         private bool FocusIsInMenu =>
             _window.FocusManager?.GetFocusedElement() is Visual focused
             && (focused is MenuItem || focused.FindAncestorOfType<MenuItem>() is not null);
 
         /// <summary>
-        /// Ctrl+C and Edit &gt; Copy put the selected sequence on the clipboard as JSON when the sequence list is the focused
-        /// surface. With the timeline focused they do nothing here: copying chains and tracks is a separate feature.
+        /// Ctrl+C and Edit &gt; Copy put the selection on the clipboard as JSON: the selected sequence when the sequence list is
+        /// the focused surface, the selected chains or tracks when the timeline is.
         /// </summary>
         public void CopySelection()
         {
-            if (!ListIsClipboardSurface || _document is not { } document || CurrentSequence is null) return;
-            _window.CopyTextToClipboard(document.CopySequence(SequenceIndex));
+            if (_document is not { } document) return;
+            switch (Surface)
+            {
+                case ClipboardSurface.List when CurrentSequence is not null:
+                    _window.CopyTextToClipboard(document.CopySequence(SequenceIndex));
+                    break;
+                case ClipboardSurface.Timeline when _window.SequenceTimeline.CopySelectionText() is { } text:
+                    _window.CopyTextToClipboard(text);
+                    break;
+            }
         }
 
         /// <summary>
-        /// Ctrl+V and Edit &gt; Paste read a copied sequence from the clipboard and insert it after the selected one. Text
-        /// that is not a sequence is ignored without a word; a damaged copy shows the error banner.
+        /// Ctrl+V and Edit &gt; Paste read a copied sequence (list) or copied chains or tracks (timeline) from the clipboard
+        /// and insert them. Text that is not the right kind of copy is ignored without a word; a damaged copy shows the error banner.
         /// </summary>
         public void PasteSelection()
         {
-            if (!ListIsClipboardSurface || _document is not { } document) return;
-            _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
+            if (_document is not { } document) return;
+            var surface = Surface;
+            if (surface == ClipboardSurface.List)
+                _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
+            else if (surface == ClipboardSurface.Timeline)
+                _ = _window.RunGuardedAsync(() => PasteIntoTimelineAsync(document), "Paste");
         }
 
-        public bool CanCopyPaste => ListIsClipboardSurface;
+        /// <summary>Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal.</summary>
+        public void CutSelection()
+        {
+            var surface = Surface;
+            if (surface == ClipboardSurface.None) return;
+            CopySelection();
+            if (surface == ClipboardSurface.List)
+            {
+                DeleteSelected();
+                FocusSelectedRow();
+            }
+            else
+            {
+                _window.SequenceTimeline.DeleteSelected();
+            }
+        }
+
+        /// <summary>Ctrl+D and Edit &gt; Duplicate: the selected sequence (list) or the selected chains or tracks (timeline).</summary>
+        public void DuplicateSelection()
+        {
+            var surface = Surface;
+            if (surface == ClipboardSurface.List)
+                DuplicateSelected();
+            else if (surface == ClipboardSurface.Timeline)
+                _window.SequenceTimeline.DuplicateSelected();
+        }
+
+        public bool CanCopyPaste => Surface != ClipboardSurface.None;
+
+        private async Task PasteIntoTimelineAsync(SequenceDocument document)
+        {
+            if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard) return;
+            string? text = await clipboard.TryGetTextAsync();
+            if (document != _document) return;
+            if (!TimelineClipboard.TryRead(text, out var content, out var error))
+            {
+                if (error is not null) _window.ShowErrorBanner(error);
+                return;
+            }
+            _window.SequenceTimeline.Paste(content!);
+        }
 
         private async Task PasteAsync(SequenceDocument document)
         {
@@ -381,7 +451,7 @@ public partial class MainWindow
         private void OnWindowGotFocus(object? sender, RoutedEventArgs e)
         {
             if (_window._visiblePane != this) return;
-            if (!FocusIsInMenu) _listFocusedBeforeMenu = SequenceListHasFocus;
+            if (!FocusIsInMenu) _surfaceBeforeMenu = _document is null ? ClipboardSurface.None : LiveSurface;
             _window.UpdateDocumentMenuItems();
         }
 
