@@ -856,11 +856,9 @@
                                 </Panel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
+                        <!-- Items are built per right-click from what was hit (SequenceListMenuLayout). -->
                         <ListBox.ContextMenu>
-                            <ContextMenu x:Name="SequenceListMenu">
-                                <MenuItem Header="Rename…" x:Name="SequenceRenameItem" />
-                                <MenuItem Header="Delete" x:Name="SequenceDeleteItem" />
-                            </ContextMenu>
+                            <ContextMenu x:Name="SequenceListMenu" />
                         </ListBox.ContextMenu>
                     </ListBox>
                     <Border Grid.Row="2"
