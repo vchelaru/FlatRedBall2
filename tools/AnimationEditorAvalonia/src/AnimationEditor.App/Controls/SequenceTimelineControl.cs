@@ -1,10 +1,12 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -47,6 +49,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     private double _dragOriginEdge;
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
+
+    private InlineRenameBox? _renameBox;
+    private int _renameTrack;
 
     private TimelineChainId? _selection;
     private (LibraryChip Chip, Point Point)? _chipGhost;
@@ -95,6 +100,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Raised when the user picks Rename on a track header, with the track index. The host prompts for the name.</summary>
     public event Action<int>? RenameTrackRequested;
 
+    /// <summary>Raised with the reason when an in-place rename is refused (an empty or taken name).</summary>
+    public event Action<string>? ErrorRaised;
+
     /// <summary>Raised while the ruler is pressed or dragged, with the time under the pointer clamped to the sequence.</summary>
     public event Action<double>? Scrubbed;
 
@@ -142,7 +150,10 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     public void Show(SequenceDocument? document, int sequenceIndex, IUndoManager? undo)
     {
         if (!ReferenceEquals(document, _document) || sequenceIndex != _sequenceIndex)
+        {
+            EndTrackRename();
             SetSelection(null, null);
+        }
         _document = document;
         _sequenceIndex = sequenceIndex;
         _undo = undo;
@@ -169,6 +180,76 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         }
         Rebuild();
         return true;
+    }
+
+    /// <summary>Deselects the chain or track, so the inspector shows the sequence.</summary>
+    public void ClearSelection() => SetSelection(null, null);
+
+    /// <summary>True while a track's name is being edited in place.</summary>
+    public bool IsRenamingTrack => _renameBox is { IsEditing: true };
+
+    /// <summary>
+    /// Edits track <paramref name="track"/>'s name in place over its header. Enter or clicking away commits through
+    /// <see cref="SequenceDocument.RenameTrack"/> (one undo entry; a refused name goes out on <see cref="ErrorRaised"/>
+    /// and the old name stays), Escape cancels.
+    /// </summary>
+    public void BeginRenameTrack(int track)
+    {
+        if (Sequence is not { } sequence || track < 0 || track >= sequence.Tracks.Count) return;
+        EndTrackRename();
+        if (_renameBox is null)
+        {
+            _renameBox = new InlineRenameBox();
+            _renameBox.Committed += (_, _) => CommitTrackRename();
+            _renameBox.Cancelled += (_, _) =>
+            {
+                EndTrackRename();
+                Focus();
+            };
+        }
+        _renameTrack = track;
+        VisualChildren.Add(_renameBox);
+        LogicalChildren.Add(_renameBox);
+        InvalidateMeasure();
+        InvalidateArrange();
+        _renameBox.Begin(sequence.Tracks[track].Name);
+    }
+
+    private void CommitTrackRename()
+    {
+        if (_renameBox is null) return;
+        string name = _renameBox.Text ?? string.Empty;
+        int track = _renameTrack;
+        EndTrackRename();
+        Focus();
+        if (_document is { } document && _undo is { } undo && track < TrackCount
+            && document.RenameTrack(undo, _sequenceIndex, track, name) is { } error)
+            ErrorRaised?.Invoke(error);
+    }
+
+    private void EndTrackRename()
+    {
+        if (_renameBox is not { } box || !VisualChildren.Contains(box)) return;
+        box.Abandon();
+        VisualChildren.Remove(box);
+        LogicalChildren.Remove(box);
+        InvalidateArrange();
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, TimelineViewport.LaneHeight - 12));
+        return default;
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        if (_renameBox is { } box && VisualChildren.Contains(box))
+        {
+            double height = TimelineViewport.LaneHeight - 12;
+            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + 6, TimelineViewport.HeaderWidth - 4, height));
+        }
+        return finalSize;
     }
 
     private void SetSelection(TimelineChainId? chain, int? track)
@@ -224,6 +305,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             Selection = null;
         if (SelectedTrack is { } track && track >= TrackCount)
             SetSelection(null, null);
+        if (IsRenamingTrack && _renameTrack >= TrackCount)
+            EndTrackRename();
         Viewport.ClampVertical(TrackCount, Bounds.Height);
         InvalidateVisual();
         ContentChanged?.Invoke();
@@ -235,6 +318,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerPressed(e);
         if (_document is null || Sequence is not { } sequence) return;
+        // A press inside the rename box is the box's own (caret, word select).
+        if (_renameBox is { } box && e.Source is Visual source && (source == box || box.IsVisualAncestorOf(source))) return;
         Focus();
         var point = e.GetPosition(this);
         var properties = e.GetCurrentPoint(this).Properties;
@@ -260,6 +345,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         {
             SetSelection(null, row.Track);
             InvalidateVisual();
+            if (e.ClickCount == 2) BeginRenameTrack(row.Track);
             return;
         }
 
@@ -417,6 +503,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         else if (TimelineViewport.ContentHeight(TrackCount) > Bounds.Height)
         {
             Viewport.ScrollVertically(-e.Delta.Y * TimelineViewport.LaneHeight, TrackCount, Bounds.Height);
+            InvalidateArrange();
         }
         else
         {

@@ -198,7 +198,7 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     /// <summary>The names the sequence tab's list shows, in order.</summary>
     public List<string> SequenceNames =>
-        Control<ListBox>("SequenceList").Items.OfType<string>().ToList();
+        Control<ListBox>("SequenceList").Items.OfType<AnimationEditor.App.Models.SequenceListItem>().Select(item => item.Name).ToList();
 
     /// <summary>
     /// A chain whose frames are pixel rectangles (x, y, width, height) on <paramref name="texture"/>,
