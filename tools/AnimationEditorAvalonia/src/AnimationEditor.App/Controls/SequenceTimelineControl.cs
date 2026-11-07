@@ -53,6 +53,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
 
+    // Snapping: the targets a move or resize snaps to, taken when the drag starts, and the one it is snapped to now.
+    private IReadOnlyList<SnapTarget> _snapOthers = Array.Empty<SnapTarget>();
+    private IReadOnlyList<double>? _frameBoundaries;
+    private SnapTarget? _snapGuide;
+    private bool _chipBypass;
+
     private int? _hoverEyeTrack;
     private Point _eyePoint;
 
@@ -183,6 +189,15 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     /// <summary>The y of the line marking <see cref="TrackDropSlot"/>, in this control's coordinates.</summary>
     public double? TrackDropLineY => TrackDropSlot is { } slot ? TrackReorder.SlotY(Viewport, slot) : null;
+
+    /// <summary>
+    /// The target the current drag (a move, a resize, or a chip over a lane) is snapped to, or null when it is free. The
+    /// timeline draws a guide line at its time.
+    /// </summary>
+    public SnapTarget? SnapGuide => _snapGuide ?? DropPreview?.Snapped;
+
+    /// <summary>The time of <see cref="SnapGuide"/>, or null when nothing is snapped.</summary>
+    public double? SnapGuideTime => SnapGuide?.Time;
 
     /// <summary>The context menu of the last right-click: a track header's, or a chain's.</summary>
     public ContextMenu Menu => _menu;
@@ -377,9 +392,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// Draws where <paramref name="chip"/> would land if dropped at <paramref name="point"/> (this control's
     /// coordinates), or clears that when <paramref name="chip"/> or <paramref name="point"/> is null.
     /// </summary>
-    public void UpdateChipDrag(LibraryChip? chip, Point? point)
+    public void UpdateChipDrag(LibraryChip? chip, Point? point, bool bypassSnap = false)
     {
         ClearHover();
+        // Kept after the drag ends: the drop that follows plans from it.
+        if (chip is not null) _chipBypass = bypassSnap;
         _chipGhost = chip is not null && point is { } p && PlanDrop(chip, p).Kind != TimelineDropKind.None ? (chip, p) : null;
         InvalidateVisual();
     }
@@ -396,7 +413,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private TimelineDropPlan PlanDrop(LibraryChip chip, Point point) =>
         Sequence is null
             ? TimelineDropPlan.None
-            : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain));
+            : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain),
+                TimelineSnapTargets.Others(_blocks, null, _playhead), _chipBypass);
 
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at <paramref name="point"/>: on a lane, at the time under the point; on the
@@ -551,6 +569,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragOriginTrack = block.Track;
         _dragOriginStart = block.Start;
         _dragOriginEdge = block.FullEnd;
+        _snapOthers = TimelineSnapTargets.Others(_blocks, block.Reference, _playhead);
+        _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain) : null;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
         ShowCursor(point);
@@ -593,9 +613,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
 
         double dt = (point.X - _pressPoint.X) / Viewport.PixelsPerSecond;
+        bool bypass = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
         if (_drag == DragKind.Move)
         {
-            _dragged.Start = TimelineLayout.SnapStart(_dragOriginStart + dt);
+            var snap = TimelineSnap.Move(_dragOriginStart + dt, _dragBlock.Full, _snapOthers, Viewport.PixelsPerSecond, bypass);
+            _dragged.Start = snap.Time;
+            _snapGuide = snap.Target;
             var row = Viewport.RowAt(point.Y, sequence.Tracks.Count);
             int current = sequence.Tracks.FindIndex(t => t.Chains.Contains(_dragged));
             if (row.Kind == TimelineRowKind.Track && row.Track != current)
@@ -608,9 +631,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
         else
         {
-            var track = sequence.Tracks[_dragOriginTrack];
-            _dragged.Loops = TimelineLayout.EdgeDragLoops(_dragBlock, _dragOriginEdge + dt, Viewport.PixelsPerSecond,
-                SequenceTimeline.NextStart(track, _dragged));
+            var result = TimelineSnapTargets.ResizeEdge(_dragBlock, _dragOriginEdge + dt, _snapOthers, _frameBoundaries,
+                Viewport.PixelsPerSecond, bypass);
+            _dragged.Loops = result.Loops;
+            _snapGuide = result.Snap.Target;
         }
         Rebuild();
     }
@@ -826,6 +850,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragged = null;
         _dragBlock = null;
         _gestureBefore = null;
+        _snapGuide = null;
+        _snapOthers = Array.Empty<SnapTarget>();
+        _frameBoundaries = null;
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -956,9 +983,29 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawTrackDrop(context, size);
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
+        DrawSnapGuide(context, size);
         DrawPlayhead(context, size);
         DrawHover(context, size);
         DrawEyeTooltip(context, size);
+    }
+
+    // A thin accent line at the snap target, over every lane, plus a tick on the edge of the chain it snapped to.
+    private void DrawSnapGuide(DrawingContext context, Size size)
+    {
+        if (SnapGuide is not { } target || Sequence is null) return;
+        double x = Snap(Viewport.XAt(target.Time));
+        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        double bottom = Math.Min(size.Height, Viewport.LaneTop(TrackCount));
+        var brush = Brush("Accent");
+        using (context.PushClip(new Rect(TimelineViewport.HeaderWidth, TimelineViewport.RulerHeight, Math.Max(0, size.Width - TimelineViewport.HeaderWidth), Math.Max(0, size.Height - TimelineViewport.RulerHeight))))
+        {
+            context.DrawLine(new Pen(brush, 1), new Point(x, TimelineViewport.RulerHeight), new Point(x, bottom));
+            if (target.Kind == SnapKind.ChainEdge && target.Track >= 0 && target.Track < TrackCount)
+            {
+                double top = Viewport.LaneTop(target.Track) + TimelineLayout.BodyTop;
+                context.DrawLine(new Pen(brush, 3), new Point(x, top), new Point(x, top + TimelineLayout.LabelHeight + TimelineLayout.FilmHeight));
+            }
+        }
     }
 
     private void DrawPlayhead(DrawingContext context, Size size)
