@@ -35,9 +35,6 @@ public sealed partial class SequenceTimelineControl
     // SelectionChanged reaches the Inspector; during a rubber band it is raised at most this often, and once more when the band ends.
     private readonly SelectionChangeThrottle _marqueeThrottle = new(Stopwatch.Frequency / 30);
 
-    /// <summary>How many times the timeline content (chains, lanes, ruler) has been drawn. A selection change draws only the selection layer, so this does not move.</summary>
-    internal int RenderCount { get; private set; }
-
     /// <summary>How many times the selection layer has been drawn.</summary>
     internal int SelectionLayerRenderCount { get; private set; }
 
