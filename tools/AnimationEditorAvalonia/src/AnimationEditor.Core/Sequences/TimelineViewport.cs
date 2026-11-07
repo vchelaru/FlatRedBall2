@@ -30,7 +30,8 @@ public sealed class TimelineViewport
 {
     public const double HeaderWidth = 120;
     public const double RulerHeight = 22;
-    public const double LaneHeight = 36;
+    /// <summary>The one lane height (no setting): a label strip and a filmstrip row, then the cut-tail strip. See <see cref="TimelineLayout"/>.</summary>
+    public const double LaneHeight = 48;
     public const double MinPixelsPerSecond = 10;
     public const double MaxPixelsPerSecond = 2000;
     public const double DefaultPixelsPerSecond = 120;

@@ -88,4 +88,11 @@ public class TimelineLayoutTests
         TimelineLayout.EdgeDragLoops(block, 2 + (magnet + 1) / 1000, pixelsPerSecond: 1000, nextStart: null)
             .ShouldBe((float)(2 + (magnet + 1) / 1000), 1e-5f);
     }
+
+    [Fact]
+    public void ShowsLabel_BlankBelowThirtySixPixels()
+    {
+        TimelineLayout.ShowsLabel(35.9).ShouldBeFalse();
+        TimelineLayout.ShowsLabel(36).ShouldBeTrue();
+    }
 }
