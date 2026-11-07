@@ -271,6 +271,7 @@ public partial class MainWindow
                 ShowPlayhead();
             };
             w.SequenceTimelineZoom.Attach(w.SequenceTimeline);
+            Controls.TimelineScrollBinder.Attach(w.SequenceTimeline, w.SequenceTimelineHScroll, w.SequenceTimelineVScroll);
 
             var preview = w.SequencePreview;
             w.SequencePreviewZoom.Attach(preview);
