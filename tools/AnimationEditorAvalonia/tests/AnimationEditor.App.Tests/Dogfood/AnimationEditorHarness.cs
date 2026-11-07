@@ -217,6 +217,14 @@ internal sealed class AnimationEditorHarness : IDisposable
         Dialogs.ThrowIfUnanswered();
     }
 
+    /// <summary>Opens <paramref name="path"/> as a PNG viewer tab, as a Files panel double-click does, and waits for it to load.</summary>
+    public async Task OpenPngTabAsync(string path)
+    {
+        Window.OpenPngAsTab(path);
+        await Window.WhenPngTabLoaded();
+        Layout();
+    }
+
     /// <summary>Reads a saved project back from disk.</summary>
     public static AnimationChainListSave ReadSaved(string path) => AnimationChainListSave.FromFile(path);
 
