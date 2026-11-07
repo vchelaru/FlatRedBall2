@@ -1080,6 +1080,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// <summary>True while a flip animation is playing for the frame on screen.</summary>
     public bool IsFlipAnimating => _flips.Count > 0;
 
+    /// <summary>Seconds the oldest running flip animation has played, or null when none is running. Lets tests report where an animation stood when an assertion failed.</summary>
+    internal double? FlipElapsedSeconds => _flips.Count == 0 ? null : _flips[0].Elapsed;
+
     private void OnFramesFlipped(IReadOnlyList<FrameFlipChange> changes)
     {
         if (IsGroupPreviewActive) return;
