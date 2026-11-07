@@ -105,7 +105,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         using var _ = editor;
         editor.ClickAt(At(editor, 1, 1.75));
         await CtrlAsync(editor, Key.C);
-        editor.ClickAt(At(editor, 2, 5.0));   // empty lane space: nothing selected, the timeline keeps the focus
+        editor.Press(Key.Escape);   // nothing selected, the timeline keeps the focus, the playhead stays at 0
 
         await CtrlAsync(editor, Key.V);
 
