@@ -83,6 +83,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         private set => SetSelection(value, null);
     }
 
+    /// <summary>True while the pointer is over the "+ new track" cell of the header column.</summary>
+    public bool IsNewTrackHot { get; private set; }
+
     /// <summary>The track whose header is selected, or null.</summary>
     public int? SelectedTrack { get; private set; }
 
@@ -385,6 +388,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
+        if (row.Kind == TimelineRowKind.NewTrack && point.X < TimelineViewport.HeaderWidth && _undo is { } undo)
+        {
+            // The same document edit a chip dropped on the new-track row makes, with no chain.
+            _document.AddTrack(undo, _sequenceIndex);
+            SetSelection(null, TrackCount - 1);
+            Rebuild();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it.
+            BeginRenameTrack(TrackCount - 1);
+            return;
+        }
+
         if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
         {
             SetSelection(null, row.Track);
@@ -428,6 +442,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerMoved(e);
         UpdateHover(e.GetPosition(this));
+        UpdateNewTrackHot(e.GetPosition(this));
         if (_scrubbing)
         {
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
@@ -491,6 +506,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerExited(e);
         ClearHover();
+        UpdateNewTrackHot(new Point(-1, -1));
         if (_drag != DragKind.None || _scrubbing) return;
         _lastPoint = new Point(-1, -1);
         ShowCursor(_lastPoint);
@@ -510,6 +526,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _shownCursor = TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
         if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
+    }
+
+    // The "+ new track" cell lights up under the pointer, except while a chain or the ruler is being dragged.
+    private void UpdateNewTrackHot(Point point)
+    {
+        bool hot = _drag == DragKind.None && !_scrubbing && Sequence is { } sequence && point.X >= 0
+            && point.X < TimelineViewport.HeaderWidth && Viewport.RowAt(point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
+        if (hot == IsNewTrackHot) return;
+        IsNewTrackHot = hot;
+        InvalidateVisual();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -735,8 +761,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
             }
-            var newTrack = Text("+ new track", 11, Brush("InkMid"));
-            context.DrawText(newTrack, new Point(8, Viewport.LaneTop(sequence.Tracks.Count) + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
+            double newTop = Viewport.LaneTop(sequence.Tracks.Count);
+            if (IsNewTrackHot)
+            {
+                context.FillRectangle(new SolidColorBrush(AccentCoolColor(), DropRowOpacity), new Rect(0, newTop, header, TimelineViewport.LaneHeight));
+                context.DrawRectangle(null, new Pen(Brush("AccentCool"), 1), new Rect(1.5, newTop + 1.5, header - 3, TimelineViewport.LaneHeight - 3), 3, 3);
+            }
+            var newTrack = Text("+ new track", 11, Brush(IsNewTrackHot ? "Ink" : "InkMid"));
+            context.DrawText(newTrack, new Point(8, newTop + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
     }

@@ -100,6 +100,27 @@ public class SequenceDocumentTimelineTests
     }
 
     [Fact]
+    public void AddTrack_AddsAnEmptyUniquelyNamedTrack_OneUndoStep_SavesAndHasNoLength()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Track");
+        var undo = new UndoManager();
+
+        string first = document.AddTrack(undo, 0);
+        string second = document.AddTrack(undo, 0);
+
+        (first, second).ShouldBe(("Track 2", "Track 3"));
+        var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
+        tracks.Select(t => (t.Name, t.Z, t.Chains.Count)).ShouldBe(new[] { ("Track", 0, 0), ("Track 2", 1, 0), ("Track 3", 2, 0) });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Track 'Track 2'", "Add Track 'Track 3'" });
+        SequenceTimeline.Length(document.Save.Sequences[0], _ => 1).ShouldBe(0);
+        undo.Undo();
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2" });
+        undo.Redo();
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2", "Track 3" });
+    }
+
+    [Fact]
     public void DeleteChainDeleteTrackAndRenameTrack_AreUndoable_AndADuplicateTrackNameIsRefused()
     {
         using var dir = new TestHelpers.TempDir();
