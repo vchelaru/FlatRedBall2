@@ -16,7 +16,21 @@ public enum TimelineClipboardKind { Chains, Tracks }
 /// <param name="Tracks">The copied tracks (empty for chains), with their chains' sources as absolute paths.</param>
 /// <param name="Sources">The distinct absolute source paths used, in first-use order.</param>
 public sealed record TimelineClipboardContent(TimelineClipboardKind Kind, IReadOnlyList<SequenceChainReferenceSave> Chains,
-    string TrackName, IReadOnlyList<SequenceTrackSave> Tracks, IReadOnlyList<string> Sources);
+    string TrackName, IReadOnlyList<SequenceTrackSave> Tracks, IReadOnlyList<string> Sources,
+    IReadOnlyList<CopiedTrack>? SourceTracks = null, IReadOnlyList<int>? ChainTracks = null)
+{
+    /// <summary>The tracks the copied chains were on, in lane order. Empty for an envelope written before chains carried their tracks.</summary>
+    public IReadOnlyList<CopiedTrack> SourceTracks { get; } = SourceTracks ?? Array.Empty<CopiedTrack>();
+
+    /// <summary>For each chain in <see cref="Chains"/>, the index of its track in <see cref="SourceTracks"/>.</summary>
+    public IReadOnlyList<int> ChainTracks { get; } = ChainTracks ?? Array.Empty<int>();
+}
+
+/// <summary>A chain being copied, with the track it is on and that track's lane (its index in the sequence).</summary>
+public sealed record CopiedChain(SequenceChainReferenceSave Chain, SequenceTrackSave Track, int Lane);
+
+/// <summary>A track the copied chains came from: its lane in the source sequence and the settings a missing track is made with.</summary>
+public sealed record CopiedTrack(string Name, int Lane, float X, float Y, int Z, bool FlipHorizontal, bool Visible);
 
 /// <summary>What a timeline paste or duplicate made: where the new chains and tracks are, and a message for each source refused.</summary>
 public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, IReadOnlyList<int> Tracks, IReadOnlyList<string> Errors)
@@ -30,9 +44,15 @@ public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, 
 /// paths so it can be pasted into another <c>.seqj</c>.
 /// </summary>
 /// <remarks>
-/// <code>{ "kind": "frb2-animation-editor-chains", "version": 1, "sources": ["C:/a/hero.achx"], "track": "Body", "chains": [ { "source": "C:/a/hero.achx", "chain": "Walk", "start": 0, "loops": 1 } ] }</code>
+/// <code>{ "kind": "frb2-animation-editor-chains", "version": 1, "sources": ["C:/a/hero.achx"], "track": "Body",
+///   "sourceTracks": [ { "name": "Body", "lane": 0, "x": 0, "y": 0, "z": 0, "flipHorizontal": false, "visible": true } ],
+///   "chainTracks": [ 0 ],
+///   "chains": [ { "source": "C:/a/hero.achx", "chain": "Walk", "start": 0, "loops": 1 } ] }</code>
 /// A chain's <c>start</c> is seconds after the earliest copied chain, so a paste can put that one anywhere. <c>track</c>
-/// names the track the first copied chain was on. A tracks envelope holds <c>"tracks": [ ... ]</c> in the file's track shape.
+/// names the track the first copied chain was on. <c>sourceTracks</c> lists the tracks the chains came from in lane order
+/// (the lane is the track's index in the source sequence, and the rest is what a missing track is made with) and
+/// <c>chainTracks</c> gives each chain's index into it. An envelope without those two (written before they existed) pastes by
+/// <c>track</c> alone. A tracks envelope holds <c>"tracks": [ ... ]</c> in the file's track shape.
 /// </remarks>
 public static class TimelineClipboard
 {
@@ -55,8 +75,10 @@ public static class TimelineClipboard
     /// The envelope for <paramref name="chains"/> (in the order given), whose relative sources are resolved against
     /// <paramref name="sourceFolder"/>. <paramref name="trackName"/> is the track of the first one.
     /// </summary>
-    public static string WriteChains(IReadOnlyList<SequenceChainReferenceSave> chains, string trackName, string sourceFolder)
+    public static string WriteChains(IReadOnlyList<CopiedChain> items, string sourceFolder)
     {
+        var chains = items.Select(item => item.Chain).ToList();
+        string trackName = items.Count > 0 ? items[0].Track.Name : string.Empty;
         var copies = CloneChains(chains);
         double earliest = copies.Count > 0 ? copies.Min(chain => chain.Start) : 0;
         foreach (var chain in copies) chain.Start -= earliest;
@@ -66,6 +88,31 @@ public static class TimelineClipboard
         holder.Chains.AddRange(copies);
         var envelope = Envelope(ChainsKind, sources);
         envelope["track"] = trackName;
+        var lanes = new List<int>();
+        var sourceTracks = new JsonArray();
+        var chainTracks = new JsonArray();
+        foreach (var item in items)
+        {
+            int index = lanes.IndexOf(item.Lane);
+            if (index < 0)
+            {
+                index = lanes.Count;
+                lanes.Add(item.Lane);
+                sourceTracks.Add(new JsonObject
+                {
+                    ["name"] = item.Track.Name,
+                    ["lane"] = item.Lane,
+                    ["x"] = item.Track.X,
+                    ["y"] = item.Track.Y,
+                    ["z"] = item.Track.Z,
+                    ["flipHorizontal"] = item.Track.FlipHorizontal,
+                    ["visible"] = item.Track.Visible,
+                });
+            }
+            chainTracks.Add((JsonNode?)JsonValue.Create(index));
+        }
+        envelope["sourceTracks"] = sourceTracks;
+        envelope["chainTracks"] = chainTracks;
         envelope["chains"] = JsonNode.Parse(ToWrapper(new[] { holder }))!["sequences"]![0]!["tracks"]![0]!["chains"]!.DeepClone();
         return envelope.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
@@ -118,6 +165,11 @@ public static class TimelineClipboard
         string trackName = envelope.TryGetPropertyValue("track", out var track) && track is JsonValue trackValue
             && trackValue.TryGetValue<string>(out var named) ? named : string.Empty;
 
+        IReadOnlyList<CopiedTrack>? sourceTracks = null;
+        IReadOnlyList<int>? chainTracks = null;
+        if (chains && !TryReadTrackInfo(envelope, array.Count, out sourceTracks, out chainTracks))
+            return Fail(noun, "its track information is damaged.", out error);
+
         List<SequenceTrackSave> read;
         try
         {
@@ -143,9 +195,54 @@ public static class TimelineClipboard
             if (reference.Source.Length > 0 && !used.Contains(reference.Source, StringComparer.OrdinalIgnoreCase))
                 used.Add(reference.Source);
         content = chains
-            ? new TimelineClipboardContent(TimelineClipboardKind.Chains, read.Single().Chains, trackName, Array.Empty<SequenceTrackSave>(), used)
+            ? new TimelineClipboardContent(TimelineClipboardKind.Chains, read.Single().Chains, trackName, Array.Empty<SequenceTrackSave>(), used,
+                sourceTracks, chainTracks)
             : new TimelineClipboardContent(TimelineClipboardKind.Tracks, Array.Empty<SequenceChainReferenceSave>(), string.Empty, read, used);
         return true;
+    }
+
+    // sourceTracks and chainTracks go together: both, valid, or neither (an envelope from before they existed).
+    private static bool TryReadTrackInfo(JsonObject envelope, int chainCount, out IReadOnlyList<CopiedTrack>? sourceTracks, out IReadOnlyList<int>? chainTracks)
+    {
+        sourceTracks = null;
+        chainTracks = null;
+        bool hasTracks = envelope.TryGetPropertyValue("sourceTracks", out var tracksNode);
+        bool hasIndices = envelope.TryGetPropertyValue("chainTracks", out var indicesNode);
+        if (!hasTracks && !hasIndices) return true;
+        if (tracksNode is not JsonArray tracksArray || indicesNode is not JsonArray indicesArray || indicesArray.Count != chainCount) return false;
+
+        var tracks = new List<CopiedTrack>();
+        foreach (var node in tracksArray)
+        {
+            if (node is not JsonObject track || !TryGet(track, "name", out string? name) || name is null || !TryGet(track, "lane", out int lane)) return false;
+            if (!TryGetOptional(track, "x", 0f, out float x) || !TryGetOptional(track, "y", 0f, out float y) || !TryGetOptional(track, "z", 0, out int z)
+                || !TryGetOptional(track, "flipHorizontal", false, out bool flip) || !TryGetOptional(track, "visible", true, out bool visible))
+                return false;
+            tracks.Add(new CopiedTrack(name, lane, x, y, z, flip, visible));
+        }
+        var indices = new List<int>();
+        foreach (var node in indicesArray)
+        {
+            if (node is not JsonValue value || !value.TryGetValue<int>(out int index) || index < 0 || index >= tracks.Count) return false;
+            indices.Add(index);
+        }
+        sourceTracks = tracks;
+        chainTracks = indices;
+        return true;
+    }
+
+    private static bool TryGet<T>(JsonObject node, string name, out T? value)
+    {
+        value = default;
+        return node.TryGetPropertyValue(name, out var found) && found is JsonValue json && json.TryGetValue(out value);
+    }
+
+    // A property that may be missing (then <paramref name="fallback"/>), but must be the right kind when present.
+    private static bool TryGetOptional<T>(JsonObject node, string name, T fallback, out T value)
+    {
+        value = fallback;
+        if (!node.TryGetPropertyValue(name, out var found) || found is null) return true;
+        return found is JsonValue json && json.TryGetValue(out value!);
     }
 
     private static JsonObject Envelope(string kind, List<string> sources)

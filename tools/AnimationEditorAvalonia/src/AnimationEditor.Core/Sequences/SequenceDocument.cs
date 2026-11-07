@@ -194,8 +194,9 @@ public sealed class SequenceDocument
     {
         var tracks = Save.Sequences[sequence].Tracks;
         var ordered = chains.Distinct().OrderBy(id => id.Track).ThenBy(id => id.Chain).ToList();
-        return TimelineClipboard.WriteChains(ordered.Select(id => tracks[id.Track].Chains[id.Chain]).ToList(),
-            ordered.Count > 0 ? tracks[ordered[0].Track].Name : string.Empty, Path.GetDirectoryContainingThis().FullPath);
+        return TimelineClipboard.WriteChains(
+            ordered.Select(id => new CopiedChain(tracks[id.Track].Chains[id.Chain], tracks[id.Track], id.Track)).ToList(),
+            Path.GetDirectoryContainingThis().FullPath);
     }
 
     /// <summary>The clipboard text for the given tracks of <paramref name="sequence"/>, top lane first.</summary>
@@ -204,37 +205,84 @@ public sealed class SequenceDocument
             Path.GetDirectoryContainingThis().FullPath);
 
     /// <summary>
-    /// Pastes copied chains onto track <paramref name="selectedTrack"/> of <paramref name="sequence"/>, the earliest at
-    /// <paramref name="time"/> seconds and the rest keeping their distance from it. With no valid selected track they go onto
-    /// the track named like the first copied chain's, or a new track of that name (made free) when there is none. The sources
-    /// they use join this file's source list when not already there, all as one undo entry.
+    /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
+    /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
+    /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made at the end
+    /// with the copied track's offset, flip, z and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
+    /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
+    /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
+    /// the chains use join this file's source list when not already there, all as one undo entry.
     /// </summary>
     public TimelinePasteResult PasteChains(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack, double time)
     {
         if (content.Chains.Count == 0) return TimelinePasteResult.Empty;
         var tracks = Save.Sequences[sequence].Tracks;
-        int? existing = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected
-            : tracks.FindIndex(track => track.Name == content.TrackName) is >= 0 and var named ? named : null;
-        string newName = NameGenerator.Unique(tracks.Select(t => t.Name), string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName);
-        int target = existing ?? tracks.Count;
-        int firstIndex = existing is { } index ? tracks[index].Chains.Count : 0;
-        string targetName = existing is { } found ? tracks[found].Name : newName;
+        bool legacy = content.SourceTracks.Count == 0;
+        // An envelope with no track information is one track, the first chain's; every chain is on it.
+        var sourceTracks = legacy
+            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, 0, 0, 0, false, true) }
+            : content.SourceTracks;
+        int ChainTrack(int chain) => legacy ? 0 : content.ChainTracks[chain];
+
+        // For each source track: the existing track it lands on, or null for one to be made.
+        var landing = new int?[sourceTracks.Count];
+        int? anchor = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected : null;
+        for (int i = 0; i < sourceTracks.Count; i++)
+        {
+            if (anchor is { } start)
+            {
+                int lane = start + sourceTracks[i].Lane - sourceTracks[0].Lane;
+                landing[i] = lane < tracks.Count ? lane : null;
+            }
+            else
+            {
+                int byName = tracks.FindIndex(track => track.Name == sourceTracks[i].Name);
+                landing[i] = byName >= 0 ? byName : null;
+            }
+        }
+        string firstName = landing[ChainTrack(0)] is { } existing ? tracks[existing].Name : sourceTracks[ChainTrack(0)].Name;
         string description = content.Chains.Count == 1
-            ? $"Paste '{content.Chains[0].Chain}' on '{targetName}'"
+            ? $"Paste '{content.Chains[0].Chain}' on '{firstName}'"
             : $"Paste {Plural.Format(content.Chains.Count, "chain")}";
+
         var errors = new List<string>();
+        var made = new List<TimelineChainId>();
         var folder = Path.GetDirectoryContainingThis();
         Edit(undo, description, save =>
         {
             var destination = save.Sequences[sequence].Tracks;
-            if (existing is null) destination.Add(new SequenceTrackSave { Name = newName, Z = destination.Count });
+            var target = new int[sourceTracks.Count];
+            for (int i = 0; i < sourceTracks.Count; i++)
+            {
+                if (landing[i] is { } index)
+                {
+                    target[i] = index;
+                    continue;
+                }
+                var source = sourceTracks[i];
+                destination.Add(new SequenceTrackSave
+                {
+                    Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
+                    X = source.X,
+                    Y = source.Y,
+                    Z = legacy ? destination.Count : source.Z,
+                    FlipHorizontal = source.FlipHorizontal,
+                    Visible = source.Visible,
+                });
+                target[i] = destination.Count - 1;
+            }
             var pasted = TimelineClipboard.CloneChains(content.Chains);
             MergeSources(save, pasted, folder, errors);
-            foreach (var chain in pasted) chain.Start += Math.Max(0, time);
-            destination[target].Chains.AddRange(pasted);
+            for (int i = 0; i < pasted.Count; i++)
+            {
+                pasted[i].Start += Math.Max(0, time);
+                var chains = destination[target[ChainTrack(i)]].Chains;
+                chains.Add(pasted[i]);
+                made.Add(new TimelineChainId(target[ChainTrack(i)], chains.Count - 1));
+            }
         });
-        return new TimelinePasteResult(Enumerable.Range(firstIndex, content.Chains.Count).Select(i => new TimelineChainId(target, i)).ToList(),
-            Array.Empty<int>(), errors);
+        return new TimelinePasteResult(made, Array.Empty<int>(), errors);
     }
 
     /// <summary>

@@ -24,8 +24,8 @@ public sealed partial class SequenceTimelineControl
     }
 
     /// <summary>
-    /// Pastes copied chains or tracks. Chains go onto the selected track (see <see cref="SequenceDocument.PasteChains"/> for
-    /// when there is none), the earliest at the playhead. Tracks go right after the lowest selected track, else at the end.
+    /// Pastes copied chains or tracks. Chains go onto the tracks <see cref="SequenceDocument.PasteChains"/> describes, anchored at
+    /// <see cref="PasteAnchorTrack"/>, the earliest at the playhead. Tracks go right after the lowest selected track, else at the end.
     /// What was pasted becomes the selection.
     /// </summary>
     public void Paste(TimelineClipboardContent content)
@@ -34,7 +34,7 @@ public sealed partial class SequenceTimelineControl
         TimelinePasteResult result;
         if (content.Kind == TimelineClipboardKind.Chains)
         {
-            result = _document.PasteChains(_undo, _sequenceIndex, content, Selection?.Track ?? SelectedTrack, _playhead);
+            result = _document.PasteChains(_undo, _sequenceIndex, content, PasteAnchorTrack(), _playhead);
             SelectChains(result.Chains);
         }
         else
@@ -57,6 +57,15 @@ public sealed partial class SequenceTimelineControl
         else if (_model.Kind == TimelineSelectionKind.Tracks)
             SelectTracks(_document.DuplicateTracks(_undo, _sequenceIndex, _model.Tracks.ToList()).Tracks);
     }
+
+    // The track a chains paste is anchored at: the selected header, else the track of the first selected chain (document order),
+    // so copying chains and pasting with them still selected maps the copy onto the same lanes. Null when nothing is selected.
+    private int? PasteAnchorTrack() => _model.Kind switch
+    {
+        TimelineSelectionKind.Tracks => _model.PrimaryTrack,
+        TimelineSelectionKind.Chains => _model.Chains[0].Track,
+        _ => null,
+    };
 
     // The lane of the lowest selected chain or header, or null when nothing is selected.
     private int? LowestSelectedTrack() => _model.Kind switch

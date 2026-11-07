@@ -113,6 +113,48 @@ public class SequenceTimelineCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task CtrlV_WithNoTrackSelected_PutsEachChainBackOnItsOwnTrack()
+    {
+        var (editor, boss) = await OpenAsync();
+        using var _ = editor;
+        var timeline = Timeline(editor);
+        // One chain from Body and two from Head.
+        editor.ClickAt(At(editor, 0, 0.25));
+        editor.ClickAt(At(editor, 1, 0.6), RawInputModifiers.Control);
+        editor.ClickAt(At(editor, 1, 1.75), RawInputModifiers.Control);
+        await CtrlAsync(editor, Key.C);
+        editor.ClickAt(At(editor, 2, 5.0));   // empty lane space: nothing selected
+        Scrub(editor, 2.0);
+
+        await CtrlAsync(editor, Key.V);
+
+        // Walk (0) is the earliest copied chain, so it lands at the playhead; Head's two keep their distances from it.
+        Chains(boss, 0).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0), ("Run", 2.0), ("Walk", 2.0) });
+        Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5), ("Run", 2.5), ("Walk", 3.5) });
+        Chains(boss, 2).ShouldBeEmpty();
+        timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 3), new TimelineChainId(1, 2), new TimelineChainId(1, 3) });
+        editor.UndoLabels.ShouldBe(new[] { "Paste 3 chains" });
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlV_WithATrackSelected_KeepsTheLaneOffsetsBetweenTheCopiedTracks()
+    {
+        var (editor, boss) = await OpenAsync();
+        using var _ = editor;
+        editor.ClickAt(At(editor, 0, 0.25));
+        editor.ClickAt(At(editor, 1, 1.75), RawInputModifiers.Control);
+        await CtrlAsync(editor, Key.C);
+        editor.ClickAt(Header(editor, 1));
+        Scrub(editor, 2.0);
+
+        await CtrlAsync(editor, Key.V);
+
+        // Body (lane 0) maps to the selected Head (lane 1); Head's chain is one lane further, on Tail.
+        Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5), ("Walk", 2.0) });
+        Chains(boss, 2).ShouldBe(new[] { ("Walk", 3.5) });
+    }
+
+    [AvaloniaFact]
     public async Task CtrlV_IntoAnotherSeqjTab_MakesTheTrack_AddsTheSourceRelativeToIt_InOneUndoEntry()
     {
         var (editor, boss) = await OpenAsync();
