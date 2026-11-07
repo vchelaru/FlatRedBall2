@@ -36,7 +36,7 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 
 ## Bugs
 
-1. **A `.seqj` with a wrong-typed field crashes the open path.** `{ "sequences": [ { "name": 5 } ] }` throws `InvalidOperationException` from `SequenceListSave.ReadSequence` (`GetValue<string>` on a number). `SequenceTabPane.LoadAsync` only catches `IOException`, `UnauthorizedAccessException` and `JsonException`, so the exception escapes `OpenAsync` instead of showing the "Could not open" banner. The same applies to `x`, `y`, `z`, `start`, `loops` and the booleans. Repro: write that file into a project and open it; a corrupt-JSON file is handled, this is not. Fix: wrap the typed reads and throw `JsonException`.
+1. **A `.seqj` with a wrong-typed field crashes the open path.** `{ "sequences": [ { "name": 5 } ] }` throws `InvalidOperationException` from `SequenceListSave.ReadSequence` (`GetValue<string>` on a number). `SequenceTabPane.LoadAsync` only catches `IOException`, `UnauthorizedAccessException` and `JsonException`, so the exception escapes `OpenAsync` instead of showing the "Could not open" banner. The same applies to `x`, `y`, `z`, `start`, `loops` and the booleans. Repro: write that file into a project and open it; a corrupt-JSON file is handled, this is not. **Fixed:** every typed read goes through `SeqjObject`, which throws `JsonException` naming the property.
 2. **Fixed meanwhile, not a finding:** the doc gap that nothing surfaced `IsFromNewerVersion` (now #1610), and Delete with only a sequence selected doing nothing (now #1608).
 
 ## Not testable headlessly
@@ -46,7 +46,7 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 | OS drag-drop of files into the library | `SequenceDocument.AddSources`; the test raises the same DragEvent the OS would | none |
 | Chip drag cursor, timeline edge cursor (#1597, #1609, merged after the mutation runs, not audited) | `TimelineDropPlan`, `TimelineLayout.HitTest`, `TimelineCursor` | n/a |
 | Timeline, preview and chip pixels | `TimelineLayout`, `TimelineDropPlan`, `SequenceScene`; chip outline has a pixel test | `TickStep` and ruler label formatting in `SequenceTimelineControl.Render` |
-| Playback tick clamp (`MaxTickSeconds` in `SequenceTabPane.OnTick`) | `SequenceClock`, `TickClock` | the clamp itself (A26 is open) |
+| Playback tick clamp (`MaxTickSeconds` in `SequenceTabPane.OnTick`) | `SequenceClock`, `TickClock` | none: the clamp is now `SequenceClock.AdvanceTick` (A26 pinned) |
 | Status bar "Auto Save Failed" for a .seqj | `SequenceDocument.SaveError` (tested) | `SequenceTabPane.Status` label choice (not mutation-run) |
 
 ## Equivalent or redundant survivors
@@ -198,7 +198,7 @@ Failed!  - Failed:     1 |
 | A23 | dragging a chain to another lane moves it there | caught | DraggingAChainToAnotherLane_MovesItToThatTrack_AndCtrlZPutsItBack |
 | A24 | Delete removes the selected track | caught | DeleteKey_WithATrackSelected_DeletesTheTrack_AndCtrlZBringsItBack |
 | A25 | track header menu Delete Track | caught | TrackHeaderMenu_RenamesAndDeletesATrack_EachUndoable |
-| A26 | playback tick is clamped after a stall | UNPINNED (open) | OPEN: playback tick clamp (MaxTickSeconds) has no seam; needs the clamp extracted into Core |
+| A26 | playback tick is clamped after a stall | UNPINNED -> pinned | SequenceClockTests.AdvanceTick_AfterALongStall_MovesNoFurtherThanTheCap (clamp extracted into `SequenceClock.AdvanceTick`) |
 | A27 | leaving the tab stops playback | survived (self-correcting) | a detached sequence has length 0, so the first tick stops the clock |
 | A28 | corrupt seqj reports and does not open | UNPINNED -> pinned | SequenceAuditScenarioTests.OpeningACorruptSeqj_ShowsTheBanner_AndOpensNoTab |
 | A29 | selecting another sequence stops playback | UNPINNED -> pinned | SequenceAuditScenarioTests.SwitchingToAnotherSequence_StopsPlayback_AtZero |

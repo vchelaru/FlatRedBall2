@@ -74,9 +74,6 @@ public partial class MainWindow
         // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
         private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
 
-        // A stall (window drag, GC pause) should not jump playback by the whole frozen span.
-        private const double MaxTickSeconds = 0.25;
-
         public SequenceTabPane(MainWindow window) => _window = window;
 
         /// <summary>
@@ -425,8 +422,7 @@ public partial class MainWindow
 
         private void OnTick()
         {
-            double seconds = Math.Min(_tick.Tick(), MaxTickSeconds);
-            _clock.Advance(seconds, _window.SequenceTimeline.SequenceLength, CurrentSequence?.Loop == true);
+            _clock.AdvanceTick(_tick.Tick(), _window.SequenceTimeline.SequenceLength, CurrentSequence?.Loop == true);
             if (!_clock.IsPlaying) _timer.Stop();
             ShowPlayhead();
         }
