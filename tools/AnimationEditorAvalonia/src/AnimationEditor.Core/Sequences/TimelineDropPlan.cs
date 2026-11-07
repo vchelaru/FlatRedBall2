@@ -1,3 +1,7 @@
+using FlatRedBall2.AnimationEditorCommon;
+using System;
+using System.Collections.Generic;
+
 namespace AnimationEditor.Core.Sequences;
 
 /// <summary>Where a dragged library chip would land.</summary>
@@ -24,7 +28,9 @@ public enum TimelineDropKind
 /// <param name="Length">The ghost's length in seconds.</param>
 /// <param name="Left">The ghost's left edge in pixels.</param>
 /// <param name="Width">The ghost's width in pixels.</param>
-public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, double Start, double Length, double Left, double Width)
+/// <param name="Snapped">The target the start or end snapped to, or null when it did not.</param>
+public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, double Start, double Length, double Left, double Width,
+    SnapTarget? Snapped = null)
 {
     public static readonly TimelineDropPlan None = default;
 
@@ -36,19 +42,22 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
 
     /// <summary>
     /// The plan for a chip released at (<paramref name="x"/>, <paramref name="y"/>) in the timeline's own coordinates.
-    /// <paramref name="cycleLength"/> is the chip's chain length in seconds, 0 when it is missing.
+    /// <paramref name="cycleLength"/> is the chip's chain length in seconds, 0 when it is missing. Either end of the ghost
+    /// snaps to <paramref name="targets"/> (see <see cref="TimelineSnapTargets.Others"/>) unless <paramref name="bypass"/>.
     /// </summary>
-    public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength)
+    public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength,
+        IReadOnlyList<SnapTarget>? targets = null, bool bypass = false)
     {
         if (x < TimelineViewport.HeaderWidth || x > viewWidth) return None;
         var row = viewport.RowAt(y, trackCount);
         if (row.Kind is not (TimelineRowKind.Track or TimelineRowKind.NewTrack)) return None;
 
-        double start = TimelineLayout.SnapStart(viewport.TimeAt(x));
         double length = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
+        var snap = TimelineSnap.Move(viewport.TimeAt(x), length, targets ?? Array.Empty<SnapTarget>(), viewport.PixelsPerSecond, bypass);
+        double start = snap.Time;
         return new TimelineDropPlan(
             row.Kind == TimelineRowKind.Track ? TimelineDropKind.Track : TimelineDropKind.NewTrack,
             row.Kind == TimelineRowKind.Track ? row.Track : trackCount,
-            start, length, viewport.XAt(start), length * viewport.PixelsPerSecond);
+            start, length, viewport.XAt(start), length * viewport.PixelsPerSecond, snap.Target);
     }
 }

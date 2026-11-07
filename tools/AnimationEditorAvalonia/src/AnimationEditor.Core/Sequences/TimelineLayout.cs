@@ -35,13 +35,7 @@ public static class TimelineLayout
     /// </summary>
     public const double MissingLength = 1;
 
-    /// <summary>Starts snap to this many seconds when a chain is dropped or moved.</summary>
-    public const double StartStep = 0.05;
-
     public const double EdgeGrabPixels = 6;
-
-    /// <summary>How close, in pixels, a dragged edge must come to a whole cycle or the next chain to be pulled there.</summary>
-    public const double MagnetPixels = 8;
 
     // Vertical bands inside a lane: a chain's block is a thin label strip over a filmstrip row, and its cut tail sits in a
     // strip below so a tail stays visible and grabbable under the chain that cuts it.
@@ -140,11 +134,4 @@ public static class TimelineLayout
         }
         return null;
     }
-
-    /// <summary>A start time for a drop or move: snapped to <see cref="StartStep"/>, never before 0.</summary>
-    public static double SnapStart(double time) => Math.Max(0, Math.Round(time / StartStep) * StartStep);
-
-    /// <summary>The loop count for dragging <paramref name="block"/>'s right edge to <paramref name="edgeTime"/>.</summary>
-    public static float EdgeDragLoops(TimelineBlock block, double edgeTime, double pixelsPerSecond, double? nextStart) =>
-        SequenceTimeline.LoopsForEdgeDrag(block.Start, edgeTime, block.CycleLength, nextStart, MagnetPixels / pixelsPerSecond);
 }
