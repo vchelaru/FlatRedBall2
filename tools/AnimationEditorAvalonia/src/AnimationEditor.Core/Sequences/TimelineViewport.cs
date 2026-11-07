@@ -38,6 +38,20 @@ public sealed class TimelineViewport
     public const double MaxPixelsPerSecond = 2000;
     public const double DefaultPixelsPerSecond = 120;
 
+    /// <summary>Raised after any change to the zoom, either scroll offset or the lane heights.</summary>
+    public event Action? Changed;
+
+    /// <summary>Sets the time at the left edge of the lanes, never before 0. A scrollbar drives this.</summary>
+    public void SetScrollSeconds(double seconds)
+    {
+        ScrollSeconds = Math.Max(0, seconds);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Sets the vertical scroll, kept within the content as <see cref="ScrollVertically"/> does.</summary>
+    public void SetScrollY(double y, int trackCount, double viewHeight) =>
+        ScrollVertically(y - ScrollY, trackCount, viewHeight);
+
     /// <summary>Zoom: how many pixels one second takes.</summary>
     public double PixelsPerSecond { get; private set; } = DefaultPixelsPerSecond;
 
@@ -68,6 +82,7 @@ public sealed class TimelineViewport
         _heights = heights.ToArray();
         _offsets = new double[_heights.Length + 1];
         for (int i = 0; i < _heights.Length; i++) _offsets[i + 1] = _offsets[i] + _heights[i];
+        Changed?.Invoke();
     }
 
     /// <summary>The height of lane <paramref name="lane"/>; the new-track row (the track count) is a base <see cref="LaneHeight"/>.</summary>
@@ -97,25 +112,31 @@ public sealed class TimelineViewport
         double anchor = TimeAt(x);
         PixelsPerSecond = Math.Clamp(PixelsPerSecond * factor, MinPixelsPerSecond, MaxPixelsPerSecond);
         ScrollSeconds = Math.Max(0, anchor - (x - HeaderWidth) / PixelsPerSecond);
+        Changed?.Invoke();
     }
 
     /// <summary>Sets the zoom, clamped, keeping the time at the left edge of the lanes where it is.</summary>
-    public void SetPixelsPerSecond(double pixelsPerSecond) =>
+    public void SetPixelsPerSecond(double pixelsPerSecond)
+    {
         PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);
+        Changed?.Invoke();
+    }
 
     /// <summary>The playhead time for a ruler press or drag at <paramref name="x"/>: the time there, clamped to 0..<paramref name="length"/>.</summary>
     public double ScrubTime(double x, double length) => Math.Clamp(TimeAt(x), 0, Math.Max(0, length));
 
     /// <summary>Scrolls the lanes sideways by <paramref name="pixels"/>; positive shows later time.</summary>
-    public void ScrollHorizontally(double pixels) =>
-        ScrollSeconds = Math.Max(0, ScrollSeconds + pixels / PixelsPerSecond);
+    public void ScrollHorizontally(double pixels) => SetScrollSeconds(ScrollSeconds + pixels / PixelsPerSecond);
 
     /// <summary>
     /// Scrolls the lanes up by <paramref name="pixels"/>, kept within the content: nothing to scroll when every lane
     /// fits in <paramref name="viewHeight"/>.
     /// </summary>
-    public void ScrollVertically(double pixels, int trackCount, double viewHeight) =>
+    public void ScrollVertically(double pixels, int trackCount, double viewHeight)
+    {
         ScrollY = Math.Clamp(ScrollY + pixels, 0, Math.Max(0, ContentHeight(trackCount) - viewHeight));
+        Changed?.Invoke();
+    }
 
 
     /// <summary>Re-clamps the vertical scroll after tracks were removed or the view grew.</summary>

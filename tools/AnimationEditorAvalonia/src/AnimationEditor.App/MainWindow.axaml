@@ -2285,7 +2285,16 @@
                                 <views:ZoomControl x:Name="SequenceTimelineZoom" VerticalAlignment="Center" />
                             </WrapPanel>
                         </Border>
-                        <controls:SequenceTimelineControl x:Name="SequenceTimeline" />
+                        <!-- The scrollbars sit beside the timeline (own column and row), not over it, so the
+                             timeline's bounds are exactly the visible lanes. TimelineScrollBinder aligns them
+                             with the lanes and keeps them in step with the wheel, the zoom and the track count. -->
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+                            <controls:SequenceTimelineControl x:Name="SequenceTimeline" />
+                            <ScrollBar x:Name="SequenceTimelineVScroll" Grid.Column="1"
+                                       Orientation="Vertical" AllowAutoHide="False" Visibility="Hidden" />
+                            <ScrollBar x:Name="SequenceTimelineHScroll" Grid.Row="1"
+                                       Orientation="Horizontal" AllowAutoHide="False" />
+                        </Grid>
                     </DockPanel>
                 </Grid>
                 <GridSplitter Grid.Row="1" ResizeDirection="Rows"
