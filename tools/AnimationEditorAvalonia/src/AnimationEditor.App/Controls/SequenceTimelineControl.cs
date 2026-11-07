@@ -315,6 +315,17 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         return true;
     }
 
+    /// <summary>
+    /// What a chip drag should show at the mouse cursor at <paramref name="point"/> (this control's
+    /// coordinates, null when the pointer is outside it): the same plan <see cref="DropChip"/> would use.
+    /// </summary>
+    public ChipDragFeedback ChipDragFeedbackAt(LibraryChip chip, Point? point)
+    {
+        var plan = point is { } p ? PlanDrop(chip, p) : TimelineDropPlan.None;
+        string? trackName = plan.Kind == TimelineDropKind.Track ? Sequence!.Tracks[plan.Row].Name : null;
+        return ChipDragFeedback.For(plan.Kind, trackName);
+    }
+
     private void Rebuild()
     {
         _blocks = Sequence is { } sequence && _document is { } document
