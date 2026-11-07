@@ -94,15 +94,19 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         LogicalChildren.Add(_selectionLayer);
         ActualThemeVariantChanged += (_, _) =>
         {
-            InvalidateVisual();
+            ClearThemeCaches();
+            RefreshPlayheadLayer();
             _selectionLayer.InvalidateVisual();
+            InvalidateVisual();
         };
         _filmstrip.TextureChanged += InvalidateVisual;
-        // The selection layer draws at the chains' positions, so it follows every scroll, zoom and lane change.
         Viewport.Changed += () =>
         {
-            ViewChanged?.Invoke();
+            Diagnostics.NoteInput();
+            RefreshPlayheadLayer();
+            // The selection layer draws at the chains' positions, so it follows every scroll, zoom and lane change.
             _selectionLayer.InvalidateVisual();
+            ViewChanged?.Invoke();
         };
         // The same smooth preset-stepping wheel zoom as the preview and texture viewport, over the timeline's own
         // zoom limits. The pivot is a time axis, so only its x matters; the time under it stays fixed.
@@ -218,7 +222,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Raised with the reason when an in-place rename is refused (an empty or taken name).</summary>
     public event Action<string>? ErrorRaised;
 
-    /// <summary>Raised while the ruler is pressed or dragged, with the time under the pointer clamped to the sequence.</summary>
+    /// <summary>
+    /// Raised while the ruler is pressed or dragged, and once when empty lane space is clicked, with the time under the
+    /// pointer clamped to the sequence.
+    /// </summary>
     public event Action<double>? Scrubbed;
 
     /// <summary>Where the playhead line is drawn, in seconds.</summary>
@@ -229,7 +236,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             if (_playhead == value) return;
             _playhead = value;
-            InvalidateVisual();
+            // On its own layer the playhead moves without repainting the lanes under it.
+            if (PlayheadLayer is { } layer) layer.InvalidateVisual();
+            else InvalidateVisual();
         }
     }
 
@@ -563,7 +572,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : null;
         if (hit is not { } found)
         {
-            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers));
+            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers), row.Kind == TimelineRowKind.Track);
             return;
         }
 
@@ -718,6 +727,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         if (_drag == DragKind.None) return;
+        if (e.InitialPressMouseButton == MouseButton.Left) SeekFromEmptyClick();
         // Commit before releasing the capture: releasing it raises CaptureLost, which cancels a track drag.
         if (_drag is DragKind.TrackPending or DragKind.Track)
         {
@@ -827,6 +837,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (e.Key == Key.F4 && Diagnostics.Enabled)
+        {
+            CycleProbeMode();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape && _drag is DragKind.TrackPending or DragKind.Track)
         {
             // Nothing was applied while dragging, so cancelling is just forgetting the drag.
@@ -1026,8 +1042,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     public override void Render(DrawingContext context)
     {
         RenderCount++;
+        Diagnostics.Frame(context, DrawTimeline, TimelineViewport.HeaderWidth + 6, TimelineViewport.RulerHeight + 6);
+    }
+
+    private void DrawTimeline(DrawingContext context)
+    {
         var size = Bounds.Size;
         context.FillRectangle(Brush("BgCanvas"), new Rect(size));
+        if (ProbeMode == TimelineProbeMode.BackgroundOnly) return;
         if (Sequence is not { } sequence) return;
 
         double header = TimelineViewport.HeaderWidth;
@@ -1051,8 +1073,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     DrawDropRow(context, new Rect(header, top, lanes.Width, laneHeight));
             }
             for (double t = firstTick; Viewport.XAt(t) < size.Width; t += step)
+            {
+                Stats.GridLines++;
                 context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
+            }
 
+            Stats.Blocks = _blocks.Count;
             foreach (var block in _blocks)
             {
                 using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
@@ -1070,7 +1096,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
         DrawSnapGuide(context, size);
-        DrawPlayhead(context, size);
+        if (PlayheadLayer is null) DrawPlayhead(context, size);
         DrawHover(context, size);
         DrawEyeTooltip(context, size);
     }
@@ -1138,10 +1164,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.FillRectangle(new SolidColorBrush(AccentColor(), 0.45), grabbed);
                     context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
                 }
-                var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
-                text.MaxTextWidth = header - TimelineLayout.HeaderNameLeft - 8;
-                text.Trimming = TextTrimming.CharacterEllipsis;
-                text.MaxLineCount = 1;
+                var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, header - TimelineLayout.HeaderNameLeft - 8);
                 using (context.PushOpacity(hidden ? HiddenOpacity + 0.2 : 1))
                     context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
@@ -1232,6 +1255,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 double x = Snap(Viewport.XAt(t));
                 context.DrawLine(tick, new Point(x, ruler - 7), new Point(x, ruler));
+                Stats.RulerLabels++;
                 context.DrawText(Text(TimelineRuler.FormatTick(t, step), 10, Brush("InkMid")), new Point(x + 3, 3));
             }
         }
@@ -1241,11 +1265,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     // The selection is not drawn here but by the selection layer above, so selecting never redraws every block.
     private void DrawBlock(DrawingContext context, TimelineBlock block)
     {
+        if (!TimelineCulling.IsBlockVisible(Viewport, block, Bounds.Width, Bounds.Height)) return;
         double top = Viewport.LaneTop(block.Track);
         double left = Viewport.XAt(block.Start);
         double pps = Viewport.PixelsPerSecond;
         var body = new Rect(left, top + TimelineLayout.BodyTop, Math.Max(1, block.Played * pps),
             TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
+        Stats.BlocksIssued++;
+        if (body.Right > TimelineViewport.HeaderWidth && body.Left < Bounds.Width) Stats.BlocksVisible++;
 
         if (block.IsCut)
         {
@@ -1288,10 +1315,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             label += $"  ×{block.Reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
-            var text = Text(label, 11, Brush("Ink"));
-            text.MaxTextWidth = Math.Max(1, body.Width - 12);
-            text.MaxLineCount = 1;
-            text.Trimming = TextTrimming.CharacterEllipsis;
+            var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, Math.Max(1, body.Width - 12));
             // A missing chain has no filmstrip, so its label centers in the whole block.
             double strip = block.IsMissing ? body.Height : TimelineLayout.LabelHeight;
             context.DrawText(text, new Point(body.X + 6, body.Y + (strip - text.Height) / 2));
@@ -1358,7 +1382,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawText(label, new Point(pill.X + 5, pill.Y + (pill.Height - label.Height) / 2));
     }
 
-    private static void DrawHatched(DrawingContext context, Rect rect, IBrush brush, double opacity)
+    private void DrawHatched(DrawingContext context, Rect rect, IBrush brush, double opacity)
     {
         if (rect.Width <= 0 || rect.Height <= 0) return;
         var pen = new Pen(brush, 1) { };
@@ -1366,24 +1390,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         using (context.PushClip(rect))
         {
             for (double x = rect.Left - rect.Height; x < rect.Right; x += 5)
+            {
+                Stats.HatchLines++;
                 context.DrawLine(pen, new Point(x, rect.Bottom), new Point(x + rect.Height, rect.Top));
+            }
         }
     }
 
     private static double Snap(double x) => Math.Round(x) + 0.5;
-
-    // The theme tokens live in ThemeDictionaries, which a lookup without the theme variant never searches.
-    private IBrush Brush(string key) =>
-        (this.TryFindResource(key, ActualThemeVariant, out var value) ? value : null) switch
-        {
-            IBrush brush => brush,
-            Color color => new SolidColorBrush(color),
-            _ => Brushes.Gray,
-        };
-
-    // mono: for a number that changes while it is on screen, so its pill does not jitter.
-    private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal, bool mono = false) =>
-        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface(mono && this.TryFindResource("MonoFont", ActualThemeVariant, out var font) && font is FontFamily family ? family : FontFamily.Default, FontStyle.Normal, weight),
-            size, brush);
 }

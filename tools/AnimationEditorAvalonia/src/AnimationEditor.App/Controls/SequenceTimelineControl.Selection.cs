@@ -46,6 +46,10 @@ public sealed partial class SequenceTimelineControl
     private Point _marqueeEnd;
     private IReadOnlyList<TimelineChainId> _marqueeBase = Array.Empty<TimelineChainId>();
 
+    // What the press that began the band was, so a release without a drag can tell a click on empty lane space (which seeks) from the rest.
+    private bool _marqueeOnLane;
+    private bool _marqueeModified;
+
     // A press on a chain that is part of a multi-selection keeps the selection for a drag; a release with no drag narrows it to this chain.
     private TimelineChainId? _collapseOnRelease;
 
@@ -129,7 +133,7 @@ public sealed partial class SequenceTimelineControl
 
     // ── Rubber band ──────────────────────────────────────────────────────────
 
-    private void BeginMarquee(Point point, Avalonia.Input.PointerPressedEventArgs e, bool additive)
+    private void BeginMarquee(Point point, Avalonia.Input.PointerPressedEventArgs e, bool additive, bool onLane)
     {
         // Pressing empty space clears the selection, as it always did; Ctrl keeps it for the band to add to.
         if (!additive) SetSelection(null, null);
@@ -138,11 +142,21 @@ public sealed partial class SequenceTimelineControl
         _marqueeBase = additive ? _model.Chains.ToList() : Array.Empty<TimelineChainId>();
         _marquee.Begin(_marqueeBase);
         _marqueeThrottle.Reset();
+        _marqueeOnLane = onLane;
+        _marqueeModified = additive || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         _drag = DragKind.MarqueePending;
         _marqueeStart = _marqueeEnd = point;
         _pressPoint = point;
         _dragPointer = e.Pointer;
         e.Pointer.Capture(this);
+    }
+
+    // A release that never became a rubber band is a click: on empty lane space it moves the playhead, as the ruler does.
+    private void SeekFromEmptyClick()
+    {
+        if (_drag is not (DragKind.MarqueePending or DragKind.Marquee)) return;
+        if (TimelineEmptyClick.PlayheadTime(Viewport, SequenceLength, _marqueeOnLane, _marqueeModified, _drag == DragKind.Marquee, _marqueeStart.X) is { } time)
+            Scrubbed?.Invoke(time);
     }
 
     private void MoveMarquee(Point point)
