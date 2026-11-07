@@ -91,6 +91,20 @@ public partial class MainWindow
             return _window._tabManager.ActiveTab ?? tab;
         }
 
+        /// <summary>An Untitled document goes through Save As; a file-backed one saves in place.</summary>
+        public async Task SaveAsync(TabEntry? tab)
+        {
+            if (_window._projectManager.AnimationChainListSave is null) return;
+
+            if (string.IsNullOrEmpty(_window._projectManager.FileName))
+                await _window._appCommands.SaveCurrentAnimationChainListAsync();
+            else
+            {
+                _window._appCommands.SaveCurrentAnimationChainList();
+                _window.UpdateTitle();
+            }
+        }
+
         /// <summary>
         /// True when <paramref name="tab"/>'s document has content worth prompting to save (issue
         /// #928): the live model for the active tab, or the snapshot captured when a background

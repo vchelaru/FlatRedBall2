@@ -420,6 +420,7 @@
                              registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New Animation" x:Name="MenuNew" />
+                        <MenuItem Header="New Se_quence File…" x:Name="MenuNewSequence" />
                         <MenuItem Header="_Open…"         x:Name="MenuLoad" />
                         <MenuItem Header="Open _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
@@ -815,6 +816,51 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                </Grid>
+
+                <!-- Sequence list: fills TopPane while a .seqj tab is active. A flat list of the
+                     file's sequences; tracks show in the timeline, not here. -->
+                <Grid x:Name="SequenceListPane" RowDefinitions="Auto,*,Auto" IsVisible="False">
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource BgRail}"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Height="36">
+                        <TextBlock Text="SEQUENCES"
+                                   Margin="10,0"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource InkMid}"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <ListBox x:Name="SequenceList" Grid.Row="1"
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="10,5" />
+                                <Setter Property="FontSize" Value="12" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ContextMenu>
+                            <ContextMenu x:Name="SequenceListMenu">
+                                <MenuItem Header="Rename…" x:Name="SequenceRenameItem" />
+                                <MenuItem Header="Delete" x:Name="SequenceDeleteItem" />
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+                    </ListBox>
+                    <Border Grid.Row="2"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="0,1,0,0"
+                            Background="{DynamicResource BgCanvas}"
+                            Padding="8,6">
+                        <Button x:Name="AddSequenceButton"
+                                Content="+ Add Sequence"
+                                HorizontalAlignment="Stretch"
+                                Height="30"
+                                Foreground="{DynamicResource Ink}"
+                                AutomationProperties.Name="Add Sequence" />
+                    </Border>
                 </Grid>
 
                 </Grid>
@@ -2158,6 +2204,39 @@
                            Orientation="Horizontal"
                            HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
                            AllowAutoHide="True" />
+            </Grid>
+
+            <!-- Sequence editor: replaces the achx editor pane while a .seqj tab is active. Same split
+                 as an .achx tab: what you edit on top (chain library beside the timeline), the
+                 composited preview below. The three regions are placeholders until their stages land. -->
+            <Grid x:Name="SequenceEditorPane" Grid.Column="2" RowDefinitions="*,4,250"
+                  Background="{DynamicResource BgCanvas}" IsVisible="False">
+                <Grid Grid.Row="0" ColumnDefinitions="220,4,*">
+                    <Border x:Name="SequenceLibraryPlaceholder" Grid.Column="0"
+                            Background="{DynamicResource BgPanel}">
+                        <TextBlock Text="Library" Classes="sequence-placeholder" />
+                    </Border>
+                    <GridSplitter Grid.Column="1" ResizeDirection="Columns"
+                                  Background="{DynamicResource LineStrong}" />
+                    <Border x:Name="SequenceTimelinePlaceholder" Grid.Column="2">
+                        <TextBlock Text="Timeline" Classes="sequence-placeholder" />
+                    </Border>
+                </Grid>
+                <GridSplitter Grid.Row="1" ResizeDirection="Rows"
+                              Background="{DynamicResource LineStrong}"
+                              HorizontalAlignment="Stretch" />
+                <Border x:Name="SequencePreviewPlaceholder" Grid.Row="2"
+                        Background="{DynamicResource BgPanel}">
+                    <TextBlock Text="Preview" Classes="sequence-placeholder" />
+                </Border>
+                <Grid.Styles>
+                    <Style Selector="TextBlock.sequence-placeholder">
+                        <Setter Property="FontSize" Value="11" />
+                        <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                    </Style>
+                </Grid.Styles>
             </Grid>
 
         </Grid>

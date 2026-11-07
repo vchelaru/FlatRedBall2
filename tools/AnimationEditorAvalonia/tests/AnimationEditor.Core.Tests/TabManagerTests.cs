@@ -692,6 +692,14 @@ public class TabManagerTests
     }
 
     [Fact]
+    public void TabEntry_Kind_SeqjPath_IsSequence()
+    {
+        var entry = new TabEntry(P(@"C:\Games\Boss.SEQJ"));
+
+        Assert.Equal(TabKind.Sequence, entry.Kind);
+    }
+
+    [Fact]
     public void TabEntry_Kind_UppercasePngExtension_IsPng()
     {
         var entry = new TabEntry(P(@"C:\Games\SHEET.PNG"));

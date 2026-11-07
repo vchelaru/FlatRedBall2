@@ -19,8 +19,8 @@ public sealed class HotkeyDefinition
     public required Action Action { get; init; }
     public Func<bool>? ShouldSkip { get; init; }
 
-    /// <summary>Defaults to <see cref="HotkeyScope.Document"/>, so a new hotkey cannot reach a hidden document by accident.</summary>
-    public HotkeyScope Scope { get; init; } = HotkeyScope.Document;
+    /// <summary>Defaults to <see cref="HotkeyScope.Achx"/>, the narrowest scope, so a new hotkey cannot reach a hidden document by accident.</summary>
+    public HotkeyScope Scope { get; init; } = HotkeyScope.Achx;
 
     public bool Matches(string keyName, HotkeyModifiers pressed) =>
         Gestures.Any(g => g.Matches(keyName, pressed));

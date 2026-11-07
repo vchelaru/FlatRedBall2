@@ -50,12 +50,16 @@ public static class AchxFolderScanner
     public static bool IsTsxPath(string path) =>
         Path.GetExtension(path).Equals(".tsx", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>True when <paramref name="path"/> has a <c>.seqj</c> (sequence) extension.</summary>
+    public static bool IsSequencePath(string path) =>
+        Path.GetExtension(path).Equals(".seqj", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True for any file the Project tree scan/watch surfaces: an animation chain file
-    /// (<see cref="IsAchxPath"/>) or a Tiled tileset (<see cref="IsTsxPath"/>). Kept separate from
-    /// <see cref="IsAchxPath"/> because that narrower check also drives non-tree logic --
-    /// <c>NewAnimationFileNaming</c>'s stem-collision set in particular -- that must stay
-    /// achx/achj-only.</summary>
-    public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path);
+    /// (<see cref="IsAchxPath"/>), a Tiled tileset (<see cref="IsTsxPath"/>) or a sequence
+    /// (<see cref="IsSequencePath"/>). Kept separate from <see cref="IsAchxPath"/> because that
+    /// narrower check also drives non-tree logic -- <c>NewAnimationFileNaming</c>'s stem-collision
+    /// set in particular -- that must stay achx/achj-only.</summary>
+    public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path) || IsSequencePath(path);
 
     private static async Task ScanAsync(
         IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results, List<string> folderPaths)
@@ -96,4 +100,10 @@ public sealed record AchxFileEntry(IEditorFile File, IEditorFolder ParentFolder,
     /// <summary>True when this entry is a <c>.tsx</c> rather than an animation chain file -- the
     /// Project tree shows it with the Tiled icon and skips thumbnail generation for it.</summary>
     public bool IsTsx => AchxFolderScanner.IsTsxPath(FileName);
+
+    /// <summary>True when this entry is a <c>.seqj</c>; the Project tree shows it with the sequence icon.</summary>
+    public bool IsSequence => AchxFolderScanner.IsSequencePath(FileName);
+
+    /// <summary>True for an <c>.achx</c>/<c>.achj</c>, the only kind with frames to draw a thumbnail from.</summary>
+    public bool HasAnimationFrames => AchxFolderScanner.IsAchxPath(FileName);
 }

@@ -54,12 +54,16 @@ namespace AnimationEditor.Core.Models
             && Path.IsRelativeTo(folder);
 
         /// <summary>
-        /// Determines the <see cref="TabKind"/> for <paramref name="path"/> by extension.
-        /// A <c>.png</c> (any case) is <see cref="TabKind.Png"/>; everything else — including
-        /// untitled sentinels and empty paths — is <see cref="TabKind.Achx"/>.
+        /// Determines the <see cref="TabKind"/> for <paramref name="path"/> by extension, ignoring case:
+        /// <c>.png</c> is <see cref="TabKind.Png"/>, <c>.seqj</c> is <see cref="TabKind.Sequence"/>, and
+        /// everything else, including untitled sentinels and empty paths, is <see cref="TabKind.Achx"/>.
         /// </summary>
-        public static TabKind ResolveKind(FilePath path) =>
-            path.Extension == "png" ? TabKind.Png : TabKind.Achx;
+        public static TabKind ResolveKind(FilePath path) => path.Extension switch
+        {
+            "png" => TabKind.Png,
+            "seqj" => TabKind.Sequence,
+            _ => TabKind.Achx,
+        };
 
         /// <summary>
         /// Undo/redo stack snapshot saved when this tab was last deactivated.

@@ -20,10 +20,9 @@ public partial class MainWindow
         // Latest-wins guard + in-flight handle for the async decode, mirroring the history load.
         private int _textureLoadId;
 
-        // Bottom tab strip's selection just before it was forced away from a now-hidden tab
-        // (Inspector/History) during a PNG preview (#686), restored when the pane hides.
-        // Null whenever the bottom strip was never touched (the common case, #877).
-        private TabItem? _sidebarTabBefore;
+        // Inspector and History, hidden during a PNG preview (#686). Built on first Show, since panes
+        // are constructed before the window's controls exist.
+        private HiddenSidebarTabs? _hiddenTabs;
 
         public PngTabPane(MainWindow window) => _window = window;
 
@@ -42,13 +41,8 @@ public partial class MainWindow
             w.PngPaneGrid.IsVisible = true;
             w.PngPane.IsVisible = true;
             w.DiffBlamePane.IsVisible = true;
-            w.InspectorTab.IsVisible = false;
-            w.HistoryTab.IsVisible = false;
-            if (w.SidebarTabs.SelectedItem is TabItem { IsVisible: false } hidden)
-            {
-                _sidebarTabBefore = hidden;
-                w.SidebarTabs.SelectedItem = w.FilesTab;
-            }
+            _hiddenTabs ??= new HiddenSidebarTabs(w.SidebarTabs, w.FilesTab, w.InspectorTab, w.HistoryTab);
+            _hiddenTabs.Hide();
         }
 
         public void Hide()
@@ -58,13 +52,7 @@ public partial class MainWindow
             w.PngPane.IsVisible = false;
             w.PngPaneGrid.IsVisible = false;
             w.DiffBlamePane.IsVisible = false;
-            w.InspectorTab.IsVisible = true;
-            w.HistoryTab.IsVisible = true;
-            if (_sidebarTabBefore is { } restore)
-            {
-                w.SidebarTabs.SelectedItem = restore;
-                _sidebarTabBefore = null;
-            }
+            _hiddenTabs?.Restore();
         }
 
         public void CaptureLeaving(TabEntry tab) { }
@@ -102,6 +90,9 @@ public partial class MainWindow
         }
 
         public Task<TabEntry?> PrepareCloseAsync(TabEntry tab) => Task.FromResult<TabEntry?>(tab);
+
+        // Never reached: Save is document-scoped, which this pane refuses.
+        public Task SaveAsync(TabEntry? tab) => Task.CompletedTask;
 
         public void Closing(TabEntry tab) { }
 

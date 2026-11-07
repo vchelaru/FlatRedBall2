@@ -12,5 +12,8 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>A <c>.png</c> image opened as a plain preview.</summary>
         Png,
+
+        /// <summary>A <c>.seqj</c> sequence file, edited in its own pane with its own document.</summary>
+        Sequence,
     }
 }

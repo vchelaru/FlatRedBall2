@@ -14,8 +14,9 @@ public static class OpenFileFilters
     /// </summary>
     public static IReadOnlyList<OpenFileFilter> AnimationFiles { get; } = new[]
     {
-        new OpenFileFilter("All Supported Files", new[] { "*.achx", "*.achj", "*.tsx" }),
+        new OpenFileFilter("All Supported Files", new[] { "*.achx", "*.achj", "*.tsx", "*.seqj" }),
         new OpenFileFilter("Animation Chain", new[] { "*.achx", "*.achj" }),
         new OpenFileFilter("Tiled Tileset", new[] { "*.tsx" }),
+        new OpenFileFilter("Sequence", new[] { "*.seqj" }),
     };
 }

@@ -186,6 +186,20 @@ internal sealed class AnimationEditorHarness : IDisposable
         return path;
     }
 
+    /// <summary>Writes a <c>.seqj</c> holding one empty sequence per name, in order.</summary>
+    public string WriteSeqj(string name, params string[] sequenceNames)
+    {
+        string path = Path.Combine(ProjectFolder, name);
+        SequenceListSave save = new SequenceListSave();
+        save.Sequences.AddRange(sequenceNames.Select(sequenceName => new SequenceSave { Name = sequenceName }));
+        save.Save(path);
+        return path;
+    }
+
+    /// <summary>The names the sequence tab's list shows, in order.</summary>
+    public List<string> SequenceNames =>
+        Control<ListBox>("SequenceList").Items.OfType<string>().ToList();
+
     /// <summary>
     /// A chain whose frames are pixel rectangles (x, y, width, height) on <paramref name="texture"/>,
     /// for <see cref="WriteAchx"/>. Once opened, the editor holds the coordinates as UV (0..1) in

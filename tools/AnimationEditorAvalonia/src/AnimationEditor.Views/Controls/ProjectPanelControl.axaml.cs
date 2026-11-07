@@ -259,9 +259,9 @@ public partial class ProjectPanelControl : UserControl
     {
         foreach (var node in nodes)
         {
-            // A .tsx has no animation frames to preview -- it always shows the Tiled icon
-            // (ShowTsxIcon), so there's nothing for ProjectTreeThumbnailService to generate.
-            if (node.IsFile && !node.IsTsx) results.Add(node);
+            // A .tsx or .seqj has no animation frames to preview -- it always shows its own icon,
+            // so there's nothing for ProjectTreeThumbnailService to generate.
+            if (node.IsFile && node.Entry!.HasAnimationFrames) results.Add(node);
             else if (!node.IsFile) CollectFileNodes(node.Children, results);
         }
     }
@@ -291,7 +291,7 @@ public partial class ProjectPanelControl : UserControl
     /// </summary>
     public async Task InvalidateThumbnail(AchxFileEntry entry)
     {
-        if (_thumbnailService is null || entry.IsTsx) return;
+        if (_thumbnailService is null || !entry.HasAnimationFrames) return;
 
         var node = FindNode(TreeRoots, entry);
         if (node is null) return;
@@ -649,8 +649,12 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
     /// chain icon/thumbnail, since a tileset has no animation frames to preview.</summary>
     public bool IsTsx => Entry?.IsTsx == true;
 
-    public bool ShowFallbackIcon => IsFile && !IsTsx && _thumbnail is null;
+    /// <summary>True for a <c>.seqj</c> row, shown with the sequence icon and never a thumbnail.</summary>
+    public bool IsSequence => Entry?.IsSequence == true;
+
+    public bool ShowFallbackIcon => Entry?.HasAnimationFrames == true && _thumbnail is null;
     public bool ShowTsxIcon => IsTsx;
+    public bool ShowSequenceIcon => IsSequence;
 
     public bool IsExpanded
     {

@@ -567,6 +567,26 @@ public class ProjectPanelControlTests
         Assert.Equal(0, tsxFile.OpenReadCount);
     }
 
+    [AvaloniaFact]
+    public async Task SetEntries_SeqjFile_ShowsSequenceIconAndSkipsThumbnailLoad()
+    {
+        var root = new FakeFolder("Content");
+        var seqjFile = new FakeFile("Boss.seqj", Encoding.UTF8.GetBytes("{}"));
+        var entry = new AchxFileEntry(seqjFile, root, "Boss.seqj");
+
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        control.Initialize(new ProjectTreeThumbnailService(diskCacheDirectory: null));
+
+        control.SetEntries(new[] { entry });
+        await control.ThumbnailLoadTask;
+
+        var node = control.TreeRoots[0];
+        Assert.True(node.ShowSequenceIcon);
+        Assert.False(node.ShowFallbackIcon);
+        Assert.False(node.ShowTsxIcon);
+        Assert.Equal(0, seqjFile.OpenReadCount);
+    }
+
     // Issue #1018: right-click a folder row -> "New Animation File", named inline in the tree.
     [AvaloniaFact]
     public void ClickingNewAnimationFile_AddsPendingRowInEditModeWithSuggestedName()

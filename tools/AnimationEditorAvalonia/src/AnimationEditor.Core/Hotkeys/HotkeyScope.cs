@@ -4,8 +4,15 @@ namespace AnimationEditor.Core.Hotkeys;
 public enum HotkeyScope
 {
     /// <summary>
-    /// Acts on the open animation document (its selection, undo history or file). Fires only while a
-    /// tab that edits a document is active, so it never reaches a document hidden behind another tab kind.
+    /// Acts on the open animation chain document's content (chains, frames, shapes, textures, the wireframe and
+    /// preview). Fires only while an <c>.achx</c> tab is active, so it never reaches that document while it is
+    /// hidden behind another tab kind.
+    /// </summary>
+    Achx,
+
+    /// <summary>
+    /// Acts on whichever document the active tab edits through the shared undo history: undo, redo, save and the
+    /// History panel. Fires in every tab kind that has a document.
     /// </summary>
     Document,
 
