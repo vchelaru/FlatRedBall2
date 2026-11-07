@@ -109,6 +109,18 @@ public class SequencePreviewScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task BeforeItsChainStarts_TheTrackIsHiddenAtTimeZero()
+    {
+        // Hidden before the chain on purpose: this is how a sprite appears partway through a sequence.
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0.4, 1)));
+        await editor.OpenAsync(boss);
+
+        Timeline(editor).Playhead.ShouldBe(0, 1e-6);
+        SequencePreview(editor).Composite.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
     public async Task ACutChain_SwitchesToTheNextChainAtItsStart()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
