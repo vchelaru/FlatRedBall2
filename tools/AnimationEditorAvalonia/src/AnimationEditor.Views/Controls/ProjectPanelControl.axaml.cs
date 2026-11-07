@@ -125,8 +125,8 @@ public partial class ProjectPanelControl : UserControl
     public event Action? NewAnimationRequested;
 
     /// <summary>
-    /// Raised when the user commits a name for "New Animation File" on a folder row (issue
-    /// #1018). The host creates the file and opens it -- this control only picks the name and the
+    /// Raised when the user commits a name for "New Animation File" or "New Sequence File" on a
+    /// folder row (issue #1018); the file name's extension says which. The host creates the file and opens it -- this control only picks the name and the
     /// extension, and has no way to write anything itself. Never raised for a name that collides
     /// with a sibling: the inline editor stays open showing the error instead.
     /// </summary>
@@ -454,66 +454,74 @@ public partial class ProjectPanelControl : UserControl
 
         if (_contextNode is { IsFolder: true } folderNode)
         {
-            // Issue #1018: create a new animation file inline in this folder.
-            var newFileItem = new MenuItem { Header = "New Animation File" };
-            newFileItem.Click += (_, _) => BeginNewAnimationFile(folderNode);
-            ProjectTree.ContextMenu.Items.Add(newFileItem);
-
-            var convertFolderItem = new MenuItem { Header = "Convert Animations to .achj" };
-            convertFolderItem.Click += (_, _) => FolderConvertToAchjRequested?.Invoke(folderNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(convertFolderItem);
-
-            var revealItem = new MenuItem { Header = "Reveal in File Manager" };
-            revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(revealItem);
+            // Convert only has something to act on when an .achx sits somewhere under the folder.
+            // Checked against the scan the tree was built from, so opening the menu reads no disk.
+            var hasConvertible = ProjectFolderConvertRule.HasConvertibleAchx(
+                _allEntries.Select(f => f.RelativePath), folderNode.RelativePath);
+            AddMenuGroups(ProjectTreeMenuLayout.ForFolder(hasConvertible), folderNode);
             return;
         }
 
         if (_contextNode is { IsFile: true } fileNode)
+            AddMenuGroups(ProjectTreeMenuLayout.ForFile(fileNode.Entry!.FileName), fileNode);
+    }
+
+    private void AddMenuGroups(IReadOnlyList<IReadOnlyList<ProjectTreeMenuCommand>> groups, AchxTreeNodeVm node)
+    {
+        var items = ProjectTree.ContextMenu!.Items;
+        for (int i = 0; i < groups.Count; i++)
         {
-            // Same two items and headers as the document tab strip's context menu
-            // (MainWindow.axaml.cs, #881/#884) for the equivalent open file.
-            var openFolderItem = new MenuItem { Header = "Open Containing Folder" };
-            openFolderItem.Click += (_, _) => FileRevealRequested?.Invoke(fileNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(openFolderItem);
-
-            var copyPathItem = new MenuItem { Header = "Copy Full Path" };
-            copyPathItem.Click += (_, _) => FileCopyPathRequested?.Invoke(fileNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(copyPathItem);
-
-            ProjectTree.ContextMenu.Items.Add(new Separator());
-
-            var duplicateItem = new MenuItem { Header = "Duplicate" };
-            duplicateItem.Click += (_, _) => FileDuplicateRequested?.Invoke(fileNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(duplicateItem);
-
-            if (fileNode.RelativePath.EndsWith(".achx", StringComparison.OrdinalIgnoreCase))
+            if (i > 0) items.Add(new Separator());
+            foreach (var command in groups[i])
             {
-                var convertItem = new MenuItem { Header = "Convert to .achj" };
-                convertItem.Click += (_, _) => FileConvertToAchjRequested?.Invoke(fileNode.RelativePath);
-                ProjectTree.ContextMenu.Items.Add(convertItem);
+                var (header, onClick) = DescribeMenuCommand(command, node);
+                var item = new MenuItem { Header = header };
+                item.Click += (_, _) => onClick();
+                items.Add(item);
             }
-
-            var deleteItem = new MenuItem { Header = "Delete" };
-            deleteItem.Click += (_, _) => FileDeleteRequested?.Invoke(fileNode.RelativePath);
-            ProjectTree.ContextMenu.Items.Add(deleteItem);
         }
     }
+
+    private (string Header, Action OnClick) DescribeMenuCommand(ProjectTreeMenuCommand command, AchxTreeNodeVm node) =>
+        command switch
+        {
+            // Issue #1018: create a new animation file inline in this folder.
+            ProjectTreeMenuCommand.NewAnimationFile => ("New Animation File", () => BeginNewFile(node, sequence: false)),
+            ProjectTreeMenuCommand.NewSequenceFile => ("New Sequence File", () => BeginNewFile(node, sequence: true)),
+            ProjectTreeMenuCommand.ConvertFolderToAchj => ("Convert Animations to .achj", () => FolderConvertToAchjRequested?.Invoke(node.RelativePath)),
+            ProjectTreeMenuCommand.RevealFolder => ("Reveal in File Manager", () => FolderRevealRequested?.Invoke(node.RelativePath)),
+            // Same two items and headers as the document tab strip's context menu
+            // (MainWindow.axaml.cs, #881/#884) for the equivalent open file.
+            ProjectTreeMenuCommand.OpenContainingFolder => ("Open Containing Folder", () => FileRevealRequested?.Invoke(node.RelativePath)),
+            ProjectTreeMenuCommand.CopyFullPath => ("Copy Full Path", () => FileCopyPathRequested?.Invoke(node.RelativePath)),
+            ProjectTreeMenuCommand.Duplicate => ("Duplicate", () => FileDuplicateRequested?.Invoke(node.RelativePath)),
+            ProjectTreeMenuCommand.ConvertFileToAchj => ("Convert to .achj", () => FileConvertToAchjRequested?.Invoke(node.RelativePath)),
+            ProjectTreeMenuCommand.Delete => ("Delete", () => FileDeleteRequested?.Invoke(node.RelativePath)),
+            _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
+        };
 
     /// <summary>
     /// Adds a placeholder row under <paramref name="folderNode"/> and puts it straight into inline
     /// edit mode (issue #1018). Nothing is written until the name is committed -- an abandoned edit
     /// leaves no file behind, so Escape only has to drop the row.
     /// </summary>
-    private void BeginNewAnimationFile(AchxTreeNodeVm folderNode)
+    private void BeginNewFile(AchxTreeNodeVm folderNode, bool sequence)
     {
         CancelPendingNewAnimationFile();
 
-        var extension = NewAnimationFileNaming.ResolveExtension(
-            _allEntries
-                .Where(f => ExcludeBinObjCheck.IsChecked != true || !BinObjPathFilter.IsExcluded(f.RelativePath))
-                .Select(f => f.FileName));
-        var suggested = NewAnimationFileNaming.SuggestFileName(SiblingFileNames(folderNode), extension);
+        string suggested;
+        if (sequence)
+        {
+            suggested = NewAnimationFileNaming.SuggestSequenceFileName(SiblingFileNames(folderNode));
+        }
+        else
+        {
+            var extension = NewAnimationFileNaming.ResolveExtension(
+                _allEntries
+                    .Where(f => ExcludeBinObjCheck.IsChecked != true || !BinObjPathFilter.IsExcluded(f.RelativePath))
+                    .Select(f => f.FileName));
+            suggested = NewAnimationFileNaming.SuggestFileName(SiblingFileNames(folderNode), extension);
+        }
 
         _pendingNode = AchxTreeNodeVm.CreatePending(suggested, folderNode.RelativePath);
         _pendingParent = folderNode;
@@ -547,8 +555,9 @@ public partial class ProjectPanelControl : UserControl
         if (_pendingNode is null || _pendingParent is null) return;
 
         var extension = new FilePath(_pendingNode.Name).Extension;
-        var result = NewAnimationFileNaming.Resolve(
-            _pendingNode.EditText, SiblingFileNames(_pendingParent), extension);
+        var result = string.Equals(extension, NewAnimationFileNaming.SequenceExtension, StringComparison.OrdinalIgnoreCase)
+            ? NewAnimationFileNaming.ResolveSequence(_pendingNode.EditText, SiblingFileNames(_pendingParent))
+            : NewAnimationFileNaming.Resolve(_pendingNode.EditText, SiblingFileNames(_pendingParent), extension);
 
         if (result.Error is not null)
         {

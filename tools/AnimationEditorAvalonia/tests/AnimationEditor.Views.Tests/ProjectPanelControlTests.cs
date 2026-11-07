@@ -217,7 +217,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "New Animation File", "Convert Animations to .achj", "Reveal in File Manager" }, headers);
+            Assert.Equal(new object?[] { "New Animation File", "New Sequence File", "Convert Animations to .achj", "Reveal in File Manager" }, headers);
         }
         finally { window.Close(); }
     }
@@ -332,6 +332,180 @@ public class ProjectPanelControlTests
         }
         finally { window.Close(); }
     }
+
+    // Menu contents with a "-" wherever a separator sits.
+    private static string[] MenuLayout(Controls.ProjectPanelControl control) =>
+        control.ProjectTree.ContextMenu!.Items
+            .Select(i => i is Separator ? "-" : (string)((MenuItem)i!).Header!)
+            .ToArray();
+
+    [AvaloniaFact]
+    public void FolderMenu_SeparatesNewItemsFromConvertAndReveal()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites"
+
+            Assert.Equal(new[]
+            {
+                "New Animation File", "New Sequence File", "-",
+                "Convert Animations to .achj", "-",
+                "Reveal in File Manager",
+            }, MenuLayout(control));
+        }
+        finally { window.Close(); }
+    }
+
+    // The item converts .achx to .achj, so a folder tree holding only .achj (or nothing) has nothing to act on.
+    [AvaloniaFact]
+    public void FolderMenu_NoAchxAnywhereUnderIt_HidesConvertAndItsSeparator()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[]
+        {
+            new AchxFileEntry(new FakeFile("hero.achj"), root, "Sprites/Enemies/hero.achj"),
+            new AchxFileEntry(new FakeFile("old.achx"), root, "Other/old.achx"),
+        });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots.Single(n => n.Name == "Sprites"));
+
+            Assert.Equal(new[]
+            {
+                "New Animation File", "New Sequence File", "-",
+                "Reveal in File Manager",
+            }, MenuLayout(control));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void FolderMenu_AchxOnlyInASubfolder_StillOffersConvert()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/Enemies/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites"
+
+            Assert.Contains("Convert Animations to .achj", MenuLayout(control));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void FileMenu_SeparatesLocationItemsFromEditItemsAndDelete()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]);
+
+            Assert.Equal(new[]
+            {
+                "Open Containing Folder", "Copy Full Path", "-",
+                "Duplicate", "Convert to .achj", "-",
+                "Delete",
+            }, MenuLayout(control));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ClickingNewSequenceFile_AddsPendingRowNamedNewSequence()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites"
+            MenuItemNamed(control, "New Sequence File").RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            Assert.True(pending.IsEditing);
+            Assert.Equal("NewSequence.seqj", pending.Name);
+            Assert.Equal("NewSequence", pending.EditText);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CommittingNewSequenceName_RaisesNewAnimationFileRequestedWithSeqjFileName()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]);
+            MenuItemNamed(control, "New Sequence File").RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            Controls.NewAnimationFileRequest? requested = null;
+            control.NewAnimationFileRequested += r => requested = r;
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            pending.EditText = "Boss";
+            PressKey(control, pending, Key.Enter);
+
+            Assert.Equal("Sprites", requested!.Value.FolderRelativePath);
+            Assert.Equal("Boss.seqj", requested!.Value.FileName);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void NewSequenceName_AlreadyTakenBySiblingSeqj_ShowsErrorAndStaysInEditMode()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("Boss.seqj"), root, "Sprites/Boss.seqj") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]);
+            MenuItemNamed(control, "New Sequence File").RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            var raised = false;
+            control.NewAnimationFileRequested += _ => raised = true;
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            pending.EditText = "Boss";
+            PressKey(control, pending, Key.Enter);
+
+            Assert.False(raised);
+            Assert.True(pending.IsEditing);
+            Assert.Equal("\"Boss\" already exists in this folder.", pending.ErrorMessage);
+        }
+        finally { window.Close(); }
+    }
+
+    private static MenuItem MenuItemNamed(Controls.ProjectPanelControl control, string header) =>
+        control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>().Single(i => (string)i.Header! == header);
 
     [AvaloniaFact]
     public void ClickingConvertAnimationsToAchj_RaisesFolderConvertRequestedWithRelativePath()
