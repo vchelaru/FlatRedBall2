@@ -103,6 +103,8 @@ public partial class MainWindow
         public bool Accepts(HotkeyScope scope) => scope == HotkeyScope.App;
 
         // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.
+        public bool BrowserClickOpensPreview => true;
+
         public bool CanDetach => false;
 
         public bool HasProjectPanelRow(TabEntry tab) => false;

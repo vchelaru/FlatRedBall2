@@ -2212,10 +2212,7 @@
             <Grid x:Name="SequenceEditorPane" Grid.Column="2" RowDefinitions="*,4,250"
                   Background="{DynamicResource BgCanvas}" IsVisible="False">
                 <Grid Grid.Row="0" ColumnDefinitions="220,4,*">
-                    <Border x:Name="SequenceLibraryPlaceholder" Grid.Column="0"
-                            Background="{DynamicResource BgPanel}">
-                        <TextBlock Text="Library" Classes="sequence-placeholder" />
-                    </Border>
+                    <controls:SequenceLibraryControl x:Name="SequenceLibrary" Grid.Column="0" />
                     <GridSplitter Grid.Column="1" ResizeDirection="Columns"
                                   Background="{DynamicResource LineStrong}" />
                     <Border x:Name="SequenceTimelinePlaceholder" Grid.Column="2">

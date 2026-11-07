@@ -160,6 +160,8 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => true;
 
+        public bool BrowserClickOpensPreview => true;
+
         public bool CanDetach => true;
 
         public bool HasProjectPanelRow(TabEntry tab) => !IsUntitledTab(tab);

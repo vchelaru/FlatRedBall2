@@ -69,6 +69,13 @@ internal interface ITabPane
     /// </summary>
     bool Accepts(HotkeyScope scope);
 
+    /// <summary>
+    /// Whether a single click on a file in the Animations browser opens it in the preview tab. False for a kind that
+    /// takes files dragged from the browser: pressing a row to drag it also selects it, and opening a preview there
+    /// would switch away from the tab being dropped on. Double-click still opens the file.
+    /// </summary>
+    bool BrowserClickOpensPreview { get; }
+
     /// <summary>Whether the tab's context menu offers Detach to New Window.</summary>
     bool CanDetach { get; }
 
