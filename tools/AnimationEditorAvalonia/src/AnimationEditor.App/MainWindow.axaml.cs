@@ -5500,6 +5500,9 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Puts <paramref name="text"/> on the system clipboard; shared by every Copy Qualified Name menu item.</summary>
+    internal void CopyTextToClipboard(string text) => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text);
+
     private void OnTreeContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (AnimTree.ContextMenu is null) return;
@@ -5531,7 +5534,7 @@ public partial class MainWindow : Window
             Rename: rename,
             AddAnimation: AddAnimationChainAndBeginInlineRename,
             DuplicateChainFlip: duplicateChainFlip,
-            CopyText: text => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text));
+            CopyText: CopyTextToClipboard);
 
         var plan = TreeMenuPlanBuilder.Build(data, _appCommands, _selectedState, _objectFinder, _projectManager, actions);
         // Host slots get the real dialog/filesystem menu item (see TreeMenuHostSlot — these
