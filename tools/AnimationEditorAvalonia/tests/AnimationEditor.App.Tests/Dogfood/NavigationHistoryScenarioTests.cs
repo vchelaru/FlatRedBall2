@@ -13,7 +13,8 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// Back and forward (mouse buttons 4 and 5, Alt+Left/Right, View menu) over the places the user jumped between:
-/// Go to Definition and tab-strip clicks. Plain selection clicks record nothing.
+/// Go to Definition and tab-strip clicks. Selection clicks and the rest of the global history are in
+/// <see cref="NavigationGlobalHistoryScenarioTests"/>.
 /// </summary>
 public class NavigationHistoryScenarioTests
 {
@@ -117,8 +118,6 @@ public class NavigationHistoryScenarioTests
         string second = editor.WriteAchx("b.achx", AnimationEditorHarness.Chain("Two", "sheet.png", (0, 0, 16, 16)));
         await editor.OpenAsync(first);
         await editor.OpenAsync(second);
-        BackEnabled(editor).ShouldBeFalse();
-
         editor.ClickTab("a.achx");
         await SettleAsync(editor);
         editor.Services.SelectedState.SelectedChain!.Name.ShouldBe("One");
@@ -146,21 +145,6 @@ public class NavigationHistoryScenarioTests
         await SettleAsync(editor);
 
         ForwardEnabled(editor).ShouldBeFalse();
-    }
-
-    [AvaloniaFact]
-    public async Task PlainSelectionClicks_RecordNothing()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor));
-
-        editor.ClickAt(OnChain(editor, 0.05));
-        editor.ClickAt(OnChain(editor, 1.05));
-        editor.Press(Key.Left, RawInputModifiers.Alt);
-        await SettleAsync(editor);
-
-        BackEnabled(editor).ShouldBeFalse();
-        Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 1));
     }
 
     [AvaloniaFact]
