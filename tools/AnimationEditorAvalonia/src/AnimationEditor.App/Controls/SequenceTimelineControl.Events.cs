@@ -61,6 +61,7 @@ public sealed partial class SequenceTimelineControl
     {
         var markers = EventMarkersOf(block);
         if (markers.Count == 0) return;
+        Stats.Markers += markers.Count;
         double pps = Viewport.PixelsPerSecond;
         double left = Viewport.XAt(block.Start);
         double right = left + block.Played * pps;
@@ -88,6 +89,7 @@ public sealed partial class SequenceTimelineControl
             double x = left + marker.X;
             if (x + EventMarkers.MarkerPixels < TimelineViewport.HeaderWidth) continue;
             if (x > size) break;
+            Stats.MarkersIssued++;
             double poleX = Snap(x);
             context.DrawLine(pole, new Point(poleX, top + TimelineLayout.BodyBottom), new Point(poleX, rowBottom - 1));
 

@@ -356,6 +356,8 @@
     </Window.Resources>
 
     <Grid>
+        <!-- Bracket a whole frame for the F3 window diagnostics (WindowDiagnosticsHub); they draw nothing. -->
+        <controls:RenderFrameProbe x:Name="FrameProbeBegin" />
         <DockPanel>
         <!-- ── Title bar: app icon + name + menus + drag region + window controls ── -->
         <Border DockPanel.Dock="Top"
@@ -2291,6 +2293,8 @@
                              with the lanes and keeps them in step with the wheel, the zoom and the track count. -->
                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
                             <controls:SequenceTimelineControl x:Name="SequenceTimeline" />
+                            <!-- The playhead has its own layer, so a playing sequence repaints a thin line, not every block. -->
+                            <controls:TimelinePlayheadOverlay x:Name="SequenceTimelinePlayhead" IsHitTestVisible="False" />
                             <ScrollBar x:Name="SequenceTimelineVScroll" Grid.Column="1"
                                        Orientation="Vertical" AllowAutoHide="False" Visibility="Hidden" />
                             <ScrollBar x:Name="SequenceTimelineHScroll" Grid.Row="1"
@@ -2384,5 +2388,6 @@
         <Border x:Name="GripNE" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top"    Background="Transparent" Cursor="TopRightCorner"    PointerPressed="OnResizeGrip" />
         <Border x:Name="GripSW" Width="8" Height="8" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomLeftCorner"  PointerPressed="OnResizeGrip" />
         <Border x:Name="GripSE" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomRightCorner" PointerPressed="OnResizeGrip" />
+        <controls:RenderFrameProbe x:Name="FrameProbeEnd" IsEnd="True" ZIndex="100" />
     </Grid>
 </Window>

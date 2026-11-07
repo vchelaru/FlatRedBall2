@@ -62,6 +62,9 @@ internal sealed class FilmstripRenderer
     // A frame's cell size is its region of the texture in pixels, so a new texture size changes every cell drawn from it.
     private void OnPathInvalidated(string path)
     {
+        // The atlas holds thumbnails of every sheet, so it starts over; they are cut again as the strips draw.
+        Atlas.Clear();
+        TextureChanged?.Invoke();
         List<LayoutKey>? stale = null;
         foreach (var (key, layout) in _layouts)
             if (Array.Exists(layout.Paths, p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
@@ -70,6 +73,20 @@ internal sealed class FilmstripRenderer
         foreach (var key in stale) _layouts.Remove(key);
         TextureChanged?.Invoke();
     }
+
+    /// <summary>The frame's work counters, set by the control before each draw; null counts nothing.</summary>
+    public TimelineFrameStats? Stats { get; set; }
+
+    internal FilmstripAtlas Atlas { get; } = new();
+
+    /// <summary>What the filmstrip operations report from the render thread, for the F3 overlay.</summary>
+    internal FilmstripProbe Probe { get; } = new();
+
+    /// <summary>Diagnostics: draw each cell with its own draws instead of batching them (see <see cref="TimelineProbeMode"/>).</summary>
+    public bool PerCellDraws { get; set; }
+
+    /// <summary>Diagnostics: make the render thread wait for the GPU after each filmstrip.</summary>
+    public bool WaitForGpu { get; set; }
 
     /// <summary>Forgets the laid-out cells: the document or the chain data behind them may have changed.</summary>
     public void Invalidate()
@@ -128,7 +145,16 @@ internal sealed class FilmstripRenderer
         IReadOnlyList<FilmstripCell> cells, Rect film, double minX, double maxX, double scaling, Pen boundary, IBrush numberBrush)
     {
         if (cells.Count == 0) return;
+        if (Stats is { } counted) counted.Cells += cells.Count;
         var info = InfoFor(document, source, chain);
+        Atlas.BeginFrame();
+        // The sprites, merged-group bars and boundary lines of the whole strip go out as one operation; only a sprite the
+        // atlas can't hold (wider than a page) falls back to a clipped bitmap draw.
+        Color? boundaryColor = boundary.Brush is ISolidColorBrush solid
+            ? Color.FromArgb((byte)Math.Round(solid.Color.A * solid.Opacity), solid.Color.R, solid.Color.G, solid.Color.B)
+            : null;
+        _draws.Clear();
+        _numbered.Clear();
         int first = FirstVisible(cells, minX - film.X);
         for (int i = first; i < cells.Count; i++)
         {
@@ -137,16 +163,56 @@ internal sealed class FilmstripRenderer
             if (left > maxX) break;
             double right = Math.Max(left + 1, Math.Round(film.X + cell.X + cell.Width));
             var rect = new Rect(left, film.Y, right - left, film.Height);
-            using (context.PushClip(rect))
+            if (Stats is { } stats)
             {
-                DrawSprite(context, chain, info, cell, rect, scaling);
-                if (cell.IsMerged)
-                    context.FillRectangle(AmberBrush, new Rect(rect.X, rect.Bottom - 2, rect.Width, 2));
-                if (rect.Width >= NumberMinCellWidth)
-                    DrawNumber(context, cell.Frame + 1, rect, numberBrush);
+                stats.CellsIssued++;
+                if (right > minX && left < maxX) stats.CellsVisible++;
             }
-            if (i > 0) context.DrawLine(boundary, new Point(left + 0.5, film.Y), new Point(left + 0.5, film.Bottom));
+
+            AtlasEntry? sprite = null;
+            double spriteLeft = 0, spriteTop = 0;
+            if (SpriteEntry(chain, info, cell, rect.Height, scaling, out bool fallback) is { } entry)
+            {
+                sprite = entry;
+                spriteLeft = Math.Round(rect.X + cell.SpriteX);
+                spriteTop = rect.Y + Math.Round((rect.Height - entry.Height / scaling) / 2);
+                if (Stats is { } drawn) drawn.Images++;
+            }
+            else if (fallback)
+            {
+                if (Stats is { } clipped) clipped.Clips++;
+                using (context.PushClip(rect))
+                    DrawSprite(context, chain, info, cell, rect, scaling);
+            }
+
+            bool boundaryInOp = i > 0 && boundaryColor is not null;
+            _draws.Add(new FilmstripCellDraw(left, right, boundaryInOp, cell.IsMerged, sprite ?? default, sprite is not null, spriteLeft, spriteTop));
+            if (i > 0 && boundaryColor is null)
+                context.DrawLine(boundary, new Point(left + 0.5, film.Y), new Point(left + 0.5, film.Bottom));
+            if (rect.Width >= NumberMinCellWidth) _numbered.Add((cell.Frame + 1, rect));
         }
+
+        if (_draws.Count > 0)
+        {
+            if (Stats is { } ops) ops.FilmstripOps++;
+            context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundaryColor ?? default, Probe, PerCellDraws, WaitForGpu));
+        }
+        foreach (var (number, rect) in _numbered)
+            DrawNumber(context, number, rect, numberBrush);
+    }
+
+    private readonly List<FilmstripCellDraw> _draws = new();
+    private readonly List<(int Number, Rect Rect)> _numbered = new();
+
+    // The atlas thumbnail for a cell's frame, cut at the display's pixel height; null when the frame has nothing to draw
+    // or the atlas can't hold it (fallback says which).
+    private AtlasEntry? SpriteEntry(AnimationChainSave chain, ChainInfo info, FilmstripCell cell, double rowHeight, double scaling, out bool fallback)
+    {
+        fallback = false;
+        if (Thumbnails is null || info.Paths[cell.Frame] is not { } path || Thumbnails.GetBitmap(path) is not { } sheet) return null;
+        var frame = chain.Frames[cell.Frame];
+        int target = Math.Max(1, (int)Math.Round(rowHeight * scaling));
+        return Atlas.Get(sheet, path, info.Plain[cell.Frame], frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, info.Colors[cell.Frame], target, out fallback);
     }
 
     private void DrawSprite(DrawingContext context, AnimationChainSave chain, ChainInfo info, FilmstripCell cell, Rect rect, double scaling)
@@ -159,6 +225,7 @@ internal sealed class FilmstripRenderer
         var bitmap = Thumbnails.GetFrameThumbnail(info.Paths[cell.Frame], info.Plain[cell.Frame], info.Colors[cell.Frame],
             diagonal ? target : MaxBitmapSide, diagonal ? MaxBitmapSide : target);
         if (bitmap is null) return;
+        if (Stats is { } drawn) drawn.Images++;
 
         double bitmapWidth = bitmap.PixelSize.Width / scaling;
         double bitmapHeight = bitmap.PixelSize.Height / scaling;
