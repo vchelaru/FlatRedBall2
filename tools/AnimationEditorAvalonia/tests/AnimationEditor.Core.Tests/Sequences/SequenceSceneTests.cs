@@ -74,14 +74,29 @@ public class SequenceSceneTests
     }
 
     [Fact]
-    public void At_OutsideItsChain_TheTrackIsHidden()
+    public void At_BeforeItsChainStarts_TheTrackIsHidden()
     {
+        // Hidden before the chain on purpose: this is how a sprite appears partway through a sequence.
+        // If it showed before its chain, it would always be visible.
         using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0.4, 1)));
+
+        SequenceScene.At(document, 0, 0).ShouldBeEmpty();
+        SequenceScene.At(document, 0, 0.39).ShouldBeEmpty();
+        SequenceScene.At(document, 0, 0.4).Single().FrameIndex.ShouldBe(0);
+    }
+
+    [Fact]
+    public void At_AfterItsChainEnds_TheTrackIsHidden()
+    {
+        // Hidden after the chain on purpose: this is how a sprite disappears partway through a sequence.
+        using var dir = new TestHelpers.TempDir();
+        // Walk is 0.5 s, so this chain plays from 1 s to 1.5 s.
         var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 1, 1)));
 
-        SequenceScene.At(document, 0, 0.5).ShouldBeEmpty();
         SequenceScene.At(document, 0, 1.2).Single().FrameIndex.ShouldBe(0);
         SequenceScene.At(document, 0, 1.5).ShouldBeEmpty();
+        SequenceScene.At(document, 0, 2).ShouldBeEmpty();
     }
 
     [Fact]

@@ -108,6 +108,12 @@ namespace AnimationEditor.Core.Models
         public Dictionary<string, List<string>> CollapsedLibrarySources { get; set; } = new();
 
         /// <summary>
+        /// The sequence selected in a <c>.seqj</c> tab (#1651), keyed by the <c>.seqj</c> file's
+        /// <see cref="FilePath.Standardized"/> path; the value is the sequence's name. A file at its first sequence has no entry.
+        /// </summary>
+        public Dictionary<string, string> SelectedSequences { get; set; } = new();
+
+        /// <summary>
         /// True when a <c>.seqj</c> tab's library plays every chip's chain at once (#1622) instead of only the hovered one.
         /// One setting for all files: it is how the user likes to browse, not a property of any one sequence file.
         /// </summary>

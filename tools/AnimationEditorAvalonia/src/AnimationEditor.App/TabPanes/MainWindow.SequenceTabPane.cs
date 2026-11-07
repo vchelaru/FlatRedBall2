@@ -125,6 +125,9 @@ public partial class MainWindow
                     return Task.FromResult(false);
                 }
                 _documents[tab.Path] = document;
+                // Open and tab restore both create the document here, so this is where the remembered sequence applies.
+                document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
+                    _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
@@ -221,6 +224,7 @@ public partial class MainWindow
             {
                 if (_refreshing || _document is null) return;
                 _document.SelectedSequence = w.SequenceList.SelectedIndex;
+                RememberSelection();
                 w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
                 ShowInspector();
                 // Another sequence starts from its beginning.
@@ -260,6 +264,8 @@ public partial class MainWindow
                 w.SaveSettingsFile();
             };
             w.SequenceTimeline.Thumbnails = w._thumbnailService;
+            // A texture replaced on disk: the preview redraws its sprites from the re-decoded sheet.
+            w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
@@ -334,7 +340,8 @@ public partial class MainWindow
                 {
                     var (header, onClick) = command switch
                     {
-                        SequenceListMenuCommand.Rename => ("Rename…", (Action)(() => _ = RenameSelectedAsync())),
+                        SequenceListMenuCommand.CopyQualifiedName => ("Copy Qualified Name", (Action)CopyQualifiedName),
+                        SequenceListMenuCommand.Rename => ("Rename…", () => _ = RenameSelectedAsync()),
                         SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
                         SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
@@ -344,6 +351,13 @@ public partial class MainWindow
                     menu.Items.Add(item);
                 }
             }
+        }
+
+        /// <summary>Copies "<c>Name in path/to/File.seqj</c>" for the selected sequence, the same text the ANIMATIONS tree copies for a chain.</summary>
+        private void CopyQualifiedName()
+        {
+            if (_document is { } document && CurrentSequence is { } sequence)
+                _window.CopyTextToClipboard(QualifiedName.Format(document.Path.FullPath, sequence.Name));
         }
 
         /// <summary>Double-clicking a sequence swaps its name for the same inline box the ANIMATIONS tree uses.</summary>
@@ -526,6 +540,18 @@ public partial class MainWindow
             _window.SaveSettingsFile();
         }
 
+        private static List<string> SequenceNames(SequenceDocument document) => document.Save.Sequences.Select(sequence => sequence.Name).ToList();
+
+        // The selected sequence persists per .seqj file, by name, so a rename of it carries over. View state again:
+        // no undo entry and the file is not touched. Called after every selection or edit, so it follows undo and redo too.
+        private void RememberSelection()
+        {
+            if (_document is null) return;
+            if (SequenceSelectionMemory.Remember(_window._appSettings.SelectedSequences, _document.Path.Standardized,
+                    SequenceNames(_document), _document.SelectedSequence))
+                _window.SaveSettingsFile();
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
@@ -544,6 +570,7 @@ public partial class MainWindow
                 _refreshing = false;
             }
             _document.SelectedSequence = selected;
+            RememberSelection();
             // The settings copy is current after every toggle, so reloading it on each refresh is safe.
             _window.SequenceLibrary.CollapsedSources.Load(
                 _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));

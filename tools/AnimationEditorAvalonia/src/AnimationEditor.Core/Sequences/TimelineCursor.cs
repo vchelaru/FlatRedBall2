@@ -10,6 +10,9 @@ public enum TimelineCursor
 
     /// <summary>North-south double arrow: a track header is being dragged to another lane.</summary>
     Reorder,
+
+    /// <summary>Four-way arrow: the timeline is being panned by a middle-button drag.</summary>
+    Pan,
 }
 
 public static class TimelineCursors

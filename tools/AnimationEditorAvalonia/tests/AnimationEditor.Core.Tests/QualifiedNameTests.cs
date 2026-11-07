@@ -22,6 +22,22 @@ public class QualifiedNameTests
     }
 
     [Fact]
+    public void Format_Sequence_NamesTheSeqjFileTheSameWay()
+    {
+        QualifiedName.Format(@"C:\game\Entities\Bosses\Shubby\ShubbySequences.seqj", "Action")
+            .ShouldBe("Action in C:/game/Entities/Bosses/Shubby/ShubbySequences.seqj");
+    }
+
+    [Theory]
+    [InlineData("Heavy Attack")]
+    [InlineData("Attack.2")]
+    public void Format_Sequence_NameWithSpacesOrDots_IsKeptVerbatim(string name)
+    {
+        QualifiedName.Format(@"C:\my game\sub.folder\Boss.seqj", name)
+            .ShouldBe($"{name} in C:/my game/sub.folder/Boss.seqj");
+    }
+
+    [Fact]
     public void TreeMenu_ChainNode_CopyQualifiedNameCopiesNameInFile()
     {
         var ctx = TestHelpers.SetupFreshAcls();

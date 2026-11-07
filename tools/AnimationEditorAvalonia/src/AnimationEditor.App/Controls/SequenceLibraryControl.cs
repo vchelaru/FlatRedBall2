@@ -495,7 +495,18 @@ public sealed class LibraryChipView : Border
 
         PointerEntered += (_, _) => SetHovered(true);
         PointerExited += (_, _) => SetHovered(false);
+        AttachedToVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated += OnTextureChanged; };
+        DetachedFromVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated -= OnTextureChanged; };
         ShowFrame(0);
+    }
+
+    // The thumbnail service dropped a texture that changed on disk; the chip is holding an image cropped from the old one.
+    private void OnTextureChanged(string path)
+    {
+        if (FrameIndex < 0 || FrameIndex >= Chip.Chain.Frames.Count) return;
+        string? shown = _document.ResolveTexturePath(Chip.Source, Chip.Chain.Frames[FrameIndex]);
+        if (string.Equals(shown, path, StringComparison.OrdinalIgnoreCase))
+            ShowFrame(FrameIndex, force: true);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -600,10 +611,10 @@ public sealed class LibraryChipView : Border
         ShowFrame(ChainClock.Locate(Chip.Chain, cycle > 0 ? seconds % cycle : 0).FrameIndex);
     }
 
-    private void ShowFrame(int index)
+    private void ShowFrame(int index, bool force = false)
     {
         var frames = Chip.Chain.Frames;
-        if (index == FrameIndex || index >= frames.Count) return;
+        if ((index == FrameIndex && !force) || index >= frames.Count) return;
         FrameIndex = index;
         var frame = frames[index];
         _image.Source = _thumbnails?.GetFrameThumbnail(

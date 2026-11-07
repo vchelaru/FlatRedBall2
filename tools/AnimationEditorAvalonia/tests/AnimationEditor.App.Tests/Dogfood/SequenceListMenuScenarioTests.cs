@@ -2,13 +2,14 @@ using FlatRedBall2.AnimationEditorCommon;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
-/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Rename, Delete and Add
-/// Sequence; blank space offers only Add Sequence. (The popup is not part of the headless back-buffer, so the
+/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Copy Qualified Name,
+/// Rename, Delete and Add Sequence; blank space offers only Add Sequence. (The popup is not part of the headless back-buffer, so the
 /// menus are checked by their items rather than by screenshot.)
 /// </summary>
 public class SequenceListMenuScenarioTests
@@ -40,7 +41,7 @@ public class SequenceListMenuScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task RightClickingARow_SelectsIt_AndOffersRenameDeleteThenAddSequence()
+    public async Task RightClickingARow_SelectsIt_AndOffersCopyQualifiedName_RenameDelete_ThenAddSequence()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "Idle", "Attack"));
@@ -49,7 +50,21 @@ public class SequenceListMenuScenarioTests
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
         List(editor).SelectedIndex.ShouldBe(1);
-        Headers(List(editor)).ShouldBe(new[] { "Rename…", "Delete", "-", "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Copy Qualified Name", "-", "Rename…", "Delete", "-", "Add Sequence" });
+    }
+
+    [AvaloniaFact]
+    public async Task CopyQualifiedName_FromARowMenu_CopiesTheRightClickedSequenceInItsFile()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "Idle", "Heavy Attack");
+        await editor.OpenAsync(boss);
+        editor.RightClick(List(editor).ContainerFromIndex(1)!);
+
+        editor.PickMenuItem(List(editor).ContextMenu!, "Copy Qualified Name");
+        string? copied = await editor.Window.Clipboard!.TryGetTextAsync();
+
+        copied.ShouldBe($"Heavy Attack in {boss.Replace('\\', '/')}");
     }
 
     [AvaloniaFact]
@@ -62,7 +77,7 @@ public class SequenceListMenuScenarioTests
         Headers(List(editor)).Count.ShouldBe(1);
         List(editor).ContextMenu!.Close();
         editor.RightClick(List(editor).ContainerFromIndex(0)!);
-        Headers(List(editor)).Count.ShouldBe(4);
+        Headers(List(editor)).Count.ShouldBe(6);
         List(editor).ContextMenu!.Close();
         RightClickBlankSpace(editor);
         Headers(List(editor)).ShouldBe(new[] { "Add Sequence" });
