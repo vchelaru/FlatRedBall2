@@ -42,8 +42,9 @@ public sealed class SequenceDocument
     public SequenceListSave Save { get; private set; }
 
     /// <summary>
-    /// The sequence the list has selected, or -1 for none. Adding, renaming and deleting a sequence move it to the
-    /// sequence that changed, and undo and redo move it the same way, so the list follows the history.
+    /// The sequence the list has selected, or -1 for none. Every edit moves it to the sequence it changed (an add,
+    /// rename or delete name theirs; any other edit is found by diffing), and undo and redo move it the same way, so
+    /// the list follows the history.
     /// </summary>
     public int SelectedSequence { get; set; }
 
