@@ -1,8 +1,10 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -50,11 +52,77 @@ public class SequenceNewTrackScenarioTests
         timeline.SelectedTrack.ShouldBe(1);
         editor.Control<SequenceInspectorControl>("SequenceInspector").TrackNameBox.Text.ShouldBe("Track 2");
 
+        // The new track's name is open for editing; Escape keeps the default and gives the keys back to the timeline.
+        editor.Press(Key.Escape);
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(1);
         editor.Press(Key.Y, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2" });
         timeline.Blocks.ShouldBeEmpty();
+    }
+
+    private static InlineRenameBox? TrackBox(AnimationEditorHarness editor) =>
+        Timeline(editor).GetVisualChildren().OfType<InlineRenameBox>().SingleOrDefault();
+
+    private static List<string> SavedTracks(string path) =>
+        SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(track => track.Name).ToList();
+
+    [AvaloniaFact]
+    public async Task ClickingNewTrack_OpensItsNameForEditing_WithTheDefaultSelected_AndTypingEnterRenamesIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, "Body");
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        editor.ClickAt(NewTrackCell(editor, 1));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        timeline.IsRenamingTrack.ShouldBeTrue();
+        var box = TrackBox(editor)!;
+        box.Text.ShouldBe("Track");
+        box.SelectedText.ShouldBe("Track");
+        editor.Type("Legs");
+        editor.Press(Key.Enter);
+
+        timeline.IsRenamingTrack.ShouldBeFalse();
+        SavedTracks(boss).ShouldBe(new[] { "Body", "Legs" });
+        editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'", "Rename Track 'Track' to 'Legs'" });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        SavedTracks(boss).ShouldBe(new[] { "Body", "Track" });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        SavedTracks(boss).ShouldBe(new[] { "Body" });
+    }
+
+    [AvaloniaFact]
+    public async Task EscapeOnTheNewTracksName_KeepsTheDefault_AndATakenOrEmptyNameShowsTheBanner()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, "Body");
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        editor.ClickAt(NewTrackCell(editor, 1));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+        editor.Type("Nope");
+        editor.Press(Key.Escape);
+        timeline.IsRenamingTrack.ShouldBeFalse();
+        SavedTracks(boss).ShouldBe(new[] { "Body", "Track" });
+
+        editor.ClickAt(NewTrackCell(editor, 2));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+        editor.Type("Body");
+        editor.Press(Key.Enter);
+        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2" });
+
+        editor.ClickAt(NewTrackCell(editor, 3));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+        TrackBox(editor)!.Text = "  ";
+        editor.Press(Key.Enter);
+        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("needs a name");
+        SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2", "Track 3" });
+        editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'", "Add Track 'Track 2'", "Add Track 'Track 3'" });
     }
 
     [AvaloniaFact]

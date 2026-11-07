@@ -393,6 +393,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             _document.AddTrack(undo, _sequenceIndex);
             SetSelection(null, TrackCount - 1);
             Rebuild();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it.
+            BeginRenameTrack(TrackCount - 1);
             return;
         }
 
