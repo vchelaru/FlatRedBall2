@@ -428,6 +428,27 @@ public class SequencePreviewLiveScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task HidingAndShowingATrack_UpdatesThePreviewAtOnce_AndSoDoUndoAndRedo()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0)), Track("Fx", ("Run", 0)));
+        await editor.OpenAsync(boss);
+        var steps = new Steps(editor, boss);
+
+        Timeline(editor).ToggleTrackVisibility(0);
+        ShownChains(editor).ShouldBe(new[] { "Run:0" });
+        steps.Check("hide");
+        Undo(editor);
+        ShownChains(editor).ShouldBe(new[] { "Walk:0", "Run:0" });
+        steps.Check("undo hide");
+        Redo(editor);
+        ShownChains(editor).ShouldBe(new[] { "Run:0" });
+        steps.Check("redo hide");
+
+        steps.ShouldAllBeFresh();
+    }
+
+    [AvaloniaFact]
     public async Task AnEdit_LeavesThePreviewsZoomAndPanAlone()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

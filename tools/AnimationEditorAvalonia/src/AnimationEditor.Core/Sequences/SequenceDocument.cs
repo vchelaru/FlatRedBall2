@@ -270,6 +270,21 @@ public sealed class SequenceDocument
             target.Y = y;
         });
 
+    /// <summary>
+    /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
+    /// (no undo entry) when the track already is that way.
+    /// </summary>
+    public void SetTrackVisible(IUndoManager undo, int sequence, int track, bool visible) =>
+        Edit(undo, $"{(visible ? "Show" : "Hide")} Track '{Save.Sequences[sequence].Tracks[track].Name}'",
+            save => save.Sequences[sequence].Tracks[track].Visible = visible);
+
+    /// <summary>Shows every track of a sequence again, as one undo entry; none when all are already shown.</summary>
+    public void ShowAllTracks(IUndoManager undo, int sequence) =>
+        Edit(undo, "Show All Tracks", save =>
+        {
+            foreach (var track in save.Sequences[sequence].Tracks) track.Visible = true;
+        });
+
     public void SetTrackFlip(IUndoManager undo, int sequence, int track, bool flip) =>
         Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for '{Save.Sequences[sequence].Tracks[track].Name}'",
             save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
