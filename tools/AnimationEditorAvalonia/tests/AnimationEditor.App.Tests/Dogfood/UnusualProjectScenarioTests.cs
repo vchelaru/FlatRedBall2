@@ -466,7 +466,7 @@ public class UnusualProjectScenarioTests
     /// refuses the rename, while on Unix a read-only file is replaced happily and only a folder
     /// without write permission refuses the temp file.
     /// </summary>
-    private static void MakeUnwritable(string path)
+    internal static void MakeUnwritable(string path)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -479,7 +479,7 @@ public class UnusualProjectScenarioTests
         }
     }
 
-    private static void MakeWritable(string path)
+    internal static void MakeWritable(string path)
     {
         if (OperatingSystem.IsWindows())
         {
