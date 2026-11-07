@@ -775,7 +775,10 @@ public partial class MainWindow : Window
 
         CaptureLeavingActiveTab();
         _tabManager.Activate(tab.Path);
-        await ShowTabAsync(tab);
+        // A sequence tab that was restored but never opened parses its file now; one that no longer parses is dropped
+        // like a refused File > Open, which brings back the tab the user came from.
+        if (!await ShowTabAsync(tab) && tab.Kind == TabKind.Sequence)
+            DropUnloadedTab(tab.Path);
     }
 
     private void ActivateUntitledTabContent(TabEntry tab)
@@ -923,17 +926,21 @@ public partial class MainWindow : Window
         // Load the active tab directly — bypassing LoadAnimationFileAsync avoids the early-return
         // in that method (OpenOrFocus would return Focused for a tab that RestoreFrom already
         // registered, skipping the actual file load).
-        if (_tabManager.ActiveTab is not { } active) return;
-        if (!await ShowTabAsync(active, TabLoad.Restore))
+        if (_tabManager.ActiveTab == null) return;
+        while (_tabManager.ActiveTab is { } active)
         {
+            if (await ShowTabAsync(active, TabLoad.Restore)) return;
+
             // The file that was open when the editor last closed no longer opens (missing
             // texture, declined UV conversion, unreadable file) -- restoring it as a ghost
             // active tab would show nothing behind it, so drop it the same way a refused
-            // File > Open does.
-            DropUnloadedTab(active.Path);
-            if (_tabManager.ActiveTab == null)
-                ResetToNoTabsOpen();
+            // File > Open does. Nothing is on screen yet, so the tab that falls back in is
+            // loaded by the next pass (and dropped too if it fails), however its kind compares.
+            DropUnloadedTab(active.Path, showFallback: false);
+            if (_tabManager.ActiveTab == active) break;
         }
+        if (_tabManager.ActiveTab == null)
+            ResetToNoTabsOpen();
     }
 
     // ── Startup ───────────────────────────────────────────────────────────────
@@ -6900,13 +6907,14 @@ public partial class MainWindow : Window
     /// workflow then refused. Nothing was loaded, so the previous tab's content is still what the
     /// editor shows; only the strip and the Project panel selection need to follow.
     /// </summary>
-    private void DropUnloadedTab(FilePath path)
+    /// <param name="showFallback">False when the caller loads whichever tab falls back in itself, as session restore does.</param>
+    private void DropUnloadedTab(FilePath path, bool showFallback = true)
     {
         _tabManager.Close(path);
         var next = _tabManager.ActiveTab;
         // The open swapped to the document pane before it failed; a different kind falling back
         // in has to be shown and loaded again.
-        if (next != null && PaneFor(next) != _visiblePane)
+        if (showFallback && next != null && PaneFor(next) != _visiblePane)
         {
             _ = ShowTabAsync(next);
             return;
