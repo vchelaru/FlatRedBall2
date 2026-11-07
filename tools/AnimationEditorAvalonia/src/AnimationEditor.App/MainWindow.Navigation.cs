@@ -1,6 +1,7 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Navigation;
+using AnimationEditor.Core.Sequences;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;

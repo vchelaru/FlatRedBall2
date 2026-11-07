@@ -84,7 +84,19 @@ internal interface ITabPane
     /// <summary>The Ctrl+V hotkey and Edit &gt; Paste, the counterpart of <see cref="CopySelection"/>.</summary>
     void PasteSelection();
 
-    /// <summary>Whether Edit &gt; Copy and Paste are enabled while this kind is active.</summary>
+    /// <summary>
+    /// The Ctrl+X hotkey and Edit &gt; Cut: <see cref="CopySelection"/>, then removes what was copied. Only called while
+    /// <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void CutSelection();
+
+    /// <summary>
+    /// The Ctrl+D hotkey and Edit &gt; Duplicate: copies what is selected in place. Only called while <see cref="Accepts"/>
+    /// takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void DuplicateSelection();
+
+    /// <summary>Whether Edit &gt; Copy, Cut, Paste and Duplicate are enabled while this kind is active.</summary>
     bool CanCopyPaste { get; }
 
     /// <summary>

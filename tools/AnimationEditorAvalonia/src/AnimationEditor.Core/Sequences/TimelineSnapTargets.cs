@@ -2,6 +2,7 @@ using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -20,18 +21,26 @@ public static class TimelineSnapTargets
     /// <paramref name="dragged"/>, the <paramref name="playhead"/>, and time 0. A chain that <paramref name="dragged"/>
     /// cuts offers no played end, since that end is only where the dragged chain happens to start.
     /// </summary>
-    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, SequenceChainReferenceSave? dragged, double playhead)
+    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, SequenceChainReferenceSave? dragged, double playhead) =>
+        Others(blocks, dragged is null ? Array.Empty<SequenceChainReferenceSave>() : new[] { dragged }, playhead);
+
+    /// <summary>
+    /// <see cref="Others(IReadOnlyList{TimelineBlock}, SequenceChainReferenceSave?, double)"/> for a drag of several
+    /// chains at once: none of them offers an edge, since they all move together, and a chain cut by any of them offers
+    /// no played end.
+    /// </summary>
+    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, IReadOnlyCollection<SequenceChainReferenceSave> dragged, double playhead)
     {
-        double? draggedStart = null;
+        var draggedStarts = new List<double>();
         foreach (var block in blocks)
-            if (ReferenceEquals(block.Reference, dragged)) draggedStart = block.Start;
+            if (dragged.Any(reference => ReferenceEquals(block.Reference, reference))) draggedStarts.Add(block.Start);
 
         var targets = new List<SnapTarget>(blocks.Count * 3 + 2);
         foreach (var block in blocks)
         {
-            if (ReferenceEquals(block.Reference, dragged)) continue;
+            if (dragged.Any(reference => ReferenceEquals(block.Reference, reference))) continue;
             targets.Add(new SnapTarget(block.Start, SnapKind.ChainEdge, block.Track, block.Chain));
-            bool cutByDragged = block.IsCut && draggedStart is { } cutAt && Math.Abs(block.PlayedEnd - cutAt) < 1e-9;
+            bool cutByDragged = block.IsCut && draggedStarts.Any(cutAt => Math.Abs(block.PlayedEnd - cutAt) < 1e-9);
             if (!cutByDragged)
                 targets.Add(new SnapTarget(block.PlayedEnd, SnapKind.ChainEdge, block.Track, block.Chain));
             if (block.IsCut)
