@@ -10,6 +10,16 @@ public class NavigationCoalescingTests
     private static readonly TimeSpan Long = NavigationCoalescing.QuietWindow + TimeSpan.FromSeconds(1);
 
     [Fact]
+    public void ShouldRecord_FrameMoveExactlyAtTheQuietWindow_Records_AndJustUnderItDoesNot()
+    {
+        var leaving = new NavigationLocation("a.achx", ChainName: "Walk", FrameIndex: 1);
+        var arriving = new NavigationLocation("a.achx", ChainName: "Walk", FrameIndex: 2);
+
+        NavigationCoalescing.ShouldRecord(leaving, arriving, NavigationCoalescing.QuietWindow).ShouldBeTrue();
+        NavigationCoalescing.ShouldRecord(leaving, arriving, NavigationCoalescing.QuietWindow - TimeSpan.FromMilliseconds(1)).ShouldBeFalse();
+    }
+
+    [Fact]
     public void ShouldRecord_DifferentTab_AlwaysRecords()
     {
         var leaving = new NavigationLocation("a.achx", ChainName: "Walk", FrameIndex: 0);

@@ -72,6 +72,83 @@ public class SequenceTimelineTests
     }
 
     [Theory]
+    [InlineData(0.5, 2, false, 0.5)]   // inside the sequence: shown as is
+    [InlineData(2.5, 2, true, 0.5)]    // past the end with Loop: wraps
+    [InlineData(2.5, 2, false, 2)]     // past the end without Loop: held at the length
+    [InlineData(-1, 2, false, 0)]      // negative elapsed time shows 0
+    [InlineData(-1, 2, true, 0)]
+    [InlineData(1, 0, true, 0)]        // an empty sequence always shows 0
+    public void WrapTime_WrapsOrHoldsAtTheEnd_AndNeverGoesNegative(double time, double length, bool loop, double expected)
+    {
+        SequenceTimeline.WrapTime(time, length, loop).ShouldBe(expected, 1e-9);
+    }
+
+    [Fact]
+    public void FullLength_NegativeLoops_IsZero()
+    {
+        SequenceTimeline.FullLength(loops: -2, cycleLength: 3).ShouldBe(0);
+    }
+
+    [Fact]
+    public void ActiveAt_ExactlyAtTheEndOrBeforeTheFirstStart_IsHidden()
+    {
+        var walk = Ref("Walk", start: 1);
+        var track = new SequenceTrackSave { Chains = { walk } };
+
+        SequenceTimeline.ActiveAt(track, 0.99, _ => 2, out _).ShouldBeNull();
+        SequenceTimeline.ActiveAt(track, 1.0, _ => 2, out double atStart).ShouldBe(walk);
+        atStart.ShouldBe(0, 1e-9);
+        SequenceTimeline.ActiveAt(track, 3.0, _ => 2, out _).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Length_AMissingChainCutsTheOneBeforeIt_AndNoChainsIsZero()
+    {
+        var long_ = Ref("Long", start: 0, loops: 10);
+        var missing = Ref("Deleted", start: 1);
+        var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { long_, missing } } } };
+        double Cycle(SequenceChainReferenceSave r) => r == long_ ? 1 : 0;
+
+        // Long asks for 10 s but is cut at 1 s by the missing chain, which itself plays 0 s.
+        SequenceTimeline.Length(sequence, Cycle).ShouldBe(1, 1e-9);
+        SequenceTimeline.Length(new SequenceSave(), _ => 1).ShouldBe(0);
+    }
+
+    [Fact]
+    public void LoopsForEdgeDrag_BeforeTheStart_NeverShrinksBelowTheMinimum()
+    {
+        SequenceTimeline.LoopsForEdgeDrag(start: 2, edgeTime: 1, cycleLength: 1, nextStart: null, magnetSeconds: 0.05)
+            .ShouldBe(SequenceTimeline.MinimumLoops);
+        SequenceTimeline.LoopsForEdgeDrag(start: 2, edgeTime: 2, cycleLength: 1, nextStart: null, magnetSeconds: 0.05)
+            .ShouldBe(SequenceTimeline.MinimumLoops);
+    }
+
+    [Fact]
+    public void LoopsForEdgeDrag_NoCycleToMeasure_ReturnsOne()
+    {
+        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 5, cycleLength: 0, nextStart: null, magnetSeconds: 0.05).ShouldBe(1);
+    }
+
+    [Fact]
+    public void LoopsForEdgeDrag_CycleAndNextChainBothInReach_PullsToTheNearerOne()
+    {
+        // Cycle 1 s from 0: whole cycle at 2.0, next chain at 2.04, edge dragged to 2.01, magnet 0.05.
+        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 2.01, cycleLength: 1, nextStart: 2.04, magnetSeconds: 0.05)
+            .ShouldBe(2f, 1e-5f);
+        // Edge at 2.035: the next chain is the nearer.
+        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime: 2.035, cycleLength: 1, nextStart: 2.04, magnetSeconds: 0.05)
+            .ShouldBe(2.04f, 1e-5f);
+    }
+
+    [Fact]
+    public void LoopsForEdgeDrag_NextChainStartingTogether_IsNotAMagnet()
+    {
+        // A tie (next starts where this one does) has no edge to snap to: 0.4 s of a 4 s cycle stays 0.1 loops.
+        SequenceTimeline.LoopsForEdgeDrag(start: 1, edgeTime: 1.4, cycleLength: 4, nextStart: 1, magnetSeconds: 1)
+            .ShouldBe(0.1f, 1e-5f);
+    }
+
+    [Theory]
     // edge time, expected loops (cycle 1 s, start 0, magnet 0.05 s, next chain at 2.5 s)
     [InlineData(1.7, 1.7)]
     [InlineData(2.04, 2.0)]   // within the magnet: pulled to a whole cycle
