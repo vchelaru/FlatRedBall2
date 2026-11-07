@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
@@ -14,4 +16,10 @@ public class SequenceSave
 
     /// <summary>The sprites, one per track.</summary>
     public List<SequenceTrackSave> Tracks { get; set; } = new();
+
+    /// <summary>
+    /// Properties this code does not know, kept as raw JSON and written back unchanged after the known ones. See
+    /// <see cref="SequenceListSave.UnknownProperties"/>.
+    /// </summary>
+    public JsonObject UnknownProperties { get; } = new();
 }
