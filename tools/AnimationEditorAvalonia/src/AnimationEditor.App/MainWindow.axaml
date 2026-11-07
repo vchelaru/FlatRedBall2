@@ -2363,7 +2363,13 @@
                             <views:ZoomControl x:Name="SequencePreviewZoom" VerticalAlignment="Center" />
                         </WrapPanel>
                     </Border>
-                    <views:PreviewControl x:Name="SequencePreview" />
+                    <Grid>
+                        <views:PreviewControl x:Name="SequencePreview" />
+                        <!-- Says why the canvas is empty when no chain plays at the playhead. -->
+                        <TextBlock x:Name="SequenceEmptyHint" IsVisible="False" IsHitTestVisible="False"
+                                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,12"
+                                   Foreground="{DynamicResource InkMid}" FontSize="12" />
+                    </Grid>
                 </DockPanel>
             </Grid>
 

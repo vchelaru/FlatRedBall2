@@ -106,6 +106,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             SetSelection(null, null);
     }
 
+    /// <summary>True while a chain is being moved or resized and the change is not yet an undo entry.</summary>
+    public bool IsDraggingChain => _drag is DragKind.Move or DragKind.Edge;
+
     /// <summary>The lane whose header is being dragged to reorder it, or null. A press that has not moved past the threshold is a click, not a drag.</summary>
     public int? DraggedTrack => _drag == DragKind.Track ? _dragTrack : null;
 
