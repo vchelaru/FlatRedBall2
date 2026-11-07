@@ -24,6 +24,12 @@ public partial class MainWindow
         var path = await _appCommands.FileDialogService.PickSaveFileAsync("New Sequence File", "seqj",
             new[] { new FileTypeChoice("seqj", "Sequence") });
         if (string.IsNullOrEmpty(path)) return;
+        await CreateSequenceFileAsync(path);
+    }
+
+    /// <summary>Writes a file with one empty sequence at <paramref name="path"/> and opens it. Shared by File &gt; New Sequence File and the Animations tab's folder menu.</summary>
+    internal async Task CreateSequenceFileAsync(string path)
+    {
         var save = new SequenceListSave();
         save.Sequences.Add(new SequenceSave { Name = "Sequence" });
         try

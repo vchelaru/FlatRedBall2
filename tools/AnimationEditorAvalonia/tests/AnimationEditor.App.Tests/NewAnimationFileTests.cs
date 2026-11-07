@@ -45,6 +45,49 @@ public class NewAnimationFileTests
         finally { window.Close(); Directory.Delete(dir, true); }
     }
 
+    [AvaloniaFact]
+    public async Task CreateNewAnimationFileAsync_SeqjName_WritesSequenceFileIntoFolderAndOpensIt()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "Bosses"));
+        var expected = Path.Combine(dir, "Bosses", "Boss.seqj");
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            await window.OpenProjectFolderForTestAsync(dir);
+
+            await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("Bosses", "Boss.seqj"));
+
+            Assert.Equal(new[] { "Sequence" },
+                FlatRedBall2.AnimationEditorCommon.SequenceListSave.FromFile(expected).Sequences.Select(s => s.Name));
+            Assert.Contains(GetTabManager(window).Tabs, t => t.Path == new FilePath(expected));
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task CreateNewAnimationFileAsync_SeqjAlreadyExists_LeavesItAlone()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var existing = Path.Combine(dir, "Boss.seqj");
+        File.WriteAllText(existing, "original contents");
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            await window.OpenProjectFolderForTestAsync(dir);
+
+            await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("", "Boss.seqj"));
+
+            Assert.Equal("original contents", File.ReadAllText(existing));
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
     // The tree's scan can be stale (an external git pull, another editor), so the panel's own
     // collision check isn't the last word -- creating must never clobber a file already there.
     [AvaloniaFact]
