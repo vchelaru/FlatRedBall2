@@ -2,7 +2,6 @@ using AnimationEditor.Core.Sequences;
 using Avalonia.Controls;
 using Avalonia.Input;
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace AnimationEditor.App.Controls;
@@ -26,26 +25,16 @@ internal static class DragCursors
     internal static int StockCursorId(ChipDragCursor cursor) => cursor == ChipDragCursor.Copy ? IdcHand : IdcNo;
 
     /// <summary>The stock Win32 cursor (<c>IDC_*</c>) for <paramref name="cursor"/>.</summary>
-    internal static int StockCursorId(TimelineCursor cursor) => cursor switch
-    {
-        TimelineCursor.ResizeHorizontal => IdcSizeWE,
-        _ => IdcArrow,
-    };
+    internal static int StockCursorId(TimelineCursor cursor) => cursor == TimelineCursor.ResizeHorizontal ? IdcSizeWE : IdcArrow;
 
     private static readonly Cursor CopyCursor = new(StandardCursorType.DragCopy);
     private static readonly Cursor NotAllowedCursor = new(StandardCursorType.No);
 
     /// <summary>The Avalonia cursor for a timeline hover, or null (inherit) for the default arrow.</summary>
-    internal static Cursor? ForHover(TimelineCursor cursor) => cursor switch
-    {
-        TimelineCursor.ResizeHorizontal => ResizeCursor,
-        // No stock grab cursor exists on any platform; off Windows this is the closest one. Windows draws the real hands.
-        TimelineCursor.Grab or TimelineCursor.Grabbing => MoveCursor,
-        _ => null,
-    };
+    internal static Cursor? ForHover(TimelineCursor cursor) =>
+        cursor == TimelineCursor.ResizeHorizontal ? ResizeCursor : null;
 
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
-    private static readonly Cursor MoveCursor = new(StandardCursorType.SizeAll);
 
     /// <summary>Shows <paramref name="cursor"/> during a chip drag. Call on every pointer move: Windows resets the cursor between moves.</summary>
     public static void Apply(Control control, ChipDragCursor cursor)
@@ -57,75 +46,9 @@ internal static class DragCursors
     /// <summary>Shows <paramref name="cursor"/> during a timeline drag. Call on every pointer move: Windows resets the cursor between moves.</summary>
     public static void Apply(Control control, TimelineCursor cursor)
     {
-        if (!OperatingSystem.IsWindows()) control.Cursor = ForHover(cursor);
-        else if (cursor is TimelineCursor.Grab or TimelineCursor.Grabbing) SetCursor(GrabHandle(control, cursor == TimelineCursor.Grabbing));
-        else SetOsCursor(StockCursorId(cursor));
+        if (OperatingSystem.IsWindows()) SetOsCursor(StockCursorId(cursor));
+        else control.Cursor = ForHover(cursor);
     }
-
-    // Custom HCURSORs, built once per (open or closed, pixel size) and destroyed when the process exits.
-    private static readonly Dictionary<(bool Closed, int Size), IntPtr> GrabHandles = new();
-    private static bool _exitHooked;
-    private const int SmCxCursor = 13;
-
-    private static IntPtr GrabHandle(Control control, bool closed)
-    {
-        double scale = TopLevel.GetTopLevel(control)?.RenderScaling ?? 1;
-        int size = GetSystemMetricsForDpi(SmCxCursor, (uint)Math.Round(96 * scale));
-        if (size < 32) size = (int)Math.Round(32 * scale);
-        if (GrabHandles.TryGetValue((closed, size), out var cached)) return cached;
-
-        using var art = GrabCursorArt.Render(closed, size);
-        byte[] pixels = GrabCursorArt.ToStraightBgra(art);
-        var (hotX, hotY) = GrabCursorArt.HotspotFor(size);
-        IntPtr color, mask;
-        var pinned = GCHandle.Alloc(pixels, GCHandleType.Pinned);
-        try
-        {
-            color = CreateBitmap(size, size, 1, 32, pinned.AddrOfPinnedObject());
-            mask = CreateBitmap(size, size, 1, 1, IntPtr.Zero);
-        }
-        finally { pinned.Free(); }
-        var info = new IconInfo { IsIcon = 0, HotspotX = hotX, HotspotY = hotY, Mask = mask, Color = color };
-        IntPtr handle = CreateIconIndirect(ref info);
-        DeleteObject(color);
-        DeleteObject(mask);
-        if (handle == IntPtr.Zero) return LoadCursor(IntPtr.Zero, IdcHand);
-        GrabHandles[(closed, size)] = handle;
-        if (!_exitHooked)
-        {
-            _exitHooked = true;
-            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-            {
-                foreach (var h in GrabHandles.Values) DestroyCursor(h);
-            };
-        }
-        return handle;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct IconInfo
-    {
-        public int IsIcon;
-        public int HotspotX;
-        public int HotspotY;
-        public IntPtr Mask;
-        public IntPtr Color;
-    }
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr CreateIconIndirect(ref IconInfo info);
-
-    [DllImport("user32.dll")]
-    private static extern int DestroyCursor(IntPtr cursor);
-
-    [DllImport("user32.dll")]
-    private static extern int GetSystemMetricsForDpi(int index, uint dpi);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateBitmap(int width, int height, uint planes, uint bitsPerPixel, IntPtr bits);
-
-    [DllImport("gdi32.dll")]
-    private static extern int DeleteObject(IntPtr obj);
 
     /// <summary>Ends the drag's cursor. The next pointer move lets Avalonia set the cursor of whatever is under it.</summary>
     public static void Restore(Control control, Cursor? resting)
