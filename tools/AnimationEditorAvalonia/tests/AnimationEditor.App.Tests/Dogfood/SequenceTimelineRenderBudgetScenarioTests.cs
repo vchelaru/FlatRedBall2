@@ -111,6 +111,53 @@ public class SequenceTimelineRenderBudgetScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task APlainFilmstrip_DrawsItsCellsWithoutAClipOrADrawPerCell()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+
+        timeline.ScrollToSeconds(22);
+        editor.Layout();
+
+        var frame = timeline.LastFrame;
+        frame.CellsIssued.ShouldBeGreaterThan(20);
+        frame.Clips.ShouldBe(0);
+        frame.FilmstripOps.ShouldBeLessThanOrEqualTo(frame.BlocksIssued);
+    }
+
+    [AvaloniaFact]
+    public async Task ScrollingAcrossTheStrip_ReusesTheThumbnailAtlas()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+        timeline.ScrollToSeconds(2);
+        editor.Layout();
+        int generation = timeline.FilmstripAtlasGeneration;
+
+        timeline.ScrollToSeconds(30);
+        editor.Layout();
+
+        timeline.FilmstripAtlasGeneration.ShouldBe(generation);
+        timeline.FilmstripAtlasPages.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
+    public async Task ATextureChange_DropsTheThumbnailAtlas()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+        editor.Layout();
+        int generation = timeline.FilmstripAtlasGeneration;
+
+        editor.Services.ThumbnailService.InvalidatePath(Path.Combine(editor.ProjectFolder, "sheet.png"));
+
+        timeline.FilmstripAtlasGeneration.ShouldBeGreaterThan(generation);
+    }
+
+    [AvaloniaFact]
     public async Task ScrollingToTheMiddle_IssuesOnlyTheFilmstripCellsOnScreen()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

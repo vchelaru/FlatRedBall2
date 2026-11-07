@@ -12,6 +12,7 @@ internal sealed class TimelineFrameStats
     public int Images, Clips, Texts, HatchLines, GridLines, RulerLabels;
     public int Markers, MarkersIssued;
     public int TextsCreated;
+    public int FilmstripOps;
 
     /// <summary>Milliseconds the UI thread spent recording the frame (<c>Render</c>), not the raster that follows it.</summary>
     public double RecordMs;
@@ -26,6 +27,7 @@ internal sealed class TimelineFrameStats
         Images = Clips = Texts = HatchLines = GridLines = RulerLabels = 0;
         Markers = MarkersIssued = 0;
         TextsCreated = 0;
+        FilmstripOps = 0;
         RecordMs = 0;
         AllocatedBytes = 0;
     }

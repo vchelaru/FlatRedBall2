@@ -31,6 +31,10 @@ public sealed partial class SequenceTimelineControl
 
     private TimelineFrameStats Stats => Diagnostics.Current;
 
+    internal int FilmstripAtlasGeneration => _filmstrip.Atlas.Generation;
+
+    internal int FilmstripAtlasPages => _filmstrip.Atlas.PageCount;
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);

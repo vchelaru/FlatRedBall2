@@ -116,7 +116,7 @@ internal sealed class TimelineDiagnostics
         string[] lines =
         {
             $"timeline: record {_recordMs.Average:F2} ms  raster {_rasterMs.Average:F2} ms  {_lastFpsText}  [{_backend}]",
-            $"blocks {Last.BlocksIssued}/{Last.Blocks} (visible {Last.BlocksVisible})  cells {Last.CellsIssued} (visible {Last.CellsVisible})  images {Last.Images}",
+            $"blocks {Last.BlocksIssued}/{Last.Blocks} (visible {Last.BlocksVisible})  cells {Last.CellsIssued} (visible {Last.CellsVisible})  images {Last.Images}  ops {Last.FilmstripOps}",
             $"clips {Last.Clips}  texts {Last.Texts}  hatch {Last.HatchLines}  grid {Last.GridLines}  ruler {Last.RulerLabels}  alloc {Last.AllocatedBytes / 1024} KB",
         };
         var typeface = new Typeface(FontFamily.Default);
