@@ -141,10 +141,16 @@ internal sealed class FilmstripRenderer
     /// Draws <paramref name="cells"/> into <paramref name="film"/> (the block's filmstrip rectangle). Only cells that
     /// overlap [<paramref name="minX"/>, <paramref name="maxX"/>] are drawn.
     /// </summary>
-    public void Draw(DrawingContext context, SequenceDocument document, string source, AnimationChainSave chain,
-        IReadOnlyList<FilmstripCell> cells, Rect film, double minX, double maxX, double scaling, Pen boundary, IBrush numberBrush)
+    public bool Draw(DrawingContext context, SequenceDocument document, string source, AnimationChainSave chain,
+        IReadOnlyList<FilmstripCell> cells, Rect film, double minX, double maxX, double scaling, Pen boundary, IBrush numberBrush, BlockPaint? block = null)
     {
-        if (cells.Count == 0) return;
+        if (cells.Count == 0)
+        {
+            if (block is null) return false;
+            if (Stats is { } empty) empty.FilmstripOps++;
+            context.Custom(new FilmstripOp(Array.Empty<FilmstripCellDraw>(), Array.Empty<SkiaSharp.SKImage>(), film, default, Probe, PerCellDraws, WaitForGpu, block));
+            return true;
+        }
         if (Stats is { } counted) counted.Cells += cells.Count;
         var info = InfoFor(document, source, chain);
         Atlas.BeginFrame();
@@ -192,13 +198,22 @@ internal sealed class FilmstripRenderer
             if (rect.Width >= NumberMinCellWidth) _numbered.Add((cell.Frame + 1, rect));
         }
 
-        if (_draws.Count > 0)
+        bool drew = _draws.Count > 0 || block is not null;
+        if (drew)
         {
             if (Stats is { } ops) ops.FilmstripOps++;
-            context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundaryColor ?? default, Probe, PerCellDraws, WaitForGpu));
+            context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundaryColor ?? default, Probe, PerCellDraws, WaitForGpu, block));
         }
         foreach (var (number, rect) in _numbered)
             DrawNumber(context, number, rect, numberBrush);
+        return drew;
+    }
+
+    /// <summary>Draws only a block's own paint (no filmstrip cells), for a block whose chain has nothing to show.</summary>
+    public void DrawBlockOnly(DrawingContext context, Rect film, BlockPaint block)
+    {
+        if (Stats is { } ops) ops.FilmstripOps++;
+        context.Custom(new FilmstripOp(Array.Empty<FilmstripCellDraw>(), Array.Empty<SkiaSharp.SKImage>(), film, default, Probe, PerCellDraws, WaitForGpu, block));
     }
 
     private readonly List<FilmstripCellDraw> _draws = new();

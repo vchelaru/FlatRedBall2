@@ -10,6 +10,9 @@ public enum TimelineProbeMode
     /// <summary>Draw everything, each filmstrip as batched draws.</summary>
     Normal,
 
+    /// <summary>Draw everything, but the lanes and each block's fill, outline and marks through the drawing context as before, to compare against <see cref="Normal"/>.</summary>
+    LegacyDrawing,
+
     /// <summary>Draw everything, each filmstrip cell with its own draws (the earlier shape), to compare against <see cref="Normal"/>.</summary>
     PerCellDraws,
 

@@ -1062,26 +1062,30 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         using (context.PushClip(lanes))
         {
-            for (int lane = 0; lane < sequence.Tracks.Count; lane++)
+            if (!TryDrawLaneBackdrop(context, sequence, size, step, firstTick, drop))
             {
-                double top = Viewport.LaneTop(lane);
-                double laneHeight = Viewport.LaneHeightOf(lane);
-                if (lane % 2 == 1)
-                    context.FillRectangle(Brush("TreeRowStripe"), new Rect(header, top, lanes.Width, laneHeight));
-                context.DrawLine(line, new Point(header, top + laneHeight - 0.5), new Point(size.Width, top + laneHeight - 0.5));
-                if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
-                    DrawDropRow(context, new Rect(header, top, lanes.Width, laneHeight));
-            }
-            for (double t = firstTick; Viewport.XAt(t) < size.Width; t += step)
-            {
-                Stats.GridLines++;
-                context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
+                for (int lane = 0; lane < sequence.Tracks.Count; lane++)
+                {
+                    double top = Viewport.LaneTop(lane);
+                    double laneHeight = Viewport.LaneHeightOf(lane);
+                    Stats.LegacyDraws += 2;
+                    if (lane % 2 == 1)
+                        context.FillRectangle(Brush("TreeRowStripe"), new Rect(header, top, lanes.Width, laneHeight));
+                    context.DrawLine(line, new Point(header, top + laneHeight - 0.5), new Point(size.Width, top + laneHeight - 0.5));
+                    if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
+                        DrawDropRow(context, new Rect(header, top, lanes.Width, laneHeight));
+                }
+                for (double t = firstTick; Viewport.XAt(t) < size.Width; t += step)
+                {
+                    Stats.GridLines++;
+                    context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
+                }
             }
 
             Stats.Blocks = _blocks.Count;
             foreach (var block in _blocks)
             {
-                using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
+                using (PushOpacityUnlessOpaque(context, IsTrackHidden(block.Track) ? HiddenOpacity : 1))
                 {
                     DrawBlock(context, block);
                     DrawEvents(context, block, size.Width);
@@ -1165,7 +1169,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
                 }
                 var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, header - TimelineLayout.HeaderNameLeft - 8);
-                using (context.PushOpacity(hidden ? HiddenOpacity + 0.2 : 1))
+                using (PushOpacityUnlessOpaque(context, hidden ? HiddenOpacity + 0.2 : 1))
                     context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
@@ -1283,6 +1287,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         string colorKey = block.IsMissing ? "Accent" : "AccentCool";
         var color = Brush(colorKey) is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
+        bool paintedByOp = false;
         if (block.IsMissing)
         {
             context.FillRectangle(new SolidColorBrush(color, 0.15), body, 3);
@@ -1290,22 +1295,36 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
         else
         {
-            context.FillRectangle(new SolidColorBrush(color, 0.35), body, 3);
             var film = new Rect(left, top + TimelineLayout.FilmTop, body.Width, TimelineLayout.FilmHeight);
-            context.FillRectangle(Brush("BgCanvas"), film);
-            DrawFilmstrip(context, block, film);
-        }
-        context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 1), body, 3, 3);
-
-        // Whole-cycle marks, so a float loop count reads at a glance.
-        if (block.CycleLength > 0)
-        {
-            var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
-            double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
-            for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
+            if (ProbeMode != TimelineProbeMode.LegacyDrawing && BlockPaintFor(block, body, film, color, left, pps) is { } paint)
             {
-                double x = Snap(left + k * block.CycleLength * pps);
-                context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
+                // The fill, backdrop, outline and cycle marks go with the filmstrip in one operation.
+                DrawFilmstrip(context, block, film, paint);
+                paintedByOp = true;
+            }
+            else
+            {
+                Stats.LegacyDraws += 2;
+                context.FillRectangle(new SolidColorBrush(color, 0.35), body, 3);
+                context.FillRectangle(Brush("BgCanvas"), film);
+                DrawFilmstrip(context, block, film);
+            }
+        }
+        if (!paintedByOp)
+        {
+            Stats.LegacyDraws++;
+            context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 1), body, 3, 3);
+
+            // Whole-cycle marks, so a float loop count reads at a glance.
+            if (block.CycleLength > 0)
+            {
+                var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
+                double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
+                for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
+                {
+                    double x = Snap(left + k * block.CycleLength * pps);
+                    context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
+                }
             }
         }
 

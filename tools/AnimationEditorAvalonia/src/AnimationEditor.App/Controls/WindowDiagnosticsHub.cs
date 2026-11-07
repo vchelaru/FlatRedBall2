@@ -33,6 +33,7 @@ internal sealed class WindowDiagnosticsHub
     private volatile string _backend = "?";
 
     private Timer? _watcher;
+    private Dispatcher? _dispatcher;   // taken on the UI thread when switched on; the watcher thread must never ask for Dispatcher.UIThread itself
     private int _pending;
     private readonly object _stallLock = new();
     private readonly List<(long Stamp, double Ms)> _stalls = new();
@@ -56,6 +57,7 @@ internal sealed class WindowDiagnosticsHub
             _enabled = value;
             if (value)
             {
+                _dispatcher = Dispatcher.UIThread;
                 _watcher = new Timer(_ => Probe(), null, WatchPeriod, WatchPeriod);
                 SampleGc(force: true);
             }
@@ -88,7 +90,8 @@ internal sealed class WindowDiagnosticsHub
     {
         if (Interlocked.Exchange(ref _pending, 1) == 1) return;
         long posted = Stopwatch.GetTimestamp();
-        Dispatcher.UIThread.Post(() =>
+        if (_dispatcher is not { } dispatcher) return;
+        dispatcher.Post(() =>
         {
             double ms = (Stopwatch.GetTimestamp() - posted) * 1000.0 / Stopwatch.Frequency;
             Volatile.Write(ref _pending, 0);
