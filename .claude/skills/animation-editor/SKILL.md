@@ -37,7 +37,7 @@ tools/AnimationEditorAvalonia/
 │   ├── DEVELOPMENT.md            ← read first when starting work
 │   └── FEATURE_COVERAGE_REPORT.md
 ├── src/
-│   ├── AnimationEditor.App/      ← Avalonia host: MainWindow.axaml(.cs), Models/, Services/, Settings/, and App-only Controls/ (e.g. FilesPanelControl)
+│   ├── AnimationEditor.App/      ← Avalonia host: MainWindow.axaml(.cs), TabPanes/, Models/, Services/, Settings/, and App-only Controls/ (e.g. FilesPanelControl)
 │   ├── AnimationEditor.Views/    ← the SkiaSharp controls, consumed by App
 │   │   └── Controls/
 │   │       ├── WireframeControl.cs, TextureViewport.cs    ← top panel (texture + frame regions)
@@ -63,6 +63,8 @@ dotnet build tools/AnimationEditorAvalonia/AnimationEditorAvalonia.slnx
 Test commands and headless-test discipline live in the `animation-editor-testing` skill.
 
 ## Two-panel mental model
+
+This is the `.achx` tab. `.png` and `.seqj` tabs show their own panes (see "Tab panes and hotkey scopes").
 
 - **Wireframe (top)** — the texture editor. User loads a sprite sheet, draws/edits frame regions on it. State: pan, zoom, selected frame, snap-to-grid.
 - **Preview (bottom)** — the animation player. Plays the selected `AnimationChain` at runtime speed; supports onion skin and origin guides. State: pan, zoom, playback timer, speed multiplier.
@@ -119,6 +121,10 @@ the two gestures onto one shared size-preserving helper again — see
 The preview and the GIF/WebP export sample a chain through `KeyframeSampler` (`AnimationEditor.Core/Keyframes/`), which wraps the shared `KeyframeEvaluator`; there is no per-session Interpolate toggle. The inspector's diamond and eight-icon picker are `KeyframeControl` (`AnimationEditor.Views/Controls/`), mapped to stored (type, easing) names by `KeyframeCurvePicker`. A stored curve outside the eight reads as "nothing selected" and is never rewritten except by an explicit pick. A frame with its keyframe off ignores its own values, so edits to those fields go only to frames that are keyframes, and the read-only fields show `KeyframeInspectorState.DisplayOffset`/`DisplayColor`.
 
 Shapes use the same machinery per shape (`ShapeKeyframeGroup.Offset`/`Size`, `KeyframeInspectorState.ForShapes`, `AppCommands.SetShapeKeyframe`/`SetShapeKeyframeCurve`, one `KeyframeControl` per group in each shape panel). A shape's keyframe state is relative to its name: the first frame holding the name is always a keyframe, so the diamond is disabled there. Offset and size edits go only to shapes whose group is a keyframe (`MainWindow.ShapeKeyframes`); a skipped shape's fields show the computed value and must never be written back as its own. Polygon points are a third group (`ShapeKeyframeGroup.Points`, polygons only; `PointsInterpolation`/`PointsEasing`/`SkipPointsKeyframe`): point i glides to point i, a differing count snaps, and with the keyframe off the vertex rows show `DisplayShapePoints` read-only and the preview refuses vertex gestures (`PreviewControl.IsPolygonVertexLocked`). A selected polygon's timeline shows Offset + Points lanes (no Size). The preview samples shapes through `KeyframeSampler.SampleShape`/`SampleShapePoints`, but dragging or resizing a shape in the preview still edits its stored values, not the glided ones.
+
+## Tab panes and hotkey scopes
+
+Each `TabKind` (`.achx`, `.png`, `.seqj`) has one `ITabPane` in `AnimationEditor.App/TabPanes/`. `MainWindow` routes tab lifecycle through `PaneFor`; a new kind is an `ITabPane` implementation plus a case in `PaneFor`. Hotkeys (`HotkeyDefinition.Scope`) and main-menu items carry a `HotkeyScope`: `Achx` (the default), `Document`, or `App`. A pane lists the scopes it takes in `Accepts`, and refused scopes do nothing (menu items are disabled). So a new hotkey or menu item works only in `.achx` tabs unless it is set to `Document` or `App`; for menu items that means adding it to `DocumentScopedMenuItems` or `AppScopedMenuItems` in `MainWindow.axaml.cs`.
 
 ## Back/forward navigation (mouse buttons 4/5, Alt+Left/Right, View menu)
 
