@@ -48,6 +48,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
 
+    private TimelineChainId? _selection;
     private (LibraryChip Chip, Point Point)? _chipGhost;
     private double _playhead;
     private bool _scrubbing;
@@ -63,13 +64,33 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
 
     public TimelineViewport Viewport { get; } = new();
 
-    public TimelineChainId? Selection { get; private set; }
+    /// <summary>The selected chain, or null. At most one thing is selected: choosing a chain clears <see cref="SelectedTrack"/> and the reverse.</summary>
+    public TimelineChainId? Selection
+    {
+        get => _selection;
+        private set => SetSelection(value, null);
+    }
+
+    /// <summary>The track whose header is selected, or null.</summary>
+    public int? SelectedTrack { get; private set; }
 
     /// <summary>The context menu of the last right-click: a track header's, or a chain's.</summary>
     public ContextMenu Menu => _menu;
 
     /// <summary>The chains as drawn, for tests and the host.</summary>
     public IReadOnlyList<TimelineBlock> Blocks => _blocks;
+
+    /// <summary>Raised when what is selected changes, for the inspector.</summary>
+    public event Action? SelectionChanged;
+
+    /// <summary>
+    /// Raised after the shown sequence is rebuilt: an edit, undo, redo, or each step of a drag. The inspector reads the
+    /// document again so its values follow a drag live.
+    /// </summary>
+    public event Action? ContentChanged;
+
+    /// <summary>Raised when the user double-clicks a chain or picks Go to Definition on it.</summary>
+    public event Action<SequenceChainReferenceSave>? GoToDefinitionRequested;
 
     /// <summary>Raised when the user picks Rename on a track header, with the track index. The host prompts for the name.</summary>
     public event Action<int>? RenameTrackRequested;
@@ -121,21 +142,41 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     public void Show(SequenceDocument? document, int sequenceIndex, IUndoManager? undo)
     {
         if (!ReferenceEquals(document, _document) || sequenceIndex != _sequenceIndex)
-            Selection = null;
+            SetSelection(null, null);
         _document = document;
         _sequenceIndex = sequenceIndex;
         _undo = undo;
         Rebuild();
     }
 
-    /// <summary>Removes the selected chain. Returns false when no chain is selected.</summary>
+    /// <summary>Removes the selected chain, or the selected track with its chains. Returns false when nothing is selected.</summary>
     public bool DeleteSelected()
     {
-        if (_document is null || _undo is null || Selection is not { } selection) return false;
-        Selection = null;
-        _document.DeleteChain(_undo, _sequenceIndex, selection.Track, selection.Chain);
+        if (_document is null || _undo is null) return false;
+        if (Selection is { } selection)
+        {
+            Selection = null;
+            _document.DeleteChain(_undo, _sequenceIndex, selection.Track, selection.Chain);
+        }
+        else if (SelectedTrack is { } track)
+        {
+            Selection = null;
+            _document.DeleteTrack(_undo, _sequenceIndex, track);
+        }
+        else
+        {
+            return false;
+        }
         Rebuild();
         return true;
+    }
+
+    private void SetSelection(TimelineChainId? chain, int? track)
+    {
+        if (_selection == chain && SelectedTrack == track) return;
+        _selection = chain;
+        SelectedTrack = track;
+        SelectionChanged?.Invoke();
     }
 
     /// <summary>
@@ -181,8 +222,11 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             : Array.Empty<TimelineBlock>();
         if (Selection is { } selection && !_blocks.Any(b => b.Track == selection.Track && b.Chain == selection.Chain))
             Selection = null;
+        if (SelectedTrack is { } track && track >= TrackCount)
+            SetSelection(null, null);
         Viewport.ClampVertical(TrackCount, Bounds.Height);
         InvalidateVisual();
+        ContentChanged?.Invoke();
     }
 
     // ── Pointer ──────────────────────────────────────────────────────────────
@@ -212,18 +256,30 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
+        if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
+        {
+            SetSelection(null, row.Track);
+            InvalidateVisual();
+            return;
+        }
+
         var hit = point.X >= TimelineViewport.HeaderWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, sequence.Tracks.Count, point.X, point.Y)
             : null;
         if (hit is not { } found)
         {
-            Selection = null;
+            SetSelection(null, null);
             InvalidateVisual();
             return;
         }
 
         var block = found.Block;
         Selection = new TimelineChainId(block.Track, block.Chain);
+        if (e.ClickCount == 2)
+        {
+            GoToDefinitionRequested?.Invoke(block.Reference);
+            return;
+        }
         _drag = DragKind.Pending;
         _pressedPart = found.Part;
         _pressPoint = point;
@@ -385,6 +441,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         int track = row.Track;
         if (point.X < TimelineViewport.HeaderWidth)
         {
+            SetSelection(null, track);
+            InvalidateVisual();
             var rename = new MenuItem { Header = "Rename Track…" };
             rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
             var delete = new MenuItem { Header = "Delete Track" };
@@ -401,8 +459,12 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         {
             Selection = new TimelineChainId(hit.Block.Track, hit.Block.Chain);
             InvalidateVisual();
+            var reference = hit.Block.Reference;
+            var definition = new MenuItem { Header = "Go to Definition" };
+            definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(reference);
             var remove = new MenuItem { Header = "Remove from Track" };
             remove.Click += (_, _) => DeleteSelected();
+            _menu.Items.Add(definition);
             _menu.Items.Add(remove);
         }
     }
@@ -474,6 +536,11 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             for (int lane = 0; lane < sequence.Tracks.Count; lane++)
             {
                 double top = Viewport.LaneTop(lane);
+                if (SelectedTrack == lane)
+                {
+                    var accent = Brush("Accent") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
+                    context.FillRectangle(new SolidColorBrush(accent, 0.25), new Rect(0, top, header, TimelineViewport.LaneHeight));
+                }
                 var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
                 text.MaxTextWidth = header - 16;
                 text.Trimming = TextTrimming.CharacterEllipsis;
