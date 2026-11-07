@@ -185,7 +185,9 @@ public class SequenceMalformedOpenScenarioTests
     }
 
     // Writes broken.seqj and good.seqj into a fresh folder, saves a session over the tabs `session` picks, and starts the editor on it.
-    private static void RunRestore(Func<string, (string[] Tabs, string Active)> session, Action<AnimationEditorHarness> check)
+    // `moreFiles` writes extra fixtures into that folder before the editor starts.
+    internal static void RunRestore(Func<string, (string[] Tabs, string Active)> session, Action<AnimationEditorHarness> check,
+        Action<string>? moreFiles = null)
     {
         string folder = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
         string settingsRoot = Path.Combine(folder, "settings");
@@ -193,6 +195,7 @@ public class SequenceMalformedOpenScenarioTests
         File.WriteAllText(Path.Combine(folder, "broken.seqj"), WrongKindJson);
         File.WriteAllText(Path.Combine(folder, "good.seqj"),
             """{ "version": 1, "sources": [], "sequences": [ { "name": "Idle", "loop": false, "tracks": [] } ] }""");
+        moreFiles?.Invoke(folder);
         var (tabs, active) = session(folder);
         var settingsFile = AppSettingsLocation.ForApplicationDataRoot(settingsRoot);
         Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
