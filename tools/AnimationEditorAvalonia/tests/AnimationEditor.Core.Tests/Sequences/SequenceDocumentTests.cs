@@ -213,4 +213,29 @@ public class SequenceDocumentTests
         undo.Undo();
         document.Save.Sequences[0].Loop.ShouldBeFalse();
     }
+
+    [Fact]
+    public void EditAndUndo_KeepVersionAndUnknownProperties_InTheFileOnDisk()
+    {
+        // Edit and undo go through ToJsonString/FromJsonString snapshots, so they must not drop another writer's data.
+        using var dir = new TestHelpers.TempDir();
+        string path = Path.Combine(dir.Path, "boss.seqj");
+        File.WriteAllText(path, """
+            { "version": 5, "tool": { "name": "other", "tags": [1, 2] }, "sources": [],
+              "sequences": [ { "name": "Idle", "note": "keep", "tracks": [ { "name": "Body", "rig": 7, "chains": [] } ] } ] }
+            """);
+        var document = SequenceDocument.Load(path);
+        var undo = new UndoManager();
+
+        document.AddSequence(undo);
+        undo.Undo();
+        undo.Redo();
+
+        string onDisk = File.ReadAllText(path);
+        onDisk.ShouldContain("\"version\": 5");
+        onDisk.ShouldContain("\"tags\"");
+        onDisk.ShouldContain("\"note\": \"keep\"");
+        onDisk.ShouldContain("\"rig\": 7");
+        document.Save.IsFromNewerVersion.ShouldBeTrue();
+    }
 }
