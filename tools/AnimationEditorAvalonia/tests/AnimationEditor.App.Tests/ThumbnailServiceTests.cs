@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using AnimationEditor.App.Services;
@@ -450,6 +451,24 @@ public class ThumbnailServiceTests
         Assert.NotNull(afterInvalidate);
         // Invalidation must drop the cached image so a hot-reloaded sheet re-uploads.
         Assert.NotSame(first, afterInvalidate);
+    }
+
+    // #1624: views that keep their own copy of what they drew (laid-out cells, a chip's image) need to hear which
+    // texture was dropped, with the path in the same forward-slash form the caches key on.
+    [Fact]
+    public void InvalidatePath_RaisesPathInvalidated_ForThatPathOnly_AndKeepsOtherPathsCached()
+    {
+        var svc    = MakeSvc();
+        var path   = WriteTempPng(8, 8);
+        var other  = WriteTempPng(4, 4);
+        var kept   = svc.GetBitmap(other);
+        var raised = new List<string>();
+        svc.PathInvalidated += raised.Add;
+
+        svc.InvalidatePath(path.Replace('/', '\\'));
+
+        Assert.Equal(new[] { path.Replace('\\', '/') }, raised);
+        Assert.Same(kept, svc.GetBitmap(other));
     }
 
     [Fact]

@@ -264,6 +264,8 @@ public partial class MainWindow
                 w.SaveSettingsFile();
             };
             w.SequenceTimeline.Thumbnails = w._thumbnailService;
+            // A texture replaced on disk: the preview redraws its sprites from the re-decoded sheet.
+            w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
