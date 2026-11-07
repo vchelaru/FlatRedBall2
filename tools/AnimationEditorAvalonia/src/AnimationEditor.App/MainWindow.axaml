@@ -458,6 +458,9 @@
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
                     <MenuItem Header="_View">
+                        <MenuItem Header="_Back"    x:Name="MenuNavBack" />
+                        <MenuItem Header="_Forward" x:Name="MenuNavForward" />
+                        <Separator />
                         <!-- InputGesture text for the four zoom items is set in code from the
                              hotkey registry (see note above) — issue #638. Clicking a menu item
                              always zooms that specific panel; Ctrl+Plus/Minus is one shared,
