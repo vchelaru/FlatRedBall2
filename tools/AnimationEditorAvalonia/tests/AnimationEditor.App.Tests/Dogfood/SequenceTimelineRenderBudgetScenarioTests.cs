@@ -197,7 +197,7 @@ public class SequenceTimelineRenderBudgetScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TheNoFilmstripsProbe_DrawsNoFilmstripOps_AndF4OnlyCyclesWhileDiagnosticsAreOn()
+    public async Task TheNoFilmstripsProbe_DrawsNoFilmstripCells_AndF4OnlyCyclesWhileDiagnosticsAreOn()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteLongSequence(editor));
@@ -211,12 +211,30 @@ public class SequenceTimelineRenderBudgetScenarioTests
         timeline.Focus();
         editor.Press(Key.F4);
         editor.Press(Key.F4);
+        editor.Press(Key.F4);
         timeline.ProbeMode.ShouldBe(TimelineProbeMode.NoFilmstrips);
         timeline.ScrollToSeconds(22);
         editor.Layout();
 
-        timeline.LastFrame.FilmstripOps.ShouldBe(0);
+        timeline.LastFrame.CellsIssued.ShouldBe(0);
         timeline.LastFrame.BlocksIssued.ShouldBeGreaterThan(0);
+    }
+
+    [AvaloniaFact]
+    public async Task ANormalFrame_DrawsLanesAndBlocksAsOperations_NotOneNodeAtATime()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+
+        timeline.ScrollToSeconds(22);
+        editor.Layout();
+        timeline.LastFrame.LegacyDraws.ShouldBe(0);
+
+        timeline.ProbeMode = TimelineProbeMode.LegacyDrawing;
+        editor.Layout();
+
+        timeline.LastFrame.LegacyDraws.ShouldBeGreaterThan(timeline.LastFrame.BlocksIssued);
     }
 
     [AvaloniaFact]

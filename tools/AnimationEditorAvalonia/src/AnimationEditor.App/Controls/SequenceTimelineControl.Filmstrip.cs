@@ -111,16 +111,30 @@ public sealed partial class SequenceTimelineControl
         }
     }
 
-    private void DrawFilmstrip(DrawingContext context, TimelineBlock block, Rect film)
+    // With a block paint the one operation also draws the block's fill, backdrop, outline and cycle marks, and runs without
+    // the film clip (the outline reaches past the film row). Without one it is the filmstrip alone, under that clip.
+    private void DrawFilmstrip(DrawingContext context, TimelineBlock block, Rect film, BlockPaint? paint = null)
     {
-        if (ProbeMode is TimelineProbeMode.NoFilmstrips or TimelineProbeMode.NoFilmstripsOrText or TimelineProbeMode.BackgroundOnly) return;
-        if (_document is not { } document || document.FindChain(block.Reference) is not { Frames.Count: > 0 } chain) return;
-        var cells = FilmstripCells(block);
-        var boundary = new Pen(Brush("LineStrong"), 1);
-        double scaling = (VisualRoot as TopLevel)?.RenderScaling ?? 1;
-        _filmstrip.Stats = Stats;
-        using (context.PushClip(film))
-            _filmstrip.Draw(context, document, block.Reference.Source, chain, cells, film,
-                TimelineViewport.HeaderWidth, Bounds.Width, scaling, boundary, Brush("Ink"));
+        bool probedAway = ProbeMode is TimelineProbeMode.NoFilmstrips or TimelineProbeMode.NoFilmstripsOrText or TimelineProbeMode.BackgroundOnly;
+        bool drawn = false;
+        if (!probedAway && _document is { } document && document.FindChain(block.Reference) is { Frames.Count: > 0 } chain)
+        {
+            var cells = FilmstripCells(block);
+            var boundary = new Pen(Brush("LineStrong"), 1);
+            double scaling = (VisualRoot as TopLevel)?.RenderScaling ?? 1;
+            _filmstrip.Stats = Stats;
+            if (paint is not null)
+            {
+                drawn = _filmstrip.Draw(context, document, block.Reference.Source, chain, cells, film,
+                    TimelineViewport.HeaderWidth, Bounds.Width, scaling, boundary, Brush("Ink"), paint);
+            }
+            else
+            {
+                using (context.PushClip(film))
+                    _filmstrip.Draw(context, document, block.Reference.Source, chain, cells, film,
+                        TimelineViewport.HeaderWidth, Bounds.Width, scaling, boundary, Brush("Ink"));
+            }
+        }
+        if (!drawn && paint is not null) _filmstrip.DrawBlockOnly(context, film, paint);
     }
 }

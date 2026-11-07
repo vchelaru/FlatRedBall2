@@ -38,9 +38,11 @@ internal sealed class FilmstripOp : ICustomDrawOperation
     private readonly FilmstripProbe? _probe;
     private readonly bool _perCell;
     private readonly bool _waitForGpu;
+    private readonly BlockPaint? _block;
+    private double _opacity = 1;   // what an enclosing PushOpacity asks of every draw, read from the lease each time
 
     public FilmstripOp(FilmstripCellDraw[] cells, SKImage[] pages, Rect film, Color boundary,
-        FilmstripProbe? probe = null, bool perCell = false, bool waitForGpu = false)
+        FilmstripProbe? probe = null, bool perCell = false, bool waitForGpu = false, BlockPaint? block = null)
     {
         _cells = cells;
         _pages = pages;
@@ -50,7 +52,8 @@ internal sealed class FilmstripOp : ICustomDrawOperation
         _probe = probe;
         _perCell = perCell;
         _waitForGpu = waitForGpu;
-        Bounds = film;
+        _block = block;
+        Bounds = block is null ? film : block.Body.Inflate(2);
     }
 
     public Rect Bounds { get; }
@@ -65,11 +68,14 @@ internal sealed class FilmstripOp : ICustomDrawOperation
         using (lease)
         {
             var gr = lease.GrContext;
+            _opacity = lease.CurrentOpacity;
             if (gr is not null && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
                 gr.SetResourceCacheLimit(GpuResourceCacheBytes);
             long start = Stopwatch.GetTimestamp();
+            if (_block is not null) DrawBlockBackdrop(lease.SkCanvas, _block);
             if (_perCell) DrawPerCell(lease.SkCanvas);
             else DrawBatched(lease.SkCanvas);
+            if (_block is not null) DrawBlockFront(lease.SkCanvas, _block);
             if (_waitForGpu) gr?.Flush(submit: true, synchronous: true);
             long elapsed = Stopwatch.GetTimestamp() - start;
             if (_probe is not null)
@@ -80,6 +86,49 @@ internal sealed class FilmstripOp : ICustomDrawOperation
                 _probe.Report(elapsed, resources, bytes, gr?.GetResourceCacheLimit() ?? 0);
             }
         }
+    }
+
+    private static SKRect ToSk(Avalonia.Rect r) => new((float)r.Left, (float)r.Top, (float)r.Right, (float)r.Bottom);
+
+    // In layout units under Avalonia's own transform and clip, with the same anti-aliasing Avalonia's drawing would use.
+    // Under a dimmed track every sprite is multiplied by white at the track's opacity.
+    private void DrawAtlas(SKCanvas canvas, SKImage page, SKRect[] sources, SKRotationScaleMatrix[] moves)
+    {
+        if (_opacity >= 1)
+        {
+            canvas.DrawAtlas(page, sources, moves, Nearest);
+            return;
+        }
+        var tint = new SKColor(255, 255, 255, (byte)(255 * _opacity));
+        var colors = new SKColor[sources.Length];
+        Array.Fill(colors, tint);
+        canvas.DrawAtlas(page, sources, moves, colors, SKBlendMode.Modulate, Nearest, new SKRect(-1e6f, -1e6f, 1e6f, 1e6f), null);
+    }
+
+    // Null at full opacity, so the common draw carries no paint at all.
+    private SKPaint? SpritePaint() => _opacity >= 1 ? null : new SKPaint { Color = new SKColor(255, 255, 255, (byte)(255 * _opacity)) };
+
+    private SKColor Dim(SKColor color) => _opacity >= 1 ? color : color.WithAlpha((byte)(color.Alpha * _opacity));
+
+    private void DrawBlockBackdrop(SKCanvas canvas, BlockPaint block)
+    {
+        using (var fill = new SKPaint { IsAntialias = true, Color = Dim(block.Fill) })
+            canvas.DrawRoundRect(ToSk(block.Body), (float)block.Radius, (float)block.Radius, fill);
+        if (block.Film is { } film)
+            using (var background = new SKPaint { IsAntialias = true, Color = Dim(block.FilmBackground) })
+                canvas.DrawRect(ToSk(film), background);
+    }
+
+    private void DrawBlockFront(SKCanvas canvas, BlockPaint block)
+    {
+        using (var outline = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = block.OutlineThickness, Color = Dim(block.Outline) })
+            canvas.DrawRoundRect(ToSk(block.Body), (float)block.Radius, (float)block.Radius, outline);
+        if (block.MarkXs.Length == 0) return;
+        // A dashed one-pixel line, two on and two off from the top, drawn as the little rectangles it is.
+        using var mark = new SKPaint { IsAntialias = true, Color = Dim(block.Mark) };
+        foreach (double x in block.MarkXs)
+            for (double y = block.MarkTop; y < block.MarkBottom; y += 4)
+                canvas.DrawRect(new SKRect((float)(x - 0.5), (float)y, (float)(x + 0.5), (float)Math.Min(y + 2, block.MarkBottom)), mark);
     }
 
     private readonly record struct Pixels(CellPlacement Place, FilmstripCellDraw Cell);
@@ -122,10 +171,10 @@ internal sealed class FilmstripOp : ICustomDrawOperation
                 moves.Add(new SKRotationScaleMatrix(1, 0, p.Place.SpriteLeft, p.Place.SpriteTop));
             }
             if (sources.Count > 0)
-                canvas.DrawAtlas(_pages[page], sources.ToArray(), moves.ToArray(), Nearest);
+                DrawAtlas(canvas, _pages[page], sources.ToArray(), moves.ToArray());
         }
 
-        using (var amber = new SKPaint { Color = Amber })
+        using (var amber = new SKPaint { Color = Dim(Amber) })
             foreach (var p in placed)
             {
                 if (!p.Cell.IsMerged) continue;
@@ -134,7 +183,7 @@ internal sealed class FilmstripOp : ICustomDrawOperation
             }
 
         int width = Math.Max(1, (int)Math.Round(scale));
-        using (var line = new SKPaint { Color = _boundary })
+        using (var line = new SKPaint { Color = Dim(_boundary) })
             foreach (var p in placed)
                 if (p.Cell.DrawsBoundary)
                     canvas.DrawRect(new SKRect(p.Place.CellLeft, p.Place.CellTop, p.Place.CellLeft + width, p.Place.CellBottom), line);
@@ -147,13 +196,13 @@ internal sealed class FilmstripOp : ICustomDrawOperation
         canvas.Save();
         var placed = Place(canvas, out double scale);
         canvas.ResetMatrix();
-        using var amber = new SKPaint { Color = Amber };
-        using var line = new SKPaint { Color = _boundary };
+        using var amber = new SKPaint { Color = Dim(Amber) };
+        using var line = new SKPaint { Color = Dim(_boundary) };
         foreach (var p in placed)
         {
             if (p.Place.HasSprite && p.Cell.Sprite.Page < _pages.Length)
                 canvas.DrawImage(_pages[p.Cell.Sprite.Page], SourceOf(p),
-                    new SKRect(p.Place.SpriteLeft, p.Place.SpriteTop, p.Place.SpriteRight, p.Place.SpriteBottom), Nearest);
+                    new SKRect(p.Place.SpriteLeft, p.Place.SpriteTop, p.Place.SpriteRight, p.Place.SpriteBottom), Nearest, SpritePaint());
             if (p.Cell.IsMerged)
             {
                 int barTop = Math.Max(p.Place.CellTop, p.Place.CellBottom - Math.Max(1, (int)Math.Round(2 * scale)));

@@ -14,6 +14,9 @@ internal sealed class TimelineFrameStats
     public int TextsCreated;
     public int FilmstripOps;
 
+    /// <summary>Block and backdrop draws issued one by one through the drawing context, which the single-operation paths exist to avoid.</summary>
+    public int LegacyDraws;
+
     /// <summary>Milliseconds the UI thread spent recording the frame (<c>Render</c>), not the raster that follows it.</summary>
     public double RecordMs;
 
@@ -28,6 +31,7 @@ internal sealed class TimelineFrameStats
         Markers = MarkersIssued = 0;
         TextsCreated = 0;
         FilmstripOps = 0;
+        LegacyDraws = 0;
         RecordMs = 0;
         AllocatedBytes = 0;
     }
