@@ -79,6 +79,17 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>The track whose header is selected, or null.</summary>
     public int? SelectedTrack { get; private set; }
 
+    /// <summary>Selects chain <paramref name="chain"/>, or else track <paramref name="track"/>'s header, as a click would. A place that no longer exists clears the selection.</summary>
+    public void Select(TimelineChainId? chain, int? track)
+    {
+        if (chain is { } id && _blocks.Any(b => b.Track == id.Track && b.Chain == id.Chain))
+            SetSelection(id, null);
+        else if (chain is null && track is { } header && header >= 0 && header < TrackCount)
+            SetSelection(null, header);
+        else
+            SetSelection(null, null);
+    }
+
     /// <summary>The context menu of the last right-click: a track header's, or a chain's.</summary>
     public ContextMenu Menu => _menu;
 

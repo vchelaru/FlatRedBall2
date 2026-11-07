@@ -314,6 +314,7 @@ public partial class MainWindow : Window
         WirePlaybackControls();
         WireTimelineTransport();
         WireKeyboard();
+        WireNavigation();
         WireTabBar();
         WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
@@ -652,7 +653,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    _ = ActivateTabAsync(captured);
+                    _ = ActivateTabFromStripAsync(captured);
                 }
 
                 _dragTab = null;
@@ -1752,6 +1753,13 @@ public partial class MainWindow : Window
     /// </summary>
     internal async Task OpenAndSelectChainAsync(string path, string chainName)
     {
+        var before = CaptureNavigationLocation();
+        await OpenAndSelectChainCoreAsync(path, chainName);
+        PushHistoryIfMoved(before);
+    }
+
+    private async Task OpenAndSelectChainCoreAsync(string path, string chainName)
+    {
         var filePath = new FilePath(path);
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == filePath) is { } open)
             await ActivateTabAsync(open);
@@ -2591,7 +2599,7 @@ public partial class MainWindow : Window
     // added to one of them (as HotkeyScope defaults).
     private MenuItem[] AppScopedMenuItems =>
     [
-        MenuNew, MenuNewSequence, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
+        MenuNavBack, MenuNavForward, MenuNew, MenuNewSequence, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
         MenuSettings, MenuShowDiagnostics, MenuShowShortcuts, MenuViewLog, MenuChatOnDiscord, MenuAbout,
     ];
 
@@ -7410,6 +7418,20 @@ public partial class MainWindow : Window
             },
             new()
             {
+                Id = "nav-back", Description = "Back", Category = "View",
+                Gestures = new[] { new HotkeyGesture("Left", Alt) },
+                Scope = HotkeyScope.App,
+                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
+            },
+            new()
+            {
+                Id = "nav-forward", Description = "Forward", Category = "View",
+                Gestures = new[] { new HotkeyGesture("Right", Alt) },
+                Scope = HotkeyScope.App,
+                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
+            },
+            new()
+            {
                 Id = "new", Description = "New Animation", Category = "File",
                 Gestures = new[] { new HotkeyGesture("N", Command) },
                 Scope = HotkeyScope.App,
@@ -7518,6 +7540,8 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuNew, "new");
         SetMenuGesture(MenuLoad, "load");
         SetMenuGesture(MenuSave, "save");
+        SetMenuGesture(MenuNavBack, "nav-back");
+        SetMenuGesture(MenuNavForward, "nav-forward");
         // Wireframe/Preview Zoom In (and Out) share one gesture — it's contextual to whichever
         // panel has focus — so both menu items truthfully show the same shortcut text.
         SetMenuGesture(MenuWireframeZoomIn, "panel-zoom-in");
