@@ -238,7 +238,11 @@ public partial class MainWindow
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
-            w.SequenceLibrary.ChipDragMoved += (chip, e) => w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+            w.SequenceLibrary.ChipDragMoved += (chip, e) =>
+            {
+                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+                w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(chip, TimelinePoint(e));
+            };
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
             {
                 w.SequenceTimeline.UpdateChipDrag(null, null);
