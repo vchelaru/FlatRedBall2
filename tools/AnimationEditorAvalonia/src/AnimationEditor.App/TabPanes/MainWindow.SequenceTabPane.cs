@@ -202,6 +202,7 @@ public partial class MainWindow
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+            w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
 
             _timer.Tick += (_, _) => OnTick();
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
@@ -354,6 +355,17 @@ public partial class MainWindow
             _document = null;
         }
 
+        // Collapsed sources persist per .seqj file. They are view state, so no undo entry and the file is not touched.
+        private void StoreCollapsedSources()
+        {
+            if (_document is null) return;
+            var key = _document.Path.Standardized;
+            var keys = _window.SequenceLibrary.CollapsedSources.Keys;
+            if (keys.Count == 0) _window._appSettings.CollapsedLibrarySources.Remove(key);
+            else _window._appSettings.CollapsedLibrarySources[key] = keys.ToList();
+            _window.SaveSettingsFile();
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
@@ -372,6 +384,9 @@ public partial class MainWindow
                 _refreshing = false;
             }
             _selectedIndex[_document.Path] = selected;
+            // The settings copy is current after every toggle, so reloading it on each refresh is safe.
+            _window.SequenceLibrary.CollapsedSources.Load(
+                _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
             _window.SequenceLibrary.Show(_document);
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
             _window.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
