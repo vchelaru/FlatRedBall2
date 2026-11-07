@@ -107,10 +107,32 @@ public sealed class TimelineViewport
     /// Multiplies the zoom by <paramref name="factor"/>, clamped, keeping the time under <paramref name="x"/> where it
     /// is (unless that would scroll before 0).
     /// </summary>
-    public void ZoomAround(double x, double factor)
+    public void ZoomAround(double x, double factor) => SetPixelsPerSecondAround(x, PixelsPerSecond * factor);
+
+    /// <summary>The zoom factor (1.0 = 100%) at <see cref="MinPixelsPerSecond"/>.</summary>
+    public const float MinZoom = (float)(MinPixelsPerSecond / DefaultPixelsPerSecond);
+
+    /// <summary>The zoom factor (1.0 = 100%) at <see cref="MaxPixelsPerSecond"/>.</summary>
+    public const float MaxZoom = (float)(MaxPixelsPerSecond / DefaultPixelsPerSecond);
+
+    /// <summary>The zoom factor, where 1.0 (100%) is <see cref="DefaultPixelsPerSecond"/>.</summary>
+    public float Zoom => (float)(PixelsPerSecond / DefaultPixelsPerSecond);
+
+    /// <summary>
+    /// The pixels per second for a zoom factor, with float noise rounded off so a preset lands on its exact value
+    /// (100% is exactly <see cref="DefaultPixelsPerSecond"/>) and the zoom limits on exactly the pixel limits.
+    /// </summary>
+    public static double PixelsPerSecondForZoom(float zoom) =>
+        Math.Clamp(Math.Round(zoom * DefaultPixelsPerSecond, 3), MinPixelsPerSecond, MaxPixelsPerSecond);
+
+    /// <summary>
+    /// Sets the zoom to <paramref name="pixelsPerSecond"/>, clamped, keeping the time under <paramref name="x"/>
+    /// where it is (unless that would scroll before 0).
+    /// </summary>
+    public void SetPixelsPerSecondAround(double x, double pixelsPerSecond)
     {
         double anchor = TimeAt(x);
-        PixelsPerSecond = Math.Clamp(PixelsPerSecond * factor, MinPixelsPerSecond, MaxPixelsPerSecond);
+        PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);
         ScrollSeconds = Math.Max(0, anchor - (x - HeaderWidth) / PixelsPerSecond);
         Changed?.Invoke();
     }
