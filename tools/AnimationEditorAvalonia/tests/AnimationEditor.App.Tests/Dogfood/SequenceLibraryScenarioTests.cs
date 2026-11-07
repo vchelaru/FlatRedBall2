@@ -2,6 +2,7 @@ using AnimationEditor.App.Controls;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -152,5 +153,137 @@ public class SequenceLibraryScenarioTests
         editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("hero.achx");
         editor.Tabs.ActiveTab!.IsPreview.ShouldBeFalse();
         editor.TabLabels.ShouldContain("boss.seqj");
+    }
+
+    // The title side of a header row, away from the remove button at its right edge.
+    private static Point OnHeaderTitle(AnimationEditorHarness editor, Control header)
+    {
+        Point center = editor.CenterOf(header);
+        return new Point(center.X - header.Bounds.Width / 4, center.Y);
+    }
+
+    private static MenuItem Item(ContextMenu menu, string header) =>
+        menu.Items.OfType<MenuItem>().Single(item => (string?)item.Header == header);
+
+    [AvaloniaFact]
+    public async Task RightClickingAChip_OffersGoToDefinition_WhichOpensTheSourceAndSelectsThatChain()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        string boss = WriteSeqj(editor, "chars/hero.achx");
+        await editor.OpenAsync(boss);
+        LibraryChipView run = Library(editor).ChipFor("chars/hero.achx", "Run")!;
+
+        editor.RightClick(run);
+
+        run.ContextMenu!.IsOpen.ShouldBeTrue();
+        run.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header).ShouldBe(new[] { "Go to Definition" });
+        editor.PickMenuItem(run.ContextMenu, "Go to Definition");
+        await editor.WaitUntilAsync(() => editor.Services.SelectedState.SelectedChain?.Name == "Run", TimeSpan.FromSeconds(5));
+
+        editor.TabLabels.ShouldBe(new[] { "boss.seqj", "hero.achx" });
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
+        editor.Services.SelectedState.SelectedChain!.Name.ShouldBe("Run");
+        editor.ErrorBannerText.ShouldBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task RightClickingASourceHeader_OffersGoToDefinitionAndRemove_AndGoToDefinitionOpensTheSource()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        string boss = WriteSeqj(editor, "chars/hero.achx");
+        await editor.OpenAsync(boss);
+        Control header = Library(editor).HeaderFor("chars/hero.achx")!;
+
+        editor.RightClickAt(OnHeaderTitle(editor, header));
+
+        header.ContextMenu!.IsOpen.ShouldBeTrue();
+        header.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header)
+            .ShouldBe(new[] { "Go to Definition", "Remove Source" });
+        editor.PickMenuItem(header.ContextMenu, "Go to Definition");
+        await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
+
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
+        editor.ErrorBannerText.ShouldBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task HeaderRemoveSource_DoesWhatTheXButtonDoes_AndCtrlZBringsItBack()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        string boss = WriteSeqj(editor, "chars/hero.achx");
+        await editor.OpenAsync(boss);
+        Control header = Library(editor).HeaderFor("chars/hero.achx")!;
+
+        editor.RightClickAt(OnHeaderTitle(editor, header));
+        editor.PickMenuItem(header.ContextMenu!, "Remove Source");
+
+        Library(editor).Sources.ShouldBeEmpty();
+        editor.UndoLabels.ShouldBe(new[] { "Remove Source 'hero.achx'" });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        Library(editor).ChipFor("chars/hero.achx", "Walk").ShouldNotBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task AMissingSourcesHeader_DisablesGoToDefinition_ButKeepsRemove()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteSeqj(editor, "gone.achx");
+        await editor.OpenAsync(boss);
+        Control header = Library(editor).HeaderFor("gone.achx")!;
+
+        editor.RightClickAt(OnHeaderTitle(editor, header));
+
+        header.ContextMenu!.IsOpen.ShouldBeTrue();
+        Item(header.ContextMenu, "Go to Definition").IsEnabled.ShouldBeFalse();
+        Item(header.ContextMenu, "Remove Source").IsEnabled.ShouldBeTrue();
+        editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
+    }
+
+    [AvaloniaFact]
+    public async Task RightClickingAChipMidDrag_OpensNoMenu_AndDoesNotBreakTheDrag()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        string boss = WriteSeqj(editor, "chars/hero.achx");
+        await editor.OpenAsync(boss);
+        LibraryChipView walk = Library(editor).ChipFor("chars/hero.achx", "Walk")!;
+        Point start = editor.CenterOf(walk);
+        Point away = new Point(start.X + 30, start.Y + 30);
+
+        editor.Window.MouseMove(start, RawInputModifiers.None);
+        editor.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(away, RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseDown(away, MouseButton.Right, RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseUp(away, MouseButton.Right, RawInputModifiers.LeftMouseButton);
+        editor.Layout();
+
+        walk.ContextMenu!.IsOpen.ShouldBeFalse();
+        editor.Window.MouseUp(away, MouseButton.Left, RawInputModifiers.None);
+        editor.Layout();
+        editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
+        editor.UndoLabels.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task GoToDefinitionFromTheLibrary_LeavesTheSequenceTabsUndoHistoryAlone()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        string boss = WriteSeqj(editor);
+        await editor.OpenAsync(boss);
+        await Drop(editor, Library(editor), Path.Combine(editor.ProjectFolder, "chars", "hero.achx"));
+        editor.UndoLabels.ShouldBe(new[] { "Add Source 'hero.achx'" });
+        LibraryChipView walk = Library(editor).ChipFor("chars/hero.achx", "Walk")!;
+
+        editor.RightClick(walk);
+        editor.PickMenuItem(walk.ContextMenu!, "Go to Definition");
+        await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
+        editor.ClickTab("boss.seqj");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        editor.UndoLabels.ShouldBe(new[] { "Add Source 'hero.achx'" });
     }
 }

@@ -91,6 +91,20 @@ public class SequenceDocumentInspectorEditTests
         missingSource.ShouldBe((null, "nowhere.achj is missing or could not be read."));
     }
 
+    [Fact]
+    public void LocateDefinition_WithNoChain_ReturnsTheSourcesPath_AndStillRefusesAMissingSource()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteHero(dir);
+        var document = Load(dir);
+
+        var whole = document.LocateDefinition(new SequenceChainReferenceSave { Source = "hero.achj" });
+        var missing = document.LocateDefinition(new SequenceChainReferenceSave { Source = "nowhere.achj" });
+
+        whole.ShouldBe((new AnimationEditor.Core.Paths.FilePath(Path.Combine(dir.Path, "hero.achj")).FullPath, null));
+        missing.ShouldBe((null, "nowhere.achj is missing or could not be read."));
+    }
+
     private static void WriteHero(TestHelpers.TempDir dir)
     {
         var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
