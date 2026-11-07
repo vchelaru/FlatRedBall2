@@ -61,6 +61,14 @@ internal sealed class FilmstripRenderer
         return cells;
     }
 
+    /// <summary>The frame's whole sprite fit in a square of <paramref name="size"/> pixels, for the hover card.</summary>
+    public Bitmap? Enlarged(SequenceDocument document, string source, AnimationChainSave chain, int frameIndex, int size)
+    {
+        if (Thumbnails is null || frameIndex < 0 || frameIndex >= chain.Frames.Count) return null;
+        var info = InfoFor(document, source, chain);
+        return Thumbnails.GetFrameThumbnail(info.Paths[frameIndex], chain.Frames[frameIndex], info.Colors[frameIndex], size, size);
+    }
+
     private ChainInfo InfoFor(SequenceDocument document, string source, AnimationChainSave chain)
     {
         if (_infos.TryGetValue(chain, out var info)) return info;
