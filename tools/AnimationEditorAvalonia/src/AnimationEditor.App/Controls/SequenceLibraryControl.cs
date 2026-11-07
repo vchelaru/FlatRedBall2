@@ -153,7 +153,7 @@ public sealed class SequenceLibraryControl : UserControl
     {
         var name = new TextBlock
         {
-            Text = source.IsMissing ? $"⚠ {source.Source}" : source.Source,
+            Text = source.IsMissing ? $"⚠ {SourceTitle.Format(source.Source)}" : SourceTitle.Format(source.Source),
             FontWeight = FontWeight.SemiBold, FontSize = 12,
             TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
         };

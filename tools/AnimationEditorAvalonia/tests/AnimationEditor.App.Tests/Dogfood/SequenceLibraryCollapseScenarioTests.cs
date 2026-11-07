@@ -85,6 +85,25 @@ public class SequenceLibraryCollapseScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task SourceHeader_ShowsTheFileName_AndTheFullRelativePathInItsTooltip()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "chars"));
+        editor.WritePng(Path.Combine("chars", "sheet.png"), 64, 64);
+        editor.WriteAchx(Path.Combine("chars", "hero.achx"), AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string boss = WriteSeqj(editor, "chars/hero.achx", "../OldCoil/Gone.achj");
+
+        await editor.OpenAsync(boss);
+
+        var texts = Library(editor).GetVisualDescendants().OfType<TextBlock>().ToList();
+        texts.Select(text => text.Text).ShouldContain("hero.achx");
+        texts.Select(text => text.Text).ShouldContain("⚠ Gone.achj");
+        ToolTip.GetTip(texts.Single(text => text.Text == "hero.achx")).ShouldBe("chars/hero.achx");
+        ToolTip.GetTip(texts.Single(text => text.Text == "⚠ Gone.achj")).ShouldBe("../OldCoil/Gone.achj");
+        SequenceListSave.FromFile(boss).Sources.ShouldBe(new[] { "chars/hero.achx", "../OldCoil/Gone.achj" });
+    }
+
+    [AvaloniaFact]
     public async Task AMissingSource_HasNoToggle_AndClickingItsHeaderDoesNothing()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
