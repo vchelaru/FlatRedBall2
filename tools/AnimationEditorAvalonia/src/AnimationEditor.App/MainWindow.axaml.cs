@@ -1747,9 +1747,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Opens (or focuses) the animation file at <paramref name="path"/> as a tab and selects the chain named
-    /// <paramref name="chainName"/> in it. An open tab is activated the way a click on the tab strip does, so
-    /// the file's own undo history comes back; selects nothing when the file has no such chain.
+    /// Opens (or focuses) the animation file at <paramref name="path"/> as a tab and focuses the chain named
+    /// <paramref name="chainName"/> in it as a double-click on its tree row does (selected, expanded, scrolled
+    /// into view, frames fitted in the wireframe). An open tab is activated the way a click on the tab strip
+    /// does, so the file's own undo history comes back; focuses nothing when the file has no such chain.
     /// </summary>
     internal async Task OpenAndSelectChainAsync(string path, string chainName)
     {
@@ -1775,7 +1776,23 @@ public partial class MainWindow : Window
 
         _selectedState.SelectedChain = reloadedChain;
         SyncTreeSelection();
+        var node = TreeBuilder.FindNodeForData(_treeRoots, reloadedChain);
+        if (node is not null)
+            node.IsExpanded = true;
+
+        // Layout and the selection's texture load come first: the wireframe has no size right after a
+        // tab switch, and fitting a chain to a view with no bitmap or size does nothing.
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        if (node is not null && AnimTree.TreeContainerFromItem(node) is TreeViewItem row)
+            row.BringIntoView();
+        FocusChain(reloadedChain);
     }
+
+    /// <summary>
+    /// The part of a chain-row double-click that the selecting click does not already do: move the
+    /// wireframe camera onto the chain's frames. Shared by the tree gesture and Go to Definition.
+    /// </summary>
+    private void FocusChain(AnimationChainSave chain) => WireframeCtrl.FitChainToView(chain);
 
     private void OnChainRegionChanged(AnimationChainSave chain)
     {
@@ -8251,7 +8268,7 @@ public partial class MainWindow : Window
                 // — see WireframeControl.ComputeHighlightedFrames. Double-click's only remaining
                 // job is moving the camera onto them (#716). No-op for an empty chain:
                 // FitChainToView already no-ops with nothing to fit.
-                WireframeCtrl.FitChainToView(chain);
+                FocusChain(chain);
                 return true;
             case AnimationFrameSave frame:
                 WireframeCtrl.CenterOnFrame(frame);
