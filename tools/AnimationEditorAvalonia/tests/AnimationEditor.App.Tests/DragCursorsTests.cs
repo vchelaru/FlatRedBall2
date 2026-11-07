@@ -20,4 +20,10 @@ public class DragCursorsTests
         DragCursors.StockCursorId(TimelineCursor.ResizeHorizontal).ShouldBe(32644);
         DragCursors.StockCursorId(TimelineCursor.Default).ShouldBe(32512);
     }
+
+    [Fact]
+    public void StockCursorId_PanIsSizeAll()
+    {
+        DragCursors.StockCursorId(TimelineCursor.Pan).ShouldBe(32646);
+    }
 }

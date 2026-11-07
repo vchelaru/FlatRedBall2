@@ -7,6 +7,9 @@ public enum TimelineCursor
 
     /// <summary>West-east double arrow: a chain's right edge can be dragged to change its loop count.</summary>
     ResizeHorizontal,
+
+    /// <summary>Four-way arrow: the timeline is being panned by a middle-button drag.</summary>
+    Pan,
 }
 
 public static class TimelineCursors
