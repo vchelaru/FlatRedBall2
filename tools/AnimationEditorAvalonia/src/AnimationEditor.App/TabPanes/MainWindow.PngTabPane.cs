@@ -104,6 +104,12 @@ public partial class MainWindow
 
         public void DeleteSelection() { }
 
+        public void CopySelection() { }
+
+        public void PasteSelection() { }
+
+        public bool CanCopyPaste => false;
+
         public void TogglePlayback() { }
 
         // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.

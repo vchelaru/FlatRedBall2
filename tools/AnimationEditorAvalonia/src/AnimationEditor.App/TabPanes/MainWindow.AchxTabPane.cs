@@ -162,6 +162,12 @@ public partial class MainWindow
 
         public void DeleteSelection() => _window.HandleDelete();
 
+        public void CopySelection() => _ = _window.HandleCopyAsync();
+
+        public void PasteSelection() => _ = _window.HandlePasteAsync();
+
+        public bool CanCopyPaste => true;
+
         public void TogglePlayback() => _window.PreviewCtrl.TogglePlayPause();
 
         public bool BrowserClickOpensPreview => true;

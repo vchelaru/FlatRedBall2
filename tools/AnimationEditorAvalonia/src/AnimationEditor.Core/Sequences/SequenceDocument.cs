@@ -140,10 +140,76 @@ public sealed class SequenceDocument
     /// <summary>Adds an empty sequence with a name no other sequence uses. Returns that name.</summary>
     public string AddSequence(IUndoManager undo)
     {
-        string name = UniqueName(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
+        string name = NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
         Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }),
             selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
+    }
+
+    /// <summary>
+    /// Inserts a deep copy of the sequence at <paramref name="index"/> right after it, with the next free name, and selects
+    /// it, as one undo entry. Returns the new name.
+    /// </summary>
+    public string DuplicateSequence(IUndoManager undo, int index)
+    {
+        string original = Save.Sequences[index].Name;
+        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name), original);
+        Edit(undo, $"Duplicate Sequence '{original}'", save =>
+        {
+            var copy = SequenceClipboard.Clone(save.Sequences[index]);
+            copy.Name = name;
+            save.Sequences.Insert(index + 1, copy);
+        }, selectBefore: index, selectAfter: index + 1);
+        return name;
+    }
+
+    /// <summary>The clipboard text for the sequence at <paramref name="index"/> (see <see cref="SequenceClipboard"/>).</summary>
+    public string CopySequence(int index) =>
+        SequenceClipboard.Write(Save.Sequences[index], Path.GetDirectoryContainingThis().FullPath);
+
+    /// <summary>
+    /// Pastes a copied sequence after the selected one (at the end when none is selected) with a free name, and selects it.
+    /// The sources it uses join this file's source list when not already there, all as one undo entry.
+    /// </summary>
+    public SequencePasteResult PasteSequence(IUndoManager undo, SequenceClipboardContent content)
+    {
+        int selected = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count ? SelectedSequence : Save.Sequences.Count - 1;
+        int insertAt = selected + 1;
+        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name),
+            string.IsNullOrWhiteSpace(content.Sequence.Name) ? DefaultSequenceName : content.Sequence.Name.Trim());
+        var errors = new List<string>();
+        var folder = Path.GetDirectoryContainingThis();
+        Edit(undo, $"Paste Sequence '{name}'", save =>
+        {
+            var pasted = SequenceClipboard.Clone(content.Sequence);
+            pasted.Name = name;
+            // Each source as this file writes it, keyed by where it points, so a source already listed (in any case) is reused.
+            var listed = new Dictionary<FilePath, string>();
+            foreach (string source in save.Sources)
+                listed.TryAdd(SourcePath(source), source);
+            var refused = new HashSet<FilePath>();
+            foreach (var reference in pasted.Tracks.SelectMany(track => track.Chains).Where(reference => reference.Source.Length > 0))
+            {
+                var file = new FilePath(SequenceClipboard.AbsolutePath(folder.FullPath, reference.Source));
+                if (!listed.TryGetValue(file, out string? written))
+                {
+                    written = file.RelativeTo(folder);
+                    if (file.Extension is not ("achx" or "achj") || file == Path)
+                    {
+                        // Kept as a reference the library shows as missing; only the library entry is refused.
+                        if (refused.Add(file)) errors.Add($"{file.NoPath} can't be a source. Only .achx and .achj files can.");
+                    }
+                    else
+                    {
+                        save.Sources.Add(written);
+                        listed[file] = written;
+                    }
+                }
+                reference.Source = written;
+            }
+            save.Sequences.Insert(insertAt, pasted);
+        }, selectBefore: SelectedSequence, selectAfter: insertAt);
+        return new SequencePasteResult(name, errors);
     }
 
     /// <summary>Renames the sequence at <paramref name="index"/>. Returns why it was refused, or null.</summary>
@@ -212,7 +278,7 @@ public sealed class SequenceDocument
             Edit(undo, $"Add '{chain}' to '{trackName}'", save => save.Sequences[sequence].Tracks[index].Chains.Add(reference));
             return;
         }
-        string name = UniqueName(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -226,7 +292,7 @@ public sealed class SequenceDocument
     /// </summary>
     public string AddTrack(IUndoManager undo, int sequence)
     {
-        string name = UniqueName(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -376,19 +442,6 @@ public sealed class SequenceDocument
         {
             SaveError = ex.Message;
         }
-    }
-
-    /// <summary>
-    /// The default name for a new sequence or track: <paramref name="baseName"/> when free, else the first free
-    /// "<paramref name="baseName"/> 2", "... 3", and so on. Free ignores case, and a gap left by a deletion is filled.
-    /// </summary>
-    private static string UniqueName(IEnumerable<string> usedNames, string baseName)
-    {
-        var used = usedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!used.Contains(baseName)) return baseName;
-        int suffix = 2;
-        while (used.Contains($"{baseName} {suffix}")) suffix++;
-        return $"{baseName} {suffix}";
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
