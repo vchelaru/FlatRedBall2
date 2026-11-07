@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Sequences;
@@ -41,8 +42,9 @@ public sealed class SequenceDocument
     public SequenceListSave Save { get; private set; }
 
     /// <summary>
-    /// The sequence the list has selected, or -1 for none. Adding, renaming and deleting a sequence move it to the
-    /// sequence that changed, and undo and redo move it the same way, so the list follows the history.
+    /// The sequence the list has selected, or -1 for none. Every edit moves it to the sequence it changed (an add,
+    /// rename or delete name theirs; any other edit is found by diffing), and undo and redo move it the same way, so
+    /// the list follows the history.
     /// </summary>
     public int SelectedSequence { get; set; }
 
@@ -275,7 +277,8 @@ public sealed class SequenceDocument
     {
         string after = Save.ToJsonString();
         if (after == before) return;
-        undo.Execute(new SnapshotCommand(this, description, before, after));
+        int? changed = ChangedSequence(before, after);
+        undo.Execute(new SnapshotCommand(this, description, before, after, changed, changed));
     }
 
     /// <summary>Puts <see cref="Save"/> back as it was at <paramref name="before"/>, with no undo entry.</summary>
@@ -321,7 +324,24 @@ public sealed class SequenceDocument
         mutate(copy);
         string after = copy.ToJsonString();
         if (after == before) return;
+        // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
+        if (selectBefore is null && selectAfter is null && ChangedSequence(before, after) is { } changed)
+            selectBefore = selectAfter = changed;
         undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter));
+    }
+
+    /// <summary>
+    /// The index of the first sequence that differs between two snapshots, or null when none does (a sources-only
+    /// edit) or the sequence count changed (an add or delete says which sequence it selects itself).
+    /// </summary>
+    private static int? ChangedSequence(string before, string after)
+    {
+        var was = JsonNode.Parse(before)!["sequences"]!.AsArray();
+        var now = JsonNode.Parse(after)!["sequences"]!.AsArray();
+        if (was.Count != now.Count) return null;
+        for (int i = 0; i < was.Count; i++)
+            if (!JsonNode.DeepEquals(was[i], now[i])) return i;
+        return null;
     }
 
     private void Restore(string json, int? selectedSequence = null)
