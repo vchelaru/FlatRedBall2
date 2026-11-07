@@ -131,26 +131,6 @@ public class TimelineLayoutTests
     }
 
     [Fact]
-    public void SnapStart_RoundsToTheStep_AndNeverGoesBeforeZero()
-    {
-        TimelineLayout.SnapStart(1.234).ShouldBe(1.25, 1e-9);
-        TimelineLayout.SnapStart(-0.4).ShouldBe(0);
-    }
-
-    [Fact]
-    public void EdgeDragLoops_MagnetIsAFixedPixelDistanceAtAnyZoom()
-    {
-        var reference = Ref("Walk", 0);
-        var block = TimelineLayout.Blocks(new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { reference } } } }, Cycle)[0];
-        double magnet = TimelineLayout.MagnetPixels;
-
-        // At 100 px/s the magnet reaches 0.08 s; at 1000 px/s only 0.008 s.
-        TimelineLayout.EdgeDragLoops(block, 2 + (magnet - 1) / 100, pixelsPerSecond: 100, nextStart: null).ShouldBe(2f);
-        TimelineLayout.EdgeDragLoops(block, 2 + (magnet + 1) / 1000, pixelsPerSecond: 1000, nextStart: null)
-            .ShouldBe((float)(2 + (magnet + 1) / 1000), 1e-5f);
-    }
-
-    [Fact]
     public void ShowsLabel_BlankBelowThirtySixPixels()
     {
         TimelineLayout.ShowsLabel(35.9).ShouldBeFalse();

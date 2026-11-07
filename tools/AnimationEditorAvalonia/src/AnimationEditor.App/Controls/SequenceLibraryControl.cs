@@ -493,8 +493,6 @@ public sealed class LibraryChipView : Border
         stack.Children.Add(name);
         Child = stack;
 
-        PointerEntered += (_, _) => SetHovered(true);
-        PointerExited += (_, _) => SetHovered(false);
         AttachedToVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated += OnTextureChanged; };
         DetachedFromVisualTree += (_, _) => { if (_thumbnails is not null) _thumbnails.PathInvalidated -= OnTextureChanged; };
         ShowFrame(0);
@@ -582,13 +580,16 @@ public sealed class LibraryChipView : Border
     public bool IsPlaying { get; private set; }
 
     /// <summary>True while the pointer is over the chip.</summary>
-    internal bool IsHovered { get; private set; }
+    internal bool IsHovered => IsPointerOver;
 
-    private void SetHovered(bool hovered)
+    // The outline and the hover playback both follow Avalonia's own IsPointerOver, which is re-derived from hit-testing as
+    // the layout changes, so a missed enter or exit cannot leave a chip stuck on or off. The outline does not depend on
+    // the chain having frames to play: it also tells the user the chip is interactive (draggable, has a menu).
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
-        IsHovered = hovered;
-        // A chain with one frame has nothing to play, so hovering it gives no highlight either.
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, hovered && Chip.Chain.Frames.Count >= 2 ? "Accent" : "LineBrush");
+        base.OnPropertyChanged(change);
+        if (change.Property != IsPointerOverProperty) return;
+        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver ? "Accent" : "LineBrush");
         _library.RefreshPlayback();
     }
 

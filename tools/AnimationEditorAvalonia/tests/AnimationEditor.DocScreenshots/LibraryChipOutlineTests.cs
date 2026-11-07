@@ -25,40 +25,28 @@ public class LibraryChipOutlineTests
     private const int CornerPixels = 6;
 
     [AvaloniaFact]
+    public void HoveredOneFrameChip_DrawsTheSameOutlineAsAManyFrameChip()
+    {
+        using var frame = HoverChip(frames: 1, out var chip, out var origin);
+        frame.Save(Path.Combine(ScreenshotOutput.ResolveFeatureDir("chip-outline-clip"), "chip-one-frame.png"));
+        int left = (int)Math.Round(origin.X);
+        int top = (int)Math.Round(origin.Y);
+        int bottom = top + (int)Math.Round(chip.Bounds.Height) - 1;
+        int right = left + (int)Math.Round(chip.Bounds.Width) - 1;
+        var pixels = Read(frame);
+
+        Assert.True(pixels((left + right) / 2, top) > 60, "no accent outline along the top edge of a one-frame chip");
+        Assert.True(pixels((left + right) / 2, bottom) > 60, "no accent outline along the bottom edge of a one-frame chip");
+        Assert.True(pixels(left, (top + bottom) / 2) > 60, "no accent outline along the left edge of a one-frame chip");
+    }
+
+    [AvaloniaFact]
     public void HoveredChip_OutlineCornersAreTheSameAtTopAndBottom()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "AEChipOutline", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
-        var chain = new AnimationChainSave { Name = "Walk" };
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "x.png", FrameLength = 0.1f });
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "x.png", FrameLength = 0.1f });
-        list.AnimationChains.Add(chain);
-        list.Save(Path.Combine(dir, "hero.achx"));
-        var seq = new SequenceListSave();
-        seq.Sources.Add("hero.achx");
-        string seqPath = Path.Combine(dir, "boss.seqj");
-        seq.Save(seqPath);
-        var document = SequenceDocument.Load(seqPath);
-
-        var library = new SequenceLibraryControl();
-        library.Show(document);
-        var chip = library.ChipFor("hero.achx", "Walk")!;
-        var host = new Border { Padding = new Thickness(Margin), Child = library, Width = 400, Height = 300 };
-        var window = new Window { Width = 400, Height = 300, Content = host };
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
-
-        var origin = chip.TranslatePoint(new Point(0, 0), window)!.Value;
-        window.MouseMove(new Point(origin.X + 40, origin.Y + 30));
-        Dispatcher.UIThread.RunJobs();
+        using var frame = HoverChip(frames: 2, out var chip, out var origin);
         Assert.True(chip.IsPlaying);
-
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        using var frame = window.CaptureRenderedFrame()!;
         string outDir = ScreenshotOutput.ResolveFeatureDir("chip-outline-clip");
         frame.Save(Path.Combine(outDir, Environment.GetEnvironmentVariable("CHIP_SHOT") ?? "chip.png"));
-
         int left = (int)Math.Round(origin.X);
         int top = (int)Math.Round(origin.Y);
         int bottom = top + (int)Math.Round(chip.Bounds.Height) - 1;
@@ -76,6 +64,40 @@ public class LibraryChipOutlineTests
             AssertSame(pixels, left + dx, top + dy, left + dx, bottom - dy, "left", dx, dy);
             AssertSame(pixels, right - dx, top + dy, right - dx, bottom - dy, "right", dx, dy);
         }
+    }
+
+    // Shows the library with one chip of a chain with <paramref name="frames"/> frames, moves the real pointer over it and renders.
+    private static WriteableBitmap HoverChip(int frames, out LibraryChipView chip, out Point origin)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "AEChipOutline", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        for (int i = 0; i < frames; i++)
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "x.png", FrameLength = 0.1f });
+        list.AnimationChains.Add(chain);
+        list.Save(Path.Combine(dir, "hero.achx"));
+        var seq = new SequenceListSave();
+        seq.Sources.Add("hero.achx");
+        string seqPath = Path.Combine(dir, "boss.seqj");
+        seq.Save(seqPath);
+        var document = SequenceDocument.Load(seqPath);
+
+        var library = new SequenceLibraryControl();
+        library.Show(document);
+        chip = library.ChipFor("hero.achx", "Walk")!;
+        var host = new Border { Padding = new Thickness(Margin), Child = library, Width = 400, Height = 300 };
+        var window = new Window { Width = 400, Height = 300, Content = host };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        origin = chip.TranslatePoint(new Point(0, 0), window)!.Value;
+        window.MouseMove(new Point(origin.X + 40, origin.Y + 30));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(chip.IsPointerOver);
+
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        return window.CaptureRenderedFrame()!;
     }
 
     private static void AssertSame(Func<int, int, int> redness, int x1, int y1, int x2, int y2, string side, int dx, int dy)

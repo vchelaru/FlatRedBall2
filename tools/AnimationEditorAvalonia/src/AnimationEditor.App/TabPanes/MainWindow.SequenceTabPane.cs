@@ -114,6 +114,11 @@ public partial class MainWindow
 
         public Task<bool> LoadAsync(TabEntry tab, TabLoad load)
         {
+            if (_documents.TryGetValue(tab.Path, out var known))
+            {
+                // A source edited in its own tab (or on disk) while this tab was away: read it again before showing.
+                known.ReloadChangedSources();
+            }
             if (!_documents.TryGetValue(tab.Path, out var document))
             {
                 try
@@ -297,13 +302,13 @@ public partial class MainWindow
             w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
-            w.SequenceTimeline.ContentChanged += ShowInspector;
+            w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
-                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e), e.KeyModifiers.HasFlag(KeyModifiers.Alt));
                 w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(chip, TimelinePoint(e));
             };
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
@@ -461,6 +466,26 @@ public partial class MainWindow
             w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack);
         }
 
+        /// <summary>
+        /// The one path from what the sequence says to what every view shows. The timeline rebuilds from the document
+        /// after each edit, undo, redo, load and sequence switch, and on every step of a chain drag, and raises
+        /// <see cref="SequenceTimelineControl.ContentChanged"/> each time; the inspector, the Loop toggle, the playhead
+        /// and the preview all follow from here, so none needs its own call after an edit.
+        /// </summary>
+        private void OnTimelineContentChanged()
+        {
+            var w = _window;
+            ShowInspector();
+            // Hiding the tab empties the timeline after detaching; the stopped readout stays as it was.
+            if (_document is null) return;
+            w.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
+            // An edit can shorten the sequence under the playhead. A drag step does not move it: Escape restores the
+            // length, and the playhead should be where the user left it.
+            if (!w.SequenceTimeline.IsDraggingChain)
+                _clock.Seek(_clock.Time, w.SequenceTimeline.SequenceLength);
+            ShowPlayhead();
+        }
+
         /// <summary>Opens the reference's source file as a tab and selects its chain there (none when the chain is empty). A missing source or chain shows the error banner instead.</summary>
         private async Task GoToDefinitionAsync(SequenceChainReferenceSave reference)
         {
@@ -568,8 +593,29 @@ public partial class MainWindow
 
         private void AddSequence()
         {
-            if (_document is null) return;
-            _document.AddSequence(_window._undoManager);
+            if (_document is not { } document) return;
+            string name = document.AddSequence(_window._undoManager);
+            // The new sequence starts from its beginning.
+            StopPlayback();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it. Posted so a
+            // closing menu has handed focus back first and cannot take it from the box.
+            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Scrolls the sequence called <paramref name="name"/> into view and swaps its name for the inline box, with the
+        /// text selected. Does nothing when the document or the list has moved on since the sequence was added.
+        /// </summary>
+        private void BeginRenameNewSequence(SequenceDocument document, string name)
+        {
+            var list = _window.SequenceList;
+            int index = _items.FindIndex(item => item.Name == name);
+            if (document != _document || index < 0 || index != list.SelectedIndex) return;
+            list.ScrollIntoView(index);
+            list.UpdateLayout();
+            if (list.ContainerFromIndex(index) is not ListBoxItem container) return;
+            _items[index].IsEditing = true;
+            container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(name);
         }
 
         /// <summary>
@@ -672,13 +718,8 @@ public partial class MainWindow
             _window.SequenceLibrary.CollapsedSources.Load(
                 _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
             _window.SequenceLibrary.Show(_document);
+            // Rebuilding the timeline raises ContentChanged, which refreshes the inspector, Loop toggle, playhead and preview.
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
-            // An undo or redo can change which sequence is selected without the list raising a selection change.
-            ShowInspector();
-            _window.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
-            // An edit can shorten the sequence under the playhead.
-            _clock.Seek(_clock.Time, _window.SequenceTimeline.SequenceLength);
-            ShowPlayhead();
             _window.UpdateStatusBar();
         }
     }

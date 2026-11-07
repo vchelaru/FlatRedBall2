@@ -18,7 +18,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// </summary>
 public static class SequenceTimeline
 {
-    /// <summary>The smallest loop count <see cref="LoopsForEdgeDrag"/> returns, so a chain never shrinks to nothing.</summary>
+    /// <summary>The smallest loop count <see cref="LoopsForEdge"/> returns, so a chain never shrinks to nothing.</summary>
     public const float MinimumLoops = 0.05f;
 
     /// <summary>Authored length in seconds: <paramref name="loops"/> cycles of <paramref name="cycleLength"/>. Never negative.</summary>
@@ -112,28 +112,18 @@ public static class SequenceTimeline
         return loop ? time % length : length;
     }
 
+    /// <summary>The earliest a chain's right edge can sit: <see cref="MinimumLoops"/> cycles after <paramref name="start"/>.</summary>
+    public static double MinimumEdge(double start, double cycleLength) => start + MinimumLoops * cycleLength;
+
     /// <summary>
-    /// The loop count for dragging a chain's right edge to <paramref name="edgeTime"/>. The count is free (fractions
-    /// allowed) and never below <see cref="MinimumLoops"/>. Within <paramref name="magnetSeconds"/> of a whole cycle or of
-    /// <paramref name="nextStart"/>, the edge is pulled to the nearer of the two. The edge may still go past
-    /// <paramref name="nextStart"/>: that overlap is allowed and cut at playback, so the magnet only guards against
-    /// making one by accident. Returns 1 when <paramref name="cycleLength"/> is not positive, since a missing chain has
-    /// nothing to measure.
+    /// The loop count that puts a chain's right edge at <paramref name="edgeTime"/>. The count is free (fractions
+    /// allowed) and never below <see cref="MinimumLoops"/>. Snapping the edge is <see cref="TimelineSnap"/>'s job; this
+    /// only converts. Returns 1 when <paramref name="cycleLength"/> is not positive, since a missing chain has nothing
+    /// to measure.
     /// </summary>
-    public static float LoopsForEdgeDrag(double start, double edgeTime, double cycleLength, double? nextStart, double magnetSeconds)
+    public static float LoopsForEdge(double start, double edgeTime, double cycleLength)
     {
         if (cycleLength <= 0) return 1;
-
-        double edge = edgeTime;
-        double best = magnetSeconds;
-        double whole = Math.Round((edgeTime - start) / cycleLength);
-        if (whole >= 1 && Math.Abs(start + whole * cycleLength - edgeTime) is var toWhole && toWhole <= best)
-        {
-            edge = start + whole * cycleLength;
-            best = toWhole;
-        }
-        if (nextStart is { } next && next > start && Math.Abs(next - edgeTime) < best)
-            edge = next;
-        return (float)Math.Max(MinimumLoops, (edge - start) / cycleLength);
+        return (float)Math.Max(MinimumLoops, (edgeTime - start) / cycleLength);
     }
 }
