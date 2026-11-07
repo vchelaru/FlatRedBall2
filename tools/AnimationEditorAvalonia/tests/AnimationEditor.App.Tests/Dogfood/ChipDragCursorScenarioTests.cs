@@ -40,35 +40,54 @@ public class ChipDragCursorScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
         var chip = editor.Control<SequenceLibraryControl>("SequenceLibrary").ChipFor("hero.achx", "Walk")!;
+        var timeline = editor.Control<SequenceTimelineControl>("SequenceTimeline");
         Point start = editor.CenterOf(chip);
-        chip.Cursor!.ShouldNotBeNull();
-        var resting = chip.Cursor;
+        Point offTimeline = editor.PointIn(chip, chip.Bounds.Width / 2, chip.Bounds.Height + 40);
+        Point ruler = editor.PointIn(timeline, 300, 5);
 
         editor.Window.MouseMove(start, RawInputModifiers.None);
+        var resting = CursorUnder(editor, start);
+        resting.ShouldNotBeNull();
         editor.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
-        editor.Window.MouseMove(editor.PointIn(chip, chip.Bounds.Width / 2, chip.Bounds.Height + 40), RawInputModifiers.LeftMouseButton);
-        chip.DragCursor.ShouldBe(ChipDragCursor.NotAllowed);
-        var notAllowed = chip.Cursor;
-        notAllowed.ShouldNotBe(resting);
 
-        editor.Window.MouseMove(Lane(editor, 0), RawInputModifiers.LeftMouseButton);
+        MoveTo(editor, offTimeline);
+        chip.DragCursor.ShouldBe(ChipDragCursor.NotAllowed);
+        CursorUnder(editor, offTimeline).ShouldBe(ChipDragGhost.CursorFor(ChipDragCursor.NotAllowed));
+
+        MoveTo(editor, Lane(editor, 0));
         chip.DragCursor.ShouldBe(ChipDragCursor.Copy);
-        chip.Cursor.ShouldNotBe(notAllowed);
-        chip.Cursor.ShouldNotBe(resting);
+        CursorUnder(editor, Lane(editor, 0)).ShouldBe(ChipDragGhost.CursorFor(ChipDragCursor.Copy));
         FloatingCardText(editor)!.ShouldContain("Add to Body");
 
-        editor.Window.MouseMove(Lane(editor, 1), RawInputModifiers.LeftMouseButton);
+        MoveTo(editor, Lane(editor, 1));
         FloatingCardText(editor)!.ShouldContain("Add as a new track");
+        CursorUnder(editor, Lane(editor, 1)).ShouldBe(ChipDragGhost.CursorFor(ChipDragCursor.Copy));
 
-        editor.Window.MouseMove(editor.PointIn(editor.Control<SequenceTimelineControl>("SequenceTimeline"), 300, 5), RawInputModifiers.LeftMouseButton);
+        MoveTo(editor, ruler);
         chip.DragCursor.ShouldBe(ChipDragCursor.NotAllowed);
+        CursorUnder(editor, ruler).ShouldBe(ChipDragGhost.CursorFor(ChipDragCursor.NotAllowed));
 
         editor.Window.MouseUp(Lane(editor, 0), MouseButton.Left, RawInputModifiers.None);
         editor.Layout();
         chip.DragCursor.ShouldBeNull();
-        chip.Cursor.ShouldBe(resting);
+        CursorUnder(editor, start).ShouldBe(resting);
+        CursorUnder(editor, ruler).ShouldNotBe(ChipDragGhost.CursorFor(ChipDragCursor.NotAllowed));
         FloatingCardText(editor).ShouldBeNull();
     }
+
+    // Two events: the first sets the feedback, and Avalonia re-hit-tests the pointer ahead of the next one, as the second event of a moving mouse does.
+    private static void MoveTo(AnimationEditorHarness editor, Point point)
+    {
+        editor.Window.MouseMove(point, RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseMove(new Point(point.X + 1, point.Y), RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseMove(point, RawInputModifiers.LeftMouseButton);
+    }
+
+    // What the OS shows is the cursor of the element under the pointer, not of the control that holds the capture.
+    private static Cursor? CursorUnder(AnimationEditorHarness editor, Point point) =>
+        editor.Window.InputHitTest(point) is Visual hit
+            ? hit.GetSelfAndVisualAncestors().OfType<InputElement>().Select(e => e.Cursor).FirstOrDefault(c => c is not null)
+            : null;
 
     // The ghost card is the only overlay child that reads "Add ..." or "Drop on a track".
     private static string? FloatingCardText(AnimationEditorHarness editor)

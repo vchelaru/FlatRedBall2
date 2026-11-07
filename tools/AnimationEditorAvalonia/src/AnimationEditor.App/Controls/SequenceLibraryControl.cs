@@ -220,8 +220,6 @@ public sealed class LibraryChipView : Border
     private readonly ThumbnailService? _thumbnails;
     private readonly SequenceLibraryControl _library;
     private static readonly Cursor GrabCursor = new(StandardCursorType.Hand);
-    private static readonly Cursor CopyCursor = new(StandardCursorType.DragCopy);
-    private static readonly Cursor NotAllowedCursor = new(StandardCursorType.No);
 
     private Point? _pressedAt;
     private bool _dragging;
@@ -291,14 +289,13 @@ public sealed class LibraryChipView : Border
         ShowDragFeedback(e);
     }
 
-    /// <summary>The cursor shown while a drag is in progress; <see cref="Cursor"/> on this control because it holds the pointer capture.</summary>
+    /// <summary>The cursor kind shown while a drag is in progress, or null. The cursor itself comes from <see cref="ChipDragGhost"/>'s sheets.</summary>
     internal ChipDragCursor? DragCursor { get; private set; }
 
     private void ShowDragFeedback(PointerEventArgs e)
     {
         if (_library.DragFeedback is not { } feedback) return;
         DragCursor = feedback.Cursor;
-        Cursor = feedback.Cursor == ChipDragCursor.Copy ? CopyCursor : NotAllowedCursor;
         _ghost ??= new ChipDragGhost(Chip.Chain.Name);
         _ghost.Update(this, _image.Source, feedback, e.GetPosition(this));
     }
@@ -327,7 +324,6 @@ public sealed class LibraryChipView : Border
         _pressedAt = null;
         _dragging = false;
         Opacity = 1;
-        Cursor = GrabCursor;
         DragCursor = null;
         _library.DragFeedback = null;
         _ghost?.Hide();
