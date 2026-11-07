@@ -179,7 +179,6 @@ public class SequenceZoomRestoreScenarioTests
         ZoomField(editor).StepUp();
         session.StoredSettings().TimelineZooms[session.Key(session.Boss)].ShouldBe(150);
         ZoomField(editor).StepDown();
-        ZoomField(editor).StepDown();
         session.StoredSettings().TimelineZooms.ShouldBeEmpty();
     }
 
