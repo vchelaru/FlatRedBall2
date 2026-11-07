@@ -22,8 +22,10 @@ public class SequenceNewerVersionScenarioTests
         }
         """;
 
+    private const string Notice = "Newer file format (v2). Unknown data is kept when you save.";
+
     private static void DismissNotice(AnimationEditorHarness editor) =>
-        editor.Click(editor.Notifications.ToastDismissBtn);
+        editor.Click(editor.Notifications.ErrorBannerDismissBtn);
 
     [AvaloniaFact]
     public async Task OpeningANewerSeqj_ShowsTheNotice_AndSavingKeepsTheVersionAndUnknownFields()
@@ -34,10 +36,8 @@ public class SequenceNewerVersionScenarioTests
 
         await editor.OpenAsync(boss);
 
-        editor.ToastText.ShouldNotBeNull();
-        editor.ToastText.ShouldContain("boss.seqj was written by a newer version of the editor");
-        editor.ToastText.ShouldContain("format version 2");
-        editor.ToastText.ShouldContain("understands up to 1");
+        editor.WarningBannerText.ShouldBe(Notice);
+        editor.ErrorBannerText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "Idle" });
 
         editor.Click(editor.Control<Button>("AddSequenceButton"));
@@ -56,19 +56,19 @@ public class SequenceNewerVersionScenarioTests
         File.WriteAllText(boss, NewerJson);
         string other = editor.WriteSeqj("other.seqj", "Walk");
         await editor.OpenAsync(boss);
-        // Longer than the 6 seconds an ordinary toast lasts.
-        editor.Wait(TimeSpan.FromSeconds(7));
-        editor.ToastText.ShouldNotBeNull();
+        // Longer than the 8 seconds an error banner lasts.
+        await editor.WaitAsync(TimeSpan.FromSeconds(9));
+        editor.WarningBannerText.ShouldBe(Notice);
 
         DismissNotice(editor);
-        editor.ToastText.ShouldBeNull();
+        editor.WarningBannerText.ShouldBeNull();
         await editor.OpenAsync(other);
         editor.ClickTab("boss.seqj");
         editor.ClickTab("other.seqj");
         editor.ClickTab("boss.seqj");
         editor.Click(editor.Control<Button>("AddSequenceButton"));
 
-        editor.ToastText.ShouldBeNull();
+        editor.WarningBannerText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -79,8 +79,9 @@ public class SequenceNewerVersionScenarioTests
 
         await editor.OpenAsync(boss);
 
-        editor.ToastText.ShouldBeNull();
+        editor.WarningBannerText.ShouldBeNull();
         editor.ErrorBannerText.ShouldBeNull();
+        editor.ToastText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -104,15 +105,14 @@ public class SequenceNewerVersionScenarioTests
         try
         {
             using AnimationEditorHarness editor = new AnimationEditorHarness(settingsRoot);
-            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.ToastText != null, TimeSpan.FromSeconds(5));
+            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.WarningBannerText != null, TimeSpan.FromSeconds(5));
             editor.Layout();
 
-            editor.ToastText.ShouldNotBeNull();
-            editor.ToastText.ShouldContain("boss.seqj");
+            editor.WarningBannerText.ShouldBe(Notice);
             DismissNotice(editor);
             editor.ClickTab("other.seqj");
             editor.ClickTab("boss.seqj");
-            editor.ToastText.ShouldBeNull();
+            editor.WarningBannerText.ShouldBeNull();
         }
         finally
         {

@@ -8,17 +8,11 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class NewerVersionNoticeTests
 {
     [Fact]
-    public void MessageFor_NewerFile_NamesTheFileAndBothVersions()
+    public void MessageFor_NewerFile_IsOneShortLineWithTheVersion()
     {
         var save = SequenceListSave.FromJsonString("""{ "version": 4, "sources": [], "sequences": [] }""");
 
-        string? message = NewerVersionNotice.MessageFor("boss.seqj", save);
-
-        message.ShouldNotBeNull();
-        message.ShouldContain("boss.seqj");
-        message.ShouldContain("format version 4");
-        message.ShouldContain("understands up to 1");
-        message.ShouldContain("kept when you save");
+        NewerVersionNotice.MessageFor(save).ShouldBe("Newer file format (v4). Unknown data is kept when you save.");
     }
 
     [Fact]
@@ -26,7 +20,7 @@ public class NewerVersionNoticeTests
     {
         var save = SequenceListSave.FromJsonString("""{ "version": 1, "sources": [], "sequences": [] }""");
 
-        NewerVersionNotice.MessageFor("boss.seqj", save).ShouldBeNull();
+        NewerVersionNotice.MessageFor(save).ShouldBeNull();
     }
 
     [Fact]
@@ -34,6 +28,6 @@ public class NewerVersionNoticeTests
     {
         var save = SequenceListSave.FromJsonString("""{ "sources": [], "sequences": [] }""");
 
-        NewerVersionNotice.MessageFor("boss.seqj", save).ShouldBeNull();
+        NewerVersionNotice.MessageFor(save).ShouldBeNull();
     }
 }

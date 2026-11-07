@@ -109,7 +109,12 @@ internal sealed class AnimationEditorHarness : IDisposable
     public EditorNotificationOverlay Notifications => Control<EditorNotificationOverlay>("Notifications");
 
     /// <summary>The error banner's text while it shows, else null.</summary>
-    public string? ErrorBannerText => Notifications.ErrorBanner.IsVisible ? Notifications.ErrorBannerText.Text : null;
+    public string? ErrorBannerText =>
+        Notifications.ErrorBanner.IsVisible && !Notifications.IsBannerWarning ? Notifications.ErrorBannerText.Text : null;
+
+    /// <summary>The warning banner's text while it shows, else null.</summary>
+    public string? WarningBannerText =>
+        Notifications.ErrorBanner.IsVisible && Notifications.IsBannerWarning ? Notifications.ErrorBannerText.Text : null;
 
     /// <summary>The toast's text while it shows, else null.</summary>
     public string? ToastText => Notifications.ToastPanel.IsVisible ? Notifications.ToastMessage.Text : null;

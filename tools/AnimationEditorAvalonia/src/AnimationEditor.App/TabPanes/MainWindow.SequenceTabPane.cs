@@ -131,8 +131,8 @@ public partial class MainWindow
                 _documents[tab.Path] = document;
                 // The one place a document is created (open, restore and back/forward all come through here), and
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
-                if (NewerVersionNotice.MessageFor(tab.DisplayName, document.Save) is { } notice)
-                    _window.ShowToast(notice, autoHide: false);
+                if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
+                    _window.Notifications.ShowWarningBanner(notice);
             }
 
             Detach();
