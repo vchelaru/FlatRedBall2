@@ -170,67 +170,71 @@ public class SequenceDocumentAuditTests
     }
 
     [Fact]
-    public void HiddenTracks_ToggleLeavesTheFileUndoHistoryAndSaveUntouched()
+    public void SetTrackVisible_Hide_IsOneUndoEntry_SavesVisibleFalse_AndUndoAndRedoRestoreIt()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir, "Idle");
         var undo = new UndoManager();
-        byte[] before = File.ReadAllBytes(document.Path.FullPath);
-        string json = document.Save.ToJsonString();
 
-        document.HiddenTracks.Toggle("Idle", "Body");
+        document.SetTrackVisible(undo, 0, 0, visible: false);
 
-        document.HiddenTracks.IsHidden("Idle", "Body").ShouldBeTrue();
-        undo.CanUndo.ShouldBeFalse();
-        File.ReadAllBytes(document.Path.FullPath).ShouldBe(before);
-        document.Save.ToJsonString().ShouldBe(json);
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Hide Track 'Body'" });
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        File.ReadAllText(document.Path.FullPath).ShouldContain("\"visible\": false");
+
+        undo.Undo();
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeTrue();
+        File.ReadAllText(document.Path.FullPath).ShouldNotContain("visible");
+
+        undo.Redo();
+        File.ReadAllText(document.Path.FullPath).ShouldContain("\"visible\": false");
     }
 
     [Fact]
-    public void RenameTrack_CarriesTheHiddenState_AndUndoAndRedoCarryItBack()
+    public void SetTrackVisible_Show_NamesItInTheUndoHistory_AndAnUnchangedValueRecordsNothing()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir, "Idle");
         var undo = new UndoManager();
-        document.HiddenTracks.Toggle("Idle", "Body");
+        document.SetTrackVisible(undo, 0, 0, visible: true);
+        undo.CanUndo.ShouldBeFalse();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+
+        document.SetTrackVisible(undo, 0, 0, visible: true);
+
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Hide Track 'Body'", "Show Track 'Body'" });
+        File.ReadAllText(document.Path.FullPath).ShouldNotContain("visible");
+    }
+
+    [Fact]
+    public void ShowAllTracks_ShowsEveryHiddenTrackOfTheSequenceInOneUndoEntry()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+        document.SetTrackVisible(undo, 0, 1, visible: false);
+
+        document.ShowAllTracks(undo, 0);
+
+        document.Save.Sequences[0].Tracks.Select(t => t.Visible).ShouldBe(new[] { true, true });
+        undo.UndoHistory.Last().Description.ShouldBe("Show All Tracks");
+        undo.Undo();
+        document.Save.Sequences[0].Tracks.Select(t => t.Visible).ShouldBe(new[] { false, false });
+    }
+
+    [Fact]
+    public void RenameTrack_OfAHiddenTrack_KeepsItHidden()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
 
         document.RenameTrack(undo, 0, 0, "Torso");
-        bool afterRename = document.HiddenTracks.IsHidden("Idle", "Torso");
-        undo.Undo();
-        bool afterUndo = document.HiddenTracks.IsHidden("Idle", "Body");
-        undo.Redo();
 
-        afterRename.ShouldBeTrue();
-        afterUndo.ShouldBeTrue();
-        document.HiddenTracks.Entries.Select(e => (e.Sequence, e.Track)).ShouldBe(new[] { ("Idle", "Torso") });
-    }
-
-    [Fact]
-    public void RenameSequence_CarriesTheHiddenState_AndUndoCarriesItBack()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, "Idle");
-        var undo = new UndoManager();
-        document.HiddenTracks.Toggle("Idle", "Body");
-
-        document.RenameSequence(undo, 0, "Charge");
-        bool afterRename = document.HiddenTracks.IsHidden("Charge", "Body");
-        undo.Undo();
-
-        afterRename.ShouldBeTrue();
-        document.HiddenTracks.IsHidden("Idle", "Body").ShouldBeTrue();
-    }
-
-    [Fact]
-    public void DeleteTrack_PrunesItsHiddenState()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, "Idle");
-        document.HiddenTracks.Toggle("Idle", "Body");
-        document.HiddenTracks.Toggle("Idle", "Arms");
-
-        document.DeleteTrack(new UndoManager(), 0, 0);
-
-        document.HiddenTracks.Entries.Select(e => e.Track).ShouldBe(new[] { "Arms" });
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Visible.ShouldBeFalse();
     }
 }

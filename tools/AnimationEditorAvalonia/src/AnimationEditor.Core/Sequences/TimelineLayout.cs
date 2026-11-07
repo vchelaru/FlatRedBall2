@@ -75,11 +75,13 @@ public static class TimelineLayout
     }
 
     /// <summary>
-    /// The eye toggle in a track header: centered on the top band of the lane (the label strip's row), so it sits in
-    /// the same place whatever the lane's height. The name starts at <see cref="HeaderNameLeft"/>, past it.
+    /// The eye toggle and the name in a track header share one line, centered on the lane's base body
+    /// (<see cref="TimelineViewport.LaneHeight"/>), not on the whole lane: a lane with an event row is taller, and
+    /// centering on it would move the pair down on those lanes only. The name starts at <see cref="HeaderNameLeft"/>, past the eye.
     /// </summary>
+    public const double HeaderCenterY = TimelineViewport.LaneHeight / 2;
     public const double EyeCenterX = 11;
-    public const double EyeCenterY = BodyTop + LabelHeight / 2;
+    public const double EyeCenterY = HeaderCenterY;
     public const double EyeHitHalf = 7;
     public const double HeaderNameLeft = 24;
 

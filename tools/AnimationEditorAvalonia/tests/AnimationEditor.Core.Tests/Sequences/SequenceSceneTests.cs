@@ -140,26 +140,23 @@ public class SequenceSceneTests
     public void At_AHiddenTrack_IsLeftOut_AndTheOtherTrackStays()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir,
-            Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1)),
-            Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
-        var hidden = new HiddenTrackSet();
-        hidden.Toggle("Attack", "Fx");
+        var fx = Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1));
+        fx.Visible = false;
+        var document = Load(dir, fx, Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
 
-        SequenceScene.At(document, 0, 0.1, hidden).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
+        SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
     }
 
     [Fact]
     public void At_EveryTrackHidden_IsEmpty()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir,
-            Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1)),
-            Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
-        var hidden = new HiddenTrackSet();
-        hidden.Toggle("Attack", "Fx");
-        hidden.Toggle("Attack", "Body");
+        var fx = Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1));
+        var body = Track("Body", 1, ("body/body.achj", "Walk", 0, 1));
+        fx.Visible = false;
+        body.Visible = false;
+        var document = Load(dir, fx, body);
 
-        SequenceScene.At(document, 0, 0.1, hidden).ShouldBeEmpty();
+        SequenceScene.At(document, 0, 0.1).ShouldBeEmpty();
     }
 }

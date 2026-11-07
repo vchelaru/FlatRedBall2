@@ -145,6 +145,7 @@ public class SequenceListSave
         };
         // Written only when set, so the common unflipped track stays short.
         if (track.FlipHorizontal) result["flipHorizontal"] = true;
+        if (!track.Visible) result["visible"] = false;
         result["chains"] = chains;
         return AppendUnknown(result, track.UnknownProperties);
     }
@@ -198,8 +199,9 @@ public class SequenceListSave
             Y = node.Float("y"),
             Z = node.Int("z"),
             FlipHorizontal = node.Bool("flipHorizontal"),
+            Visible = node.Bool("visible", fallback: true),
         };
-        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "chains");
+        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "chains");
         foreach (var chain in node.Objects("chains"))
         {
             var reference = new SequenceChainReferenceSave
