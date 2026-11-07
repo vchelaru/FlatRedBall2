@@ -913,7 +913,10 @@
                     <TabItem x:Name="InspectorTab" Header="Inspector">
                         <Border x:Name="InspectorTabContent"
                                 Background="{DynamicResource BgPanel}">
-                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          <Grid>
+                            <!-- On a .seqj tab SequenceInspector replaces this (SequenceTabPane). -->
+                            <ScrollViewer x:Name="AchxInspector"
+                                          HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto">
                                 <StackPanel Margin="0" Spacing="0">
 
@@ -1439,6 +1442,8 @@
 
                                 </StackPanel>
                             </ScrollViewer>
+                            <controls:SequenceInspectorControl x:Name="SequenceInspector" IsVisible="False" />
+                          </Grid>
                         </Border>
                     </TabItem>
 
