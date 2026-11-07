@@ -140,7 +140,7 @@ public sealed class SequenceDocument
     /// <summary>Adds an empty sequence with a name no other sequence uses. Returns that name.</summary>
     public string AddSequence(IUndoManager undo)
     {
-        string name = UniqueName(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
+        string name = NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
         Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }),
             selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
@@ -278,7 +278,7 @@ public sealed class SequenceDocument
             Edit(undo, $"Add '{chain}' to '{trackName}'", save => save.Sequences[sequence].Tracks[index].Chains.Add(reference));
             return;
         }
-        string name = UniqueName(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -292,7 +292,7 @@ public sealed class SequenceDocument
     /// </summary>
     public string AddTrack(IUndoManager undo, int sequence)
     {
-        string name = UniqueName(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
@@ -442,19 +442,6 @@ public sealed class SequenceDocument
         {
             SaveError = ex.Message;
         }
-    }
-
-    /// <summary>
-    /// The default name for a new sequence or track: <paramref name="baseName"/> when free, else the first free
-    /// "<paramref name="baseName"/> 2", "... 3", and so on. Free ignores case, and a gap left by a deletion is filled.
-    /// </summary>
-    private static string UniqueName(IEnumerable<string> usedNames, string baseName)
-    {
-        var used = usedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!used.Contains(baseName)) return baseName;
-        int suffix = 2;
-        while (used.Contains($"{baseName} {suffix}")) suffix++;
-        return $"{baseName} {suffix}";
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
