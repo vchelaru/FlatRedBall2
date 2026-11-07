@@ -317,6 +317,22 @@ public class SequenceTimelineScenarioTests
         return point;
     }
 
+    [AvaloniaFact]
+    public async Task HoveringAnEdge_SetsTheControlsCursor_AndLeavingItClearsTheCursor()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        editor.Layout();
+        double bodyY = timeline.Viewport.LaneTop(0) + (TimelineLayout.BodyTop + TimelineLayout.BodyBottom) / 2;
+
+        Hover(editor, EdgeX(timeline, 0.5), bodyY);
+        timeline.Cursor.ShouldNotBeNull("the resize arrow is the control's own cursor while hovering an edge");
+        Hover(editor, EdgeX(timeline, 0.25), bodyY);
+        timeline.Cursor.ShouldBeNull("over the body the control inherits the default arrow");
+    }
+
     [AvaloniaTheory]
     [InlineData(40)]
     [InlineData(120)]

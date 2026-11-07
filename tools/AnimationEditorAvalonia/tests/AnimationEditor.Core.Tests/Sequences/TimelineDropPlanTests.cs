@@ -92,6 +92,29 @@ public class TimelineDropPlanTests
     }
 
     [Fact]
+    public void For_WhenScrolledAlong_StartsAtTheTimeUnderThePointer_NotTheTimeFromTheOrigin()
+    {
+        var viewport = new TimelineViewport();
+        viewport.ScrollHorizontally(240);
+        var (x, y) = Point(viewport, 3.0, row: 0);
+
+        var plan = TimelineDropPlan.For(viewport, ViewWidth, 1, x, y, 0.5);
+
+        plan.Kind.ShouldBe(TimelineDropKind.Track);
+        plan.Start.ShouldBe(3.0, 1e-9);
+        plan.Left.ShouldBe(x, 1e-9);
+    }
+
+    [Fact]
+    public void For_AtExactlyTheRightEdge_StillTargetsTheLane()
+    {
+        var viewport = new TimelineViewport();
+        double y = viewport.LaneTop(0) + TimelineViewport.LaneHeight / 2;
+
+        TimelineDropPlan.For(viewport, ViewWidth, 1, ViewWidth, y, 0.5).Kind.ShouldBe(TimelineDropKind.Track);
+    }
+
+    [Fact]
     public void For_AtTheLeftEdgeOfTheLanes_StartsAtZero()
     {
         var viewport = new TimelineViewport();
