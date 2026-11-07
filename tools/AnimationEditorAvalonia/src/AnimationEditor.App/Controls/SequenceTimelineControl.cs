@@ -26,11 +26,12 @@ public readonly record struct TimelineChainId(int Track, int Chain);
 /// host moves its clock on <see cref="Scrubbed"/> and sets <see cref="Playhead"/> back. Geometry and hit-testing live in
 /// <see cref="TimelineViewport"/> and <see cref="TimelineLayout"/>.
 /// </summary>
-public sealed class SequenceTimelineControl : Control, IZoomTarget
+public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 {
     private const double DragThresholdPixels = 3;
     private const double WheelZoomStep = 1.15;
     private const double WheelScrollPixels = 60;
+    private const double RenameBoxHeight = 24;
 
     private enum DragKind { None, Pending, Move, Edge }
 
@@ -168,6 +169,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         _document = document;
         _sequenceIndex = sequenceIndex;
         _undo = undo;
+        _filmstrip.Invalidate();
         Rebuild();
     }
 
@@ -249,7 +251,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, TimelineViewport.LaneHeight - 12));
+        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         return default;
     }
 
@@ -257,8 +259,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     {
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
-            double height = TimelineViewport.LaneHeight - 12;
-            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + 6, TimelineViewport.HeaderWidth - 4, height));
+            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + (TimelineViewport.LaneHeight - RenameBoxHeight) / 2,
+                TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         }
         return finalSize;
     }
@@ -721,6 +723,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         else
         {
             context.FillRectangle(new SolidColorBrush(color, 0.35), body, 3);
+            var film = new Rect(left, top + TimelineLayout.FilmTop, body.Width, TimelineLayout.FilmHeight);
+            context.FillRectangle(Brush("BgCanvas"), film);
+            DrawFilmstrip(context, block, film);
         }
         context.DrawRectangle(null, new Pen(selected ? Brush("Ink") : new SolidColorBrush(color), selected ? 2 : 1), body, 3, 3);
 
@@ -728,20 +733,27 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         if (block.CycleLength > 0)
         {
             var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
+            double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
             for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
             {
                 double x = Snap(left + k * block.CycleLength * pps);
-                context.DrawLine(mark, new Point(x, body.Top + 2), new Point(x, body.Bottom - 2));
+                context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
             }
         }
 
+        if (!TimelineLayout.ShowsLabel(body.Width)) return;
         string label = block.IsMissing ? $"⚠ {block.Reference.Chain} (missing)" : block.Reference.Chain;
         if (!block.IsMissing && Math.Abs(block.Reference.Loops - 1) > 1e-6)
             label += $"  ×{block.Reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
             var text = Text(label, 11, Brush("Ink"));
-            context.DrawText(text, new Point(body.X + 6, body.Y + (body.Height - text.Height) / 2));
+            text.MaxTextWidth = Math.Max(1, body.Width - 12);
+            text.MaxLineCount = 1;
+            text.Trimming = TextTrimming.CharacterEllipsis;
+            // A missing chain has no filmstrip, so its label centers in the whole block.
+            double strip = block.IsMissing ? body.Height : TimelineLayout.LabelHeight;
+            context.DrawText(text, new Point(body.X + 6, body.Y + (strip - text.Height) / 2));
         }
     }
 
