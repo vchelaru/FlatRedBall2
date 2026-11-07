@@ -40,6 +40,33 @@ public class SequenceTabScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ReadOnlySeqj_TakesTheEdit_ShowsAutoSaveFailed_AndSavesOnceWritable()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "Sequence");
+        await editor.OpenAsync(boss);
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
+        UnusualProjectScenarioTests.MakeUnwritable(boss);
+        try
+        {
+            editor.Click(editor.Control<Button>("AddSequenceButton"));
+
+            editor.SequenceNames.ShouldBe(new[] { "Sequence", "Sequence 2" });
+            editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
+            SavedSequenceNames(boss).ShouldBe(new[] { "Sequence" });
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(boss);
+        }
+
+        editor.Click(editor.Control<Button>("AddSequenceButton"));
+
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On", "the next edit saves again once the file is writable");
+        SavedSequenceNames(boss).ShouldBe(new[] { "Sequence", "Sequence 2", "Sequence 3" });
+    }
+
+    [AvaloniaFact]
     public async Task AddSequence_SavesTheFile_AndCtrlZTakesItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

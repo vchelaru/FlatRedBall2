@@ -653,7 +653,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double laneHeight = TimelineViewport.LaneHeight;
         var line = new Pen(Brush("LineBrush"), 1);
         var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
-        double step = TickStep(Viewport.PixelsPerSecond);
+        double step = TimelineRuler.TickStep(Viewport.PixelsPerSecond);
         double firstTick = Math.Floor(Viewport.ScrollSeconds / step) * step;
         var drop = DropPreview ?? TimelineDropPlan.None;
 
@@ -745,7 +745,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 double x = Snap(Viewport.XAt(t));
                 context.DrawLine(tick, new Point(x, ruler - 7), new Point(x, ruler));
-                context.DrawText(Text(FormatTick(t, step), 10, Brush("InkMid")), new Point(x + 3, 3));
+                context.DrawText(Text(TimelineRuler.FormatTick(t, step), 10, Brush("InkMid")), new Point(x + 3, 3));
             }
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(0, ruler - 0.5), new Point(size.Width, ruler - 0.5));
@@ -879,16 +879,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 context.DrawLine(pen, new Point(x, rect.Bottom), new Point(x + rect.Height, rect.Top));
         }
     }
-
-    /// <summary>Seconds between ruler ticks: the smallest step that leaves at least 60 pixels between labels.</summary>
-    internal static double TickStep(double pixelsPerSecond)
-    {
-        double[] steps = { 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60 };
-        return steps.FirstOrDefault(step => step * pixelsPerSecond >= 60, 120);
-    }
-
-    private static string FormatTick(double time, double step) =>
-        (step < 1 ? time.ToString("0.##", CultureInfo.InvariantCulture) : Math.Round(time).ToString(CultureInfo.InvariantCulture)) + "s";
 
     private static double Snap(double x) => Math.Round(x) + 0.5;
 
