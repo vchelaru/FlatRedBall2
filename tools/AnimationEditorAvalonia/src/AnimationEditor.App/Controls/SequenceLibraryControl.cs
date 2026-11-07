@@ -49,7 +49,18 @@ public sealed class SequenceLibraryControl : UserControl
         };
         BindResource(title, TextBlock.ForegroundProperty, "InkMid");
         _autoplayToggle.Classes.Add("toolbarToggle");
-        _autoplayToggle.Content = "▶ All";
+        // The ▶ character falls back to another font, whose taller line box pushed a text label up, so the play mark is
+        // a drawn triangle (PathIcon takes the button's foreground in every state) and only "All" is text.
+        _autoplayToggle.Content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                new PathIcon { Data = Geometry.Parse("M0,0 L8,4 L0,8 Z"), Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center },
+                new TextBlock { Text = "All", VerticalAlignment = VerticalAlignment.Center },
+            },
+        };
+        _autoplayToggle.VerticalContentAlignment = VerticalAlignment.Center;
         _autoplayToggle.FontSize = 11;
         _autoplayToggle.Height = 22;
         _autoplayToggle.Padding = new Thickness(8, 0);
