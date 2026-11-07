@@ -236,7 +236,9 @@ public sealed class LibraryChipView : Border
         SequenceLibraryControl.BindResource(this, BackgroundProperty, "BgRail");
         ToolTip.SetTip(this, chip.Chain.Name);
 
-        var thumb = new Border { Height = 46, Child = _image };
+        // The thumbnail's square corners would paint over the outline's rounded top corners (ClipToBounds clips to the
+        // outer radius, which still leaves the stroke exposed), so it takes the inner radius: outer 5 minus the 1px border.
+        var thumb = new Border { Height = 46, CornerRadius = new CornerRadius(4, 4, 0, 0), Child = _image };
         SequenceLibraryControl.BindResource(thumb, BackgroundProperty, "BgCanvas");
         var name = new TextBlock
         {
