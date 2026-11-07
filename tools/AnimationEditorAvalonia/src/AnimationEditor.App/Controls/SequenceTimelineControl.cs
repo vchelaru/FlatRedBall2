@@ -21,7 +21,8 @@ public readonly record struct TimelineChainId(int Track, int Chain);
 /// <summary>
 /// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a lane per track with its chains, and a dashed row that
 /// makes a new track. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
-/// count; drop a library chip to add a chain. Each gesture is one undo entry, recorded on release. Ctrl+wheel zooms
+/// count; drop a library chip to add a chain; drag a track header up or down to reorder the lanes (the bottom lane
+/// draws in front, see <see cref="TrackReorder"/>). Each gesture is one undo entry, recorded on release. Ctrl+wheel zooms
 /// around the pointer; the wheel scrolls (Shift+wheel always sideways). Pressing or dragging on the ruler scrubs: the
 /// host moves its clock on <see cref="Scrubbed"/> and sets <see cref="Playhead"/> back. Geometry and hit-testing live in
 /// <see cref="TimelineViewport"/> and <see cref="TimelineLayout"/>.
@@ -34,7 +35,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private readonly WheelZoomAccumulator _wheelZoom = new();
     private const double RenameBoxHeight = 24;
 
-    private enum DragKind { None, Pending, Move, Edge }
+    private enum DragKind { None, Pending, Move, Edge, TrackPending, Track }
 
     private readonly ContextMenu _menu = new();
     private SequenceDocument? _document;
@@ -51,6 +52,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private double _dragOriginEdge;
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
+
+    // A track-header drag: which lane, the gap the pointer points at, and the pointer to release on Escape.
+    private int _dragTrack;
+    private int _trackSlot;
+    private IPointer? _dragPointer;
 
     private InlineRenameBox? _renameBox;
     private int _renameTrack;
@@ -100,6 +106,18 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         else
             SetSelection(null, null);
     }
+
+    /// <summary>The lane whose header is being dragged to reorder it, or null. A press that has not moved past the threshold is a click, not a drag.</summary>
+    public int? DraggedTrack => _drag == DragKind.Track ? _dragTrack : null;
+
+    /// <summary>
+    /// The gap the dragged header would drop into, 0 above the first lane to the track count below the last, or null
+    /// when no header is dragged or the gap is beside the dragged lane itself (dropping there changes nothing).
+    /// </summary>
+    public int? TrackDropSlot => _drag == DragKind.Track && _trackSlot != _dragTrack && _trackSlot != _dragTrack + 1 ? _trackSlot : null;
+
+    /// <summary>The y of the line marking <see cref="TrackDropSlot"/>, in this control's coordinates.</summary>
+    public double? TrackDropLineY => TrackDropSlot is { } slot ? TrackReorder.SlotY(Viewport, slot) : null;
 
     /// <summary>The context menu of the last right-click: a track header's, or a chain's.</summary>
     public ContextMenu Menu => _menu;
@@ -181,6 +199,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _document = document;
         _sequenceIndex = sequenceIndex;
         _undo = undo;
+        // A track move, or its undo or redo, names the track to keep selected: the lane it ended up in.
+        if (document?.TakeTrackSelection() is { } moved && moved < TrackCount)
+            SetSelection(null, moved);
         _filmstrip.Invalidate();
         InvalidateEvents();
         Rebuild();
@@ -405,7 +426,20 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             SetSelection(null, row.Track);
             InvalidateVisual();
-            if (e.ClickCount == 2) BeginRenameTrack(row.Track);
+            if (e.ClickCount == 2)
+            {
+                BeginRenameTrack(row.Track);
+                return;
+            }
+            // A drag of the header reorders the lanes once it passes the movement threshold; until then it is a click.
+            _drag = DragKind.TrackPending;
+            _pressedPart = TimelineHitPart.Body;
+            _pressPoint = point;
+            _dragTrack = row.Track;
+            _trackSlot = row.Track;
+            _dragPointer = e.Pointer;
+            e.Pointer.Capture(this);
+            ShowCursor(point);
             return;
         }
 
@@ -451,6 +485,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         var point = e.GetPosition(this);
+        if (_drag is DragKind.TrackPending or DragKind.Track)
+        {
+            MoveTrackDrag(point);
+            return;
+        }
         ShowCursor(point);
         if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         if (_drag == DragKind.Pending)
@@ -493,6 +532,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         if (_drag == DragKind.None) return;
+        // Commit before releasing the capture: releasing it raises CaptureLost, which cancels a track drag.
+        if (_drag is DragKind.TrackPending or DragKind.Track)
+        {
+            EndDrag();
+            e.Pointer.Capture(null);
+            return;
+        }
         e.Pointer.Capture(null);
         EndDrag();
     }
@@ -501,7 +547,31 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerCaptureLost(e);
         _scrubbing = false;
+        // Losing the pointer mid-drag (the window deactivated) abandons a reorder rather than dropping it somewhere.
+        if (_drag is DragKind.TrackPending or DragKind.Track)
+        {
+            ResetDrag();
+            ReleaseCursor();
+            InvalidateVisual();
+            return;
+        }
         EndDrag();
+    }
+
+    private void MoveTrackDrag(Point point)
+    {
+        if (_drag == DragKind.TrackPending)
+        {
+            if (Math.Abs(point.X - _pressPoint.X) < DragThresholdPixels && Math.Abs(point.Y - _pressPoint.Y) < DragThresholdPixels)
+            {
+                ShowCursor(point);
+                return;
+            }
+            _drag = DragKind.Track;
+        }
+        _trackSlot = TrackReorder.SlotAt(Viewport, TrackCount, point.Y);
+        ShowCursor(point);
+        InvalidateVisual();
     }
 
     protected override void OnPointerExited(PointerEventArgs e)
@@ -525,7 +595,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         TimelineHit? hover = point.X >= TimelineViewport.HeaderWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y)
             : null;
-        _shownCursor = TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
+        _shownCursor = _drag == DragKind.Track
+            ? TimelineCursor.Reorder
+            : TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
         if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
     }
@@ -543,6 +615,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (e.Key == Key.Escape && _drag is DragKind.TrackPending or DragKind.Track)
+        {
+            // Nothing was applied while dragging, so cancelling is just forgetting the drag.
+            ResetDrag();
+            _dragPointer?.Capture(null);
+            ReleaseCursor();
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
         if (e.Key != Key.Escape || _drag == DragKind.None || _document is null || _gestureBefore is null) return;
         // Escape puts the dragged chain back with no undo entry.
         string before = _gestureBefore;
@@ -568,6 +650,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void CommitDrag()
     {
+        if (_drag is DragKind.TrackPending or DragKind.Track)
+        {
+            CommitTrackDrag();
+            return;
+        }
         var kind = _drag;
         var dragged = _dragged;
         int originTrack = _dragOriginTrack;
@@ -592,8 +679,24 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _document.CommitGesture(_undo, description, before);
     }
 
+    /// <summary>Drops the dragged header into the gap it points at: one undo entry, and the moved track stays selected.</summary>
+    private void CommitTrackDrag()
+    {
+        int? slot = TrackDropSlot;
+        int track = _dragTrack;
+        ResetDrag();
+        InvalidateVisual();
+        if (slot is not { } target || _document is null || _undo is null || Sequence is null) return;
+        if (_document.MoveTrack(_undo, _sequenceIndex, track, target) is { } moved)
+        {
+            SetSelection(null, moved);
+            Rebuild();
+        }
+    }
+
     private void ResetDrag()
     {
+        _dragPointer = null;
         _drag = DragKind.None;
         _dragged = null;
         _dragBlock = null;
@@ -716,6 +819,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
 
         DrawHeaders(context, sequence, size, drop);
+        DrawTrackDrop(context, size);
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
         DrawPlayhead(context, size);
@@ -752,12 +856,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 double top = Viewport.LaneTop(lane);
                 double laneHeight = Viewport.LaneHeightOf(lane);
                 if (SelectedTrack == lane)
-                {
-                    var accent = Brush("Accent") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
-                    context.FillRectangle(new SolidColorBrush(accent, 0.25), new Rect(0, top, header, laneHeight));
-                }
+                    context.FillRectangle(new SolidColorBrush(AccentColor(), 0.25), new Rect(0, top, header, laneHeight));
                 if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
                     DrawDropRow(context, new Rect(0, top, header, laneHeight));
+                if (DraggedTrack == lane)
+                {
+                    // The grabbed header: a stronger fill and an outline, so it reads as lifted.
+                    var grabbed = new Rect(1, top + 1, header - 3, laneHeight - 2);
+                    context.FillRectangle(new SolidColorBrush(AccentColor(), 0.45), grabbed);
+                    context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
+                }
                 var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
                 text.MaxTextWidth = header - 16;
                 text.Trimming = TextTrimming.CharacterEllipsis;
@@ -778,11 +886,30 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
     }
 
+    // While a header is dragged: the dragged lane tinted across the lanes, and a line across the whole timeline at the gap it would drop into.
+    private void DrawTrackDrop(DrawingContext context, Size size)
+    {
+        if (DraggedTrack is not { } dragged) return;
+        double ruler = TimelineViewport.RulerHeight;
+        using (context.PushClip(new Rect(0, ruler, size.Width, Math.Max(0, size.Height - ruler))))
+        {
+            context.FillRectangle(new SolidColorBrush(AccentColor(), 0.12),
+                new Rect(TimelineViewport.HeaderWidth, Viewport.LaneTop(dragged), Math.Max(0, size.Width - TimelineViewport.HeaderWidth), Viewport.LaneHeightOf(dragged)));
+            if (TrackDropLineY is not { } y) return;
+            var brush = Brush("Accent");
+            context.DrawLine(new Pen(brush, 3), new Point(0, y), new Point(size.Width, y));
+            context.DrawEllipse(brush, null, new Point(4, y), 4, 4);
+        }
+    }
+
     private void DrawRuler(DrawingContext context, Size size, double step, double firstTick)
     {
         double header = TimelineViewport.HeaderWidth;
         double ruler = TimelineViewport.RulerHeight;
         context.FillRectangle(Brush("BgRail"), new Rect(0, 0, size.Width, ruler));
+        // Which end of the lane stack draws in front; the header column is otherwise empty up here.
+        var order = Text("↑ back   ↓ front", 10, Brush("InkMid"));
+        context.DrawText(order, new Point(8, (ruler - order.Height) / 2));
         using (context.PushClip(new Rect(header, 0, Math.Max(0, size.Width - header), ruler)))
         {
             var tick = new Pen(Brush("LineStrong"), 1);
@@ -856,6 +983,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     }
 
     private const double DropRowOpacity = 0.14;
+
+    private Color AccentColor() => Brush("Accent") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
 
     private Color AccentCoolColor() => Brush("AccentCool") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
 
