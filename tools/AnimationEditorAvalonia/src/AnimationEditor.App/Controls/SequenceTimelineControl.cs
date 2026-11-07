@@ -88,12 +88,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ActualThemeVariantChanged += (_, _) =>
         {
             ClearThemeCaches();
+            RefreshPlayheadLayer();
             InvalidateVisual();
         };
         _filmstrip.TextureChanged += InvalidateVisual;
         Viewport.Changed += () =>
         {
             Diagnostics.NoteInput();
+            RefreshPlayheadLayer();
             ViewChanged?.Invoke();
         };
         // The same smooth preset-stepping wheel zoom as the preview and texture viewport, over the timeline's own
@@ -242,7 +244,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             if (_playhead == value) return;
             _playhead = value;
-            InvalidateVisual();
+            // On its own layer the playhead moves without repainting the lanes under it.
+            if (PlayheadLayer is { } layer) layer.InvalidateVisual();
+            else InvalidateVisual();
         }
     }
 
@@ -946,8 +950,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     // ── Drawing ──────────────────────────────────────────────────────────────
 
-    public override void Render(DrawingContext context) =>
+    public override void Render(DrawingContext context)
+    {
+        RenderCount++;
         Diagnostics.Frame(context, DrawTimeline, TimelineViewport.HeaderWidth + 6, TimelineViewport.RulerHeight + 6);
+    }
 
     private void DrawTimeline(DrawingContext context)
     {
@@ -999,7 +1006,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
         DrawSnapGuide(context, size);
-        DrawPlayhead(context, size);
+        if (PlayheadLayer is null) DrawPlayhead(context, size);
         DrawHover(context, size);
         DrawEyeTooltip(context, size);
     }

@@ -107,6 +107,8 @@ public class SequenceTimelineRenderBudgetScenarioTests
         timeline.DiagnosticsEnabled.ShouldBeTrue();
         // Avalonia's layout and render time graphs repaint the whole window every frame, so F3 must not turn them on.
         editor.Window.RendererDiagnostics.DebugOverlays.ShouldBe(Avalonia.Rendering.RendererDebugOverlays.Fps);
+        // The window-wide lines: whole-frame render time, UI thread stalls, garbage collection.
+        timeline.DiagnosticsExtraLines.ShouldNotBeNull().Invoke().Count.ShouldBe(3);
 
         editor.Press(Key.F3);
         timeline.DiagnosticsEnabled.ShouldBeFalse();
@@ -157,6 +159,41 @@ public class SequenceTimelineRenderBudgetScenarioTests
         editor.Services.ThumbnailService.InvalidatePath(Path.Combine(editor.ProjectFolder, "sheet.png"));
 
         timeline.FilmstripAtlasGeneration.ShouldBeGreaterThan(generation);
+    }
+
+    [AvaloniaFact]
+    public async Task AMovingPlayhead_RepaintsItsOwnLayerNotTheLanes()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+        var layer = editor.Control<TimelinePlayheadOverlay>("SequenceTimelinePlayhead");
+        editor.Layout();
+        int timelineDraws = timeline.RenderCount, layerDraws = layer.RenderCount;
+
+        timeline.Playhead = 1.5;
+        editor.Layout();
+        timeline.Playhead = 1.6;
+        editor.Layout();
+
+        timeline.RenderCount.ShouldBe(timelineDraws);
+        layer.RenderCount.ShouldBeGreaterThan(layerDraws);
+    }
+
+    [AvaloniaFact]
+    public async Task ScrollingTheTimeline_RepaintsThePlayheadLayerToo()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+        var layer = editor.Control<TimelinePlayheadOverlay>("SequenceTimelinePlayhead");
+        editor.Layout();
+        int layerDraws = layer.RenderCount;
+
+        timeline.ScrollToSeconds(10);
+        editor.Layout();
+
+        layer.RenderCount.ShouldBeGreaterThan(layerDraws);
     }
 
     [AvaloniaFact]

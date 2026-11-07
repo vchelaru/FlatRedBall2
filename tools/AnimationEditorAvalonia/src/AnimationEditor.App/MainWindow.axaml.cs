@@ -156,6 +156,7 @@ public partial class MainWindow : Window
     private const int DiffTolerance = 0;
     // Debounces the Grouping slider so dragging re-merges once the user pauses, not per pixel-tick.
     private DispatcherTimer? _diffSliderDebounce;
+    private readonly WindowDiagnosticsHub _diagnosticsHub = new();
 
     private List<AnimationChainSave>? _pendingPastedChains;
     private List<bool>? _pendingPastedChainExpand;
@@ -2564,6 +2565,8 @@ public partial class MainWindow : Window
         // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
         // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
+        FrameProbeBegin.Hub = FrameProbeEnd.Hub = _diagnosticsHub;
+        SequenceTimeline.DiagnosticsExtraLines = _diagnosticsHub.Lines;
         MenuSettings.Click += OnSettingsClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
         MenuCopy.Click          += (_, _) => ActivePane.CopySelection();
@@ -3210,6 +3213,9 @@ public partial class MainWindow : Window
         WireframeCtrl.DiagnosticsEnabled = on;
         PreviewCtrl.DiagnosticsEnabled   = on;
         SequenceTimeline.DiagnosticsEnabled = on;
+        _diagnosticsHub.Enabled = on;
+        FrameProbeBegin.InvalidateVisual();
+        FrameProbeEnd.InvalidateVisual();
         // Avalonia's own frames-per-second readout for the whole window. Not its layout and render time graphs: those repaint
         // the whole window on every frame, which would slow exactly what is being measured.
         RendererDiagnostics.DebugOverlays = on ? Avalonia.Rendering.RendererDebugOverlays.Fps : Avalonia.Rendering.RendererDebugOverlays.None;

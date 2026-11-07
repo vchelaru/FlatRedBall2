@@ -29,7 +29,17 @@ public sealed partial class SequenceTimelineControl
 
     internal TimelineDiagnostics DiagnosticsHost => Diagnostics;
 
+    /// <summary>Extra overlay lines for the whole window, set by the host.</summary>
+    internal System.Func<System.Collections.Generic.IReadOnlyList<string>>? DiagnosticsExtraLines
+    {
+        get => Diagnostics.ExtraLines;
+        set => Diagnostics.ExtraLines = value;
+    }
+
     private TimelineFrameStats Stats => Diagnostics.Current;
+
+    /// <summary>How many times the timeline has been drawn, for tests.</summary>
+    internal int RenderCount { get; private set; }
 
     internal int FilmstripAtlasGeneration => _filmstrip.Atlas.Generation;
 

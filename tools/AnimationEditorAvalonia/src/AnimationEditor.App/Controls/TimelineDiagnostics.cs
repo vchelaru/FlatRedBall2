@@ -54,6 +54,9 @@ internal sealed class TimelineDiagnostics
 
     public string? LogPath { get; set; }
 
+    /// <summary>More overlay lines (the window-wide ones), asked for each time the overlay draws.</summary>
+    public Func<System.Collections.Generic.IReadOnlyList<string>>? ExtraLines { get; set; }
+
     public bool Enabled
     {
         get => _enabled;
@@ -122,17 +125,18 @@ internal sealed class TimelineDiagnostics
 
     private void DrawOverlay(DrawingContext context, double left, double top)
     {
-        string[] lines =
+        var lines = new System.Collections.Generic.List<string>
         {
             $"timeline: record {_recordMs.Average:F2} ms  raster {_rasterMs.Average:F2} ms  [{_backend}]",
             $"cadence: records {_renderRate.Hertz:F0}/s (worst gap {_renderRate.WorstGapMilliseconds:F0} ms)  rasters {_rasterRate.Hertz:F0}/s  input {_inputRate.Hertz:F0}/s (worst gap {_inputRate.WorstGapMilliseconds:F0} ms)",
             $"blocks {Last.BlocksIssued}/{Last.Blocks} (visible {Last.BlocksVisible})  cells {Last.CellsIssued} (visible {Last.CellsVisible})  images {Last.Images}  ops {Last.FilmstripOps}",
             $"clips {Last.Clips}  texts {Last.Texts}  hatch {Last.HatchLines}  grid {Last.GridLines}  ruler {Last.RulerLabels}  alloc {Last.AllocatedBytes / 1024} KB",
         };
+        if (ExtraLines?.Invoke() is { } extra) lines.AddRange(extra);
         var typeface = new Typeface(FontFamily.Default);
         double width = 0, height = 0;
-        var texts = new FormattedText[lines.Length];
-        for (int i = 0; i < lines.Length; i++)
+        var texts = new FormattedText[lines.Count];
+        for (int i = 0; i < lines.Count; i++)
         {
             texts[i] = new FormattedText(lines[i], CultureInfo.InvariantCulture, FlowDirection.LeftToRight, typeface, 11,
                 new SolidColorBrush(Color.FromRgb(0, 255, 80)));
