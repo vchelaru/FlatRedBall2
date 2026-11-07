@@ -19,6 +19,9 @@ public sealed class TimelineSelection
 {
     private readonly List<TimelineChainId> _chains = new();
     private readonly List<int> _tracks = new();
+    // The same chains and tracks, for Contains: a timeline of thousands of chains asks once per chain on every draw.
+    private readonly HashSet<TimelineChainId> _chainSet = new();
+    private readonly HashSet<int> _trackSet = new();
     private TimelineChainId? _primaryChain;
     private int? _primaryTrack;
 
@@ -39,15 +42,17 @@ public sealed class TimelineSelection
     /// <summary>True when more than one chain or track is selected.</summary>
     public bool IsMulti => Count > 1;
 
-    public bool Contains(TimelineChainId id) => _chains.Contains(id);
+    public bool Contains(TimelineChainId id) => _chainSet.Contains(id);
 
-    public bool ContainsTrack(int track) => _tracks.Contains(track);
+    public bool ContainsTrack(int track) => _trackSet.Contains(track);
 
     public bool Clear()
     {
         if (Count == 0) return false;
         _chains.Clear();
         _tracks.Clear();
+        _chainSet.Clear();
+        _trackSet.Clear();
         _primaryChain = null;
         _primaryTrack = null;
         return true;
@@ -98,7 +103,7 @@ public sealed class TimelineSelection
     /// <summary>Makes an already selected chain the primary one, as pressing on it to drag the whole selection does. False when it is not selected or already is.</summary>
     public bool MakePrimary(TimelineChainId id)
     {
-        if (!_chains.Contains(id) || _primaryChain == id) return false;
+        if (!_chainSet.Contains(id) || _primaryChain == id) return false;
         _primaryChain = id;
         return true;
     }
@@ -188,8 +193,12 @@ public sealed class TimelineSelection
         if (same) return false;
         _chains.Clear();
         _chains.AddRange(nextChains);
+        _chainSet.Clear();
+        _chainSet.UnionWith(nextChains);
         _tracks.Clear();
         _tracks.AddRange(nextTracks);
+        _trackSet.Clear();
+        _trackSet.UnionWith(nextTracks);
         _primaryChain = primaryChain;
         _primaryTrack = primaryTrack;
         return true;

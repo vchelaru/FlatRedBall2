@@ -89,9 +89,21 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ClipToBounds = true;
         ContextMenu = _menu;
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
-        ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        _selectionLayer = new SelectionLayer(this);
+        VisualChildren.Add(_selectionLayer);
+        LogicalChildren.Add(_selectionLayer);
+        ActualThemeVariantChanged += (_, _) =>
+        {
+            InvalidateVisual();
+            _selectionLayer.InvalidateVisual();
+        };
         _filmstrip.TextureChanged += InvalidateVisual;
-        Viewport.Changed += () => ViewChanged?.Invoke();
+        // The selection layer draws at the chains' positions, so it follows every scroll, zoom and lane change.
+        Viewport.Changed += () =>
+        {
+            ViewChanged?.Invoke();
+            _selectionLayer.InvalidateVisual();
+        };
         // The same smooth preset-stepping wheel zoom as the preview and texture viewport, over the timeline's own
         // zoom limits. The pivot is a time axis, so only its x matters; the time under it stays fixed.
         _zoomAnimator = new ZoomAnimator(
@@ -365,12 +377,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        _selectionLayer.Measure(availableSize);
         _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         return default;
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+        _selectionLayer.Arrange(new Rect(finalSize));
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
             box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + TimelineLayout.HeaderCenterY - RenameBoxHeight / 2,
@@ -443,6 +457,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _blocks = Sequence is { } sequence && _document is { } document
             ? TimelineLayout.Blocks(sequence, document.CycleLength)
             : Array.Empty<TimelineBlock>();
+        _trackStarts = TimelineLayout.TrackStarts(_blocks, TrackCount);
         RetainSelection();
         if (IsRenamingTrack && _renameTrack >= TrackCount)
             EndTrackRename();
@@ -450,6 +465,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Viewport.ClampVertical(TrackCount, Bounds.Height);
         InvalidateArrange();
         InvalidateVisual();
+        _selectionLayer.InvalidateVisual();
         ContentChanged?.Invoke();
     }
 
@@ -858,7 +874,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_drag is DragKind.MarqueePending or DragKind.Marquee)
         {
             ResetDrag();
-            InvalidateVisual();
+            EndMarquee();
             return;
         }
         var kind = _drag;
@@ -950,6 +966,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
         base.OnSizeChanged(e);
+        _selectionLayer.InvalidateVisual();
         Viewport.ClampVertical(TrackCount, e.NewSize.Height);
     }
 
@@ -1008,6 +1025,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     public override void Render(DrawingContext context)
     {
+        RenderCount++;
         var size = Bounds.Size;
         context.FillRectangle(Brush("BgCanvas"), new Rect(size));
         if (Sequence is not { } sequence) return;
@@ -1039,13 +1057,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
                 {
-                    DrawBlock(context, block, _model.Contains(new TimelineChainId(block.Track, block.Chain)));
+                    DrawBlock(context, block);
                     DrawEvents(context, block, size.Width);
                 }
             }
             DrawNewTrackRow(context, sequence, lanes, drop);
             DrawChipGhost(context, drop);
-            DrawMarquee(context);
         }
 
         DrawHeaders(context, sequence, size, drop);
@@ -1096,6 +1113,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void DrawHeaders(DrawingContext context, SequenceSave sequence, Size size, TimelineDropPlan drop)
     {
+        _headerSelectionShown = _model.Tracks.Count > 0;
         double header = TimelineViewport.HeaderWidth;
         double ruler = TimelineViewport.RulerHeight;
         var area = new Rect(0, ruler, header, Math.Max(0, size.Height - ruler));
@@ -1220,7 +1238,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(0, ruler - 0.5), new Point(size.Width, ruler - 0.5));
     }
 
-    private void DrawBlock(DrawingContext context, TimelineBlock block, bool selected)
+    // The selection is not drawn here but by the selection layer above, so selecting never redraws every block.
+    private void DrawBlock(DrawingContext context, TimelineBlock block)
     {
         double top = Viewport.LaneTop(block.Track);
         double left = Viewport.XAt(block.Start);
@@ -1249,7 +1268,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             context.FillRectangle(Brush("BgCanvas"), film);
             DrawFilmstrip(context, block, film);
         }
-        context.DrawRectangle(null, new Pen(selected ? Brush("Ink") : new SolidColorBrush(color), selected ? 2 : 1), body, 3, 3);
+        context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 1), body, 3, 3);
 
         // Whole-cycle marks, so a float loop count reads at a glance.
         if (block.CycleLength > 0)
