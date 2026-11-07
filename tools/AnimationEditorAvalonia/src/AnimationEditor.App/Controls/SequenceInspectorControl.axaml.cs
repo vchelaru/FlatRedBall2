@@ -37,6 +37,8 @@ public partial class SequenceInspectorControl : UserControl
 
         TrackXField.ValueChanged += (_, _) => CommitOffset();
         TrackYField.ValueChanged += (_, _) => CommitOffset();
+        TrackVisibleBox.IsCheckedChanged += (_, _) => Commit(document =>
+            document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
         TrackFlipBox.IsCheckedChanged += (_, _) => Commit(document =>
             document.SetTrackFlip(_undo!, _sequence, _track!.Value, TrackFlipBox.IsChecked == true));
         TrackZField.ValueChanged += (_, _) =>
@@ -141,6 +143,7 @@ public partial class SequenceInspectorControl : UserControl
         Put(TrackNameBox, track.Name, force);
         Put(TrackXField, (decimal)track.X, force);
         Put(TrackYField, (decimal)track.Y, force);
+        TrackVisibleBox.IsChecked = track.Visible;
         TrackFlipBox.IsChecked = track.FlipHorizontal;
         Put(TrackZField, track.Z, force);
     }

@@ -54,7 +54,9 @@ public static class SequenceScene
     /// The sprite of every track with a chain playing at <paramref name="time"/> in sequence
     /// <paramref name="sequenceIndex"/>, back to front: by Z, equal Z in track order. A track with no chain playing, or
     /// whose chain is missing or empty, is left out (its sprite is hidden). A track is hidden before its first chain and
-    /// after its last one on purpose: this is how a sprite appears or disappears partway through a sequence.
+    /// after its last one on purpose: this is how a sprite appears or disappears partway through a sequence. A track whose
+    /// <see cref="SequenceTrackSave.Visible"/> is false is left out too, shapes included; the sequence's length and
+    /// playback do not change.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time)
     {
@@ -64,6 +66,7 @@ public static class SequenceScene
         for (int t = 0; t < tracks.Count; t++)
         {
             var track = tracks[t];
+            if (!track.Visible) continue;
             var reference = SequenceTimeline.ActiveAt(track, time, r => document.CycleLength(r) ?? 0, out double local);
             if (reference is null || document.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
 

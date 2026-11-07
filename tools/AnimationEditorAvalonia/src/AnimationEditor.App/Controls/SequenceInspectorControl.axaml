@@ -77,6 +77,8 @@
                             <viewsControls:FlankerNumericField x:Name="TrackYField" Grid.Column="1"
                                                                Minimum="-100000" Maximum="100000" Increment="1" FormatString="0.###" />
                         </Grid>
+                        <CheckBox x:Name="TrackVisibleBox" Content="Visible"
+                                  AutomationProperties.AutomationId="seq-track-visible" />
                         <CheckBox x:Name="TrackFlipBox" Content="Flip Horizontal"
                                   AutomationProperties.AutomationId="seq-track-flip" />
                         <Grid ColumnDefinitions="78,*">
