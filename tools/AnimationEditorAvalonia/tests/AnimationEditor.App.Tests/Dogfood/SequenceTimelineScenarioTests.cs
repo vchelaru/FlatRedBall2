@@ -300,6 +300,7 @@ public class SequenceTimelineScenarioTests
         Point point = editor.PointIn(Timeline(editor), x, viewport.LaneTop(0) + 10);
 
         editor.Wheel(point, 2, RawInputModifiers.Control);
+        Timeline(editor).SettleZoomAnimation();
 
         viewport.PixelsPerSecond.ShouldBeGreaterThan(TimelineViewport.DefaultPixelsPerSecond);
         viewport.TimeAt(x).ShouldBe(timeUnderPointer, 1e-6);
