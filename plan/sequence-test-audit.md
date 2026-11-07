@@ -45,9 +45,9 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 |---|---|---|
 | OS drag-drop of files into the library | `SequenceDocument.AddSources`; the test raises the same DragEvent the OS would | none |
 | Chip drag cursor, timeline edge cursor (#1597, #1609, merged after the mutation runs, not audited) | `TimelineDropPlan`, `TimelineLayout.HitTest`, `TimelineCursor` | n/a |
-| Timeline, preview and chip pixels | `TimelineLayout`, `TimelineDropPlan`, `SequenceScene`; chip outline has a pixel test | `TickStep` and ruler label formatting in `SequenceTimelineControl.Render` |
+| Timeline, preview and chip pixels | `TimelineLayout`, `TimelineDropPlan`, `SequenceScene`; chip outline has a pixel test | none: ruler step and labels are now `TimelineRuler` (tested) |
 | Playback tick clamp (`MaxTickSeconds` in `SequenceTabPane.OnTick`) | `SequenceClock`, `TickClock` | none: the clamp is now `SequenceClock.AdvanceTick` (A26 pinned) |
-| Status bar "Auto Save Failed" for a .seqj | `SequenceDocument.SaveError` (tested) | `SequenceTabPane.Status` label choice (not mutation-run) |
+| Status bar "Auto Save Failed" for a .seqj | `SequenceDocument.SaveError` (tested) | none: `SequenceTabScenarioTests.ReadOnlySeqj_*` drives the label, mutation-checked |
 
 ## Equivalent or redundant survivors
 
@@ -199,7 +199,7 @@ Failed!  - Failed:     1 |
 | A24 | Delete removes the selected track | caught | DeleteKey_WithATrackSelected_DeletesTheTrack_AndCtrlZBringsItBack |
 | A25 | track header menu Delete Track | caught | TrackHeaderMenu_RenamesAndDeletesATrack_EachUndoable |
 | A26 | playback tick is clamped after a stall | UNPINNED -> pinned | SequenceClockTests.AdvanceTick_AfterALongStall_MovesNoFurtherThanTheCap (clamp extracted into `SequenceClock.AdvanceTick`) |
-| A27 | leaving the tab stops playback | survived (self-correcting) | a detached sequence has length 0, so the first tick stops the clock |
+| A27 | leaving the tab stops playback | UNPINNED -> pinned | SequenceAuditScenarioTests.LeavingTheSequenceTab_WhilePlaying_StopsTheClock (the time readout shows Hide stopped it while attached; a later tick would also stop the clock) |
 | A28 | corrupt seqj reports and does not open | UNPINNED -> pinned | SequenceAuditScenarioTests.OpeningACorruptSeqj_ShowsTheBanner_AndOpensNoTab |
 | A29 | selecting another sequence stops playback | UNPINNED -> pinned | SequenceAuditScenarioTests.SwitchingToAnotherSequence_StopsPlayback_AtZero |
 | A30 | edit shortening the sequence reseeks the playhead | UNPINNED -> pinned | SequenceAuditScenarioTests.AnEditThatShortensTheSequence_PullsThePlayheadBackToItsEnd |
