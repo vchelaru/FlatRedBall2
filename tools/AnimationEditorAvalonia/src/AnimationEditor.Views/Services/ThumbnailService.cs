@@ -252,9 +252,18 @@ public sealed class ThumbnailService : IDisposable
     /// </para>
     /// </summary>
     public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(
-        AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
+        AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight) =>
+        GetFrameThumbnail(ResolveTexturePath(frame), frame, color, maxWidth, maxHeight);
+
+    /// <summary>
+    /// <see cref="GetFrameThumbnail(AnimationFrameSave, ResolvedFrameColor, int, int)"/> with the texture already
+    /// resolved, for a frame that does not belong to the open <c>.achx</c> (a sequence's source), whose relative
+    /// texture name <see cref="ResolveTexturePath"/> would resolve against the wrong folder.
+    /// </summary>
+    public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(
+        string? texturePath, AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
     {
-        var path = ResolveTexturePath(frame);
+        var path = texturePath;
         var bm   = GetBitmap(path);
         if (bm is null) return null;
 

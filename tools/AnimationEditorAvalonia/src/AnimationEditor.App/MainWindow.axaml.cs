@@ -347,17 +347,23 @@ public partial class MainWindow : Window
         // it to a permanent tab (#841).
         ProjectPanel.FileSelected += entry =>
         {
-            if (entry.File is DiskEditorFile diskFile)
+            if (entry.File is DiskEditorFile diskFile && ActivePane.BrowserClickOpensPreview)
                 _ = LoadAnimationFileAsync(diskFile.FullPath, asPreview: true);
         };
         ProjectPanel.FileDoubleClicked += entry =>
         {
-            if (entry.File is DiskEditorFile diskFile)
+            if (entry.File is not DiskEditorFile diskFile) return;
+            var path = new FilePath(diskFile.FullPath);
+            // The single click opened a preview tab unless the active pane declined it; then open it here.
+            if (_tabManager.Tabs.Any(tab => tab.Path == path))
             {
-                _tabManager.Promote(new FilePath(diskFile.FullPath));
+                _tabManager.Promote(path);
                 RebuildTabStrip();
             }
+            else
+                _ = LoadAnimationFileAsync(diskFile.FullPath);
         };
+        ProjectPanel.DragPathFor = entry => (entry.File as DiskEditorFile)?.FullPath;
         _pngFolderWatcher.Changed += changed =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -4406,6 +4412,8 @@ public partial class MainWindow : Window
     {
         // Includes native-tsx (#1140) paths alongside achx/achj (#1147) -- LoadAnimationFileAsync
         // dispatches either kind to the correct workflow via OpenProjectWorkflowAsync.
+        // A drop target that took the files (a sequence's library) handled it; don't also open them.
+        if (e.Handled) return;
         var projectFiles = AchxDropProcessor.SelectAchxFiles(DroppedFilePaths(e));
         if (projectFiles.Count == 0) return;  // not ours — leave the tree's PNG drop to run
 

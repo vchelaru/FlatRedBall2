@@ -74,6 +74,7 @@ public partial class MainWindow
         {
             var w = _window;
             Detach();
+            w.SequenceLibrary.Show(null);
             w.SequenceListPane.IsVisible = false;
             w.SequenceEditorPane.IsVisible = false;
             _hiddenTabs?.Restore();
@@ -139,6 +140,9 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => scope is HotkeyScope.App or HotkeyScope.Document;
 
+        // The library takes files dragged from the browser, so a press there must not switch tabs.
+        public bool BrowserClickOpensPreview => false;
+
         // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.
         public bool CanDetach => false;
 
@@ -155,6 +159,23 @@ public partial class MainWindow
             };
             w.SequenceRenameItem.Click += (_, _) => _ = RenameSelectedAsync();
             w.SequenceDeleteItem.Click += (_, _) => DeleteSelected();
+            w.SequenceLibrary.Thumbnails = w._thumbnailService;
+            w.SequenceLibrary.FilesDropped += AddSources;
+            w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+        }
+
+        private void AddSources(IReadOnlyList<string> paths)
+        {
+            if (_document is null) return;
+            var errors = _document.AddSources(_window._undoManager, paths);
+            if (errors.Count > 0)
+                _window.ShowErrorBanner(string.Join(" ", errors));
+        }
+
+        private void RemoveSource(string source)
+        {
+            if (_document?.RemoveSource(_window._undoManager, source) is { } error)
+                _window.ShowErrorBanner(error);
         }
 
         private void AddSequence()
@@ -212,6 +233,7 @@ public partial class MainWindow
                 _refreshing = false;
             }
             _selectedIndex[_document.Path] = selected;
+            _window.SequenceLibrary.Show(_document);
             _window.UpdateStatusBar();
         }
     }

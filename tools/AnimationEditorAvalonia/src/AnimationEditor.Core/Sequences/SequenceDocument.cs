@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -53,6 +54,59 @@ public sealed class SequenceDocument
     /// <summary>The chains of <paramref name="source"/>, with UV coordinates, or null when it is missing.</summary>
     public AnimationChainListSave? SourceChains(string source) =>
         _sources.TryGetValue(source, out var list) ? list : null;
+
+    /// <summary>
+    /// Adds the <c>.achx</c>/<c>.achj</c> files at <paramref name="absolutePaths"/> as sources, in one undo entry, stored
+    /// relative to this file. Returns a message for each file refused: a file of another type (a <c>.seqj</c> included)
+    /// or one that already is a source. The rest are still added.
+    /// </summary>
+    public IReadOnlyList<string> AddSources(IUndoManager undo, IEnumerable<string> absolutePaths)
+    {
+        var errors = new List<string>();
+        var taken = Save.Sources.Select(SourcePath).ToHashSet();
+        var added = new List<FilePath>();
+        foreach (var file in absolutePaths.Select(path => new FilePath(path)))
+        {
+            if (file.Extension is not ("achx" or "achj"))
+                errors.Add($"{file.NoPath} can't be a source. Only .achx and .achj files can.");
+            else if (!taken.Add(file))
+                errors.Add($"{file.NoPath} is already in the library.");
+            else
+                added.Add(file);
+        }
+        if (added.Count == 0) return errors;
+
+        string description = added.Count == 1 ? $"Add Source '{added[0].NoPath}'" : $"Add {added.Count} Sources";
+        var folder = Path.GetDirectoryContainingThis();
+        Edit(undo, description, save => save.Sources.AddRange(added.Select(file => file.RelativeTo(folder))));
+        return errors;
+    }
+
+    /// <summary>
+    /// Removes <paramref name="source"/> from the library. Returns why it was refused (a chain on the timeline still
+    /// uses it), or null.
+    /// </summary>
+    public string? RemoveSource(IUndoManager undo, string source)
+    {
+        int uses = Save.Sequences.SelectMany(s => s.Tracks).SelectMany(t => t.Chains)
+            .Count(reference => string.Equals(reference.Source, source, StringComparison.OrdinalIgnoreCase));
+        if (uses > 0)
+            return $"{source} is used by {Plural.Format(uses, "chain")} on the timeline. Remove those first.";
+        Edit(undo, $"Remove Source '{new FilePath(source).NoPath}'", save => save.Sources.Remove(source));
+        return null;
+    }
+
+    /// <summary>
+    /// The absolute path of <paramref name="frame"/>'s texture. A relative texture name resolves against
+    /// <paramref name="source"/>'s folder, since each source can sit in a different folder from this file.
+    /// </summary>
+    public string? ResolveTexturePath(string source, AnimationFrameSave frame)
+    {
+        if (string.IsNullOrEmpty(frame.TextureName)) return null;
+        if (System.IO.Path.IsPathRooted(frame.TextureName)) return new FilePath(frame.TextureName).FullPath;
+        string sourceFolder = SourcePath(source).GetDirectoryContainingThis().FullPath;
+        return new FilePath(System.IO.Path.Combine(sourceFolder, frame.TextureName)).FullPath;
+    }
 
     /// <summary>Adds an empty sequence with a name no other sequence uses. Returns that name.</summary>
     public string AddSequence(IUndoManager undo)
@@ -123,11 +177,13 @@ public sealed class SequenceDocument
         Changed?.Invoke();
     }
 
+    private FilePath SourcePath(string source) =>
+        new(System.IO.Path.Combine(Path.GetDirectoryContainingThis().FullPath, source));
+
     private void LoadMissingSources()
     {
-        string folder = Path.GetDirectoryContainingThis().FullPath;
         foreach (var source in Save.Sources.Where(s => !_sources.ContainsKey(s)))
-            _sources[source] = TryLoad(System.IO.Path.Combine(folder, source));
+            _sources[source] = TryLoad(SourcePath(source).FullPath);
     }
 
     private static AnimationChainListSave? TryLoad(string absolutePath)
