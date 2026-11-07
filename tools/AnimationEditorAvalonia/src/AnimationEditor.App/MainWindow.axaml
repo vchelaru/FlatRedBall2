@@ -458,6 +458,9 @@
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
                     <MenuItem Header="_View">
+                        <MenuItem Header="_Back"    x:Name="MenuNavBack" />
+                        <MenuItem Header="_Forward" x:Name="MenuNavForward" />
+                        <Separator />
                         <!-- InputGesture text for the four zoom items is set in code from the
                              hotkey registry (see note above) — issue #638. Clicking a menu item
                              always zooms that specific panel; Ctrl+Plus/Minus is one shared,
@@ -842,6 +845,17 @@
                                 <Setter Property="FontSize" Value="12" />
                             </Style>
                         </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="appModels:SequenceListItem">
+                                <!-- Double-click swaps the name for the same inline box the ANIMATIONS tree uses. -->
+                                <Panel>
+                                    <TextBlock Text="{Binding Name}"
+                                               IsVisible="{Binding !IsEditing}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <viewsControls:InlineRenameBox IsVisible="{Binding IsEditing}" />
+                                </Panel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
                         <ListBox.ContextMenu>
                             <ContextMenu x:Name="SequenceListMenu">
                                 <MenuItem Header="Rename…" x:Name="SequenceRenameItem" />
