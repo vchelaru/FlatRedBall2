@@ -132,4 +132,48 @@ public class TimelineViewportTests
         viewport.SetPixelsPerSecond(1e9);
         viewport.PixelsPerSecond.ShouldBe(TimelineViewport.MaxPixelsPerSecond);
     }
+
+    [Fact]
+    public void SetScrollSeconds_SetsTheLeftEdge_NeverBeforeZero()
+    {
+        var viewport = new TimelineViewport();
+
+        viewport.SetScrollSeconds(4.5);
+        viewport.ScrollSeconds.ShouldBe(4.5);
+        viewport.SetScrollSeconds(-3);
+        viewport.ScrollSeconds.ShouldBe(0);
+    }
+
+    [Fact]
+    public void SetScrollY_SetsTheOffset_WithinTheContent()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { 48.0, 48.0, 48.0, 48.0 });
+        double viewHeight = 200;
+        double max = viewport.ContentHeight(4) - viewHeight;
+
+        viewport.SetScrollY(30, 4, viewHeight);
+        viewport.ScrollY.ShouldBe(30);
+        viewport.SetScrollY(1e6, 4, viewHeight);
+        viewport.ScrollY.ShouldBe(max);
+    }
+
+    [Fact]
+    public void Changed_FiresForEveryMutatorThatMovesTheView()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { 48.0, 48.0, 48.0, 48.0 });
+        int count = 0;
+        viewport.Changed += () => count++;
+
+        viewport.ScrollHorizontally(50);
+        viewport.SetScrollSeconds(2);
+        viewport.ZoomAround(TimelineViewport.HeaderWidth + 100, 2);
+        viewport.SetPixelsPerSecond(300);
+        viewport.ScrollVertically(20, 4, 200);
+        viewport.SetScrollY(40, 4, 200);
+        viewport.SetLaneHeights(new[] { 60.0, 48.0 });
+
+        count.ShouldBe(7);
+    }
 }
