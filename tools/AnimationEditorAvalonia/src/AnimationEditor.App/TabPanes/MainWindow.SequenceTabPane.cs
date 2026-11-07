@@ -231,6 +231,7 @@ public partial class MainWindow
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
+            w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
 
             _timer.Tick += (_, _) => OnTick();
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
@@ -317,7 +318,7 @@ public partial class MainWindow
             w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack);
         }
 
-        /// <summary>Opens the chain's source file as a tab and selects the chain there. A missing source or chain shows the error banner instead.</summary>
+        /// <summary>Opens the reference's source file as a tab and selects its chain there (none when the chain is empty). A missing source or chain shows the error banner instead.</summary>
         private async Task GoToDefinitionAsync(SequenceChainReferenceSave reference)
         {
             if (_document is not { } document) return;
