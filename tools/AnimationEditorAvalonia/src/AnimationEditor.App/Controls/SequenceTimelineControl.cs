@@ -206,7 +206,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Raised with the reason when an in-place rename is refused (an empty or taken name).</summary>
     public event Action<string>? ErrorRaised;
 
-    /// <summary>Raised while the ruler is pressed or dragged, with the time under the pointer clamped to the sequence.</summary>
+    /// <summary>
+    /// Raised while the ruler is pressed or dragged, and once when empty lane space is clicked, with the time under the
+    /// pointer clamped to the sequence.
+    /// </summary>
     public event Action<double>? Scrubbed;
 
     /// <summary>Where the playhead line is drawn, in seconds.</summary>
@@ -547,7 +550,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : null;
         if (hit is not { } found)
         {
-            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers));
+            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers), row.Kind == TimelineRowKind.Track);
             return;
         }
 
@@ -702,6 +705,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         if (_drag == DragKind.None) return;
+        if (e.InitialPressMouseButton == MouseButton.Left) SeekFromEmptyClick();
         // Commit before releasing the capture: releasing it raises CaptureLost, which cancels a track drag.
         if (_drag is DragKind.TrackPending or DragKind.Track)
         {
