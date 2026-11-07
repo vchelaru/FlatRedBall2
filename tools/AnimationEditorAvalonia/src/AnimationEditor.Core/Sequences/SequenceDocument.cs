@@ -309,6 +309,42 @@ public sealed class SequenceDocument
             save => save.Sequences[sequence].Tracks[track].Chains.RemoveAt(chain));
     }
 
+    /// <summary>Removes the given chain references, wherever they sit, as one undo entry.</summary>
+    public void DeleteChains(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains)
+    {
+        var distinct = chains.Distinct().ToList();
+        if (distinct.Count == 0) return;
+        if (distinct.Count == 1)
+        {
+            DeleteChain(undo, sequence, distinct[0].Track, distinct[0].Chain);
+            return;
+        }
+        Edit(undo, $"Remove {Plural.Format(distinct.Count, "chain")}", save =>
+        {
+            var tracks = save.Sequences[sequence].Tracks;
+            // Highest index first, so earlier removals do not move the ones still to go.
+            foreach (var id in distinct.OrderByDescending(id => id.Chain))
+                tracks[id.Track].Chains.RemoveAt(id.Chain);
+        });
+    }
+
+    /// <summary>Removes the given tracks with their chains as one undo entry.</summary>
+    public void DeleteTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks)
+    {
+        var distinct = tracks.Distinct().ToList();
+        if (distinct.Count == 0) return;
+        if (distinct.Count == 1)
+        {
+            DeleteTrack(undo, sequence, distinct[0]);
+            return;
+        }
+        Edit(undo, $"Delete {Plural.Format(distinct.Count, "track")}", save =>
+        {
+            foreach (int track in distinct.OrderByDescending(track => track))
+                save.Sequences[sequence].Tracks.RemoveAt(track);
+        });
+    }
+
     public void DeleteTrack(IUndoManager undo, int sequence, int track) =>
         Edit(undo, $"Delete Track '{Save.Sequences[sequence].Tracks[track].Name}'",
             save => save.Sequences[sequence].Tracks.RemoveAt(track));

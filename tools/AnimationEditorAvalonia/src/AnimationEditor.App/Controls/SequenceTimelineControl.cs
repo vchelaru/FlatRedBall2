@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -52,6 +53,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     // Snapping: the targets a move or resize snaps to, taken when the drag starts, and the one it is snapped to now.
     private IReadOnlyList<SnapTarget> _snapOthers = Array.Empty<SnapTarget>();
+
+    // A chain drag moves every selected chain: where each began, the lanes the pointer asks for, and the selection to put back on Escape.
+    private sealed record DragItem(SequenceChainReferenceSave Reference, int Track, double Start);
+    private IReadOnlyList<DragItem> _dragItems = Array.Empty<DragItem>();
+    private int _requestedTrackDelta;
+    private IReadOnlyList<TimelineChainId> _dragSelectionBefore = Array.Empty<TimelineChainId>();
+    private TimelineChainId? _dragPrimaryBefore;
     private IReadOnlyList<double>? _frameBoundaries;
     private SnapTarget? _snapGuide;
     private bool _chipBypass;
@@ -280,19 +288,21 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Rebuild();
     }
 
-    /// <summary>Removes the selected chain, or the selected track with its chains. Returns false when nothing is selected.</summary>
+    /// <summary>Removes every selected chain, or every selected track with its chains, as one undo entry. Returns false when nothing is selected.</summary>
     public bool DeleteSelected()
     {
         if (_document is null || _undo is null) return false;
-        if (Selection is { } selection)
+        if (_model.Kind == TimelineSelectionKind.Chains)
         {
-            SetSelection(null, null);
-            _document.DeleteChain(_undo, _sequenceIndex, selection.Track, selection.Chain);
+            var chains = _model.Chains.ToList();
+            NotifySelection(_model.Clear());
+            _document.DeleteChains(_undo, _sequenceIndex, chains);
         }
-        else if (SelectedTrack is { } track)
+        else if (_model.Kind == TimelineSelectionKind.Tracks)
         {
-            SetSelection(null, null);
-            _document.DeleteTrack(_undo, _sequenceIndex, track);
+            var tracks = _model.Tracks.ToList();
+            NotifySelection(_model.Clear());
+            _document.DeleteTracks(_undo, _sequenceIndex, tracks);
         }
         else
         {
@@ -395,7 +405,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Sequence is null
             ? TimelineDropPlan.None
             : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain),
-                TimelineSnapTargets.Others(_blocks, null, _playhead), _chipBypass);
+                TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass);
 
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at <paramref name="point"/>: on a lane, at the time under the point; on the
@@ -578,7 +588,15 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragOriginTrack = block.Track;
         _dragOriginStart = block.Start;
         _dragOriginEdge = block.FullEnd;
-        _snapOthers = TimelineSnapTargets.Others(_blocks, block.Reference, _playhead);
+        // A body drag takes every selected chain along; an edge drag resizes just this one.
+        var dragIds = found.Part == TimelineHitPart.Body && _model.Contains(id) ? _model.Chains : new[] { id };
+        _dragItems = dragIds
+            .Select(chain => _blocks.First(b => b.Track == chain.Track && b.Chain == chain.Chain))
+            .Select(b => new DragItem(b.Reference, b.Track, b.Start)).ToList();
+        _requestedTrackDelta = 0;
+        _dragSelectionBefore = _model.Chains.ToList();
+        _dragPrimaryBefore = _model.PrimaryChain;
+        _snapOthers = TimelineSnapTargets.Others(_blocks, _dragItems.Select(item => item.Reference).ToList(), _playhead);
         _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain) : null;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
@@ -631,17 +649,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_drag == DragKind.Move)
         {
             var snap = TimelineSnap.Move(_dragOriginStart + dt, _dragBlock.Full, _snapOthers, Viewport.PixelsPerSecond, bypass);
-            _dragged.Start = snap.Time;
             _snapGuide = snap.Target;
             var row = Viewport.RowAt(point.Y, sequence.Tracks.Count);
-            int current = sequence.Tracks.FindIndex(t => t.Chains.Contains(_dragged));
-            if (row.Kind == TimelineRowKind.Track && row.Track != current)
-            {
-                sequence.Tracks[current].Chains.Remove(_dragged);
-                sequence.Tracks[row.Track].Chains.Add(_dragged);
-                current = row.Track;
-            }
-            SetSelection(new TimelineChainId(current, sequence.Tracks[current].Chains.IndexOf(_dragged)), null);
+            if (row.Kind == TimelineRowKind.Track) _requestedTrackDelta = row.Track - _dragOriginTrack;
+            var plan = TimelineMultiMove.Plan(_dragItems.Select(item => new TimelineMultiMove.Origin(item.Track, item.Start)).ToList(),
+                snap.Time - _dragOriginStart, _requestedTrackDelta, sequence.Tracks.Count);
+            MoveDragItems(sequence, plan);
         }
         else
         {
@@ -651,6 +664,26 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             _snapGuide = result.Snap.Target;
         }
         Rebuild();
+    }
+
+    // Puts every dragged chain at its origin plus the plan, in the lane it asks for, and keeps the selection on them.
+    private void MoveDragItems(SequenceSave sequence, TimelineMultiMove.Result plan)
+    {
+        foreach (var item in _dragItems)
+        {
+            item.Reference.Start = item.Start + plan.TimeDelta;
+            int target = item.Track + plan.TrackDelta;
+            int current = sequence.Tracks.FindIndex(t => t.Chains.Contains(item.Reference));
+            if (current == target) continue;
+            sequence.Tracks[current].Chains.Remove(item.Reference);
+            sequence.Tracks[target].Chains.Add(item.Reference);
+        }
+        TimelineChainId IdOf(SequenceChainReferenceSave reference)
+        {
+            int track = sequence.Tracks.FindIndex(t => t.Chains.Contains(reference));
+            return new TimelineChainId(track, sequence.Tracks[track].Chains.IndexOf(reference));
+        }
+        NotifySelection(_model.SelectChains(_dragItems.Select(item => IdOf(item.Reference)).ToList(), IdOf(_dragged!)));
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -792,8 +825,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (e.Key != Key.Escape || _drag == DragKind.None || _document is null || _gestureBefore is null) return;
         // Escape puts the dragged chain back with no undo entry.
         string before = _gestureBefore;
+        var selectedBefore = _dragSelectionBefore;
+        var primaryBefore = _dragPrimaryBefore;
         ResetDrag();
         _document.CancelGesture(before);
+        NotifySelection(_model.SelectChains(selectedBefore, primaryBefore));
         ReleaseCursor();
         e.Handled = true;
     }
@@ -830,6 +866,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         int originTrack = _dragOriginTrack;
         string? before = _gestureBefore;
         var collapse = _collapseOnRelease;
+        int movedCount = _dragItems.Count;
         ResetDrag();
         if (kind == DragKind.Pending && collapse is { } clicked) SetSelection(clicked, null);
         if (kind == DragKind.Pending || dragged is null || before is null || _document is null || _undo is null
@@ -844,8 +881,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         else
         {
             var track = sequence.Tracks.First(t => t.Chains.Contains(dragged));
-            description = sequence.Tracks.IndexOf(track) == originTrack
-                ? $"Move '{dragged.Chain}'"
+            description = movedCount > 1 ? $"Move {Plural.Format(movedCount, "chain")}"
+                : sequence.Tracks.IndexOf(track) == originTrack ? $"Move '{dragged.Chain}'"
                 : $"Move '{dragged.Chain}' to '{track.Name}'";
         }
         _document.CommitGesture(_undo, description, before);
@@ -877,6 +914,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _snapOthers = Array.Empty<SnapTarget>();
         _frameBoundaries = null;
         _collapseOnRelease = null;
+        _dragItems = Array.Empty<DragItem>();
         _marqueeBase = Array.Empty<TimelineChainId>();
     }
 
@@ -930,12 +968,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
             var visibility = new MenuItem { Header = IsTrackHidden(track) ? "Show Track" : "Hide Track" };
             visibility.Click += (_, _) => ToggleTrackVisibility(track);
-            var delete = new MenuItem { Header = "Delete Track" };
-            delete.Click += (_, _) =>
-            {
-                SetSelection(null, null);
-                _document.DeleteTrack(_undo, _sequenceIndex, track);
-            };
+            bool deletesSelection = _model.IsMulti;
+            var delete = new MenuItem { Header = deletesSelection ? "Delete Selected Tracks" : "Delete Track" };
+            delete.Click += (_, _) => DeleteSelected();
             _menu.Items.Add(rename);
             _menu.Items.Add(visibility);
             if (Sequence!.Tracks.Any(t => !t.Visible))
@@ -956,7 +991,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var reference = hit.Block.Reference;
             var definition = new MenuItem { Header = "Go to Definition" };
             definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(reference);
-            var remove = new MenuItem { Header = "Remove from Track" };
+            var remove = new MenuItem { Header = _model.IsMulti ? "Remove Selected Chains" : "Remove from Track" };
             remove.Click += (_, _) => DeleteSelected();
             _menu.Items.Add(definition);
             _menu.Items.Add(remove);
