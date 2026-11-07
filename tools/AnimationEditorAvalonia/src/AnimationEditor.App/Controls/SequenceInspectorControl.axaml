@@ -91,6 +91,16 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Several chains or tracks selected: only the count; no field is common to all of them. -->
+                <Border x:Name="MultiPanel" IsVisible="False" Padding="12,8,12,10"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="MultiCountText" Classes="heading" AutomationProperties.AutomationId="seq-multi-count" />
+                        <TextBlock Classes="note"
+                                   Text="Drag to move them together, Delete to remove them, Ctrl+C to copy them, Ctrl+D to duplicate them. Click one to edit it." />
+                    </StackPanel>
+                </Border>
+
                 <!-- Chain -->
                 <Border x:Name="ChainPanel" IsVisible="False" Padding="12,8,12,10"
                         BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">

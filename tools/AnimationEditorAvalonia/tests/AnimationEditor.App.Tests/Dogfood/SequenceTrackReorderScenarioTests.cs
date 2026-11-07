@@ -208,7 +208,7 @@ public class SequenceTrackReorderScenarioTests
         editor.Press(Key.Escape);
 
         editor.RightClickAt(Header(editor, 1));
-        Timeline(editor).Menu.Items.Count.ShouldBe(3);
+        Timeline(editor).Menu.Items.Count.ShouldBe(4);
         Timeline(editor).SelectedTrack.ShouldBe(1);
     }
 }

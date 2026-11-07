@@ -108,6 +108,10 @@ public partial class MainWindow
 
         public void PasteSelection() { }
 
+        public void CutSelection() { }
+
+        public void DuplicateSelection() { }
+
         public bool CanCopyPaste => false;
 
         public void TogglePlayback() { }

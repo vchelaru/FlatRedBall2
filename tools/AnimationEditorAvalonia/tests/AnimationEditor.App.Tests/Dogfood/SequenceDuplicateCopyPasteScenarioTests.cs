@@ -322,7 +322,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task EditMenuCopyAndPaste_AreEnabledOnlyWhileTheListIsFocused_OnASeqjTab()
+    public async Task EditMenuCopyAndPaste_AreEnabledOnlyWhileTheListOrTheTimelineIsFocused_OnASeqjTab()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteBoss(editor));
@@ -332,7 +332,11 @@ public class SequenceDuplicateCopyPasteScenarioTests
         ClickRow(editor, 0);
         (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));
 
+        // The timeline copies chains and tracks, so it enables them too; anything else does not.
         ClickTimeline(editor);
+        (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));
+        editor.Control<Button>("AddSequenceButton").Focus();
+        editor.Layout();
         (copy.IsEnabled, paste.IsEnabled).ShouldBe((false, false));
         editor.Control<MenuItem>("MenuCut").IsEnabled.ShouldBeFalse();
 
