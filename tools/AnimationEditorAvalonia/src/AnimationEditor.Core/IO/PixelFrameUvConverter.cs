@@ -6,7 +6,7 @@ namespace AnimationEditor.Core.IO;
 /// Converts a single frame's raw-pixel coordinates (<see cref="TextureCoordinateType.Pixel"/>) to
 /// normalized UV (0-1), given the decoded texture's pixel size. Used by the project-tree thumbnail
 /// generator (issue #839), which only ever needs one frame's coordinates converted and already has
-/// the texture decoded -- unlike <c>ProjectManager.ConvertCoordinates</c>, which round-trips an
+/// the texture decoded -- unlike <c>TextureCoordinateConverter.ConvertCoordinates</c>, which round-trips an
 /// entire <c>AnimationChainListSave</c> for save/load.
 /// </summary>
 public static class PixelFrameUvConverter
