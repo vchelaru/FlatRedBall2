@@ -294,10 +294,12 @@ public sealed class LibraryChipView : Border
 
     private void ShowDragFeedback(PointerEventArgs e)
     {
-        if (_library.DragFeedback is not { } feedback) return;
-        DragCursor = feedback.Cursor;
         _ghost ??= new ChipDragGhost(Chip.Chain.Name);
+        if (_library.DragFeedback is not { } feedback) { ChipDragLog.Write("DragFeedback was null"); return; }
+        DragCursor = feedback.Cursor;
         _ghost.Update(this, _image.Source, feedback, e.GetPosition(this));
+        ChipDragLog.Apply(this, feedback.Cursor);
+        _ghost.Log(this, e, $"{feedback.Cursor} / {feedback.Hint}", $"sheet {feedback.Cursor}");
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -321,11 +323,13 @@ public sealed class LibraryChipView : Border
 
     private void EndPress()
     {
+        bool wasDragging = _dragging;
         _pressedAt = null;
         _dragging = false;
         Opacity = 1;
         DragCursor = null;
         _library.DragFeedback = null;
+        if (wasDragging) ChipDragLog.DragEnded(this);
         _ghost?.Hide();
     }
 

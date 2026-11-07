@@ -76,6 +76,13 @@ internal sealed class ChipDragGhost
         Canvas.SetTop(_card, point.Y + CursorOffset);
     }
 
+    // TEMPORARY diagnostic, see ChipDragLog.
+    public void Log(Control chip, PointerEventArgs e, string drag, string lastSet)
+    {
+        var sheet = _layer is not null && _layer.Children.Contains(_copySheet) ? _copySheet : _layer is not null && _layer.Children.Contains(_notAllowedSheet) ? _notAllowedSheet : null;
+        ChipDragLog.Move(chip, e, drag, lastSet, _layer, sheet);
+    }
+
     public void Hide()
     {
         _layer?.Children.Remove(_card);
