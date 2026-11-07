@@ -64,7 +64,6 @@ public partial class MainWindow
     {
         private readonly MainWindow _window;
         private readonly Dictionary<FilePath, SequenceDocument> _documents = new();
-        private readonly Dictionary<FilePath, int> _selectedIndex = new();
         private bool _wired;
         private SequenceDocument? _document;
         private bool _refreshing;
@@ -158,7 +157,6 @@ public partial class MainWindow
             if (_documents.TryGetValue(tab.Path, out var document) && document == _document)
                 Detach();
             _documents.Remove(tab.Path);
-            _selectedIndex.Remove(tab.Path);
         }
 
         public TabStatus Status(TabEntry? tab)
@@ -174,7 +172,29 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => scope is HotkeyScope.App or HotkeyScope.Document;
 
-        public void DeleteSelection() => _window.SequenceTimeline.DeleteSelected();
+        /// <summary>
+        /// Delete removes what was last clicked: a sequence when the list holds the keyboard focus, else the timeline's
+        /// selected chain or track. Clicking a row drops the timeline selection and clicking the timeline moves the
+        /// focus there, so the two never both apply.
+        /// </summary>
+        public void DeleteSelection()
+        {
+            if (SequenceListHasFocus)
+            {
+                DeleteSelected();
+                // Rebuilding the list drops its focus once the old row is gone; lay it out now and take it back.
+                _window.SequenceList.UpdateLayout();
+                _window.SequenceList.ContainerFromIndex(_window.SequenceList.SelectedIndex)?.Focus();
+            }
+            else
+            {
+                _window.SequenceTimeline.DeleteSelected();
+            }
+        }
+
+        private bool SequenceListHasFocus =>
+            _window.FocusManager?.GetFocusedElement() is Visual focused
+            && (focused == _window.SequenceList || _window.SequenceList.IsVisualAncestorOf(focused));
 
         public void TogglePlayback()
         {
@@ -199,7 +219,7 @@ public partial class MainWindow
             w.SequenceList.SelectionChanged += (_, _) =>
             {
                 if (_refreshing || _document is null) return;
-                _selectedIndex[_document.Path] = w.SequenceList.SelectedIndex;
+                _document.SelectedSequence = w.SequenceList.SelectedIndex;
                 w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
                 ShowInspector();
                 // Another sequence starts from its beginning.
@@ -427,7 +447,6 @@ public partial class MainWindow
         {
             if (_document is null) return;
             _document.AddSequence(_window._undoManager);
-            Select(_document.Save.Sequences.Count - 1);
         }
 
         private async Task RenameSelectedAsync()
@@ -446,13 +465,6 @@ public partial class MainWindow
             _document.DeleteSequence(_window._undoManager, index);
         }
 
-        private void Select(int index)
-        {
-            if (_document is null) return;
-            _selectedIndex[_document.Path] = index;
-            Refresh();
-        }
-
         private void Detach()
         {
             if (_document != null)
@@ -465,8 +477,8 @@ public partial class MainWindow
         {
             if (_document is null) return;
             _items = _document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
-            int selected = _selectedIndex.TryGetValue(_document.Path, out int kept) ? kept : 0;
-            selected = Math.Min(selected, _items.Count - 1);
+            // The document says which sequence an edit, undo or redo left selected.
+            int selected = Math.Min(_document.SelectedSequence, _items.Count - 1);
             _refreshing = true;
             try
             {
@@ -477,9 +489,11 @@ public partial class MainWindow
             {
                 _refreshing = false;
             }
-            _selectedIndex[_document.Path] = selected;
+            _document.SelectedSequence = selected;
             _window.SequenceLibrary.Show(_document);
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
+            // An undo or redo can change which sequence is selected without the list raising a selection change.
+            ShowInspector();
             _window.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
             // An edit can shorten the sequence under the playhead.
             _clock.Seek(_clock.Time, _window.SequenceTimeline.SequenceLength);
