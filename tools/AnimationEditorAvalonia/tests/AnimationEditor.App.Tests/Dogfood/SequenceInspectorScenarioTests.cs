@@ -126,6 +126,98 @@ public class SequenceInspectorScenarioTests
         tabs.SelectedItem.ShouldBe(editor.Control<TabItem>("HistoryTab"));
     }
 
+    // Two sequences, each with a track, so clicking the list changes what is selected.
+    private static string WriteTwoSequences(AnimationEditorHarness editor)
+    {
+        string path = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        var save = SequenceListSave.FromFile(path);
+        var second = new SequenceSave { Name = "Idle" };
+        second.Tracks.Add(Track("Legs", ("Run", 0, 2)));
+        save.Sequences.Add(second);
+        save.Save(path);
+        return path;
+    }
+
+    private static ListBox SequenceListBox(AnimationEditorHarness editor) => editor.Control<ListBox>("SequenceList");
+
+    [AvaloniaFact]
+    public async Task ClickingTheSequence_AfterATrackIsSelected_ShowsTheSequenceSection()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteTwoSequences(editor);
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+        editor.ClickAt(OnHeader(editor, 0));
+        inspector.TrackPanel.IsVisible.ShouldBeTrue();
+
+        // The row is already the selected one, so the list sees no selection change.
+        editor.Click((Control)SequenceListBox(editor).ContainerFromIndex(0)!);
+
+        (inspector.SequencePanel.IsVisible, inspector.TrackPanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((true, false, false));
+        Timeline(editor).SelectedTrack.ShouldBeNull();
+        inspector.SequenceNameBox.Text.ShouldBe("Attack");
+        editor.Control<TabControl>("SidebarTabs").SelectedItem.ShouldBe(editor.Control<TabItem>("InspectorTab"));
+    }
+
+    [AvaloniaFact]
+    public async Task ClickingAnotherSequence_ShowsItsFields_AndBringsTheInspectorForward_ButNotOffHistory()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteTwoSequences(editor);
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+        var tabs = editor.Control<TabControl>("SidebarTabs");
+        tabs.SelectedItem = editor.Control<TabItem>("FilesTab");
+
+        editor.Click((Control)SequenceListBox(editor).ContainerFromIndex(1)!);
+
+        inspector.SequencePanel.IsVisible.ShouldBeTrue();
+        inspector.SequenceNameBox.Text.ShouldBe("Idle");
+        tabs.SelectedItem.ShouldBe(editor.Control<TabItem>("InspectorTab"));
+
+        tabs.SelectedItem = editor.Control<TabItem>("HistoryTab");
+        editor.Click((Control)SequenceListBox(editor).ContainerFromIndex(0)!);
+        inspector.SequenceNameBox.Text.ShouldBe("Attack");
+        tabs.SelectedItem.ShouldBe(editor.Control<TabItem>("HistoryTab"));
+    }
+
+    [AvaloniaFact]
+    public async Task RenamingTheClickedSequence_InTheInspector_IsOneUndoStep_AndTheListFollows()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteTwoSequences(editor);
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+        editor.ClickAt(OnChain(editor, 0, 0.1));
+        editor.Click((Control)SequenceListBox(editor).ContainerFromIndex(1)!);
+
+        editor.TypeAndEnter(inspector.SequenceNameBox, "Slam");
+
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Slam" });
+        SequenceListSave.FromFile(boss).Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Attack", "Slam" });
+        editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Slam'" });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
+        inspector.SequenceNameBox.Text.ShouldBe("Idle");
+    }
+
+    [AvaloniaFact]
+    public async Task SelectingAChain_ThenASequence_SwitchesSections()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteTwoSequences(editor);
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+
+        editor.ClickAt(OnChain(editor, 0, 0.1));
+        inspector.ChainPanel.IsVisible.ShouldBeTrue();
+        editor.Click((Control)SequenceListBox(editor).ContainerFromIndex(1)!);
+        (inspector.SequencePanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((true, false));
+        editor.ClickAt(OnChain(editor, 0, 0.1));
+        (inspector.SequencePanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((false, true));
+        inspector.ChainNameText.Text.ShouldBe("Run");
+    }
+
     [AvaloniaFact]
     public async Task EditingATrack_EachFieldIsOneUndoStep_AndCtrlZRestoresIt()
     {
