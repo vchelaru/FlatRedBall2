@@ -3204,6 +3204,9 @@ public partial class MainWindow : Window
         WireframeCtrl.DiagnosticsEnabled = on;
         PreviewCtrl.DiagnosticsEnabled   = on;
         SequenceTimeline.DiagnosticsEnabled = on;
+        // Avalonia's own frames-per-second readout for the whole window. Not its layout and render time graphs: those repaint
+        // the whole window on every frame, which would slow exactly what is being measured.
+        RendererDiagnostics.DebugOverlays = on ? Avalonia.Rendering.RendererDebugOverlays.Fps : Avalonia.Rendering.RendererDebugOverlays.None;
     }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)

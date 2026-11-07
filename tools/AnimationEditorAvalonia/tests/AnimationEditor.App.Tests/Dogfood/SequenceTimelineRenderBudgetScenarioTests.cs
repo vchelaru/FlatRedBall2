@@ -105,6 +105,8 @@ public class SequenceTimelineRenderBudgetScenarioTests
 
         editor.Press(Key.F3);
         timeline.DiagnosticsEnabled.ShouldBeTrue();
+        // Avalonia's layout and render time graphs repaint the whole window every frame, so F3 must not turn them on.
+        editor.Window.RendererDiagnostics.DebugOverlays.ShouldBe(Avalonia.Rendering.RendererDebugOverlays.Fps);
 
         editor.Press(Key.F3);
         timeline.DiagnosticsEnabled.ShouldBeFalse();

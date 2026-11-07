@@ -36,7 +36,9 @@ internal sealed class TimelineDiagnostics
     private int _windowFrames;
     private double _windowRasterMs, _windowRasterMax, _windowRecordMs;
     private volatile string _backend = "?";
-    private volatile string _lastFpsText = "";
+    private readonly BurstRate _renderRate = new();   // UI thread: when the timeline was recorded
+    private readonly BurstRate _rasterRate = new();   // render thread: when it finished rasterizing
+    private readonly BurstRate _inputRate = new();    // UI thread: scroll, drag and zoom input reaching the timeline
 
     public TimelineDiagnostics(Action invalidate)
     {
@@ -82,6 +84,12 @@ internal sealed class TimelineDiagnostics
 
     public void Stop() => _timer?.Stop();
 
+    /// <summary>Notes one input event that moves the view (a wheel notch, a drag step, a scrollbar change), for the input rate.</summary>
+    public void NoteInput()
+    {
+        if (Active) _inputRate.Add(Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency);
+    }
+
     private DispatcherTimer CreateTimer()
     {
         var timer = new DispatcherTimer { Interval = RepaintInterval };
@@ -96,6 +104,7 @@ internal sealed class TimelineDiagnostics
         bool active = Active;
         long allocBefore = GC.GetAllocatedBytesForCurrentThread();
         long start = Stopwatch.GetTimestamp();
+        if (active) _renderRate.Add(start / (double)Stopwatch.Frequency);
         if (active) context.Custom(new MarkerOp(this, begin: true, null));
 
         draw(context);
@@ -115,7 +124,8 @@ internal sealed class TimelineDiagnostics
     {
         string[] lines =
         {
-            $"timeline: record {_recordMs.Average:F2} ms  raster {_rasterMs.Average:F2} ms  {_lastFpsText}  [{_backend}]",
+            $"timeline: record {_recordMs.Average:F2} ms  raster {_rasterMs.Average:F2} ms  [{_backend}]",
+            $"cadence: records {_renderRate.Hertz:F0}/s (worst gap {_renderRate.WorstGapMilliseconds:F0} ms)  rasters {_rasterRate.Hertz:F0}/s  input {_inputRate.Hertz:F0}/s (worst gap {_inputRate.WorstGapMilliseconds:F0} ms)",
             $"blocks {Last.BlocksIssued}/{Last.Blocks} (visible {Last.BlocksVisible})  cells {Last.CellsIssued} (visible {Last.CellsVisible})  images {Last.Images}  ops {Last.FilmstripOps}",
             $"clips {Last.Clips}  texts {Last.Texts}  hatch {Last.HatchLines}  grid {Last.GridLines}  ruler {Last.RulerLabels}  alloc {Last.AllocatedBytes / 1024} KB",
         };
@@ -150,6 +160,7 @@ internal sealed class TimelineDiagnostics
         }
         double ms = (now - _beginStamp) * 1000.0 / Stopwatch.Frequency;
         _rasterMs.Add(ms);
+        _rasterRate.Add(now / (double)Stopwatch.Frequency);
         LastRasterMs = ms;
         RasterFrames++;
         _windowFrames++;
@@ -160,14 +171,14 @@ internal sealed class TimelineDiagnostics
         double elapsed = (now - _windowStart) / (double)Stopwatch.Frequency;
         if (elapsed < 1.0) return;
 
-        double fps = _windowFrames / elapsed;
-        _lastFpsText = $"{fps:F0} fps";
+        double fps = _windowFrames / elapsed;   // frames over the whole window, idle time included
+
         if (!string.IsNullOrEmpty(LogPath) && stats is not null)
         {
             string line = string.Format(CultureInfo.InvariantCulture,
-                "{0:HH:mm:ss.fff} [{1}] fps {2:F1} frames {3} raster avg {4:F2} max {5:F2} ms record avg {6:F2} ms | {7}{8}",
+                "{0:HH:mm:ss.fff} [{1}] avg {2:F1}/s over the second (idle included), burst {9:F0}/s raster {10:F0}/s input {11:F0}/s, frames {3} raster avg {4:F2} max {5:F2} ms record avg {6:F2} ms | {7}{8}",
                 DateTime.Now, _backend, fps, _windowFrames, _windowRasterMs / _windowFrames, _windowRasterMax,
-                _windowRecordMs / _windowFrames, stats, Environment.NewLine);
+                _windowRecordMs / _windowFrames, stats, Environment.NewLine, _renderRate.Hertz, _rasterRate.Hertz, _inputRate.Hertz);
             try { File.AppendAllText(LogPath, line); } catch (IOException) { }
         }
         _windowStart = now;
