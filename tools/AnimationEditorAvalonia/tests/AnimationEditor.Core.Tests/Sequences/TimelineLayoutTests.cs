@@ -58,6 +58,67 @@ public class TimelineLayoutTests
     }
 
     [Fact]
+    public void LaneHeights_OnlyTracksWithEvents_GrowByTheEventRow()
+    {
+        var sequence = new SequenceSave
+        {
+            Tracks =
+            {
+                new SequenceTrackSave { Chains = { Ref("Walk", 0) } },
+                new SequenceTrackSave { Chains = { Ref("Run", 0), Ref("Hit", 1) } },
+                new SequenceTrackSave(),
+            },
+        };
+        var blocks = TimelineLayout.Blocks(sequence, Cycle);
+
+        var heights = TimelineLayout.LaneHeights(blocks, 3, block => block.Reference.Chain == "Hit");
+
+        heights.ShouldBe(new[] { TimelineViewport.LaneHeight, TimelineViewport.LaneHeight + TimelineLayout.EventRowHeight, TimelineViewport.LaneHeight });
+    }
+
+    [Fact]
+    public void HitTest_InATallLanesEventRow_HitsTheBlockBody_AndNeverACutTail()
+    {
+        // Walk 0..3 s cut at 2 s by Run: the event row under Walk's cut tail is empty space, under Run it is Run's.
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 3), Ref("Run", 2) } };
+        var sequence = new SequenceSave { Tracks = { track } };
+        var blocks = TimelineLayout.Blocks(sequence, Cycle);
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { TimelineViewport.LaneHeight + TimelineLayout.EventRowHeight });
+        double eventY = LaneY(viewport, 0, TimelineLayout.EventRowTop + 6);
+
+        TimelineHit? Hit(double time) => TimelineLayout.HitTest(viewport, blocks, 1, viewport.XAt(time), eventY);
+
+        Hit(1).ShouldBe(new TimelineHit(blocks[0], TimelineHitPart.Body));
+        Hit(2.5)!.Value.Block.Reference.Chain.ShouldBe("Run");
+        // Past Run's end (3 s) only Walk's cut tail would reach, and the tail strip is above the event row.
+        Hit(3.2).ShouldBeNull();
+    }
+
+    [Fact]
+    public void HitTest_AfterATallLane_FindsTheNextTracksBlocksAtTheirShiftedPosition()
+    {
+        var sequence = new SequenceSave
+        {
+            Tracks =
+            {
+                new SequenceTrackSave { Chains = { Ref("Walk", 0) } },
+                new SequenceTrackSave { Chains = { Ref("Run", 0) } },
+            },
+        };
+        var blocks = TimelineLayout.Blocks(sequence, Cycle);
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { TimelineViewport.LaneHeight + TimelineLayout.EventRowHeight, TimelineViewport.LaneHeight });
+        double secondLaneY = viewport.LaneTop(1) + TimelineLayout.BodyTop + 2;
+
+        var hit = TimelineLayout.HitTest(viewport, blocks, 2, viewport.XAt(0.5), secondLaneY);
+
+        hit!.Value.Block.Reference.Chain.ShouldBe("Run");
+        // The same y with every lane 48 px would land on the first lane's event row, not on Run's body.
+        viewport.LaneTop(1).ShouldBe(TimelineViewport.RulerHeight + 60);
+    }
+
+    [Fact]
     public void Blocks_EndingAFloatRoundingPastTheNextStart_IsNotCut()
     {
         // 2.5 float loops of a float-summed 0.1 s × 5 cycle land a hair past 1.25, where the edge magnet put it.

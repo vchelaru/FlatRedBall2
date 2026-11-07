@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -30,7 +32,7 @@ public sealed class TimelineViewport
 {
     public const double HeaderWidth = 120;
     public const double RulerHeight = 22;
-    /// <summary>The one lane height (no setting): a label strip and a filmstrip row, then the cut-tail strip. See <see cref="TimelineLayout"/>.</summary>
+    /// <summary>The base lane height: a label strip and a filmstrip row, then the cut-tail strip. A track with events is taller (<see cref="TimelineLayout.EventRowHeight"/>); see <see cref="SetLaneHeights"/>.</summary>
     public const double LaneHeight = 48;
     public const double MinPixelsPerSecond = 10;
     public const double MaxPixelsPerSecond = 2000;
@@ -50,17 +52,40 @@ public sealed class TimelineViewport
     public double TimeAt(double x) => ScrollSeconds + (x - HeaderWidth) / PixelsPerSecond;
 
     /// <summary>The top of row <paramref name="lane"/>, where the track count is the new-track row.</summary>
-    public double LaneTop(int lane) => RulerHeight + lane * LaneHeight - ScrollY;
+    public double LaneTop(int lane) => RulerHeight + OffsetOf(lane) - ScrollY;
+
+    // Each track's own lane height (a track with events is taller), and where each lane starts below the ruler. A lane
+    // past the list, such as the new-track row, is a base lane.
+    private double[] _heights = Array.Empty<double>();
+    private double[] _offsets = { 0 };
+
+    /// <summary>
+    /// Sets each track's lane height, in track order. Call it whenever the tracks or their contents change, then
+    /// <see cref="ClampVertical"/>: the vertical scroll limit depends on it.
+    /// </summary>
+    public void SetLaneHeights(IReadOnlyList<double> heights)
+    {
+        _heights = heights.ToArray();
+        _offsets = new double[_heights.Length + 1];
+        for (int i = 0; i < _heights.Length; i++) _offsets[i + 1] = _offsets[i] + _heights[i];
+    }
+
+    /// <summary>The height of lane <paramref name="lane"/>; the new-track row (the track count) is a base <see cref="LaneHeight"/>.</summary>
+    public double LaneHeightOf(int lane) => lane >= 0 && lane < _heights.Length ? _heights[lane] : LaneHeight;
+
+    private double OffsetOf(int lane) =>
+        lane <= _heights.Length ? _offsets[lane] : _offsets[^1] + (lane - _heights.Length) * LaneHeight;
 
     /// <summary>The height every lane plus the new-track row needs, ruler included.</summary>
-    public static double ContentHeight(int trackCount) => RulerHeight + (trackCount + 1) * LaneHeight;
+    public double ContentHeight(int trackCount) => RulerHeight + OffsetOf(trackCount) + LaneHeight;
 
     public TimelineRow RowAt(double y, int trackCount)
     {
         if (y < RulerHeight) return new TimelineRow(TimelineRowKind.Ruler);
-        int lane = (int)Math.Floor((y - RulerHeight + ScrollY) / LaneHeight);
-        if (lane < trackCount) return new TimelineRow(TimelineRowKind.Track, lane);
-        return lane == trackCount ? new TimelineRow(TimelineRowKind.NewTrack) : new TimelineRow(TimelineRowKind.None);
+        double offset = y - RulerHeight + ScrollY;
+        for (int lane = 0; lane < trackCount; lane++)
+            if (offset < OffsetOf(lane + 1)) return new TimelineRow(TimelineRowKind.Track, lane);
+        return offset < OffsetOf(trackCount) + LaneHeight ? new TimelineRow(TimelineRowKind.NewTrack) : new TimelineRow(TimelineRowKind.None);
     }
 
     /// <summary>
@@ -91,6 +116,7 @@ public sealed class TimelineViewport
     /// </summary>
     public void ScrollVertically(double pixels, int trackCount, double viewHeight) =>
         ScrollY = Math.Clamp(ScrollY + pixels, 0, Math.Max(0, ContentHeight(trackCount) - viewHeight));
+
 
     /// <summary>Re-clamps the vertical scroll after tracks were removed or the view grew.</summary>
     public void ClampVertical(int trackCount, double viewHeight) => ScrollVertically(0, trackCount, viewHeight);
