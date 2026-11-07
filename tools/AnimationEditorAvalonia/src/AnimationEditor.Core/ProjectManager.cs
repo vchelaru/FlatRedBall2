@@ -139,28 +139,10 @@ namespace AnimationEditor.Core
             FilePath fileName,
             AnimationChainListSave? preParsed = null)
         {
-            AnimationChainListSave acls;
-            if (preParsed != null)
-            {
-                // Caller already has the parsed content -- nothing to read from disk, so the
-                // existence check below only applies to the "read fileName ourselves" path.
-                acls = preParsed;
-            }
-            else
-            {
-                if (!fileName.Exists())
-                    throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
-
-                var rawContent = File.ReadAllText(fileName.FullPath);
-                if (IO.AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
-                    throw new System.IO.InvalidDataException(
-                        $"{IO.AchxConflictMarkerDetector.ConflictMarkerMessage} ({fileName.FullPath})");
-
-                acls = AnimationChainListSave.FromString(rawContent);
-            }
-
-            OnDiskCoordinateType = acls.CoordinateType;
-            ConvertCoordinates(acls, fileName.GetDirectoryContainingThis().FullPath, TextureCoordinateType.UV);
+            // Caller already has the parsed content -- nothing to read from disk, so the
+            // existence and conflict-marker checks only apply when reading fileName ourselves.
+            var acls = preParsed ?? AnimationFileLoader.Read(fileName);
+            OnDiskCoordinateType = AnimationFileLoader.ConvertToEditorCoordinates(acls, fileName);
 
             AnimationChainListSave = acls;
             FileName = fileName.FullPath;
@@ -185,11 +167,6 @@ namespace AnimationEditor.Core
             else
                 ReferencedPngs = new FilePath[0];
         }
-
-        // The editor's rendering and inspector code assumes UV (0–1) frame coordinates throughout.
-        // .achx files saved with CoordinateType=Pixel store raw pixel coordinates instead, so load
-        // converts them via ConvertCoordinates, which reads each texture's PNG header directly to
-        // avoid pulling an image-decode dependency into Core.
 
         /// <summary>
         /// Save the current animation chain list to <paramref name="targetPath"/>, as .achj
@@ -226,7 +203,7 @@ namespace AnimationEditor.Core
                 return;
             }
 
-            var sizes = ConvertCoordinates(acls, achxDirectory, diskFormat);
+            var sizes = TextureCoordinateConverter.ConvertCoordinates(acls, achxDirectory, diskFormat);
             try
             {
                 Write();
@@ -234,132 +211,13 @@ namespace AnimationEditor.Core
             finally
             {
                 // Convert back to UV so the in-memory model continues to be UV.
-                ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV, sizes);
+                TextureCoordinateConverter.ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV, sizes);
             }
         }
 
         /// <summary>True when <paramref name="path"/> has a .achj (JSON) extension; false for .achx or anything else.</summary>
         internal static bool IsJsonPath(string? path) =>
             !string.IsNullOrEmpty(path) && new FilePath(path).Extension == "achj";
-
-        /// <summary>
-        /// Convert <paramref name="acls"/> to <paramref name="target"/> coordinate space
-        /// in place and return the per-texture size cache used (so a paired round-trip
-        /// can reuse it). No-op if already in <paramref name="target"/> space.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">
-        /// Converting toward <see cref="TextureCoordinateType.Pixel"/> (i.e. preparing a persisted
-        /// on-disk write) needs every referenced texture's pixel size resolved up front: writing a
-        /// file with <c>CoordinateType=Pixel</c> while a frame's texture size couldn't be resolved
-        /// would leave that frame's coordinates un-converted (still UV-scale) under a header that
-        /// claims otherwise, corrupting the file (#1135). Converting toward UV -- on load, or when
-        /// reversing an in-memory model back after a successful Pixel save -- stays lenient: a
-        /// texture that hasn't been built yet is an expected, tolerated state while editing, and no
-        /// persisted artifact is at risk.
-        /// </exception>
-        private static Dictionary<string, (int W, int H)> ConvertCoordinates(
-            AnimationChainListSave acls,
-            string achxDirectory,
-            TextureCoordinateType target,
-            Dictionary<string, (int W, int H)>? sizeCache = null)
-        {
-            sizeCache ??= new Dictionary<string, (int W, int H)>(System.StringComparer.OrdinalIgnoreCase);
-
-            if (acls.CoordinateType == target) return sizeCache;
-
-            bool toPixel = target == TextureCoordinateType.Pixel;
-
-            if (toPixel)
-            {
-                var unresolved = new List<string>();
-                foreach (var chain in acls.AnimationChains)
-                {
-                    foreach (var frame in chain.Frames)
-                    {
-                        if (string.IsNullOrEmpty(frame.TextureName)) continue;
-                        if (sizeCache.ContainsKey(frame.TextureName)) continue;
-
-                        if (TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out var size))
-                            sizeCache[frame.TextureName] = size;
-                        else
-                            unresolved.Add(frame.TextureName);
-                    }
-                }
-
-                if (unresolved.Count > 0)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot save with CoordinateType=Pixel: texture size could not be resolved " +
-                        $"for: {string.Join(", ", unresolved.Distinct())}. Fix or rebuild the missing " +
-                        $"{Plural.Noun(unresolved.Distinct().Count(), "texture")}, or switch the on-disk coordinate format to UV.");
-                }
-            }
-
-            foreach (var chain in acls.AnimationChains)
-            {
-                foreach (var frame in chain.Frames)
-                {
-                    if (string.IsNullOrEmpty(frame.TextureName)) continue;
-
-                    if (!sizeCache.TryGetValue(frame.TextureName, out var size))
-                    {
-                        // Only reached when target == UV -- the toPixel branch above already
-                        // guaranteed every frame's texture is in sizeCache or threw.
-                        if (!TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out size))
-                            continue;
-                        sizeCache[frame.TextureName] = size;
-                    }
-
-                    if (size.W <= 0 || size.H <= 0) continue;
-
-                    if (toPixel)
-                    {
-                        frame.LeftCoordinate   *= size.W;
-                        frame.RightCoordinate  *= size.W;
-                        frame.TopCoordinate    *= size.H;
-                        frame.BottomCoordinate *= size.H;
-                    }
-                    else
-                    {
-                        frame.LeftCoordinate   /= size.W;
-                        frame.RightCoordinate  /= size.W;
-                        frame.TopCoordinate    /= size.H;
-                        frame.BottomCoordinate /= size.H;
-                    }
-                }
-            }
-
-            acls.CoordinateType = target;
-            return sizeCache;
-        }
-
-        /// <summary>
-        /// Resolves <paramref name="textureName"/> to a pixel size via <paramref name="sizeCache"/>,
-        /// falling back to a PNG header read under <paramref name="achxDirectory"/>. Returns <see langword="false"/>
-        /// without touching <paramref name="sizeCache"/> when neither resolves.
-        /// </summary>
-        private static bool TryResolveTextureSize(
-            string textureName,
-            string achxDirectory,
-            Dictionary<string, (int W, int H)> sizeCache,
-            out (int W, int H) size)
-        {
-            if (sizeCache.TryGetValue(textureName, out size)) return true;
-
-            var path = System.IO.Path.IsPathRooted(textureName)
-                ? textureName
-                : System.IO.Path.Combine(achxDirectory, textureName);
-
-            var read = TryReadPngSize(path);
-            if (read == null)
-            {
-                size = default;
-                return false;
-            }
-
-            size = read.Value;
-            return true;
-        }
 
         /// <summary>
         /// Resolves <paramref name="textureName"/> (relative to the loaded .achx's directory, or
@@ -378,32 +236,10 @@ namespace AnimationEditor.Core
                 ? textureName
                 : System.IO.Path.Combine(dir, textureName);
 
-            var size = TryReadPngSize(path);
+            var size = TextureCoordinateConverter.TryReadPngSize(path);
             return size == null ? null : (size.Value.W, size.Value.H);
         }
 
-        private static (int W, int H)? TryReadPngSize(string path)
-        {
-            try
-            {
-                using var fs = System.IO.File.OpenRead(path);
-                System.Span<byte> hdr = stackalloc byte[24];
-                if (fs.Read(hdr) != 24) return null;
-
-                // PNG signature: 89 50 4E 47 0D 0A 1A 0A, then 8 bytes IHDR header,
-                // then width (BE int32) and height (BE int32).
-                if (hdr[0] != 0x89 || hdr[1] != 0x50 || hdr[2] != 0x4E || hdr[3] != 0x47)
-                    return null;
-
-                int w = (hdr[16] << 24) | (hdr[17] << 16) | (hdr[18] << 8) | hdr[19];
-                int h = (hdr[20] << 24) | (hdr[21] << 16) | (hdr[22] << 8) | hdr[23];
-                return (w, h);
-            }
-            catch
-            {
-                return null;
-            }
-        }
 
         /// <summary>
         /// Heals every frame's <see cref="AnimationFrameSave.TextureName"/> against
@@ -570,7 +406,7 @@ namespace AnimationEditor.Core
                     ? frame.TextureName
                     : System.IO.Path.Combine(achxDirectory, frame.TextureName);
 
-                if (TryReadPngSize(path) == null)
+                if (TextureCoordinateConverter.TryReadPngSize(path) == null)
                     missing.Add(frame.TextureName);
             }
 
