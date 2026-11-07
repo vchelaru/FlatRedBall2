@@ -113,6 +113,7 @@ public sealed partial class SequenceTimelineControl
 
     private void DrawFilmstrip(DrawingContext context, TimelineBlock block, Rect film)
     {
+        if (ProbeMode is TimelineProbeMode.NoFilmstrips or TimelineProbeMode.NoFilmstripsOrText or TimelineProbeMode.BackgroundOnly) return;
         if (_document is not { } document || document.FindChain(block.Reference) is not { Frames.Count: > 0 } chain) return;
         var cells = FilmstripCells(block);
         var boundary = new Pen(Brush("LineStrong"), 1);

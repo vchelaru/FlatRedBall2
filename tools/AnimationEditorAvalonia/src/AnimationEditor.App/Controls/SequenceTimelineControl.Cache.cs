@@ -52,6 +52,7 @@ public sealed partial class SequenceTimelineControl
     private FormattedText CachedText(string text, double size, IBrush brush, FontWeight weight, double maxWidth, bool mono)
     {
         Stats.Texts++;
+        if (ProbesTextAway) text = "";
         var key = new TextKey(text, size, brush, weight, maxWidth, mono);
         if (_texts.TryGetValue(key, out var cached)) return cached;
         Stats.TextsCreated++;

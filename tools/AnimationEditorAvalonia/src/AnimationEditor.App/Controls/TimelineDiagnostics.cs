@@ -57,6 +57,15 @@ internal sealed class TimelineDiagnostics
     /// <summary>More overlay lines (the window-wide ones), asked for each time the overlay draws.</summary>
     public Func<System.Collections.Generic.IReadOnlyList<string>>? ExtraLines { get; set; }
 
+    /// <summary>The filmstrip operations' readings, taken once per frame at the end marker.</summary>
+    internal FilmstripProbe? Probe { get; set; }
+
+    /// <summary>The overlay lines about the probe (mode, filmstrip draw time, GPU cache).</summary>
+    public Func<System.Collections.Generic.IReadOnlyList<string>>? ProbeLines { get; set; }
+
+    /// <summary>Milliseconds the filmstrip draws took on the render thread in the newest frame, and how often the GPU cache changed.</summary>
+    public (double Milliseconds, long Changes) LastFilmstripFrame { get; private set; }
+
     public bool Enabled
     {
         get => _enabled;
@@ -132,6 +141,7 @@ internal sealed class TimelineDiagnostics
             $"blocks {Last.BlocksIssued}/{Last.Blocks} (visible {Last.BlocksVisible})  cells {Last.CellsIssued} (visible {Last.CellsVisible})  images {Last.Images}  ops {Last.FilmstripOps}",
             $"clips {Last.Clips}  texts {Last.Texts}  hatch {Last.HatchLines}  grid {Last.GridLines}  ruler {Last.RulerLabels}  alloc {Last.AllocatedBytes / 1024} KB",
         };
+        if (ProbeLines?.Invoke() is { } probe) lines.AddRange(probe);
         if (ExtraLines?.Invoke() is { } extra) lines.AddRange(extra);
         var typeface = new Typeface(FontFamily.Default);
         double width = 0, height = 0;
@@ -165,6 +175,7 @@ internal sealed class TimelineDiagnostics
         double ms = (now - _beginStamp) * 1000.0 / Stopwatch.Frequency;
         _rasterMs.Add(ms);
         _rasterRate.Add(now / (double)Stopwatch.Frequency);
+        if (Probe is { } filmstripProbe) LastFilmstripFrame = filmstripProbe.Take();
         LastRasterMs = ms;
         RasterFrames++;
         _windowFrames++;

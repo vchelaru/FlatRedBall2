@@ -79,6 +79,15 @@ internal sealed class FilmstripRenderer
 
     internal FilmstripAtlas Atlas { get; } = new();
 
+    /// <summary>What the filmstrip operations report from the render thread, for the F3 overlay.</summary>
+    internal FilmstripProbe Probe { get; } = new();
+
+    /// <summary>Diagnostics: draw each cell with its own draws instead of batching them (see <see cref="TimelineProbeMode"/>).</summary>
+    public bool PerCellDraws { get; set; }
+
+    /// <summary>Diagnostics: make the render thread wait for the GPU after each filmstrip.</summary>
+    public bool WaitForGpu { get; set; }
+
     /// <summary>Forgets the laid-out cells: the document or the chain data behind them may have changed.</summary>
     public void Invalidate()
     {
@@ -186,7 +195,7 @@ internal sealed class FilmstripRenderer
         if (_draws.Count > 0)
         {
             if (Stats is { } ops) ops.FilmstripOps++;
-            context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundaryColor ?? default));
+            context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundaryColor ?? default, Probe, PerCellDraws, WaitForGpu));
         }
         foreach (var (number, rect) in _numbered)
             DrawNumber(context, number, rect, numberBrush);

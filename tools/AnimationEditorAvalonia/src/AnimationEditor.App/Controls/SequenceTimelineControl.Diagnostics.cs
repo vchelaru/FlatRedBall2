@@ -8,7 +8,11 @@ public sealed partial class SequenceTimelineControl
 {
     private TimelineDiagnostics? _diagnostics;
 
-    private TimelineDiagnostics Diagnostics => _diagnostics ??= new TimelineDiagnostics(InvalidateVisual);
+    private TimelineDiagnostics Diagnostics => _diagnostics ??= new TimelineDiagnostics(InvalidateVisual)
+    {
+        Probe = _filmstrip.Probe,
+        ProbeLines = ProbeOverlayLines,
+    };
 
     /// <summary>Shows the draw-time overlay (record and raster milliseconds, fps, GPU or CPU, what was drawn) over the lanes. Toggled with F3.</summary>
     public bool DiagnosticsEnabled

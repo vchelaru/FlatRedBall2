@@ -793,6 +793,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (e.Key == Key.F4 && Diagnostics.Enabled)
+        {
+            CycleProbeMode();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape && _drag is DragKind.TrackPending or DragKind.Track)
         {
             // Nothing was applied while dragging, so cancelling is just forgetting the drag.
@@ -977,6 +983,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         var size = Bounds.Size;
         context.FillRectangle(Brush("BgCanvas"), new Rect(size));
+        if (ProbeMode == TimelineProbeMode.BackgroundOnly) return;
         if (Sequence is not { } sequence) return;
 
         double header = TimelineViewport.HeaderWidth;

@@ -197,6 +197,29 @@ public class SequenceTimelineRenderBudgetScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task TheNoFilmstripsProbe_DrawsNoFilmstripOps_AndF4OnlyCyclesWhileDiagnosticsAreOn()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteLongSequence(editor));
+        var timeline = Timeline(editor);
+        timeline.Focus();
+
+        editor.Press(Key.F4);
+        timeline.ProbeMode.ShouldBe(TimelineProbeMode.Normal);
+
+        editor.Press(Key.F3);
+        timeline.Focus();
+        editor.Press(Key.F4);
+        editor.Press(Key.F4);
+        timeline.ProbeMode.ShouldBe(TimelineProbeMode.NoFilmstrips);
+        timeline.ScrollToSeconds(22);
+        editor.Layout();
+
+        timeline.LastFrame.FilmstripOps.ShouldBe(0);
+        timeline.LastFrame.BlocksIssued.ShouldBeGreaterThan(0);
+    }
+
+    [AvaloniaFact]
     public async Task ScrollingToTheMiddle_IssuesOnlyTheFilmstripCellsOnScreen()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
