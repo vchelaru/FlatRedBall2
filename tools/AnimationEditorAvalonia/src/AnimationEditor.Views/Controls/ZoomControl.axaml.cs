@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -17,8 +18,7 @@ namespace AnimationEditor.App.Controls;
 public partial class ZoomControl : UserControl
 {
     /// <summary>Zoom presets (percent) the +/- buttons and mouse-wheel step through.</summary>
-    public static readonly int[] Presets =
-        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
+    public static readonly int[] Presets = ZoomPresetStepper.Presets;
 
     private static readonly string[] PresetTexts = Presets.Select(p => $"{p}%").ToArray();
 
