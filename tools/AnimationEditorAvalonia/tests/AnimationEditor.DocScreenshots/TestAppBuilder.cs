@@ -18,11 +18,13 @@ namespace AnimationEditor.DocScreenshots;
 /// <c>RenderToBitmap</c>, which draws straight onto a canvas and bypasses Avalonia's
 /// compositor entirely. <see cref="ScreenshotCapture"/> instead captures Avalonia's own
 /// composited output for an arbitrary visual, so it needs the compositor to actually run.
+/// <c>WithInterFont</c> matches the real app (<c>Program.BuildAvaloniaApp</c>), so text is shaped with the font users see.
 /// </summary>
 public class TestAppBuilder
 {
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<global::AnimationEditor.App.App>()
             .UseSkia()
+            .WithInterFont()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 }

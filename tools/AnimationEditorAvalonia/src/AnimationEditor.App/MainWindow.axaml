@@ -653,18 +653,18 @@
                         <TextBlock x:Name="StatusSaveLabel"
                                    Text="Not saved"
                                    FontSize="11"
-                                   FontFamily="Consolas,Menlo,Monospace"
+                                   FontFamily="{DynamicResource MonoFont}"
                                    Foreground="{DynamicResource InkMid}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock x:Name="StatusFilename"
                                FontSize="11"
-                               FontFamily="Consolas,Menlo,Monospace"
+                               FontFamily="{DynamicResource MonoFont}"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="StatusCounts"
                                FontSize="11"
-                               FontFamily="Consolas,Menlo,Monospace"
+                               FontFamily="{DynamicResource MonoFont}"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
                     <!-- Tiled tileset sync status (issue #1139), hidden until a sync has
@@ -680,7 +680,7 @@
                                  Fill="{DynamicResource AccentSoft}" />
                         <TextBlock x:Name="TiledSyncLabel"
                                    FontSize="11"
-                                   FontFamily="Consolas,Menlo,Monospace"
+                                   FontFamily="{DynamicResource MonoFont}"
                                    Foreground="{DynamicResource InkMid}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -690,19 +690,19 @@
                             VerticalAlignment="Center">
                     <TextBlock x:Name="StatusCursor"
                                FontSize="11"
-                               FontFamily="Consolas,Menlo,Monospace"
+                               FontFamily="{DynamicResource MonoFont}"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="StatusSelection"
                                FontSize="11"
-                               FontFamily="Consolas,Menlo,Monospace"
+                               FontFamily="{DynamicResource MonoFont}"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <!-- center: transient status message (last child — fills remaining space) -->
                 <TextBlock x:Name="StatusMessage"
                            FontSize="11"
-                           FontFamily="Consolas,Menlo,Monospace"
+                           FontFamily="{DynamicResource MonoFont}"
                            Foreground="{DynamicResource InkMid}"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"
@@ -2262,6 +2262,7 @@
                                 </Button>
                                 <TextBlock x:Name="SequenceTimeText"
                                            Text="0.00 s"
+                                           FontFamily="{DynamicResource MonoFont}"
                                            MinWidth="92"
                                            Margin="8,0"
                                            VerticalAlignment="Center"
