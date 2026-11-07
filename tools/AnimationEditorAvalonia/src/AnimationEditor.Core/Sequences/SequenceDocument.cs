@@ -26,6 +26,8 @@ public sealed class SequenceDocument
     private const string DefaultSequenceName = "Sequence";
 
     // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
+    private int? _trackToSelect;
+
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
 
     private SequenceDocument(string path, SequenceListSave save)
@@ -240,6 +242,37 @@ public sealed class SequenceDocument
         Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for '{Save.Sequences[sequence].Tracks[track].Name}'",
             save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
 
+    /// <summary>
+    /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
+    /// (0 above the first lane, the track count below the last) as one undo entry, renumbering Z as
+    /// <see cref="TrackReorder"/> describes. Returns the track's new index, or null when the drop changes nothing.
+    /// </summary>
+    public int? MoveTrack(IUndoManager undo, int sequence, int from, int slot)
+    {
+        var tracks = Save.Sequences[sequence].Tracks;
+        if (TrackReorder.Plan(tracks.Select(t => t.Z).ToList(), from, slot) is not { } plan) return null;
+        Edit(undo, $"Move Track '{tracks[from].Name}'", save =>
+        {
+            var target = save.Sequences[sequence].Tracks;
+            var moved = plan.Order.Select(old => target[old]).ToList();
+            for (int lane = 0; lane < moved.Count; lane++) moved[lane].Z = plan.Z[lane];
+            target.Clear();
+            target.AddRange(moved);
+        }, trackBefore: from, trackAfter: plan.To);
+        return plan.To;
+    }
+
+    /// <summary>
+    /// The track a track move, or its undo or redo, left selected, or null when the last change names none. Reading it
+    /// clears it, so the timeline takes it once on the refresh that follows.
+    /// </summary>
+    public int? TakeTrackSelection()
+    {
+        int? track = _trackToSelect;
+        _trackToSelect = null;
+        return track;
+    }
+
     public void SetTrackZ(IUndoManager undo, int sequence, int track, int z) =>
         Edit(undo, $"Set Z of '{Save.Sequences[sequence].Tracks[track].Name}' to {z}",
             save => save.Sequences[sequence].Tracks[track].Z = z);
@@ -317,7 +350,8 @@ public sealed class SequenceDocument
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
-    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null)
+    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
+        int? trackBefore = null, int? trackAfter = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -327,7 +361,7 @@ public sealed class SequenceDocument
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
         if (selectBefore is null && selectAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter));
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter));
     }
 
     /// <summary>
@@ -344,10 +378,11 @@ public sealed class SequenceDocument
         return null;
     }
 
-    private void Restore(string json, int? selectedSequence = null)
+    private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null)
     {
         Save = SequenceListSave.FromJsonString(json);
         if (selectedSequence is { } selected) SelectedSequence = selected;
+        _trackToSelect = selectedTrack;
         LoadMissingSources();
         SaveToDisk();
         Changed?.Invoke();
@@ -377,17 +412,18 @@ public sealed class SequenceDocument
     }
 
     // selectBefore and selectAfter are the selected sequence once undone and once done; null leaves the selection alone.
+    // trackBefore and trackAfter are the same for the selected track; null when the edit names none.
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
-        int? selectBefore = null, int? selectAfter = null) : IUndoableCommand
+        int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null) : IUndoableCommand
     {
         public string Description => description;
 
         public bool Do()
         {
-            document.Restore(after, selectAfter);
+            document.Restore(after, selectAfter, trackAfter);
             return true;
         }
 
-        public void Undo() => document.Restore(before, selectBefore);
+        public void Undo() => document.Restore(before, selectBefore, trackBefore);
     }
 }

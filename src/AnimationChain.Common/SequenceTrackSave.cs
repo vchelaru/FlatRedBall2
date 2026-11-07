@@ -20,7 +20,11 @@ public class SequenceTrackSave
     /// <summary>Mirrors the sprite and its frame offsets across the track's X.</summary>
     public bool FlipHorizontal { get; set; }
 
-    /// <summary>Draw order: higher draws on top. Equal values draw in track order.</summary>
+    /// <summary>
+    /// Draw order: higher draws on top. Equal values draw in track order, a later track on top. The editor lists tracks
+    /// in file order, top lane first, so the bottom lane is in front; dragging a lane header rewrites the list order and
+    /// moves this value only as far as keeping that true takes.
+    /// </summary>
     public int Z { get; set; }
 
     /// <summary>
