@@ -114,6 +114,24 @@ public static class TimelineLayout
     }
 
     /// <summary>
+    /// Where each track's blocks start in <paramref name="blocks"/> (which <see cref="Blocks"/> lists track by track): entry
+    /// <c>t</c> is the index of track <c>t</c>'s first block and entry <c>trackCount</c> is the block count, so track
+    /// <c>t</c>'s blocks are the indices from entry <c>t</c> up to but not including entry <c>t + 1</c>.
+    /// </summary>
+    public static int[] TrackStarts(IReadOnlyList<TimelineBlock> blocks, int trackCount)
+    {
+        var starts = new int[trackCount + 1];
+        int block = 0;
+        for (int track = 0; track < trackCount; track++)
+        {
+            starts[track] = block;
+            while (block < blocks.Count && blocks[block].Track == track) block++;
+        }
+        starts[trackCount] = blocks.Count;
+        return starts;
+    }
+
+    /// <summary>
     /// The chain under (<paramref name="x"/>, <paramref name="y"/>), and whether the point is on its resize edge. In the
     /// tail strip a cut tail wins over the body of the chain that cuts it; elsewhere a later chain wins, as it draws on top.
     /// </summary>
