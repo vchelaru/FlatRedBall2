@@ -1,3 +1,4 @@
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
@@ -6,8 +7,11 @@ using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
 using Avalonia;
 using Avalonia.Input;
+using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -42,7 +46,8 @@ public partial class MainWindow
     /// A <c>.seqj</c> tab: the file's sequences in the top-left list, and the library, timeline and composited
     /// preview in place of the achx editor. Each open file keeps its own <see cref="SequenceDocument"/> for the
     /// window's lifetime and its undo history on the <see cref="TabEntry"/>, like an achx tab, so undo, redo and
-    /// save work here while every achx-only command stays off.
+    /// save work here while every achx-only command stays off. The playhead is a <see cref="SequenceClock"/> driven
+    /// by a timer; each tick hands the preview the sprites <see cref="SequenceScene.At"/> finds.
     /// </summary>
     private sealed class SequenceTabPane : ITabPane
     {
@@ -52,6 +57,14 @@ public partial class MainWindow
         private HiddenSidebarTabs? _hiddenTabs;
         private SequenceDocument? _document;
         private bool _refreshing;
+
+        private readonly SequenceClock _clock = new();
+        private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+        // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
+        private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
+
+        // A stall (window drag, GC pause) should not jump playback by the whole frozen span.
+        private const double MaxTickSeconds = 0.25;
 
         public SequenceTabPane(MainWindow window) => _window = window;
 
@@ -75,7 +88,9 @@ public partial class MainWindow
         public void Hide()
         {
             var w = _window;
+            StopPlayback();
             Detach();
+            w.SequencePreview.Composite = null;
             w.SequenceLibrary.Show(null);
             w.SequenceTimeline.Show(null, -1, null);
             w.SequenceListPane.IsVisible = false;
@@ -104,6 +119,7 @@ public partial class MainWindow
             Detach();
             _document = document;
             _document.Changed += Refresh;
+            _clock.Stop();
             // The undo stack is shared by every tab; this tab's own history lives in its snapshot.
             _window._undoManager.Clear();
             if (tab.UndoSnapshot != null)
@@ -145,6 +161,14 @@ public partial class MainWindow
 
         public void DeleteSelection() => _window.SequenceTimeline.DeleteSelected();
 
+        public void TogglePlayback()
+        {
+            if (_clock.IsPlaying)
+                PausePlayback();
+            else
+                Play();
+        }
+
         // The library takes files dragged from the browser, so a press there must not switch tabs.
         public bool BrowserClickOpensPreview => false;
 
@@ -162,6 +186,8 @@ public partial class MainWindow
                 if (_refreshing || _document is null) return;
                 _selectedIndex[_document.Path] = w.SequenceList.SelectedIndex;
                 w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
+                // Another sequence starts from its beginning.
+                StopPlayback();
             };
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceLibrary.ChipDragMoved += (chip, e) => w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
@@ -176,6 +202,87 @@ public partial class MainWindow
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+
+            _timer.Tick += (_, _) => OnTick();
+            w.SequencePlayButton.Click += (_, _) => TogglePlayback();
+            w.SequenceStopButton.Click += (_, _) => StopPlayback();
+            w.SequenceLoopToggle.Click += (_, _) => SetLoop(w.SequenceLoopToggle.IsChecked == true);
+            w.SequenceTimeline.Scrubbed += time =>
+            {
+                _clock.Seek(time, w.SequenceTimeline.SequenceLength);
+                ShowPlayhead();
+            };
+            w.SequenceTimelineZoom.Attach(w.SequenceTimeline);
+
+            var preview = w.SequencePreview;
+            w.SequencePreviewZoom.Attach(preview);
+            preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
+            preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
+            preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+            w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
+            w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
+            w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+        }
+
+        private int SequenceIndex => _window.SequenceList.SelectedIndex;
+
+        private SequenceSave? CurrentSequence =>
+            _document is { } document && SequenceIndex >= 0 && SequenceIndex < document.Save.Sequences.Count
+                ? document.Save.Sequences[SequenceIndex]
+                : null;
+
+        private void Play()
+        {
+            _clock.Play(_window.SequenceTimeline.SequenceLength);
+            if (_clock.IsPlaying)
+            {
+                _tick.Reset();
+                _tick.Tick();
+                _timer.Start();
+            }
+            ShowPlayhead();
+        }
+
+        private void PausePlayback()
+        {
+            _clock.Pause();
+            _timer.Stop();
+            ShowPlayhead();
+        }
+
+        private void StopPlayback()
+        {
+            _clock.Stop();
+            _timer.Stop();
+            ShowPlayhead();
+        }
+
+        private void OnTick()
+        {
+            double seconds = Math.Min(_tick.Tick(), MaxTickSeconds);
+            _clock.Advance(seconds, _window.SequenceTimeline.SequenceLength, CurrentSequence?.Loop == true);
+            if (!_clock.IsPlaying) _timer.Stop();
+            ShowPlayhead();
+        }
+
+        /// <summary>Moves the playhead, the preview, the time readout and the play button to the clock.</summary>
+        private void ShowPlayhead()
+        {
+            var w = _window;
+            double time = _clock.Time;
+            w.SequenceTimeline.Playhead = time;
+            w.SequencePreview.Composite = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time);
+            w.SequenceTimeText.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.00} s / {1:0.00} s",
+                time, w.SequenceTimeline.SequenceLength);
+            w.SequencePlayIcon.Path = _clock.IsPlaying
+                ? "avares://AnimationEditor.Views/Assets/icons/svg/IconPause.svg"
+                : "avares://AnimationEditor.Views/Assets/icons/svg/IconPlay.svg";
+        }
+
+        private void SetLoop(bool loop)
+        {
+            if (_document is null || SequenceIndex < 0) return;
+            _document.SetLoop(_window._undoManager, SequenceIndex, loop);
         }
 
         /// <summary>Where <paramref name="e"/> is on the timeline, or null when it is outside it.</summary>
@@ -267,6 +374,10 @@ public partial class MainWindow
             _selectedIndex[_document.Path] = selected;
             _window.SequenceLibrary.Show(_document);
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
+            _window.SequenceLoopToggle.IsChecked = CurrentSequence?.Loop == true;
+            // An edit can shorten the sequence under the playhead.
+            _clock.Seek(_clock.Time, _window.SequenceTimeline.SequenceLength);
+            ShowPlayhead();
             _window.UpdateStatusBar();
         }
     }

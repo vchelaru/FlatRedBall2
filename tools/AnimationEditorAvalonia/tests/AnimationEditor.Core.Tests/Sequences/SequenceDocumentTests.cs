@@ -195,4 +195,22 @@ public class SequenceDocumentTests
 
         resolved.ShouldBe(new AnimationEditor.Core.Paths.FilePath(Path.Combine(chars, "sheet.png")).FullPath);
     }
+
+    [Fact]
+    public void SetLoop_IsOneUndoStep_SavesAndUndoes()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var save = new SequenceListSave();
+        save.Sequences.Add(new SequenceSave { Name = "Attack" });
+        string path = WriteSeqj(dir.Path, save);
+        var document = SequenceDocument.Load(path);
+        var undo = new UndoManager();
+
+        document.SetLoop(undo, 0, true);
+
+        SequenceListSave.FromFile(path).Sequences[0].Loop.ShouldBeTrue();
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Turn Loop On for 'Attack'" });
+        undo.Undo();
+        document.Save.Sequences[0].Loop.ShouldBeFalse();
+    }
 }

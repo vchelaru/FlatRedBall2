@@ -162,6 +162,8 @@ public partial class MainWindow
 
         public void DeleteSelection() => _window.HandleDelete();
 
+        public void TogglePlayback() => _window.PreviewCtrl.TogglePlayPause();
+
         public bool BrowserClickOpensPreview => true;
 
         public bool CanDetach => true;

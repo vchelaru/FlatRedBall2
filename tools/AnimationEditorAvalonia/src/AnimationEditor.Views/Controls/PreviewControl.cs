@@ -6,6 +6,7 @@ using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Input;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
 using Avalonia;
 using Avalonia.Controls;
@@ -295,6 +296,25 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     {
         get => _showBoundingBox;
         set { _showBoundingBox = value; InvalidateVisual(); }
+    }
+
+    private IReadOnlyList<SequenceSprite>? _composite;
+
+    /// <summary>
+    /// Sprites to draw back to front in place of the achx selection: a sequence tab's composited preview. Each draws
+    /// from its own texture at its track's offset and flip, with its chain's shapes. Null (the default) shows the
+    /// selection. A control used this way should be given an <see cref="ISelectedState"/> of its own that nothing
+    /// selects in, so its shape and sprite gestures have nothing to edit.
+    /// </summary>
+    public IReadOnlyList<SequenceSprite>? Composite
+    {
+        get => _composite;
+        set
+        {
+            _composite = value;
+            InvalidateVisual();
+            RaiseViewChanged();
+        }
     }
 
     /// <summary>
@@ -620,6 +640,40 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         return layers.ToArray();
     }
 
+    private PreviewLayer[] BuildCompositeLayers(IReadOnlyList<SequenceSprite> sprites)
+    {
+        var layers = new PreviewLayer[sprites.Count];
+        for (int i = 0; i < sprites.Count; i++)
+        {
+            var sprite = sprites[i];
+            string? texPath = CacheKey(sprite.TexturePath);
+            _thumbnailService!.GetImage(texPath);
+            var sample = sprite.Sample();
+            layers[i] = new PreviewLayer(sprite.Frame, texPath, sample.OffsetX, sample.OffsetY, sample.Color, sprite.FlipMatrix);
+        }
+        return layers;
+    }
+
+    // The image and bitmap caches are keyed with forward slashes (see ThumbnailService.GetImage).
+    private static string? CacheKey(string? path) => path?.Replace('\\', '/');
+
+    private PreviewShapeInfo[] BuildCompositeShapes(IReadOnlyList<SequenceSprite> sprites)
+    {
+        if (!_showShapes) return Array.Empty<PreviewShapeInfo>();
+        return sprites
+            .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Chain)
+                .Select(shape => PlaceOnTrack(shape, sprite.X, sprite.Y, sprite.FlipHorizontal)))
+            .ToArray();
+    }
+
+    /// <summary>Moves a frame's shape by its track's offset, mirroring it across the track's X when the track flips.</summary>
+    internal static PreviewShapeInfo PlaceOnTrack(PreviewShapeInfo shape, float x, float y, bool flipHorizontal)
+    {
+        if (!flipHorizontal) return shape with { X = x + shape.X, Y = y + shape.Y };
+        float[]? points = shape.Points?.Select((value, i) => i % 2 == 0 ? -value : value).ToArray();
+        return shape with { X = x - shape.X, Y = y + shape.Y, Points = points };
+    }
+
     /// <summary>
     /// A group layer's offset and color, glided by the stored curves at its own track's playhead (#1478).
     /// A pinned frame the playhead isn't on shows its value at the start of the frame.
@@ -794,6 +848,16 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private RenderSnapshot BuildRenderSnapshot(float width, float height)
     {
         float renderScaling = (float)(TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0);
+        if (_composite is not null)
+        {
+            return new RenderSnapshot(
+                null, null, _zoom, _panX, _panY, _showOrigin, _showUserGuides, _showBoundingBox, null, null, width, height,
+                _appState!.OffsetMultiplier,
+                _hGuides.ToArray(), _vGuides.ToArray(),
+                _draggedGuideIdx, _draggingHGuide,
+                BuildCompositeShapes(_composite), 0f, 0f, default, default,
+                BuildCompositeLayers(_composite), renderScaling);
+        }
         if (IsGroupPreviewActive)
         {
             return new RenderSnapshot(
@@ -1566,6 +1630,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                     Include((p.X + point.X) * om, -(p.Y + point.Y) * om, 0f, 0f);
         }
 
+        if (_composite is not null)
+        {
+            // Each sprite where it draws now, so the extent follows playback instead of a chain's union of frames.
+            foreach (var sprite in _composite)
+            {
+                var sample = sprite.Sample();
+                if (CacheKey(sprite.TexturePath) is { } key &&
+                    _thumbnailService!.BitmapCache.TryGetValue(key, out var bitmap) && bitmap is not null)
+                {
+                    var (_, _, sw, sh) = ComputeSourceRect(sprite.Frame, bitmap.Width, bitmap.Height);
+                    Include(sample.OffsetX * om, -sample.OffsetY * om, sw * _zoom / 2f, sh * _zoom / 2f);
+                }
+            }
+            return (minX, maxX, minY, maxY);
+        }
+
         var chain = _selectedState!.SelectedChain;
         if (chain is not null)
             foreach (var frame in chain.Frames) IncludeFrame(frame);
@@ -1834,13 +1914,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         return BuildShapeInfos(frame, pinnedFrame is not null, pinnedFrame is not null && !playheadOnPinned ? 0 : _playback.FrameElapsed);
     }
 
-    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame)
+    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame,
+        AnimationChainSave? owningChain = null)
     {
         if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
 
         // Shape offset and size glide by the curves stored on the shapes (#1478); with the default snap curve
         // this is each shape's own value.
-        var chain = FindOwningChain(frame);
+        var chain = owningChain ?? FindOwningChain(frame);
         int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
         KeyframeShapeValue ValueOf(ShapeSave shape)
         {
@@ -1972,7 +2053,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             ?? (ReferenceEquals(chain, _selectedState!.SelectedChain) ? _playback : null);
 
     /// <summary>Test-only: returns the shape infos that would be passed to the renderer for the current state.</summary>
-    internal PreviewShapeInfo[] GetShapeInfosForTest() => BuildShapeInfos();
+    internal PreviewShapeInfo[] GetShapeInfosForTest() => _composite is not null ? BuildCompositeShapes(_composite) : BuildShapeInfos();
 
     // -- Pointer events --------------------------------------------------------
 
@@ -3313,7 +3394,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     /// <summary>One composited chain in a multi-select group preview (#576) — its current frame,
     /// resolved texture path, and its own resting RelativeX/Y offset and effective color.</summary>
     private record PreviewLayer(
-        AnimationFrameSave Frame, string? TexturePath, float OffsetX, float OffsetY, ResolvedFrameColor Color);
+        AnimationFrameSave Frame, string? TexturePath, float OffsetX, float OffsetY, ResolvedFrameColor Color,
+        // Replaces the frame's own flip when set: a sequence track that mirrors its sprite.
+        (float a, float b, float c, float d)? Flip = null);
 
     /// <summary>
     /// Resolves a frame's sticky effective color within its chain. Returns an all-unset result
@@ -3421,7 +3504,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
                 float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
                 float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu, layer.Flip);
             }
         }
         else

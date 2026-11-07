@@ -73,6 +73,13 @@ public sealed class TimelineViewport
         ScrollSeconds = Math.Max(0, anchor - (x - HeaderWidth) / PixelsPerSecond);
     }
 
+    /// <summary>Sets the zoom, clamped, keeping the time at the left edge of the lanes where it is.</summary>
+    public void SetPixelsPerSecond(double pixelsPerSecond) =>
+        PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);
+
+    /// <summary>The playhead time for a ruler press or drag at <paramref name="x"/>: the time there, clamped to 0..<paramref name="length"/>.</summary>
+    public double ScrubTime(double x, double length) => Math.Clamp(TimeAt(x), 0, Math.Max(0, length));
+
     /// <summary>Scrolls the lanes sideways by <paramref name="pixels"/>; positive shows later time.</summary>
     public void ScrollHorizontally(double pixels) =>
         ScrollSeconds = Math.Max(0, ScrollSeconds + pixels / PixelsPerSecond);

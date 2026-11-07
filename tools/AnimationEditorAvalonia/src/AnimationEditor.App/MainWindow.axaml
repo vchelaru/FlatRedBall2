@@ -2215,23 +2215,129 @@
                     <controls:SequenceLibraryControl x:Name="SequenceLibrary" Grid.Column="0" />
                     <GridSplitter Grid.Column="1" ResizeDirection="Columns"
                                   Background="{DynamicResource LineStrong}" />
-                    <controls:SequenceTimelineControl x:Name="SequenceTimeline" Grid.Column="2" />
+                    <DockPanel Grid.Column="2">
+                        <!-- Transport: play/pause, stop, time, the sequence's Loop flag, and the timeline zoom. -->
+                        <Border DockPanel.Dock="Top"
+                                BorderBrush="{DynamicResource LineBrush}"
+                                BorderThickness="0,0,0,1"
+                                Background="{DynamicResource BgRail}"
+                                Padding="4,3">
+                            <WrapPanel VerticalAlignment="Center">
+                                <Button x:Name="SequencePlayButton"
+                                        Height="26" Width="32"
+                                        Foreground="{DynamicResource Ink}"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="Play / Pause (Space)">
+                                    <svg:Svg x:Name="SequencePlayIcon" Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPlay.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </Button>
+                                <Button x:Name="SequenceStopButton"
+                                        Height="26" Width="32" Margin="4,0,0,0"
+                                        Foreground="{DynamicResource Ink}"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="Stop and go back to the start">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconStop.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </Button>
+                                <TextBlock x:Name="SequenceTimeText"
+                                           Text="0.00 s"
+                                           MinWidth="92"
+                                           Margin="8,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Ink}" />
+                                <ToggleButton x:Name="SequenceLoopToggle"
+                                              Classes="toolbarToggle"
+                                              Height="26" Width="32"
+                                              Foreground="{DynamicResource Ink}"
+                                              VerticalAlignment="Center"
+                                              ToolTip.Tip="Loop: the sequence restarts at 0 once it ends (saved in the file)">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </ToggleButton>
+                                <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                        Margin="8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Zoom:" VerticalAlignment="Center"
+                                           Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
+                                           FontSize="11" />
+                                <views:ZoomControl x:Name="SequenceTimelineZoom" VerticalAlignment="Center" />
+                            </WrapPanel>
+                        </Border>
+                        <controls:SequenceTimelineControl x:Name="SequenceTimeline" />
+                    </DockPanel>
                 </Grid>
                 <GridSplitter Grid.Row="1" ResizeDirection="Rows"
                               Background="{DynamicResource LineStrong}"
                               HorizontalAlignment="Stretch" />
-                <Border x:Name="SequencePreviewPlaceholder" Grid.Row="2"
-                        Background="{DynamicResource BgPanel}">
-                    <TextBlock Text="Preview" Classes="sequence-placeholder" />
-                </Border>
-                <Grid.Styles>
-                    <Style Selector="TextBlock.sequence-placeholder">
-                        <Setter Property="FontSize" Value="11" />
-                        <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
-                        <Setter Property="HorizontalAlignment" Value="Center" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                    </Style>
-                </Grid.Styles>
+                <!-- Composited preview: a PreviewControl of its own (zoom, pan, rulers, guides, origin), fed the
+                     sprites active at the playhead. -->
+                <DockPanel Grid.Row="2">
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Background="{DynamicResource BgRail}"
+                            Padding="4,3">
+                        <WrapPanel VerticalAlignment="Center">
+                            <ToggleButton x:Name="SequenceShowShapes"
+                                          Classes="toolbarToggle"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0"
+                                          IsChecked="True"
+                                          ToolTip.Tip="Show the active chains' collision shapes">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Shapes" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton x:Name="SequenceShowOrigin"
+                                          Classes="toolbarToggle"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="4,0,4,0"
+                                          IsChecked="True"
+                                          ToolTip.Tip="Show the entity origin crosshair">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCrosshair.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Origin" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton x:Name="SequenceShowBoundingBox"
+                                          Classes="toolbarToggle"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          IsChecked="False"
+                                          ToolTip.Tip="Show each sprite's bounding box outline">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Bounding Box" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                    Margin="4,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Zoom:" VerticalAlignment="Center"
+                                       Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
+                                       FontSize="11" />
+                            <views:ZoomControl x:Name="SequencePreviewZoom" VerticalAlignment="Center" />
+                        </WrapPanel>
+                    </Border>
+                    <views:PreviewControl x:Name="SequencePreview" />
+                </DockPanel>
             </Grid>
 
         </Grid>
