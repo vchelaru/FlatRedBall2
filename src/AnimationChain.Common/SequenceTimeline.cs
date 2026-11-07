@@ -112,20 +112,26 @@ public static class SequenceTimeline
 
     /// <summary>
     /// The loop count for dragging a chain's right edge to <paramref name="edgeTime"/>. The count is free (fractions
-    /// allowed), pulled to a whole cycle when within <paramref name="magnetSeconds"/> of one, stopped at
-    /// <paramref name="nextStart"/> because length past it would never play, and never below <see cref="MinimumLoops"/>.
-    /// Returns 1 when <paramref name="cycleLength"/> is not positive, since a missing chain has nothing to measure.
+    /// allowed) and never below <see cref="MinimumLoops"/>. Within <paramref name="magnetSeconds"/> of a whole cycle or of
+    /// <paramref name="nextStart"/>, the edge is pulled to the nearer of the two. The edge may still go past
+    /// <paramref name="nextStart"/>: that overlap is allowed and cut at playback, so the magnet only guards against
+    /// making one by accident. Returns 1 when <paramref name="cycleLength"/> is not positive, since a missing chain has
+    /// nothing to measure.
     /// </summary>
     public static float LoopsForEdgeDrag(double start, double edgeTime, double cycleLength, double? nextStart, double magnetSeconds)
     {
         if (cycleLength <= 0) return 1;
 
-        double loops = (edgeTime - start) / cycleLength;
-        double whole = Math.Round(loops);
-        if (whole >= 1 && Math.Abs(loops - whole) * cycleLength <= magnetSeconds)
-            loops = whole;
-        if (nextStart is { } next)
-            loops = Math.Min(loops, (next - start) / cycleLength);
-        return (float)Math.Max(MinimumLoops, loops);
+        double edge = edgeTime;
+        double best = magnetSeconds;
+        double whole = Math.Round((edgeTime - start) / cycleLength);
+        if (whole >= 1 && Math.Abs(start + whole * cycleLength - edgeTime) is var toWhole && toWhole <= best)
+        {
+            edge = start + whole * cycleLength;
+            best = toWhole;
+        }
+        if (nextStart is { } next && next > start && Math.Abs(next - edgeTime) < best)
+            edge = next;
+        return (float)Math.Max(MinimumLoops, (edge - start) / cycleLength);
     }
 }

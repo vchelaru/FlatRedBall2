@@ -160,6 +160,8 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => true;
 
+        public void DeleteSelection() => _window.HandleDelete();
+
         public bool BrowserClickOpensPreview => true;
 
         public bool CanDetach => true;

@@ -11,8 +11,8 @@ public enum HotkeyScope
     Achx,
 
     /// <summary>
-    /// Acts on whichever document the active tab edits through the shared undo history: undo, redo, save and the
-    /// History panel. Fires in every tab kind that has a document.
+    /// Acts on whichever document the active tab edits: undo, redo, save, the History panel, and Delete, which each
+    /// tab kind routes to its own selection. Fires in every tab kind that has a document.
     /// </summary>
     Document,
 

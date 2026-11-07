@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -135,6 +136,82 @@ public sealed class SequenceDocument
         Edit(undo, $"Delete Sequence '{name}'", save => save.Sequences.RemoveAt(index));
     }
 
+    /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
+    public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) =>
+        SourceChains(reference.Source)?.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain);
+
+    /// <summary>
+    /// Seconds of one playback cycle of <paramref name="reference"/>'s chain (twice its length for ping-pong), or null
+    /// when the chain is missing.
+    /// </summary>
+    public double? CycleLength(SequenceChainReferenceSave reference) =>
+        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain) : null;
+
+    /// <summary>
+    /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on
+    /// track <paramref name="track"/> of sequence <paramref name="sequence"/>. A null track adds a new track named
+    /// after the chain.
+    /// </summary>
+    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start)
+    {
+        var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start) };
+        if (track is { } index)
+        {
+            string trackName = Save.Sequences[sequence].Tracks[index].Name;
+            Edit(undo, $"Add '{chain}' to '{trackName}'", save => save.Sequences[sequence].Tracks[index].Chains.Add(reference));
+            return;
+        }
+        string name = UniqueTrackName(Save.Sequences[sequence], chain);
+        Edit(undo, $"Add Track '{name}'", save =>
+        {
+            var tracks = save.Sequences[sequence].Tracks;
+            tracks.Add(new SequenceTrackSave { Name = name, Z = tracks.Count, Chains = { reference } });
+        });
+    }
+
+    /// <summary>Removes chain reference <paramref name="chain"/> (an index into the track's list) from its track.</summary>
+    public void DeleteChain(IUndoManager undo, int sequence, int track, int chain)
+    {
+        var owner = Save.Sequences[sequence].Tracks[track];
+        Edit(undo, $"Remove '{owner.Chains[chain].Chain}' from '{owner.Name}'",
+            save => save.Sequences[sequence].Tracks[track].Chains.RemoveAt(chain));
+    }
+
+    public void DeleteTrack(IUndoManager undo, int sequence, int track) =>
+        Edit(undo, $"Delete Track '{Save.Sequences[sequence].Tracks[track].Name}'",
+            save => save.Sequences[sequence].Tracks.RemoveAt(track));
+
+    /// <summary>Renames a track. Returns why it was refused (empty, or another track of the sequence has the name), or null.</summary>
+    public string? RenameTrack(IUndoManager undo, int sequence, int track, string name)
+    {
+        name = name.Trim();
+        var tracks = Save.Sequences[sequence].Tracks;
+        string oldName = tracks[track].Name;
+        if (name.Length == 0) return "A track needs a name.";
+        if (name == oldName) return null;
+        if (tracks.Where((_, i) => i != track).Any(t => t.Name == name))
+            return $"A track named \"{name}\" already exists.";
+        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name);
+        return null;
+    }
+
+    /// <summary>
+    /// Starts a gesture that edits <see cref="Save"/> in place on every pointer move (a drag). Returns the state to pass
+    /// to <see cref="CommitGesture"/> or <see cref="CancelGesture"/> when it ends.
+    /// </summary>
+    public string BeginGesture() => Save.ToJsonString();
+
+    /// <summary>Records everything since <paramref name="before"/> as one undo entry and saves. Does nothing when nothing changed.</summary>
+    public void CommitGesture(IUndoManager undo, string description, string before)
+    {
+        string after = Save.ToJsonString();
+        if (after == before) return;
+        undo.Execute(new SnapshotCommand(this, description, before, after));
+    }
+
+    /// <summary>Puts <see cref="Save"/> back as it was at <paramref name="before"/>, with no undo entry.</summary>
+    public void CancelGesture(string before) => Restore(before);
+
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
@@ -147,6 +224,15 @@ public sealed class SequenceDocument
         {
             SaveError = ex.Message;
         }
+    }
+
+    private static string UniqueTrackName(SequenceSave sequence, string baseName)
+    {
+        var used = sequence.Tracks.Select(t => t.Name).ToHashSet();
+        if (!used.Contains(baseName)) return baseName;
+        int suffix = 2;
+        while (used.Contains($"{baseName} {suffix}")) suffix++;
+        return $"{baseName} {suffix}";
     }
 
     private string UniqueName(string baseName)

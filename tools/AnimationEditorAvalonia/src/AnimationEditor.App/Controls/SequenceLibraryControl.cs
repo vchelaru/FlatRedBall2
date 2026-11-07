@@ -17,8 +17,9 @@ namespace AnimationEditor.App.Controls;
 
 /// <summary>
 /// A <c>.seqj</c> tab's library: each source as a titled group of chain chips. A chip shows its chain's first frame
-/// and plays while hovered. Files dropped on it are reported through <see cref="FilesDropped"/>; the host decides
-/// what to add, so this control never edits the document.
+/// and plays while hovered. Files dropped on it are reported through <see cref="FilesDropped"/> and chip drags through
+/// <see cref="ChipDragMoved"/>/<see cref="ChipDragEnded"/>; the host decides what to add, so this control never edits
+/// the document.
 /// </summary>
 public sealed class SequenceLibraryControl : UserControl
 {
@@ -67,6 +68,19 @@ public sealed class SequenceLibraryControl : UserControl
 
     /// <summary>Raised when the user clicks a source's remove button, with the source as written in the file.</summary>
     public event Action<string>? RemoveSourceRequested;
+
+    /// <summary>
+    /// Raised on each pointer move while a chip is dragged. The drag stays inside the window (pointer capture, not OS
+    /// drag-drop), so the host reads the position against whatever control it drops on.
+    /// </summary>
+    public event Action<LibraryChip, PointerEventArgs>? ChipDragMoved;
+
+    /// <summary>Raised when a chip drag ends: with the release, or null when the drag was cancelled.</summary>
+    public event Action<LibraryChip, PointerEventArgs?>? ChipDragEnded;
+
+    internal void RaiseChipDragMoved(LibraryChip chip, PointerEventArgs e) => ChipDragMoved?.Invoke(chip, e);
+
+    internal void RaiseChipDragEnded(LibraryChip chip, PointerEventArgs? e) => ChipDragEnded?.Invoke(chip, e);
 
     /// <summary>What the library shows, from the last <see cref="Show"/>.</summary>
     public IReadOnlyList<LibrarySource> Sources { get; private set; } = Array.Empty<LibrarySource>();
@@ -150,7 +164,7 @@ public sealed class SequenceLibraryControl : UserControl
             var chips = new WrapPanel();
             foreach (var chip in source.Chips)
             {
-                var view = new LibraryChipView(chip, _document!, Thumbnails) { Margin = new Thickness(0, 0, 6, 6) };
+                var view = new LibraryChipView(chip, _document!, Thumbnails, this) { Margin = new Thickness(0, 0, 6, 6) };
                 _chips[(chip.Source, chip.Chain.Name)] = view;
                 chips.Children.Add(view);
             }
@@ -194,18 +208,24 @@ public sealed class LibraryChipView : Border
     private const int ThumbWidth = 80;
     private const int ThumbHeight = 42;
 
+    private const double DragThreshold = 4;
+
     private readonly SequenceDocument _document;
     private readonly ThumbnailService? _thumbnails;
+    private readonly SequenceLibraryControl _library;
+    private Point? _pressedAt;
+    private bool _dragging;
     private readonly ResolvedFrameColor[] _colors;
     private readonly Image _image = new() { Stretch = Stretch.None };
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1 / 30.0) };
     private readonly Stopwatch _elapsed = new();
 
-    internal LibraryChipView(LibraryChip chip, SequenceDocument document, ThumbnailService? thumbnails)
+    internal LibraryChipView(LibraryChip chip, SequenceDocument document, ThumbnailService? thumbnails, SequenceLibraryControl library)
     {
         Chip = chip;
         _document = document;
         _thumbnails = thumbnails;
+        _library = library;
         _colors = EffectiveFrameColor.ResolveAll(chip.Chain.Frames);
 
         Width = 86;
@@ -234,6 +254,52 @@ public sealed class LibraryChipView : Border
         PointerExited += (_, _) => StopPlaying();
         DetachedFromVisualTree += (_, _) => StopPlaying();
         ShowFrame(0);
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _pressedAt = e.GetPosition(this);
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (_pressedAt is not { } pressed) return;
+        var point = e.GetPosition(this);
+        if (!_dragging && Math.Abs(point.X - pressed.X) < DragThreshold && Math.Abs(point.Y - pressed.Y) < DragThreshold) return;
+        _dragging = true;
+        Opacity = 0.6;
+        _library.RaiseChipDragMoved(Chip, e);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (_pressedAt is null) return;
+        bool dragged = _dragging;
+        EndPress();
+        e.Pointer.Capture(null);
+        if (dragged) _library.RaiseChipDragEnded(Chip, e);
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        if (_pressedAt is null) return;
+        bool dragged = _dragging;
+        EndPress();
+        if (dragged) _library.RaiseChipDragEnded(Chip, null);
+    }
+
+    private void EndPress()
+    {
+        _pressedAt = null;
+        _dragging = false;
+        Opacity = 1;
     }
 
     public LibraryChip Chip { get; }
