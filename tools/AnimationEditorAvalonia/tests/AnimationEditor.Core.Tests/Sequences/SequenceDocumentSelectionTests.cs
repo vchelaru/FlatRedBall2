@@ -54,6 +54,21 @@ public class SequenceDocumentSelectionTests
         document.SelectedSequence.ShouldBe(1);
     }
 
+    [Fact]
+    public void RenameSequence_KeepSelection_LeavesTheSelectionAlone_ButUndoAndRedoStillSelectTheRenamedOne()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var (document, undo) = Open(dir, "A", "B", "C");
+        document.SelectedSequence = 2;
+
+        document.RenameSequence(undo, 0, "Alpha", keepSelection: true);
+        document.SelectedSequence.ShouldBe(2);
+        undo.Undo();
+        document.SelectedSequence.ShouldBe(0);
+        undo.Redo();
+        document.SelectedSequence.ShouldBe(0);
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(1, 1)]

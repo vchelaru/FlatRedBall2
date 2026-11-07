@@ -518,12 +518,23 @@ public partial class MainWindow
         private void OnSequenceRenameCommitted(object? sender, RoutedEventArgs e)
         {
             if (e.Source is not InlineRenameBox { DataContext: SequenceListItem item } box) return;
+            // Enter commits with the box still focused and hands focus back to the list; a click-away already moved it
+            // to whatever was clicked, which keeps it.
+            bool refocusList = box.IsFocused;
             item.IsEditing = false;
-            _window.SequenceList.Focus();
-            int index = _items.IndexOf(item);
-            if (_document is { } document && index >= 0
-                && document.RenameSequence(_window._undoManager, index, box.Text ?? string.Empty) is { } error)
-                _window.ShowErrorBanner(error);
+            if (refocusList) _window.SequenceList.Focus();
+            var document = _document;
+            string text = box.Text ?? string.Empty;
+            // A click on another row loses the box's focus in the middle of that press, before the row is selected.
+            // Renaming rebuilds the list, which would drop the press's selection, so the rename waits for the press to
+            // finish and then leaves whatever it selected alone.
+            Dispatcher.UIThread.Post(() =>
+            {
+                int index = _items.IndexOf(item);
+                if (document is null || document != _document || index < 0) return;
+                if (document.RenameSequence(_window._undoManager, index, text, keepSelection: true) is { } error)
+                    _window.ShowErrorBanner(error);
+            });
         }
 
         private void OnSequenceRenameCancelled(object? sender, RoutedEventArgs e)
