@@ -2,7 +2,6 @@ using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using Avalonia.Input;
 using Avalonia.Media;
 
 namespace AnimationEditor.App.Controls;
@@ -14,20 +13,6 @@ namespace AnimationEditor.App.Controls;
 internal sealed class ChipDragGhost
 {
     private const double CursorOffset = 16;
-
-    private static readonly Cursor CopyCursor = new(StandardCursorType.DragCopy);
-    private static readonly Cursor NotAllowedCursor = new(StandardCursorType.No);
-
-    /// <summary>The platform cursor for <paramref name="cursor"/>.</summary>
-    internal static Cursor CursorFor(ChipDragCursor cursor) => cursor == ChipDragCursor.Copy ? CopyCursor : NotAllowedCursor;
-
-    // Avalonia shows the cursor of the element under the pointer, even while another control holds the capture, so each
-    // cursor kind gets a transparent sheet over the whole window. Changing kind swaps sheets, which takes effect on the
-    // next pointer move.
-    private readonly Border _copySheet = Sheet(CopyCursor);
-    private readonly Border _notAllowedSheet = Sheet(NotAllowedCursor);
-
-    private static Border Sheet(Cursor cursor) => new() { Background = Brushes.Transparent, Cursor = cursor };
 
     private readonly Border _card;
     private readonly Image _image = new() { Stretch = Stretch.None };
@@ -59,12 +44,6 @@ internal sealed class ChipDragGhost
     {
         _layer ??= OverlayLayer.GetOverlayLayer(anchor);
         if (_layer is null) return;
-        var sheet = feedback.Cursor == ChipDragCursor.Copy ? _copySheet : _notAllowedSheet;
-        var other = sheet == _copySheet ? _notAllowedSheet : _copySheet;
-        _layer.Children.Remove(other);
-        sheet.Width = _layer.Bounds.Width;
-        sheet.Height = _layer.Bounds.Height;
-        if (!_layer.Children.Contains(sheet)) _layer.Children.Insert(0, sheet);
         if (!_layer.Children.Contains(_card)) _layer.Children.Add(_card);
         _image.Source = thumbnail;
         _hint.Text = feedback.Hint;
@@ -76,17 +55,5 @@ internal sealed class ChipDragGhost
         Canvas.SetTop(_card, point.Y + CursorOffset);
     }
 
-    // TEMPORARY diagnostic, see ChipDragLog.
-    public void Log(Control chip, PointerEventArgs e, string drag, string lastSet)
-    {
-        var sheet = _layer is not null && _layer.Children.Contains(_copySheet) ? _copySheet : _layer is not null && _layer.Children.Contains(_notAllowedSheet) ? _notAllowedSheet : null;
-        ChipDragLog.Move(chip, e, drag, lastSet, _layer, sheet);
-    }
-
-    public void Hide()
-    {
-        _layer?.Children.Remove(_card);
-        _layer?.Children.Remove(_copySheet);
-        _layer?.Children.Remove(_notAllowedSheet);
-    }
+    public void Hide() => _layer?.Children.Remove(_card);
 }
