@@ -498,8 +498,29 @@ public partial class MainWindow
 
         private void AddSequence()
         {
-            if (_document is null) return;
-            _document.AddSequence(_window._undoManager);
+            if (_document is not { } document) return;
+            string name = document.AddSequence(_window._undoManager);
+            // The new sequence starts from its beginning.
+            StopPlayback();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it. Posted so a
+            // closing menu has handed focus back first and cannot take it from the box.
+            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Scrolls the sequence called <paramref name="name"/> into view and swaps its name for the inline box, with the
+        /// text selected. Does nothing when the document or the list has moved on since the sequence was added.
+        /// </summary>
+        private void BeginRenameNewSequence(SequenceDocument document, string name)
+        {
+            var list = _window.SequenceList;
+            int index = _items.FindIndex(item => item.Name == name);
+            if (document != _document || index < 0 || index != list.SelectedIndex) return;
+            list.ScrollIntoView(index);
+            list.UpdateLayout();
+            if (list.ContainerFromIndex(index) is not ListBoxItem container) return;
+            _items[index].IsEditing = true;
+            container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(name);
         }
 
         private async Task RenameSelectedAsync()
