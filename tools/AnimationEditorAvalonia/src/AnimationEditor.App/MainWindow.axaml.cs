@@ -653,7 +653,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    _ = ActivateTabFromStripAsync(captured);
+                    _ = ActivateTabAsync(captured);
                 }
 
                 _dragTab = null;
@@ -765,6 +765,10 @@ public partial class MainWindow : Window
     {
         if (tab == _tabManager.ActiveTab) return;
 
+        // Every tab switch the user makes (strip click, Go to Definition) is a history entry; Back and Forward
+        // suppress it.
+        using var navigation = _navigation.BeginUserAction();
+
         // A pending cut deliberately survives a tab switch (#1026) -- paste on a different tab
         // completes it as a cross-tab move; ResolveCompletion decides staleness lazily at paste
         // time, so this is no longer a "just tidy up the highlight" clear.
@@ -834,6 +838,8 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task CloseTabAsync(TabEntry tab)
     {
+        // Closing the active tab moves the user to another one, which is a history entry.
+        using var navigation = _navigation.BeginUserAction();
         var toClose = await PaneFor(tab).PrepareCloseAsync(tab);
         if (toClose is not null)
             CloseTabCore(toClose);
@@ -1202,7 +1208,7 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() => ShowToast($"Auto save failed — {message}"));
         _appCommands.Notified += message => Dispatcher.UIThread.InvokeAsync(() => ShowToast(message));
 
-        Notifications.WireUndo(() => _undoManager.Undo());
+        Notifications.WireUndo(Undo);
 
         // Wire hot reload watcher
         _appCommands.HotReloadWatcher = new HotReloadWatcher();
@@ -1753,9 +1759,8 @@ public partial class MainWindow : Window
     /// </summary>
     internal async Task OpenAndSelectChainAsync(string path, string chainName)
     {
-        var before = CaptureNavigationLocation();
+        using var navigation = _navigation.BeginUserAction();
         await OpenAndSelectChainCoreAsync(path, chainName);
-        PushHistoryIfMoved(before);
     }
 
     private async Task OpenAndSelectChainCoreAsync(string path, string chainName)
@@ -2553,8 +2558,8 @@ public partial class MainWindow : Window
             _appCommands.HotReloadWatcher.IsEnabled = MenuEnableHotReload.IsChecked == true;
         };
 
-        MenuUndo.Click += (_, _) => _undoManager.Undo();
-        MenuRedo.Click += (_, _) => _undoManager.Redo();
+        MenuUndo.Click += (_, _) => Undo();
+        MenuRedo.Click += (_, _) => Redo();
         _undoManager.StackChanged += () =>
         {
             UpdateDocumentMenuItems();
@@ -2562,8 +2567,8 @@ public partial class MainWindow : Window
         };
         RefreshHistoryPanel();
 
-        HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
-        HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
+        HistoryUndoButton.Click += (_, _) => Undo();
+        HistoryRedoButton.Click += (_, _) => Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
         var shortcutsTabToggle = new Helpers.ToggleableSidebarTab(SidebarTabs, ShortcutsTab, InspectorTab, MenuShowShortcuts);
         ShortcutsTabCloseButton.Click += (_, _) => shortcutsTabToggle.Hide();
@@ -6802,6 +6807,9 @@ public partial class MainWindow : Window
     /// </param>
     private async Task LoadAnimationFileAsync(string fileName, bool asPreview = false)
     {
+        // Project panel clicks, File > Open, recent files and drag-drop all land here, so this is the one place
+        // that makes opening a file a history entry.
+        using var navigation = _navigation.BeginUserAction();
         if (string.IsNullOrEmpty(fileName)) return;
         if (PaneFor(TabEntry.ResolveKind(new FilePath(fileName))) != _achxPane)
         {
@@ -7378,7 +7386,7 @@ public partial class MainWindow : Window
                 Id = "undo", Description = "Undo", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Z", Command, Forbidden: Shift) },
                 Scope = HotkeyScope.Document,
-                Action = () => _undoManager.Undo(),
+                Action = Undo,
             },
             new()
             {
@@ -7389,7 +7397,7 @@ public partial class MainWindow : Window
                     new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
                 },
                 Scope = HotkeyScope.Document,
-                Action = () => _undoManager.Redo(),
+                Action = Redo,
             },
             new()
             {

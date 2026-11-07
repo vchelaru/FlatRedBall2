@@ -107,4 +107,18 @@ public class NavigationHistoryTests
     {
         new NavigationHistory().Forward(At("a"), _ => true).ShouldBeNull();
     }
+
+    [Fact]
+    public void Changed_RaisesOnPush_AndOnASuccessfulStep()
+    {
+        var history = new NavigationHistory();
+        int raised = 0;
+        history.Changed += () => raised++;
+
+        history.Push(At("a.seqj"));
+        history.Back(At("b.achx"), _ => true);
+        history.Back(At("a.seqj"), _ => true);
+
+        raised.ShouldBe(2);
+    }
 }
