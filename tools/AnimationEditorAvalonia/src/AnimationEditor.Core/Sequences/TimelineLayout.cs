@@ -53,6 +53,27 @@ public static class TimelineLayout
     public const double TailTop = BodyBottom + 2;
     public const double TailBottom = TailTop + 3;
 
+    /// <summary>
+    /// The event row sits under the tail strip, at the bottom of a lane that has events. A lane with none stays
+    /// <see cref="TimelineViewport.LaneHeight"/> tall; one with events is <see cref="EventRowHeight"/> taller.
+    /// </summary>
+    public const double EventRowTop = TimelineViewport.LaneHeight;
+    public const double EventRowHeight = 12;
+
+    /// <summary>
+    /// Each track's lane height: the base height, plus the event row for a track where <paramref name="hasEvents"/> is
+    /// true for at least one of its blocks.
+    /// </summary>
+    public static double[] LaneHeights(IReadOnlyList<TimelineBlock> blocks, int trackCount, Func<TimelineBlock, bool> hasEvents)
+    {
+        var heights = new double[trackCount];
+        Array.Fill(heights, TimelineViewport.LaneHeight);
+        foreach (var block in blocks)
+            if (block.Track >= 0 && block.Track < trackCount && heights[block.Track] == TimelineViewport.LaneHeight && hasEvents(block))
+                heights[block.Track] += EventRowHeight;
+        return heights;
+    }
+
     /// <summary>The narrowest block that still draws a label: about three characters plus the ellipsis.</summary>
     public const double MinLabelPixels = 36;
 
@@ -94,7 +115,8 @@ public static class TimelineLayout
         double inLane = y - viewport.LaneTop(row.Track);
         var lane = blocks.Where(b => b.Track == row.Track).Reverse().ToList();
 
-        if (inLane >= TailTop)
+        // The tail strip, not the event row below it: a cut tail's far end is a resize edge, and the event row is read-only.
+        if (inLane >= TailTop && inLane < EventRowTop)
         {
             foreach (var block in lane.Where(b => b.IsCut))
             {

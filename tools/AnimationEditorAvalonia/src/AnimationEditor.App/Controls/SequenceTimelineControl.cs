@@ -176,6 +176,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _sequenceIndex = sequenceIndex;
         _undo = undo;
         _filmstrip.Invalidate();
+        InvalidateEvents();
         Rebuild();
     }
 
@@ -265,7 +266,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
-            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + (TimelineViewport.LaneHeight - RenameBoxHeight) / 2,
+            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + (Viewport.LaneHeightOf(_renameTrack) - RenameBoxHeight) / 2,
                 TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         }
         return finalSize;
@@ -346,7 +347,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             SetSelection(null, null);
         if (IsRenamingTrack && _renameTrack >= TrackCount)
             EndTrackRename();
+        Viewport.SetLaneHeights(TimelineLayout.LaneHeights(_blocks, TrackCount, HasEvents));
         Viewport.ClampVertical(TrackCount, Bounds.Height);
+        InvalidateArrange();
         InvalidateVisual();
         ContentChanged?.Invoke();
     }
@@ -584,7 +587,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             double delta = e.Delta.X != 0 ? e.Delta.X : e.Delta.Y;
             Viewport.ScrollHorizontally(-delta * WheelScrollPixels);
         }
-        else if (TimelineViewport.ContentHeight(TrackCount) > Bounds.Height)
+        else if (Viewport.ContentHeight(TrackCount) > Bounds.Height)
         {
             Viewport.ScrollVertically(-e.Delta.Y * TimelineViewport.LaneHeight, TrackCount, Bounds.Height);
             InvalidateArrange();
@@ -650,7 +653,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         double header = TimelineViewport.HeaderWidth;
         double ruler = TimelineViewport.RulerHeight;
-        double laneHeight = TimelineViewport.LaneHeight;
         var line = new Pen(Brush("LineBrush"), 1);
         var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
         double step = TimelineRuler.TickStep(Viewport.PixelsPerSecond);
@@ -662,6 +664,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             for (int lane = 0; lane < sequence.Tracks.Count; lane++)
             {
                 double top = Viewport.LaneTop(lane);
+                double laneHeight = Viewport.LaneHeightOf(lane);
                 if (lane % 2 == 1)
                     context.FillRectangle(Brush("TreeRowStripe"), new Rect(header, top, lanes.Width, laneHeight));
                 context.DrawLine(line, new Point(header, top + laneHeight - 0.5), new Point(size.Width, top + laneHeight - 0.5));
@@ -672,7 +675,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
 
             foreach (var block in _blocks)
+            {
                 DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
+                DrawEvents(context, block, size.Width);
+            }
             DrawNewTrackRow(context, sequence, lanes, drop);
             DrawChipGhost(context, drop);
         }
@@ -712,20 +718,21 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             for (int lane = 0; lane < sequence.Tracks.Count; lane++)
             {
                 double top = Viewport.LaneTop(lane);
+                double laneHeight = Viewport.LaneHeightOf(lane);
                 if (SelectedTrack == lane)
                 {
                     var accent = Brush("Accent") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
-                    context.FillRectangle(new SolidColorBrush(accent, 0.25), new Rect(0, top, header, TimelineViewport.LaneHeight));
+                    context.FillRectangle(new SolidColorBrush(accent, 0.25), new Rect(0, top, header, laneHeight));
                 }
                 if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
-                    DrawDropRow(context, new Rect(0, top, header, TimelineViewport.LaneHeight));
+                    DrawDropRow(context, new Rect(0, top, header, laneHeight));
                 var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
                 text.MaxTextWidth = header - 16;
                 text.Trimming = TextTrimming.CharacterEllipsis;
                 text.MaxLineCount = 1;
-                context.DrawText(text, new Point(8, top + (TimelineViewport.LaneHeight - text.Height) / 2));
-                context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + TimelineViewport.LaneHeight - 0.5),
-                    new Point(header, top + TimelineViewport.LaneHeight - 0.5));
+                context.DrawText(text, new Point(8, top + (laneHeight - text.Height) / 2));
+                context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
+                    new Point(header, top + laneHeight - 0.5));
             }
             var newTrack = Text("+ new track", 11, Brush("InkMid"));
             context.DrawText(newTrack, new Point(8, Viewport.LaneTop(sequence.Tracks.Count) + (TimelineViewport.LaneHeight - newTrack.Height) / 2));

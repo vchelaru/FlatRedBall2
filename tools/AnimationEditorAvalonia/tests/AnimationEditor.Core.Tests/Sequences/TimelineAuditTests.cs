@@ -70,7 +70,7 @@ public class TimelineAuditTests
     public void ScrollVertically_IsKeptWithinTheContent_AndNothingScrollsWhenEverythingFits()
     {
         var viewport = new TimelineViewport();
-        double content = TimelineViewport.ContentHeight(trackCount: 10);
+        double content = viewport.ContentHeight(trackCount: 10);
 
         viewport.ScrollVertically(1_000_000, trackCount: 10, viewHeight: 200);
         viewport.ScrollY.ShouldBe(content - 200);
