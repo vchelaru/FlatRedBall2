@@ -1742,13 +1742,27 @@ public partial class MainWindow : Window
     {
         if (target.Entry.File is not DiskEditorFile diskFile) return;
 
-        await OpenFileAsTab(diskFile.FullPath);
+        await OpenAndSelectChainAsync(diskFile.FullPath, target.Chain.Name);
+    }
+
+    /// <summary>
+    /// Opens (or focuses) the animation file at <paramref name="path"/> as a tab and selects the chain named
+    /// <paramref name="chainName"/> in it. An open tab is activated the way a click on the tab strip does, so
+    /// the file's own undo history comes back; selects nothing when the file has no such chain.
+    /// </summary>
+    internal async Task OpenAndSelectChainAsync(string path, string chainName)
+    {
+        var filePath = new FilePath(path);
+        if (_tabManager.Tabs.FirstOrDefault(t => t.Path == filePath) is { } open)
+            await ActivateTabAsync(open);
+        else
+            await OpenFileAsTab(path);
         // The tree rebuild is dispatched (not awaited) by FinishLoadIntoEditor; flush the UI-thread
         // queue so it has run before we look the chain up in _treeRoots.
         await Dispatcher.UIThread.InvokeAsync(() => { });
 
         var reloadedChain = _projectManager.AnimationChainListSave?.AnimationChains
-            .FirstOrDefault(c => c.Name == target.Chain.Name);
+            .FirstOrDefault(c => c.Name == chainName);
         if (reloadedChain is null) return;
 
         _selectedState.SelectedChain = reloadedChain;

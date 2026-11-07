@@ -148,6 +148,17 @@ public sealed class SequenceDocument
         SourceChains(reference.Source)?.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain);
 
     /// <summary>
+    /// Where <paramref name="reference"/>'s chain is defined: the absolute path of its source file, or an error message
+    /// when the source can't be read or has no such chain. Exactly one of the two is non-null.
+    /// </summary>
+    public (string? Path, string? Error) LocateDefinition(SequenceChainReferenceSave reference)
+    {
+        if (IsSourceMissing(reference.Source)) return (null, $"{reference.Source} is missing or could not be read.");
+        if (FindChain(reference) is null) return (null, $"{reference.Source} has no chain named \"{reference.Chain}\".");
+        return (SourcePath(reference.Source).FullPath, null);
+    }
+
+    /// <summary>
     /// Seconds of one playback cycle of <paramref name="reference"/>'s chain (twice its length for ping-pong), or null
     /// when the chain is missing.
     /// </summary>
@@ -201,6 +212,45 @@ public sealed class SequenceDocument
         Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name);
         return null;
     }
+
+    /// <summary>Sets a track's offset from the entity origin.</summary>
+    public void SetTrackOffset(IUndoManager undo, int sequence, int track, float x, float y) =>
+        Edit(undo, $"Set Offset of '{Save.Sequences[sequence].Tracks[track].Name}' to ({Format(x)}, {Format(y)})", save =>
+        {
+            var target = save.Sequences[sequence].Tracks[track];
+            target.X = x;
+            target.Y = y;
+        });
+
+    public void SetTrackFlip(IUndoManager undo, int sequence, int track, bool flip) =>
+        Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for '{Save.Sequences[sequence].Tracks[track].Name}'",
+            save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
+
+    public void SetTrackZ(IUndoManager undo, int sequence, int track, int z) =>
+        Edit(undo, $"Set Z of '{Save.Sequences[sequence].Tracks[track].Name}' to {z}",
+            save => save.Sequences[sequence].Tracks[track].Z = z);
+
+    /// <summary>Moves a chain to <paramref name="start"/> seconds. Returns why it was refused (negative or not a number), or null.</summary>
+    public string? SetChainStart(IUndoManager undo, int sequence, int track, int chain, double start)
+    {
+        if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
+        string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
+        Edit(undo, $"Set Start of '{name}' to {Format(start)}",
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start);
+        return null;
+    }
+
+    /// <summary>Sets how many cycles a chain plays. Returns why it was refused (zero, negative or not a number), or null.</summary>
+    public string? SetChainLoops(IUndoManager undo, int sequence, int track, int chain, float loops)
+    {
+        if (!float.IsFinite(loops) || loops <= 0) return "Loops must be above 0.";
+        string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
+        Edit(undo, $"Set Loops of '{name}' to {Format(loops)}",
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);
+        return null;
+    }
+
+    private static string Format(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Starts a gesture that edits <see cref="Save"/> in place on every pointer move (a drag). Returns the state to pass

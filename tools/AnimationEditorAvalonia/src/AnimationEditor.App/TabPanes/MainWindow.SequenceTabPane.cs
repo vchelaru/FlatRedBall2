@@ -54,7 +54,7 @@ public partial class MainWindow
         private readonly MainWindow _window;
         private readonly Dictionary<FilePath, SequenceDocument> _documents = new();
         private readonly Dictionary<FilePath, int> _selectedIndex = new();
-        private HiddenSidebarTabs? _hiddenTabs;
+        private bool _wired;
         private SequenceDocument? _document;
         private bool _refreshing;
 
@@ -70,19 +70,21 @@ public partial class MainWindow
 
         /// <summary>
         /// Shows the sequence list where the ANIMATIONS tree goes and the sequence editor where the achx editor goes.
-        /// The Inspector hides: it edits the achx document, which stays loaded behind this tab.
+        /// The Inspector tab stays, showing the sequence inspector in place of the achx one, which edits the achx
+        /// document that stays loaded behind this tab.
         /// </summary>
         public void Show()
         {
             var w = _window;
-            if (_hiddenTabs is null)
+            if (!_wired)
             {
-                _hiddenTabs = new HiddenSidebarTabs(w.SidebarTabs, w.ProjectTab, w.InspectorTab);
+                _wired = true;
                 WireControls();
             }
             w.SequenceListPane.IsVisible = true;
             w.SequenceEditorPane.IsVisible = true;
-            _hiddenTabs.Hide();
+            w.AchxInspector.IsVisible = false;
+            w.SequenceInspector.IsVisible = true;
         }
 
         public void Hide()
@@ -95,7 +97,8 @@ public partial class MainWindow
             w.SequenceTimeline.Show(null, -1, null);
             w.SequenceListPane.IsVisible = false;
             w.SequenceEditorPane.IsVisible = false;
-            _hiddenTabs?.Restore();
+            w.SequenceInspector.IsVisible = false;
+            w.AchxInspector.IsVisible = true;
         }
 
         public void CaptureLeaving(TabEntry tab) => tab.UndoSnapshot = _window._undoManager.TakeSnapshot();
@@ -190,6 +193,11 @@ public partial class MainWindow
                 StopPlayback();
             };
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
+            w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
+            w.SequenceTimeline.ContentChanged += ShowInspector;
+            w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
+            w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) => w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
             {
@@ -222,6 +230,39 @@ public partial class MainWindow
             w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+        }
+
+        /// <summary>
+        /// Selecting on the timeline brings the Inspector forward, unless the History or Shortcuts tab is showing: the
+        /// user is reading that while editing.
+        /// </summary>
+        private void OnTimelineSelectionChanged()
+        {
+            var w = _window;
+            ShowInspector();
+            bool selected = w.SequenceTimeline.Selection is not null || w.SequenceTimeline.SelectedTrack is not null;
+            if (selected && w.SidebarTabs.SelectedItem != w.HistoryTab && w.SidebarTabs.SelectedItem != w.ShortcutsTab)
+                w.SidebarTabs.SelectedItem = w.InspectorTab;
+        }
+
+        /// <summary>Points the inspector at the timeline's selection. It reads the document, so a drag shows live.</summary>
+        private void ShowInspector()
+        {
+            var w = _window;
+            w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack);
+        }
+
+        /// <summary>Opens the chain's source file as a tab and selects the chain there. A missing source or chain shows the error banner instead.</summary>
+        private async Task GoToDefinitionAsync(SequenceChainReferenceSave reference)
+        {
+            if (_document is not { } document) return;
+            var (path, error) = document.LocateDefinition(reference);
+            if (path is null)
+            {
+                _window.ShowErrorBanner(error!);
+                return;
+            }
+            await _window.OpenAndSelectChainAsync(path, reference.Chain);
         }
 
         private int SequenceIndex => _window.SequenceList.SelectedIndex;
