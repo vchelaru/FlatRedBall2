@@ -49,6 +49,65 @@ public class TimelineViewportTests
         viewport.RowAt(firstLane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
     }
 
+    // Lane 0 and 2 carry an event row (60 px), lane 1 does not (48 px).
+    private static TimelineViewport MixedViewport()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { 60.0, 48.0, 60.0 });
+        return viewport;
+    }
+
+    [Fact]
+    public void LaneTop_FollowsEachTracksOwnHeight_AndTheNewTrackRowIsAFullBaseLane()
+    {
+        var viewport = MixedViewport();
+        double ruler = TimelineViewport.RulerHeight;
+
+        viewport.LaneTop(0).ShouldBe(ruler);
+        viewport.LaneTop(1).ShouldBe(ruler + 60);
+        viewport.LaneTop(2).ShouldBe(ruler + 108);
+        viewport.LaneTop(3).ShouldBe(ruler + 168);
+        viewport.LaneHeightOf(0).ShouldBe(60);
+        viewport.LaneHeightOf(1).ShouldBe(48);
+        viewport.LaneHeightOf(3).ShouldBe(TimelineViewport.LaneHeight);
+        viewport.ContentHeight(3).ShouldBe(ruler + 168 + TimelineViewport.LaneHeight);
+    }
+
+    [Fact]
+    public void RowAt_AMixOfTallAndNormalLanes_PutsEachBoundaryAtItsOwnHeight()
+    {
+        var viewport = MixedViewport();
+        double ruler = TimelineViewport.RulerHeight;
+
+        viewport.RowAt(ruler + 59, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 0));
+        viewport.RowAt(ruler + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(ruler + 107, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(ruler + 109, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 2));
+        viewport.RowAt(ruler + 169, 3).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        viewport.RowAt(ruler + 168 + TimelineViewport.LaneHeight + 1, 3).ShouldBe(new TimelineRow(TimelineRowKind.None));
+    }
+
+    [Fact]
+    public void ScrollVertically_UsesTheTallLanesInTheContentExtent()
+    {
+        var viewport = MixedViewport();
+
+        viewport.ScrollVertically(1_000_000, trackCount: 3, viewHeight: 100);
+
+        viewport.ScrollY.ShouldBe(TimelineViewport.RulerHeight + 168 + TimelineViewport.LaneHeight - 100);
+        viewport.LaneTop(0).ShouldBe(TimelineViewport.RulerHeight - viewport.ScrollY);
+    }
+
+    [Fact]
+    public void SetLaneHeights_ForFewerTracksThanAskedAbout_TreatsTheRestAsBaseLanes()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { 60.0 });
+
+        viewport.LaneTop(2).ShouldBe(TimelineViewport.RulerHeight + 60 + TimelineViewport.LaneHeight);
+        viewport.RowAt(TimelineViewport.RulerHeight + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+    }
+
     [Fact]
     public void ScrubTime_IsTheTimeUnderX_ClampedToTheSequence()
     {

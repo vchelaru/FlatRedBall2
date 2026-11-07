@@ -53,6 +53,11 @@ public sealed partial class SequenceTimelineControl
                 source = (hit.Block.Reference.Source, chain);
                 card = FilmstripReadout.At(hit.Block.Reference.Chain, chain.Frames.Count, hit.Block.Start, cell, visit);
             }
+            else if (EventCardAt(point, inLane) is { } eventCard)
+            {
+                card = eventCard.Card;
+                source = eventCard.Source;
+            }
         }
         if (card is null && HoverCard is null) return;
         _hoverPoint = point;

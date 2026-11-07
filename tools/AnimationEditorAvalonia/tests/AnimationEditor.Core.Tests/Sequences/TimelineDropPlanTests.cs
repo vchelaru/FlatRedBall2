@@ -13,6 +13,24 @@ public class TimelineDropPlanTests
         (viewport.XAt(seconds), viewport.LaneTop(row) + TimelineViewport.LaneHeight / 2);
 
     [Fact]
+    public void For_BelowATallLane_TargetsTheNextTrack_AndItsEventRowStillBelongsToTheTallOne()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(new[] { TimelineViewport.LaneHeight + 12, TimelineViewport.LaneHeight });
+        double x = viewport.XAt(0.5);
+
+        var inEventRow = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(0) + TimelineViewport.LaneHeight + 6, 0.5);
+        var firstOfNext = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(1) + 2, 0.5);
+        var newTrack = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(2) + 2, 0.5);
+
+        inEventRow.Row.ShouldBe(0);
+        inEventRow.Kind.ShouldBe(TimelineDropKind.Track);
+        firstOfNext.Row.ShouldBe(1);
+        newTrack.Kind.ShouldBe(TimelineDropKind.NewTrack);
+        newTrack.Row.ShouldBe(2);
+    }
+
+    [Fact]
     public void For_OverATrackLane_TargetsThatTrackAtTheSnappedTime()
     {
         var viewport = new TimelineViewport();
