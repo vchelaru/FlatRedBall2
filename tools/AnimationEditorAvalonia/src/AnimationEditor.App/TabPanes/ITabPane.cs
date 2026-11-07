@@ -48,6 +48,12 @@ internal interface ITabPane
     /// </summary>
     Task<TabEntry?> PrepareCloseAsync(TabEntry tab);
 
+    /// <summary>
+    /// File &gt; Save for <paramref name="tab"/>, the active tab (null when none is open). Only called while
+    /// <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    Task SaveAsync(TabEntry? tab);
+
     /// <summary>Cleans up after the user discards <paramref name="tab"/>, just before it leaves the strip.</summary>
     void Closing(TabEntry tab);
 
@@ -59,7 +65,7 @@ internal interface ITabPane
 
     /// <summary>
     /// Whether hotkeys and menu items of <paramref name="scope"/> act while this kind is active.
-    /// Document-scoped menu items are disabled while it returns false.
+    /// Menu items of a refused scope are disabled.
     /// </summary>
     bool Accepts(HotkeyScope scope);
 

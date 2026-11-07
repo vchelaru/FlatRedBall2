@@ -273,6 +273,7 @@ public partial class MainWindow : Window
             () => TreeBuilder.CaptureExpandState(_treeRoots), _tabManager);
         _achxPane = new AchxTabPane(this);
         _pngPane = new PngTabPane(this);
+        _sequencePane = new SequenceTabPane(this);
         _visiblePane = _achxPane;
 
         NumericExpressionInput.Install();
@@ -658,11 +659,13 @@ public partial class MainWindow : Window
     // showing when the window opens.
     private readonly AchxTabPane _achxPane;
     private readonly PngTabPane _pngPane;
+    private readonly SequenceTabPane _sequencePane;
     private ITabPane _visiblePane;
 
     private ITabPane PaneFor(TabKind kind) => kind switch
     {
         TabKind.Png => _pngPane,
+        TabKind.Sequence => _sequencePane,
         _ => _achxPane,
     };
 
@@ -704,15 +707,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Opens <paramref name="path"/> as a tab of a kind that has no document (a .png today), or
-    /// focuses it if already open. Keeps the current document as a background tab, as File &gt; Open does.
+    /// Opens <paramref name="path"/> as a tab of a kind other than achx (a .png or .seqj), or focuses
+    /// it if already open. Keeps the achx document as a background tab, as File &gt; Open does. A file
+    /// that fails to load takes its tab back with it.
     /// </summary>
-    private void OpenNonDocumentTab(string path)
+    /// <param name="asPreview">Opens it in the reusable preview tab, as a single click in the Project panel does.</param>
+    private async Task OpenNonDocumentTabAsync(string path, bool asPreview = false)
     {
         CaptureLeavingActiveTab();
         EnsureCurrentEditorContentHasTab();
-        _tabManager.OpenOrFocus(new FilePath(path));
-        _ = ShowTabAsync(_tabManager.ActiveTab!);
+        var filePath = new FilePath(path);
+        var result = asPreview ? _tabManager.OpenPreview(filePath) : _tabManager.OpenOrFocus(filePath);
+        if (!await ShowTabAsync(_tabManager.ActiveTab!) && result != TabOpenResult.Focused)
+            DropUnloadedTab(filePath);
     }
 
     /// <summary>
@@ -722,7 +729,7 @@ public partial class MainWindow : Window
     public void OpenPngAsTab(string path)
     {
         if (string.IsNullOrEmpty(path)) return;
-        OpenNonDocumentTab(path);
+        _ = OpenNonDocumentTabAsync(path);
     }
 
     // Lets tests await both background operations a PNG tab kicks off (history load + texture decode)
@@ -2466,6 +2473,7 @@ public partial class MainWindow : Window
     private void WireMenuEvents()
     {
         MenuNew.Click    += OnNewClick;
+        MenuNewSequence.Click += (_, _) => _ = NewSequenceFileAsync();
         MenuLoad.Click   += OnLoadClick;
         MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuCloseProject.Click += OnCloseProjectClick;
@@ -2534,7 +2542,7 @@ public partial class MainWindow : Window
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
 
         RefreshRecentFiles();
-        CollectDocumentMenuItems(MainMenu.Items);
+        CollectScopedMenuItems(MainMenu.Items);
         UpdateDocumentMenuItems();
 
         // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
@@ -2542,38 +2550,43 @@ public partial class MainWindow : Window
             MainMenu.IsVisible = false;
     }
 
-    // Menu items that work in every tab kind. Every other leaf item in the main menu acts on the
-    // document, so a new item is document-scoped unless it is added here (as HotkeyScope defaults).
+    // Menu items that work in every tab kind. Every leaf item in the main menu not listed here or in
+    // DocumentScopedMenuItems acts on the achx document, so a new item is achx-scoped unless it is
+    // added to one of them (as HotkeyScope defaults).
     private MenuItem[] AppScopedMenuItems =>
     [
-        MenuNew, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
+        MenuNew, MenuNewSequence, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
         MenuSettings, MenuShowDiagnostics, MenuShowShortcuts, MenuViewLog, MenuChatOnDiscord, MenuAbout,
     ];
 
-    private readonly List<MenuItem> _documentMenuItems = new();
+    // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
+    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory];
 
-    private void CollectDocumentMenuItems(IEnumerable<object?> items)
+    private readonly List<(MenuItem Item, HotkeyScope Scope)> _scopedMenuItems = new();
+
+    private void CollectScopedMenuItems(IEnumerable<object?> items)
     {
         var appScoped = AppScopedMenuItems;
+        var documentScoped = DocumentScopedMenuItems;
         foreach (var item in items.OfType<MenuItem>())
         {
             if (appScoped.Contains(item)) continue;
             if (item.Items.OfType<MenuItem>().Any())
-                CollectDocumentMenuItems(item.Items);
+                CollectScopedMenuItems(item.Items);
             else
-                _documentMenuItems.Add(item);
+                _scopedMenuItems.Add((item, documentScoped.Contains(item) ? HotkeyScope.Document : HotkeyScope.Achx));
         }
     }
 
     /// <summary>
-    /// Disables the document's menu items while the visible pane refuses
-    /// <see cref="HotkeyScope.Document"/> (a PNG tab), so they can't act on a document hidden behind it.
+    /// Disables each menu item whose scope the visible pane refuses (achx commands on a PNG or sequence
+    /// tab, document commands on a PNG tab), so none can act on a document hidden behind another tab kind.
     /// </summary>
     private void UpdateDocumentMenuItems()
     {
+        foreach (var (item, scope) in _scopedMenuItems)
+            item.IsEnabled = _visiblePane.Accepts(scope);
         bool documentActive = _visiblePane.Accepts(HotkeyScope.Document);
-        foreach (var item in _documentMenuItems)
-            item.IsEnabled = documentActive;
         MenuUndo.IsEnabled = documentActive && _undoManager.CanUndo;
         MenuRedo.IsEnabled = documentActive && _undoManager.CanRedo;
     }
@@ -2897,18 +2910,7 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void OnSaveClick(object? sender, RoutedEventArgs e)
-    {
-        if (_projectManager.AnimationChainListSave is null) return;
-
-        if (string.IsNullOrEmpty(_projectManager.FileName))
-            _ = _appCommands.SaveCurrentAnimationChainListAsync();
-        else
-        {
-            _appCommands.SaveCurrentAnimationChainList();
-            UpdateTitle();
-        }
-    }
+    private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = ActivePane.SaveAsync(_tabManager.ActiveTab);
 
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
@@ -6757,7 +6759,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(fileName)) return;
         if (PaneFor(TabEntry.ResolveKind(new FilePath(fileName))) != _achxPane)
         {
-            OpenNonDocumentTab(fileName);
+            await OpenNonDocumentTabAsync(fileName, asPreview);
             return;
         }
 
@@ -7327,6 +7329,7 @@ public partial class MainWindow : Window
             {
                 Id = "undo", Description = "Undo", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Z", Command, Forbidden: Shift) },
+                Scope = HotkeyScope.Document,
                 Action = () => _undoManager.Undo(),
             },
             new()
@@ -7337,6 +7340,7 @@ public partial class MainWindow : Window
                     new HotkeyGesture("Y", Command),
                     new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
                 },
+                Scope = HotkeyScope.Document,
                 Action = () => _undoManager.Redo(),
             },
             new()
@@ -7380,6 +7384,7 @@ public partial class MainWindow : Window
             {
                 Id = "save", Description = "Save", Category = "File",
                 Gestures = new[] { new HotkeyGesture("S", Command) },
+                Scope = HotkeyScope.Document,
                 Action = () => OnSaveClick(null, null!),
             },
             // Ctrl+Plus/Minus zooms whichever panel (wireframe, preview, or the PNG diff pane)

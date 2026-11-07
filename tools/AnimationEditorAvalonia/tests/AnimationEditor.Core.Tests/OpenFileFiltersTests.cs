@@ -11,7 +11,7 @@ public class OpenFileFiltersTests
     {
         var first = OpenFileFilters.AnimationFiles[0];
 
-        Assert.Equal(new[] { "*.achx", "*.achj", "*.tsx" }, first.Patterns);
+        Assert.Equal(new[] { "*.achx", "*.achj", "*.tsx", "*.seqj" }, first.Patterns);
     }
 
     [Fact]
@@ -19,6 +19,6 @@ public class OpenFileFiltersTests
     {
         var perFormat = OpenFileFilters.AnimationFiles.Skip(1).SelectMany(f => f.Patterns).OrderBy(p => p);
 
-        Assert.Equal(new[] { "*.achj", "*.achx", "*.tsx" }, perFormat);
+        Assert.Equal(new[] { "*.achj", "*.achx", "*.seqj", "*.tsx" }, perFormat);
     }
 }

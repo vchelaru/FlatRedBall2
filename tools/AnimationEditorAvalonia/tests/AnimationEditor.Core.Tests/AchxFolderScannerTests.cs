@@ -44,6 +44,21 @@ public class AchxFolderScannerTests
     }
 
     [Fact]
+    public async Task ScanAsync_SeqjFile_IsIncludedWithoutAnimationFrames()
+    {
+        var root = new FakeEditorFolder("Content");
+        root.Files.Add(new FakeEditorFile("hero.achx"));
+        root.Files.Add(new FakeEditorFile("Boss.SEQJ"));
+
+        var entries = await AchxFolderScanner.ScanAsync(root);
+
+        var sequence = entries.Single(e => e.FileName == "Boss.SEQJ");
+        Assert.True(sequence.IsSequence);
+        Assert.False(sequence.HasAnimationFrames);
+        Assert.True(entries.Single(e => e.FileName == "hero.achx").HasAnimationFrames);
+    }
+
+    [Fact]
     public async Task ScanAsync_TsxFile_IsIncludedAndFlaggedAsTsx()
     {
         var root = new FakeEditorFolder("Content");

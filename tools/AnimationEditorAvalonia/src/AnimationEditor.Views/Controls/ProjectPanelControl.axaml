@@ -92,6 +92,10 @@
                         <!-- .tsx row: the same Tiled logo used elsewhere in the app
                              (status bar's tileset-sync indicator) rather than the chain icon,
                              since a tileset has no animation frames to preview. -->
+                        <svg:Svg IsVisible="{Binding ShowSequenceIcon}"
+                                 Width="16" Height="16"
+                                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconSequence.svg"
+                                 CurrentColor="{DynamicResource IconInkMuted}" />
                         <Image IsVisible="{Binding ShowTsxIcon}"
                                Width="16" Height="16"
                                Source="avares://AnimationEditor.Views/Assets/icons/png/tiled-icon-128.png"

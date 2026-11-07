@@ -254,7 +254,7 @@ public class PanelsScenarioTests
         Avalonia.Application.Current!.RequestedThemeVariant.ShouldBe(ThemeVariant.Light);
     }
 
-    private static TreeViewItem RowFor(AnimationEditorHarness editor, ProjectPanelControl panel, string fileName)
+    internal static TreeViewItem RowFor(AnimationEditorHarness editor, ProjectPanelControl panel, string fileName)
     {
         editor.Layout();
         return panel.ProjectTree.GetVisualDescendants().OfType<TreeViewItem>()
