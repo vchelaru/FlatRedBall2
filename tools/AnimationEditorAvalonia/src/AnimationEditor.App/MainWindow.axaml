@@ -420,6 +420,7 @@
                              registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New Animation" x:Name="MenuNew" />
+                        <MenuItem Header="New Se_quence File…" x:Name="MenuNewSequence" />
                         <MenuItem Header="_Open…"         x:Name="MenuLoad" />
                         <MenuItem Header="Open _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />

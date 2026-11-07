@@ -165,7 +165,14 @@ public sealed class SequenceDocument
 
     private static AnimationChainListSave? TryLoad(string absolutePath)
     {
-        try { return File.Exists(absolutePath) ? AnimationChainListSave.FromFile(absolutePath) : null; }
+        try
+        {
+            if (!File.Exists(absolutePath)) return null;
+            var list = AnimationChainListSave.FromFile(absolutePath);
+            // The editor's drawing code expects the in-memory UV form that ProjectManager.LoadAnimationChain produces.
+            ProjectManager.ConvertCoordinates(list, Path.GetDirectoryName(absolutePath) ?? "", TextureCoordinateType.UV);
+            return list;
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Text.Json.JsonException or System.Xml.XmlException)
         {
             return null;

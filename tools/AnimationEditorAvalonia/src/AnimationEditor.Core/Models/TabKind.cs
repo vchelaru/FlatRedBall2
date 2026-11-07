@@ -12,5 +12,8 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>A <c>.png</c> image opened as a plain preview.</summary>
         Png,
+
+        /// <summary>A <c>.seqj</c> sequence file (spike). Has its own document and undo history, no achx model.</summary>
+        Sequence,
     }
 }

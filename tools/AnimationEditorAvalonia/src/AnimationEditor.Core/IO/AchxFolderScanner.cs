@@ -55,7 +55,11 @@ public static class AchxFolderScanner
     /// <see cref="IsAchxPath"/> because that narrower check also drives non-tree logic --
     /// <c>NewAnimationFileNaming</c>'s stem-collision set in particular -- that must stay
     /// achx/achj-only.</summary>
-    public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path);
+    public static bool IsProjectTreePath(string path) => IsAchxPath(path) || IsTsxPath(path) || IsSequencePath(path);
+
+    /// <summary>True for a <c>.seqj</c> sequence file (spike).</summary>
+    public static bool IsSequencePath(string path) =>
+        Path.GetExtension(path).Equals(".seqj", StringComparison.OrdinalIgnoreCase);
 
     private static async Task ScanAsync(
         IEditorFolder folder, string relativePrefix, List<AchxFileEntry> results, List<string> folderPaths)

@@ -343,13 +343,22 @@ public partial class MainWindow : Window
         // it to a permanent tab (#841).
         ProjectPanel.FileSelected += entry =>
         {
+            // Spike: the press that starts a drag into a sequence's library also selects the row, which would
+            // replace the sequence tab with a preview of the file. In a sequence tab only double-click opens.
+            if (_tabManager.ActiveTab is { Kind: TabKind.Sequence }) return;
             if (entry.File is DiskEditorFile diskFile)
                 _ = LoadAnimationFileAsync(diskFile.FullPath, asPreview: true);
         };
+        ProjectPanel.ResolveDragPath = entry => (entry.File as DiskEditorFile)?.FullPath;
         ProjectPanel.FileDoubleClicked += entry =>
         {
             if (entry.File is DiskEditorFile diskFile)
             {
+                if (_tabManager.ActiveTab is { Kind: TabKind.Sequence })
+                {
+                    _ = LoadAnimationFileAsync(diskFile.FullPath);
+                    return;
+                }
                 _tabManager.Promote(new FilePath(diskFile.FullPath));
                 RebuildTabStrip();
             }
@@ -667,6 +676,7 @@ public partial class MainWindow : Window
             _tabController.CaptureLeavingTab(leavingTab);
             SaveCompanionFile();
         }
+        CaptureLeavingSequenceTab(leavingTab);
 
         // Keep the currently-open achx editor content as a background tab, same as File > Open.
         EnsureCurrentEditorContentHasTab();
@@ -687,6 +697,7 @@ public partial class MainWindow : Window
     /// <summary>Swaps the main pane to the PNG viewer and loads <paramref name="tab"/>'s image.</summary>
     private void ShowPngPane(TabEntry tab)
     {
+        HideSequencePane();
         AchxEditorPane.IsVisible = false;
         PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
@@ -723,6 +734,7 @@ public partial class MainWindow : Window
     {
         // Restore the editing sidebar unconditionally — it must come back whenever we intend to show
         // the achx editor, including on the paths below that short-circuit before touching the panes.
+        HideSequencePane();
         SetSidebarForPng(false);
         if (!PngPane.IsVisible) return;
         PngPane.LoadTexture(null);   // clear the previewed texture (Pass null to unload)
@@ -805,6 +817,18 @@ public partial class MainWindow : Window
         if (leavingTab is { Kind: TabKind.Achx })
         {
             _tabController.CaptureLeavingTab(leavingTab);
+        }
+        CaptureLeavingSequenceTab(leavingTab);
+
+        if (tab.Kind == TabKind.Sequence)
+        {
+            if (leavingTab is { Kind: TabKind.Achx })
+                SaveCompanionFile();
+            _tabManager.Activate(tab.Path);
+            ShowSequencePane(tab);
+            SyncProjectPanelSelectionTo(tab);
+            RebuildTabStrip();
+            return;
         }
 
         // PNG tabs bypass the animation-editor machinery entirely.
@@ -961,7 +985,13 @@ public partial class MainWindow : Window
         var next = _tabManager.ActiveTab;
         if (next != null)
         {
-            if (next.Kind == TabKind.Png)
+            if (next.Kind == TabKind.Sequence)
+            {
+                ShowSequencePane(next);
+                SyncProjectPanelSelectionTo(next);
+                RebuildTabStrip();
+            }
+            else if (next.Kind == TabKind.Png)
             {
                 ShowPngPane(next);
                 SyncProjectPanelSelectionTo(next);
@@ -1060,6 +1090,10 @@ public partial class MainWindow : Window
             if (active.Kind == TabKind.Png)
             {
                 ShowPngPane(active);
+            }
+            else if (active.Kind == TabKind.Sequence)
+            {
+                ShowSequencePane(active);
             }
             else
             {
@@ -2658,6 +2692,7 @@ public partial class MainWindow : Window
     private void WireMenuEvents()
     {
         MenuNew.Click    += OnNewClick;
+        MenuNewSequence.Click += (_, _) => _ = NewSequenceFileAsync();
         MenuLoad.Click   += OnLoadClick;
         MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuCloseProject.Click += OnCloseProjectClick;
@@ -6902,6 +6937,11 @@ public partial class MainWindow : Window
     private async Task LoadAnimationFileAsync(string fileName, bool asPreview = false)
     {
         if (string.IsNullOrEmpty(fileName)) return;
+        if (AchxFolderScanner.IsSequencePath(fileName))
+        {
+            OpenSequenceAsTab(fileName);
+            return;
+        }
 
         // Opening an achx always returns to the editor pane if a PNG tab was showing.
         ShowAchxPane();
@@ -6913,6 +6953,7 @@ public partial class MainWindow : Window
         {
             _tabController.CaptureLeavingTab(leavingTab);
         }
+        CaptureLeavingSequenceTab(leavingTab);
 
         // If there is already a file open that hasn't been registered as a tab yet,
         // add it as a background tab so it appears as the first tab when the second

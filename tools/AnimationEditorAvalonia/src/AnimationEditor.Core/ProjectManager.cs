@@ -257,7 +257,7 @@ namespace AnimationEditor.Core
         /// texture that hasn't been built yet is an expected, tolerated state while editing, and no
         /// persisted artifact is at risk.
         /// </exception>
-        private static Dictionary<string, (int W, int H)> ConvertCoordinates(
+        internal static Dictionary<string, (int W, int H)> ConvertCoordinates(
             AnimationChainListSave acls,
             string achxDirectory,
             TextureCoordinateType target,

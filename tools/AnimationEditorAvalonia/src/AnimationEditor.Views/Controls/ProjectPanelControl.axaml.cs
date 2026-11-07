@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
@@ -166,6 +167,7 @@ public partial class ProjectPanelControl : UserControl
         // TreeViewItem's own pointer handling toggles IsExpanded on the second click before a
         // Bubble-registered DoubleTapped handler on an ancestor would ever see it.
         ProjectTree.AddHandler(InputElement.PointerPressedEvent, OnProjectTreePointerPressed, RoutingStrategies.Tunnel);
+        ProjectTree.AddHandler(InputElement.PointerMovedEvent, OnProjectTreePointerMoved, RoutingStrategies.Tunnel);
 
         var contextMenu = new ContextMenu();
         contextMenu.Opening += OnTreeContextMenuOpening;
@@ -385,11 +387,40 @@ public partial class ProjectPanelControl : UserControl
             return;
         }
 
+        if (props.IsLeftButtonPressed && e.ClickCount == 1 && GetNodeVmFromSource(e.Source) is { IsFile: true, Entry: { } pressed })
+        {
+            _dragPressEvent = e;
+            _dragEntry = pressed;
+        }
+
         if (!props.IsLeftButtonPressed || e.ClickCount != 2) return;
 
         if (GetNodeVmFromSource(e.Source) is not { IsFile: true, Entry: { } entry }) return;
 
         FileDoubleClicked?.Invoke(entry);
+    }
+
+    // Spike: drag a file row out (to a sequence's library). OS drag-drop, so headless tests can't drive it.
+    private PointerPressedEventArgs? _dragPressEvent;
+    private AchxFileEntry? _dragEntry;
+
+    /// <summary>Maps a row to its on-disk path for drag-out. Set by the host; rows without a path don't drag.</summary>
+    public Func<AchxFileEntry, string?>? ResolveDragPath { get; set; }
+
+    private async void OnProjectTreePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragPressEvent is not { } press || _dragEntry is not { } entry) return;
+        if (!e.GetCurrentPoint(ProjectTree).Properties.IsLeftButtonPressed) { _dragPressEvent = null; return; }
+        var delta = e.GetPosition(ProjectTree) - press.GetPosition(ProjectTree);
+        if (Math.Abs(delta.X) < 4 && Math.Abs(delta.Y) < 4) return;
+        _dragPressEvent = null;
+        _dragEntry = null;
+        if (ResolveDragPath?.Invoke(entry) is not { } path || TopLevel.GetTopLevel(this) is not { } top) return;
+        var file = await top.StorageProvider.TryGetFileFromPathAsync(path);
+        if (file is null) return;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.CreateFile(file));
+        await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Copy);
     }
 
     private static AchxTreeNodeVm? GetNodeVmFromSource(object? source)

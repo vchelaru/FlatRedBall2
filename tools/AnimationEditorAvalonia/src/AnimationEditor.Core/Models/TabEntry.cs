@@ -59,7 +59,12 @@ namespace AnimationEditor.Core.Models
         /// untitled sentinels and empty paths — is <see cref="TabKind.Achx"/>.
         /// </summary>
         public static TabKind ResolveKind(FilePath path) =>
-            path.Extension == "png" ? TabKind.Png : TabKind.Achx;
+            path.Extension switch
+            {
+                "png" => TabKind.Png,
+                "seqj" => TabKind.Sequence,
+                _ => TabKind.Achx,
+            };
 
         /// <summary>
         /// Undo/redo stack snapshot saved when this tab was last deactivated.
