@@ -4,6 +4,7 @@ using AnimationEditor.Core.Navigation;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,16 +13,37 @@ using FilePath = AnimationEditor.Core.Paths.FilePath;
 namespace AnimationEditor.App;
 
 /// <summary>
-/// Back and forward between places the user jumped between on purpose (Go to Definition, a click on the tab strip),
-/// like a browser. Plain selection clicks never record anything; the selection is read when the user leaves.
+/// A global back and forward history, like a browser's. Any pointer press or release, key press, tab switch, file
+/// open or tab close is a user action (<see cref="NavigationTracker"/>); when it moves the active tab or the
+/// selection, the place it started from becomes a history entry. Undo, Back and Forward, loads and playback happen
+/// outside any action (or suppress it) and record nothing. The place is read fresh when an action starts.
 /// </summary>
 public partial class MainWindow
 {
     private readonly NavigationHistory _navigationHistory = new();
+    private readonly Stopwatch _navigationClock = Stopwatch.StartNew();
+    private NavigationTracker _navigation = null!;
     private bool _navigatingHistory;
 
     private void WireNavigation()
     {
+        _navigation = new NavigationTracker(
+            _navigationHistory, CaptureNavigationLocation, IsStillPresent, () => _navigationClock.Elapsed);
+
+        // Every real input is a user action. The action stays open until the dispatcher is idle, so selection changes
+        // the input triggers (including posted catch-ups) land inside it; a drag's later moves are not new actions.
+        AddHandler(PointerPressedEvent, (object? _, PointerPressedEventArgs e) =>
+        {
+            if (MouseNavigationDirection(e.GetCurrentPoint(this).Properties.PointerUpdateKind) is null)
+                BeginInputAction();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerReleasedEvent, (object? _, PointerReleasedEventArgs e) => BeginInputAction(),
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(KeyDownEvent, (object? _, KeyEventArgs e) =>
+        {
+            if (IsNavigationInputKey(e.Key, e.KeyModifiers)) BeginInputAction();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
         // Tunnel, so the buttons work wherever the pointer is and no control reacts to them first.
         AddHandler(PointerPressedEvent, (object? _, PointerPressedEventArgs e) =>
         {
@@ -31,7 +53,33 @@ public partial class MainWindow
         }, RoutingStrategies.Tunnel);
         MenuNavBack.Click += (_, _) => _ = NavigateHistoryAsync(back: true);
         MenuNavForward.Click += (_, _) => _ = NavigateHistoryAsync(back: false);
+        _navigationHistory.Changed += UpdateNavigationMenuItems;
         UpdateNavigationMenuItems();
+    }
+
+    private void BeginInputAction()
+    {
+        var action = _navigation.BeginUserAction();
+        Dispatcher.UIThread.Post(action.Dispose, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Whether a key press can be a navigation: not a lone modifier, and not a Ctrl/Cmd or Alt chord (undo, paste,
+    /// save, Alt+Left/Right are commands, not selection moves).
+    /// </summary>
+    internal static bool IsNavigationInputKey(Key key, KeyModifiers modifiers) =>
+        key is not (Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+            or Key.LWin or Key.RWin)
+        && (modifiers & (KeyModifiers.Control | KeyModifiers.Meta | KeyModifiers.Alt)) == 0;
+
+    private void Undo()
+    {
+        using (_navigation.Suppress()) _undoManager.Undo();
+    }
+
+    private void Redo()
+    {
+        using (_navigation.Suppress()) _undoManager.Redo();
     }
 
     /// <summary>-1 for the mouse Back button, +1 for Forward, null for any other press.</summary>
@@ -73,33 +121,17 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Remembers <paramref name="before"/> when the user has since moved somewhere else.</summary>
-    private void PushHistoryIfMoved(NavigationLocation? before)
-    {
-        if (before is not { } leaving || _navigatingHistory) return;
-        if (CaptureNavigationLocation() != leaving)
-            _navigationHistory.Push(leaving);
-        UpdateNavigationMenuItems();
-    }
-
-    /// <summary>A tab-strip click: activates <paramref name="tab"/> and makes the tab it came from a history entry.</summary>
-    private async Task ActivateTabFromStripAsync(TabEntry tab)
-    {
-        var before = CaptureNavigationLocation();
-        await ActivateTabAsync(tab);
-        PushHistoryIfMoved(before);
-    }
-
     private async Task NavigateHistoryAsync(bool back)
     {
         if (_navigatingHistory) return;
         var here = CaptureNavigationLocation() ?? new NavigationLocation(string.Empty);
         _navigatingHistory = true;
+        using var suppress = _navigation.Suppress();
         try
         {
             var target = back
-                ? _navigationHistory.Back(here, CanReach)
-                : _navigationHistory.Forward(here, CanReach);
+                ? _navigationHistory.Back(here, IsStillPresent)
+                : _navigationHistory.Forward(here, IsStillPresent);
             if (target is { } location)
                 await RestoreNavigationLocationAsync(location);
         }
@@ -117,6 +149,24 @@ public partial class MainWindow
         var path = new FilePath(location.Path);
         if (_tabManager.Tabs.Any(t => t.Path == path)) return true;
         return !TabManager.IsUntitledSentinel(location.Path) && File.Exists(path.FullPath);
+    }
+
+    /// <summary>
+    /// <see cref="CanReach"/>, plus: in the active tab, the chain, frame or sequence must still exist. A chain the
+    /// user just renamed or deleted is not a place worth coming back to.
+    /// </summary>
+    private bool IsStillPresent(NavigationLocation location)
+    {
+        if (!CanReach(location)) return false;
+        if (_tabManager.ActiveTab is not { } active || active.Path != new FilePath(location.Path)) return true;
+        if (active.Kind == TabKind.Achx && location.ChainName is { } name)
+        {
+            var chain = _projectManager.AnimationChainListSave?.AnimationChains.FirstOrDefault(c => c.Name == name);
+            return chain is not null && (location.FrameIndex is not { } frame || frame < chain.Frames.Count);
+        }
+        if (active.Kind == TabKind.Sequence && location.SequenceIndex is { } sequence)
+            return sequence < SequenceList.ItemCount;
+        return true;
     }
 
     private async Task RestoreNavigationLocationAsync(NavigationLocation location)

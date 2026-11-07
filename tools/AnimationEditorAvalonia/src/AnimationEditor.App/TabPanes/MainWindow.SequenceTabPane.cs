@@ -221,7 +221,7 @@ public partial class MainWindow
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
                 w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
-                w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(TimelinePoint(e));
+                w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(chip, TimelinePoint(e));
             };
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
             {

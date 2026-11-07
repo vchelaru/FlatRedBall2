@@ -1,0 +1,54 @@
+namespace AnimationEditor.Core.Sequences;
+
+/// <summary>Where a dragged library chip would land.</summary>
+public enum TimelineDropKind
+{
+    /// <summary>Not over a droppable row.</summary>
+    None,
+
+    /// <summary>On an existing track's lane.</summary>
+    Track,
+
+    /// <summary>On the dashed row that makes a new track.</summary>
+    NewTrack,
+}
+
+/// <summary>
+/// What dropping a library chip at a point on the timeline would do, and the ghost block that previews it. The
+/// timeline draws the ghost from this and the drop itself reads <see cref="Kind"/>, <see cref="Row"/> and
+/// <see cref="Start"/> from it, so the preview and the result cannot disagree.
+/// </summary>
+/// <param name="Kind">The target.</param>
+/// <param name="Row">The lane index: the track for <see cref="TimelineDropKind.Track"/>, the track count for <see cref="TimelineDropKind.NewTrack"/>.</param>
+/// <param name="Start">The chain's start in seconds, snapped.</param>
+/// <param name="Length">The ghost's length in seconds.</param>
+/// <param name="Left">The ghost's left edge in pixels.</param>
+/// <param name="Width">The ghost's width in pixels.</param>
+public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, double Start, double Length, double Left, double Width)
+{
+    public static readonly TimelineDropPlan None = default;
+
+    /// <summary>The start as shown beside the ghost, such as <c>0.85 s</c>.</summary>
+    public string TimeLabel => FormatTime(Start);
+
+    public static string FormatTime(double seconds) =>
+        seconds.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " s";
+
+    /// <summary>
+    /// The plan for a chip released at (<paramref name="x"/>, <paramref name="y"/>) in the timeline's own coordinates.
+    /// <paramref name="cycleLength"/> is the chip's chain length in seconds, 0 when it is missing.
+    /// </summary>
+    public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength)
+    {
+        if (x < TimelineViewport.HeaderWidth || x > viewWidth) return None;
+        var row = viewport.RowAt(y, trackCount);
+        if (row.Kind is not (TimelineRowKind.Track or TimelineRowKind.NewTrack)) return None;
+
+        double start = TimelineLayout.SnapStart(viewport.TimeAt(x));
+        double length = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
+        return new TimelineDropPlan(
+            row.Kind == TimelineRowKind.Track ? TimelineDropKind.Track : TimelineDropKind.NewTrack,
+            row.Kind == TimelineRowKind.Track ? row.Track : trackCount,
+            start, length, viewport.XAt(start), length * viewport.PixelsPerSecond);
+    }
+}

@@ -16,6 +16,9 @@ public sealed class NavigationHistory
     private readonly List<NavigationLocation> _back = new();
     private readonly List<NavigationLocation> _forward = new();
 
+    /// <summary>Raised after a push or a step that moved, so the host can refresh Back and Forward enablement.</summary>
+    public event Action? Changed;
+
     public NavigationHistory(int capacity = DefaultCapacity) => _capacity = capacity;
 
     public bool CanGoBack => _back.Count > 0;
@@ -29,9 +32,12 @@ public sealed class NavigationHistory
     public void Push(NavigationLocation leaving)
     {
         _forward.Clear();
-        if (_back.Count > 0 && _back[^1] == leaving) return;
-        _back.Add(leaving);
-        Trim(_back);
+        if (!(_back.Count > 0 && _back[^1] == leaving))
+        {
+            _back.Add(leaving);
+            Trim(_back);
+        }
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -56,6 +62,7 @@ public sealed class NavigationHistory
             if (!isValid(candidate)) continue;
             to.Add(current);
             Trim(to);
+            Changed?.Invoke();
             return candidate;
         }
         return null;
