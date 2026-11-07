@@ -1,10 +1,12 @@
 using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace AnimationEditor.App.Controls;
@@ -17,6 +19,24 @@ namespace AnimationEditor.App.Controls;
 public sealed partial class SequenceTimelineControl
 {
     private readonly TimelineSelection _model = new();
+
+    // What is selected is drawn by this layer, a child that covers the control. Selecting, and dragging a rubber band, redraws
+    // only it, so the cost follows what is selected and not every chain on a timeline of thousands.
+    private readonly SelectionLayer _selectionLayer;
+
+    // Whether the last draw of the track headers showed one as selected, so that the headers (drawn with the rest) are redrawn when that changes.
+    private bool _headerSelectionShown;
+
+    // Where each track's blocks start in _blocks, for the rubber band's binary search. Rebuilt with the blocks.
+    private int[] _trackStarts = new int[1];
+
+    private readonly TimelineMarqueeSelector _marquee = new();
+
+    // SelectionChanged reaches the Inspector; during a rubber band it is raised at most this often, and once more when the band ends.
+    private readonly SelectionChangeThrottle _marqueeThrottle = new(Stopwatch.Frequency / 30);
+
+    /// <summary>How many times the selection layer has been drawn.</summary>
+    internal int SelectionLayerRenderCount { get; private set; }
 
     // A rubber band: where it started and ended (this control's coordinates), and the chains a Ctrl band adds to.
     private Point _marqueeStart;
@@ -87,8 +107,15 @@ public sealed partial class SequenceTimelineControl
 
     private void NotifySelection(bool changed)
     {
-        InvalidateVisual();
+        InvalidateSelection();
         if (changed) SelectionChanged?.Invoke();
+    }
+
+    // Selecting chains redraws only the selection layer. The track headers belong to the content, so they are redrawn when one is or was selected.
+    private void InvalidateSelection()
+    {
+        _selectionLayer.InvalidateVisual();
+        if (_model.Tracks.Count > 0 || _headerSelectionShown) InvalidateVisual();
     }
 
     // After a rebuild, what no longer exists leaves the selection. A chain stays selected while something is still at its place.
@@ -107,9 +134,11 @@ public sealed partial class SequenceTimelineControl
     {
         // Pressing empty space clears the selection, as it always did; Ctrl keeps it for the band to add to.
         if (!additive) SetSelection(null, null);
-        InvalidateVisual();
+        _selectionLayer.InvalidateVisual();
         if (point.X < TimelineViewport.HeaderWidth) return;
         _marqueeBase = additive ? _model.Chains.ToList() : Array.Empty<TimelineChainId>();
+        _marquee.Begin(_marqueeBase);
+        _marqueeThrottle.Reset();
         _marqueeOnLane = onLane;
         _marqueeModified = additive || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         _drag = DragKind.MarqueePending;
@@ -135,8 +164,61 @@ public sealed partial class SequenceTimelineControl
             _drag = DragKind.Marquee;
         }
         _marqueeEnd = point;
-        var touched = TimelineMarquee.Chains(Viewport, _blocks, _marqueeStart.X, _marqueeStart.Y, point.X, point.Y);
-        NotifySelection(_model.SelectChains(_marqueeBase.Concat(touched)));
+        bool changed = _marquee.Update(_model, Viewport, _blocks, _trackStarts, _marqueeStart.X, _marqueeStart.Y, point.X, point.Y);
+        // The band itself moved, so the layer redraws; the selection is only reported when it really changed, and not faster than the Inspector needs.
+        _selectionLayer.InvalidateVisual();
+        if (changed && _marqueeThrottle.Request(Stopwatch.GetTimestamp()))
+            SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Ends a rubber band: reports a selection change that was held back, so listeners end up with the final selection.</summary>
+    private void EndMarquee()
+    {
+        bool held = _marqueeThrottle.Flush();
+        _marqueeThrottle.Reset();
+        _selectionLayer.InvalidateVisual();
+        if (held) SelectionChanged?.Invoke();
+    }
+
+    private void RenderSelectionLayer(DrawingContext context)
+    {
+        SelectionLayerRenderCount++;
+        if (Sequence is null) return;
+        var size = Bounds.Size;
+        double header = TimelineViewport.HeaderWidth;
+        double ruler = TimelineViewport.RulerHeight;
+        var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
+        using (context.PushClip(lanes))
+        {
+            if (_model.Chains.Count > 0)
+            {
+                var pen = new Pen(Brush("Ink"), 2);
+                foreach (var block in _blocks)
+                {
+                    double left = Viewport.XAt(block.Start);
+                    double width = Math.Max(1, block.Played * Viewport.PixelsPerSecond);
+                    if (left > size.Width || left + width < header || !_model.Contains(new TimelineChainId(block.Track, block.Chain))) continue;
+                    var body = new Rect(left, Viewport.LaneTop(block.Track) + TimelineLayout.BodyTop, width, TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
+                    using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
+                        context.DrawRectangle(null, pen, body, 3, 3);
+                }
+            }
+            DrawMarquee(context);
+        }
+    }
+
+    /// <summary>The child control that draws the selection over the timeline. It takes no input.</summary>
+    private sealed class SelectionLayer : Control
+    {
+        private readonly SequenceTimelineControl _owner;
+
+        public SelectionLayer(SequenceTimelineControl owner)
+        {
+            _owner = owner;
+            IsHitTestVisible = false;
+        }
+
+        public override void Render(DrawingContext context) => _owner.RenderSelectionLayer(context);
     }
 
     private void DrawMarquee(DrawingContext context)
@@ -163,6 +245,7 @@ public sealed partial class SequenceTimelineControl
         {
             var before = _marqueeBase;
             var pointer = _dragPointer;
+            _marqueeThrottle.Reset();
             ResetDrag();
             NotifySelection(_model.SelectChains(before));
             pointer?.Capture(null);
