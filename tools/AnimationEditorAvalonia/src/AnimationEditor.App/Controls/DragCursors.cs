@@ -25,16 +25,26 @@ internal static class DragCursors
     internal static int StockCursorId(ChipDragCursor cursor) => cursor == ChipDragCursor.Copy ? IdcHand : IdcNo;
 
     /// <summary>The stock Win32 cursor (<c>IDC_*</c>) for <paramref name="cursor"/>.</summary>
-    internal static int StockCursorId(TimelineCursor cursor) => cursor == TimelineCursor.ResizeHorizontal ? IdcSizeWE : IdcArrow;
+    internal static int StockCursorId(TimelineCursor cursor) => cursor switch
+    {
+        TimelineCursor.ResizeHorizontal => IdcSizeWE,
+        TimelineCursor.Hand => IdcHand,
+        _ => IdcArrow,
+    };
 
     private static readonly Cursor CopyCursor = new(StandardCursorType.DragCopy);
     private static readonly Cursor NotAllowedCursor = new(StandardCursorType.No);
 
     /// <summary>The Avalonia cursor for a timeline hover, or null (inherit) for the default arrow.</summary>
-    internal static Cursor? ForHover(TimelineCursor cursor) =>
-        cursor == TimelineCursor.ResizeHorizontal ? ResizeCursor : null;
+    internal static Cursor? ForHover(TimelineCursor cursor) => cursor switch
+    {
+        TimelineCursor.ResizeHorizontal => ResizeCursor,
+        TimelineCursor.Hand => HandCursor,
+        _ => null,
+    };
 
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
 
     /// <summary>Shows <paramref name="cursor"/> during a chip drag. Call on every pointer move: Windows resets the cursor between moves.</summary>
     public static void Apply(Control control, ChipDragCursor cursor)

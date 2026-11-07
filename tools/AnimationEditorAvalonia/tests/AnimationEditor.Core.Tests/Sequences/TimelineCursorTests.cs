@@ -11,10 +11,10 @@ public class TimelineCursorTests
         new(new TimelineBlock(0, 0, new SequenceChainReferenceSave(), 1, 1, 1, false), part);
 
     [Fact]
-    public void Hovering_ShowsResizeOnlyOverAnEdge()
+    public void Hovering_ShowsResizeOverAnEdge_HandOverABody_ArrowOverNothing()
     {
         TimelineCursors.For(Hit(TimelineHitPart.Edge), null).ShouldBe(TimelineCursor.ResizeHorizontal);
-        TimelineCursors.For(Hit(TimelineHitPart.Body), null).ShouldBe(TimelineCursor.Default);
+        TimelineCursors.For(Hit(TimelineHitPart.Body), null).ShouldBe(TimelineCursor.Hand);
         TimelineCursors.For(null, null).ShouldBe(TimelineCursor.Default);
     }
 
@@ -26,9 +26,9 @@ public class TimelineCursorTests
     }
 
     [Fact]
-    public void WhileGrippingABody_PassingOverAnEdgeShowsNoResize()
+    public void WhileGrippingABody_HandStaysEvenOverAnEdgeOrNothing()
     {
-        TimelineCursors.For(Hit(TimelineHitPart.Edge), TimelineHitPart.Body).ShouldBe(TimelineCursor.Default);
-        TimelineCursors.For(null, TimelineHitPart.Body).ShouldBe(TimelineCursor.Default);
+        TimelineCursors.For(Hit(TimelineHitPart.Edge), TimelineHitPart.Body).ShouldBe(TimelineCursor.Hand);
+        TimelineCursors.For(null, TimelineHitPart.Body).ShouldBe(TimelineCursor.Hand);
     }
 }
