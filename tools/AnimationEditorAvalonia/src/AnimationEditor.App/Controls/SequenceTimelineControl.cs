@@ -867,7 +867,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var brush = Brush("AccentCool");
         context.DrawLine(new Pen(brush, 1, new DashStyle(new double[] { 2, 2 }, 0)), new Point(x, TimelineViewport.RulerHeight), new Point(x, size.Height));
 
-        var label = Text(drop.TimeLabel, 10, Brush("Ink"), FontWeight.SemiBold);
+        var label = Text(drop.TimeLabel, 10, Brush("Ink"), FontWeight.SemiBold, mono: true);
         var pill = new Rect(x + 3, 2, label.Width + 10, TimelineViewport.RulerHeight - 5);
         if (pill.Right > size.Width) pill = pill.WithX(x - 3 - pill.Width);
         context.FillRectangle(Brush("BgPanel"), pill, 3);
@@ -908,6 +908,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             _ => Brushes.Gray,
         };
 
-    private static FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal) =>
-        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, weight), size, brush);
+    // mono: for a number that changes while it is on screen, so its pill does not jitter.
+    private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal, bool mono = false) =>
+        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(mono && this.TryFindResource("MonoFont", ActualThemeVariant, out var font) && font is FontFamily family ? family : FontFamily.Default, FontStyle.Normal, weight),
+            size, brush);
 }

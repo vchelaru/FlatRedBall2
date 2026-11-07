@@ -93,4 +93,8 @@
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>
+
+    <!-- Fixed-width face for text that counts in place (time readout, zoom field, status bar): Inter's
+         digits are proportional, so a changing number would shift everything beside it. -->
+    <FontFamily x:Key="MonoFont">Consolas,Menlo,Monospace</FontFamily>
 </ResourceDictionary>
