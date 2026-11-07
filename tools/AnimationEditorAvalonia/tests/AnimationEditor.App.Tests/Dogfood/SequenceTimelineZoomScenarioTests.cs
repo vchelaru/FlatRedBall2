@@ -36,10 +36,14 @@ public class SequenceTimelineZoomScenarioTests
     private static Point PointOnLane(AnimationEditorHarness editor, SequenceTimelineControl timeline, double x) =>
         editor.PointIn(timeline, x, timeline.Viewport.LaneTop(0) + 10);
 
+    // One notch per wheel event; the zoom eases toward its preset, so run it to the end like the live timer would.
     private static void CtrlWheel(AnimationEditorHarness editor, Point point, int notches)
     {
         for (int i = 0; i < Math.Abs(notches); i++)
+        {
             editor.Wheel(point, Math.Sign(notches), RawInputModifiers.Control);
+            editor.Control<SequenceTimelineControl>("SequenceTimeline").SettleZoomAnimation();
+        }
     }
 
     [AvaloniaFact]
@@ -111,6 +115,33 @@ public class SequenceTimelineZoomScenarioTests
                 CtrlWheel(editor, point, -1);
                 timeline.Viewport.TimeAt(x).ShouldBe(time, 1e-6, $"zooming out, notch {i + 1}");
             }
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlWheel_EasesToThePreset_KeepingThePointerTimeFixedThroughTheAnimation()
+    {
+        var (editor, timeline) = await OpenAsync();
+        using (editor)
+        {
+            timeline.Viewport.SetScrollSeconds(2);
+            double x = TimelineViewport.HeaderWidth + 300;
+            double time = timeline.Viewport.TimeAt(x);
+            editor.Wheel(PointOnLane(editor, timeline, x), 1, RawInputModifiers.Control);
+
+            timeline.IsZoomAnimating.ShouldBeTrue();
+            int ticks = 0;
+            while (timeline.StepZoomAnimation(1f / 60f))
+            {
+                ticks++;
+                timeline.Viewport.PixelsPerSecond.ShouldBeGreaterThan(TimelineViewport.DefaultPixelsPerSecond);
+                timeline.Viewport.PixelsPerSecond.ShouldBeLessThan(TimelineViewport.DefaultPixelsPerSecond * 1.5);
+                timeline.Viewport.TimeAt(x).ShouldBe(time, 1e-6, $"tick {ticks}");
+            }
+
+            ticks.ShouldBeGreaterThan(0, "an ease, not a jump");
+            timeline.Viewport.PixelsPerSecond.ShouldBe(TimelineViewport.DefaultPixelsPerSecond * 1.5, "ends exactly on 150%");
+            timeline.Viewport.TimeAt(x).ShouldBe(time, 1e-6);
         }
     }
 

@@ -21,9 +21,18 @@ public class TimelineZoomPresetTests
         return viewport;
     }
 
+    // One wheel notch: the shared stepper picks the target zoom, the viewport applies it around the pointer. The
+    // control's ZoomAnimator composes the same two pieces, easing toward the target.
+    private static void Step(TimelineViewport viewport, int direction)
+    {
+        float zoom = ZoomPresetStepper.StepZoom(
+            viewport.Zoom, direction, ZoomPresetStepper.Presets, TimelineViewport.MinZoom, TimelineViewport.MaxZoom);
+        viewport.SetPixelsPerSecondAround(Anchor, TimelineViewport.PixelsPerSecondForZoom(zoom));
+    }
+
     private static void StepMany(TimelineViewport viewport, int direction, int count)
     {
-        for (int i = 0; i < count; i++) viewport.ZoomStepAround(Anchor, direction);
+        for (int i = 0; i < count; i++) Step(viewport, direction);
     }
 
     [Fact]
@@ -33,14 +42,14 @@ public class TimelineZoomPresetTests
         var levelsOut = new List<double> { viewport.PixelsPerSecond };
         while (viewport.PixelsPerSecond > TimelineViewport.MinPixelsPerSecond)
         {
-            viewport.ZoomStepAround(Anchor, -1);
+            Step(viewport, -1);
             levelsOut.Add(viewport.PixelsPerSecond);
         }
 
         var levelsIn = new List<double> { viewport.PixelsPerSecond };
         while (viewport.PixelsPerSecond < TimelineViewport.DefaultPixelsPerSecond)
         {
-            viewport.ZoomStepAround(Anchor, +1);
+            Step(viewport, +1);
             levelsIn.Add(viewport.PixelsPerSecond);
         }
 
@@ -56,11 +65,11 @@ public class TimelineZoomPresetTests
 
         foreach (int preset in new[] { 75, 66, 50, 33, 25, 16, 10 })
         {
-            viewport.ZoomStepAround(Anchor, -1);
+            Step(viewport, -1);
             Percent(viewport).ShouldBe(preset, 1e-9);
         }
 
-        viewport.ZoomStepAround(Anchor, -1);
+        Step(viewport, -1);
         viewport.PixelsPerSecond.ShouldBe(TimelineViewport.MinPixelsPerSecond, "5% is below the clamp, so the clamp is the last notch");
     }
 
@@ -74,7 +83,7 @@ public class TimelineZoomPresetTests
     {
         var viewport = At(from);
 
-        viewport.ZoomStepAround(Anchor, direction);
+        Step(viewport, direction);
 
         Percent(viewport).ShouldBe(expected, 1e-9);
     }
@@ -88,7 +97,7 @@ public class TimelineZoomPresetTests
 
         StepMany(viewport, +1, 40);
         viewport.PixelsPerSecond.ShouldBe(TimelineViewport.MaxPixelsPerSecond, "3200% is past the clamp, so the clamp is the last notch");
-        viewport.ZoomStepAround(Anchor, +1);
+        Step(viewport, +1);
         viewport.PixelsPerSecond.ShouldBe(TimelineViewport.MaxPixelsPerSecond);
     }
 
@@ -98,7 +107,7 @@ public class TimelineZoomPresetTests
         var viewport = new TimelineViewport();
         StepMany(viewport, +1, 40);
 
-        viewport.ZoomStepAround(Anchor, -1);
+        Step(viewport, -1);
 
         Percent(viewport).ShouldBe(1600, 1e-9);
     }
@@ -118,7 +127,7 @@ public class TimelineZoomPresetTests
         for (int i = 0; i < 6; i++)
         {
             double before = viewport.TimeAt(Anchor);
-            viewport.ZoomStepAround(Anchor, direction);
+            Step(viewport, direction);
             // Zooming out near the start clamps the scroll at 0, which moves the anchor: the one exception.
             if (viewport.ScrollSeconds > 0) viewport.TimeAt(Anchor).ShouldBe(before, 1e-9);
         }

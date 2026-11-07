@@ -27,6 +27,8 @@ internal sealed class ZoomAnimator
     private readonly Action<float, float, float> _applyFactor;
     private readonly Action<float> _snapZoom;
     private readonly Func<int[]?> _getPresets;
+    private readonly float _minZoom;
+    private readonly float _maxZoom;
     private readonly WheelZoomAccumulator _wheelAccumulator = new();
 
     private DispatcherTimer? _timer;
@@ -45,12 +47,18 @@ internal sealed class ZoomAnimator
     /// float drift that <c>zoom * (next / zoom)</c> accumulates (#451).
     /// </param>
     /// <param name="getPresets">Live <see cref="IZoomTarget.WheelZoomPresets"/> (may be null).</param>
+    /// <param name="minZoom">Lowest target zoom; defaults to <see cref="CanvasTransform.MinZoom"/>.</param>
+    /// <param name="maxZoom">Highest target zoom; defaults to <see cref="CanvasTransform.MaxZoom"/>.</param>
     public ZoomAnimator(
         Func<float> getZoom,
         Action<float, float, float> applyFactor,
         Action<float> snapZoom,
-        Func<int[]?> getPresets)
+        Func<int[]?> getPresets,
+        float minZoom = CanvasTransform.MinZoom,
+        float maxZoom = CanvasTransform.MaxZoom)
     {
+        _minZoom = minZoom;
+        _maxZoom = maxZoom;
         _getZoom = getZoom;
         _applyFactor = applyFactor;
         _snapZoom = snapZoom;
@@ -134,13 +142,10 @@ internal sealed class ZoomAnimator
 
     public void StopTimer() => _timer?.Stop();
 
-    private float ComputeTargetZoom(float basisZoom, bool zoomIn)
-    {
-        float targetPct = _getPresets() is { Length: > 0 } presets
-            ? ZoomPresetStepper.StepToNextPreset(basisZoom * 100f, presets, zoomIn ? +1 : -1)
-            : basisZoom * 100f * (zoomIn ? NonPresetFactor : 1f / NonPresetFactor);
-        return Math.Clamp(targetPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-    }
+    private float ComputeTargetZoom(float basisZoom, bool zoomIn) =>
+        _getPresets() is { Length: > 0 } presets
+            ? ZoomPresetStepper.StepZoom(basisZoom, zoomIn ? +1 : -1, presets, _minZoom, _maxZoom)
+            : Math.Clamp(basisZoom * (zoomIn ? NonPresetFactor : 1f / NonPresetFactor), _minZoom, _maxZoom);
 
     private DispatcherTimer CreateTimer()
     {

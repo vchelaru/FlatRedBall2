@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AnimationEditor.Core.Rendering;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -110,20 +109,27 @@ public sealed class TimelineViewport
     /// </summary>
     public void ZoomAround(double x, double factor) => SetPixelsPerSecondAround(x, PixelsPerSecond * factor);
 
-    /// <summary>
-    /// Steps the zoom to the next preset above (<paramref name="direction"/> &gt; 0) or below it, from
-    /// <see cref="ZoomPresetStepper.Presets"/>, keeping the time under <paramref name="x"/> where it is. A zoom between
-    /// presets (typed, say) goes to the nearest preset in that direction. A preset past the 10..2000 px/s limits is
-    /// clamped, so the limit itself is the last notch.
-    /// </summary>
-    public void ZoomStepAround(double x, int direction)
-    {
-        int percent = ZoomPresetStepper.StepToNextPreset(
-            (float)(PixelsPerSecond / DefaultPixelsPerSecond * 100), ZoomPresetStepper.Presets, direction);
-        SetPixelsPerSecondAround(x, DefaultPixelsPerSecond * percent / 100);
-    }
+    /// <summary>The zoom factor (1.0 = 100%) at <see cref="MinPixelsPerSecond"/>.</summary>
+    public const float MinZoom = (float)(MinPixelsPerSecond / DefaultPixelsPerSecond);
 
-    private void SetPixelsPerSecondAround(double x, double pixelsPerSecond)
+    /// <summary>The zoom factor (1.0 = 100%) at <see cref="MaxPixelsPerSecond"/>.</summary>
+    public const float MaxZoom = (float)(MaxPixelsPerSecond / DefaultPixelsPerSecond);
+
+    /// <summary>The zoom factor, where 1.0 (100%) is <see cref="DefaultPixelsPerSecond"/>.</summary>
+    public float Zoom => (float)(PixelsPerSecond / DefaultPixelsPerSecond);
+
+    /// <summary>
+    /// The pixels per second for a zoom factor, with float noise rounded off so a preset lands on its exact value
+    /// (100% is exactly <see cref="DefaultPixelsPerSecond"/>) and the zoom limits on exactly the pixel limits.
+    /// </summary>
+    public static double PixelsPerSecondForZoom(float zoom) =>
+        Math.Clamp(Math.Round(zoom * DefaultPixelsPerSecond, 3), MinPixelsPerSecond, MaxPixelsPerSecond);
+
+    /// <summary>
+    /// Sets the zoom to <paramref name="pixelsPerSecond"/>, clamped, keeping the time under <paramref name="x"/>
+    /// where it is (unless that would scroll before 0).
+    /// </summary>
+    public void SetPixelsPerSecondAround(double x, double pixelsPerSecond)
     {
         double anchor = TimeAt(x);
         PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);

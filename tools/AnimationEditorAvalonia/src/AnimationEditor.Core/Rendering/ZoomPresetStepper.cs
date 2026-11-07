@@ -53,4 +53,12 @@ public static class ZoomPresetStepper
             return presets[0];
         }
     }
+
+    /// <summary>
+    /// <see cref="StepToNextPreset"/> on a zoom factor (1.0 = 100%), with the result clamped to
+    /// [<paramref name="minZoom"/>, <paramref name="maxZoom"/>]. A preset past a limit lands on the limit, so
+    /// the limit is the last notch. Shared by <c>ZoomAnimator</c> and anything else that steps a zoom factor.
+    /// </summary>
+    public static float StepZoom(float zoom, int direction, int[] presets, float minZoom, float maxZoom) =>
+        Math.Clamp(StepToNextPreset(zoom * 100f, presets, direction) / 100f, minZoom, maxZoom);
 }

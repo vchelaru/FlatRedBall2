@@ -31,8 +31,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 {
     private const double DragThresholdPixels = 3;
     private const double WheelScrollPixels = 60;
-
-    private readonly WheelZoomAccumulator _wheelZoom = new();
     private const double RenameBoxHeight = 24;
 
     private enum DragKind { None, Pending, Move, Edge, TrackPending, Track }
@@ -76,7 +74,35 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
         Viewport.Changed += () => ViewChanged?.Invoke();
+        // The same smooth preset-stepping wheel zoom as the preview and texture viewport, over the timeline's own
+        // zoom limits. The pivot is a time axis, so only its x matters; the time under it stays fixed.
+        _zoomAnimator = new ZoomAnimator(
+            () => Viewport.Zoom,
+            (x, _, factor) => { Viewport.ZoomAround(x, factor); AfterZoomTick(); },
+            zoom => { Viewport.SetPixelsPerSecondAround(_zoomPivotX, TimelineViewport.PixelsPerSecondForZoom(zoom)); AfterZoomTick(); },
+            () => ZoomPresetStepper.Presets,
+            TimelineViewport.MinZoom,
+            TimelineViewport.MaxZoom);
+        DetachedFromVisualTree += (_, _) => _zoomAnimator.StopTimer();
     }
+
+    private readonly ZoomAnimator _zoomAnimator;
+    private double _zoomPivotX;
+
+    private void AfterZoomTick()
+    {
+        ZoomChanged?.Invoke(Zoom * 100f);
+        InvalidateVisual();
+    }
+
+    /// <summary>True while a wheel zoom is easing toward its preset.</summary>
+    internal bool IsZoomAnimating => _zoomAnimator.IsAnimating;
+
+    /// <summary>Test-only: advances the in-flight wheel zoom by <paramref name="dtSeconds"/>; true while still easing.</summary>
+    internal bool StepZoomAnimation(float dtSeconds) => _zoomAnimator.Step(dtSeconds);
+
+    /// <summary>Test-only: runs the in-flight wheel zoom to its preset synchronously.</summary>
+    internal void SettleZoomAnimation() => _zoomAnimator.Settle();
 
     public TimelineViewport Viewport { get; } = new();
 
@@ -165,16 +191,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : 0;
 
     // IZoomTarget: 100% is the default pixels per second.
-    public float Zoom => (float)(Viewport.PixelsPerSecond / TimelineViewport.DefaultPixelsPerSecond);
+    public float Zoom => Viewport.Zoom;
 
-    // Set by ZoomControl.Attach, which also drives the +/- buttons. The wheel steps through the shared preset list
-    // directly (TimelineViewport.ZoomStepAround), so this value is not read.
+    // Set by ZoomControl.Attach, which also drives the +/- buttons. The wheel animator reads the same shared list
+    // (ZoomPresetStepper.Presets) directly, so this value is not read.
     public int[]? WheelZoomPresets { get; set; }
 
     public event Action<float>? ZoomChanged;
 
     public void SetZoomPercent(int percent)
     {
+        _zoomAnimator.Cancel(); // an explicit zoom overrides any in-flight wheel ease
         ClearHover();
         Viewport.SetPixelsPerSecond(TimelineViewport.DefaultPixelsPerSecond * percent / 100.0);
         ZoomChanged?.Invoke(Zoom * 100f);
@@ -711,11 +738,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var point = e.GetPosition(this);
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
         {
-            // One preset per wheel notch; a touchpad's many small deltas add up to a notch before stepping (#1236).
-            int steps = _wheelZoom.Consume(e.Delta.Y);
-            for (int i = 0; i < Math.Abs(steps); i++)
-                Viewport.ZoomStepAround(Math.Max(point.X, TimelineViewport.HeaderWidth), Math.Sign(steps));
-            if (steps != 0) ZoomChanged?.Invoke(Zoom * 100f);
+            _zoomPivotX = Math.Max(point.X, TimelineViewport.HeaderWidth);
+            _zoomAnimator.Wheel((float)_zoomPivotX, 0, e.Delta.Y);
         }
         else if (e.Delta.X != 0 || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
