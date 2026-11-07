@@ -271,6 +271,9 @@ public partial class MainWindow : Window
         // The controller reads expand state from the tree's own _treeRoots collection.
         _tabController = new TabController(_undoManager, _appCommands,
             () => TreeBuilder.CaptureExpandState(_treeRoots), _tabManager);
+        _achxPane = new AchxTabPane(this);
+        _pngPane = new PngTabPane(this);
+        _visiblePane = _achxPane;
 
         NumericExpressionInput.Install();
         InitializeComponent();
@@ -499,9 +502,9 @@ public partial class MainWindow : Window
             // stacking and failing to dismiss (issue #472): Avalonia reuses this one instance and
             // light-dismisses it on the next click.
             var tabMenu = new ContextMenu();
-            // Detaching re-opens the file in a fresh editor window; that path only knows how to
-            // load achx, so PNG viewer tabs omit it (issue #604).
-            if (captured.Kind == TabKind.Achx)
+            // Detaching re-opens the file in a fresh editor window; kinds that window cannot
+            // load omit it (PNG viewer tabs, issue #604).
+            if (PaneFor(captured).CanDetach)
                 tabMenu.Items.Add(new MenuItem
                 {
                     Header = "Detach to New Window",
@@ -649,143 +652,91 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── PNG viewer tabs (issue #604) ────────────────────────────────────────────
+    // ── Tab kinds ───────────────────────────────────────────────────────────────
+
+    // One per TabKind; see ITabPane. The achx pane also stands for "no tab open", and is the one
+    // showing when the window opens.
+    private readonly AchxTabPane _achxPane;
+    private readonly PngTabPane _pngPane;
+    private ITabPane _visiblePane;
+
+    private ITabPane PaneFor(TabKind kind) => kind switch
+    {
+        TabKind.Png => _pngPane,
+        _ => _achxPane,
+    };
+
+    private ITabPane PaneFor(TabEntry? tab) => tab is null ? _achxPane : PaneFor(tab.Kind);
+
+    private ITabPane ActivePane => PaneFor(_tabManager.ActiveTab);
+
+    /// <summary>Hides the visible kind's pane and shows <paramref name="pane"/>. No-op when it is already showing.</summary>
+    private void ShowPane(ITabPane pane)
+    {
+        if (pane == _visiblePane) return;
+        _visiblePane.Hide();
+        _visiblePane = pane;
+        pane.Show();
+    }
+
+    /// <summary>Snapshots the active tab before another one replaces it.</summary>
+    private void CaptureLeavingActiveTab()
+    {
+        if (_tabManager.ActiveTab is { } leaving)
+            PaneFor(leaving).CaptureLeaving(leaving);
+    }
 
     /// <summary>
-    /// Opens <paramref name="path"/> (a .png) as a viewer tab, or focuses it if already open.
-    /// Called from the Files panel on double-click. Mirrors the achx open flow's handling of the
-    /// leaving tab, but shows the PNG pane instead of loading an animation model.
+    /// Shows <paramref name="tab"/>, already active in <see cref="_tabManager"/>, in its kind's pane
+    /// and loads its content. Returns false when the content could not be loaded.
+    /// </summary>
+    private async Task<bool> ShowTabAsync(TabEntry tab, TabLoad load = TabLoad.Switch)
+    {
+        var pane = PaneFor(tab);
+        ShowPane(pane);
+        bool loaded = await pane.LoadAsync(tab, load);
+        SyncProjectPanelSelectionTo(tab);
+        RebuildTabStrip();
+        UpdateTitle();
+        UpdateStatusBar();
+        return loaded;
+    }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> as a tab of a kind that has no document (a .png today), or
+    /// focuses it if already open. Keeps the current document as a background tab, as File &gt; Open does.
+    /// </summary>
+    private void OpenNonDocumentTab(string path)
+    {
+        CaptureLeavingActiveTab();
+        EnsureCurrentEditorContentHasTab();
+        _tabManager.OpenOrFocus(new FilePath(path));
+        _ = ShowTabAsync(_tabManager.ActiveTab!);
+    }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> (a .png) as a viewer tab (issue #604), or focuses it if
+    /// already open. Called from the Files panel on double-click.
     /// </summary>
     public void OpenPngAsTab(string path)
     {
         if (string.IsNullOrEmpty(path)) return;
-
-        // Preserve the leaving achx tab's edit state before the view swaps away from the editor.
-        var leavingTab = _tabManager.ActiveTab;
-        if (leavingTab is { Kind: TabKind.Achx })
-        {
-            _tabController.CaptureLeavingTab(leavingTab);
-            SaveCompanionFile();
-        }
-
-        // Keep the currently-open achx editor content as a background tab, same as File > Open.
-        EnsureCurrentEditorContentHasTab();
-
-        _tabManager.OpenOrFocus(new FilePath(path));
-        ShowPngPane(_tabManager.ActiveTab!);
-        RebuildTabStrip();
+        OpenNonDocumentTab(path);
     }
-
-    // Latest-wins guard + in-flight handle for the async PNG decode, mirroring the history load.
-    private int _pngTextureLoadId;
-    private Task _pngTextureLoadInFlight = Task.CompletedTask;
 
     // Lets tests await both background operations a PNG tab kicks off (history load + texture decode)
     // before deleting the temp dir they read from — otherwise cleanup races the live git/file handles.
-    internal Task WhenPngTabLoaded() => Task.WhenAll(_blameLoadInFlight, _pngTextureLoadInFlight);
-
-    /// <summary>Swaps the main pane to the PNG viewer and loads <paramref name="tab"/>'s image.</summary>
-    private void ShowPngPane(TabEntry tab)
-    {
-        AchxEditorPane.IsVisible = false;
-        PngPaneGrid.IsVisible = true;
-        PngPane.IsVisible = true;
-        SetSidebarForPng(true);
-        ResetPngUsageOverlay();
-        // Decode the image off the UI thread so the tab appears immediately even for a large sheet;
-        // a "Loading…" overlay shows until it's ready. The history load is likewise async.
-        _pngTextureLoadInFlight = LoadPngTextureAsync(tab.Path.FullPath);
-        LoadBlameForPng(tab.Path.FullPath);
-    }
-
-    private async Task LoadPngTextureAsync(string absolutePath)
-    {
-        int id = ++_pngTextureLoadId;
-        PngLoadingText.IsVisible = true;
-        try
-        {
-            await PngPane.LoadTextureAsync(absolutePath);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[PngTab] texture load failed: {ex}");
-        }
-        finally
-        {
-            // Only the newest load clears the indicator, so a superseded load can't hide it early.
-            if (id == _pngTextureLoadId)
-                PngLoadingText.IsVisible = false;
-        }
-    }
-
-    /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
-    private void ShowAchxPane()
-    {
-        // Restore the editing sidebar unconditionally — it must come back whenever we intend to show
-        // the achx editor, including on the paths below that short-circuit before touching the panes.
-        SetSidebarForPng(false);
-        if (!PngPane.IsVisible) return;
-        PngPane.LoadTexture(null);   // clear the previewed texture (Pass null to unload)
-        PngPane.IsVisible = false;
-        PngPaneGrid.IsVisible = false;
-        AchxEditorPane.IsVisible = true;
-    }
-
-    private bool _sidebarCollapsedForPng;
-    // Bottom tab strip's selection just before it was forced away from a now-hidden tab
-    // (Inspector/History) during a PNG preview (#686) — restored when returning to the achx editor.
-    // Null whenever the bottom strip was never touched (the common case, #877).
-    private TabItem? _sidebarTabBeforePng;
-
-    /// <summary>
-    /// Swaps <c>TopPane</c>'s content between the ANIMATIONS tree and the Diff/blame pane for a
-    /// read-only PNG-preview tab (issue #604), and restores it for the achx editor. Both panes fill
-    /// the same cell (#877) — the row's size never changes, only which one is visible — so resizing
-    /// the sidebar splitter behaves identically in either mode. A PNG has no editable frame/shape
-    /// properties or undo history, so Inspector and History hide too; Files/Textures stays visible (#875 follow-up)
-    /// since its Project scope browses PNGs independent of any open tab. The bottom tab strip's
-    /// selection is otherwise left alone — Diff no longer lives down there, so there's nothing to
-    /// force it to unless the previously-selected tab was Inspector or History and just got hidden.
-    /// </summary>
-    private void SetSidebarForPng(bool png)
-    {
-        if (png == _sidebarCollapsedForPng) return;
-        if (png)
-        {
-            AnimationsBlock.IsVisible = false;
-            DiffBlamePane.IsVisible = true;
-            InspectorTab.IsVisible = false;
-            HistoryTab.IsVisible = false;
-            if (SidebarTabs.SelectedItem is TabItem { IsVisible: false } hidden)
-            {
-                _sidebarTabBeforePng = hidden;
-                SidebarTabs.SelectedItem = FilesTab;
-            }
-        }
-        else
-        {
-            AnimationsBlock.IsVisible = true;
-            DiffBlamePane.IsVisible = false;
-            InspectorTab.IsVisible = true;
-            HistoryTab.IsVisible = true;
-            if (_sidebarTabBeforePng is { } restore)
-            {
-                SidebarTabs.SelectedItem = restore;
-                _sidebarTabBeforePng = null;
-            }
-        }
-        _sidebarCollapsedForPng = png;
-    }
+    internal Task WhenPngTabLoaded() => Task.WhenAll(_blameLoadInFlight, _pngPane.TextureLoadInFlight);
 
     /// <summary>
     /// Keeps the Project list's selection following whichever tab just became active (#910) --
     /// the tab strip is otherwise the only way to switch tabs without the Project list itself
-    /// having caused it. PNG tabs and untitled/unsaved tabs have no corresponding Project-list
-    /// row, so those clear the selection instead of leaving a stale highlight.
+    /// having caused it. Tabs with no Project-list row (PNG, untitled) clear the selection
+    /// instead of leaving a stale highlight.
     /// </summary>
     private void SyncProjectPanelSelectionTo(TabEntry tab)
     {
-        var entry = tab.Kind == TabKind.Achx && !IsUntitledTab(tab)
+        var entry = PaneFor(tab).HasProjectPanelRow(tab)
             ? FindProjectPanelEntry(ProjectPanel.TreeRoots, tab.Path.FullPath)
             : null;
         ProjectPanel.SyncSelectionToActiveFile(entry);
@@ -799,46 +750,9 @@ public partial class MainWindow : Window
         // completes it as a cross-tab move; ResolveCompletion decides staleness lazily at paste
         // time, so this is no longer a "just tidy up the highlight" clear.
 
-        // Save the leaving tab's undo history and in-memory model before the editor switches.
-        // PNG tabs carry no model or undo stack, so only capture when leaving the achx editor.
-        var leavingTab = _tabManager.ActiveTab;
-        if (leavingTab is { Kind: TabKind.Achx })
-        {
-            _tabController.CaptureLeavingTab(leavingTab);
-        }
-
-        // PNG tabs bypass the animation-editor machinery entirely.
-        if (tab.Kind == TabKind.Png)
-        {
-            if (leavingTab is { Kind: TabKind.Achx })
-                SaveCompanionFile();
-            _tabManager.Activate(tab.Path);
-            ShowPngPane(tab);
-            SyncProjectPanelSelectionTo(tab);
-            RebuildTabStrip();
-            return;
-        }
-
-        ShowAchxPane();
-        SaveCompanionFile();
+        CaptureLeavingActiveTab();
         _tabManager.Activate(tab.Path);
-        // Bypass LoadAnimationFileAsync so we don't hit the short-circuit that skips
-        // the file load when the path is already the active tab.
-        if (IsUntitledTab(tab))
-        {
-            ActivateUntitledTabContent(tab);
-        }
-        else
-        {
-            // A failed reload (missing texture, declined UV conversion, unreadable file) leaves
-            // the previous tab's document still live -- restoring *this* tab's undo snapshot onto
-            // it would apply the wrong tab's history to the wrong document.
-            bool activated = await _appCommands.ActivateTabContentAsync(tab);
-            if (activated && tab.UndoSnapshot != null)
-                _undoManager.RestoreSnapshot(tab.UndoSnapshot);
-        }
-        SyncProjectPanelSelectionTo(tab);
-        RebuildTabStrip();
+        await ShowTabAsync(tab);
     }
 
     private void ActivateUntitledTabContent(TabEntry tab)
@@ -895,59 +809,20 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Closes <paramref name="tab"/>, prompting to save first when it is an untitled tab that
-    /// has actual content (issue #928) -- an untitled tab that was never edited (or was edited
-    /// back to empty) closes silently, same as before. "Save" runs the normal Save-As flow;
-    /// declining it (dialog cancelled) leaves the tab open rather than closing with no file
-    /// written. "Don't Save" and the empty-tab fast path both fall through to
+    /// Closes <paramref name="tab"/> once its kind agrees (<see cref="ITabPane.PrepareCloseAsync"/>:
+    /// an untitled tab with content prompts to save, #928). Discarding falls through to
     /// <see cref="CloseTabCore"/>, which is what clears the crash-recovery file (#927).
     /// </summary>
     private async Task CloseTabAsync(TabEntry tab)
     {
-        if (tab.Kind == TabKind.Achx && IsUntitledTab(tab) && UntitledTabHasContent(tab))
-        {
-            var choice = await ShowSaveDiscardCancelDialogAsync(
-                $"\"{tab.DisplayName}\" has unsaved changes. Save before closing?",
-                "Unsaved Changes");
-            if (choice == SaveDiscardCancelChoice.Cancel) return;
-
-            if (choice == SaveDiscardCancelChoice.Save)
-            {
-                if (tab != _tabManager.ActiveTab)
-                    await ActivateTabAsync(tab);
-
-                await _appCommands.SaveCurrentAnimationChainListAsync();
-                if (string.IsNullOrEmpty(_projectManager.FileName))
-                    return; // Save As was cancelled -- leave the tab open, nothing was written.
-
-                // A successful save renames the sentinel tab in place (the CurrentFileChanged
-                // handler's Rename), which replaces the TabEntry instance -- re-resolve through
-                // ActiveTab rather than closing the now-stale `tab` reference.
-                tab = _tabManager.ActiveTab ?? tab;
-            }
-        }
-
-        CloseTabCore(tab);
+        var toClose = await PaneFor(tab).PrepareCloseAsync(tab);
+        if (toClose is not null)
+            CloseTabCore(toClose);
     }
-
-    /// <summary>
-    /// True when <paramref name="tab"/>'s document has actual content worth prompting to save
-    /// (issue #928) -- reads the live model for the active tab, or the cached snapshot captured
-    /// when a background tab was last left (<see cref="TabController.CaptureLeavingTab"/>).
-    /// </summary>
-    private bool UntitledTabHasContent(TabEntry tab) =>
-        (tab == _tabManager.ActiveTab ? _projectManager.AnimationChainListSave : tab.CachedEditorModel)
-            is { AnimationChains.Count: > 0 };
 
     private void CloseTabCore(TabEntry tab)
     {
-        // Closing an untitled tab is an explicit discard of its unsaved content -- clear any
-        // crash-recovery file autosave-on-edit wrote for it (AppCommands.SaveCurrentAnimationChainList
-        // writes there whenever FileName is null), or it re-prompts to restore already-discarded
-        // content on the next launch (#927).
-        if (IsUntitledTab(tab))
-            _ioManager.DeleteRecoveryFile();
-
+        PaneFor(tab).Closing(tab);
         _tabManager.Close(tab.Path);
         ShowActiveTabAfterClose();
     }
@@ -955,37 +830,15 @@ public partial class MainWindow : Window
     /// <summary>
     /// Brings the editor in line with <see cref="TabManager.ActiveTab"/> after tabs were closed:
     /// loads whichever tab the manager fell back to, or resets to the no-tabs state when none are left.
+    /// Loads the fallback tab directly rather than through <see cref="LoadAnimationFileAsync"/>,
+    /// which would re-register the just-closed file as a background tab.
     /// </summary>
     private void ShowActiveTabAfterClose()
     {
-        var next = _tabManager.ActiveTab;
-        if (next != null)
-        {
-            if (next.Kind == TabKind.Png)
-            {
-                ShowPngPane(next);
-                SyncProjectPanelSelectionTo(next);
-                RebuildTabStrip();
-            }
-            // Use OpenAchxWorkflowAsync directly — bypasses EnsureCurrentEditorContentHasTab
-            // so the just-closed file is not accidentally re-registered as a background tab.
-            else if (!IsUntitledTab(next))
-            {
-                ShowAchxPane();
-                _ = ActivateTabAfterCloseAsync(next);
-            }
-            else
-            {
-                ShowAchxPane();
-                ActivateUntitledTabContent(next);
-                SyncProjectPanelSelectionTo(next);
-                RebuildTabStrip();
-            }
-        }
+        if (_tabManager.ActiveTab is { } next)
+            _ = ShowTabAsync(next);
         else
-        {
             ResetToNoTabsOpen();
-        }
     }
 
     /// <summary>
@@ -997,7 +850,7 @@ public partial class MainWindow : Window
     {
         // ResetToBlankDocument (#1147) also clears any native-tsx/texture-size/ReferencedPngs
         // state the last tab left behind.
-        ShowAchxPane();
+        ShowPane(_achxPane);
         ShowTree(_noTabTree);
         _projectManager.ResetToBlankDocument();
         _selectedState.Reset();
@@ -1016,15 +869,6 @@ public partial class MainWindow : Window
     /// from it (#618). With no document open that leftover texture only looks like live content.
     /// </summary>
     private void ClearWireframeTexture() => WireframeCtrl.LoadTexture(null);
-
-    private async Task ActivateTabAfterCloseAsync(TabEntry tab)
-    {
-        bool activated = await _appCommands.ActivateTabContentAsync(tab);
-        if (activated && tab.UndoSnapshot != null)
-            _undoManager.RestoreSnapshot(tab.UndoSnapshot);
-        SyncProjectPanelSelectionTo(tab);
-        RebuildTabStrip();
-    }
 
     private void SaveTabsToSettings()
     {
@@ -1051,32 +895,19 @@ public partial class MainWindow : Window
         _tabManager.RestoreFrom(valid, _appSettings.ActiveTabPath);
         RebuildTabStrip();
 
-        // Load the active tab's file directly — bypassing LoadAnimationFileAsync avoids
-        // the early-return in that method (OpenOrFocus would return Focused for a tab
-        // that RestoreFrom already registered, skipping the actual file load).
-        var active = _tabManager.ActiveTab;
-        if (active != null)
+        // Load the active tab directly — bypassing LoadAnimationFileAsync avoids the early-return
+        // in that method (OpenOrFocus would return Focused for a tab that RestoreFrom already
+        // registered, skipping the actual file load).
+        if (_tabManager.ActiveTab is not { } active) return;
+        if (!await ShowTabAsync(active, TabLoad.Restore))
         {
-            if (active.Kind == TabKind.Png)
-            {
-                ShowPngPane(active);
-            }
-            else
-            {
-                bool opened = await _appCommands.OpenProjectWorkflowAsync(active.Path.FullPath);
-                if (!opened)
-                {
-                    // The file that was open when the editor last closed no longer opens (missing
-                    // texture, declined UV conversion, unreadable file) -- restoring it as a ghost
-                    // active tab would show nothing behind it, so drop it the same way a refused
-                    // File > Open does.
-                    DropUnloadedTab(active.Path);
-                    if (_tabManager.ActiveTab == null)
-                        ResetToNoTabsOpen();
-                    return;
-                }
-            }
-            RebuildTabStrip();
+            // The file that was open when the editor last closed no longer opens (missing
+            // texture, declined UV conversion, unreadable file) -- restoring it as a ghost
+            // active tab would show nothing behind it, so drop it the same way a refused
+            // File > Open does.
+            DropUnloadedTab(active.Path);
+            if (_tabManager.ActiveTab == null)
+                ResetToNoTabsOpen();
         }
     }
 
@@ -2148,39 +1979,15 @@ public partial class MainWindow : Window
         ToolTip.SetTip(TiledSyncLabel, tooltip);
     }
 
+    // The active tab's kind decides the contents, so a background document never shows through.
     private void UpdateStatusBar()
     {
-        var (label, brush) = _undoManager.SaveState switch
-        {
-            AnimationEditor.Core.CommandsAndState.Commands.SaveState.AutoSaveOn => ("Auto Save On", _autoSaveBrush),
-            AnimationEditor.Core.CommandsAndState.Commands.SaveState.Failed     => ("Auto Save Failed", _failedBrush),
-            _                                                                    => ("Not saved", _unsavedBrush),
-        };
-        StatusSaveLabel.Text = label;
-        StatusDot.Fill       = brush;
-        StatusFilename.Text  = Path.GetFileName(_projectManager.FileName ?? string.Empty);
-        var acls = _projectManager.AnimationChainListSave;
-        int selectedChainCount = _selectedState.SelectedChains.Count;
-        if (acls == null || acls.AnimationChains.Count == 0)
-        {
-            StatusCounts.Text = string.Empty;
-        }
-        else if (selectedChainCount >= 2)
-        {
-            // Multiple chains selected: a whole-file total or a per-chain breakdown is noise, so
-            // just report the selection count (#623).
-            StatusCounts.Text = $"{selectedChainCount} chains selected";
-        }
-        else if (_selectedState.SelectedFrames.Count >= 2)
-        {
-            StatusCounts.Text = $"{_selectedState.SelectedFrames.Count} frames selected";
-        }
-        else
-        {
-            int totalFrames = acls.AnimationChains.Sum(c => c.Frames.Count);
-            string totalTime = TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(acls));
-            StatusCounts.Text = $"{Plural.Format(acls.AnimationChains.Count, "chain")} · {Plural.Format(totalFrames, "frame")} · {totalTime}";
-        }
+        var status = ActivePane.Status(_tabManager.ActiveTab);
+        StatusSaveLabel.Text = status.SaveLabel;
+        StatusDot.IsVisible  = status.SaveBrush is not null;
+        StatusDot.Fill       = status.SaveBrush;
+        StatusFilename.Text  = status.FileName;
+        StatusCounts.Text    = status.Counts;
     }
 
 
@@ -2873,7 +2680,7 @@ public partial class MainWindow : Window
         if (_tabManager.ActiveTab is null)
         {
             _appCommands.CloseProject();
-            ShowAchxPane();
+            ShowPane(_achxPane);
             ClearWireframeTexture();
         }
         else
@@ -6902,17 +6709,15 @@ public partial class MainWindow : Window
     private async Task LoadAnimationFileAsync(string fileName, bool asPreview = false)
     {
         if (string.IsNullOrEmpty(fileName)) return;
-
-        // Opening an achx always returns to the editor pane if a PNG tab was showing.
-        ShowAchxPane();
-
-        // Save the leaving tab's undo history and in-memory model before a different file takes over.
-        // PNG tabs carry neither, so only capture when leaving the achx editor.
-        var leavingTab = _tabManager.ActiveTab;
-        if (leavingTab is { Kind: TabKind.Achx })
+        if (PaneFor(TabEntry.ResolveKind(new FilePath(fileName))) != _achxPane)
         {
-            _tabController.CaptureLeavingTab(leavingTab);
+            OpenNonDocumentTab(fileName);
+            return;
         }
+
+        // Save the leaving tab's state before a different file takes over.
+        CaptureLeavingActiveTab();
+        ShowPane(_achxPane);
 
         // If there is already a file open that hasn't been registered as a tab yet,
         // add it as a background tab so it appears as the first tab when the second
@@ -6945,6 +6750,8 @@ public partial class MainWindow : Window
                         _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
                 }
                 RebuildTabStrip();
+                UpdateTitle();
+                UpdateStatusBar();
                 return;
             }
 
@@ -6978,13 +6785,18 @@ public partial class MainWindow : Window
     {
         _tabManager.Close(path);
         var next = _tabManager.ActiveTab;
-        if (next != null)
+        // The open swapped to the document pane before it failed; a different kind falling back
+        // in has to be shown and loaded again.
+        if (next != null && PaneFor(next) != _visiblePane)
         {
-            if (next.Kind == TabKind.Png)
-                ShowPngPane(next);
-            SyncProjectPanelSelectionTo(next);
+            _ = ShowTabAsync(next);
+            return;
         }
+        if (next != null)
+            SyncProjectPanelSelectionTo(next);
         RebuildTabStrip();
+        UpdateTitle();
+        UpdateStatusBar();
     }
 
     /// <summary>
@@ -7084,7 +6896,7 @@ public partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        var filePath = _projectManager.FileName;
+        var filePath = ActivePane.TitlePath(_tabManager.ActiveTab);
         Title = TitleBarHelper.BuildWindowTitle(filePath);
 
         var hasFile = !string.IsNullOrEmpty(filePath);
@@ -7462,6 +7274,7 @@ public partial class MainWindow : Window
             {
                 Id = "toggle-diagnostics", Description = "Toggle Render Diagnostics", Category = "View",
                 Gestures = new[] { new HotkeyGesture("F3") },
+                Scope = HotkeyScope.App,
                 Action = ToggleDiagnostics,
             },
             new()
@@ -7507,12 +7320,14 @@ public partial class MainWindow : Window
             {
                 Id = "new", Description = "New Animation", Category = "File",
                 Gestures = new[] { new HotkeyGesture("N", Command) },
+                Scope = HotkeyScope.App,
                 Action = () => OnNewClick(null, null!),
             },
             new()
             {
                 Id = "load", Description = "Open…", Category = "File",
                 Gestures = new[] { new HotkeyGesture("O", Command) },
+                Scope = HotkeyScope.App,
                 Action = () => _ = LoadAsync(),
             },
             new()
@@ -7536,6 +7351,7 @@ public partial class MainWindow : Window
                 Id = "panel-zoom-in", Description = "Zoom In (Focused Panel)", Category = "View",
                 Gestures = new[] { new HotkeyGesture("OemPlus", Command, Forbidden: Shift) },
                 ShouldSkip = () => FocusedPanelZoom() is null,
+                Scope = HotkeyScope.App,
                 Action = () => FocusedPanelZoom()!.StepUp(),
             },
             new()
@@ -7543,6 +7359,7 @@ public partial class MainWindow : Window
                 Id = "panel-zoom-out", Description = "Zoom Out (Focused Panel)", Category = "View",
                 Gestures = new[] { new HotkeyGesture("OemMinus", Command, Forbidden: Shift) },
                 ShouldSkip = () => FocusedPanelZoom() is null,
+                Scope = HotkeyScope.App,
                 Action = () => FocusedPanelZoom()!.StepDown(),
             },
         };
@@ -7660,6 +7477,7 @@ public partial class MainWindow : Window
 
             var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
             if (match is null) return;
+            if (!ActivePane.Accepts(match)) return;
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;
