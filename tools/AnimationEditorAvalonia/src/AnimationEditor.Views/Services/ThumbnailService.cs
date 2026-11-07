@@ -91,6 +91,13 @@ public sealed class ThumbnailService : IDisposable
     public ThumbnailService(IProjectManager projectManager) =>
         _projectManager = projectManager;
 
+    /// <summary>
+    /// Raised by <see cref="InvalidatePath"/> with the texture path in the cache's forward-slash form, after the
+    /// service has dropped its own entries. A view that keeps what it drew from that texture (laid-out cells, a
+    /// chip's image) listens here, so a texture changed on disk reaches it whichever watcher noticed.
+    /// </summary>
+    public event Action<string>? PathInvalidated;
+
     /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.
     /// Normalises backslashes to forward slashes before lookup so FSW-reported paths (backslash
     /// on Windows) evict entries that were stored via <c>FilePath.FullPath</c> (forward slash).
@@ -123,6 +130,8 @@ public sealed class ThumbnailService : IDisposable
         if (staleFull is not null)
             foreach (var k in staleFull)
                 _fullImageCache.Remove(k);
+
+        PathInvalidated?.Invoke(key);
     }
 
     /// <summary>

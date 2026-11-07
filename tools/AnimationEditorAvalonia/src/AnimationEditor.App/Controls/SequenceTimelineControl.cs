@@ -73,6 +73,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ContextMenu = _menu;
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        _filmstrip.TextureChanged += InvalidateVisual;
         Viewport.Changed += () => ViewChanged?.Invoke();
         // The same smooth preset-stepping wheel zoom as the preview and texture viewport, over the timeline's own
         // zoom limits. The pivot is a time axis, so only its x matters; the time under it stays fixed.
