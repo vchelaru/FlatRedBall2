@@ -21,6 +21,13 @@ public class SequenceTrackSave
     public bool FlipHorizontal { get; set; }
 
     /// <summary>
+    /// Initial visibility of the track. The editor preview hides the track when false and runtimes may skip drawing
+    /// it; game code may still enable it by name at runtime. Written to the file only when false, so every file
+    /// without hidden tracks stays unchanged.
+    /// </summary>
+    public bool Visible { get; set; } = true;
+
+    /// <summary>
     /// Draw order: higher draws on top. Equal values draw in track order, a later track on top. The editor lists tracks
     /// in file order, top lane first, so the bottom lane is in front; dragging a lane header rewrites the list order and
     /// moves this value only as far as keeping that true takes.
