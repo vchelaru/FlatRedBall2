@@ -323,7 +323,7 @@ public sealed class LibraryChipView : Border
         DragCursor = feedback.Cursor;
         _ghost ??= new ChipDragGhost(Chip.Chain.Name);
         _ghost.Update(this, _image.Source, feedback, e.GetPosition(this));
-        ChipDragCursors.Apply(this, feedback.Cursor);
+        DragCursors.Apply(this, feedback.Cursor);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -353,7 +353,7 @@ public sealed class LibraryChipView : Border
         Opacity = 1;
         DragCursor = null;
         _library.DragFeedback = null;
-        if (wasDragging) ChipDragCursors.Restore(this, GrabCursor);
+        if (wasDragging) DragCursors.Restore(this, GrabCursor);
         _ghost?.Hide();
     }
 
