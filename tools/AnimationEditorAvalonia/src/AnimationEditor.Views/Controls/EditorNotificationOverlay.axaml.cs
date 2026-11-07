@@ -78,7 +78,8 @@ public partial class EditorNotificationOverlay : UserControl
         _ = AutoHideItemDeletedAsync(token);
     }
 
-    public void ShowToast(string message, Action? retryAction = null)
+    /// <param name="autoHide">False keeps the toast up until it is dismissed, for a notice the user must not miss.</param>
+    public void ShowToast(string message, Action? retryAction = null, bool autoHide = true)
     {
         _toastRetryAction = retryAction;
         ToastMessage.Text = message;
@@ -86,6 +87,7 @@ public partial class EditorNotificationOverlay : UserControl
         ToastPanel.IsVisible = true;
 
         _toastTimer?.Stop();
+        if (!autoHide) return;
         _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
         _toastTimer.Tick += (_, _) => HideToastIfNotHovered();
         _toastTimer.Start();

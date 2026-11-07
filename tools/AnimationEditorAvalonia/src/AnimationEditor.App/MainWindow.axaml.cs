@@ -7309,8 +7309,8 @@ public partial class MainWindow : Window
     /// </summary>
     private void ShowErrorBanner(string text) => Notifications.ShowErrorBanner(text);
 
-    private void ShowToast(string message, Action? retryAction = null) =>
-        Notifications.ShowToast(message, retryAction);
+    private void ShowToast(string message, Action? retryAction = null, bool autoHide = true) =>
+        Notifications.ShowToast(message, retryAction, autoHide);
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
