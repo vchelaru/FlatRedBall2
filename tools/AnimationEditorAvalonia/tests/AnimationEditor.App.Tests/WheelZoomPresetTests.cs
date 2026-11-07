@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;

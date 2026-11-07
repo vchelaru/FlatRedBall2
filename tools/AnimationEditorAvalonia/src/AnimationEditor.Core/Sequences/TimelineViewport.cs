@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AnimationEditor.Core.Rendering;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -107,10 +108,25 @@ public sealed class TimelineViewport
     /// Multiplies the zoom by <paramref name="factor"/>, clamped, keeping the time under <paramref name="x"/> where it
     /// is (unless that would scroll before 0).
     /// </summary>
-    public void ZoomAround(double x, double factor)
+    public void ZoomAround(double x, double factor) => SetPixelsPerSecondAround(x, PixelsPerSecond * factor);
+
+    /// <summary>
+    /// Steps the zoom to the next preset above (<paramref name="direction"/> &gt; 0) or below it, from
+    /// <see cref="ZoomPresetStepper.Presets"/>, keeping the time under <paramref name="x"/> where it is. A zoom between
+    /// presets (typed, say) goes to the nearest preset in that direction. A preset past the 10..2000 px/s limits is
+    /// clamped, so the limit itself is the last notch.
+    /// </summary>
+    public void ZoomStepAround(double x, int direction)
+    {
+        int percent = ZoomPresetStepper.StepToNextPreset(
+            (float)(PixelsPerSecond / DefaultPixelsPerSecond * 100), ZoomPresetStepper.Presets, direction);
+        SetPixelsPerSecondAround(x, DefaultPixelsPerSecond * percent / 100);
+    }
+
+    private void SetPixelsPerSecondAround(double x, double pixelsPerSecond)
     {
         double anchor = TimeAt(x);
-        PixelsPerSecond = Math.Clamp(PixelsPerSecond * factor, MinPixelsPerSecond, MaxPixelsPerSecond);
+        PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);
         ScrollSeconds = Math.Max(0, anchor - (x - HeaderWidth) / PixelsPerSecond);
         Changed?.Invoke();
     }

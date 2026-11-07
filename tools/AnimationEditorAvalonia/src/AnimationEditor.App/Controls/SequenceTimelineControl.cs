@@ -29,8 +29,9 @@ public readonly record struct TimelineChainId(int Track, int Chain);
 public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 {
     private const double DragThresholdPixels = 3;
-    private const double WheelZoomStep = 1.15;
     private const double WheelScrollPixels = 60;
+
+    private readonly WheelZoomAccumulator _wheelZoom = new();
     private const double RenameBoxHeight = 24;
 
     private enum DragKind { None, Pending, Move, Edge }
@@ -148,7 +149,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     // IZoomTarget: 100% is the default pixels per second.
     public float Zoom => (float)(Viewport.PixelsPerSecond / TimelineViewport.DefaultPixelsPerSecond);
 
-    // The wheel zooms by a fixed factor, not through presets.
+    // Set by ZoomControl.Attach, which also drives the +/- buttons. The wheel steps through the shared preset list
+    // directly (TimelineViewport.ZoomStepAround), so this value is not read.
     public int[]? WheelZoomPresets { get; set; }
 
     public event Action<float>? ZoomChanged;
@@ -606,8 +608,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var point = e.GetPosition(this);
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
         {
-            Viewport.ZoomAround(Math.Max(point.X, TimelineViewport.HeaderWidth), Math.Pow(WheelZoomStep, e.Delta.Y));
-            ZoomChanged?.Invoke(Zoom * 100f);
+            // One preset per wheel notch; a touchpad's many small deltas add up to a notch before stepping (#1236).
+            int steps = _wheelZoom.Consume(e.Delta.Y);
+            for (int i = 0; i < Math.Abs(steps); i++)
+                Viewport.ZoomStepAround(Math.Max(point.X, TimelineViewport.HeaderWidth), Math.Sign(steps));
+            if (steps != 0) ZoomChanged?.Invoke(Zoom * 100f);
         }
         else if (e.Delta.X != 0 || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
