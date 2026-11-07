@@ -775,9 +775,9 @@ public partial class MainWindow : Window
 
         CaptureLeavingActiveTab();
         _tabManager.Activate(tab.Path);
-        // A sequence tab that was restored but never opened parses its file now; one that no longer parses is dropped
-        // like a refused File > Open, which brings back the tab the user came from.
-        if (!await ShowTabAsync(tab) && tab.Kind == TabKind.Sequence)
+        // A tab that was restored but never opened, or whose file changed on disk, loads now; one that no longer loads
+        // is dropped like a refused File > Open, which brings back the tab the user came from.
+        if (!await ShowTabAsync(tab))
             DropUnloadedTab(tab.Path);
     }
 
