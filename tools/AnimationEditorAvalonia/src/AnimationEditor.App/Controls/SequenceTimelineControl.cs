@@ -58,6 +58,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private (LibraryChip Chip, Point Point)? _chipGhost;
     private double _playhead;
     private bool _scrubbing;
+    private Point _lastPoint;
+    private TimelineCursor _shownCursor;
 
     public SequenceTimelineControl()
     {
@@ -69,6 +71,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     }
 
     public TimelineViewport Viewport { get; } = new();
+
+    /// <summary>The cursor the timeline last asked for. The OS cursor itself is not observable headlessly.</summary>
+    public TimelineCursor ShownCursor => _shownCursor;
 
     /// <summary>The selected chain, or null. At most one thing is selected: choosing a chain clears <see cref="SelectedTrack"/> and the reverse.</summary>
     public TimelineChainId? Selection
@@ -408,6 +413,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragOriginEdge = block.FullEnd;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
+        ShowCursor(point);
         InvalidateVisual();
     }
 
@@ -419,8 +425,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
             return;
         }
-        if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         var point = e.GetPosition(this);
+        ShowCursor(point);
+        if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         if (_drag == DragKind.Pending)
         {
             if (Math.Abs(point.X - _pressPoint.X) < DragThresholdPixels && Math.Abs(point.Y - _pressPoint.Y) < DragThresholdPixels) return;
@@ -453,6 +460,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        _lastPoint = e.GetPosition(this);
         if (_scrubbing)
         {
             _scrubbing = false;
@@ -471,6 +479,30 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         EndDrag();
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        if (_drag != DragKind.None || _scrubbing) return;
+        _lastPoint = new Point(-1, -1);
+        ShowCursor(_lastPoint);
+    }
+
+    /// <summary>
+    /// Shows the cursor for a pointer at <paramref name="point"/>. While a chain is gripped the pointer is captured, and
+    /// only the raw OS call changes the cursor then (see <see cref="DragCursors"/>), so it goes through there on every move.
+    /// Plain hover uses <see cref="InputElement.Cursor"/>.
+    /// </summary>
+    private void ShowCursor(Point point)
+    {
+        _lastPoint = point;
+        TimelineHit? hover = point.X >= TimelineViewport.HeaderWidth
+            ? TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y)
+            : null;
+        _shownCursor = TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
+        Cursor = DragCursors.ForHover(_shownCursor);
+        if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -479,12 +511,26 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         string before = _gestureBefore;
         ResetDrag();
         _document.CancelGesture(before);
+        ReleaseCursor();
         e.Handled = true;
     }
 
     private void EndDrag()
     {
         if (_drag == DragKind.None) return;
+        CommitDrag();
+        ReleaseCursor();
+    }
+
+    /// <summary>The drag held the OS cursor; hand it back to whatever is under the pointer now (after the blocks settle).</summary>
+    private void ReleaseCursor()
+    {
+        ShowCursor(_lastPoint);
+        DragCursors.Apply(this, _shownCursor);
+    }
+
+    private void CommitDrag()
+    {
         var kind = _drag;
         var dragged = _dragged;
         int originTrack = _dragOriginTrack;
