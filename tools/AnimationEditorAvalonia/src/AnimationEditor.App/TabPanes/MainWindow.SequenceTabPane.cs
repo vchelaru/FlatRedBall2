@@ -1,3 +1,4 @@
+using AnimationEditor.App.Models;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
@@ -5,9 +6,13 @@ using FlatRedBall2.AnimationEditorCommon;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
+using AnimationEditor.Views.Controls;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -63,6 +68,7 @@ public partial class MainWindow
         private bool _wired;
         private SequenceDocument? _document;
         private bool _refreshing;
+        private List<SequenceListItem> _items = new();
 
         private readonly SequenceClock _clock = new();
         private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(16) };
@@ -195,9 +201,17 @@ public partial class MainWindow
                 if (_refreshing || _document is null) return;
                 _selectedIndex[_document.Path] = w.SequenceList.SelectedIndex;
                 w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
+                ShowInspector();
                 // Another sequence starts from its beginning.
                 StopPlayback();
             };
+            // Clicking the row that is already selected raises no SelectionChanged, so the press itself says "the
+            // sequence": it drops the timeline selection and brings the sequence fields forward.
+            w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+            w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
+            w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
+            w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
+            w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += ShowInspector;
@@ -248,8 +262,52 @@ public partial class MainWindow
             var w = _window;
             ShowInspector();
             bool selected = w.SequenceTimeline.Selection is not null || w.SequenceTimeline.SelectedTrack is not null;
-            if (selected && w.SidebarTabs.SelectedItem != w.HistoryTab && w.SidebarTabs.SelectedItem != w.ShortcutsTab)
+            if (selected) BringInspectorForward();
+        }
+
+        private void BringInspectorForward()
+        {
+            var w = _window;
+            if (w.SidebarTabs.SelectedItem != w.HistoryTab && w.SidebarTabs.SelectedItem != w.ShortcutsTab)
                 w.SidebarTabs.SelectedItem = w.InspectorTab;
+        }
+
+        private void OnSequenceListPressed(object? sender, PointerPressedEventArgs e)
+        {
+            var w = _window;
+            if (_document is null || !e.GetCurrentPoint(w.SequenceList).Properties.IsLeftButtonPressed) return;
+            if (e.Source is not Visual source || source.FindAncestorOfType<ListBoxItem>() is null || source.FindAncestorOfType<InlineRenameBox>() is not null || source is InlineRenameBox) return;
+            w.SequenceTimeline.ClearSelection();
+            ShowInspector();
+            BringInspectorForward();
+        }
+
+        /// <summary>Double-clicking a sequence swaps its name for the same inline box the ANIMATIONS tree uses.</summary>
+        private void OnSequenceListDoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (_document is null || e.Source is not Visual source || source is InlineRenameBox || source.FindAncestorOfType<InlineRenameBox>() is not null) return;
+            if (source.FindAncestorOfType<ListBoxItem>() is not { DataContext: SequenceListItem item } container) return;
+            item.IsEditing = true;
+            container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(item.Name);
+            e.Handled = true;
+        }
+
+        private void OnSequenceRenameCommitted(object? sender, RoutedEventArgs e)
+        {
+            if (e.Source is not InlineRenameBox { DataContext: SequenceListItem item } box) return;
+            item.IsEditing = false;
+            _window.SequenceList.Focus();
+            int index = _items.IndexOf(item);
+            if (_document is { } document && index >= 0
+                && document.RenameSequence(_window._undoManager, index, box.Text ?? string.Empty) is { } error)
+                _window.ShowErrorBanner(error);
+        }
+
+        private void OnSequenceRenameCancelled(object? sender, RoutedEventArgs e)
+        {
+            if (e.Source is not InlineRenameBox { DataContext: SequenceListItem item }) return;
+            item.IsEditing = false;
+            _window.SequenceList.Focus();
         }
 
         /// <summary>Points the inspector at the timeline's selection. It reads the document, so a drag shows live.</summary>
@@ -417,13 +475,13 @@ public partial class MainWindow
         private void Refresh()
         {
             if (_document is null) return;
-            var names = _document.Save.Sequences.Select(sequence => sequence.Name).ToList();
+            _items = _document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
             int selected = _selectedIndex.TryGetValue(_document.Path, out int kept) ? kept : 0;
-            selected = Math.Min(selected, names.Count - 1);
+            selected = Math.Min(selected, _items.Count - 1);
             _refreshing = true;
             try
             {
-                _window.SequenceList.ItemsSource = names;
+                _window.SequenceList.ItemsSource = _items;
                 _window.SequenceList.SelectedIndex = selected;
             }
             finally
