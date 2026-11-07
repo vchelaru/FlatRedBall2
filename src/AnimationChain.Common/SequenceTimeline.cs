@@ -9,7 +9,9 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <item>The next chain is the one with the next later start. On a tie, list order decides: of two chains starting
 /// together, the earlier one in <see cref="SequenceTrackSave.Chains"/> plays for zero seconds.</item>
 /// <item>A missing chain (cycle length 0) never plays, but it still cuts the chain before it.</item>
-/// <item>Outside every chain, the track's sprite is hidden.</item>
+/// <item>Outside every chain, the track's sprite is hidden. That includes the time before the first chain starts,
+/// on purpose: it is how a sprite appears partway through a sequence. If it showed before its chain, it would always
+/// be visible.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
 /// chain data.

@@ -39,7 +39,7 @@ public sealed partial class SequenceTimelineControl
     {
         FilmstripCard? card = null;
         (string, AnimationChainSave)? source = null;
-        if (_drag == DragKind.None && !_scrubbing && _chipGhost is null && point.X >= TimelineViewport.HeaderWidth
+        if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= TimelineViewport.HeaderWidth
             && _document is { } document && Sequence is { } sequence
             && Viewport.RowAt(point.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row)
         {

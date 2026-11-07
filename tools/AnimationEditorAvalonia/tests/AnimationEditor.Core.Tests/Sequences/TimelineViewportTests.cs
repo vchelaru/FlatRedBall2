@@ -88,6 +88,40 @@ public class TimelineViewportTests
     }
 
     [Fact]
+    public void Pan_MovesTheContentWithThePointer_OnBothAxesAtOnce()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetScrollSeconds(5);
+        viewport.ScrollVertically(100, trackCount: 10, viewHeight: 200);
+
+        // Dragging left by 120 px (one second at the default zoom) and up by 30 shows later time and lower lanes.
+        viewport.Pan(-TimelineViewport.DefaultPixelsPerSecond, -30, trackCount: 10, viewHeight: 200);
+
+        viewport.ScrollSeconds.ShouldBe(6, 1e-9);
+        viewport.ScrollY.ShouldBe(130);
+        viewport.Pan(TimelineViewport.DefaultPixelsPerSecond * 2, 50, trackCount: 10, viewHeight: 200);
+        viewport.ScrollSeconds.ShouldBe(4, 1e-9);
+        viewport.ScrollY.ShouldBe(80);
+    }
+
+    [Fact]
+    public void Pan_StopsAtTimeZeroAndAtBothEndsOfTheLanes()
+    {
+        var viewport = new TimelineViewport();
+        viewport.SetScrollSeconds(1);
+
+        viewport.Pan(100_000, 100_000, trackCount: 10, viewHeight: 200);
+        viewport.ScrollSeconds.ShouldBe(0);
+        viewport.ScrollY.ShouldBe(0);
+
+        viewport.Pan(0, -1_000_000, trackCount: 10, viewHeight: 200);
+        viewport.ScrollY.ShouldBe(viewport.ContentHeight(10) - 200);
+        // Everything fits: nothing to pan vertically.
+        viewport.Pan(0, -50, trackCount: 1, viewHeight: 500);
+        viewport.ScrollY.ShouldBe(0);
+    }
+
+    [Fact]
     public void ScrollVertically_UsesTheTallLanesInTheContentExtent()
     {
         var viewport = MixedViewport();
