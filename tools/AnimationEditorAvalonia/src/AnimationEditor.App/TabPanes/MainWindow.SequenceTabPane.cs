@@ -101,7 +101,6 @@ public partial class MainWindow
             StopPlayback();
             Detach();
             w.SequencePreview.Composite = null;
-            w.SequenceEmptyHint.IsVisible = false;
             w.SequenceLibrary.Show(null);
             w.SequenceTimeline.Show(null, -1, null);
             w.SequenceListPane.IsVisible = false;
@@ -480,11 +479,7 @@ public partial class MainWindow
             var w = _window;
             double time = _clock.Time;
             w.SequenceTimeline.Playhead = time;
-            var shown = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time);
-            w.SequencePreview.Composite = shown;
-            string? hint = shown is null ? null : SequencePreviewHint.For(CurrentSequence, shown.Count, time);
-            w.SequenceEmptyHint.Text = hint;
-            w.SequenceEmptyHint.IsVisible = hint is not null;
+            w.SequencePreview.Composite = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time);
             w.SequenceTimeText.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.00} s / {1:0.00} s",
                 time, w.SequenceTimeline.SequenceLength);
             w.SequencePlayIcon.Path = _clock.IsPlaying

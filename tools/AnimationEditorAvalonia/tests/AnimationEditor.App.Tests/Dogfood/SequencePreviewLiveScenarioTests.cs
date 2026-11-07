@@ -231,7 +231,6 @@ public class SequencePreviewLiveScenarioTests
         string boss = WriteFixture(editor);
         await editor.OpenAsync(boss);
         ShownChains(editor).ShouldBeEmpty();
-        editor.Control<TextBlock>("SequenceEmptyHint").IsVisible.ShouldBeFalse();
 
         editor.Drag(editor.CenterOf(Chip(editor, "Walk")), At(editor, 0, 0));
 
@@ -400,37 +399,32 @@ public class SequencePreviewLiveScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task AChainThatStartsAfterThePlayhead_LeavesThePreviewEmptyWithAHintNamingWhenItStarts()
+    public async Task AChainThatStartsAfterThePlayhead_LeavesThePreviewPlainlyEmpty_UntilTheyScrubIntoIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0.4)));
         await editor.OpenAsync(boss);
-        var hint = editor.Control<TextBlock>("SequenceEmptyHint");
 
         ShownChains(editor).ShouldBeEmpty();
-        hint.IsVisible.ShouldBeTrue();
-        hint.Text.ShouldBe("Nothing plays at the playhead. The next chain starts at 0.40 s.");
 
         editor.ClickAt(RulerAt(editor, 0.45));
         ShownChains(editor).ShouldBe(new[] { "Walk:0" });
-        hint.IsVisible.ShouldBeFalse();
     }
 
     [AvaloniaFact]
-    public async Task TheHint_FollowsAnEditThatFillsOrEmptiesThePlayhead()
+    public async Task ChangingAChainsStart_FillsOrEmptiesThePreviewAtOnce_AndSoDoUndoAndRedo()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0.4)));
         await editor.OpenAsync(boss);
-        var hint = editor.Control<TextBlock>("SequenceEmptyHint");
         editor.ClickAt(At(editor, 0, 0.6));
 
         TypeInto(editor, Inspector(editor).ChainStartField, "0");
-        hint.IsVisible.ShouldBeFalse();
+        ShownChains(editor).ShouldBe(new[] { "Walk:0" });
         Undo(editor);
-        hint.IsVisible.ShouldBeTrue();
+        ShownChains(editor).ShouldBeEmpty();
         Redo(editor);
-        hint.IsVisible.ShouldBeFalse();
+        ShownChains(editor).ShouldBe(new[] { "Walk:0" });
     }
 
     [AvaloniaFact]
