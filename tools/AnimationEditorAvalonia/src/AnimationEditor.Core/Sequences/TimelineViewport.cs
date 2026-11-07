@@ -147,6 +147,17 @@ public sealed class TimelineViewport
     /// <summary>The playhead time for a ruler press or drag at <paramref name="x"/>: the time there, clamped to 0..<paramref name="length"/>.</summary>
     public double ScrubTime(double x, double length) => Math.Clamp(TimeAt(x), 0, Math.Max(0, length));
 
+    /// <summary>
+    /// Drags the content with the pointer: a pointer move of (<paramref name="dx"/>, <paramref name="dy"/>) pixels moves
+    /// the lanes the same way, so moving right shows earlier time and moving down shows higher lanes. Time stops at 0
+    /// and the lanes at the content's ends.
+    /// </summary>
+    public void Pan(double dx, double dy, int trackCount, double viewHeight)
+    {
+        ScrollSeconds = Math.Max(0, ScrollSeconds - dx / PixelsPerSecond);
+        ScrollVertically(-dy, trackCount, viewHeight);
+    }
+
     /// <summary>Scrolls the lanes sideways by <paramref name="pixels"/>; positive shows later time.</summary>
     public void ScrollHorizontally(double pixels) => SetScrollSeconds(ScrollSeconds + pixels / PixelsPerSecond);
 

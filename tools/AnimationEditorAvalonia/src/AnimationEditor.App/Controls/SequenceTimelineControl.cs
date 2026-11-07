@@ -63,6 +63,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private (LibraryChip Chip, Point Point)? _chipGhost;
     private double _playhead;
     private bool _scrubbing;
+    private bool _panning;
+    private Point _panLast;
     private Point _lastPoint;
     private TimelineCursor _shownCursor;
 
@@ -423,6 +425,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var properties = e.GetCurrentPoint(this).Properties;
         var row = Viewport.RowAt(point.Y, sequence.Tracks.Count);
 
+        // A middle-button drag pans from anywhere in the timeline, without touching selection or anything dragged.
+        if (properties.IsMiddleButtonPressed)
+        {
+            if (_drag != DragKind.None || _scrubbing || _panning) return;
+            _panning = true;
+            _panLast = point;
+            e.Pointer.Capture(this);
+            ShowCursor(point);
+            e.Handled = true;
+            return;
+        }
         if (properties.IsRightButtonPressed)
         {
             BuildMenu(point, row);
@@ -507,6 +520,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         base.OnPointerMoved(e);
         UpdateHover(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
+        if (_panning)
+        {
+            var at = e.GetPosition(this);
+            Viewport.Pan(at.X - _panLast.X, at.Y - _panLast.Y, TrackCount, Bounds.Height);
+            _panLast = at;
+            ShowCursor(at);
+            InvalidateArrange();
+            InvalidateVisual();
+            return;
+        }
         if (_scrubbing)
         {
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
@@ -553,6 +576,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerReleased(e);
         _lastPoint = e.GetPosition(this);
+        if (_panning)
+        {
+            if (e.InitialPressMouseButton == MouseButton.Middle) EndPan(e.Pointer);
+            return;
+        }
         if (_scrubbing)
         {
             _scrubbing = false;
@@ -575,6 +603,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerCaptureLost(e);
         _scrubbing = false;
+        if (_panning)
+        {
+            _panning = false;
+            ReleaseCursor();
+        }
         // Losing the pointer mid-drag (the window deactivated) abandons a reorder rather than dropping it somewhere.
         if (_drag is DragKind.TrackPending or DragKind.Track)
         {
@@ -584,6 +617,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         EndDrag();
+    }
+
+    private void EndPan(IPointer pointer)
+    {
+        _panning = false;
+        pointer.Capture(null);
+        ReleaseCursor();
     }
 
     private void MoveTrackDrag(Point point)
@@ -607,7 +647,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         base.OnPointerExited(e);
         ClearHover();
         UpdateNewTrackHot(new Point(-1, -1));
-        if (_drag != DragKind.None || _scrubbing) return;
+        if (_drag != DragKind.None || _scrubbing || _panning) return;
         _lastPoint = new Point(-1, -1);
         ShowCursor(_lastPoint);
     }
@@ -623,17 +663,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         TimelineHit? hover = point.X >= TimelineViewport.HeaderWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y)
             : null;
-        _shownCursor = _drag == DragKind.Track
-            ? TimelineCursor.Reorder
+        _shownCursor = _panning ? TimelineCursor.Pan
+            : _drag == DragKind.Track ? TimelineCursor.Reorder
             : TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
-        if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
+        if (_drag != DragKind.None || _panning) DragCursors.Apply(this, _shownCursor);
     }
 
     // The "+ new track" cell lights up under the pointer, except while a chain or the ruler is being dragged.
     private void UpdateNewTrackHot(Point point)
     {
-        bool hot = _drag == DragKind.None && !_scrubbing && Sequence is { } sequence && point.X >= 0
+        bool hot = _drag == DragKind.None && !_scrubbing && !_panning && Sequence is { } sequence && point.X >= 0
             && point.X < TimelineViewport.HeaderWidth && Viewport.RowAt(point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
         if (hot == IsNewTrackHot) return;
         IsNewTrackHot = hot;
