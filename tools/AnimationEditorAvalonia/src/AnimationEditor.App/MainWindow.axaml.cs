@@ -2566,6 +2566,7 @@ public partial class MainWindow : Window
         // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         FrameProbeBegin.Hub = FrameProbeEnd.Hub = _diagnosticsHub;
+        Closed += (_, _) => _diagnosticsHub.Enabled = false;   // its watcher thread must not outlive the window
         SequenceTimeline.DiagnosticsExtraLines = _diagnosticsHub.Lines;
         MenuSettings.Click += OnSettingsClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
