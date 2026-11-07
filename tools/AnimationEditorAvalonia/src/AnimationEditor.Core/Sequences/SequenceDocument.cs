@@ -31,6 +31,7 @@ public sealed class SequenceDocument
     {
         Path = new FilePath(path);
         Save = save;
+        SelectedSequence = save.Sequences.Count > 0 ? 0 : -1;
         LoadMissingSources();
     }
 
@@ -38,6 +39,12 @@ public sealed class SequenceDocument
 
     /// <summary>The file's data. Replaced by undo and redo, so do not hold on to it or to anything inside it.</summary>
     public SequenceListSave Save { get; private set; }
+
+    /// <summary>
+    /// The sequence the list has selected, or -1 for none. Adding, renaming and deleting a sequence move it to the
+    /// sequence that changed, and undo and redo move it the same way, so the list follows the history.
+    /// </summary>
+    public int SelectedSequence { get; set; }
 
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
@@ -113,7 +120,8 @@ public sealed class SequenceDocument
     public string AddSequence(IUndoManager undo)
     {
         string name = UniqueName(DefaultSequenceName);
-        Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }));
+        Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }),
+            selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
     }
 
@@ -126,14 +134,17 @@ public sealed class SequenceDocument
         if (name == oldName) return null;
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
-        Edit(undo, $"Rename Sequence '{oldName}' to '{name}'", save => save.Sequences[index].Name = name);
+        Edit(undo, $"Rename Sequence '{oldName}' to '{name}'", save => save.Sequences[index].Name = name,
+            selectBefore: index, selectAfter: index);
         return null;
     }
 
     public void DeleteSequence(IUndoManager undo, int index)
     {
         string name = Save.Sequences[index].Name;
-        Edit(undo, $"Delete Sequence '{name}'", save => save.Sequences.RemoveAt(index));
+        // The neighbour that takes its place, or the last one when the deleted sequence was last.
+        Edit(undo, $"Delete Sequence '{name}'", save => save.Sequences.RemoveAt(index),
+            selectBefore: index, selectAfter: Math.Min(index, Save.Sequences.Count - 2));
     }
 
     /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
@@ -303,19 +314,20 @@ public sealed class SequenceDocument
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
-    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate)
+    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
         mutate(copy);
         string after = copy.ToJsonString();
         if (after == before) return;
-        undo.Execute(new SnapshotCommand(this, description, before, after));
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter));
     }
 
-    private void Restore(string json)
+    private void Restore(string json, int? selectedSequence = null)
     {
         Save = SequenceListSave.FromJsonString(json);
+        if (selectedSequence is { } selected) SelectedSequence = selected;
         LoadMissingSources();
         SaveToDisk();
         Changed?.Invoke();
@@ -344,16 +356,18 @@ public sealed class SequenceDocument
         }
     }
 
-    private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after) : IUndoableCommand
+    // selectBefore and selectAfter are the selected sequence once undone and once done; null leaves the selection alone.
+    private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
+        int? selectBefore = null, int? selectAfter = null) : IUndoableCommand
     {
         public string Description => description;
 
         public bool Do()
         {
-            document.Restore(after);
+            document.Restore(after, selectAfter);
             return true;
         }
 
-        public void Undo() => document.Restore(before);
+        public void Undo() => document.Restore(before, selectBefore);
     }
 }

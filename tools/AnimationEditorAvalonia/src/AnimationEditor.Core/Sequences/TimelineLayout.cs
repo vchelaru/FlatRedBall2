@@ -43,12 +43,21 @@ public static class TimelineLayout
     /// <summary>How close, in pixels, a dragged edge must come to a whole cycle or the next chain to be pulled there.</summary>
     public const double MagnetPixels = 8;
 
-    // Vertical bands inside a lane: chain bodies on top, cut tails in a strip below them so a tail stays visible and
-    // grabbable under the chain that cuts it.
-    public const double BodyTop = 4;
-    public const double BodyBottom = TimelineViewport.LaneHeight - 12;
+    // Vertical bands inside a lane: a chain's block is a thin label strip over a filmstrip row, and its cut tail sits in a
+    // strip below so a tail stays visible and grabbable under the chain that cuts it.
+    public const double BodyTop = 3;
+    public const double LabelHeight = 14;
+    public const double FilmHeight = 25;
+    public const double BodyBottom = BodyTop + LabelHeight + FilmHeight;
+    public const double FilmTop = BodyTop + LabelHeight;
     public const double TailTop = BodyBottom + 2;
-    public const double TailBottom = TimelineViewport.LaneHeight - 3;
+    public const double TailBottom = TailTop + 3;
+
+    /// <summary>The narrowest block that still draws a label: about three characters plus the ellipsis.</summary>
+    public const double MinLabelPixels = 36;
+
+    /// <summary>Whether a block <paramref name="blockWidth"/> pixels wide draws its name. Below that the strip stays blank.</summary>
+    public static bool ShowsLabel(double blockWidth) => blockWidth >= MinLabelPixels;
 
     /// <summary>
     /// Every chain on <paramref name="sequence"/>, track by track in playback order.

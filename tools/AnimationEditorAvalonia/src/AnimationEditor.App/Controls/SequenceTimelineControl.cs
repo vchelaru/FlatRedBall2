@@ -26,11 +26,12 @@ public readonly record struct TimelineChainId(int Track, int Chain);
 /// host moves its clock on <see cref="Scrubbed"/> and sets <see cref="Playhead"/> back. Geometry and hit-testing live in
 /// <see cref="TimelineViewport"/> and <see cref="TimelineLayout"/>.
 /// </summary>
-public sealed class SequenceTimelineControl : Control, IZoomTarget
+public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 {
     private const double DragThresholdPixels = 3;
     private const double WheelZoomStep = 1.15;
     private const double WheelScrollPixels = 60;
+    private const double RenameBoxHeight = 24;
 
     private enum DragKind { None, Pending, Move, Edge }
 
@@ -57,6 +58,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     private (LibraryChip Chip, Point Point)? _chipGhost;
     private double _playhead;
     private bool _scrubbing;
+    private Point _lastPoint;
+    private TimelineCursor _shownCursor;
 
     public SequenceTimelineControl()
     {
@@ -68,6 +71,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     }
 
     public TimelineViewport Viewport { get; } = new();
+
+    /// <summary>The cursor the timeline last asked for. The OS cursor itself is not observable headlessly.</summary>
+    public TimelineCursor ShownCursor => _shownCursor;
 
     /// <summary>The selected chain, or null. At most one thing is selected: choosing a chain clears <see cref="SelectedTrack"/> and the reverse.</summary>
     public TimelineChainId? Selection
@@ -168,6 +174,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         _document = document;
         _sequenceIndex = sequenceIndex;
         _undo = undo;
+        _filmstrip.Invalidate();
         Rebuild();
     }
 
@@ -249,7 +256,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, TimelineViewport.LaneHeight - 12));
+        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         return default;
     }
 
@@ -257,8 +264,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     {
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
-            double height = TimelineViewport.LaneHeight - 12;
-            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + 6, TimelineViewport.HeaderWidth - 4, height));
+            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + (TimelineViewport.LaneHeight - RenameBoxHeight) / 2,
+                TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         }
         return finalSize;
     }
@@ -313,6 +320,17 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         Selection = new TimelineChainId(track, sequence.Tracks[track].Chains.Count - 1);
         Rebuild();
         return true;
+    }
+
+    /// <summary>
+    /// What a chip drag should show at the mouse cursor at <paramref name="point"/> (this control's
+    /// coordinates, null when the pointer is outside it): the same plan <see cref="DropChip"/> would use.
+    /// </summary>
+    public ChipDragFeedback ChipDragFeedbackAt(LibraryChip chip, Point? point)
+    {
+        var plan = point is { } p ? PlanDrop(chip, p) : TimelineDropPlan.None;
+        string? trackName = plan.Kind == TimelineDropKind.Track ? Sequence!.Tracks[plan.Row].Name : null;
+        return ChipDragFeedback.For(plan.Kind, trackName);
     }
 
     private void Rebuild()
@@ -395,6 +413,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         _dragOriginEdge = block.FullEnd;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
+        ShowCursor(point);
         InvalidateVisual();
     }
 
@@ -406,8 +425,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
             return;
         }
-        if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         var point = e.GetPosition(this);
+        ShowCursor(point);
+        if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         if (_drag == DragKind.Pending)
         {
             if (Math.Abs(point.X - _pressPoint.X) < DragThresholdPixels && Math.Abs(point.Y - _pressPoint.Y) < DragThresholdPixels) return;
@@ -440,6 +460,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        _lastPoint = e.GetPosition(this);
         if (_scrubbing)
         {
             _scrubbing = false;
@@ -458,6 +479,30 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         EndDrag();
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        if (_drag != DragKind.None || _scrubbing) return;
+        _lastPoint = new Point(-1, -1);
+        ShowCursor(_lastPoint);
+    }
+
+    /// <summary>
+    /// Shows the cursor for a pointer at <paramref name="point"/>. While a chain is gripped the pointer is captured, and
+    /// only the raw OS call changes the cursor then (see <see cref="DragCursors"/>), so it goes through there on every move.
+    /// Plain hover uses <see cref="InputElement.Cursor"/>.
+    /// </summary>
+    private void ShowCursor(Point point)
+    {
+        _lastPoint = point;
+        TimelineHit? hover = point.X >= TimelineViewport.HeaderWidth
+            ? TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y)
+            : null;
+        _shownCursor = TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
+        Cursor = DragCursors.ForHover(_shownCursor);
+        if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -466,12 +511,26 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         string before = _gestureBefore;
         ResetDrag();
         _document.CancelGesture(before);
+        ReleaseCursor();
         e.Handled = true;
     }
 
     private void EndDrag()
     {
         if (_drag == DragKind.None) return;
+        CommitDrag();
+        ReleaseCursor();
+    }
+
+    /// <summary>The drag held the OS cursor; hand it back to whatever is under the pointer now (after the blocks settle).</summary>
+    private void ReleaseCursor()
+    {
+        ShowCursor(_lastPoint);
+        DragCursors.Apply(this, _shownCursor);
+    }
+
+    private void CommitDrag()
+    {
         var kind = _drag;
         var dragged = _dragged;
         int originTrack = _dragOriginTrack;
@@ -710,6 +769,9 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         else
         {
             context.FillRectangle(new SolidColorBrush(color, 0.35), body, 3);
+            var film = new Rect(left, top + TimelineLayout.FilmTop, body.Width, TimelineLayout.FilmHeight);
+            context.FillRectangle(Brush("BgCanvas"), film);
+            DrawFilmstrip(context, block, film);
         }
         context.DrawRectangle(null, new Pen(selected ? Brush("Ink") : new SolidColorBrush(color), selected ? 2 : 1), body, 3, 3);
 
@@ -717,20 +779,27 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         if (block.CycleLength > 0)
         {
             var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
+            double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
             for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
             {
                 double x = Snap(left + k * block.CycleLength * pps);
-                context.DrawLine(mark, new Point(x, body.Top + 2), new Point(x, body.Bottom - 2));
+                context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
             }
         }
 
+        if (!TimelineLayout.ShowsLabel(body.Width)) return;
         string label = block.IsMissing ? $"⚠ {block.Reference.Chain} (missing)" : block.Reference.Chain;
         if (!block.IsMissing && Math.Abs(block.Reference.Loops - 1) > 1e-6)
             label += $"  ×{block.Reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
             var text = Text(label, 11, Brush("Ink"));
-            context.DrawText(text, new Point(body.X + 6, body.Y + (body.Height - text.Height) / 2));
+            text.MaxTextWidth = Math.Max(1, body.Width - 12);
+            text.MaxLineCount = 1;
+            text.Trimming = TextTrimming.CharacterEllipsis;
+            // A missing chain has no filmstrip, so its label centers in the whole block.
+            double strip = block.IsMissing ? body.Height : TimelineLayout.LabelHeight;
+            context.DrawText(text, new Point(body.X + 6, body.Y + (strip - text.Height) / 2));
         }
     }
 

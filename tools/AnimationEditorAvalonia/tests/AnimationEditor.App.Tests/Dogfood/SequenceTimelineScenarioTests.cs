@@ -6,6 +6,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -305,5 +306,116 @@ public class SequenceTimelineScenarioTests
         editor.Wheel(point, -3, RawInputModifiers.Shift);
         viewport.ScrollSeconds.ShouldBeGreaterThan(0);
         editor.UndoLabels.ShouldBeEmpty();
+    }
+
+    private static double EdgeX(SequenceTimelineControl timeline, double time) => timeline.Viewport.XAt(time);
+
+    private static Point Hover(AnimationEditorHarness editor, double x, double y)
+    {
+        var point = editor.PointIn(Timeline(editor), x, y);
+        editor.Window.MouseMove(point, RawInputModifiers.None);
+        return point;
+    }
+
+    [AvaloniaTheory]
+    [InlineData(40)]
+    [InlineData(120)]
+    [InlineData(600)]
+    public async Task HoveringTheRightEdgeGrabZone_ShowsResize_AndOneStepInsideTheBodyDoesNot(double pixelsPerSecond)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        timeline.Viewport.SetPixelsPerSecond(pixelsPerSecond);
+        editor.Layout();
+        double bodyY = timeline.Viewport.LaneTop(0) + (TimelineLayout.BodyTop + TimelineLayout.BodyBottom) / 2;
+        double right = EdgeX(timeline, 0.5);
+        double width = right - EdgeX(timeline, 0);
+        double grab = Math.Min(TimelineLayout.EdgeGrabPixels, width / 3);
+
+        Hover(editor, right, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+        Hover(editor, right + TimelineLayout.EdgeGrabPixels, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+        Hover(editor, right - grab + 0.5, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+
+        Hover(editor, right - grab - 1, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        Hover(editor, EdgeX(timeline, 0) + 1, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        Hover(editor, right + TimelineLayout.EdgeGrabPixels + 1, bodyY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+    }
+
+    [AvaloniaFact]
+    public async Task HoveringACutTail_ShowsResizeAtItsEdge_AndItsBodyDoesNot()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        // Walk loops 3 times (1.5 s) but Run starts at 1.0 s and cuts it.
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 3), ("Run", 1.0, 1)));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        double tailY = timeline.Viewport.LaneTop(0) + TimelineLayout.TailTop + 2;
+
+        Hover(editor, EdgeX(timeline, 1.25), tailY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        Hover(editor, EdgeX(timeline, 1.5), tailY);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingTheEdge_KeepsResizeOutsideTheBlockAndTheTimeline_AndReleaseRestoresIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        Point edge = At(editor, 0, 0.5);
+        Hover(editor, EdgeX(timeline, 0.5), timeline.Viewport.LaneTop(0) + 10);
+        editor.Window.MouseDown(edge, MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(At(editor, 0, 1.0), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+        // Above the timeline entirely, and back over the chain's own body.
+        editor.Window.MouseMove(new Point(edge.X + 40, edge.Y - 200), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+        editor.Window.MouseMove(At(editor, 0, 0.1), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+
+        Point away = At(editor, 0, 3.0);
+        editor.Window.MouseUp(away, MouseButton.Left, RawInputModifiers.None);
+        editor.Layout();
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+    }
+
+    [AvaloniaFact]
+    public async Task MovingAChain_NeverShowsResize_EvenPassingOverAnEdge_AndEscapeEndsTheEdgeCursor()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Other", ("Run", 3, 1)));
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        editor.Window.MouseMove(At(editor, 0, 0.25), RawInputModifiers.None);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        editor.Window.MouseDown(At(editor, 0, 0.25), MouseButton.Left, RawInputModifiers.None);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        editor.Window.MouseMove(At(editor, 0, 1.0), RawInputModifiers.LeftMouseButton);
+        // Over Run's right edge (it ends at 3.2 s).
+        editor.Window.MouseMove(At(editor, 1, 3.2), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        editor.Window.MouseMove(editor.PointIn(timeline, 5, 5), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        editor.Press(Key.Escape);
+        editor.Window.MouseUp(At(editor, 0, 0.25), MouseButton.Left, RawInputModifiers.None);
+
+        editor.Window.MouseDown(At(editor, 0, 0.5), MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(At(editor, 0, 0.9), RawInputModifiers.LeftMouseButton);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
+        editor.Press(Key.Escape);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
+        editor.Window.MouseUp(At(editor, 0, 0.9), MouseButton.Left, RawInputModifiers.None);
     }
 }

@@ -103,6 +103,12 @@ public sealed class SequenceLibraryControl : UserControl
     /// <summary>Raised when a chip drag ends: with the release, or null when the drag was cancelled.</summary>
     public event Action<LibraryChip, PointerEventArgs?>? ChipDragEnded;
 
+    /// <summary>
+    /// What the cursor and the floating card show for the chip being dragged. The host sets it from inside
+    /// <see cref="ChipDragMoved"/>; it is read right after that event returns.
+    /// </summary>
+    public ChipDragFeedback? DragFeedback { get; set; }
+
     internal void RaiseGoToDefinition(SequenceChainReferenceSave reference) => GoToDefinitionRequested?.Invoke(reference);
 
     internal void RaiseChipDragMoved(LibraryChip chip, PointerEventArgs e) => ChipDragMoved?.Invoke(chip, e);
@@ -310,8 +316,11 @@ public sealed class LibraryChipView : Border
     private readonly SequenceDocument _document;
     private readonly ThumbnailService? _thumbnails;
     private readonly SequenceLibraryControl _library;
+    private static readonly Cursor GrabCursor = new(StandardCursorType.Hand);
+
     private Point? _pressedAt;
     private bool _dragging;
+    private ChipDragGhost? _ghost;
     private readonly ResolvedFrameColor[] _colors;
     private readonly Image _image = new() { Stretch = Stretch.None };
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1 / 30.0) };
@@ -332,6 +341,7 @@ public sealed class LibraryChipView : Border
         SequenceLibraryControl.BindResource(this, BorderBrushProperty, "LineBrush");
         SequenceLibraryControl.BindResource(this, BackgroundProperty, "BgRail");
         ToolTip.SetTip(this, chip.Chain.Name);
+        Cursor = GrabCursor;
         var definition = new MenuItem { Header = "Go to Definition" };
         definition.Click += (_, _) => _library.RaiseGoToDefinition(
             new SequenceChainReferenceSave { Source = chip.Source, Chain = chip.Chain.Name });
@@ -378,6 +388,19 @@ public sealed class LibraryChipView : Border
         _dragging = true;
         Opacity = 0.6;
         _library.RaiseChipDragMoved(Chip, e);
+        ShowDragFeedback(e);
+    }
+
+    /// <summary>The cursor kind shown while a drag is in progress, or null. The cursor itself comes from <see cref="ChipDragGhost"/>'s sheets.</summary>
+    internal ChipDragCursor? DragCursor { get; private set; }
+
+    private void ShowDragFeedback(PointerEventArgs e)
+    {
+        if (_library.DragFeedback is not { } feedback) return;
+        DragCursor = feedback.Cursor;
+        _ghost ??= new ChipDragGhost(Chip.Chain.Name);
+        _ghost.Update(this, _image.Source, feedback, e.GetPosition(this));
+        DragCursors.Apply(this, feedback.Cursor);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -401,9 +424,14 @@ public sealed class LibraryChipView : Border
 
     private void EndPress()
     {
+        bool wasDragging = _dragging;
         _pressedAt = null;
         _dragging = false;
         Opacity = 1;
+        DragCursor = null;
+        _library.DragFeedback = null;
+        if (wasDragging) DragCursors.Restore(this, GrabCursor);
+        _ghost?.Hide();
     }
 
     public LibraryChip Chip { get; }
