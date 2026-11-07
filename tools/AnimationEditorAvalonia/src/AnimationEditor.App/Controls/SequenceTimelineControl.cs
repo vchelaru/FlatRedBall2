@@ -68,6 +68,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ContextMenu = _menu;
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        _filmstrip.TextureChanged += InvalidateVisual;
     }
 
     public TimelineViewport Viewport { get; } = new();
