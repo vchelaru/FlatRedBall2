@@ -167,11 +167,18 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         return true;
     }
 
-    private TimelineRow? DropTarget(Point point)
+    private TimelineRow? DropTarget(Point point) =>
+        Sequence is null ? null : ChipDrop.TargetAt(Viewport, TrackCount, point.X, point.Y, Bounds.Width);
+
+    /// <summary>
+    /// What a chip drag should show at the mouse cursor at <paramref name="point"/> (this control's
+    /// coordinates, null when the pointer is outside it): the same target <see cref="DropChip"/> would use.
+    /// </summary>
+    public ChipDragFeedback ChipDragFeedbackAt(Point? point)
     {
-        if (Sequence is null || point.X < TimelineViewport.HeaderWidth || point.X > Bounds.Width) return null;
-        var row = Viewport.RowAt(point.Y, TrackCount);
-        return row.Kind is TimelineRowKind.Track or TimelineRowKind.NewTrack ? row : null;
+        var target = point is { } p ? DropTarget(p) : null;
+        string? trackName = target is { Kind: TimelineRowKind.Track } row ? Sequence!.Tracks[row.Track].Name : null;
+        return ChipDragFeedback.For(target, trackName);
     }
 
     private void Rebuild()

@@ -78,6 +78,12 @@ public sealed class SequenceLibraryControl : UserControl
     /// <summary>Raised when a chip drag ends: with the release, or null when the drag was cancelled.</summary>
     public event Action<LibraryChip, PointerEventArgs?>? ChipDragEnded;
 
+    /// <summary>
+    /// What the cursor and the floating card show for the chip being dragged. The host sets it from inside
+    /// <see cref="ChipDragMoved"/>; it is read right after that event returns.
+    /// </summary>
+    public ChipDragFeedback? DragFeedback { get; set; }
+
     internal void RaiseChipDragMoved(LibraryChip chip, PointerEventArgs e) => ChipDragMoved?.Invoke(chip, e);
 
     internal void RaiseChipDragEnded(LibraryChip chip, PointerEventArgs? e) => ChipDragEnded?.Invoke(chip, e);
@@ -213,8 +219,13 @@ public sealed class LibraryChipView : Border
     private readonly SequenceDocument _document;
     private readonly ThumbnailService? _thumbnails;
     private readonly SequenceLibraryControl _library;
+    private static readonly Cursor GrabCursor = new(StandardCursorType.Hand);
+    private static readonly Cursor CopyCursor = new(StandardCursorType.DragCopy);
+    private static readonly Cursor NotAllowedCursor = new(StandardCursorType.No);
+
     private Point? _pressedAt;
     private bool _dragging;
+    private ChipDragGhost? _ghost;
     private readonly ResolvedFrameColor[] _colors;
     private readonly Image _image = new() { Stretch = Stretch.None };
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1 / 30.0) };
@@ -235,6 +246,7 @@ public sealed class LibraryChipView : Border
         SequenceLibraryControl.BindResource(this, BorderBrushProperty, "LineBrush");
         SequenceLibraryControl.BindResource(this, BackgroundProperty, "BgRail");
         ToolTip.SetTip(this, chip.Chain.Name);
+        Cursor = GrabCursor;
 
         // The thumbnail's square corners would paint over the outline's rounded top corners (ClipToBounds clips to the
         // outer radius, which still leaves the stroke exposed), so it takes the inner radius: outer 5 minus the 1px border.
@@ -276,6 +288,19 @@ public sealed class LibraryChipView : Border
         _dragging = true;
         Opacity = 0.6;
         _library.RaiseChipDragMoved(Chip, e);
+        ShowDragFeedback(e);
+    }
+
+    /// <summary>The cursor shown while a drag is in progress; <see cref="Cursor"/> on this control because it holds the pointer capture.</summary>
+    internal ChipDragCursor? DragCursor { get; private set; }
+
+    private void ShowDragFeedback(PointerEventArgs e)
+    {
+        if (_library.DragFeedback is not { } feedback) return;
+        DragCursor = feedback.Cursor;
+        Cursor = feedback.Cursor == ChipDragCursor.Copy ? CopyCursor : NotAllowedCursor;
+        _ghost ??= new ChipDragGhost(Chip.Chain.Name);
+        _ghost.Update(this, _image.Source, feedback, e.GetPosition(this));
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -302,6 +327,10 @@ public sealed class LibraryChipView : Border
         _pressedAt = null;
         _dragging = false;
         Opacity = 1;
+        Cursor = GrabCursor;
+        DragCursor = null;
+        _library.DragFeedback = null;
+        _ghost?.Hide();
     }
 
     public LibraryChip Chip { get; }

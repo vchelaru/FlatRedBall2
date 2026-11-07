@@ -190,7 +190,11 @@ public partial class MainWindow
                 StopPlayback();
             };
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
-            w.SequenceLibrary.ChipDragMoved += (chip, e) => w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+            w.SequenceLibrary.ChipDragMoved += (chip, e) =>
+            {
+                w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+                w.SequenceLibrary.DragFeedback = w.SequenceTimeline.ChipDragFeedbackAt(TimelinePoint(e));
+            };
             w.SequenceLibrary.ChipDragEnded += (chip, e) =>
             {
                 w.SequenceTimeline.UpdateChipDrag(null, null);
