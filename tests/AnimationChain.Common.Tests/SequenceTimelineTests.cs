@@ -72,13 +72,14 @@ public class SequenceTimelineTests
     }
 
     [Theory]
-    // edge time, expected loops (cycle 1 s, start 0, magnet 0.05 s, next chain at 3 s)
+    // edge time, expected loops (cycle 1 s, start 0, magnet 0.05 s, next chain at 2.5 s)
     [InlineData(1.7, 1.7)]
     [InlineData(2.04, 2.0)]   // within the magnet: pulled to a whole cycle
-    [InlineData(3.6, 3.0)]    // stopped at the next chain
-    public void LoopsForEdgeDrag_FreeWithMagnetAndStopsAtNextChain(double edgeTime, double expected)
+    [InlineData(2.53, 2.5)]   // within the magnet: pulled to the next chain's start
+    [InlineData(3.6, 3.6)]    // past the next chain: allowed, the overlap is cut at playback
+    public void LoopsForEdgeDrag_FreeWithMagnetsAtCyclesAndNextChain(double edgeTime, double expected)
     {
-        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime, cycleLength: 1, nextStart: 3, magnetSeconds: 0.05)
+        SequenceTimeline.LoopsForEdgeDrag(start: 0, edgeTime, cycleLength: 1, nextStart: 2.5, magnetSeconds: 0.05)
             .ShouldBe((float)expected, 1e-5f);
     }
 }

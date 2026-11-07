@@ -102,6 +102,8 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => scope == HotkeyScope.App;
 
+        public void DeleteSelection() { }
+
         // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.
         public bool BrowserClickOpensPreview => true;
 

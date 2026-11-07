@@ -2208,16 +2208,14 @@
 
             <!-- Sequence editor: replaces the achx editor pane while a .seqj tab is active. Same split
                  as an .achx tab: what you edit on top (chain library beside the timeline), the
-                 composited preview below. The three regions are placeholders until their stages land. -->
+                 composited preview below. The preview is a placeholder until its stage lands. -->
             <Grid x:Name="SequenceEditorPane" Grid.Column="2" RowDefinitions="*,4,250"
                   Background="{DynamicResource BgCanvas}" IsVisible="False">
                 <Grid Grid.Row="0" ColumnDefinitions="220,4,*">
                     <controls:SequenceLibraryControl x:Name="SequenceLibrary" Grid.Column="0" />
                     <GridSplitter Grid.Column="1" ResizeDirection="Columns"
                                   Background="{DynamicResource LineStrong}" />
-                    <Border x:Name="SequenceTimelinePlaceholder" Grid.Column="2">
-                        <TextBlock Text="Timeline" Classes="sequence-placeholder" />
-                    </Border>
+                    <controls:SequenceTimelineControl x:Name="SequenceTimeline" Grid.Column="2" />
                 </Grid>
                 <GridSplitter Grid.Row="1" ResizeDirection="Rows"
                               Background="{DynamicResource LineStrong}"

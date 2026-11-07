@@ -7318,7 +7318,9 @@ public partial class MainWindow : Window
                     : new[] { new HotkeyGesture("Delete") },
                 // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
                 ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
-                Action = HandleDelete,
+                // Each tab kind deletes its own selection, so a sequence tab never deletes from the hidden achx.
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.DeleteSelection(),
             },
             new()
             {

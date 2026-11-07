@@ -4,6 +4,8 @@ using FlatRedBall2.AnimationEditorCommon;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
+using Avalonia;
+using Avalonia.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -75,6 +77,7 @@ public partial class MainWindow
             var w = _window;
             Detach();
             w.SequenceLibrary.Show(null);
+            w.SequenceTimeline.Show(null, -1, null);
             w.SequenceListPane.IsVisible = false;
             w.SequenceEditorPane.IsVisible = false;
             _hiddenTabs?.Restore();
@@ -140,6 +143,8 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => scope is HotkeyScope.App or HotkeyScope.Document;
 
+        public void DeleteSelection() => _window.SequenceTimeline.DeleteSelected();
+
         // The library takes files dragged from the browser, so a press there must not switch tabs.
         public bool BrowserClickOpensPreview => false;
 
@@ -154,14 +159,41 @@ public partial class MainWindow
             w.AddSequenceButton.Click += (_, _) => AddSequence();
             w.SequenceList.SelectionChanged += (_, _) =>
             {
-                if (!_refreshing && _document != null)
-                    _selectedIndex[_document.Path] = w.SequenceList.SelectedIndex;
+                if (_refreshing || _document is null) return;
+                _selectedIndex[_document.Path] = w.SequenceList.SelectedIndex;
+                w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
+            };
+            w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
+            w.SequenceLibrary.ChipDragMoved += (chip, e) => w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e));
+            w.SequenceLibrary.ChipDragEnded += (chip, e) =>
+            {
+                w.SequenceTimeline.UpdateChipDrag(null, null);
+                if (e != null && TimelinePoint(e) is { } point)
+                    w.SequenceTimeline.DropChip(chip, point);
             };
             w.SequenceRenameItem.Click += (_, _) => _ = RenameSelectedAsync();
             w.SequenceDeleteItem.Click += (_, _) => DeleteSelected();
             w.SequenceLibrary.Thumbnails = w._thumbnailService;
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+        }
+
+        /// <summary>Where <paramref name="e"/> is on the timeline, or null when it is outside it.</summary>
+        private Point? TimelinePoint(PointerEventArgs e)
+        {
+            var timeline = _window.SequenceTimeline;
+            var point = e.GetPosition(timeline);
+            return new Rect(timeline.Bounds.Size).Contains(point) ? point : null;
+        }
+
+        private async Task RenameTrackAsync(int track)
+        {
+            if (_document is not { } document || _window.SequenceList.SelectedIndex is not (>= 0 and var sequence)) return;
+            string oldName = document.Save.Sequences[sequence].Tracks[track].Name;
+            string? name = await _window._appCommands.PromptStringAsync("Rename Track", "Track name:", oldName);
+            if (name is null || document != _document) return;
+            if (document.RenameTrack(_window._undoManager, sequence, track, name) is { } error)
+                _window.ShowErrorBanner(error);
         }
 
         private void AddSources(IReadOnlyList<string> paths)
@@ -234,6 +266,7 @@ public partial class MainWindow
             }
             _selectedIndex[_document.Path] = selected;
             _window.SequenceLibrary.Show(_document);
+            _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
             _window.UpdateStatusBar();
         }
     }

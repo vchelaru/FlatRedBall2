@@ -70,6 +70,12 @@ internal interface ITabPane
     bool Accepts(HotkeyScope scope);
 
     /// <summary>
+    /// The Delete hotkey: deletes what is selected in this kind's document. Only called while <see cref="Accepts"/>
+    /// takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void DeleteSelection();
+
+    /// <summary>
     /// Whether a single click on a file in the Animations browser opens it in the preview tab. False for a kind that
     /// takes files dragged from the browser: pressing a row to drag it also selects it, and opening a preview there
     /// would switch away from the tab being dropped on. Double-click still opens the file.
