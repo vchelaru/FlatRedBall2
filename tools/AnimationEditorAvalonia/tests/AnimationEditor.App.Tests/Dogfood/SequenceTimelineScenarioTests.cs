@@ -275,7 +275,7 @@ public class SequenceTimelineScenarioTests
     [InlineData(40)]
     [InlineData(120)]
     [InlineData(600)]
-    public async Task HoveringTheRightEdgeGrabZone_ShowsResize_AndOneStepInsideTheBodyShowsHand(double pixelsPerSecond)
+    public async Task HoveringTheRightEdgeGrabZone_ShowsResize_AndOneStepInsideTheBodyShowsOpenHand(double pixelsPerSecond)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
@@ -296,15 +296,15 @@ public class SequenceTimelineScenarioTests
         timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
 
         Hover(editor, right - grab - 1, bodyY);
-        timeline.ShownCursor.ShouldBe(TimelineCursor.Hand);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grab);
         Hover(editor, EdgeX(timeline, 0) + 1, bodyY);
-        timeline.ShownCursor.ShouldBe(TimelineCursor.Hand);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grab);
         Hover(editor, right + TimelineLayout.EdgeGrabPixels + 1, bodyY);
         timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
     }
 
     [AvaloniaFact]
-    public async Task HoveringACutTail_ShowsResizeAtItsEdge_AndHandOnItsBody()
+    public async Task HoveringACutTail_ShowsResizeAtItsEdge_AndOpenHandOnItsBody()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk loops 3 times (1.5 s) but Run starts at 1.0 s and cuts it.
@@ -314,7 +314,7 @@ public class SequenceTimelineScenarioTests
         double tailY = timeline.Viewport.LaneTop(0) + TimelineLayout.TailTop + 2;
 
         Hover(editor, EdgeX(timeline, 1.25), tailY);
-        timeline.ShownCursor.ShouldBe(TimelineCursor.Hand);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grab);
         Hover(editor, EdgeX(timeline, 1.5), tailY);
         timeline.ShownCursor.ShouldBe(TimelineCursor.ResizeHorizontal);
     }
@@ -345,20 +345,23 @@ public class SequenceTimelineScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task MovingAChain_KeepsTheHand_EvenPassingOverAnEdge_AndEscapeEndsTheEdgeCursor()
+    public async Task MovingAChain_ShowsTheClosedHand_EvenPassingOverAnEdge_AndEscapeEndsTheEdgeCursor()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Other", ("Run", 3, 1)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
+        editor.Window.MouseMove(At(editor, 0, 0.25), RawInputModifiers.None);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grab);
         editor.Window.MouseDown(At(editor, 0, 0.25), MouseButton.Left, RawInputModifiers.None);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grabbing);
         editor.Window.MouseMove(At(editor, 0, 1.0), RawInputModifiers.LeftMouseButton);
         // Over Run's right edge (it ends at 3.2 s).
         editor.Window.MouseMove(At(editor, 1, 3.2), RawInputModifiers.LeftMouseButton);
-        timeline.ShownCursor.ShouldBe(TimelineCursor.Hand);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grabbing);
         editor.Window.MouseMove(editor.PointIn(timeline, 5, 5), RawInputModifiers.LeftMouseButton);
-        timeline.ShownCursor.ShouldBe(TimelineCursor.Hand);
+        timeline.ShownCursor.ShouldBe(TimelineCursor.Grabbing);
         editor.Press(Key.Escape);
         editor.Window.MouseUp(At(editor, 0, 0.25), MouseButton.Left, RawInputModifiers.None);
 

@@ -19,6 +19,5 @@ public class DragCursorsTests
     {
         DragCursors.StockCursorId(TimelineCursor.ResizeHorizontal).ShouldBe(32644);
         DragCursors.StockCursorId(TimelineCursor.Default).ShouldBe(32512);
-        DragCursors.StockCursorId(TimelineCursor.Hand).ShouldBe(32649);
     }
 }

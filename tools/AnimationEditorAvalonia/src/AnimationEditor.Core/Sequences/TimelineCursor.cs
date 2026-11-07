@@ -5,8 +5,11 @@ public enum TimelineCursor
 {
     Default,
 
-    /// <summary>Hand: over a chain's body, which can be grabbed and dragged in time or to another lane.</summary>
-    Hand,
+    /// <summary>Open hand: over a chain's body, which can be grabbed and dragged in time or to another lane.</summary>
+    Grab,
+
+    /// <summary>Closed hand: a chain's body is being dragged.</summary>
+    Grabbing,
 
     /// <summary>West-east double arrow: a chain's right edge can be dragged to change its loop count.</summary>
     ResizeHorizontal,
@@ -24,7 +27,7 @@ public static class TimelineCursors
         return (gripped ?? hover?.Part) switch
         {
             TimelineHitPart.Edge => TimelineCursor.ResizeHorizontal,
-            TimelineHitPart.Body => TimelineCursor.Hand,
+            TimelineHitPart.Body => gripped is null ? TimelineCursor.Grab : TimelineCursor.Grabbing,
             _ => TimelineCursor.Default,
         };
     }

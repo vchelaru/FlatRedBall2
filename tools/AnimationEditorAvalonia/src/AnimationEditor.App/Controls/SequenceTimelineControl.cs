@@ -486,7 +486,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
             : null;
         _shownCursor = TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
-        if (_drag != DragKind.None) DragCursors.Apply(this, _shownCursor);
+        // Hover over a body is the custom hand, which only the raw OS call can show on Windows.
+        if (_drag != DragKind.None || _shownCursor == TimelineCursor.Grab) DragCursors.Apply(this, _shownCursor);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
