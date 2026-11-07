@@ -168,4 +168,73 @@ public class SequenceDocumentAuditTests
         document.SaveError.ShouldBeNull();
         File.Exists(seqj).ShouldBeTrue();
     }
+
+    [Fact]
+    public void SetTrackVisible_Hide_IsOneUndoEntry_SavesVisibleFalse_AndUndoAndRedoRestoreIt()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Hide Track 'Body'" });
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        File.ReadAllText(document.Path.FullPath).ShouldContain("\"visible\": false");
+
+        undo.Undo();
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeTrue();
+        File.ReadAllText(document.Path.FullPath).ShouldNotContain("visible");
+
+        undo.Redo();
+        File.ReadAllText(document.Path.FullPath).ShouldContain("\"visible\": false");
+    }
+
+    [Fact]
+    public void SetTrackVisible_Show_NamesItInTheUndoHistory_AndAnUnchangedValueRecordsNothing()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.SetTrackVisible(undo, 0, 0, visible: true);
+        undo.CanUndo.ShouldBeFalse();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+
+        document.SetTrackVisible(undo, 0, 0, visible: true);
+
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Hide Track 'Body'", "Show Track 'Body'" });
+        File.ReadAllText(document.Path.FullPath).ShouldNotContain("visible");
+    }
+
+    [Fact]
+    public void ShowAllTracks_ShowsEveryHiddenTrackOfTheSequenceInOneUndoEntry()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+        document.SetTrackVisible(undo, 0, 1, visible: false);
+
+        document.ShowAllTracks(undo, 0);
+
+        document.Save.Sequences[0].Tracks.Select(t => t.Visible).ShouldBe(new[] { true, true });
+        undo.UndoHistory.Last().Description.ShouldBe("Show All Tracks");
+        undo.Undo();
+        document.Save.Sequences[0].Tracks.Select(t => t.Visible).ShouldBe(new[] { false, false });
+    }
+
+    [Fact]
+    public void RenameTrack_OfAHiddenTrack_KeepsItHidden()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Idle");
+        var undo = new UndoManager();
+        document.SetTrackVisible(undo, 0, 0, visible: false);
+
+        document.RenameTrack(undo, 0, 0, "Torso");
+
+        document.Save.Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Visible.ShouldBeFalse();
+    }
 }

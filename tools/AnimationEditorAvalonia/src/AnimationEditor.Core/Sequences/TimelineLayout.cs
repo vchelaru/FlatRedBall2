@@ -68,6 +68,21 @@ public static class TimelineLayout
         return heights;
     }
 
+    /// <summary>
+    /// The eye toggle and the name in a track header share one line, centered on the lane's base body
+    /// (<see cref="TimelineViewport.LaneHeight"/>), not on the whole lane: a lane with an event row is taller, and
+    /// centering on it would move the pair down on those lanes only. The name starts at <see cref="HeaderNameLeft"/>, past the eye.
+    /// </summary>
+    public const double HeaderCenterY = TimelineViewport.LaneHeight / 2;
+    public const double EyeCenterX = 11;
+    public const double EyeCenterY = HeaderCenterY;
+    public const double EyeHitHalf = 7;
+    public const double HeaderNameLeft = 24;
+
+    /// <summary>Whether a point in a track's header (<paramref name="yInLane"/> from the lane's top) is on the eye toggle.</summary>
+    public static bool IsOverEye(double x, double yInLane) =>
+        Math.Abs(x - EyeCenterX) <= EyeHitHalf && Math.Abs(yInLane - EyeCenterY) <= EyeHitHalf;
+
     /// <summary>The narrowest block that still draws a label: about three characters plus the ellipsis.</summary>
     public const double MinLabelPixels = 36;
 

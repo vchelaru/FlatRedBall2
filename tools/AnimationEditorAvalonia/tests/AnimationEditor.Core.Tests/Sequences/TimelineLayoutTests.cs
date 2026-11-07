@@ -136,4 +136,14 @@ public class TimelineLayoutTests
         TimelineLayout.ShowsLabel(35.9).ShouldBeFalse();
         TimelineLayout.ShowsLabel(36).ShouldBeTrue();
     }
+
+    [Fact]
+    public void IsOverEye_IsTrueOnTheEyeInTheTopBandAndFalseOnTheNameOrLowerInTheLane()
+    {
+        TimelineLayout.IsOverEye(TimelineLayout.EyeCenterX, TimelineLayout.EyeCenterY).ShouldBeTrue();
+        TimelineLayout.IsOverEye(TimelineLayout.EyeCenterX, TimelineLayout.EyeCenterY + 30).ShouldBeFalse();
+        TimelineLayout.IsOverEye(TimelineLayout.HeaderNameLeft + 20, TimelineLayout.EyeCenterY).ShouldBeFalse();
+        // Where the scenarios (and users) click a header to select it: beside the eye, not on it.
+        TimelineLayout.IsOverEye(20, 10).ShouldBeFalse();
+    }
 }
