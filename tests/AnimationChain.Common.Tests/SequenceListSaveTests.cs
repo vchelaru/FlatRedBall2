@@ -262,4 +262,34 @@ public class SequenceListSaveTests
         a.ShouldNotContain("\"extra\"");
         b.ShouldContain("\"extra\": 5");
     }
+
+    [Fact]
+    public void ToJsonString_AnUnknownEntryNamedLikeAKnownField_DoesNotReplaceIt()
+    {
+        var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "Idle" } ] }""");
+        loaded.Sequences[0].UnknownProperties["name"] = "Hijacked";
+        loaded.UnknownProperties["version"] = 99;
+
+        var root = JsonNode.Parse(loaded.ToJsonString())!.AsObject();
+
+        root["sequences"]![0]!["name"]!.GetValue<string>().ShouldBe("Idle");
+        root["version"]!.GetValue<int>().ShouldBe(1);
+    }
+
+    [Fact]
+    public void FromJsonString_LeadingByteOrderMark_IsAccepted()
+    {
+        var loaded = SequenceListSave.FromJsonString("﻿" + """{ "sources": [ "a.achj" ] }""");
+
+        loaded.Sources.ShouldBe(new[] { "a.achj" });
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("\"text\"")]
+    [InlineData("null")]
+    public void FromJsonString_RootThatIsNotAnObject_Throws(string json)
+    {
+        Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(json));
+    }
 }
