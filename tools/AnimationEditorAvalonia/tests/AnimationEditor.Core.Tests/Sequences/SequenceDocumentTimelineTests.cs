@@ -100,6 +100,33 @@ public class SequenceDocumentTimelineTests
     }
 
     [Fact]
+    public void Gesture_MovingAChainToANewTrack_IsOneUndoStep_AndUndoPutsBothBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Body");
+        var undo = new UndoManager();
+        document.PlaceChain(undo, 0, 0, "hero.achj", "Walk", 1);
+
+        string before = document.BeginGesture();
+        var sequence = document.Save.Sequences[0];
+        var walk = sequence.Tracks[0].Chains[0];
+        walk.Start = 2.5;
+        TimelineNewTrackMove.Apply(sequence, new[] { walk });
+        document.CommitGesture(undo, "Move 'Walk' to new track 'Walk'", before);
+
+        var saved = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
+        saved.Select(t => t.Name).ShouldBe(new[] { "Body", "Walk" });
+        saved[0].Chains.ShouldBeEmpty();
+        saved[1].Chains.Single().Start.ShouldBe(2.5);
+        undo.UndoHistory.Count.ShouldBe(2);
+        undo.Undo();
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body" });
+        document.Save.Sequences[0].Tracks[0].Chains.Single().Start.ShouldBe(1);
+        undo.Redo();
+        document.Save.Sequences[0].Tracks[1].Chains.Single().Start.ShouldBe(2.5);
+    }
+
+    [Fact]
     public void AddTrack_AddsAnEmptyUniquelyNamedTrack_OneUndoStep_SavesAndHasNoLength()
     {
         using var dir = new TestHelpers.TempDir();

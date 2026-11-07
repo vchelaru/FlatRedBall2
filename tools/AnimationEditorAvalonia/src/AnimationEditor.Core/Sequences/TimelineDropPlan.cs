@@ -60,4 +60,17 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
             row.Kind == TimelineRowKind.Track ? row.Track : trackCount,
             start, length, viewport.XAt(start), length * viewport.PixelsPerSecond, snap.Target);
     }
+
+    /// <summary>
+    /// The plan for an existing chain being dragged with the pointer at height <paramref name="y"/>. Only the new-track row
+    /// is a drop here (a lane is the normal move, which the drag handles itself), so any other row is <see cref="None"/>.
+    /// The chain's already-snapped <paramref name="start"/> and its <paramref name="length"/> in seconds place the ghost,
+    /// as a chip's do; <paramref name="snapped"/> is the target the drag snapped to.
+    /// </summary>
+    public static TimelineDropPlan ForMove(TimelineViewport viewport, int trackCount, double y, double start, double length, SnapTarget? snapped = null)
+    {
+        if (viewport.RowAt(y, trackCount).Kind != TimelineRowKind.NewTrack) return None;
+        return new TimelineDropPlan(TimelineDropKind.NewTrack, trackCount, start, length, viewport.XAt(start),
+            length * viewport.PixelsPerSecond, snapped);
+    }
 }
