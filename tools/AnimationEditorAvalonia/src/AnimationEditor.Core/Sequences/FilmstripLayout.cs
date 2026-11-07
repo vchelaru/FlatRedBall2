@@ -11,8 +11,8 @@ namespace AnimationEditor.Core.Sequences;
 /// <param name="SpriteHeight">The sprite's height in pixels as displayed; 0 when unknown.</param>
 public readonly record struct FilmstripFrame(double Duration, double SpriteWidth, double SpriteHeight);
 
-/// <summary>One showing of a frame within the block: <see cref="Cycle"/> is the loop cycle it starts in. Times are seconds from the block's start.</summary>
-public readonly record struct FilmstripVisit(int Frame, double Start, double End, int Cycle);
+/// <summary>One showing of a frame within the block: <see cref="Cycle"/> is the loop cycle it starts in. Times are seconds from the block's start. <see cref="IsReturn"/> marks the way back of a ping-pong.</summary>
+public readonly record struct FilmstripVisit(int Frame, double Start, double End, int Cycle, bool IsReturn = false);
 
 /// <summary>
 /// One cell of a block's filmstrip. <see cref="Frame"/> is the frame it draws (the longest of its visits). X and Width are
@@ -101,7 +101,7 @@ public static class FilmstripLayout
                 int frame = PlaybackTimeline.FrameOfVisit(v, count, pingPong, reverse);
                 double end = start + Math.Max(0, frames[frame].Duration);
                 if (start >= played - 1e-9) break;
-                var visit = new FilmstripVisit(frame, start, Math.Min(end, played), k);
+                var visit = new FilmstripVisit(frame, start, Math.Min(end, played), k, pingPong && (v >= count ^ reverse));
                 if (pingPong && units.Count > 0 && units[^1].Frame == frame)
                 {
                     // The turnaround and the loop point play the same frame twice in a row: one cell, no boundary.

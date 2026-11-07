@@ -151,6 +151,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     public void SetZoomPercent(int percent)
     {
+        ClearHover();
         Viewport.SetPixelsPerSecond(TimelineViewport.DefaultPixelsPerSecond * percent / 100.0);
         ZoomChanged?.Invoke(Zoom * 100f);
         InvalidateVisual();
@@ -284,6 +285,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// </summary>
     public void UpdateChipDrag(LibraryChip? chip, Point? point)
     {
+        ClearHover();
         _chipGhost = chip is not null && point is { } p && PlanDrop(chip, p).Kind != TimelineDropKind.None ? (chip, p) : null;
         InvalidateVisual();
     }
@@ -354,6 +356,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        ClearHover();
         if (_document is null || Sequence is not { } sequence) return;
         // A press inside the rename box is the box's own (caret, word select).
         if (_renameBox is { } box && e.Source is Visual source && (source == box || box.IsVisualAncestorOf(source))) return;
@@ -420,6 +423,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        UpdateHover(e.GetPosition(this));
         if (_scrubbing)
         {
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
@@ -482,6 +486,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
+        ClearHover();
         if (_drag != DragKind.None || _scrubbing) return;
         _lastPoint = new Point(-1, -1);
         ShowCursor(_lastPoint);
@@ -566,6 +571,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        ClearHover();
         if (Sequence is null) return;
         var point = e.GetPosition(this);
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
@@ -675,6 +681,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
         DrawPlayhead(context, size);
+        DrawHover(context, size);
     }
 
     private void DrawPlayhead(DrawingContext context, Size size)
