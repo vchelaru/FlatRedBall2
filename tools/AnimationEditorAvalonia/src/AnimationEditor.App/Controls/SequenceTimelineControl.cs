@@ -20,10 +20,11 @@ public readonly record struct TimelineChainId(int Track, int Chain);
 /// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a lane per track with its chains, and a dashed row that
 /// makes a new track. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
 /// count; drop a library chip to add a chain. Each gesture is one undo entry, recorded on release. Ctrl+wheel zooms
-/// around the pointer; the wheel scrolls (Shift+wheel always sideways). Geometry and hit-testing live in
+/// around the pointer; the wheel scrolls (Shift+wheel always sideways). Pressing or dragging on the ruler scrubs: the
+/// host moves its clock on <see cref="Scrubbed"/> and sets <see cref="Playhead"/> back. Geometry and hit-testing live in
 /// <see cref="TimelineViewport"/> and <see cref="TimelineLayout"/>.
 /// </summary>
-public sealed class SequenceTimelineControl : Control
+public sealed class SequenceTimelineControl : Control, IZoomTarget
 {
     private const double DragThresholdPixels = 3;
     private const double WheelZoomStep = 1.15;
@@ -48,6 +49,8 @@ public sealed class SequenceTimelineControl : Control
     private string? _gestureBefore;
 
     private (LibraryChip Chip, Point Point)? _chipGhost;
+    private double _playhead;
+    private bool _scrubbing;
 
     public SequenceTimelineControl()
     {
@@ -70,6 +73,42 @@ public sealed class SequenceTimelineControl : Control
 
     /// <summary>Raised when the user picks Rename on a track header, with the track index. The host prompts for the name.</summary>
     public event Action<int>? RenameTrackRequested;
+
+    /// <summary>Raised while the ruler is pressed or dragged, with the time under the pointer clamped to the sequence.</summary>
+    public event Action<double>? Scrubbed;
+
+    /// <summary>Where the playhead line is drawn, in seconds.</summary>
+    public double Playhead
+    {
+        get => _playhead;
+        set
+        {
+            if (_playhead == value) return;
+            _playhead = value;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>Seconds until the shown sequence ends (<see cref="SequenceTimeline.Length"/>); 0 when nothing is shown.</summary>
+    public double SequenceLength =>
+        Sequence is { } sequence && _document is { } document
+            ? SequenceTimeline.Length(sequence, reference => document.CycleLength(reference) ?? 0)
+            : 0;
+
+    // IZoomTarget: 100% is the default pixels per second.
+    public float Zoom => (float)(Viewport.PixelsPerSecond / TimelineViewport.DefaultPixelsPerSecond);
+
+    // The wheel zooms by a fixed factor, not through presets.
+    public int[]? WheelZoomPresets { get; set; }
+
+    public event Action<float>? ZoomChanged;
+
+    public void SetZoomPercent(int percent)
+    {
+        Viewport.SetPixelsPerSecond(TimelineViewport.DefaultPixelsPerSecond * percent / 100.0);
+        ZoomChanged?.Invoke(Zoom * 100f);
+        InvalidateVisual();
+    }
 
     private SequenceSave? Sequence =>
         _document is { } document && _sequenceIndex >= 0 && _sequenceIndex < document.Save.Sequences.Count
@@ -165,6 +204,14 @@ public sealed class SequenceTimelineControl : Control
         if (!properties.IsLeftButtonPressed) return;
         e.Handled = true;
 
+        if (row.Kind == TimelineRowKind.Ruler && point.X >= TimelineViewport.HeaderWidth)
+        {
+            _scrubbing = true;
+            e.Pointer.Capture(this);
+            Scrubbed?.Invoke(Viewport.ScrubTime(point.X, SequenceLength));
+            return;
+        }
+
         var hit = point.X >= TimelineViewport.HeaderWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, sequence.Tracks.Count, point.X, point.Y)
             : null;
@@ -193,6 +240,11 @@ public sealed class SequenceTimelineControl : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        if (_scrubbing)
+        {
+            Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
+            return;
+        }
         if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         var point = e.GetPosition(this);
         if (_drag == DragKind.Pending)
@@ -227,6 +279,12 @@ public sealed class SequenceTimelineControl : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_scrubbing)
+        {
+            _scrubbing = false;
+            e.Pointer.Capture(null);
+            return;
+        }
         if (_drag == DragKind.None) return;
         e.Pointer.Capture(null);
         EndDrag();
@@ -235,6 +293,7 @@ public sealed class SequenceTimelineControl : Control
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        _scrubbing = false;
         EndDrag();
     }
 
@@ -292,6 +351,7 @@ public sealed class SequenceTimelineControl : Control
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
         {
             Viewport.ZoomAround(Math.Max(point.X, TimelineViewport.HeaderWidth), Math.Pow(WheelZoomStep, e.Delta.Y));
+            ZoomChanged?.Invoke(Zoom * 100f);
         }
         else if (e.Delta.X != 0 || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
@@ -383,6 +443,24 @@ public sealed class SequenceTimelineControl : Control
 
         DrawHeaders(context, sequence, size);
         DrawRuler(context, size, step, firstTick);
+        DrawPlayhead(context, size);
+    }
+
+    private void DrawPlayhead(DrawingContext context, Size size)
+    {
+        double x = Snap(Viewport.XAt(_playhead));
+        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        var brush = Brush("Accent");
+        context.DrawLine(new Pen(brush, 2), new Point(x, 0), new Point(x, size.Height));
+        var head = new StreamGeometry();
+        using (var g = head.Open())
+        {
+            g.BeginFigure(new Point(x - 6, 0), true);
+            g.LineTo(new Point(x + 6, 0));
+            g.LineTo(new Point(x, 8));
+            g.EndFigure(true);
+        }
+        context.DrawGeometry(brush, null, head);
     }
 
     private void DrawHeaders(DrawingContext context, SequenceSave sequence, Size size)

@@ -136,6 +136,13 @@ public sealed class SequenceDocument
         Edit(undo, $"Delete Sequence '{name}'", save => save.Sequences.RemoveAt(index));
     }
 
+    /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
+    public void SetLoop(IUndoManager undo, int index, bool loop)
+    {
+        string name = Save.Sequences[index].Name;
+        Edit(undo, $"Turn Loop {(loop ? "On" : "Off")} for '{name}'", save => save.Sequences[index].Loop = loop);
+    }
+
     /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
     public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) =>
         SourceChains(reference.Source)?.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain);

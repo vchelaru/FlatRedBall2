@@ -321,6 +321,10 @@ public partial class MainWindow : Window
         WireframeCtrl.CommandModifier = _commandModifier;
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        // The sequence preview gets a selection of its own that nothing ever selects in, so its shape and sprite
+        // gestures have nothing of the achx document to edit. Its own playback timer has nothing to play.
+        SequencePreview.InitializeServices(new SelectedState(_projectManager), _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        SequencePreview.PauseAutoPlayback();
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
         ProjectPanel.Initialize(_projectTreeThumbnailService);
@@ -7359,7 +7363,9 @@ public partial class MainWindow : Window
                 Gestures = new[] { new HotkeyGesture("Space") },
                 // Let a focused button receive Space to activate itself rather than hijacking it.
                 ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused() || FocusManager?.GetFocusedElement() is Button,
-                Action = () => PreviewCtrl.TogglePlayPause(),
+                // Each tab kind plays its own preview, so a sequence tab never starts the hidden achx preview.
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.TogglePlayback(),
             },
             new()
             {

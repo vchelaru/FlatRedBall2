@@ -48,4 +48,29 @@ public class TimelineViewportTests
         viewport.ScrollVertically(lane, trackCount: 2, viewHeight: TimelineViewport.RulerHeight + lane);
         viewport.RowAt(firstLane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
     }
+
+    [Fact]
+    public void ScrubTime_IsTheTimeUnderX_ClampedToTheSequence()
+    {
+        var viewport = new TimelineViewport();
+        double pps = TimelineViewport.DefaultPixelsPerSecond;
+
+        viewport.ScrubTime(TimelineViewport.HeaderWidth + pps * 1.5, length: 2).ShouldBe(1.5, 1e-9);
+        viewport.ScrubTime(TimelineViewport.HeaderWidth + pps * 5, length: 2).ShouldBe(2);
+        viewport.ScrubTime(0, length: 2).ShouldBe(0);
+    }
+
+    [Fact]
+    public void SetPixelsPerSecond_KeepsTheLeftEdgeAndClamps()
+    {
+        var viewport = new TimelineViewport();
+        viewport.ScrollHorizontally(240);
+        double left = viewport.ScrollSeconds;
+
+        viewport.SetPixelsPerSecond(300);
+        viewport.PixelsPerSecond.ShouldBe(300);
+        viewport.ScrollSeconds.ShouldBe(left, 1e-9);
+        viewport.SetPixelsPerSecond(1e9);
+        viewport.PixelsPerSecond.ShouldBe(TimelineViewport.MaxPixelsPerSecond);
+    }
 }

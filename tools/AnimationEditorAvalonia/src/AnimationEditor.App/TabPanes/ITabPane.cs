@@ -76,6 +76,12 @@ internal interface ITabPane
     void DeleteSelection();
 
     /// <summary>
+    /// The Space hotkey: plays or pauses this kind's preview. Only called while <see cref="Accepts"/> takes
+    /// <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void TogglePlayback();
+
+    /// <summary>
     /// Whether a single click on a file in the Animations browser opens it in the preview tab. False for a kind that
     /// takes files dragged from the browser: pressing a row to drag it also selects it, and opening a preview there
     /// would switch away from the tab being dropped on. Double-click still opens the file.
