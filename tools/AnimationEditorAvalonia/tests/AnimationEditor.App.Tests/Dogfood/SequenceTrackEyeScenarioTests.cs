@@ -157,12 +157,12 @@ public class SequenceTrackEyeScenarioTests
         var timeline = Timeline(editor);
 
         editor.RightClickAt(OnName(editor, 0));
-        Menu(timeline).ShouldBe(new[] { "Rename Track…", "Hide Track", "Delete Track" });
+        Menu(timeline).ShouldBe(new[] { "Rename Track…", "Duplicate Track", "Hide Track", "Delete Track" });
         editor.PickMenuItem(timeline.Menu, "Hide Track");
 
         ShownTracks(editor).ShouldBe(new[] { 1, 2 });
         editor.RightClickAt(OnName(editor, 0));
-        Menu(timeline).ShouldBe(new[] { "Rename Track…", "Show Track", "Show All Tracks", "Delete Track" });
+        Menu(timeline).ShouldBe(new[] { "Rename Track…", "Duplicate Track", "Show Track", "Show All Tracks", "Delete Track" });
         editor.PickMenuItem(timeline.Menu, "Show Track");
         editor.RightClickAt(OnName(editor, 1));
         editor.PickMenuItem(timeline.Menu, "Hide Track");

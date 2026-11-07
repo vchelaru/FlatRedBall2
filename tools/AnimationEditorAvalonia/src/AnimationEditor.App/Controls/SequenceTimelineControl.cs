@@ -965,6 +965,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             if (!_model.ContainsTrack(track)) SetSelection(null, track);
             InvalidateVisual();
             var rename = new MenuItem { Header = "Rename Track…" };
+            var duplicateTrack = new MenuItem { Header = _model.IsMulti ? "Duplicate Selected Tracks" : "Duplicate Track" };
+            duplicateTrack.Click += (_, _) => DuplicateSelected();
             rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
             var visibility = new MenuItem { Header = IsTrackHidden(track) ? "Show Track" : "Hide Track" };
             visibility.Click += (_, _) => ToggleTrackVisibility(track);
@@ -972,6 +974,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var delete = new MenuItem { Header = deletesSelection ? "Delete Selected Tracks" : "Delete Track" };
             delete.Click += (_, _) => DeleteSelected();
             _menu.Items.Add(rename);
+            _menu.Items.Add(duplicateTrack);
             _menu.Items.Add(visibility);
             if (Sequence!.Tracks.Any(t => !t.Visible))
             {
@@ -991,9 +994,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var reference = hit.Block.Reference;
             var definition = new MenuItem { Header = "Go to Definition" };
             definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(reference);
+            var duplicate = new MenuItem { Header = _model.IsMulti ? "Duplicate Selected Chains" : "Duplicate" };
+            duplicate.Click += (_, _) => DuplicateSelected();
             var remove = new MenuItem { Header = _model.IsMulti ? "Remove Selected Chains" : "Remove from Track" };
             remove.Click += (_, _) => DeleteSelected();
             _menu.Items.Add(definition);
+            _menu.Items.Add(duplicate);
             _menu.Items.Add(remove);
         }
     }

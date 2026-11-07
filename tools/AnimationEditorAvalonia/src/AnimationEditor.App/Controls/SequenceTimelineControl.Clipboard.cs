@@ -45,9 +45,17 @@ public sealed partial class SequenceTimelineControl
         if (result.Errors.Count > 0) ErrorRaised?.Invoke(string.Join(" ", result.Errors));
     }
 
-    /// <summary>Duplicates the selected chains or tracks.</summary>
+    /// <summary>
+    /// Duplicates the selected chains (right after the selection, on their own tracks) or tracks (as a block right below the
+    /// lowest one), as one undo entry. The copies become the selection.
+    /// </summary>
     public void DuplicateSelected()
     {
+        if (_document is null || _undo is null || Sequence is null) return;
+        if (_model.Kind == TimelineSelectionKind.Chains)
+            SelectChains(_document.DuplicateChains(_undo, _sequenceIndex, _model.Chains.ToList()).Chains);
+        else if (_model.Kind == TimelineSelectionKind.Tracks)
+            SelectTracks(_document.DuplicateTracks(_undo, _sequenceIndex, _model.Tracks.ToList()).Tracks);
     }
 
     // The lane of the lowest selected chain or header, or null when nothing is selected.
