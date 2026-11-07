@@ -114,6 +114,12 @@ namespace AnimationEditor.Core.Models
         public Dictionary<string, string> SelectedSequences { get; set; } = new();
 
         /// <summary>
+        /// The timeline zoom of a <c>.seqj</c> tab (#1665), keyed by the <c>.seqj</c> file's <see cref="FilePath.Standardized"/>
+        /// path; the value is the percent the toolbar shows. A file at 100% has no entry.
+        /// </summary>
+        public Dictionary<string, int> TimelineZooms { get; set; } = new();
+
+        /// <summary>
         /// True when a <c>.seqj</c> tab's library plays every chip's chain at once (#1622) instead of only the hovered one.
         /// One setting for all files: it is how the user likes to browse, not a property of any one sequence file.
         /// </summary>
