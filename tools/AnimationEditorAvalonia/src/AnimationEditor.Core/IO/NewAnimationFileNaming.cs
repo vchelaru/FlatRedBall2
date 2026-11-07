@@ -118,6 +118,58 @@ public static class NewAnimationFileNaming
         return new NameResult(trimmed + "." + extension, null);
     }
 
+    /// <summary>Extension of the sequence files "New Sequence File" creates.</summary>
+    public const string SequenceExtension = "seqj";
+
+    private const string DefaultSequenceStem = "NewSequence";
+
+    /// <summary>
+    /// Name the inline editor starts on for "New Sequence File": "NewSequence", or the first numbered
+    /// variant not already taken by a <c>.seqj</c> in <paramref name="siblingFileNames"/>.
+    /// </summary>
+    public static string SuggestSequenceFileName(IEnumerable<string> siblingFileNames)
+    {
+        var taken = SequenceStemSet(siblingFileNames);
+
+        if (!taken.Contains(DefaultSequenceStem)) return DefaultSequenceStem + "." + SequenceExtension;
+
+        for (int suffix = 2; ; suffix++)
+        {
+            var candidate = DefaultSequenceStem + suffix;
+            if (!taken.Contains(candidate)) return candidate + "." + SequenceExtension;
+        }
+    }
+
+    /// <summary>
+    /// Validates a name typed for a new sequence file, same rules as <see cref="Resolve"/> except the
+    /// extension is always <c>.seqj</c> and only other <c>.seqj</c> files collide, since an animation
+    /// file of the same stem is a different file.
+    /// </summary>
+    public static NameResult ResolveSequence(string typedName, IEnumerable<string> siblingFileNames)
+    {
+        var trimmed = (typedName ?? string.Empty).Trim();
+        if (HasExtension(trimmed, SequenceExtension))
+            trimmed = trimmed[..trimmed.LastIndexOf('.')];
+
+        if (trimmed.Length == 0)
+            return new NameResult(null, "Enter a name.");
+
+        if (trimmed.IndexOfAny(InvalidNameChars) >= 0)
+            return new NameResult(null, "Name contains invalid characters.");
+
+        if (SequenceStemSet(siblingFileNames).Contains(trimmed))
+            return new NameResult(null, $"\"{trimmed}\" already exists in this folder.");
+
+        return new NameResult(trimmed + "." + SequenceExtension, null);
+    }
+
+    private static HashSet<string> SequenceStemSet(IEnumerable<string> fileNames) =>
+        fileNames
+            .Where(AchxFolderScanner.IsSequencePath)
+            .Select(name => new FilePath(name).NoPathNoExtension)
+            .Where(stem => !string.IsNullOrEmpty(stem))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     // Path.GetInvalidFileNameChars() is the host OS's list, so a name legal on Linux but not on
     // Windows would pass here and produce a project other contributors can't check out. The set
     // below is the union both platforms have to live with.

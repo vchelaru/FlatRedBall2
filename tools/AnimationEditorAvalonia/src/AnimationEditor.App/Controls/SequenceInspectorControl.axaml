@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewsControls="clr-namespace:AnimationEditor.Views.Controls;assembly=AnimationEditor.Views"
+             x:Class="AnimationEditor.App.Controls.SequenceInspectorControl">
+    <!-- The Inspector tab's content while a .seqj tab is active: one section per kind of timeline selection
+         (nothing = the sequence, a track header, a chain). Only one section shows at a time. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+        </Style>
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+        </Style>
+        <Style Selector="TextBlock.value">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource InkDim}" />
+        </Style>
+    </UserControl.Styles>
+    <Grid>
+        <TextBlock x:Name="NothingLabel" Text="No sequence" Classes="note" FontStyle="Italic"
+                   HorizontalAlignment="Center" Margin="0,12,0,0" />
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Sequence -->
+                <Border x:Name="SequencePanel" IsVisible="False" Padding="12,8,12,10"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="SEQUENCE" Classes="heading" />
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Name" Classes="label" />
+                            <TextBox x:Name="SequenceNameBox" Grid.Column="1" FontSize="11"
+                                     AutomationProperties.AutomationId="seq-name" />
+                        </Grid>
+                        <CheckBox x:Name="SequenceLoopBox" Content="Loop"
+                                  ToolTip.Tip="Restart at 0 once the last chain ends"
+                                  AutomationProperties.AutomationId="seq-loop" />
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Length" Classes="label" />
+                            <TextBlock x:Name="SequenceLengthText" Grid.Column="1" Classes="value" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Tracks" Classes="label" />
+                            <TextBlock x:Name="SequenceTracksText" Grid.Column="1" Classes="value" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Track -->
+                <Border x:Name="TrackPanel" IsVisible="False" Padding="12,8,12,10"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="TRACK" Classes="heading" />
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Name" Classes="label" />
+                            <TextBox x:Name="TrackNameBox" Grid.Column="1" FontSize="11"
+                                     AutomationProperties.AutomationId="seq-track-name" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Offset X" Classes="label" />
+                            <viewsControls:FlankerNumericField x:Name="TrackXField" Grid.Column="1"
+                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0.###" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Offset Y" Classes="label" />
+                            <viewsControls:FlankerNumericField x:Name="TrackYField" Grid.Column="1"
+                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0.###" />
+                        </Grid>
+                        <CheckBox x:Name="TrackFlipBox" Content="Flip Horizontal"
+                                  AutomationProperties.AutomationId="seq-track-flip" />
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Z-order" Classes="label" />
+                            <viewsControls:FlankerNumericField x:Name="TrackZField" Grid.Column="1"
+                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0" />
+                        </Grid>
+                        <TextBlock Classes="note"
+                                   Text="Relative to the entity origin, Y up. Higher z-order draws on top." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Chain -->
+                <Border x:Name="ChainPanel" IsVisible="False" Padding="12,8,12,10"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="CHAIN" Classes="heading" />
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Source" Classes="label" />
+                            <TextBlock x:Name="ChainSourceText" Grid.Column="1" Classes="value" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Chain" Classes="label" />
+                            <TextBlock x:Name="ChainNameText" Grid.Column="1" Classes="value" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*,Auto">
+                            <TextBlock Text="Start" Classes="label" />
+                            <viewsControls:FlankerNumericField x:Name="ChainStartField" Grid.Column="1"
+                                                               Increment="0.05" FormatString="0.###" />
+                            <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Loops" Classes="label" />
+                            <viewsControls:FlankerNumericField x:Name="ChainLoopsField" Grid.Column="1"
+                                                               Increment="1" FormatString="0.###" />
+                        </Grid>
+                        <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="Length" Classes="label" />
+                            <TextBlock x:Name="ChainLengthText" Grid.Column="1" Classes="value" />
+                        </Grid>
+                        <TextBlock x:Name="ChainMissingText" Classes="note" IsVisible="False"
+                                   Foreground="{DynamicResource Accent}" />
+                        <Button x:Name="GoToDefinitionButton" Content="Go to Definition"
+                                HorizontalAlignment="Left"
+                                ToolTip.Tip="Open the source file and select this chain"
+                                AutomationProperties.AutomationId="seq-go-to-definition" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

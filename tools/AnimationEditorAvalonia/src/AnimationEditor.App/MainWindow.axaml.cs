@@ -1742,13 +1742,27 @@ public partial class MainWindow : Window
     {
         if (target.Entry.File is not DiskEditorFile diskFile) return;
 
-        await OpenFileAsTab(diskFile.FullPath);
+        await OpenAndSelectChainAsync(diskFile.FullPath, target.Chain.Name);
+    }
+
+    /// <summary>
+    /// Opens (or focuses) the animation file at <paramref name="path"/> as a tab and selects the chain named
+    /// <paramref name="chainName"/> in it. An open tab is activated the way a click on the tab strip does, so
+    /// the file's own undo history comes back; selects nothing when the file has no such chain.
+    /// </summary>
+    internal async Task OpenAndSelectChainAsync(string path, string chainName)
+    {
+        var filePath = new FilePath(path);
+        if (_tabManager.Tabs.FirstOrDefault(t => t.Path == filePath) is { } open)
+            await ActivateTabAsync(open);
+        else
+            await OpenFileAsTab(path);
         // The tree rebuild is dispatched (not awaited) by FinishLoadIntoEditor; flush the UI-thread
         // queue so it has run before we look the chain up in _treeRoots.
         await Dispatcher.UIThread.InvokeAsync(() => { });
 
         var reloadedChain = _projectManager.AnimationChainListSave?.AnimationChains
-            .FirstOrDefault(c => c.Name == target.Chain.Name);
+            .FirstOrDefault(c => c.Name == chainName);
         if (reloadedChain is null) return;
 
         _selectedState.SelectedChain = reloadedChain;
@@ -2419,8 +2433,8 @@ public partial class MainWindow : Window
     internal Func<string, string?> DeleteToRecycleBin { get; set; } = RecycleBin.Delete;
 
     /// <summary>
-    /// Issue #1018: right-click "New Animation File" on a Project-tree folder row, after the user
-    /// named it inline. The panel has already rejected a name colliding with anything it can see,
+    /// Issue #1018: right-click "New Animation File" (or "New Sequence File") on a Project-tree
+    /// folder row, after the user named it inline. The panel has already rejected a name colliding with anything it can see,
     /// but the scan behind the tree can be stale (an external <c>git pull</c>, another editor), so
     /// this writes with <see cref="FileMode.CreateNew"/> and reports rather than overwriting. No
     /// explicit tree refresh -- the project folder watcher rescans on any create under the watched
@@ -2433,6 +2447,18 @@ public partial class MainWindow : Window
         if (folder is null) return;
 
         var absolutePath = Path.Combine(folder, request.FileName);
+        if (AchxFolderScanner.IsSequencePath(request.FileName))
+        {
+            // Unlike File > New Sequence File there is no save dialog to confirm an overwrite.
+            if (File.Exists(absolutePath))
+            {
+                ShowStatusMessage($"⚠ Could not create {request.FileName}: it already exists.", isError: true);
+                return;
+            }
+            await CreateSequenceFileAsync(absolutePath);
+            return;
+        }
+
         try
         {
             using (var stream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write))
