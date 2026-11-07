@@ -182,4 +182,57 @@ public class TabKindScenarioTests
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk", "Run" });
         editor.UndoLabels.ShouldBeEmpty();
     }
+
+    [AvaloniaFact]
+    public async Task OnAPngTab_DocumentMenuItemsAreDisabled_AndComeBackOnTheDocumentTab()
+    {
+        string[] documentItems =
+        {
+            "MenuSave", "MenuSaveAs", "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
+            "MenuUndo", "MenuRedo", "MenuCopy", "MenuCut", "MenuPaste", "MenuDuplicate",
+            "MenuReloadFromDisk", "MenuResizeTexture", "MenuAssociateTiledTileset",
+            "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut", "MenuShowHistory",
+        };
+        string[] appItems = { "MenuNew", "MenuLoad", "MenuOpenProjectFolder", "MenuSettings", "MenuEnableHotReload", "MenuViewLog", "MenuAbout" };
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string sheet = editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Jump", "sheet.png", (32, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        // One step to undo and one to redo, so Undo and Redo are both live on the document tab.
+        editor.ClickRow(editor.ChainNamed("Run"));
+        editor.Press(Key.Delete);
+        editor.ClickRow(editor.ChainNamed("Jump"));
+        editor.Press(Key.Delete);
+        editor.Press(Key.Z, RawInputModifiers.Control);
+
+        await editor.OpenPngTabAsync(sheet);
+
+        documentItems.Where(name => editor.Control<MenuItem>(name).IsEnabled).ShouldBeEmpty();
+        appItems.Where(name => !editor.Control<MenuItem>(name).IsEnabled).ShouldBeEmpty();
+        editor.ClickTab("hero.achx");
+        documentItems.Where(name => !editor.Control<MenuItem>(name).IsEnabled).ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task OnAPngTab_NativeMenuUndo_LeavesTheHiddenDocumentAlone()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string sheet = editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        editor.ClickRow(editor.ChainNamed("Run"));
+        editor.Press(Key.Delete);
+        await editor.OpenPngTabAsync(sheet);
+
+        // The macOS menu bar calls these delegates directly, with its own Cmd+Z gesture.
+        editor.Window.CreateNativeMenuActions().Undo();
+        editor.Layout();
+
+        editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk" });
+    }
 }

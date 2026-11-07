@@ -677,6 +677,7 @@ public partial class MainWindow : Window
         _visiblePane.Hide();
         _visiblePane = pane;
         pane.Show();
+        UpdateDocumentMenuItems();
     }
 
     /// <summary>Snapshots the active tab before another one replaces it.</summary>
@@ -2500,14 +2501,11 @@ public partial class MainWindow : Window
             _appCommands.HotReloadWatcher.IsEnabled = MenuEnableHotReload.IsChecked == true;
         };
 
-        MenuUndo.IsEnabled = _undoManager.CanUndo;
-        MenuRedo.IsEnabled = _undoManager.CanRedo;
         MenuUndo.Click += (_, _) => _undoManager.Undo();
         MenuRedo.Click += (_, _) => _undoManager.Redo();
         _undoManager.StackChanged += () =>
         {
-            MenuUndo.IsEnabled = _undoManager.CanUndo;
-            MenuRedo.IsEnabled = _undoManager.CanRedo;
+            UpdateDocumentMenuItems();
             RefreshHistoryPanel();
         };
         RefreshHistoryPanel();
@@ -2536,10 +2534,58 @@ public partial class MainWindow : Window
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
 
         RefreshRecentFiles();
+        CollectDocumentMenuItems(MainMenu.Items);
+        UpdateDocumentMenuItems();
 
         // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
         if (_useMacOSChrome)
             MainMenu.IsVisible = false;
+    }
+
+    // Menu items that work in every tab kind. Every other leaf item in the main menu acts on the
+    // document, so a new item is document-scoped unless it is added here (as HotkeyScope defaults).
+    private MenuItem[] AppScopedMenuItems =>
+    [
+        MenuNew, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
+        MenuSettings, MenuShowDiagnostics, MenuShowShortcuts, MenuViewLog, MenuChatOnDiscord, MenuAbout,
+    ];
+
+    private readonly List<MenuItem> _documentMenuItems = new();
+
+    private void CollectDocumentMenuItems(IEnumerable<object?> items)
+    {
+        var appScoped = AppScopedMenuItems;
+        foreach (var item in items.OfType<MenuItem>())
+        {
+            if (appScoped.Contains(item)) continue;
+            if (item.Items.OfType<MenuItem>().Any())
+                CollectDocumentMenuItems(item.Items);
+            else
+                _documentMenuItems.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// Disables the document's menu items while the visible pane refuses
+    /// <see cref="HotkeyScope.Document"/> (a PNG tab), so they can't act on a document hidden behind it.
+    /// </summary>
+    private void UpdateDocumentMenuItems()
+    {
+        bool documentActive = _visiblePane.Accepts(HotkeyScope.Document);
+        foreach (var item in _documentMenuItems)
+            item.IsEnabled = documentActive;
+        MenuUndo.IsEnabled = documentActive && _undoManager.CanUndo;
+        MenuRedo.IsEnabled = documentActive && _undoManager.CanRedo;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="item"/>'s Click handlers when it is enabled. The macOS menu bar routes
+    /// document commands through here so it obeys the same enabled state as the in-window menu.
+    /// </summary>
+    private static void ClickIfEnabled(MenuItem item)
+    {
+        if (item.IsEnabled)
+            item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }
 
     /// <summary>
@@ -2556,18 +2602,18 @@ public partial class MainWindow : Window
         OpenProjectFolder:  () => _ = OpenProjectFolderAsync(),
         CloseProjectFolder: CloseProjectFolder,
         HasProjectFolder: () => HasProjectFolderOpen,
-        Save:            () => OnSaveClick(null, null!),
-        SaveAs:          () => _ = _appCommands.SaveCurrentAnimationChainListAsync(),
-        Undo:            () => _undoManager.Undo(),
-        Redo:            () => _undoManager.Redo(),
-        Copy:            () => _ = HandleCopyAsync(),
-        Cut:             () => _ = HandleCutAsync(),
-        Paste:           () => _ = HandlePasteAsync(),
-        Duplicate:       () => HandleDuplicate(),
-        ReloadFromDisk:  () => { if (!string.IsNullOrEmpty(_projectManager.FileName)) _appCommands.ReloadAchxFromDisk(_projectManager.FileName); },
+        Save:            () => ClickIfEnabled(MenuSave),
+        SaveAs:          () => ClickIfEnabled(MenuSaveAs),
+        Undo:            () => ClickIfEnabled(MenuUndo),
+        Redo:            () => ClickIfEnabled(MenuRedo),
+        Copy:            () => ClickIfEnabled(MenuCopy),
+        Cut:             () => ClickIfEnabled(MenuCut),
+        Paste:           () => ClickIfEnabled(MenuPaste),
+        Duplicate:       () => ClickIfEnabled(MenuDuplicate),
+        ReloadFromDisk:  () => ClickIfEnabled(MenuReloadFromDisk),
         ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
-        ResizeTexture:   () => _ = DoResizeTextureAsync(),
-        ShowHistory:     () => SelectHistoryTab(),
+        ResizeTexture:   () => ClickIfEnabled(MenuResizeTexture),
+        ShowHistory:     () => ClickIfEnabled(MenuShowHistory),
         ViewLog:         () => OnViewLogClick(null, null!),
         About:           () => _ = ShowAboutDialogAsync());
 
@@ -7477,7 +7523,7 @@ public partial class MainWindow : Window
 
             var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
             if (match is null) return;
-            if (!ActivePane.Accepts(match)) return;
+            if (!ActivePane.Accepts(match.Scope)) return;
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;

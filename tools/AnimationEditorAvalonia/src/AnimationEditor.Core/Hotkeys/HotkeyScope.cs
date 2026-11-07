@@ -1,6 +1,6 @@
 namespace AnimationEditor.Core.Hotkeys;
 
-/// <summary>What a <see cref="HotkeyDefinition"/> acts on, which decides the tab kinds it fires in.</summary>
+/// <summary>What a <see cref="HotkeyDefinition"/> or menu item acts on, which decides the tab kinds it works in.</summary>
 public enum HotkeyScope
 {
     /// <summary>
