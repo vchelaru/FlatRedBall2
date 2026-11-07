@@ -282,9 +282,23 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     /// </summary>
     public void UpdateChipDrag(LibraryChip? chip, Point? point)
     {
-        _chipGhost = chip is not null && point is { } p && DropTarget(p) is not null ? (chip, p) : null;
+        _chipGhost = chip is not null && point is { } p && PlanDrop(chip, p).Kind != TimelineDropKind.None ? (chip, p) : null;
         InvalidateVisual();
     }
+
+    /// <summary>The dragged chip's current drop plan, or null when no chip is over a droppable row. The ghost is drawn from it and <see cref="DropChip"/> uses the same computation.</summary>
+    public TimelineDropPlan? DropPreview => _chipGhost is { } ghost ? PlanDrop(ghost.Chip, ghost.Point) : null;
+
+    /// <summary>The track lane a dragged chip is over (its whole row is highlighted), or null over the new-track row or nowhere.</summary>
+    public int? DropTargetTrack => DropPreview is { Kind: TimelineDropKind.Track } plan ? plan.Row : null;
+
+    /// <summary>True while a dragged chip is over the new-track row.</summary>
+    public bool IsDropTargetNewTrack => DropPreview is { Kind: TimelineDropKind.NewTrack };
+
+    private TimelineDropPlan PlanDrop(LibraryChip chip, Point point) =>
+        Sequence is null
+            ? TimelineDropPlan.None
+            : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain));
 
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at <paramref name="point"/>: on a lane, at the time under the point; on the
@@ -294,29 +308,27 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
     {
         _chipGhost = null;
         InvalidateVisual();
-        if (_document is null || _undo is null || DropTarget(point) is not { } target) return false;
-        double start = TimelineLayout.SnapStart(Viewport.TimeAt(point.X));
-        _document.PlaceChain(_undo, _sequenceIndex, target.Kind == TimelineRowKind.Track ? target.Track : null,
-            chip.Source, chip.Chain.Name, start);
+        if (_document is null || _undo is null) return false;
+        var plan = PlanDrop(chip, point);
+        if (plan.Kind == TimelineDropKind.None) return false;
+        _document.PlaceChain(_undo, _sequenceIndex, plan.Kind == TimelineDropKind.Track ? plan.Row : null,
+            chip.Source, chip.Chain.Name, plan.Start);
         var sequence = Sequence!;
-        int track = target.Kind == TimelineRowKind.Track ? target.Track : sequence.Tracks.Count - 1;
+        int track = plan.Kind == TimelineDropKind.Track ? plan.Row : sequence.Tracks.Count - 1;
         Selection = new TimelineChainId(track, sequence.Tracks[track].Chains.Count - 1);
         Rebuild();
         return true;
     }
 
-    private TimelineRow? DropTarget(Point point) =>
-        Sequence is null ? null : ChipDrop.TargetAt(Viewport, TrackCount, point.X, point.Y, Bounds.Width);
-
     /// <summary>
     /// What a chip drag should show at the mouse cursor at <paramref name="point"/> (this control's
-    /// coordinates, null when the pointer is outside it): the same target <see cref="DropChip"/> would use.
+    /// coordinates, null when the pointer is outside it): the same plan <see cref="DropChip"/> would use.
     /// </summary>
-    public ChipDragFeedback ChipDragFeedbackAt(Point? point)
+    public ChipDragFeedback ChipDragFeedbackAt(LibraryChip chip, Point? point)
     {
-        var target = point is { } p ? DropTarget(p) : null;
-        string? trackName = target is { Kind: TimelineRowKind.Track } row ? Sequence!.Tracks[row.Track].Name : null;
-        return ChipDragFeedback.For(target, trackName);
+        var plan = point is { } p ? PlanDrop(chip, p) : TimelineDropPlan.None;
+        string? trackName = plan.Kind == TimelineDropKind.Track ? Sequence!.Tracks[plan.Row].Name : null;
+        return ChipDragFeedback.For(plan.Kind, trackName);
     }
 
     private void Rebuild()
@@ -636,6 +648,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
         double step = TickStep(Viewport.PixelsPerSecond);
         double firstTick = Math.Floor(Viewport.ScrollSeconds / step) * step;
+        var drop = DropPreview ?? TimelineDropPlan.None;
 
         using (context.PushClip(lanes))
         {
@@ -645,18 +658,21 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
                 if (lane % 2 == 1)
                     context.FillRectangle(Brush("TreeRowStripe"), new Rect(header, top, lanes.Width, laneHeight));
                 context.DrawLine(line, new Point(header, top + laneHeight - 0.5), new Point(size.Width, top + laneHeight - 0.5));
+                if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
+                    DrawDropRow(context, new Rect(header, top, lanes.Width, laneHeight));
             }
             for (double t = firstTick; Viewport.XAt(t) < size.Width; t += step)
                 context.DrawLine(line, new Point(Snap(Viewport.XAt(t)), ruler), new Point(Snap(Viewport.XAt(t)), size.Height));
 
             foreach (var block in _blocks)
                 DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
-            DrawNewTrackRow(context, sequence, lanes);
-            DrawChipGhost(context);
+            DrawNewTrackRow(context, sequence, lanes, drop);
+            DrawChipGhost(context, drop);
         }
 
-        DrawHeaders(context, sequence, size);
+        DrawHeaders(context, sequence, size, drop);
         DrawRuler(context, size, step, firstTick);
+        DrawDropTime(context, size, drop);
         DrawPlayhead(context, size);
     }
 
@@ -677,7 +693,7 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         context.DrawGeometry(brush, null, head);
     }
 
-    private void DrawHeaders(DrawingContext context, SequenceSave sequence, Size size)
+    private void DrawHeaders(DrawingContext context, SequenceSave sequence, Size size, TimelineDropPlan drop)
     {
         double header = TimelineViewport.HeaderWidth;
         double ruler = TimelineViewport.RulerHeight;
@@ -693,6 +709,8 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
                     var accent = Brush("Accent") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
                     context.FillRectangle(new SolidColorBrush(accent, 0.25), new Rect(0, top, header, TimelineViewport.LaneHeight));
                 }
+                if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
+                    DrawDropRow(context, new Rect(0, top, header, TimelineViewport.LaneHeight));
                 var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
                 text.MaxTextWidth = header - 16;
                 text.Trimming = TextTrimming.CharacterEllipsis;
@@ -774,34 +792,62 @@ public sealed class SequenceTimelineControl : Control, IZoomTarget
         }
     }
 
-    private void DrawNewTrackRow(DrawingContext context, SequenceSave sequence, Rect lanes)
+    private const double DropRowOpacity = 0.14;
+
+    private Color AccentCoolColor() => Brush("AccentCool") is ISolidColorBrush solid ? solid.Color : Colors.SteelBlue;
+
+    private void DrawNewTrackRow(DrawingContext context, SequenceSave sequence, Rect lanes, TimelineDropPlan drop)
     {
         double top = Viewport.LaneTop(sequence.Tracks.Count);
         var row = new Rect(lanes.X + 4, top + 4, Math.Max(0, lanes.Width - 8), TimelineViewport.LaneHeight - 8);
-        bool target = _chipGhost is { } ghost && Viewport.RowAt(ghost.Point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
-        var brush = Brush(target ? "AccentCool" : "LineStrong");
-        context.DrawRectangle(null, new Pen(brush, 1, new DashStyle(new double[] { 4, 3 }, 0)), row, 4, 4);
+        bool target = drop.Kind == TimelineDropKind.NewTrack;
+        if (target)
+            context.FillRectangle(new SolidColorBrush(AccentCoolColor(), DropRowOpacity), new Rect(lanes.X, top, lanes.Width, TimelineViewport.LaneHeight));
+        context.DrawRectangle(null, new Pen(Brush(target ? "AccentCool" : "LineStrong"), 1, new DashStyle(new double[] { 4, 3 }, 0)), row, 4, 4);
+        // The ghost sits where the hint would, and says the same thing.
+        if (target) return;
         string hint = sequence.Tracks.Count == 0
             ? "Empty sequence. Drag a chain from the library here to start."
             : "Drop a chain here to make a new track";
-        var text = Text(hint, 11, Brush(target ? "AccentCool" : "InkMid"));
+        var text = Text(hint, 11, Brush("InkMid"));
         context.DrawText(text, new Point(row.X + 10, row.Y + (row.Height - text.Height) / 2));
     }
 
-    private void DrawChipGhost(DrawingContext context)
+    // The whole row (header and lane) a dragged chip would land on, so a far-off ghost still says which track.
+    private void DrawDropRow(DrawingContext context, Rect row)
     {
-        if (_chipGhost is not { } ghost || Sequence is not { } sequence) return;
-        var row = Viewport.RowAt(ghost.Point.Y, sequence.Tracks.Count);
-        if (row.Kind != TimelineRowKind.Track) return;
-        double start = TimelineLayout.SnapStart(Viewport.TimeAt(ghost.Point.X));
-        double cycle = ChainClock.TotalLength(ghost.Chip.Chain);
-        double length = cycle > 0 ? cycle : TimelineLayout.MissingLength;
-        double top = Viewport.LaneTop(row.Track);
-        var rect = new Rect(Viewport.XAt(start), top + TimelineLayout.BodyTop, length * Viewport.PixelsPerSecond,
-            TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
+        var color = AccentCoolColor();
+        context.FillRectangle(new SolidColorBrush(color, DropRowOpacity), row);
+        var edge = new Pen(new SolidColorBrush(color), 1);
+        context.DrawLine(edge, new Point(row.Left, row.Top + 0.5), new Point(row.Right, row.Top + 0.5));
+        context.DrawLine(edge, new Point(row.Left, row.Bottom - 0.5), new Point(row.Right, row.Bottom - 0.5));
+    }
+
+    private void DrawChipGhost(DrawingContext context, TimelineDropPlan drop)
+    {
+        if (_chipGhost is not { } ghost || drop.Kind == TimelineDropKind.None) return;
+        double top = Viewport.LaneTop(drop.Row);
+        var rect = new Rect(drop.Left, top + TimelineLayout.BodyTop, drop.Width, TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
         context.DrawRectangle(null, new Pen(Brush("AccentCool"), 2, new DashStyle(new double[] { 4, 3 }, 0)), rect, 3, 3);
         using (context.PushClip(rect))
             context.DrawText(Text(ghost.Chip.Chain.Name, 11, Brush("AccentCool")), new Point(rect.X + 6, rect.Y + 4));
+    }
+
+    // A thin dotted line down from the ruler at the drop time, with its value on the ruler.
+    private void DrawDropTime(DrawingContext context, Size size, TimelineDropPlan drop)
+    {
+        if (drop.Kind == TimelineDropKind.None) return;
+        double x = Snap(drop.Left);
+        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        var brush = Brush("AccentCool");
+        context.DrawLine(new Pen(brush, 1, new DashStyle(new double[] { 2, 2 }, 0)), new Point(x, TimelineViewport.RulerHeight), new Point(x, size.Height));
+
+        var label = Text(drop.TimeLabel, 10, Brush("Ink"), FontWeight.SemiBold);
+        var pill = new Rect(x + 3, 2, label.Width + 10, TimelineViewport.RulerHeight - 5);
+        if (pill.Right > size.Width) pill = pill.WithX(x - 3 - pill.Width);
+        context.FillRectangle(Brush("BgPanel"), pill, 3);
+        context.DrawRectangle(null, new Pen(brush, 1), pill, 3, 3);
+        context.DrawText(label, new Point(pill.X + 5, pill.Y + (pill.Height - label.Height) / 2));
     }
 
     private static void DrawHatched(DrawingContext context, Rect rect, IBrush brush, double opacity)

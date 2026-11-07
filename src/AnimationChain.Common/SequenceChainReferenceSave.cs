@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
@@ -23,4 +25,10 @@ public class SequenceChainReferenceSave
     /// that for a ping-pong chain. A fraction plays part of the last cycle.
     /// </summary>
     public float Loops { get; set; } = 1;
+
+    /// <summary>
+    /// Properties this code does not know, kept as raw JSON and written back unchanged after the known ones. See
+    /// <see cref="SequenceListSave.UnknownProperties"/>.
+    /// </summary>
+    public JsonObject UnknownProperties { get; } = new();
 }

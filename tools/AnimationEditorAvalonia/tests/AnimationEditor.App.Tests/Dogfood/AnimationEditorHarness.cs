@@ -710,6 +710,33 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
+    /// <summary>Presses at <paramref name="from"/> and moves to <paramref name="to"/>, leaving the button down. Finish with <see cref="DragMove"/> and <see cref="DragRelease"/>.</summary>
+    public void DragHold(Point from, Point to)
+    {
+        Window.MouseMove(from, RawInputModifiers.None);
+        Window.MouseDown(from, MouseButton.Left, RawInputModifiers.None);
+        for (int step = 1; step <= 4; step++)
+        {
+            double t = step / 4.0;
+            Window.MouseMove(new Point(from.X + (to.X - from.X) * t, from.Y + (to.Y - from.Y) * t), RawInputModifiers.LeftMouseButton);
+        }
+        Layout();
+    }
+
+    /// <summary>Moves the held button to <paramref name="to"/>.</summary>
+    public void DragMove(Point to)
+    {
+        Window.MouseMove(to, RawInputModifiers.LeftMouseButton);
+        Layout();
+    }
+
+    /// <summary>Releases the held button at <paramref name="to"/>.</summary>
+    public void DragRelease(Point to)
+    {
+        Window.MouseUp(to, MouseButton.Left, RawInputModifiers.None);
+        Layout();
+    }
+
     public void Wheel(Point point, double delta, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         Window.MouseMove(point, modifiers);

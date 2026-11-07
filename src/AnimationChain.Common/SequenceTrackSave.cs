@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
@@ -26,4 +28,10 @@ public class SequenceTrackSave
     /// order breaks ties (see <see cref="SequenceTimeline"/>).
     /// </summary>
     public List<SequenceChainReferenceSave> Chains { get; set; } = new();
+
+    /// <summary>
+    /// Properties this code does not know, kept as raw JSON and written back unchanged after the known ones. See
+    /// <see cref="SequenceListSave.UnknownProperties"/>.
+    /// </summary>
+    public JsonObject UnknownProperties { get; } = new();
 }
