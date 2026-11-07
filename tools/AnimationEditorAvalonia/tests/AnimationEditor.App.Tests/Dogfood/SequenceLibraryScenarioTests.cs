@@ -286,4 +286,27 @@ public class SequenceLibraryScenarioTests
 
         editor.UndoLabels.ShouldBe(new[] { "Add Source 'hero.achx'" });
     }
+
+    [AvaloniaFact]
+    public async Task GoToDefinitionFromTheLibrary_PushesAHistoryEntry_SoMouseBackReturnsToTheSequenceTab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        WriteHeroInSubfolder(editor);
+        await editor.OpenAsync(WriteSeqj(editor, "chars/hero.achx"));
+        LibraryChipView run = Library(editor).ChipFor("chars/hero.achx", "Run")!;
+
+        editor.RightClick(run);
+        editor.PickMenuItem(run.ContextMenu!, "Go to Definition");
+        await editor.WaitUntilAsync(() => editor.Services.SelectedState.SelectedChain?.Name == "Run", TimeSpan.FromSeconds(5));
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
+        editor.Control<MenuItem>("MenuNavBack").IsEnabled.ShouldBeTrue();
+
+        Point point = new Point(300, 300);
+        editor.Window.MouseDown(point, MouseButton.XButton1);
+        editor.Window.MouseUp(point, MouseButton.XButton1);
+        editor.Layout();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe("boss.seqj");
+    }
 }
