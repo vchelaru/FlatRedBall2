@@ -73,6 +73,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ContextMenu = _menu;
         _menu.Opening += (_, e) => e.Cancel = _menu.Items.Count == 0;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        Viewport.Changed += () => ViewChanged?.Invoke();
     }
 
     public TimelineViewport Viewport { get; } = new();
@@ -86,6 +87,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         get => _selection;
         private set => SetSelection(value, null);
     }
+
+    /// <summary>True while the pointer is over the "+ new track" cell of the header column.</summary>
+    public bool IsNewTrackHot { get; private set; }
 
     /// <summary>The track whose header is selected, or null.</summary>
     public int? SelectedTrack { get; private set; }
@@ -417,6 +421,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
+        if (row.Kind == TimelineRowKind.NewTrack && point.X < TimelineViewport.HeaderWidth && _undo is { } undo)
+        {
+            // The same document edit a chip dropped on the new-track row makes, with no chain.
+            _document.AddTrack(undo, _sequenceIndex);
+            SetSelection(null, TrackCount - 1);
+            Rebuild();
+            // Name it right away: the default is selected, so typing replaces it and Escape keeps it.
+            BeginRenameTrack(TrackCount - 1);
+            return;
+        }
+
         if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
         {
             // The eye is a button: it neither selects the track nor starts a rename.
@@ -467,6 +482,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         base.OnPointerMoved(e);
         UpdateEyeHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
+        UpdateNewTrackHot(e.GetPosition(this));
         if (_scrubbing)
         {
             Scrubbed?.Invoke(Viewport.ScrubTime(e.GetPosition(this).X, SequenceLength));
@@ -531,6 +547,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         base.OnPointerExited(e);
         ClearHover();
         UpdateEyeHover(null);
+        UpdateNewTrackHot(new Point(-1, -1));
         if (_drag != DragKind.None || _scrubbing) return;
         _lastPoint = new Point(-1, -1);
         ShowCursor(_lastPoint);
@@ -562,6 +579,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (track == _hoverEyeTrack) return;
         _hoverEyeTrack = track;
         if (point is { } at) _eyePoint = at;
+        InvalidateVisual();
+    }
+
+    // The "+ new track" cell lights up under the pointer, except while a chain or the ruler is being dragged.
+    private void UpdateNewTrackHot(Point point)
+    {
+        bool hot = _drag == DragKind.None && !_scrubbing && Sequence is { } sequence && point.X >= 0
+            && point.X < TimelineViewport.HeaderWidth && Viewport.RowAt(point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
+        if (hot == IsNewTrackHot) return;
+        IsNewTrackHot = hot;
         InvalidateVisual();
     }
 
@@ -805,8 +832,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
             }
-            var newTrack = Text("+ new track", 11, Brush("InkMid"));
-            context.DrawText(newTrack, new Point(8, Viewport.LaneTop(sequence.Tracks.Count) + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
+            double newTop = Viewport.LaneTop(sequence.Tracks.Count);
+            if (IsNewTrackHot)
+            {
+                context.FillRectangle(new SolidColorBrush(AccentCoolColor(), DropRowOpacity), new Rect(0, newTop, header, TimelineViewport.LaneHeight));
+                context.DrawRectangle(null, new Pen(Brush("AccentCool"), 1), new Rect(1.5, newTop + 1.5, header - 3, TimelineViewport.LaneHeight - 3), 3, 3);
+            }
+            var newTrack = Text("+ new track", 11, Brush(IsNewTrackHot ? "Ink" : "InkMid"));
+            context.DrawText(newTrack, new Point(8, newTop + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
     }
@@ -980,7 +1013,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var brush = Brush("AccentCool");
         context.DrawLine(new Pen(brush, 1, new DashStyle(new double[] { 2, 2 }, 0)), new Point(x, TimelineViewport.RulerHeight), new Point(x, size.Height));
 
-        var label = Text(drop.TimeLabel, 10, Brush("Ink"), FontWeight.SemiBold);
+        var label = Text(drop.TimeLabel, 10, Brush("Ink"), FontWeight.SemiBold, mono: true);
         var pill = new Rect(x + 3, 2, label.Width + 10, TimelineViewport.RulerHeight - 5);
         if (pill.Right > size.Width) pill = pill.WithX(x - 3 - pill.Width);
         context.FillRectangle(Brush("BgPanel"), pill, 3);
@@ -1011,6 +1044,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             _ => Brushes.Gray,
         };
 
-    private static FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal) =>
-        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, weight), size, brush);
+    // mono: for a number that changes while it is on screen, so its pill does not jitter.
+    private FormattedText Text(string text, double size, IBrush brush, FontWeight weight = FontWeight.Normal, bool mono = false) =>
+        new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(mono && this.TryFindResource("MonoFont", ActualThemeVariant, out var font) && font is FontFamily family ? family : FontFamily.Default, FontStyle.Normal, weight),
+            size, brush);
 }

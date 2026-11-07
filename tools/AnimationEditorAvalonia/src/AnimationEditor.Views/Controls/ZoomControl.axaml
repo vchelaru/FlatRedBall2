@@ -36,7 +36,8 @@
                              Text="100%"
                              MinimumPrefixLength="0" FilterMode="None"
                              Background="Transparent" BorderThickness="0" Padding="0"
-                             Height="26" VerticalAlignment="Center" FontSize="11">
+                             Height="26" VerticalAlignment="Center" FontSize="11"
+                             FontFamily="{DynamicResource MonoFont}">
                 <AutoCompleteBox.Styles>
                     <Style Selector="TextBox">
                         <Setter Property="TextAlignment" Value="Center"/>

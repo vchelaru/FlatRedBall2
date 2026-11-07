@@ -24,6 +24,7 @@ namespace AnimationEditor.Core.Sequences;
 public sealed class SequenceDocument
 {
     private const string DefaultSequenceName = "Sequence";
+    private const string DefaultTrackName = "Track";
 
     // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
@@ -199,6 +200,21 @@ public sealed class SequenceDocument
             var tracks = save.Sequences[sequence].Tracks;
             tracks.Add(new SequenceTrackSave { Name = name, Z = tracks.Count, Chains = { reference } });
         });
+    }
+
+    /// <summary>
+    /// Adds an empty track to the end of sequence <paramref name="sequence"/>, named <c>Track</c> (or <c>Track 2</c>, and
+    /// so on, when that is taken). Returns the name.
+    /// </summary>
+    public string AddTrack(IUndoManager undo, int sequence)
+    {
+        string name = UniqueTrackName(Save.Sequences[sequence], DefaultTrackName);
+        Edit(undo, $"Add Track '{name}'", save =>
+        {
+            var tracks = save.Sequences[sequence].Tracks;
+            tracks.Add(new SequenceTrackSave { Name = name, Z = tracks.Count });
+        });
+        return name;
     }
 
     /// <summary>Removes chain reference <paramref name="chain"/> (an index into the track's list) from its track.</summary>
