@@ -33,6 +33,16 @@ public sealed class SequenceClock
     /// <summary>Moves the playhead to <paramref name="time"/>, clamped to 0..<paramref name="length"/>.</summary>
     public void Seek(double time, double length) => Time = Math.Clamp(time, 0, Math.Max(0, length));
 
+    /// <summary>The most real time one timer tick may advance playback by, so a stalled frame does not skip ahead.</summary>
+    public const double MaxTickSeconds = 0.25;
+
+    /// <summary>
+    /// <see cref="Advance"/> for a timer tick: <paramref name="elapsedSeconds"/> is the real time since the previous
+    /// tick, capped at <see cref="MaxTickSeconds"/>. A window drag or GC pause that freezes the timer for seconds then
+    /// moves the playhead by at most the cap.
+    /// </summary>
+    public void AdvanceTick(double elapsedSeconds, double length, bool loop) => Advance(Math.Min(elapsedSeconds, MaxTickSeconds), length, loop);
+
     /// <summary>
     /// Advances by <paramref name="seconds"/> while playing. Past the end it wraps when <paramref name="loop"/>, and
     /// otherwise stops at the end.

@@ -55,18 +55,18 @@ public class SequenceListSave
     public List<SequenceSave> Sequences { get; set; } = new();
 
     /// <summary>Loads a <c>.seqj</c> from disk.</summary>
-    /// <exception cref="JsonException">The file is not valid JSON.</exception>
+    /// <exception cref="JsonException">The file is not valid JSON, or a field has the wrong kind; the message names the property.</exception>
     public static SequenceListSave FromFile(string path)
     {
         using var stream = File.OpenRead(path);
-        return FromJsonNode(ParseRoot(JsonNode.Parse(stream)));
+        return Read(() => JsonNode.Parse(stream));
     }
 
     /// <summary>Parses <c>.seqj</c> JSON. A leading byte-order mark is allowed.</summary>
-    /// <exception cref="JsonException"><paramref name="json"/> is not valid JSON.</exception>
+    /// <exception cref="JsonException"><paramref name="json"/> is not valid JSON, or a field has the wrong kind; the message names the property.</exception>
     public static SequenceListSave FromJsonString(string json) =>
         // JsonNode.Parse(string) rejects a BOM, unlike the stream overload.
-        FromJsonNode(ParseRoot(JsonNode.Parse(json.TrimStart('﻿'))));
+        Read(() => JsonNode.Parse(json.TrimStart('﻿')));
 
     /// <summary>Writes this file as indented JSON. Crash-safe: the old file stays intact until the new one is complete.</summary>
     public void Save(string path) => AtomicFile.Write(path, stream =>
@@ -78,8 +78,19 @@ public class SequenceListSave
     /// <summary>The same indented JSON <see cref="Save"/> writes.</summary>
     public string ToJsonString() => ToJsonNode().ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
-    private static JsonObject ParseRoot(JsonNode? node) =>
-        node as JsonObject ?? throw new JsonException("A .seqj file must contain a JSON object.");
+    // A repeated property name surfaces as ArgumentException, while the parsed object is first read rather than at
+    // Parse, so this wraps the whole read.
+    private static SequenceListSave Read(Func<JsonNode?> parse)
+    {
+        try
+        {
+            return FromJsonNode(SeqjObject.Root(parse()));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new JsonException($"The file repeats a property name: {ex.Message}", ex);
+        }
+    }
 
     // Every JsonArray.Add casts to JsonNode: the generic Add<T> overload is not trim- or AOT-safe.
     private JsonObject ToJsonNode()
@@ -154,72 +165,52 @@ public class SequenceListSave
             if (Array.IndexOf(knownKeys, key) < 0) unknown[key] = value?.DeepClone();
     }
 
-    private static int ReadVersion(JsonObject root)
+    // Every typed read goes through SeqjObject, which turns a field of the wrong kind into a JsonException naming it.
+    private static SequenceListSave FromJsonNode(SeqjObject root)
     {
-        if (!root.TryGetPropertyValue("version", out var node)) return 1;
-        if (node is JsonValue value && value.TryGetValue(out int version) && version >= 1) return version;
-        throw new JsonException("A .seqj \"version\" must be a whole number of at least 1.");
-    }
-
-    private static SequenceListSave FromJsonNode(JsonObject root)
-    {
-        var result = new SequenceListSave { Version = ReadVersion(root) };
-        CaptureUnknown(root, result.UnknownProperties, "version", "sources", "sequences");
-        if (root["sources"] is JsonArray sources)
-        {
-            foreach (var source in sources)
-                if (source?.GetValue<string>() is { } path) result.Sources.Add(path);
-        }
-
-        if (root["sequences"] is JsonArray sequences)
-        {
-            foreach (var sequenceNode in sequences.OfType<JsonObject>())
-                result.Sequences.Add(ReadSequence(sequenceNode));
-        }
+        var result = new SequenceListSave { Version = root.PositiveInt("version", fallback: 1) };
+        CaptureUnknown(root.Node, result.UnknownProperties, "version", "sources", "sequences");
+        result.Sources.AddRange(root.Strings("sources"));
+        foreach (var sequence in root.Objects("sequences"))
+            result.Sequences.Add(ReadSequence(sequence));
         return result;
     }
 
-    private static SequenceSave ReadSequence(JsonObject node)
+    private static SequenceSave ReadSequence(SeqjObject node)
     {
         var sequence = new SequenceSave
         {
-            Name = node["name"]?.GetValue<string>() ?? "",
-            Loop = node["loop"]?.GetValue<bool>() ?? false,
+            Name = node.String("name"),
+            Loop = node.Bool("loop"),
         };
-        CaptureUnknown(node, sequence.UnknownProperties, "name", "loop", "tracks");
-        if (node["tracks"] is JsonArray tracks)
-        {
-            foreach (var trackNode in tracks.OfType<JsonObject>())
-                sequence.Tracks.Add(ReadTrack(trackNode));
-        }
+        CaptureUnknown(node.Node, sequence.UnknownProperties, "name", "loop", "tracks");
+        foreach (var track in node.Objects("tracks"))
+            sequence.Tracks.Add(ReadTrack(track));
         return sequence;
     }
 
-    private static SequenceTrackSave ReadTrack(JsonObject node)
+    private static SequenceTrackSave ReadTrack(SeqjObject node)
     {
         var track = new SequenceTrackSave
         {
-            Name = node["name"]?.GetValue<string>() ?? "",
-            X = node["x"]?.GetValue<float>() ?? 0,
-            Y = node["y"]?.GetValue<float>() ?? 0,
-            Z = node["z"]?.GetValue<int>() ?? 0,
-            FlipHorizontal = node["flipHorizontal"]?.GetValue<bool>() ?? false,
+            Name = node.String("name"),
+            X = node.Float("x"),
+            Y = node.Float("y"),
+            Z = node.Int("z"),
+            FlipHorizontal = node.Bool("flipHorizontal"),
         };
-        CaptureUnknown(node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "chains");
-        if (node["chains"] is JsonArray chains)
+        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "chains");
+        foreach (var chain in node.Objects("chains"))
         {
-            foreach (var chainNode in chains.OfType<JsonObject>())
+            var reference = new SequenceChainReferenceSave
             {
-                var reference = new SequenceChainReferenceSave
-                {
-                    Source = chainNode["source"]?.GetValue<string>() ?? "",
-                    Chain = chainNode["chain"]?.GetValue<string>() ?? "",
-                    Start = chainNode["start"]?.GetValue<double>() ?? 0,
-                    Loops = chainNode["loops"]?.GetValue<float>() ?? 1,
-                };
-                CaptureUnknown(chainNode, reference.UnknownProperties, "source", "chain", "start", "loops");
-                track.Chains.Add(reference);
-            }
+                Source = chain.String("source"),
+                Chain = chain.String("chain"),
+                Start = chain.Double("start"),
+                Loops = chain.Float("loops", fallback: 1),
+            };
+            CaptureUnknown(chain.Node, reference.UnknownProperties, "source", "chain", "start", "loops");
+            track.Chains.Add(reference);
         }
         return track;
     }
