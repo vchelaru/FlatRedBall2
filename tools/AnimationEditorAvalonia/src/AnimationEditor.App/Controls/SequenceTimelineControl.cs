@@ -15,9 +15,6 @@ using System.Linq;
 
 namespace AnimationEditor.App.Controls;
 
-/// <summary>A chain on the timeline: its track, and its index in that track's <see cref="SequenceTrackSave.Chains"/>.</summary>
-public readonly record struct TimelineChainId(int Track, int Chain);
-
 /// <summary>
 /// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a lane per track with its chains, and a dashed row that
 /// makes a new track. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
@@ -35,7 +32,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     // A hidden track keeps its lane and blocks, drawn faint so they stay readable and editable.
     private const double HiddenOpacity = 0.4;
 
-    private enum DragKind { None, Pending, Move, Edge, TrackPending, Track }
+    private enum DragKind { None, Pending, Move, Edge, TrackPending, Track, MarqueePending, Marquee }
 
     private readonly ContextMenu _menu = new();
     private SequenceDocument? _document;
@@ -70,7 +67,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private InlineRenameBox? _renameBox;
     private int _renameTrack;
 
-    private TimelineChainId? _selection;
     private (LibraryChip Chip, Point Point)? _chipGhost;
     private double _playhead;
     private bool _scrubbing;
@@ -123,29 +119,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>The cursor the timeline last asked for. The OS cursor itself is not observable headlessly.</summary>
     public TimelineCursor ShownCursor => _shownCursor;
 
-    /// <summary>The selected chain, or null. At most one thing is selected: choosing a chain clears <see cref="SelectedTrack"/> and the reverse.</summary>
-    public TimelineChainId? Selection
-    {
-        get => _selection;
-        private set => SetSelection(value, null);
-    }
-
     /// <summary>True while the pointer is over the "+ new track" cell of the header column.</summary>
     public bool IsNewTrackHot { get; private set; }
-
-    /// <summary>The track whose header is selected, or null.</summary>
-    public int? SelectedTrack { get; private set; }
-
-    /// <summary>Selects chain <paramref name="chain"/>, or else track <paramref name="track"/>'s header, as a click would. A place that no longer exists clears the selection.</summary>
-    public void Select(TimelineChainId? chain, int? track)
-    {
-        if (chain is { } id && _blocks.Any(b => b.Track == id.Track && b.Chain == id.Chain))
-            SetSelection(id, null);
-        else if (chain is null && track is { } header && header >= 0 && header < TrackCount)
-            SetSelection(null, header);
-        else
-            SetSelection(null, null);
-    }
 
     /// <summary>True while a chain is being moved or resized and the change is not yet an undo entry.</summary>
     public bool IsDraggingChain => _drag is DragKind.Move or DragKind.Edge;
@@ -311,12 +286,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_document is null || _undo is null) return false;
         if (Selection is { } selection)
         {
-            Selection = null;
+            SetSelection(null, null);
             _document.DeleteChain(_undo, _sequenceIndex, selection.Track, selection.Chain);
         }
         else if (SelectedTrack is { } track)
         {
-            Selection = null;
+            SetSelection(null, null);
             _document.DeleteTrack(_undo, _sequenceIndex, track);
         }
         else
@@ -326,9 +301,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Rebuild();
         return true;
     }
-
-    /// <summary>Deselects the chain or track, so the inspector shows the sequence.</summary>
-    public void ClearSelection() => SetSelection(null, null);
 
     /// <summary>True while a track's name is being edited in place.</summary>
     public bool IsRenamingTrack => _renameBox is { IsEditing: true };
@@ -397,14 +369,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         return finalSize;
     }
 
-    private void SetSelection(TimelineChainId? chain, int? track)
-    {
-        if (_selection == chain && SelectedTrack == track) return;
-        _selection = chain;
-        SelectedTrack = track;
-        SelectionChanged?.Invoke();
-    }
-
     /// <summary>
     /// Draws where <paramref name="chip"/> would land if dropped at <paramref name="point"/> (this control's
     /// coordinates), or clears that when <paramref name="chip"/> or <paramref name="point"/> is null.
@@ -448,7 +412,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             chip.Source, chip.Chain.Name, plan.Start);
         var sequence = Sequence!;
         int track = plan.Kind == TimelineDropKind.Track ? plan.Row : sequence.Tracks.Count - 1;
-        Selection = new TimelineChainId(track, sequence.Tracks[track].Chains.Count - 1);
+        SetSelection(new TimelineChainId(track, sequence.Tracks[track].Chains.Count - 1), null);
         Rebuild();
         return true;
     }
@@ -469,10 +433,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _blocks = Sequence is { } sequence && _document is { } document
             ? TimelineLayout.Blocks(sequence, document.CycleLength)
             : Array.Empty<TimelineBlock>();
-        if (Selection is { } selection && !_blocks.Any(b => b.Track == selection.Track && b.Chain == selection.Chain))
-            Selection = null;
-        if (SelectedTrack is { } track && track >= TrackCount)
-            SetSelection(null, null);
+        RetainSelection();
         if (IsRenamingTrack && _renameTrack >= TrackCount)
             EndTrackRename();
         Viewport.SetLaneHeights(TimelineLayout.LaneHeights(_blocks, TrackCount, HasEvents));
@@ -542,6 +503,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 ToggleTrackVisibility(row.Track);
                 return;
             }
+            if (IsToggleModifier(e.KeyModifiers))
+            {
+                NotifySelection(_model.ToggleTrack(row.Track));
+                return;
+            }
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                NotifySelection(_model.ExtendTracksTo(row.Track));
+                return;
+            }
             SetSelection(null, row.Track);
             InvalidateVisual();
             if (e.ClickCount == 2)
@@ -566,13 +537,34 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : null;
         if (hit is not { } found)
         {
-            SetSelection(null, null);
-            InvalidateVisual();
+            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers));
             return;
         }
 
         var block = found.Block;
-        Selection = new TimelineChainId(block.Track, block.Chain);
+        var id = new TimelineChainId(block.Track, block.Chain);
+        // Ctrl toggles and Shift extends; neither starts a drag, so a modifier click only edits the selection.
+        if (IsToggleModifier(e.KeyModifiers))
+        {
+            NotifySelection(_model.ToggleChain(id));
+            return;
+        }
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            NotifySelection(_model.ExtendChainsTo(id, _blocks));
+            return;
+        }
+        // Pressing a chain that is part of a multi-selection keeps it, so the drag moves them all; releasing without a
+        // drag then narrows the selection to the chain that was clicked.
+        if (e.ClickCount == 1 && found.Part == TimelineHitPart.Body && _model.IsMulti && _model.Contains(id))
+        {
+            NotifySelection(_model.MakePrimary(id));
+            _collapseOnRelease = id;
+        }
+        else
+        {
+            SetSelection(id, null);
+        }
         if (e.ClickCount == 2)
         {
             GoToDefinitionRequested?.Invoke(block.Reference);
@@ -621,6 +613,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             MoveTrackDrag(point);
             return;
         }
+        if (_drag is DragKind.MarqueePending or DragKind.Marquee)
+        {
+            MoveMarquee(point);
+            return;
+        }
         ShowCursor(point);
         if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         if (_drag == DragKind.Pending)
@@ -644,7 +641,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 sequence.Tracks[row.Track].Chains.Add(_dragged);
                 current = row.Track;
             }
-            Selection = new TimelineChainId(current, sequence.Tracks[current].Chains.IndexOf(_dragged));
+            SetSelection(new TimelineChainId(current, sequence.Tracks[current].Chains.IndexOf(_dragged)), null);
         }
         else
         {
@@ -791,6 +788,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             e.Handled = true;
             return;
         }
+        if (HandleSelectionKey(e)) return;
         if (e.Key != Key.Escape || _drag == DragKind.None || _document is null || _gestureBefore is null) return;
         // Escape puts the dragged chain back with no undo entry.
         string before = _gestureBefore;
@@ -821,11 +819,19 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             CommitTrackDrag();
             return;
         }
+        if (_drag is DragKind.MarqueePending or DragKind.Marquee)
+        {
+            ResetDrag();
+            InvalidateVisual();
+            return;
+        }
         var kind = _drag;
         var dragged = _dragged;
         int originTrack = _dragOriginTrack;
         string? before = _gestureBefore;
+        var collapse = _collapseOnRelease;
         ResetDrag();
+        if (kind == DragKind.Pending && collapse is { } clicked) SetSelection(clicked, null);
         if (kind == DragKind.Pending || dragged is null || before is null || _document is null || _undo is null
             || Sequence is not { } sequence)
             return;
@@ -870,6 +876,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _snapGuide = null;
         _snapOthers = Array.Empty<SnapTarget>();
         _frameBoundaries = null;
+        _collapseOnRelease = null;
+        _marqueeBase = Array.Empty<TimelineChainId>();
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -916,7 +924,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         int track = row.Track;
         if (point.X < TimelineViewport.HeaderWidth)
         {
-            SetSelection(null, track);
+            if (!_model.ContainsTrack(track)) SetSelection(null, track);
             InvalidateVisual();
             var rename = new MenuItem { Header = "Rename Track…" };
             rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
@@ -925,7 +933,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var delete = new MenuItem { Header = "Delete Track" };
             delete.Click += (_, _) =>
             {
-                Selection = null;
+                SetSelection(null, null);
                 _document.DeleteTrack(_undo, _sequenceIndex, track);
             };
             _menu.Items.Add(rename);
@@ -941,7 +949,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
         if (TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y) is { } hit)
         {
-            Selection = new TimelineChainId(hit.Block.Track, hit.Block.Chain);
+            var hitId = new TimelineChainId(hit.Block.Track, hit.Block.Chain);
+            if (!_model.Contains(hitId)) SetSelection(hitId, null);
+            else NotifySelection(_model.MakePrimary(hitId));
             InvalidateVisual();
             var reference = hit.Block.Reference;
             var definition = new MenuItem { Header = "Go to Definition" };
@@ -988,12 +998,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
                 {
-                    DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
+                    DrawBlock(context, block, _model.Contains(new TimelineChainId(block.Track, block.Chain)));
                     DrawEvents(context, block, size.Width);
                 }
             }
             DrawNewTrackRow(context, sequence, lanes, drop);
             DrawChipGhost(context, drop);
+            DrawMarquee(context);
         }
 
         DrawHeaders(context, sequence, size, drop);
@@ -1054,7 +1065,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 double top = Viewport.LaneTop(lane);
                 double laneHeight = Viewport.LaneHeightOf(lane);
-                if (SelectedTrack == lane)
+                if (_model.ContainsTrack(lane))
                     context.FillRectangle(new SolidColorBrush(AccentColor(), 0.25), new Rect(0, top, header, laneHeight));
                 if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
                     DrawDropRow(context, new Rect(0, top, header, laneHeight));

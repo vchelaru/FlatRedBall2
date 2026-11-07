@@ -367,7 +367,7 @@ public partial class MainWindow
         {
             var w = _window;
             ShowInspector();
-            bool selected = w.SequenceTimeline.Selection is not null || w.SequenceTimeline.SelectedTrack is not null;
+            bool selected = w.SequenceTimeline.SelectedChains.Count > 0 || w.SequenceTimeline.SelectedTracks.Count > 0;
             if (selected) BringInspectorForward();
         }
 
@@ -466,7 +466,8 @@ public partial class MainWindow
         private void ShowInspector()
         {
             var w = _window;
-            w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack);
+            w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack,
+                w.SequenceTimeline.SelectionSummary);
         }
 
         /// <summary>

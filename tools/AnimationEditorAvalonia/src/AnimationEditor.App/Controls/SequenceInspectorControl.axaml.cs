@@ -25,6 +25,7 @@ public partial class SequenceInspectorControl : UserControl
     private int _sequence = -1;
     private TimelineChainId? _chain;
     private int? _track;
+    private string? _multiSummary;
     private bool _refreshing;
 
     public SequenceInspectorControl()
@@ -87,10 +88,13 @@ public partial class SequenceInspectorControl : UserControl
 
     /// <summary>
     /// Shows what is selected in sequence <paramref name="sequence"/> of <paramref name="document"/>: a chain, a track,
-    /// or (both null) the sequence itself. A null document clears the inspector.
+    /// or (both null) the sequence itself. A non-null <paramref name="multiSummary"/> ("3 chains selected") is shown instead
+    /// of any of those: several items share no editable field. A null document clears the inspector.
     /// </summary>
-    public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track)
+    public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track,
+        string? multiSummary = null)
     {
+        _multiSummary = multiSummary;
         _document = document;
         _sequence = sequence;
         _undo = undo;
@@ -111,10 +115,13 @@ public partial class SequenceInspectorControl : UserControl
             var sequence = CurrentSequence;
             var track = CurrentTrack;
             var reference = CurrentChain;
+            bool multi = sequence is not null && _multiSummary is not null;
             NothingLabel.IsVisible = sequence is null;
-            ChainPanel.IsVisible = sequence is not null && reference is not null;
-            TrackPanel.IsVisible = sequence is not null && reference is null && track is not null;
-            SequencePanel.IsVisible = sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
+            MultiPanel.IsVisible = multi;
+            MultiCountText.Text = multi ? _multiSummary : null;
+            ChainPanel.IsVisible = !multi && sequence is not null && reference is not null;
+            TrackPanel.IsVisible = !multi && sequence is not null && reference is null && track is not null;
+            SequencePanel.IsVisible = !multi && sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
 
             if (SequencePanel.IsVisible)
                 ShowSequence(sequence!, force);
