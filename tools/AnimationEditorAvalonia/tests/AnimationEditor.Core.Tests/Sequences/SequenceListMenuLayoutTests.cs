@@ -10,12 +10,12 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceListMenuLayoutTests
 {
     [Fact]
-    public void OnASequence_OffersCopyQualifiedName_ThenRenameAndDelete_ThenAddSequence()
+    public void OnASequence_OffersCopyQualifiedName_ThenRenameDuplicateAndDelete_ThenAddSequence()
     {
         SequenceListMenuLayout.For(onSequence: true).Select(group => group.ToArray()).ShouldBe(new[]
         {
             new[] { Cmd.CopyQualifiedName },
-            new[] { Cmd.Rename, Cmd.Delete },
+            new[] { Cmd.Rename, Cmd.DuplicateSequence, Cmd.Delete },
             new[] { Cmd.AddSequence },
         });
     }
