@@ -32,6 +32,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private const double DragThresholdPixels = 3;
     private const double WheelScrollPixels = 60;
     private const double RenameBoxHeight = 24;
+    // A hidden track keeps its lane and blocks, drawn faint so they stay readable and editable.
+    private const double HiddenOpacity = 0.4;
 
     private enum DragKind { None, Pending, Move, Edge, TrackPending, Track }
 
@@ -50,6 +52,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private double _dragOriginEdge;
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
+
+    private int? _hoverEyeTrack;
+    private Point _eyePoint;
 
     // A track-header drag: which lane, the gap the pointer points at, and the pointer to release on Escape.
     private int _dragTrack;
@@ -135,6 +140,34 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         else
             SetSelection(null, null);
     }
+
+    /// <summary>Whether track <paramref name="track"/> of the shown sequence is hidden: its <see cref="SequenceTrackSave.Visible"/> is false.</summary>
+    public bool IsTrackHidden(int track) =>
+        Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && !sequence.Tracks[track].Visible;
+
+    /// <summary>Hides track <paramref name="track"/>, or shows it again. One undo entry, saved with the file; the track stays on the timeline, faint.</summary>
+    public void ToggleTrackVisibility(int track)
+    {
+        if (_document is not { } document || _undo is not { } undo || Sequence is null || track < 0 || track >= TrackCount) return;
+        document.SetTrackVisible(undo, _sequenceIndex, track, IsTrackHidden(track));
+    }
+
+    /// <summary>Where lane <paramref name="lane"/>'s eye and name are centered vertically, in this control's coordinates. They share one line.</summary>
+    public (double Eye, double Name) HeaderCenters(int lane)
+    {
+        double top = Viewport.LaneTop(lane);
+        return (top + TimelineLayout.EyeCenterY, top + TimelineLayout.HeaderCenterY);
+    }
+
+    /// <summary>The track whose eye the pointer is over, or null.</summary>
+    public int? HoverEyeTrack => _hoverEyeTrack;
+
+    /// <summary>The tooltip for the eye under the pointer ("Visible" or "Hidden"), or null when the pointer is not over one. <see cref="EyeTooltipNote"/> goes under it.</summary>
+    public string? EyeTooltip =>
+        _hoverEyeTrack is { } track ? (IsTrackHidden(track) ? "Hidden" : "Visible") : null;
+
+    /// <summary>The second line of the eye's tooltip: the eye is saved state, not just a preview setting.</summary>
+    public const string EyeTooltipNote = "Saved in the file; runtimes may skip hidden tracks";
 
     /// <summary>The lane whose header is being dragged to reorder it, or null. A press that has not moved past the threshold is a click, not a drag.</summary>
     public int? DraggedTrack => _drag == DragKind.Track ? _dragTrack : null;
@@ -323,7 +356,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
-            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + (Viewport.LaneHeightOf(_renameTrack) - RenameBoxHeight) / 2,
+            box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + TimelineLayout.HeaderCenterY - RenameBoxHeight / 2,
                 TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         }
         return finalSize;
@@ -465,6 +498,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
         {
+            // The eye is a button: it neither selects the track nor starts a rename.
+            if (TimelineLayout.IsOverEye(point.X, point.Y - Viewport.LaneTop(row.Track)))
+            {
+                ToggleTrackVisibility(row.Track);
+                return;
+            }
             SetSelection(null, row.Track);
             InvalidateVisual();
             if (e.ClickCount == 2)
@@ -518,6 +557,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        UpdateEyeHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
         if (_panning)
@@ -646,6 +686,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerExited(e);
         ClearHover();
+        UpdateEyeHover(null);
         UpdateNewTrackHot(new Point(-1, -1));
         if (_drag != DragKind.None || _scrubbing || _panning) return;
         _lastPoint = new Point(-1, -1);
@@ -668,6 +709,19 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
         if (_drag != DragKind.None || _panning) DragCursors.Apply(this, _shownCursor);
+    }
+
+    private void UpdateEyeHover(Point? point)
+    {
+        int? track = null;
+        if (point is { } p && _drag == DragKind.None && !_scrubbing && _chipGhost is null && p.X < TimelineViewport.HeaderWidth
+            && Sequence is { } sequence && Viewport.RowAt(p.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row
+            && TimelineLayout.IsOverEye(p.X, p.Y - Viewport.LaneTop(row.Track)))
+            track = row.Track;
+        if (track == _hoverEyeTrack) return;
+        _hoverEyeTrack = track;
+        if (point is { } at) _eyePoint = at;
+        InvalidateVisual();
     }
 
     // The "+ new track" cell lights up under the pointer, except while a chain or the ruler is being dragged.
@@ -819,6 +873,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             InvalidateVisual();
             var rename = new MenuItem { Header = "Rename Track…" };
             rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
+            var visibility = new MenuItem { Header = IsTrackHidden(track) ? "Show Track" : "Hide Track" };
+            visibility.Click += (_, _) => ToggleTrackVisibility(track);
             var delete = new MenuItem { Header = "Delete Track" };
             delete.Click += (_, _) =>
             {
@@ -826,6 +882,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 _document.DeleteTrack(_undo, _sequenceIndex, track);
             };
             _menu.Items.Add(rename);
+            _menu.Items.Add(visibility);
+            if (Sequence!.Tracks.Any(t => !t.Visible))
+            {
+                var showAll = new MenuItem { Header = "Show All Tracks" };
+                showAll.Click += (_, _) => _document.ShowAllTracks(_undo, _sequenceIndex);
+                _menu.Items.Add(showAll);
+            }
             _menu.Items.Add(delete);
             return;
         }
@@ -876,8 +939,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
             foreach (var block in _blocks)
             {
-                DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
-                DrawEvents(context, block, size.Width);
+                using (context.PushOpacity(IsTrackHidden(block.Track) ? HiddenOpacity : 1))
+                {
+                    DrawBlock(context, block, Selection == new TimelineChainId(block.Track, block.Chain));
+                    DrawEvents(context, block, size.Width);
+                }
             }
             DrawNewTrackRow(context, sequence, lanes, drop);
             DrawChipGhost(context, drop);
@@ -889,6 +955,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawDropTime(context, size, drop);
         DrawPlayhead(context, size);
         DrawHover(context, size);
+        DrawEyeTooltip(context, size);
     }
 
     private void DrawPlayhead(DrawingContext context, Size size)
@@ -924,6 +991,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.FillRectangle(new SolidColorBrush(AccentColor(), 0.25), new Rect(0, top, header, laneHeight));
                 if (drop.Kind == TimelineDropKind.Track && drop.Row == lane)
                     DrawDropRow(context, new Rect(0, top, header, laneHeight));
+                bool hidden = IsTrackHidden(lane);
+                var centers = HeaderCenters(lane);
+                DrawEye(context, new Point(TimelineLayout.EyeCenterX, centers.Eye), hidden, _hoverEyeTrack == lane);
                 if (DraggedTrack == lane)
                 {
                     // The grabbed header: a stronger fill and an outline, so it reads as lifted.
@@ -932,10 +1002,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
                 }
                 var text = Text(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold);
-                text.MaxTextWidth = header - 16;
+                text.MaxTextWidth = header - TimelineLayout.HeaderNameLeft - 8;
                 text.Trimming = TextTrimming.CharacterEllipsis;
                 text.MaxLineCount = 1;
-                context.DrawText(text, new Point(8, top + (laneHeight - text.Height) / 2));
+                using (context.PushOpacity(hidden ? HiddenOpacity + 0.2 : 1))
+                    context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
             }
@@ -949,6 +1020,48 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             context.DrawText(newTrack, new Point(8, newTop + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
+    }
+
+    // A small drawn eye (an almond outline and a pupil); struck through when the track is hidden in the preview.
+    private void DrawEye(DrawingContext context, Point center, bool hidden, bool hover)
+    {
+        var ink = Brush(hidden ? "InkMid" : "Ink");
+        if (hover)
+        {
+            var wash = Brush("Ink") is ISolidColorBrush solid ? solid.Color : Colors.Gray;
+            double inset = TimelineLayout.EyeHitHalf - 1;
+            context.FillRectangle(new SolidColorBrush(wash, 0.16),
+                new Rect(center.X - inset, center.Y - inset, 2 * inset, 2 * inset), 3);
+        }
+        var pen = new Pen(ink, 1.25, lineCap: PenLineCap.Round);
+        var almond = new StreamGeometry();
+        using (var g = almond.Open())
+        {
+            g.BeginFigure(new Point(center.X - 6.5, center.Y), false);
+            g.QuadraticBezierTo(new Point(center.X, center.Y - 8), new Point(center.X + 6.5, center.Y));
+            g.QuadraticBezierTo(new Point(center.X, center.Y + 8), new Point(center.X - 6.5, center.Y));
+            g.EndFigure(true);
+        }
+        context.DrawGeometry(null, pen, almond);
+        if (hidden)
+            context.DrawLine(pen, new Point(center.X - 6, center.Y + 5), new Point(center.X + 6, center.Y - 5));
+        else
+            context.DrawEllipse(ink, null, center, 2, 2);
+    }
+
+    // Drawn, not a ToolTip, like the filmstrip card: it follows the pointer and can be read headlessly (EyeTooltip).
+    private void DrawEyeTooltip(DrawingContext context, Size size)
+    {
+        if (EyeTooltip is not { } tip) return;
+        var text = Text(tip, 11, Brush("Ink"), FontWeight.SemiBold);
+        var note = Text(EyeTooltipNote, 10, Brush("InkMid"));
+        var pill = new Rect(_eyePoint.X + 12, _eyePoint.Y + 16, Math.Max(text.Width, note.Width) + 12, text.Height + note.Height + 8);
+        pill = pill.WithX(Math.Clamp(pill.X, 0, Math.Max(0, size.Width - pill.Width)))
+                   .WithY(Math.Clamp(pill.Y, 0, Math.Max(0, size.Height - pill.Height)));
+        context.FillRectangle(Brush("BgPanel"), pill, 3);
+        context.DrawRectangle(null, new Pen(Brush("LineStrong"), 1), pill, 3, 3);
+        context.DrawText(text, new Point(pill.X + 6, pill.Y + 3));
+        context.DrawText(note, new Point(pill.X + 6, pill.Y + 4 + text.Height));
     }
 
     // While a header is dragged: the dragged lane tinted across the lanes, and a line across the whole timeline at the gap it would drop into.
