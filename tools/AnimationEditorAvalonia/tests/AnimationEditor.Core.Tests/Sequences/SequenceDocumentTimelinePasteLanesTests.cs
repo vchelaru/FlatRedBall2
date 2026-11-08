@@ -107,7 +107,7 @@ public class SequenceDocumentTimelinePasteLanesTests
     {
         using var dir = new TestHelpers.TempDir();
         var booster = Track("Booster", Chain("Glow", 2));
-        booster.X = 4; booster.Y = -6; booster.Z = 9; booster.FlipHorizontal = true; booster.Visible = false;
+        booster.X = 4; booster.Y = -6; booster.FlipHorizontal = true; booster.Visible = false;
         var source = Open(Path.Combine(dir.Path, "a"), new[] { "hero.achx" }, Track("Ship", Chain("Walk", 1)), booster);
         var destination = Open(Path.Combine(dir.Path, "b"), new string[0], Track("A"), Track("B"));
         var content = Read(source.CopyChains(0, All((0, 0), (1, 0))));
@@ -118,7 +118,7 @@ public class SequenceDocumentTimelinePasteLanesTests
         // Ship goes onto the selected lane 1; Booster would be lane 2, which does not exist, so it is made at the end.
         Names(destination).ShouldBe(new[] { "A", "B", "Booster" });
         var made = destination.Save.Sequences[0].Tracks[2];
-        (made.X, made.Y, made.Z, made.FlipHorizontal, made.Visible).ShouldBe((4f, -6f, 9, true, false));
+        (made.X, made.Y, made.FlipHorizontal, made.Visible).ShouldBe((4f, -6f, true, false));
         Chains(destination, 1).ShouldBe(new[] { ("Walk", 0.0) });
         Chains(destination, 2).ShouldBe(new[] { ("Glow", 1.0) });
         result.Chains.ShouldBe(All((1, 0), (2, 0)), ignoreOrder: true);
@@ -133,7 +133,7 @@ public class SequenceDocumentTimelinePasteLanesTests
     {
         using var dir = new TestHelpers.TempDir();
         var booster = Track("Booster", Chain("Glow", 2));
-        booster.X = 4; booster.Z = 9; booster.FlipHorizontal = true; booster.Visible = false;
+        booster.X = 4; booster.FlipHorizontal = true; booster.Visible = false;
         var source = Open(Path.Combine(dir.Path, "a"), new[] { "hero.achx" }, Track("Ship", Chain("Walk", 1)), booster);
         var destination = Open(Path.Combine(dir.Path, "b"), new string[0], Track("Other"), Track("Ship"));
         var content = Read(source.CopyChains(0, All((0, 0), (1, 0))));
@@ -145,7 +145,7 @@ public class SequenceDocumentTimelinePasteLanesTests
         Chains(destination, 1).ShouldBe(new[] { ("Walk", 3.0) });
         Chains(destination, 2).ShouldBe(new[] { ("Glow", 4.0) });
         var made = destination.Save.Sequences[0].Tracks[2];
-        (made.X, made.Z, made.FlipHorizontal, made.Visible).ShouldBe((4f, 9, true, false));
+        (made.X, made.FlipHorizontal, made.Visible).ShouldBe((4f, true, false));
         destination.Save.Sources.ShouldBe(new[] { "../a/hero.achx" });
         undo.UndoHistory.Count.ShouldBe(1);
         undo.Undo();

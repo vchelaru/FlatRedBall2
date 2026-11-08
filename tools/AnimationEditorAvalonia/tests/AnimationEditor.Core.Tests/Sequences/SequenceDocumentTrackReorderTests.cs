@@ -8,10 +8,10 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests.Sequences;
 
-/// <summary><see cref="SequenceDocument.MoveTrack"/>: one undo entry, the saved order and Z, and the selection that follows.</summary>
+/// <summary><see cref="SequenceDocument.MoveTrack"/>: one undo entry, the saved order, and the selection that follows.</summary>
 public class SequenceDocumentTrackReorderTests
 {
-    // Sequence 0 has tracks Back (Z 0), Mid (Z 1), Front (Z 2); Back carries a field this editor does not know.
+    // Sequence 0 has tracks Back, Mid, Front (a file written when tracks still had a Z, which is ignored); Back carries a field this editor does not know.
     private static (SequenceDocument Document, UndoManager Undo, string Path) Open(TestHelpers.TempDir dir)
     {
         string path = Path.Combine(dir.Path, "boss.seqj");
@@ -28,7 +28,7 @@ public class SequenceDocumentTrackReorderTests
     private static string[] Names(SequenceDocument document) => document.Save.Sequences[0].Tracks.Select(t => t.Name).ToArray();
 
     [Fact]
-    public void MoveTrack_FirstToLast_IsOneUndoEntry_ThatSavesTheNewOrderAndZ()
+    public void MoveTrack_FirstToLast_IsOneUndoEntry_ThatSavesTheNewOrder()
     {
         using var dir = new TestHelpers.TempDir();
         var (document, undo, path) = Open(dir);
@@ -40,11 +40,10 @@ public class SequenceDocumentTrackReorderTests
         Names(document).ShouldBe(new[] { "Mid", "Front", "Back" });
         var saved = SequenceListSave.FromFile(path).Sequences[0].Tracks;
         saved.Select(t => t.Name).ShouldBe(new[] { "Mid", "Front", "Back" });
-        saved.Select(t => t.Z).ShouldBe(new[] { 1, 2, 2 });
     }
 
     [Fact]
-    public void MoveTrack_UndoAndRedo_RestoreTheOrderAndZ()
+    public void MoveTrack_UndoAndRedo_RestoreTheOrder()
     {
         using var dir = new TestHelpers.TempDir();
         var (document, undo, path) = Open(dir);
@@ -52,11 +51,10 @@ public class SequenceDocumentTrackReorderTests
 
         undo.Undo();
         Names(document).ShouldBe(new[] { "Back", "Mid", "Front" });
-        document.Save.Sequences[0].Tracks.Select(t => t.Z).ShouldBe(new[] { 0, 1, 2 });
         undo.Redo();
 
         Names(document).ShouldBe(new[] { "Front", "Back", "Mid" });
-        SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(t => t.Z).ShouldBe(new[] { 0, 0, 1 });
+        SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Front", "Back", "Mid" });
     }
 
     [Theory]

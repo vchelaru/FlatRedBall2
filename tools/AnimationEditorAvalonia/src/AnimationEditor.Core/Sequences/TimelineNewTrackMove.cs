@@ -36,7 +36,6 @@ public static class TimelineNewTrackMove
             var track = new SequenceTrackSave
             {
                 Name = NameGenerator.Unique(sequence.Tracks.Select(t => t.Name), baseName),
-                Z = sequence.Tracks.Count,
             };
             track.Chains.AddRange(group);
             created.Add(sequence.Tracks.Count);

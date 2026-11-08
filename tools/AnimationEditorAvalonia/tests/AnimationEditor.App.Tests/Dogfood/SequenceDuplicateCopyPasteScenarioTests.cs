@@ -34,7 +34,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
         var idle = new SequenceSave { Name = "Idle", Loop = true };
-        var body = new SequenceTrackSave { Name = "Body", X = 5, Y = -3, Z = 2, FlipHorizontal = true };
+        var body = new SequenceTrackSave { Name = "Body", X = 5, Y = -3, FlipHorizontal = true };
         body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Loops = 3 });
         body.Visible = false;
         body.UnknownProperties["tag"] = "boss";
@@ -113,7 +113,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         var copy = saved.Sequences[1];
         (copy.Loop, copy.Tracks.Count).ShouldBe((true, 1));
         var track = copy.Tracks[0];
-        (track.X, track.Y, track.Z, track.FlipHorizontal).ShouldBe((5f, -3f, 2, true));
+        (track.X, track.Y, track.FlipHorizontal).ShouldBe((5f, -3f, true));
         track.Visible.ShouldBeFalse();
         track.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         (track.Chains[0].Source, track.Chains[0].Chain, track.Chains[0].Start, track.Chains[0].Loops).ShouldBe(("hero.achx", "Walk", 0.5, 3f));

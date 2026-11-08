@@ -28,7 +28,7 @@ public class SequenceDocumentTimelineDuplicateTests
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, X = 2, Z = 5, FlipHorizontal = true, Visible = false };
+        var track = new SequenceTrackSave { Name = name, X = 2, FlipHorizontal = true, Visible = false };
         track.UnknownProperties["tag"] = "boss";
         track.Chains.AddRange(chains);
         return track;
@@ -96,7 +96,7 @@ public class SequenceDocumentTimelineDuplicateTests
 
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
         var copy = document.Save.Sequences[0].Tracks[2];
-        (copy.X, copy.Z, copy.FlipHorizontal, copy.Visible).ShouldBe((2f, 5, true, false));
+        (copy.X, copy.FlipHorizontal, copy.Visible).ShouldBe((2f, true, false));
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.25, 2f, "gone.achx") });
         result.Tracks.ShouldBe(new[] { 2, 3 });

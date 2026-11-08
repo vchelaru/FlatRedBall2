@@ -34,9 +34,9 @@ public class SequenceTrackEyeScenarioTests
         chains.Save(Path.Combine(folder, "hero.achx"));
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var action = new SequenceSave { Name = "Action" };
-        foreach (var (name, z, chain) in new[] { ("Moon", 0, "Walk"), ("BlackMoon", 1, "Walk"), ("Sun", 2, "Flash") })
+        foreach (var (name, chain) in new[] { ("Moon", "Walk"), ("BlackMoon", "Walk"), ("Sun", "Flash") })
         {
-            var track = new SequenceTrackSave { Name = name, Z = z, Visible = !hidden.Contains(name) };
+            var track = new SequenceTrackSave { Name = name, Visible = !hidden.Contains(name) };
             track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0, Loops = 1 });
             action.Tracks.Add(track);
         }

@@ -29,7 +29,7 @@ public class SequenceTrackReorderScenarioTests
         string[] names = { "Back", "Mid", "Upper", "Front" };
         for (int i = 0; i < names.Length; i++)
         {
-            var track = new SequenceTrackSave { Name = names[i], Z = i, X = 10 * (i + 1) };
+            var track = new SequenceTrackSave { Name = names[i], X = 10 * (i + 1) };
             track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = i == 1 ? "Walk" : "Run" });
             sequence.Tracks.Add(track);
         }
@@ -73,7 +73,7 @@ public class SequenceTrackReorderScenarioTests
         editor.Drag(Header(editor, 0), GapBelowLast(editor));
 
         SavedNames(boss).ShouldBe(new[] { "Mid", "Upper", "Front", "Back" });
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Z).ShouldBe(new[] { 1, 2, 3, 3 });
+        File.ReadAllText(boss).ShouldNotContain("\"z\"");
         editor.UndoLabels.ShouldBe(new[] { "Move Track 'Back'" });
         DrawnBackToFront(editor).ShouldBe(new[] { 20f, 30f, 40f, 10f });
         Timeline(editor).SelectedTrack.ShouldBe(3);

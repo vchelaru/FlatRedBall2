@@ -81,13 +81,8 @@
                                   AutomationProperties.AutomationId="seq-track-visible" />
                         <CheckBox x:Name="TrackFlipBox" Content="Flip Horizontal"
                                   AutomationProperties.AutomationId="seq-track-flip" />
-                        <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="Z-order" Classes="label" />
-                            <viewsControls:FlankerNumericField x:Name="TrackZField" Grid.Column="1"
-                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0" />
-                        </Grid>
                         <TextBlock Classes="note"
-                                   Text="Relative to the entity origin, Y up. Higher z-order draws on top; equal values draw in lane order, the lower lane in front. Drag a track header to reorder." />
+                                   Text="Relative to the entity origin, Y up. The lower lane draws in front. Drag a track header to reorder." />
                     </StackPanel>
                 </Border>
 

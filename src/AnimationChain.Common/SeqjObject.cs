@@ -34,7 +34,7 @@ internal readonly struct SeqjObject(JsonObject node, string path)
         Read(key, node => node is JsonValue value && value.TryGetValue<double>(out var number) && double.IsFinite(number) ? number : (double?)null,
             "a number", fallback);
 
-    public int Int(string key, int fallback = 0) =>
+    private int Int(string key, int fallback) =>
         Read(key, node => node is JsonValue value && value.TryGetValue<int>(out var number) ? number : (int?)null, "a whole number", fallback);
 
     /// <summary>The objects in the array under <paramref name="key"/>; empty when absent. Every element must be an object.</summary>
