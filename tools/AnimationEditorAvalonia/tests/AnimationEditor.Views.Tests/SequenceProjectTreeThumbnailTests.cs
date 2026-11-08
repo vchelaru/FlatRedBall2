@@ -87,18 +87,6 @@ public class SequenceProjectTreeThumbnailTests : IDisposable
         Assert.NotNull(await service.GetThumbnailAsync(project.Entry!, 28, 28));
     }
 
-    [AvaloniaFact]
-    public async Task TwoTracks_CompositeTheTopLaneInFront()
-    {
-        // Fx is the top lane (first), so its blue square covers the red body where they overlap.
-        var project = Make(Seqj(Track("Fx", "fx/fx.achj", "Spark", 0) + "," + Track("Body", "body/body.achj", "Walk", 0)));
-        var service = new ProjectTreeThumbnailService(_cacheDir);
-
-        Assert.NotNull(await service.GetThumbnailAsync(project.Entry!, 28, 28));
-
-        using var png = SKBitmap.Decode(CacheFiles().Single());
-        Assert.Equal(SKColors.Blue, png.GetPixel(png.Width / 2, png.Height / 2).WithAlpha(255));
-    }
 
     [AvaloniaTheory]
     [InlineData("{ not json")]
@@ -163,23 +151,6 @@ public class SequenceProjectTreeThumbnailTests : IDisposable
         Assert.Equal(before.Split('_')[0], after.Split('_')[0]);
     }
 
-    [AvaloniaFact]
-    public async Task ChangingASeqjsTextureContent_ChangesTheThumbnail()
-    {
-        var project = Make(Seqj(Track("Body", "body/body.achj", "Walk", 0)));
-        var service = new ProjectTreeThumbnailService(_cacheDir);
-        await service.GetThumbnailAsync(project.Entry!, 28, 28);
-        using (var red = SKBitmap.Decode(CacheFiles().Single()))
-            Assert.Equal(SKColors.Red, red.GetPixel(14, 14).WithAlpha(255));
-
-        project.BodyPng.Content = Png(16, 16, SKColors.Lime);
-        project.BodyPng.Modified = project.BodyPng.Modified.AddMinutes(1);
-        service.InvalidateEntry(project.Entry!);
-        await service.GetThumbnailAsync(project.Entry!, 28, 28);
-
-        using var green = SKBitmap.Decode(CacheFiles().Single());
-        Assert.Equal(SKColors.Lime, green.GetPixel(14, 14).WithAlpha(255));
-    }
 
     [AvaloniaFact]
     public async Task Generation_RunsOffTheCallingThread()

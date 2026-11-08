@@ -20,11 +20,11 @@ internal static class SequenceThumbnailRenderer
     /// Renders <paramref name="layers"/> into at most <paramref name="maxWidth"/> by <paramref name="maxHeight"/> pixels. A
     /// layer whose texture is missing or cannot be decoded is left out; null when nothing is left to draw.
     /// </summary>
-    /// <param name="framesArePixels">The layers' frames still hold pixel coordinates (a source read without the editor's
+    /// <param name="framesArePixels">Whether a layer frame still holds pixel coordinates (a source read without the editor's
     /// UV conversion), converted here from each texture's size.</param>
     /// <param name="decode">Reads and decodes a layer's <see cref="SequenceThumbnailLayer.TexturePath"/>; null for a missing file.</param>
     public static async Task<SKBitmap?> RenderAsync(
-        IReadOnlyList<SequenceThumbnailLayer> layers, bool framesArePixels, Func<string, Task<SKBitmap?>> decode,
+        IReadOnlyList<SequenceThumbnailLayer> layers, Func<AnimationFrameSave, bool>? framesArePixels, Func<string, Task<SKBitmap?>> decode,
         int maxWidth, int maxHeight)
     {
         var textures = new Dictionary<string, SKBitmap?>(StringComparer.OrdinalIgnoreCase);
@@ -37,7 +37,7 @@ internal static class SequenceThumbnailRenderer
                 if (!textures.TryGetValue(layer.TexturePath, out var texture))
                     textures[layer.TexturePath] = texture = await decode(layer.TexturePath);
                 if (texture is null) continue;
-                var frame = framesArePixels ? PixelFrameUvConverter.ToUv(layer.Frame, texture.Width, texture.Height) : layer.Frame;
+                var frame = framesArePixels?.Invoke(layer.Frame) == true ? PixelFrameUvConverter.ToUv(layer.Frame, texture.Width, texture.Height) : layer.Frame;
                 drawn.Add((texture, frame, layer));
             }
             if (drawn.Count == 0) return null;
