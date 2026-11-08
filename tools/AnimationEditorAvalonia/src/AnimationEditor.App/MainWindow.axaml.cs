@@ -226,6 +226,7 @@ public partial class MainWindow : Window
     // ⌘ on macOS, Ctrl elsewhere, for Ctrl-modified mouse gestures and their user-facing text.
     // Production passes CommandModifier.ForHost(OperatingSystem.IsMacOS()); tests pick either.
     private readonly CommandModifier _commandModifier;
+    private bool IsMacOS => _commandModifier == CommandModifier.Meta;
 
     private FilePath SettingsFilePath =>
         AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
@@ -7418,6 +7419,8 @@ public partial class MainWindow : Window
                     new HotkeyGesture("Y", Command),
                     new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
                 },
+                // Mac convention; Ctrl+Y stays first for Windows/Linux. Menus show whichever fits the host.
+                MacPreferredGesture = new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
                 Scope = HotkeyScope.Document,
                 Action = Redo,
             },
@@ -7477,9 +7480,17 @@ public partial class MainWindow : Window
             new()
             {
                 Id = "save", Description = "Save", Category = "File",
-                Gestures = new[] { new HotkeyGesture("S", Command) },
+                // Shift is forbidden so Ctrl+Shift+S reaches Save As instead of saving in place.
+                Gestures = new[] { new HotkeyGesture("S", Command, Forbidden: Shift) },
                 Scope = HotkeyScope.Document,
                 Action = () => OnSaveClick(null, null!),
+            },
+            new()
+            {
+                // Achx scope like the Save As menu item: it saves the animation chain list, so other tab kinds refuse it.
+                Id = "save-as", Description = "Save As…", Category = "File",
+                Gestures = new[] { new HotkeyGesture("S", Command | Shift) },
+                Action = () => OnSaveAsClick(null, null!),
             },
             // Ctrl+Plus/Minus zooms whichever panel (wireframe, preview, or the PNG diff pane)
             // currently has keyboard focus — not a fixed pane — because requiring the user to
@@ -7570,6 +7581,7 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuNew, "new");
         SetMenuGesture(MenuLoad, "load");
         SetMenuGesture(MenuSave, "save");
+        SetMenuGesture(MenuSaveAs, "save-as");
         SetMenuGesture(MenuNavBack, "nav-back");
         SetMenuGesture(MenuNavForward, "nav-forward");
         // Wireframe/Preview Zoom In (and Out) share one gesture — it's contextual to whichever
@@ -7581,7 +7593,7 @@ public partial class MainWindow : Window
     }
 
     private KeyGesture HotkeyMenuGesture(string hotkeyId) =>
-        KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
+        KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayTextFor(IsMacOS));
 
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
         item.InputGesture = HotkeyMenuGesture(hotkeyId);
@@ -7603,7 +7615,7 @@ public partial class MainWindow : Window
     // This panel has no such constraint, so swap in words a user would actually recognize.
     // DisplayText always spells the command modifier "Ctrl"; swap in ⌘ on macOS.
     private string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
-        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus")
+        hotkey.DisplayTextFor(IsMacOS).Replace("OemPlus", "Plus").Replace("OemMinus", "Minus")
             .Replace("Ctrl", _commandModifier.DisplayName);
 
     private void WireKeyboard()
