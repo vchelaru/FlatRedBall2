@@ -810,14 +810,17 @@ public sealed class SequenceDocument
         return null;
     }
 
-    /// <summary>Sets a track's offset from the entity origin.</summary>
+    /// <summary>
+    /// Sets a track's offset from the entity origin. Like the .achx inspector's number fields, repeated calls merge into
+    /// one undo entry until <see cref="IUndoManager.SealCoalescing"/>, so typing or stepping a field is one step.
+    /// </summary>
     public void SetTrackOffset(IUndoManager undo, int sequence, int track, float x, float y) =>
         Edit(undo, $"Set Offset of '{Save.Sequences[sequence].Tracks[track].Name}' to ({Format(x)}, {Format(y)})", save =>
         {
             var target = save.Sequences[sequence].Tracks[track];
             target.X = x;
             target.Y = y;
-        });
+        }, coalesceGroup: $"offset:{sequence}:{track}");
 
     /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
     public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
@@ -900,7 +903,8 @@ public sealed class SequenceDocument
         if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Start of '{name}' to {Format(start)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start,
+            coalesceGroup: $"start:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -913,7 +917,8 @@ public sealed class SequenceDocument
         if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops,
+            coalesceGroup: $"cycles:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -1058,18 +1063,19 @@ public sealed class SequenceDocument
     {
         public string Description => description;
 
-        public string? CoalesceGroup => coalesceGroup;
+        // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
+        public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
+
+        // The merged entry undoes to where the first one started and redoes to where this one ended.
+        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
+            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
+            : this;
 
         private string Before => before;
         private int? SelectBefore => selectBefore;
         private int? TrackBefore => trackBefore;
         private SequenceSelectionState? StateBefore => stateBefore;
-
-        /// <summary>Merges a run of edits (arrow-key nudges) into one: the earlier one's "before" with this one's "after".</summary>
-        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
-            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
-                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
-            : this;
 
         public bool Do()
         {

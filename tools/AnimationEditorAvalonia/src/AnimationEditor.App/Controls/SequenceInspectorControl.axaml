@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:viewsControls="clr-namespace:AnimationEditor.Views.Controls;assembly=AnimationEditor.Views"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.App.Controls.SequenceInspectorControl">
     <!-- The Inspector tab's content while a .seqj tab is active: one section per kind of timeline selection
          (nothing = the sequence, a track header, a chain). Only one section shows at a time. -->
@@ -58,33 +59,52 @@
                 </Border>
 
                 <!-- Track -->
-                <Border x:Name="TrackPanel" IsVisible="False" Padding="12,8,12,10"
-                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="TRACK" Classes="heading" />
-                        <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="Name" Classes="label" />
-                            <TextBox x:Name="TrackNameBox" Grid.Column="1" FontSize="11"
-                                     AutomationProperties.AutomationId="seq-track-name" />
-                        </Grid>
-                        <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="Offset X" Classes="label" />
-                            <viewsControls:FlankerNumericField x:Name="TrackXField" Grid.Column="1"
-                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0.###" />
-                        </Grid>
-                        <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="Offset Y" Classes="label" />
-                            <viewsControls:FlankerNumericField x:Name="TrackYField" Grid.Column="1"
-                                                               Minimum="-100000" Maximum="100000" Increment="1" FormatString="0.###" />
-                        </Grid>
-                        <CheckBox x:Name="TrackVisibleBox" Content="Visible"
-                                  AutomationProperties.AutomationId="seq-track-visible" />
-                        <CheckBox x:Name="TrackFlipBox" Content="Flip Horizontal"
-                                  AutomationProperties.AutomationId="seq-track-flip" />
-                        <TextBlock Classes="note"
-                                   Text="Relative to the entity origin, Y up. The top lane draws in front. Drag a track header to reorder." />
-                    </StackPanel>
-                </Border>
+                <StackPanel x:Name="TrackPanel" IsVisible="False" Spacing="0">
+                    <Border Padding="12,8,12,10" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="TRACK" Classes="heading" />
+                            <Grid ColumnDefinitions="78,*">
+                                <TextBlock Text="Name" Classes="label" />
+                                <TextBox x:Name="TrackNameBox" Grid.Column="1" FontSize="11"
+                                         AutomationProperties.AutomationId="seq-track-name" />
+                            </Grid>
+                            <CheckBox x:Name="TrackVisibleBox" Content="Visible"
+                                      AutomationProperties.AutomationId="seq-track-visible" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- TRANSFORM: the same X / Y row and flip button as the .achx Inspector's frame TRANSFORM section
+                         (MainWindow.axaml PropRelX / PropFlipH), so a track offset and a frame offset read the same.
+                         Those fields show a spinner while editable (SetComputedLook), so these do too. -->
+                    <Border Padding="12,8,12,10" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="TRANSFORM" Classes="heading" />
+                            <WrapPanel ToolTip.Tip="Offset from the entity origin, Y up">
+                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                    <TextBlock Text="X" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                    <NumericUpDown x:Name="TrackXField" Grid.Column="1" MinWidth="66" ShowButtonSpinner="True"
+                                                   Minimum="-10000" Maximum="10000" Increment="1" FormatString="0.###" />
+                                </Grid>
+                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                    <TextBlock Text="Y" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                    <NumericUpDown x:Name="TrackYField" Grid.Column="1" MinWidth="66" ShowButtonSpinner="True"
+                                                   Minimum="-10000" Maximum="10000" Increment="1" FormatString="0.###" />
+                                </Grid>
+                            </WrapPanel>
+                            <ToggleButton x:Name="TrackFlipBox" ToolTip.Tip="Flip Horizontal"
+                                          HorizontalAlignment="Left" Width="32" Height="26"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                          AutomationProperties.AutomationId="seq-track-flip">
+                                <svg:Svg Width="16" Height="16"
+                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFlipH.svg"
+                                         CurrentColor="{DynamicResource IconInk}"
+                                         VerticalAlignment="Center" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
 
                 <!-- Several chains or tracks selected: only the count; no field is common to all of them. -->
                 <Border x:Name="MultiPanel" IsVisible="False" Padding="12,8,12,10"
@@ -112,14 +132,14 @@
                         <Grid ColumnDefinitions="78,*,Auto">
                             <TextBlock Text="Start" Classes="label" />
                             <viewsControls:FlankerNumericField x:Name="ChainStartField" Grid.Column="1"
-                                                               Increment="0.05" FormatString="0.###" />
+                                                               Minimum="0" Increment="0.05" FormatString="0.###" />
                             <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
                         </Grid>
                         <Grid ColumnDefinitions="78,*">
                             <TextBlock Text="Cycles" Classes="label"
                                        ToolTip.Tip="The block's length in playback cycles (a ping-pong cycle is there and back). A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                             <viewsControls:FlankerNumericField x:Name="ChainLoopsField" Grid.Column="1"
-                                                               Increment="1" FormatString="0.###"
+                                                               Minimum="0.001" Increment="1" FormatString="0.###"
                                                                ToolTip.Tip="The block's length in playback cycles (a ping-pong cycle is there and back). A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                         </Grid>
                         <Grid ColumnDefinitions="78,*">

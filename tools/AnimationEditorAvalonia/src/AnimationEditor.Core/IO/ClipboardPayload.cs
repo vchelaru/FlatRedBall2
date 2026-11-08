@@ -101,6 +101,23 @@ public static class ClipboardPayload
 
     // ── Deserialization ───────────────────────────────────────────────────
 
+    /// <summary>
+    /// True when <paramref name="text"/> starts with one of the type names <see cref="Serialize(List{AnimationChainSave})"/>
+    /// and its siblings write, whether or not the rest parses. A cheap check for "the editor put this here".
+    /// </summary>
+    public static bool HasPayloadPrefix(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        int sep = text.IndexOf(':');
+        if (sep < 0) return false;
+        var typeName = text.AsSpan(0, sep);
+        return typeName.SequenceEqual(TypeName<List<AnimationChainSave>>())
+            || typeName.SequenceEqual(TypeName<List<AnimationFrameSave>>())
+            || typeName.SequenceEqual(ShapesTypeName)
+            || typeName.SequenceEqual(nameof(AARectSave))
+            || typeName.SequenceEqual(nameof(CircleSave));
+    }
+
     public static bool TryDeserialize(
         string? text,
         out List<AnimationChainSave>? chains,
