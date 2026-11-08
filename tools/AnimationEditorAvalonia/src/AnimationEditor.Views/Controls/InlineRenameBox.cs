@@ -25,6 +25,7 @@ public sealed class InlineRenameBox : TextBox
         RoutedEvent.Register<InlineRenameBox, RoutedEventArgs>(nameof(Cancelled), RoutingStrategies.Bubble);
 
     private bool _editing;
+    private bool _seeding;
 
     public InlineRenameBox()
     {
@@ -58,13 +59,29 @@ public sealed class InlineRenameBox : TextBox
     public bool IsEditing => _editing;
 
     /// <summary>
+    /// True once the user has changed the text since <see cref="Begin"/> (even if they changed it back). Until then the
+    /// box has nothing of its own to undo, so the host lets Ctrl+Z reach the document; from then on the box owns it.
+    /// </summary>
+    public bool HasTypedText { get; private set; }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == TextProperty && _editing && !_seeding) HasTypedText = true;
+    }
+
+    /// <summary>
     /// Shows <paramref name="text"/> selected, with focus, once the box has been laid out. With <paramref name="selectAll"/>
     /// off the caret goes to the end instead, to resume text the user had already typed.
     /// </summary>
     public void Begin(string text, bool selectAll = true)
     {
         _editing = true;
+        _seeding = true;
         Text = text;
+        _seeding = false;
+        // Resumed text is text the user typed.
+        HasTypedText = !selectAll;
         Dispatcher.UIThread.Post(() =>
         {
             if (!_editing) return;

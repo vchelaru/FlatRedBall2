@@ -7884,10 +7884,11 @@ public partial class MainWindow : Window
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
 
-    // True while a sequence list row or track header rename box has focus. Undo and Redo then belong to the box's own
-    // text, not the document; the Edit menu still commits the rename first.
+    // True while a sequence list row or track header rename box has focus and the user has typed in it. Undo and Redo then
+    // belong to the box's own text, not the document; a box nothing was typed in (a fresh Add Sequence) has nothing to
+    // undo, so Ctrl+Z still takes the add back. The Edit menu still commits the rename first.
     private bool IsInlineRenameBoxFocused()
-        => FocusManager?.GetFocusedElement() is AnimationEditor.Views.Controls.InlineRenameBox;
+        => FocusManager?.GetFocusedElement() is AnimationEditor.Views.Controls.InlineRenameBox { HasTypedText: true };
 
     // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
     // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.

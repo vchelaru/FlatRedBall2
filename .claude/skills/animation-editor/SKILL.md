@@ -197,7 +197,7 @@ The library adds without dragging too: a chip double-click or Enter (chips are f
 
 ## Sequence rename boxes are plain text boxes for undo, and survive a live reload
 
-While an `InlineRenameBox` (sequence row or track header) has focus, the window-level Undo/Redo hotkeys skip (`IsInlineRenameBoxFocused`), so Ctrl+Z/Y/Shift+Z act on the typed text and never the document; the Edit menu's Undo still commits the rename first. The ANIMATIONS tree's rename box is a different control and still commits first. A live reload (`ReloadShownFromDisk`) reopens an open rename on the same sequence or track by name with the typed text (`TakePendingRename`/`ResumePendingRename`), and closes it when that name is gone.
+While an `InlineRenameBox` (sequence row or track header) has focus and the user has typed in it (`HasTypedText`), the window-level Undo/Redo hotkeys skip (`IsInlineRenameBoxFocused`), so Ctrl+Z/Y/Shift+Z act on the typed text and never the document (an untouched box, like the one Add Sequence opens, has nothing to undo, so Ctrl+Z still takes the add back); the Edit menu's Undo still commits the rename first. The ANIMATIONS tree's rename box is a different control and still commits first. A live reload (`ReloadShownFromDisk`) reopens an open rename on the same sequence or track by name with the typed text (`TakePendingRename`/`ResumePendingRename`), and closes it when that name is gone.
 
 ## Text boxes refuse the editor's own copy JSON
 
