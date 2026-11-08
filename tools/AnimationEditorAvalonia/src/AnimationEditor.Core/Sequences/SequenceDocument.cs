@@ -819,6 +819,31 @@ public sealed class SequenceDocument
             target.Y = y;
         });
 
+    /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
+    public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
+        ? $"Move Track '{Save.Sequences[sequence].Tracks[tracks[0]].Name}'"
+        : $"Move {Plural.Format(tracks.Count, "track")}";
+
+    /// <summary>
+    /// Moves tracks by (<paramref name="dx"/>, <paramref name="dy"/>) as an arrow key does, keeping each offset as it
+    /// is plus the step (no rounding). Consecutive nudges of the same tracks are one undo entry until
+    /// <see cref="IUndoManager.SealCoalescing"/> (the key coming up, focus leaving) or another edit ends the run.
+    /// </summary>
+    public void NudgeTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, float dx, float dy)
+    {
+        var moved = tracks.Distinct().OrderBy(track => track).ToList();
+        if (moved.Count == 0) return;
+        Edit(undo, DescribeMove(sequence, moved), save =>
+        {
+            foreach (int track in moved)
+            {
+                var target = save.Sequences[sequence].Tracks[track];
+                target.X += dx;
+                target.Y += dy;
+            }
+        }, coalesceGroup: $"nudge:{sequence}:{string.Join(',', moved)}");
+    }
+
     /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
     /// (no undo entry) when the track already is that way.
@@ -939,7 +964,7 @@ public sealed class SequenceDocument
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
         int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
-        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null)
+        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null, string? coalesceGroup = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -950,7 +975,7 @@ public sealed class SequenceDocument
         if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
         undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
-            stateBefore, stateAfter));
+            stateBefore, stateAfter, coalesceGroup));
     }
 
     /// <summary>
@@ -1028,9 +1053,23 @@ public sealed class SequenceDocument
     // leaves the selection alone the first time the edit runs (redo still applies selectAfter).
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
-        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null) : IUndoableCommand
+        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
+        string? coalesceGroup = null) : IUndoableCommand
     {
         public string Description => description;
+
+        public string? CoalesceGroup => coalesceGroup;
+
+        private string Before => before;
+        private int? SelectBefore => selectBefore;
+        private int? TrackBefore => trackBefore;
+        private SequenceSelectionState? StateBefore => stateBefore;
+
+        /// <summary>Merges a run of edits (arrow-key nudges) into one: the earlier one's "before" with this one's "after".</summary>
+        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
+            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
+            : this;
 
         public bool Do()
         {
