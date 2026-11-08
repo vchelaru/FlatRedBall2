@@ -49,26 +49,45 @@ public static class SequenceScene
     /// length the sprites are those of its last instant (<see cref="SequenceTimeline.PoseTime"/>), so a track whose chains
     /// finished earlier stays hidden. A looping sequence is sampled at exactly <paramref name="time"/>.
     /// </summary>
-    public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time)
+    public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time) =>
+        sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count
+            ? []
+            : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document);
+
+    /// <summary>
+    /// <see cref="At(SequenceDocument, int, double)"/> for one sequence and any source of chains: the open document, or a
+    /// <c>.seqj</c> read without opening it (the Open Project Folder thumbnails).
+    /// </summary>
+    public static IReadOnlyList<SequenceSprite> At(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup)
     {
-        if (sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count) return [];
-        var sequence = document.Save.Sequences[sequenceIndex];
         var tracks = sequence.Tracks;
-        time = SequenceTimeline.PoseTime(time, document.SequenceLength(sequenceIndex), sequence.Loop);
+        double CycleLength(SequenceChainReferenceSave reference) =>
+            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0;
+        time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(sequence, CycleLength), sequence.Loop);
         var sprites = new List<SequenceSprite>();
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
             var track = tracks[t];
             if (!track.Visible) continue;
-            var reference = SequenceTimeline.ActiveAt(track, time, r => document.CycleLength(r) ?? 0, out double local);
-            if (reference is null || document.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
+            var reference = SequenceTimeline.ActiveAt(track, time, CycleLength, out double local);
+            if (reference is null || lookup.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
 
             // The chain's own Loop flag decides what happens past one cycle: a looping chain wraps, a non-looping one holds
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
-            string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
+            string? texture = lookup.ResolveTexturePath(reference.Source, chain.Frames[frame]);
             sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, sequenceIndex));
         }
         return sprites;
     }
+}
+
+/// <summary>Where a sequence finds the chains its tracks reference, and the textures their frames use.</summary>
+public interface ISequenceChainLookup
+{
+    /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
+    AnimationChainSave? FindChain(SequenceChainReferenceSave reference);
+
+    /// <summary>The texture of <paramref name="frame"/> (a frame of a chain of <paramref name="source"/>), or null when it has none.</summary>
+    string? ResolveTexturePath(string source, AnimationFrameSave frame);
 }

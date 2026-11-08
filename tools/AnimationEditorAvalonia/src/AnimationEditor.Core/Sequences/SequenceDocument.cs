@@ -21,7 +21,7 @@ namespace AnimationEditor.Core.Sequences;
 /// Undo snapshots the whole file as JSON. A <c>.seqj</c> is small, so this stays cheap and needs no per-edit
 /// command classes; revisit if files grow large.
 /// </remarks>
-public sealed class SequenceDocument
+public sealed class SequenceDocument : ISequenceChainLookup
 {
     private const string DefaultSequenceName = "Sequence";
     private const string DefaultTrackName = "Track";
