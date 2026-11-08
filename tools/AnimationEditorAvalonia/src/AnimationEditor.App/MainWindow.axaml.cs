@@ -6081,25 +6081,25 @@ public partial class MainWindow : Window
             PropChainPanel.IsVisible = chainOnly;
             if (chainOnly)
             {
-                // Checked only when every selected chain is locked; indeterminate when they disagree.
-                var lockStates = _selectedState.SelectedChains.Select(c => c.IsLocked).Append(selectedChain!.IsLocked).Distinct().ToList();
-                PropChainLocked.IsChecked = lockStates.Count > 1 ? null : lockStates[0];
-                RefreshChainNameBox(selectedChain);
-                // Checked only when every selected chain loops; indeterminate when they disagree.
-                var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
-                PropChainLoop.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
-                PropChainPingPong.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
-                PropChainReverse.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
+                // Checked only when every selected chain has the flag; indeterminate when they disagree.
+                var bulk = SelectedChainsBulkState(selectedChain!);
+                PropChainLocked.IsChecked = bulk.Locked;
+                RefreshChainNameBox(selectedChain!, bulk.IsMultiple);
+                PropChainLoop.IsChecked = bulk.Loop;
+                PropChainPingPong.IsChecked = bulk.PingPong;
+                PropChainReverse.IsChecked = bulk.Reverse;
             }
             // Owner tile (#1182): native-tsx projects only -- an achx/achj chain has no Tiled
             // tile to own. Re-reads on every refresh (not just selection change) so an edit made
             // through the field itself picks up the committed value, including a value the
             // ownership-transfer/stale-reuse machinery in ProjectManager might have adjusted.
             PropChainTsxOwnerSection.IsVisible = chainOnly && _projectManager.IsNativeTsxProject;
+            // Each animation needs its own owner tile, so the field edits one animation only and is off for several.
+            PropChainTsxOwnerSection.IsEnabled = _selectedState.SelectedChains.Count <= 1;
             if (chainOnly && _projectManager.IsNativeTsxProject)
             {
                 var ownerTileId = _projectManager.GetTsxOwnerTileId(selectedChain!);
-                PropChainTsxOwnerInput.Value = ownerTileId.HasValue ? ownerTileId.Value : null;
+                PropChainTsxOwnerInput.Value = ownerTileId.HasValue && PropChainTsxOwnerSection.IsEnabled ? ownerTileId.Value : null;
                 PropChainTsxOwnerError.IsVisible = false;
 
                 // Label always names the target tile, so it's visible whether or not the button
@@ -6125,10 +6125,10 @@ public partial class MainWindow : Window
             // not just the chain-only inspector view PropChainLoop above is scoped to.
             if (selectedChain is not null)
             {
-                var loopStates = _selectedState.SelectedChains.Select(c => c.Loop).Append(selectedChain.Loop).Distinct().ToList();
-                LoopToggle.IsChecked = loopStates.Count > 1 ? null : loopStates[0];
-                PingPongToggle.IsChecked = SharedChainFlag(selectedChain, c => c.PingPong);
-                ReverseToggle.IsChecked = SharedChainFlag(selectedChain, c => c.Reverse);
+                var toggles = SelectedChainsBulkState(selectedChain);
+                LoopToggle.IsChecked = toggles.Loop;
+                PingPongToggle.IsChecked = toggles.PingPong;
+                ReverseToggle.IsChecked = toggles.Reverse;
             }
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
@@ -6486,8 +6486,16 @@ public partial class MainWindow : Window
 
     /// <summary>An auto-named tsx chain shows an empty box with its synthetic name as the
     /// placeholder, so clearing the box and seeing the placeholder mean the same thing.</summary>
-    private void RefreshChainNameBox(AnimationChainSave chain)
+    private void RefreshChainNameBox(AnimationChainSave chain, bool multiple = false)
     {
+        // One name cannot go on several animations (names are unique per file), like the shape panel's "(multiple — same frame)".
+        PropChainName.IsEnabled = !multiple;
+        if (multiple)
+        {
+            PropChainName.Text = string.Empty;
+            PropChainName.PlaceholderText = "(multiple — same file)";
+            return;
+        }
         var isAuto = _projectManager.IsChainNameAuto(chain);
         PropChainName.Text = isAuto ? string.Empty : chain.Name;
         PropChainName.PlaceholderText = _projectManager.GetTsxOwnerTileId(chain) is { } tileId
@@ -6500,7 +6508,7 @@ public partial class MainWindow : Window
     /// achx project) snaps the box back to the current name.</summary>
     private void ApplyChainName()
     {
-        if (_suppressPropRefresh) return;
+        if (_suppressPropRefresh || !PropChainName.IsEnabled) return;
         var chain = _selectedState.SelectedChain;
         if (chain is null) return;
 
@@ -6541,11 +6549,8 @@ public partial class MainWindow : Window
     }
 
     // Checked when every selected chain has the flag, unchecked when none does, indeterminate when they disagree.
-    private bool? SharedChainFlag(AnimationChainSave selectedChain, Func<AnimationChainSave, bool> flag)
-    {
-        var states = _selectedState.SelectedChains.Select(flag).Append(flag(selectedChain)).Distinct().ToList();
-        return states.Count > 1 ? null : states[0];
-    }
+    private AnimationBulkState SelectedChainsBulkState(AnimationChainSave selectedChain) =>
+        AnimationBulkState.For(_selectedState.SelectedChains.Append(selectedChain).Distinct().ToList());
 
     private List<AnimationChainSave> ChainsForChainProperties()
     {
