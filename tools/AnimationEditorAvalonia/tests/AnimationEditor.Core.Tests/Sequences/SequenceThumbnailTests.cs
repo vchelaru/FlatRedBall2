@@ -130,6 +130,15 @@ public class SequenceThumbnailTests
         ThumbnailLayoutCalculator.Fit([new ThumbnailSpriteRect(0, 8, 0, 0)], 28, 28).ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("body/body.achj", "body.png", "body/body.png")]
+    [InlineData("body.achj", "body.png", "body.png")]
+    [InlineData("../shared/body.achj", "tex\\body.png", "../shared/tex/body.png")]
+    [InlineData("a/b/x.achj", "../../c.png", "c.png")]
+    [InlineData("a/x.achj", "../../c.png", "../c.png")]
+    public void ResolveFrom_CollapsesDotSegments(string baseFile, string relative, string expected) =>
+        RelativeFilePaths.ResolveFrom(baseFile, relative).ShouldBe(expected);
+
     [Fact]
     public void CacheKey_ChangesWhenAnyInputChanges_AndKeepsTheIdentityPrefix()
     {

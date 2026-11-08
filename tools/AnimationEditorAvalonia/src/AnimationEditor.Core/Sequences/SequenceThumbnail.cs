@@ -115,3 +115,24 @@ public static class SequenceThumbnailCacheKey
     private static string Hash(string text) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
 }
+
+/// <summary>Joins a path written relative to a file's folder onto that file's own path, for files read without a real path.</summary>
+public static class RelativeFilePaths
+{
+    /// <summary>
+    /// <paramref name="relative"/> resolved against the folder of <paramref name="baseFile"/> (itself a forward-slash path
+    /// relative to some root), collapsing <c>.</c> and <c>..</c>. A <c>..</c> that climbs above the root is kept.
+    /// </summary>
+    public static string ResolveFrom(string baseFile, string relative)
+    {
+        var parts = new List<string>(baseFile.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries));
+        if (parts.Count > 0) parts.RemoveAt(parts.Count - 1);
+        foreach (var part in relative.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part == ".") continue;
+            if (part == ".." && parts.Count > 0 && parts[^1] != "..") parts.RemoveAt(parts.Count - 1);
+            else parts.Add(part);
+        }
+        return string.Join('/', parts);
+    }
+}
