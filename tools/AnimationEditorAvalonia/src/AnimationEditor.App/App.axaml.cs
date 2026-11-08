@@ -165,19 +165,26 @@ public partial class App : Application
         return new WindowIcon(new Bitmap(stream));
     }
 
-    private void RegisterNativeMenu(MainWindow window) =>
+    /// <summary>Gives <paramref name="window"/> its own macOS menu bar mirror; every MainWindow needs one, since the in-window menu is hidden on a Mac.</summary>
+    private static void RegisterNativeMenu(MainWindow window) =>
         NativeMenu.SetMenu(window, window.CreateNativeMenu());
 
-    internal static MainWindow CreateDetachedWindow()
+    /// <param name="settingsRoot">
+    /// Application-data root for the window's settings and thumbnail cache; null is the user's real
+    /// folder. Tests pass a temp folder.
+    /// </param>
+    internal static MainWindow CreateDetachedWindow(string? settingsRoot = null)
     {
-        var services = BuildServices();
+        var services = BuildServices(settingsRoot);
         var window = services.GetRequiredService<MainWindow>();
         window.Icon = LoadAppIcon();
+        RegisterNativeMenu(window);
         return window;
     }
 
-    private static ServiceProvider BuildServices()
+    private static ServiceProvider BuildServices(string? settingsRoot = null)
     {
+        settingsRoot ??= Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var sc = new ServiceCollection();
 
         sc.AddSingleton<ProjectManager>();
@@ -224,8 +231,7 @@ public partial class App : Application
             new ThumbnailService(sp.GetRequiredService<IProjectManager>()));
 
         sc.AddSingleton<ProjectTreeThumbnailService>(sp =>
-            new ProjectTreeThumbnailService(ProjectThumbnailCacheLocation.ForApplicationDataRoot(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))));
+            new ProjectTreeThumbnailService(ProjectThumbnailCacheLocation.ForApplicationDataRoot(settingsRoot)));
 
         sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
         sc.AddSingleton(_ => PlatformWheelInput.CreateForHost());
@@ -242,7 +248,7 @@ public partial class App : Application
             sp.GetRequiredService<IPendingCutState>(),
             sp.GetRequiredService<ThumbnailService>(),
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            settingsRoot,
             sp.GetRequiredService<IApplicationUpdater>(),
             useMacOSChrome: OperatingSystem.IsMacOS(),
             commandModifier: CommandModifier.ForHost(OperatingSystem.IsMacOS()),
