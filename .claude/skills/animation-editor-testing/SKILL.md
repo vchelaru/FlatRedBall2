@@ -45,8 +45,8 @@ fails the scenario. Read results from `Project`, `Services.SelectedState`, `Node
 encodes, so do not rediscover them: hit-testing needs a render tick after layout
 (`AvaloniaHeadlessPlatform.ForceRenderTimerTick`), `DispatcherTimer`s tick only while the test
 awaits (`WaitAsync`, never `Thread.Sleep`+`RunJobs`), text labels are not hit-testable so a
-label-only double-tap is unreachable, file-backed documents auto-save so only Untitled tabs prompt
-on close, and File > Load bypasses `IFileDialogService` so it cannot be scripted.
+label-only double-tap is unreachable, file-backed documents auto-save so only Untitled tabs and tabs whose last save failed
+(`MakeUnwritable`) prompt on close, and File > Load bypasses `IFileDialogService` so it cannot be scripted.
 
 ## `[AvaloniaFact]` is a last resort
 

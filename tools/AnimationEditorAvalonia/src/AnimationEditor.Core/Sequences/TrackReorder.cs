@@ -23,6 +23,13 @@ public static class TrackReorder
     public static double SlotY(TimelineViewport viewport, int slot) => viewport.LaneTop(slot);
 
     /// <summary>
+    /// The gap that moves track <paramref name="from"/> one lane up (<paramref name="delta"/> -1) or down (+1), for Alt+Up and
+    /// Alt+Down, or null at the top or bottom lane. The same slot a header drag would drop on.
+    /// </summary>
+    public static int? StepSlot(int from, int trackCount, int delta) =>
+        delta < 0 ? (from > 0 ? from - 1 : null) : (from < trackCount - 1 ? from + 2 : null);
+
+    /// <summary>
     /// The lane track <paramref name="from"/> ends up in when dropped on gap <paramref name="slot"/>, or null when the drop
     /// changes nothing (the gap just above or below the track itself).
     /// </summary>

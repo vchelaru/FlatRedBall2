@@ -65,7 +65,7 @@ public sealed partial class SequenceTimelineControl
     /// <summary>Every selected track header, ascending. Empty while chains are selected.</summary>
     public IReadOnlyList<int> SelectedTracks => _model.Tracks;
 
-    /// <summary>"3 chains selected" when more than one chain or track is, else null; the Inspector shows it in place of any field.</summary>
+    /// <summary>"3 chains selected" when more than one chain or track is, else null; the status bar shows it.</summary>
     public string? SelectionSummary =>
         !_model.IsMulti ? null
         : _model.Kind == TimelineSelectionKind.Chains ? $"{Plural.Format(_model.Count, "chain")} selected"
@@ -98,6 +98,9 @@ public sealed partial class SequenceTimelineControl
     /// <summary>Selects exactly these track headers (those that exist). None clears the selection.</summary>
     public void SelectTracks(IEnumerable<int> tracks) =>
         NotifySelection(_model.SelectTracks(tracks.Where(track => track >= 0 && track < TrackCount)));
+
+    /// <summary>Selects every chain, or every track while headers are selected: what Ctrl+A does with the timeline focused.</summary>
+    public void SelectAllItems() => NotifySelection(_model.SelectAll(_blocks, TrackCount));
 
     /// <summary>Deselects the chain or track, so the inspector shows the sequence.</summary>
     public void ClearSelection() => SetSelection(null, null);

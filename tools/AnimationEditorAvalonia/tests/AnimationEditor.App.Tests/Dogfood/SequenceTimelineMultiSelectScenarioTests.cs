@@ -1,6 +1,7 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
@@ -191,29 +192,32 @@ public class SequenceTimelineMultiSelectScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task Inspector_ForAMultiSelection_SaysHowManyAreSelected_AndOneChainShowsItsFieldsAsBefore()
+    public async Task Inspector_ForAMultiSelection_EditsThemTogether_TheStatusBarSaysHowManyAreSelected()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
         var inspector = Inspector(editor);
+        var counts = editor.Control<TextBlock>("StatusCounts");
         editor.ClickAt(At(editor, 0, 0.25));
         inspector.ChainPanel.IsVisible.ShouldBeTrue();
+        counts.Text.ShouldBe("1 sequence");
 
         editor.ClickAt(At(editor, 0, 1.25), RawInputModifiers.Control);
         editor.ClickAt(At(editor, 1, 0.6), RawInputModifiers.Control);
 
-        inspector.MultiPanel.IsVisible.ShouldBeTrue();
-        inspector.MultiCountText.Text.ShouldBe("3 chains selected");
-        inspector.ChainPanel.IsVisible.ShouldBeFalse();
+        counts.Text.ShouldBe("3 chains selected");
+        inspector.ChainPanel.IsVisible.ShouldBeTrue("the chain fields stand for all three");
         inspector.TrackPanel.IsVisible.ShouldBeFalse();
         inspector.SequencePanel.IsVisible.ShouldBeFalse();
 
         editor.ClickAt(Header(editor, 0));
         editor.ClickAt(Header(editor, 1), RawInputModifiers.Control);
-        inspector.MultiCountText.Text.ShouldBe("2 tracks selected");
+        counts.Text.ShouldBe("2 tracks selected");
+        inspector.TrackPanel.IsVisible.ShouldBeTrue();
+        inspector.ChainPanel.IsVisible.ShouldBeFalse();
         editor.ClickAt(Header(editor, 1), RawInputModifiers.Control);
         inspector.TrackPanel.IsVisible.ShouldBeTrue();
-        inspector.MultiPanel.IsVisible.ShouldBeFalse();
+        counts.Text.ShouldBe("1 sequence");
     }
 
     [AvaloniaFact]
