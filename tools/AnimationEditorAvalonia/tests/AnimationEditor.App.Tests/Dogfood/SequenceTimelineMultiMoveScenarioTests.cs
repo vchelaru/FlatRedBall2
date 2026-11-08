@@ -155,7 +155,7 @@ public class SequenceTimelineMultiMoveScenarioTests
         SavedTrack(boss, 0).Chains[0].Loops.ShouldBeGreaterThan(1f);
         SavedTrack(boss, 0).Chains[1].Loops.ShouldBe(1f);
         editor.UndoLabels.Count.ShouldBe(1);
-        editor.UndoLabels[0].ShouldStartWith("Set Loops");
+        editor.UndoLabels[0].ShouldStartWith("Set Cycles");
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0) });
     }
 

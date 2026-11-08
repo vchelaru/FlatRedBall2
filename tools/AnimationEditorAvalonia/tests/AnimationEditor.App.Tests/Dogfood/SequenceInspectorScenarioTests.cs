@@ -267,7 +267,7 @@ public class SequenceInspectorScenarioTests
         (chain.Start, chain.Loops).ShouldBe((1.5, 2.5f));
         Timeline(editor).Blocks.Single().Start.ShouldBe(1.5);
         Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 0));
-        editor.UndoLabels.ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Loops of 'Walk' to 2.5" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Cycles of 'Walk' to 2.5" });
 
         editor.Press(Key.Z, RawInputModifiers.Control);
         SavedTrack(boss, 0).Chains.Single().Loops.ShouldBe(1f);

@@ -654,7 +654,7 @@ public sealed class SequenceDocument
     {
         if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
-        Edit(undo, $"Set Loops of '{name}' to {Format(loops)}",
+        Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
             save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);
         return null;
     }

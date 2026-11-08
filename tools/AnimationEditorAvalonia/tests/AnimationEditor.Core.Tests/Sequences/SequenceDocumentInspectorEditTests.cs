@@ -153,7 +153,7 @@ public class SequenceDocumentInspectorEditTests
         document.SetChainLoops(undo, 0, 0, 0, 2.5f).ShouldBeNull();
 
         SavedTrack(document).Chains.Single().Loops.ShouldBe(2.5f);
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Loops of 'Walk' to 2.5" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
     }
 
     [Theory]

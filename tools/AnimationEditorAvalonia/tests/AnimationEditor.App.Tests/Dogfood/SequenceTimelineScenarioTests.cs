@@ -206,7 +206,7 @@ public class SequenceTimelineScenarioTests
         var walk = Timeline(editor).Blocks.Single(b => b.Reference.Chain == "Walk");
         walk.IsCut.ShouldBeTrue();
         walk.Played.ShouldBe(1.25, 1e-6);
-        editor.UndoLabels.ShouldBe(new[] { "Set Loops of 'Walk' to 2", "Set Loops of 'Walk' to 2.5", "Set Loops of 'Walk' to 3.8" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Cycles of 'Walk' to 2", "Set Cycles of 'Walk' to 2.5", "Set Cycles of 'Walk' to 3.8" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         WalkLoops().ShouldBe(2.5f, 1e-5f);
     }

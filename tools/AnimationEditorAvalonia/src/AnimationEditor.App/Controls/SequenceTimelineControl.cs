@@ -965,7 +965,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         string description;
         if (kind == DragKind.Edge)
         {
-            description = $"Set Loops of '{dragged.Chain}' to {dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
+            description = $"Set Cycles of '{dragged.Chain}' to {dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         }
         else if (toNewTrack)
         {
