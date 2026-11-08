@@ -2709,6 +2709,13 @@ public partial class MainWindow : Window
         ReloadFromDisk:  () => ClickIfEnabled(MenuReloadFromDisk),
         ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
         ResizeTexture:   () => ClickIfEnabled(MenuResizeTexture),
+        NavBack:         () => _ = NavigateHistoryAsync(back: true),
+        NavForward:      () => _ = NavigateHistoryAsync(back: false),
+        CanGoBack:       () => _navigationHistory.CanGoBack,
+        CanGoForward:    () => _navigationHistory.CanGoForward,
+        SubscribeNavigationChanged: handler => _navigationHistory.Changed += handler,
+        NavBackGesture:    HotkeyMenuGesture("nav-back"),
+        NavForwardGesture: HotkeyMenuGesture("nav-forward"),
         ShowHistory:     () => ClickIfEnabled(MenuShowHistory),
         ViewLog:         () => OnViewLogClick(null, null!),
         About:           () => _ = ShowAboutDialogAsync());
@@ -7609,8 +7616,11 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuPreviewZoomOut, "panel-zoom-out");
     }
 
+    private KeyGesture HotkeyMenuGesture(string hotkeyId) =>
+        KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
+
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
-        item.InputGesture = KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
+        item.InputGesture = HotkeyMenuGesture(hotkeyId);
 
     // Sourced from the same registry the KeyDown dispatch and menu gesture text use (#632), so
     // this list can never drift from what a keypress actually does (#634).
