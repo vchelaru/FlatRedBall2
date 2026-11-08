@@ -31,7 +31,7 @@ namespace AnimationEditor.App.Controls;
 /// (one frame = FrameLength seconds). When a single frame is selected, shows that
 /// frame statically with optional onion-skin overlay.
 /// </summary>
-public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInputTarget
+public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInputTarget
 {
     // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;
@@ -1839,7 +1839,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
                 ? GetResizeCursor(_shapeResizeHandle)
                 : StandardCursorType.SizeAll;
 
-        if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null)
+        if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null || IsDraggingTrack)
             return StandardCursorType.SizeAll;
 
         if (_selectedState!.SelectedPolygon is { } hoverPolygon && !IsPolygonVertexLocked(hoverPolygon))
@@ -1865,6 +1865,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
         if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
             cursorType = StandardCursorType.SizeAll;
         if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
+            cursorType = StandardCursorType.SizeAll;
+        if (cursorType is null && TrackSpriteAt((float)pos.X, (float)pos.Y) is not null)
             cursorType = StandardCursorType.SizeAll;
         return cursorType;
     }
@@ -2929,7 +2931,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             _draggedGuideIdx = -1;
             GuidesChanged?.Invoke();
         }
-        else return false;
+        else if (!CancelTrackDrag()) return false;
 
         var pointer = _dragPointer;
         _dragPointer = null;
@@ -3054,6 +3056,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             }
         }
 
+        // A sequence tab's composite: a press grabs a track's sprite, or does nothing on empty space.
+        if (TryBeginTrackPress(e, pos)) return;
+
         // No guide hit — try to drag a shape (or just select one).
 
         // The selected polygon's vertex and edge-midpoint handles come first.
@@ -3168,6 +3173,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
             return;
         }
 
+        if (MoveTrackDrag(e, pos)) return;
 
         if (_shapeResizeHandle != HandleKind.None)
         {
@@ -3263,6 +3269,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
 
         base.OnPointerReleased(e);
 
+        if (EndTrackDrag(e)) return;
 
         if (_shapeResizeHandle != HandleKind.None)
         {

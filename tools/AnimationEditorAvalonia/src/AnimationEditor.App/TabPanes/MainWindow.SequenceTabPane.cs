@@ -8,6 +8,7 @@ using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
+using AnimationEditor.Views.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -62,7 +63,7 @@ public partial class MainWindow
     /// save work here while every achx-only command stays off. The playhead is a <see cref="SequenceClock"/> driven
     /// by a timer; each tick hands the preview the sprites <see cref="SequenceScene.At"/> finds.
     /// </summary>
-    private sealed class SequenceTabPane : ITabPane
+    private sealed partial class SequenceTabPane : ITabPane
     {
         private readonly MainWindow _window;
         private readonly Dictionary<FilePath, SequenceDocument> _documents = new();
@@ -254,6 +255,8 @@ public partial class MainWindow
                 _documents[tab.Path] = document;
                 // Our own saves go through the watcher's guard so their change events do not reload the document.
                 document.SaveRunner = _watcher.RunOwnSave;
+                // The same toast an achx shows (MainWindow wires AppCommands.SaveFailed), so a failed write is never silent.
+                document.SaveFailed += message => _window.ShowToast($"Auto save failed — {message}");
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
@@ -261,6 +264,9 @@ public partial class MainWindow
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
                     _window.Notifications.ShowWarningBanner(notice);
+                // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
+                if (document.DuplicateNamesNotice is { } duplicates)
+                    _window.Notifications.ShowWarningBanner(duplicates);
             }
 
             Detach();
@@ -274,6 +280,7 @@ public partial class MainWindow
                 _window._undoManager.RestoreSnapshot(tab.UndoSnapshot);
             Refresh();
             RestoreZoom();
+            RestoreGuides();
             StartWatching(document);
             return Task.FromResult(true);
         }
@@ -298,9 +305,45 @@ public partial class MainWindow
             }
         }
 
-        public Task<TabEntry?> PrepareCloseAsync(TabEntry tab) => Task.FromResult<TabEntry?>(tab);
+        /// <summary>
+        /// A tab whose last save failed still holds edits the file lacks, so closing it asks first, like the Untitled achx
+        /// tab does (#928). Every other .seqj tab has already saved each edit and closes silently.
+        /// </summary>
+        public async Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
+        {
+            if (!_documents.TryGetValue(tab.Path, out var document) || !document.HasUnsavedEdits) return tab;
+            return await ConfirmCloseAsync(document) ? tab : null;
+        }
 
-        // Every edit already saved the file; this writes it again, which also retries a failed save.
+        /// <summary>Whether any open .seqj holds edits its file lacks (a failed save), for the window-close check.</summary>
+        public bool HasUnsavedEdits => _documents.Values.Any(document => document.HasUnsavedEdits);
+
+        /// <summary>
+        /// The window is closing: asks about each document with unsaved edits. Returns false when the user cancelled or a
+        /// chosen save failed again, so the window stays open.
+        /// </summary>
+        public async Task<bool> ConfirmWindowCloseAsync()
+        {
+            foreach (var document in _documents.Values.Where(document => document.HasUnsavedEdits).ToList())
+                if (!await ConfirmCloseAsync(document)) return false;
+            return true;
+        }
+
+        // The achx Untitled prompt's wording and buttons. Save retries the write; a save that fails again keeps the tab
+        // open (the toast says why), since closing would lose the edits.
+        private async Task<bool> ConfirmCloseAsync(SequenceDocument document)
+        {
+            var choice = await _window.ShowSaveDiscardCancelDialogAsync(
+                $"\"{document.Path.NoPath}\" has unsaved changes. Save before closing?",
+                "Unsaved Changes");
+            if (choice == SaveDiscardCancelChoice.Cancel) return false;
+            if (choice == SaveDiscardCancelChoice.Discard) return true;
+            document.SaveToDisk();
+            _window.UpdateStatusBar();
+            return !document.HasUnsavedEdits;
+        }
+
+        // Every edit already saved the file; this writes it again, which also retries a failed save (a failure toasts).
         public Task SaveAsync(TabEntry? tab)
         {
             _document?.SaveToDisk();
@@ -313,6 +356,7 @@ public partial class MainWindow
             CommitPendingRename();
             if (_documents.TryGetValue(tab.Path, out var document) && document == _document)
                 Detach();
+            if (document is not null) _guides.Remove(document);
             _documents.Remove(tab.Path);
         }
 
@@ -509,8 +553,8 @@ public partial class MainWindow
         // The library takes files dragged from the browser, so a press there must not switch tabs.
         public bool BrowserClickOpensPreview => false;
 
-        // Detaching re-opens the file in a fresh editor window, which only knows how to load achx.
-        public bool CanDetach => false;
+        // Detaching re-opens the file in a fresh editor window, which loads any tab kind through the same open path.
+        public bool CanDetach => true;
 
         public bool HasProjectPanelRow(TabEntry tab) => true;
 
@@ -566,6 +610,9 @@ public partial class MainWindow
             // A texture replaced on disk: the preview redraws its sprites from the re-decoded sheet.
             w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
             w.SequenceLibrary.FilesDropped += AddSources;
+            w.SequenceLibrary.AddSourceRequested += () => _ = AddSourcesFromPickerAsync();
+            w.SequenceLibrary.AddChipRequested += AddChip;
+            w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
@@ -601,9 +648,50 @@ public partial class MainWindow
             preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+            WireTrackPlacement();
             w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+
+            // Guides work as on the achx preview: the toggle shows once a guide exists, and placing one while hidden reveals them.
+            w.SequenceShowUserGuides.IsCheckedChanged += (_, _) =>
+            {
+                if (!_syncingGuideToggle) preview.ShowUserGuides = w.SequenceShowUserGuides.IsChecked == true;
+            };
+            preview.GuidesChanged += SyncGuideToggle;
+        }
+
+        // The one preview is shared by every .seqj tab, so each document's guides are put aside when it is left and put back
+        // when it is shown. In memory for the window's lifetime: a .seqj has no companion file to keep them in.
+        private sealed record GuideState(List<float> Horizontal, List<float> Vertical, bool Visible);
+
+        private readonly Dictionary<SequenceDocument, GuideState> _guides = new();
+        private bool _syncingGuideToggle;
+
+        private void StashGuides()
+        {
+            if (_document is null) return;
+            var preview = _window.SequencePreview;
+            _guides[_document] = new GuideState(preview.HGuides.ToList(), preview.VGuides.ToList(), preview.ShowUserGuides);
+        }
+
+        private void RestoreGuides()
+        {
+            var preview = _window.SequencePreview;
+            _guides.TryGetValue(_document!, out var state);
+            // SetGuides raises GuidesChanged, which syncs the toggle; the visibility goes back on after, as it never changes there.
+            preview.SetGuides(state?.Horizontal ?? new List<float>(), state?.Vertical ?? new List<float>());
+            preview.ShowUserGuides = state?.Visible ?? true;
+            SyncGuideToggle();
+        }
+
+        private void SyncGuideToggle()
+        {
+            var w = _window;
+            w.SequenceShowUserGuides.IsVisible = w.SequencePreview.HGuideCount > 0 || w.SequencePreview.VGuideCount > 0;
+            _syncingGuideToggle = true;
+            w.SequenceShowUserGuides.IsChecked = w.SequencePreview.ShowUserGuides;
+            _syncingGuideToggle = false;
         }
 
         /// <summary>
@@ -932,6 +1020,7 @@ public partial class MainWindow
             var w = _window;
             double time = _document?.Selection.Primary is { } primary ? _playback.TimeOf(primary) : 0;
             w.SequenceTimeline.Playhead = time;
+            w.SequencePreview.EditableSequence = _document is null ? -1 : SequenceIndex;
             w.SequencePreview.Composite = _document is not { } document
                 ? null
                 : SequenceScene.At(document, document.Selection.Names
@@ -973,6 +1062,23 @@ public partial class MainWindow
             var errors = _document.AddSources(_window._undoManager, paths);
             if (errors.Count > 0)
                 _window.ShowErrorBanner(string.Join(" ", errors));
+        }
+
+        // Same refusals and one undo entry as a drop; a cancelled dialog changes nothing.
+        private async Task AddSourcesFromPickerAsync()
+        {
+            if (_document is not { } document) return;
+            var paths = await _window._appCommands.FileDialogService.PickOpenFilesAsync("Add Source", OpenFileFilters.SequenceSources);
+            if (paths.Count == 0 || document != _document) return;
+            AddSources(paths);
+        }
+
+        // A double-click, Enter or the chip's menu: where the chain lands is the timeline's rule; a refusal is said, never silent.
+        private void AddChip(LibraryChip chip, ChipAddMode mode)
+        {
+            if (_document is null) return;
+            if (_window.SequenceTimeline.AddChip(chip, mode) is { } refusal)
+                _window.ShowToast(refusal);
         }
 
         private void RemoveSource(string source)
@@ -1054,6 +1160,7 @@ public partial class MainWindow
             // A wheel zoom still easing toward its preset is remembered where it was heading, for this document.
             if (_document != null)
                 _window.SequenceTimeline.SettleZoomAnimation();
+            StashGuides();
             if (_document != null)
             {
                 _document.Changed -= Refresh;

@@ -79,6 +79,22 @@ public sealed class SequenceDocument
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
 
+    /// <summary>
+    /// Raised with the reason each time a write of the file fails (or is paused because the file on disk could not be
+    /// read), the way <c>IAppCommands.SaveFailed</c> is for an <c>.achx</c>. The window turns it into a toast.
+    /// </summary>
+    public event Action<string>? SaveFailed;
+
+    /// <summary>True while the last write failed, so this document holds edits the file lacks.</summary>
+    public bool HasUnsavedEdits => SaveError is not null;
+
+    /// <summary>
+    /// Says which sequences were renamed because the file gave two the same name (sequences are keyed by name, so the
+    /// later one would be unreachable). The numbering is in memory only: the file is not rewritten until the next edit
+    /// saves it. Null when the file had no duplicates.
+    /// </summary>
+    public string? DuplicateNamesNotice { get; private set; }
+
     /// <summary>Raised after any edit, undo, redo, source reload or reload from disk.</summary>
     public event Action? Changed;
 
@@ -145,6 +161,7 @@ public sealed class SequenceDocument
             StaleOnDiskReason = ex.Message;
             return new SequenceReloadResult(false, ex.Message);
         }
+        DuplicateNamesNotice = NumberDuplicateNames(loaded);
         // The "saving is paused" failure is over once the file reads again; a real write failure is not.
         if (StaleOnDiskReason is not null) SaveError = null;
         StaleOnDiskReason = null;
@@ -186,7 +203,31 @@ public sealed class SequenceDocument
     {
         // Hashed before the read: a write in between makes the next catch-up read once more, never miss.
         byte[]? hash = HotReload.HotReloadWatcher.TryHash(path);
-        return new SequenceDocument(path, SequenceListSave.FromFile(path), hash);
+        var save = SequenceListSave.FromFile(path);
+        var notice = NumberDuplicateNames(save);
+        return new SequenceDocument(path, save, hash) { DuplicateNamesNotice = notice };
+    }
+
+    /// <summary>
+    /// Gives each sequence whose name an earlier one already has (ignoring case, like <see cref="NameGenerator"/>) the next
+    /// free numbered name, so every sequence can be reached by name. Returns what was renamed as a sentence, or null.
+    /// </summary>
+    private static string? NumberDuplicateNames(SequenceListSave save)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var renames = new List<string>();
+        foreach (var sequence in save.Sequences)
+        {
+            if (seen.Add(sequence.Name)) continue;
+            string original = sequence.Name;
+            // Counted against every name in the file, so the number never lands on a sequence further down.
+            sequence.Name = NameGenerator.Unique(save.Sequences.Select(other => other.Name).Concat(seen), original);
+            seen.Add(sequence.Name);
+            renames.Add($"'{original}' as '{sequence.Name}'");
+        }
+        return renames.Count == 0
+            ? null
+            : $"This file has sequences with the same name, which can't be told apart. Shown as {string.Join(", ", renames)}; the file keeps its names until you edit it.";
     }
 
     /// <summary>
@@ -822,6 +863,31 @@ public sealed class SequenceDocument
             target.Y = y;
         }, coalesceGroup: $"offset:{sequence}:{track}");
 
+    /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
+    public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
+        ? $"Move Track '{Save.Sequences[sequence].Tracks[tracks[0]].Name}'"
+        : $"Move {Plural.Format(tracks.Count, "track")}";
+
+    /// <summary>
+    /// Moves tracks by (<paramref name="dx"/>, <paramref name="dy"/>) as an arrow key does, keeping each offset as it
+    /// is plus the step (no rounding). Consecutive nudges of the same tracks are one undo entry until
+    /// <see cref="IUndoManager.SealCoalescing"/> (the key coming up, focus leaving) or another edit ends the run.
+    /// </summary>
+    public void NudgeTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, float dx, float dy)
+    {
+        var moved = tracks.Distinct().OrderBy(track => track).ToList();
+        if (moved.Count == 0) return;
+        Edit(undo, DescribeMove(sequence, moved), save =>
+        {
+            foreach (int track in moved)
+            {
+                var target = save.Sequences[sequence].Tracks[track];
+                target.X += dx;
+                target.Y += dy;
+            }
+        }, coalesceGroup: $"nudge:{sequence}:{string.Join(',', moved)}");
+    }
+
     /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
     /// (no undo entry) when the track already is that way.
@@ -1020,6 +1086,7 @@ public sealed class SequenceDocument
         {
             // The file holds something this document could not read; writing now would destroy it.
             SaveError = $"{Path.NoPath} changed on disk and couldn't be reloaded ({stale}). Saving is paused until it reloads.";
+            SaveFailed?.Invoke(SaveError);
             return;
         }
         try
@@ -1034,6 +1101,7 @@ public sealed class SequenceDocument
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             SaveError = ex.Message;
+            SaveFailed?.Invoke(ex.Message);
         }
     }
 
