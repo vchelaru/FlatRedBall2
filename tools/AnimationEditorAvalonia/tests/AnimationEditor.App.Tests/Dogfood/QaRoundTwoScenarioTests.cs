@@ -254,7 +254,7 @@ public class QaRoundTwoScenarioTests
 
         for (int i = 0; i < 60; i++)
         {
-            editor.Click(editor.RowButton(walk, "Add Frame"));
+            editor.ClickRapidly(editor.RowButton(walk, "Add Frame"));
         }
 
         walk.Frames.Count.ShouldBe(61);

@@ -678,11 +678,52 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public void Click(Control control, RawInputModifiers modifiers = RawInputModifiers.None) => ClickAt(CenterOf(control), modifiers);
 
+    // Avalonia reads two presses within a few pixels and half a second as a double-click, and the tree takes a
+    // double-click without selecting the row. Deleting a row and clicking the one that moved up into its place
+    // is two presses on one spot, so a single click waits out the window instead of racing the clock.
+    private const double DoubleClickWindowMilliseconds = 500;
+    private const double DoubleClickSlopPixels = 4;
+    private Point? _lastClickPoint;
+    private readonly System.Diagnostics.Stopwatch _sinceLastClick = new System.Diagnostics.Stopwatch();
+
+    private void OutrunDoubleClickWindow(Point point)
+    {
+        if (_lastClickPoint is not { } last
+            || Math.Abs(last.X - point.X) > DoubleClickSlopPixels || Math.Abs(last.Y - point.Y) > DoubleClickSlopPixels)
+        {
+            return;
+        }
+        // The pointer waits outside the window: parked on a control for half a second it would raise that
+        // control's tooltip, which then covers whatever the test clicks next.
+        Window.MouseMove(new Point(-50, -50), RawInputModifiers.None);
+        TimeSpan window = TimeSpan.FromMilliseconds(DoubleClickWindowMilliseconds + 100);
+        WaitUntil(() => _sinceLastClick.Elapsed > window, window);
+    }
+
+    private void RememberClick(Point point)
+    {
+        _lastClickPoint = point;
+        _sinceLastClick.Restart();
+    }
+
     public void ClickAt(Point point, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        OutrunDoubleClickWindow(point);
+        PressAndRelease(point, modifiers);
+    }
+
+    /// <summary>
+    /// Clicks <paramref name="control"/> without waiting out the double-click window, as a user mashing a button does:
+    /// the presses after the first count as part of a double-click.
+    /// </summary>
+    public void ClickRapidly(Control control) => PressAndRelease(CenterOf(control), RawInputModifiers.None);
+
+    private void PressAndRelease(Point point, RawInputModifiers modifiers)
     {
         Window.MouseMove(point, modifiers);
         Window.MouseDown(point, MouseButton.Left, modifiers);
         Window.MouseUp(point, MouseButton.Left, modifiers);
+        RememberClick(point);
         Layout();
     }
 
@@ -694,6 +735,7 @@ internal sealed class AnimationEditorHarness : IDisposable
         Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        RememberClick(point);
         Layout();
     }
 
