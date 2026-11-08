@@ -169,7 +169,7 @@ public class SequencePasteRoutingScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CopyTracks_PasteIntoTheSameSequence_AddsCopiesAtTheEnd()
+    public async Task CopyTracks_PasteIntoTheSameSequence_AddsCopiesOnTop()
     {
         var (editor, path) = await OpenWithTwoTracksCopiedAsync();
         using var _ = editor;
@@ -177,7 +177,7 @@ public class SequencePasteRoutingScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        Tracks(path, 0).Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Tail", "Body 2", "Head 2" });
+        Tracks(path, 0).Select(t => t.Name).ShouldBe(new[] { "Body 2", "Head 2", "Body", "Head", "Tail" });
     }
 
     [AvaloniaFact]

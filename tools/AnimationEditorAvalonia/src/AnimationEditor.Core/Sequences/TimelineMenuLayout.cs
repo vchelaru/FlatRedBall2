@@ -78,7 +78,7 @@ public static class TimelineMenuLayout
             TimelineMenuCommand.Paste => "Paste",
             TimelineMenuCommand.Duplicate => target == TimelineMenuTarget.Chain
                 ? (several ? $"Duplicate {selected} Chains" : "Duplicate")
-                : (several ? $"Duplicate {selected} Tracks" : "Duplicate Track"),
+                : (several ? $"Duplicate {selected} Tracks" : "Duplicate"),
             TimelineMenuCommand.RenameTrack => "Rename Track…",
             TimelineMenuCommand.ToggleVisibility => trackHidden ? "Show Track" : "Hide Track",
             TimelineMenuCommand.ShowAllTracks => "Show All Tracks",

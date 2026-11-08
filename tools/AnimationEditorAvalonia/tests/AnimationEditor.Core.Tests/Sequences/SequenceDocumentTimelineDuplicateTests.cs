@@ -8,7 +8,7 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests.Sequences;
 
-/// <summary>Duplicating timeline chains in place (after the selection) and tracks (below the lowest one).</summary>
+/// <summary>Duplicating timeline chains in place (after the selection) and tracks (directly in front of the topmost one).</summary>
 public class SequenceDocumentTimelineDuplicateTests
 {
     // No source file exists, so every chain is missing, and a missing chain is drawn one second long whatever its loops.
@@ -86,7 +86,7 @@ public class SequenceDocumentTimelineDuplicateTests
     }
 
     [Fact]
-    public void DuplicateTracks_InsertsCopiesBelowTheLowestSelectedTrack_WithFreeNames_KeepingEverything()
+    public void DuplicateTracks_InsertsCopiesInFrontOfTheTopmostSelectedTrack_WithFreeNames_KeepingEverything()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, Track("Body", Chain("Walk", 0.25, 2)), Track("Head"), Track("Tail"));
@@ -94,19 +94,19 @@ public class SequenceDocumentTimelineDuplicateTests
 
         var result = document.DuplicateTracks(undo, 0, new[] { 1, 0 });
 
-        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
-        var copy = document.Save.Sequences[0].Tracks[2];
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body 2", "Head 2", "Body", "Head", "Tail" });
+        var copy = document.Save.Sequences[0].Tracks[0];
         (copy.FlipHorizontal, copy.Visible).ShouldBe((true, false));
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.25, 2f, "gone.achx") });
-        result.Tracks.ShouldBe(new[] { 2, 3 });
+        result.Tracks.ShouldBe(new[] { 0, 1 });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 Tracks" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Tail" });
     }
 
     [Fact]
-    public void DuplicateTracks_OneTrack_LandsRightBelowIt()
+    public void DuplicateTracks_OneTrack_LandsRightInFrontOfIt()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, Track("Body"), Track("Head"));
@@ -114,7 +114,49 @@ public class SequenceDocumentTimelineDuplicateTests
 
         document.DuplicateTracks(undo, 0, new[] { 0 });
 
-        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Body 2", "Head" });
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body 2", "Body", "Head" });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate Track 'Body'" });
+    }
+
+    [Fact]
+    public void DuplicateTracks_OfATrackInTheMiddle_PutsTheCopyOneLaneAboveIt_LeavesTheOthersAlone_AndSelectsTheCopy()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Open(dir, Track("A"), Track("B", Chain("Walk", 0)), Track("C"));
+        var undo = new UndoManager();
+
+        var result = document.DuplicateTracks(undo, 0, new[] { 1 });
+
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "A", "B 2", "B", "C" });
+        Chains(document, 1).ShouldBe(new[] { ("Walk", 0.0) });
+        Chains(document, 2).ShouldBe(new[] { ("Walk", 0.0) });
+        result.Tracks.ShouldBe(new[] { 1 });
+    }
+
+    [Fact]
+    public void DuplicateTracks_OfTwoNonAdjacentTracks_PutsBothCopiesAboveTheTopmostOne_InTheirOriginalOrder()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Open(dir, Track("A"), Track("B"), Track("C"), Track("D"));
+
+        var result = document.DuplicateTracks(new UndoManager(), 0, new[] { 3, 1 });
+
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "A", "B 2", "D 2", "B", "C", "D" });
+        result.Tracks.ShouldBe(new[] { 1, 2 });
+    }
+
+    [Fact]
+    public void DuplicateTracks_Undo_RestoresTheTracks_AndRedoPutsTheCopiesBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Open(dir, Track("A"), Track("B"), Track("C"));
+        var undo = new UndoManager();
+        document.DuplicateTracks(undo, 0, new[] { 1 });
+
+        undo.Undo();
+
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "A", "B", "C" });
+        undo.Redo();
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "A", "B 2", "B", "C" });
     }
 }

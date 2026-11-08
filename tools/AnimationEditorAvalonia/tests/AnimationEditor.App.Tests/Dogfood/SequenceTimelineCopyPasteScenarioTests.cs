@@ -187,7 +187,7 @@ public class SequenceTimelineCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CopyingAndPastingTracks_InsertsCopiesAfterTheSelectedTrack_WithFreeNames_AndSelectsThem()
+    public async Task CopyingAndPastingTracks_InsertsCopiesInFrontOfTheSelectedTrack_WithFreeNames_AndSelectsThem()
     {
         var (editor, boss) = await OpenAsync();
         using var _ = editor;
@@ -201,9 +201,9 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
-        Chains(boss, 2).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0), ("Run", 2.0) });
-        timeline.SelectedTracks.ShouldBe(new[] { 2, 3 });
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Body 2", "Head 2", "Head", "Tail" });
+        Chains(boss, 1).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0), ("Run", 2.0) });
+        timeline.SelectedTracks.ShouldBe(new[] { 1, 2 });
         editor.UndoLabels.ShouldBe(new[] { "Paste 2 Tracks" });
     }
 

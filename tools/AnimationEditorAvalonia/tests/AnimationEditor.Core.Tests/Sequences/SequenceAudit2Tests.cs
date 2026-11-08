@@ -255,9 +255,9 @@ public class SequenceAudit2Tests
         var destination = Open(Path.Combine(dir.Path, "b"), Track("A"));
         var content = Read(source.CopyTracks(0, new[] { 0, 1 }));
 
-        destination.PasteTracks(new UndoManager(), 0, content, afterTrack: null);
+        destination.PasteTracks(new UndoManager(), 0, content, selectedTrack: null);
 
-        Names(destination).ShouldBe(new[] { "A", "A 2", "A 3" });
+        Names(destination).ShouldBe(new[] { "A 2", "A 3", "A" });
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class SequenceAudit2Tests
 
         document.DuplicateTracks(new UndoManager(), 0, new[] { 0, 1 });
 
-        Names(document).ShouldBe(new[] { "A", "A 2", "A 3", "A 4" });
+        Names(document).ShouldBe(new[] { "A 3", "A 4", "A", "A 2" });
     }
 
     [Fact]

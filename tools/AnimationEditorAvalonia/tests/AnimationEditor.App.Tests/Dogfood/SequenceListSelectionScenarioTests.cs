@@ -224,10 +224,9 @@ public class SequenceListSelectionScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "A", "B", "C"));
         ClickRow(editor, 1);
-        editor.Dialogs.AnswerNextPrompt("Beta");
         editor.RightClick((Control)List(editor).ContainerFromIndex(1)!);
         editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Beta");
         ClickRow(editor, 2);
 
         Undo(editor);

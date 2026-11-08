@@ -79,7 +79,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(List(editor).ContextMenu!).ShouldBe(new[]
         {
-            "Copy", "Cut", "Paste", "Duplicate Sequence", "-", "Rename…", "Copy Qualified Name", "-", "Delete", "-", "Add Sequence",
+            "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence",
         });
         ItemsShowTheTreesIcons(List(editor).ContextMenu!);
     }
@@ -97,7 +97,7 @@ public class SequenceClipboardMenuScenarioTests
         var menu = List(editor).ContextMenu!;
         Headers(menu).ShouldBe(new[]
         {
-            "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences", "-", "Add Sequence",
+            "Add Sequence", "-", "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences",
         });
         ItemOf(menu, "Rename…").IsEnabled.ShouldBeFalse();
     }
@@ -188,7 +188,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(Timeline(editor).Menu).ShouldBe(new[]
         {
-            "Copy", "Cut", "Paste", "Duplicate Track", "-", "Rename Track…", "Hide Track", "-", "Delete Track",
+            "Copy", "Cut", "Paste", "Duplicate", "-", "Rename Track…", "Hide Track", "-", "Delete Track",
         });
         ItemsShowTheTreesIcons(Timeline(editor).Menu);
     }
@@ -210,7 +210,7 @@ public class SequenceClipboardMenuScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ATrackHeaderMenu_CopyThenPaste_AddsTheTrackAtTheEnd()
+    public async Task ATrackHeaderMenu_CopyThenPaste_AddsTheTrackInFrontOfTheClickedOne()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
@@ -221,7 +221,7 @@ public class SequenceClipboardMenuScenarioTests
         editor.PickMenuItem(Timeline(editor).Menu, "Paste");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
-        SavedTrackNames(path).ShouldBe(new[] { "Body", "Head", "Tail", "Body 2" });
+        SavedTrackNames(path).ShouldBe(new[] { "Body", "Head", "Body 2", "Tail" });
     }
 
     [AvaloniaFact]

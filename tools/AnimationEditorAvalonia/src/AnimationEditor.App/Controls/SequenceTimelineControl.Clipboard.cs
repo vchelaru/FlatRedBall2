@@ -25,7 +25,7 @@ public sealed partial class SequenceTimelineControl
 
     /// <summary>
     /// Pastes copied chains or tracks. Chains go onto the tracks <see cref="SequenceDocument.PasteChains"/> describes, anchored at
-    /// <see cref="PasteAnchorTrack"/>, the earliest at the playhead. Tracks go right after the lowest selected track, else at the end.
+    /// <see cref="PasteAnchorTrack"/>, the earliest at the playhead. Tracks go directly in front of the topmost selected track, else on top.
     /// What was pasted becomes the selection. False when nothing was pasted.
     /// </summary>
     public bool Paste(TimelineClipboardContent content)
@@ -39,7 +39,7 @@ public sealed partial class SequenceTimelineControl
         }
         else
         {
-            result = _document.PasteTracks(_undo, _sequenceIndex, content, LowestSelectedTrack());
+            result = _document.PasteTracks(_undo, _sequenceIndex, content, TopmostSelectedTrack());
             SelectTracks(result.Tracks);
         }
         if (result.Errors.Count > 0) ErrorRaised?.Invoke(string.Join(" ", result.Errors));
@@ -47,8 +47,8 @@ public sealed partial class SequenceTimelineControl
     }
 
     /// <summary>
-    /// Duplicates the selected chains (right after the selection, on their own tracks) or tracks (as a block right below the
-    /// lowest one), as one undo entry. The copies become the selection.
+    /// Duplicates the selected chains (right after the selection, on their own tracks) or tracks (as a block directly in front of the
+    /// topmost one), as one undo entry. The copies become the selection.
     /// </summary>
     public void DuplicateSelected()
     {
@@ -68,11 +68,11 @@ public sealed partial class SequenceTimelineControl
         _ => null,
     };
 
-    // The lane of the lowest selected chain or header, or null when nothing is selected.
-    private int? LowestSelectedTrack() => _model.Kind switch
+    // The lane of the topmost (front-most) selected chain or header, or null when nothing is selected.
+    private int? TopmostSelectedTrack() => _model.Kind switch
     {
-        TimelineSelectionKind.Chains => _model.Chains.Max(chain => chain.Track),
-        TimelineSelectionKind.Tracks => _model.Tracks.Max(),
+        TimelineSelectionKind.Chains => _model.Chains.Min(chain => chain.Track),
+        TimelineSelectionKind.Tracks => _model.Tracks.Min(),
         _ => null,
     };
 }

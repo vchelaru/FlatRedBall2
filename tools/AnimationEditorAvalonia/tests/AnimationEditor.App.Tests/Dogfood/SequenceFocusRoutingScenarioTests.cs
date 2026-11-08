@@ -204,7 +204,7 @@ public class SequenceFocusRoutingScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteThreeSequences(editor));
         editor.RightClick((Control)List(editor).ContainerFromIndex(1)!);
-        editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Delete Sequence");
         await SettleAsync(editor);
 
         FocusIsInList(editor).ShouldBeTrue($"focus is on {Describe(Focused(editor))}");
