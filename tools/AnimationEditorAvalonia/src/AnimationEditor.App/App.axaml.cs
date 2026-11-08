@@ -165,19 +165,31 @@ public partial class App : Application
         return new WindowIcon(new Bitmap(stream));
     }
 
-    private void RegisterNativeMenu(MainWindow window) =>
+    /// <summary>Gives <paramref name="window"/> its own macOS menu bar mirror; every MainWindow needs one, since the in-window menu is hidden on a Mac.</summary>
+    private static void RegisterNativeMenu(MainWindow window) =>
         NativeMenu.SetMenu(window, window.CreateNativeMenu());
 
-    internal static MainWindow CreateDetachedWindow()
+    /// <param name="settingsRoot">
+    /// Application-data root for the window's settings and thumbnail cache; null is the user's real
+    /// folder. Tests pass a temp folder.
+    /// </param>
+    /// <param name="recoveryFilePath">
+    /// Crash-recovery file the window clears on close; null is the shared one in the temp folder. Tests pass their own,
+    /// since closing a window deletes it.
+    /// </param>
+    internal static MainWindow CreateDetachedWindow(string? settingsRoot = null, string? recoveryFilePath = null)
     {
-        var services = BuildServices();
+        var services = BuildServices(settingsRoot, recoveryFilePath);
         var window = services.GetRequiredService<MainWindow>();
         window.Icon = LoadAppIcon();
+        RegisterNativeMenu(window);
         return window;
     }
 
-    private static ServiceProvider BuildServices()
+    private static ServiceProvider BuildServices(string? settingsRoot = null, string? recoveryFilePath = null)
     {
+        settingsRoot ??= Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        recoveryFilePath ??= System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx");
         var sc = new ServiceCollection();
 
         sc.AddSingleton<ProjectManager>();
@@ -197,7 +209,7 @@ public partial class App : Application
 
         sc.AddSingleton<IoManager>(sp =>
             new IoManager(sp.GetRequiredService<IAppState>(),
-                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx")));
+                recoveryFilePath));
         sc.AddSingleton<IIoManager>(sp => sp.GetRequiredService<IoManager>());
 
         sc.AddSingleton<ObjectFinder>(sp =>
@@ -224,8 +236,7 @@ public partial class App : Application
             new ThumbnailService(sp.GetRequiredService<IProjectManager>()));
 
         sc.AddSingleton<ProjectTreeThumbnailService>(sp =>
-            new ProjectTreeThumbnailService(ProjectThumbnailCacheLocation.ForApplicationDataRoot(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))));
+            new ProjectTreeThumbnailService(ProjectThumbnailCacheLocation.ForApplicationDataRoot(settingsRoot)));
 
         sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
         sc.AddSingleton(_ => PlatformWheelInput.CreateForHost());
@@ -242,7 +253,7 @@ public partial class App : Application
             sp.GetRequiredService<IPendingCutState>(),
             sp.GetRequiredService<ThumbnailService>(),
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            settingsRoot,
             sp.GetRequiredService<IApplicationUpdater>(),
             useMacOSChrome: OperatingSystem.IsMacOS(),
             commandModifier: CommandModifier.ForHost(OperatingSystem.IsMacOS()),

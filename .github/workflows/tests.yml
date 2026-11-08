@@ -96,6 +96,12 @@ jobs:
       - name: Test AnimationEditor.App
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      # Names the exception behind a headless-session death (every later test fails with "idle test
+      # context"); written by UnhandledExceptionLog in AnimationEditor.App.Tests.
+      - name: Show unhandled exceptions from AnimationEditor.App tests
+        if: failure()
+        run: cat /tmp/AnimationEditorAppTests/unhandled-exceptions.log || echo "no unhandled exceptions were logged"
+
       - name: Test AnimationEditor.Views
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
