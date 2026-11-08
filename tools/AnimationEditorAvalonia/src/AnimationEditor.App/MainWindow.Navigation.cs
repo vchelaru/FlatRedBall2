@@ -121,7 +121,7 @@ public partial class MainWindow
                 var timeline = SequenceTimeline;
                 return new NavigationLocation(
                     path,
-                    SequenceIndex: SequenceList.SelectedIndex >= 0 ? SequenceList.SelectedIndex : null,
+                    SequenceIndex: _sequencePane.PrimaryIndex >= 0 ? _sequencePane.PrimaryIndex : null,
                     TimelineTrack: timeline.Selection?.Track ?? timeline.SelectedTrack,
                     TimelineChain: timeline.Selection?.Chain);
             case TabKind.Achx:
@@ -216,7 +216,7 @@ public partial class MainWindow
     private void RestoreSequenceSelection(NavigationLocation location)
     {
         if (location.SequenceIndex is >= 0 and var sequence && sequence < SequenceList.ItemCount
-            && SequenceList.SelectedIndex != sequence)
+            && _sequencePane.PrimaryIndex != sequence)
             SequenceList.SelectedIndex = sequence;
         if (location.TimelineTrack is not { } track) return;
         SequenceTimeline.Select(
