@@ -212,6 +212,28 @@ public class SequenceTimelineScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DraggingTheRightEdge_NamesTheCycles_WithADotWhateverTheCulture()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1), ("Run", 1.25, 1)));
+        await editor.OpenAsync(boss);
+        // The drag's handlers run on the UI thread, which is not the test's thread, so the culture is set there.
+        System.Globalization.CultureInfo before = Avalonia.Threading.Dispatcher.UIThread.Invoke(() => System.Globalization.CultureInfo.CurrentCulture);
+        try
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Invoke(() => System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE"));
+
+            editor.Drag(At(editor, 0, 0.5, dx: -2), At(editor, 0, 1.25, dx: -6));
+        }
+        finally
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Invoke(() => System.Globalization.CultureInfo.CurrentCulture = before);
+        }
+
+        editor.UndoLabels.ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
+    }
+
+    [AvaloniaFact]
     public async Task Escape_DuringADrag_PutsTheChainBackWithNoUndoEntry()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

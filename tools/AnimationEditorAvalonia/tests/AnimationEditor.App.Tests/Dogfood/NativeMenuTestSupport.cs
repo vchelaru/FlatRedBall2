@@ -48,7 +48,8 @@ internal static class NativeMenuTestSupport
 
 /// <summary>
 /// Compares the in-window <see cref="Menu"/> with the native bar built from it, item by item: kind, header
-/// (access-key underscores dropped), toggle type, checked and enabled state, and the gesture on the Mac command key.
+/// (access-key underscores dropped), toggle type, checked and enabled state, the gesture on the Mac command key, and
+/// that a leaf has a command (which can execute exactly when the in-window item is enabled) while a submenu has none.
 /// Each difference is one readable line naming the menu path.
 /// </summary>
 internal static class NativeMenuParity
@@ -74,7 +75,8 @@ internal static class NativeMenuParity
 
             if (expected is MenuItem item)
             {
-                if (found is not NativeMenuItem nativeItem) { differences.Add($"{where}: native item is a separator"); continue; }
+                if (found is NativeMenuItemSeparator) { differences.Add($"{where}: native item is a separator"); continue; }
+                NativeMenuItem nativeItem = (NativeMenuItem)found;
                 if (nativeItem.Header != label) differences.Add($"{where}: header is '{nativeItem.Header}'");
                 if (nativeItem.IsEnabled != item.IsEnabled) differences.Add($"{where}: enabled is {nativeItem.IsEnabled}, in-window {item.IsEnabled}");
                 if (item.ToggleType != nativeItem.ToggleType) differences.Add($"{where}: toggle type is {nativeItem.ToggleType}");
@@ -87,6 +89,14 @@ internal static class NativeMenuParity
                 {
                     if (nativeItem.Menu is null) differences.Add($"{where}: native item has no submenu");
                     else Compare(where, children, nativeItem.Menu, command, differences);
+                    if (nativeItem.Command is not null) differences.Add($"{where}: a submenu item also has a command");
+                }
+                else
+                {
+                    if (nativeItem.Menu is not null) differences.Add($"{where}: native item has a submenu, the in-window item has none");
+                    if (nativeItem.Command is null) differences.Add($"{where}: native item has no command");
+                    else if (nativeItem.Command.CanExecute(null) != item.IsEnabled)
+                        differences.Add($"{where}: command can execute is {nativeItem.Command.CanExecute(null)}, in-window enabled is {item.IsEnabled}");
                 }
             }
             else if (found is not NativeMenuItemSeparator)

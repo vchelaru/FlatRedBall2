@@ -156,6 +156,27 @@ public class SequenceDocumentInspectorEditTests
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
     }
 
+    [Fact]
+    public void SetChainLoops_NamesTheCycles_WithADotWhateverTheCulture()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+
+            document.SetChainLoops(undo, 0, 0, 0, 2.5f).ShouldBeNull();
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
+
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
+    }
+
     [Theory]
     [InlineData(0f)]
     [InlineData(-1f)]
