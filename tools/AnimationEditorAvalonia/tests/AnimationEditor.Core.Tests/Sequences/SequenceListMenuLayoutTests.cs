@@ -11,14 +11,14 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceListMenuLayoutTests
 {
     [Fact]
-    public void OnASequence_FollowsTheTreesChainMenu_CopyCutPasteDuplicate_RenameCopyName_Delete_ThenAddSequence()
+    public void OnASequence_FollowsTheTreesChainMenu_AddSequence_CopyCutPasteDuplicate_RenameCopyName_Delete()
     {
         SequenceListMenuLayout.For(onSequence: true).Select(group => group.ToArray()).ShouldBe(new[]
         {
+            new[] { Cmd.AddSequence },
             new[] { Cmd.Copy, Cmd.Cut, Cmd.Paste, Cmd.DuplicateSequence },
             new[] { Cmd.Rename, Cmd.CopyQualifiedName },
             new[] { Cmd.Delete },
-            new[] { Cmd.AddSequence },
         });
     }
 

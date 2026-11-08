@@ -174,7 +174,7 @@ public class SequenceMultiEditScenarioTests
 
         editor.RightClick(Row(editor, 3));
         Selected(editor).ShouldBe(new[] { "Jump" });
-        editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Delete Sequence");
         editor.Layout();
 
         SavedNames(boss).ShouldBe(new[] { "Idle", "Attack", "Run" });
@@ -356,9 +356,8 @@ public class SequenceMultiEditScenarioTests
 
         Selected(editor).ShouldBe(new[] { "Idle" });
         RowMenuItem(editor, "Rename…").IsEnabled.ShouldBeTrue();
-        editor.Dialogs.AnswerNextPrompt("Charge");
         editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Charge");
         SavedNames(boss).ShouldBe(new[] { "Charge", "Attack", "Run", "Jump" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Charge'" });
     }
@@ -405,13 +404,13 @@ public class SequenceMultiEditScenarioTests
         ClickRow(editor, 1);
         editor.RightClick(Row(editor, 1));
 
-        RowMenuHeaders(editor).ShouldBe(new[] { "Copy", "Cut", "Paste", "Duplicate Sequence", "Rename…", "Copy Qualified Name", "Delete", "Add Sequence" });
+        RowMenuHeaders(editor).ShouldBe(new[] { "Add Sequence", "Copy", "Cut", "Paste", "Duplicate", "Rename…", "Copy Qualified Name", "Delete Sequence" });
         List(editor).ContextMenu!.Close();
 
         SelectRows(editor, 0, 1, 2);
         editor.RightClick(Row(editor, 1));
 
-        RowMenuHeaders(editor).ShouldBe(new[] { "Copy 3 Sequences", "Cut 3 Sequences", "Paste", "Duplicate 3 Sequences", "Rename…", "Copy Qualified Name", "Delete 3 Sequences", "Add Sequence" });
+        RowMenuHeaders(editor).ShouldBe(new[] { "Add Sequence", "Copy 3 Sequences", "Cut 3 Sequences", "Paste", "Duplicate 3 Sequences", "Rename…", "Copy Qualified Name", "Delete 3 Sequences" });
     }
 
     [AvaloniaFact]

@@ -110,7 +110,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Select(c => (IUndoableCommand)new SetChainLockedCommand(c, locked, this, _events))
                 .ToArray();
             if (commands.Length == 0) return;
-            _undoManager.Execute(new CompositeCommand(commands, locked ? "Lock Animations" : "Unlock Animations"));
+            _undoManager.Execute(commands.Length == 1
+                ? commands[0]
+                : new CompositeCommand(commands, $"Set Locked on {commands.Length} Animations"));
         }
 
         public void SetChainLoop(AnimationChainSave chain, bool loop)
@@ -130,7 +132,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (commands.Length == 0) return;
             _undoManager.Execute(commands.Length == 1
                 ? commands[0]
-                : new CompositeCommand(commands, loop ? $"Enable loop on {commands.Length} animations" : $"Disable loop on {commands.Length} animations"));
+                : new CompositeCommand(commands, $"Set Loop on {commands.Length} Animations"));
         }
 
         public void SetChainsPingPong(IReadOnlyList<AnimationChainSave> chains, bool pingPong) =>
@@ -151,7 +153,7 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(commands.Length == 1
                 ? commands[0]
                 : new CompositeCommand(commands,
-                    $"{(value ? "Enable" : "Disable")} {SetChainPlaybackModeCommand.Label(mode)} on {commands.Length} animations"));
+                    $"Set {(mode == ChainPlaybackMode.PingPong ? "Ping-Pong" : "Reverse")} on {commands.Length} Animations"));
         }
 
         public string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId)

@@ -18,7 +18,7 @@ public enum SequenceListMenuCommand
 
 /// <summary>
 /// Which commands the SEQUENCES list's menu offers for what was right-clicked, as groups the view separates with
-/// a divider, in the order and wording of the ANIMATIONS tree's chain menu (Copy, Cut, Paste, Duplicate; Rename, Copy
+/// a divider, in the order and wording of the ANIMATIONS tree's chain menu (Add; Copy, Cut, Paste, Duplicate; Rename, Copy
 /// Qualified Name; Delete). Everything but Paste and Add Sequence acts on a sequence, so blank space never offers it.
 /// </summary>
 public static class SequenceListMenuLayout
@@ -29,10 +29,10 @@ public static class SequenceListMenuLayout
         SequenceListMenuCommand.Copy => selected > 1 ? $"Copy {selected} Sequences" : "Copy",
         SequenceListMenuCommand.Cut => selected > 1 ? $"Cut {selected} Sequences" : "Cut",
         SequenceListMenuCommand.Paste => "Paste",
-        SequenceListMenuCommand.DuplicateSequence => selected > 1 ? $"Duplicate {selected} Sequences" : "Duplicate Sequence",
+        SequenceListMenuCommand.DuplicateSequence => selected > 1 ? $"Duplicate {selected} Sequences" : "Duplicate",
         SequenceListMenuCommand.Rename => "Rename…",
         SequenceListMenuCommand.CopyQualifiedName => "Copy Qualified Name",
-        SequenceListMenuCommand.Delete => selected > 1 ? $"Delete {selected} Sequences" : "Delete",
+        SequenceListMenuCommand.Delete => selected > 1 ? $"Delete {selected} Sequences" : "Delete Sequence",
         SequenceListMenuCommand.AddSequence => "Add Sequence",
         _ => throw new System.ArgumentOutOfRangeException(nameof(command), command, null),
     };
@@ -62,10 +62,10 @@ public static class SequenceListMenuLayout
         onSequence
             ? new IReadOnlyList<SequenceListMenuCommand>[]
             {
+                new[] { SequenceListMenuCommand.AddSequence },
                 new[] { SequenceListMenuCommand.Copy, SequenceListMenuCommand.Cut, SequenceListMenuCommand.Paste, SequenceListMenuCommand.DuplicateSequence },
                 new[] { SequenceListMenuCommand.Rename, SequenceListMenuCommand.CopyQualifiedName },
                 new[] { SequenceListMenuCommand.Delete },
-                new[] { SequenceListMenuCommand.AddSequence },
             }
             : new IReadOnlyList<SequenceListMenuCommand>[]
             {

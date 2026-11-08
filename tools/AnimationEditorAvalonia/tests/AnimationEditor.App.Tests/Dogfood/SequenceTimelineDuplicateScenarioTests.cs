@@ -12,7 +12,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// Ctrl+D, Edit &gt; Duplicate and the context menus on timeline chains and tracks. Chains are copied right after the
-/// selection on their own tracks, tracks right below the selection; the copies become the selection.
+/// selection on their own tracks, tracks directly in front of (above) the selection; the copies become the selection.
 /// Fixture: Body: Walk 0..0.5, Walk 1..1.5, Run 2..2.2. Head: Run 0.5..0.7, Walk 1.5..2. Tail: empty.
 /// </summary>
 public class SequenceTimelineDuplicateScenarioTests
@@ -53,7 +53,7 @@ public class SequenceTimelineDuplicateScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CtrlD_OnSelectedTracks_InsertsCopiesBelowThem_AndSelectsThem()
+    public async Task CtrlD_OnSelectedTracks_InsertsCopiesInFrontOfThem_AndSelectsThem()
     {
         var (editor, boss) = await OpenAsync();
         using var _ = editor;
@@ -63,9 +63,9 @@ public class SequenceTimelineDuplicateScenarioTests
 
         editor.Press(Key.D, RawInputModifiers.Control);
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
-        Chains(boss, 3).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5) });
-        timeline.SelectedTracks.ShouldBe(new[] { 2, 3 });
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body 2", "Head 2", "Body", "Head", "Tail" });
+        Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5) });
+        timeline.SelectedTracks.ShouldBe(new[] { 0, 1 });
         editor.UndoLabels.ShouldBe(new[] { "Duplicate 2 tracks" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(3);
@@ -93,10 +93,29 @@ public class SequenceTimelineDuplicateScenarioTests
         var timeline = Timeline(editor);
 
         editor.RightClickAt(Header(editor, 1));
-        editor.PickMenuItem(timeline.Menu, "Duplicate Track");
+        editor.PickMenuItem(timeline.Menu, "Duplicate");
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Head 2", "Tail" });
-        timeline.SelectedTracks.ShouldBe(new[] { 2 });
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head 2", "Head", "Tail" });
+        timeline.SelectedTracks.ShouldBe(new[] { 1 });
+    }
+
+    [AvaloniaFact]
+    public async Task DuplicatingATrack_PutsTheCopyAboveTheOriginalInTheTimeline_AndDrawsItInFrontInThePreview()
+    {
+        var (editor, boss) = await OpenAsync();
+        using var _ = editor;
+        var timeline = Timeline(editor);
+        // At 0.25 s only Body (Walk 0..0.5) plays.
+        editor.ClickAt(editor.PointIn(timeline, timeline.Viewport.XAt(0.25), 8));
+        editor.ClickAt(Header(editor, 0));
+
+        editor.Press(Key.D, RawInputModifiers.Control);
+
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body 2", "Body", "Head", "Tail" });
+        timeline.Viewport.LaneTop(0).ShouldBeLessThan(timeline.Viewport.LaneTop(1));
+        timeline.Blocks.Where(block => block.Reference.Chain == "Walk" && block.Reference.Start == 0).Select(block => block.Track).ShouldBe(new[] { 0, 1 }, ignoreOrder: true);
+        // The preview lists sprites back to front: the original (lane 1) first, the copy (lane 0) last, so the copy is in front.
+        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.Track).ShouldBe(new[] { 1, 0 });
     }
 
     [AvaloniaFact]

@@ -40,7 +40,7 @@ public class PlaybackModeScenarioTests
         a.PingPong.ShouldBeTrue();
         b.PingPong.ShouldBeTrue();
         editor.UndoLabels.Count.ShouldBe(undoCount + 1);
-        editor.UndoLabels.Last().ShouldBe("Enable ping-pong on 2 animations");
+        editor.UndoLabels.Last().ShouldBe("Set Ping-Pong on 2 Animations");
         editor.Control<ToggleButton>("PingPongToggle").IsChecked.ShouldBe(true);
         AnimationEditorHarness.ReadSaved(path).AnimationChains.ShouldAllBe(c => c.PingPong);
 

@@ -284,9 +284,8 @@ public class SequenceTimelineScenarioTests
         Point bodyHeader = editor.PointIn(timeline, 20, timeline.Viewport.LaneTop(0) + 10);
 
         editor.RightClickAt(armsHeader);
-        editor.Dialogs.AnswerNextPrompt("Legs");
         editor.PickMenuItem(timeline.Menu, "Rename Track…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Legs");
         editor.RightClickAt(bodyHeader);
         editor.PickMenuItem(timeline.Menu, "Delete Track");
 

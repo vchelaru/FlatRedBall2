@@ -297,9 +297,10 @@ public partial class MainWindow
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
-                // later tab switches reuse it, so the notice shows once per open. It is a toast that hides on its own.
+                // later tab switches reuse it, so the notice shows once per open. A problem, since editing may lose data
+                // or miss functionality, so it stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
-                    _window.ShowInfo(notice);
+                    _window.ShowProblem(notice, sticky: true);
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
                 if (document.DuplicateNamesNotice is { } duplicates)
                     _window.ShowInfo(duplicates);
@@ -755,7 +756,6 @@ public partial class MainWindow
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
             w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
             w.SequenceTimeline.ErrorRaised += message => w.ShowProblem(message);
-            w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
@@ -833,17 +833,19 @@ public partial class MainWindow
             {
                 if (_document is not null && SequenceIndex >= 0) w.SequenceTimeline.SelectTracks(new[] { track });
             };
-            // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
-            // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
+            // Shapes, Origin and Bounding Box are the achx previews' own settings (remembered for all files in the settings the
+            // window writes on close), so flipping one here flips the achx toggle.
             w.SequenceShowShapes.IsCheckedChanged += (_, _) =>
             {
                 preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
-                w._appSettings.SequenceShowShapes = preview.ShowShapes;
+                w._appSettings.ShowShapes = preview.ShowShapes;
+                w.ShowShapesCheck.IsChecked = preview.ShowShapes;
             };
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) =>
             {
                 preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
-                w._appSettings.SequenceShowOrigin = preview.ShowOrigin;
+                w._appSettings.ShowOrigin = preview.ShowOrigin;
+                w.ShowOriginCheck.IsChecked = preview.ShowOrigin;
             };
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) =>
             {
@@ -1011,7 +1013,7 @@ public partial class MainWindow
                         SequenceListMenuCommand.Cut => CutSelection,
                         SequenceListMenuCommand.Paste => PasteSelection,
                         SequenceListMenuCommand.CopyQualifiedName => CopyQualifiedName,
-                        SequenceListMenuCommand.Rename => () => _ = RenameSelectedAsync(),
+                        SequenceListMenuCommand.Rename => RenameSelectedInPlace,
                         SequenceListMenuCommand.DuplicateSequence => DuplicateSelected,
                         SequenceListMenuCommand.Delete => () => { DeleteSelected(); RefocusListSoon(); },
                         SequenceListMenuCommand.AddSequence => AddSequence,
@@ -1288,16 +1290,6 @@ public partial class MainWindow
             return new Rect(timeline.Bounds.Size).Contains(point) ? point : null;
         }
 
-        private async Task RenameTrackAsync(int track)
-        {
-            if (_document is not { } document || SequenceIndex is not (>= 0 and var sequence)) return;
-            string oldName = document.Save.Sequences[sequence].Tracks[track].Name;
-            string? name = await _window._appCommands.PromptStringAsync("Rename Track", "Track name:", oldName);
-            if (name is null || document != _document) return;
-            if (document.RenameTrack(_window._undoManager, sequence, track, name) is { } error)
-                _window.ShowProblem(error);
-        }
-
         private void AddSources(IReadOnlyList<string> paths)
         {
             if (_document is null) return;
@@ -1404,14 +1396,11 @@ public partial class MainWindow
                 RefocusListSoon();
         }
 
-        private async Task RenameSelectedAsync()
+        /// <summary>The row menu's Rename…: the same in-place box as F2 and Add Sequence, opened once the closing menu has handed focus back.</summary>
+        private void RenameSelectedInPlace()
         {
-            if (_document is not { } document || SequenceIndex is not (>= 0 and var index) || !CanRenameSequence) return;
-            string oldName = document.Save.Sequences[index].Name;
-            string? name = await _window._appCommands.PromptStringAsync("Rename Sequence", "Sequence name:", oldName);
-            if (name is null || document != _document) return;
-            if (document.RenameSequence(_window._undoManager, index, name) is { } error)
-                _window.ShowProblem(error);
+            if (_document is not { } document || CurrentSequence is not { } sequence || !CanRenameSequence) return;
+            Dispatcher.UIThread.Post(() => BeginRenameInPlace(document, sequence.Name), DispatcherPriority.Background);
         }
 
         private void DeleteSelected()
