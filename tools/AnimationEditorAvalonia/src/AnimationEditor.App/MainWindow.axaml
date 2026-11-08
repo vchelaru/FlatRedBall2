@@ -2295,6 +2295,8 @@
                             <controls:SequenceTimelineControl x:Name="SequenceTimeline" />
                             <!-- The playhead has its own layer, so a playing sequence repaints a thin line, not every block. -->
                             <controls:TimelinePlayheadOverlay x:Name="SequenceTimelinePlayhead" IsHitTestVisible="False" />
+                            <!-- Popups (hover card, eye tooltip) draw last, over the playhead layer. -->
+                            <controls:TimelinePopupOverlay x:Name="SequenceTimelinePopups" IsHitTestVisible="False" />
                             <ScrollBar x:Name="SequenceTimelineVScroll" Grid.Column="1"
                                        Orientation="Vertical" AllowAutoHide="False" Visibility="Hidden" />
                             <ScrollBar x:Name="SequenceTimelineHScroll" Grid.Row="1"
