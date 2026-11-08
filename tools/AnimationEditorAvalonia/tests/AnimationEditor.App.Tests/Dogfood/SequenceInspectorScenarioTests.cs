@@ -237,22 +237,22 @@ public class SequenceInspectorScenarioTests
         editor.ClickAt(OnHeader(editor, 0));
 
         editor.TypeAndEnter(inspector.TrackNameBox, "Torso");
-        editor.Click(inspector.TrackFlipBox);
+        editor.Click(inspector.TrackVisibleBox);
 
         var saved = SavedTrack(boss, 0);
-        (saved.Name, saved.FlipHorizontal).ShouldBe(("Torso", true));
+        (saved.Name, saved.Visible).ShouldBe(("Torso", false));
         editor.UndoLabels.ShouldBe(new[]
         {
-            "Rename Track 'Body' to 'Torso'", "Turn Flip On for 'Torso'",
+            "Rename Track 'Body' to 'Torso'", "Hide Track 'Torso'",
         });
 
         for (int i = 0; i < 2; i++)
             editor.Press(Key.Z, RawInputModifiers.Control);
         saved = SavedTrack(boss, 0);
-        (saved.Name, saved.FlipHorizontal).ShouldBe(("Body", false));
+        (saved.Name, saved.Visible).ShouldBe(("Body", true));
         // The undone values are back in the fields, not just in the file.
         inspector.TrackNameBox.Text.ShouldBe("Body");
-        inspector.TrackFlipBox.IsChecked.ShouldBe(false);
+        inspector.TrackVisibleBox.IsChecked.ShouldBe(true);
     }
 
     [AvaloniaFact]

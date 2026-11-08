@@ -14,8 +14,8 @@ using Shouldly;
 namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
-/// The sequence Inspector's TRANSFORM section holds the .achx Inspector's frame flip button (a track has no X / Y): the same section header
-/// and the same button. These compare the two live, so a change to one that is not made to the other fails here.
+/// The sequence Inspector's track section uses the .achx Inspector's section header style (a track has a Name and a Visible flag, nothing else).
+/// These compare the two live, so a change to one that is not made to the other fails here.
 /// </summary>
 public class SequenceInspectorParityScenarioTests
 {
@@ -66,7 +66,7 @@ public class SequenceInspectorParityScenarioTests
             .Where(t => t.Length > 2 && t == t.ToUpperInvariant() && t.All(char.IsLetter));
 
     [AvaloniaFact]
-    public async Task TrackSections_UseTheFrameSectionHeaders_InTheSameStyle()
+    public async Task TrackSection_UsesTheFrameSectionHeaderStyle()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (_, frame) = await OpenBothTabsAsync(editor);
@@ -76,27 +76,10 @@ public class SequenceInspectorParityScenarioTests
         await SelectTrackAsync(editor);
 
         var headings = HeadingsIn(Inspector(editor)).ToList();
-        headings.ShouldBe(new[] { "TRACK", "TRANSFORM" });
-        var trackHeader = Inspector(editor).GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "TRANSFORM");
+        headings.ShouldBe(new[] { "TRACK" });
+        var trackHeader = Inspector(editor).GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "TRACK");
         (trackHeader.FontSize, trackHeader.FontWeight, trackHeader.Foreground).ShouldBe(
             (frameHeader.FontSize, frameHeader.FontWeight, frameHeader.Foreground));
     }
 
-    [AvaloniaFact]
-    public async Task TrackFlip_IsTheFrameFlipButton_IconToggleWithTheSameTooltip()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        var (_, frame) = await OpenBothTabsAsync(editor);
-        await SelectFrameAsync(editor, frame);
-        var frameFlip = editor.Control<ToggleButton>("PropFlipH");
-        string? icon = frameFlip.GetVisualDescendants().OfType<SvgControl>().Single().Path;
-        object? tip = ToolTip.GetTip(frameFlip);
-        await SelectTrackAsync(editor);
-
-        ToggleButton flip = Inspector(editor).TrackFlipBox;
-        flip.GetType().ShouldBe(frameFlip.GetType());
-        flip.GetVisualDescendants().OfType<SvgControl>().Single().Path.ShouldBe(icon);
-        ToolTip.GetTip(flip).ShouldBe(tip);
-        (flip.Width, flip.Height).ShouldBe((frameFlip.Width, frameFlip.Height));
-    }
 }

@@ -441,7 +441,7 @@ public sealed class SequenceDocument
     /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
     /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
     /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made on top, in
-    /// front, with the copied track's flip and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// front, with the copied track's visibility); with one, the first copied chain's track (the topmost lane copied
     /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
     /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
     /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
@@ -454,7 +454,7 @@ public sealed class SequenceDocument
         bool legacy = content.SourceTracks.Count == 0;
         // An envelope with no track information is one track, the first chain's; every chain is on it.
         var sourceTracks = legacy
-            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, false, true) }
+            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, true) }
             : content.SourceTracks;
         int ChainTrack(int chain) => legacy ? 0 : content.ChainTracks[chain];
 
@@ -503,7 +503,6 @@ public sealed class SequenceDocument
                 var newTrack = new SequenceTrackSave
                 {
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
-                    FlipHorizontal = source.FlipHorizontal,
                     Visible = source.Visible,
                 };
                 if (atFront)
@@ -906,10 +905,6 @@ public sealed class SequenceDocument
             foreach (var track in save.Sequences[sequence].Tracks) track.Visible = true;
         });
 
-    public void SetTrackFlip(IUndoManager undo, int sequence, int track, bool flip) =>
-        Edit(undo, SequenceLabel.Toggled("Flip", flip, SequenceLabel.Quoted(Save.Sequences[sequence].Tracks[track].Name)),
-            save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
-
     // ── Plural edits: the Inspector's fields applied to a multi-selection as ONE snapshot, so one undo entry ──
 
     /// <summary><see cref="SetTrackVisible"/> for several tracks, as one undo entry.</summary>
@@ -920,17 +915,6 @@ public sealed class SequenceDocument
         Edit(undo, SequenceLabel.OneOrMany(visible ? "Show" : "Hide", "Track", set.Select(index => Save.Sequences[sequence].Tracks[index].Name).ToList()), save =>
         {
             foreach (int index in set) save.Sequences[sequence].Tracks[index].Visible = visible;
-        });
-    }
-
-    /// <summary><see cref="SetTrackFlip"/> for several tracks, as one undo entry.</summary>
-    public void SetTracksFlip(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool flip)
-    {
-        var set = tracks.Distinct().OrderBy(track => track).ToList();
-        if (set.Count == 0) return;
-        Edit(undo, SequenceLabel.Toggled("Flip", flip, TracksNamed(sequence, set)), save =>
-        {
-            foreach (int index in set) save.Sequences[sequence].Tracks[index].FlipHorizontal = flip;
         });
     }
 

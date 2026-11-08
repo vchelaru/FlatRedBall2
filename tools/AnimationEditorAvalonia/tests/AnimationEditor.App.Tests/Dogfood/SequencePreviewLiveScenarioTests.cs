@@ -103,7 +103,7 @@ public class SequencePreviewLiveScenarioTests
         sprites is null
             ? "<null>"
             : string.Join(", ", sprites.Select(s =>
-                $"{s.Track}:{s.Chain.Name}#{s.FrameIndex} {Path.GetFileName(s.TexturePath)} at ({s.Sample().OffsetX},{s.Sample().OffsetY}){(s.FlipHorizontal ? " flipped" : "")}"));
+                $"{s.Track}:{s.Chain.Name}#{s.FrameIndex} {Path.GetFileName(s.TexturePath)} at ({s.Sample().OffsetX},{s.Sample().OffsetY})"));
 
     /// <summary>What <see cref="SequenceScene.At"/> gives for the saved file at the playhead, for the selected sequence.</summary>
     private static string Expected(AnimationEditorHarness editor, string path) =>
@@ -285,12 +285,12 @@ public class SequencePreviewLiveScenarioTests
         steps.Check("undo resize");
 
         editor.ClickAt(Header(editor, 2));
-        editor.Click(inspector.TrackFlipBox);
-        steps.Check("track flip");
+        editor.Click(inspector.TrackVisibleBox);
+        steps.Check("track hide");
         Undo(editor);
-        steps.Check("undo flip");
+        steps.Check("undo hide");
         Redo(editor);
-        steps.Check("redo flip");
+        steps.Check("redo hide");
 
         editor.ClickAt(At(editor, 2, 0.1));
         TypeInto(editor, inspector.ChainStartField, "0.3");
@@ -459,7 +459,7 @@ public class SequencePreviewLiveScenarioTests
         editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 0, 0));
         Undo(editor);
         editor.ClickAt(Header(editor, 0));
-        editor.Click(Inspector(editor).TrackFlipBox);
+        editor.Click(Inspector(editor).TrackVisibleBox);
         editor.DragHold(At(editor, 0, 0.25), At(editor, 0, 0.25, 100));
         editor.DragRelease(At(editor, 0, 0.25, 100));
 
