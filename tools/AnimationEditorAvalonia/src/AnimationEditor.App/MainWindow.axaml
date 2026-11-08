@@ -856,12 +856,22 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="appModels:SequenceListItem">
                                 <!-- Double-click swaps the name for the same inline box the ANIMATIONS tree uses. -->
-                                <Panel>
-                                    <TextBlock Text="{Binding Name}"
-                                               IsVisible="{Binding !IsEditing}"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <viewsControls:InlineRenameBox IsVisible="{Binding IsEditing}" />
-                                </Panel>
+                                <!-- The summary is the ANIMATIONS rows' meta text (11 px AccentCool, right-aligned, not trimmed); the name ellipsizes instead. -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Panel>
+                                        <TextBlock Text="{Binding Name}"
+                                                   IsVisible="{Binding !IsEditing}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <viewsControls:InlineRenameBox IsVisible="{Binding IsEditing}" />
+                                    </Panel>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Summary}"
+                                               Margin="8,0,0,0"
+                                               Foreground="{DynamicResource AccentCool}"
+                                               FontSize="11"
+                                               TextAlignment="Right"
+                                               VerticalAlignment="Center" />
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                         <!-- Items are built per right-click from what was hit (SequenceListMenuLayout). -->

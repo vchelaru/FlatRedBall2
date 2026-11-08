@@ -1001,7 +1001,10 @@ public partial class MainWindow
                 w.SequenceList.SelectedIndex = hitIndex;
             menu.Items.Clear();
             int selectedCount = w.SequenceList.SelectedItems!.Count;
-            var groups = SequenceListMenuLayout.For(onSequence);
+            var moves = onSequence && _document is { } document
+                ? SequenceReorder.AvailableMoves(document.Save.Sequences.Count, document.SelectedIndices.ToList())
+                : null;
+            var groups = SequenceListMenuLayout.For(onSequence, moves);
             for (int i = 0; i < groups.Count; i++)
             {
                 if (i > 0) menu.Items.Add(new Separator());
@@ -1017,6 +1020,10 @@ public partial class MainWindow
                         SequenceListMenuCommand.DuplicateSequence => DuplicateSelected,
                         SequenceListMenuCommand.Delete => () => { DeleteSelected(); RefocusListSoon(); },
                         SequenceListMenuCommand.AddSequence => AddSequence,
+                        SequenceListMenuCommand.SortSequences => SortSequences,
+                        SequenceListMenuCommand.MoveToTop or SequenceListMenuCommand.MoveUp
+                            or SequenceListMenuCommand.MoveDown or SequenceListMenuCommand.MoveToBottom
+                            => () => MoveSelected(SequenceListMenuLayout.MoveOf(command)),
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                     };
                     var item = TreeMenuRenderer.CreateMenuItem(SequenceListMenuLayout.Header(command, selectedCount), onClick, SequenceListMenuLayout.Icon(command));
@@ -1517,13 +1524,32 @@ public partial class MainWindow
             FocusSelectedRow();
         }
 
+        // The row menu's Move items: the selected sequences as one block, through the same move a drag or Alt+Up makes.
+        private void MoveSelected(ReorderMove move)
+        {
+            if (_document is not { } document) return;
+            var indices = document.SelectedIndices.ToList();
+            if (SequenceReorder.MoveSlot(document.Save.Sequences.Count, indices, move) is { } slot)
+                MoveSequences(indices, slot);
+        }
+
+        // Sort Sequences Alphabetically: an edit rather than a place to come back to, so it records no Back entry.
+        private void SortSequences()
+        {
+            if (_document is not { } document) return;
+            using (_window._navigation.Suppress())
+                document.SortSequences(_window._undoManager);
+            FocusSelectedRow();
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
             if (_document is null) return;
             // Its rows are about to be replaced; a drag still holding the old ones would drop on the wrong sequences.
             _listDrag?.CancelDrag();
-            _items =_document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
+            var current = _document;
+            _items = current.Save.Sequences.Select((sequence, index) => new SequenceListItem(sequence.Name, current.SequenceSummary(index))).ToList();
             // The document says which sequence an edit, undo or redo left selected.
             int selected = Math.Min(_document.SelectedSequence, _items.Count - 1);
             _document.SelectedSequence = selected;

@@ -374,11 +374,17 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// Moves the one selected track a lane up (<paramref name="delta"/> -1) or down (+1), as dragging its header there does: one undo
     /// entry, the track stays selected. False when no single track is selected or it is already in the last lane that way.
     /// </summary>
-    public bool MoveSelectedTrack(int delta)
+    public bool MoveSelectedTrack(int delta) => MoveSelectedTrack(delta < 0 ? ReorderMove.Up : ReorderMove.Down);
+
+    /// <summary>
+    /// Moves the one selected track as the header menu's Move items do (To Top, Up, Down, To Bottom; Up is toward the front lane,
+    /// like Alt+Up). One undo entry, the track stays selected. False when no single track is selected or the move changes nothing.
+    /// </summary>
+    public bool MoveSelectedTrack(ReorderMove move)
     {
         if (_document is null || _undo is not { } undo || Sequence is null || _model.Kind != TimelineSelectionKind.Tracks || _model.Tracks.Count != 1) return false;
         int track = _model.Tracks[0];
-        if (TrackReorder.StepSlot(track, TrackCount, delta) is not { } slot) return false;
+        if (TrackReorder.MoveSlot(track, TrackCount, move) is not { } slot) return false;
         if (_document.MoveTrack(undo, _sequenceIndex, track, slot) is not { } moved) return false;
         SetSelection(null, moved);
         Rebuild();
@@ -1149,7 +1155,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         int selected = _model.Count;
         bool trackHidden = target == TimelineMenuTarget.TrackHeader && IsTrackHidden(track);
-        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible));
+        // Moving works on one track, as Alt+Up does: with several selected the header menu offers no Move items.
+        var moves = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
+            ? TrackReorder.AvailableMoves(TrackCount, _model.Tracks[0])
+            : null;
+        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves);
         for (int i = 0; i < groups.Count; i++)
         {
             if (i > 0) _menu.Items.Add(new Separator());
@@ -1165,6 +1175,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     TimelineMenuCommand.ShowAllTracks => () => _document.ShowAllTracks(_undo, _sequenceIndex),
                     TimelineMenuCommand.GoToDefinition => () => GoToDefinitionRequested?.Invoke(hitBlock!.Reference),
                     TimelineMenuCommand.AddTrack => AddTrackAndRename,
+                    TimelineMenuCommand.MoveToTop or TimelineMenuCommand.MoveUp or TimelineMenuCommand.MoveDown or TimelineMenuCommand.MoveToBottom
+                        => () => MoveSelectedTrack(TimelineMenuLayout.MoveOf(command)),
                     _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                 };
                 string header = TimelineMenuLayout.Header(target, command, selected, trackHidden);

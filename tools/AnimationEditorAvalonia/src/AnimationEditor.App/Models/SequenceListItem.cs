@@ -7,9 +7,16 @@ internal sealed class SequenceListItem : INotifyPropertyChanged
 {
     private bool _isEditing;
 
-    public SequenceListItem(string name) => Name = name;
+    public SequenceListItem(string name, string summary)
+    {
+        Name = name;
+        Summary = summary;
+    }
 
     public string Name { get; }
+
+    /// <summary>The grey text after the name, for example "2 tracks · 0.60s" (<c>SequenceListSummary</c>).</summary>
+    public string Summary { get; }
 
     public bool IsEditing
     {
