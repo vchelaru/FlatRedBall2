@@ -237,25 +237,21 @@ public class SequenceInspectorScenarioTests
         editor.ClickAt(OnHeader(editor, 0));
 
         editor.TypeAndEnter(inspector.TrackNameBox, "Torso");
-        TypeInto(editor, inspector.TrackXField, "12.5");
-        TypeInto(editor, inspector.TrackYField, "-3");
         editor.Click(inspector.TrackFlipBox);
 
         var saved = SavedTrack(boss, 0);
-        (saved.Name, saved.X, saved.Y, saved.FlipHorizontal).ShouldBe(("Torso", 12.5f, -3f, true));
+        (saved.Name, saved.FlipHorizontal).ShouldBe(("Torso", true));
         editor.UndoLabels.ShouldBe(new[]
         {
-            "Rename Track 'Body' to 'Torso'", "Set Offset of 'Torso' to (12.5, 0)", "Set Offset of 'Torso' to (12.5, -3)",
-            "Turn Flip On for 'Torso'",
+            "Rename Track 'Body' to 'Torso'", "Turn Flip On for 'Torso'",
         });
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 2; i++)
             editor.Press(Key.Z, RawInputModifiers.Control);
         saved = SavedTrack(boss, 0);
-        (saved.Name, saved.X, saved.Y, saved.FlipHorizontal).ShouldBe(("Body", 0f, 0f, false));
+        (saved.Name, saved.FlipHorizontal).ShouldBe(("Body", false));
         // The undone values are back in the fields, not just in the file.
         inspector.TrackNameBox.Text.ShouldBe("Body");
-        inspector.TrackXField.Value.ShouldBe(0m);
         inspector.TrackFlipBox.IsChecked.ShouldBe(false);
     }
 

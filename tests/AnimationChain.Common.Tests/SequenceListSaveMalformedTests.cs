@@ -23,8 +23,6 @@ public class SequenceListSaveMalformedTests
         ("sequence", "loop", "sequences[0].loop", Kind.Bool),
         ("sequence", "tracks", "sequences[0].tracks", Kind.Array),
         ("track", "name", "sequences[0].tracks[0].name", Kind.String),
-        ("track", "x", "sequences[0].tracks[0].x", Kind.Number),
-        ("track", "y", "sequences[0].tracks[0].y", Kind.Number),
         ("track", "flipHorizontal", "sequences[0].tracks[0].flipHorizontal", Kind.Bool),
         ("track", "chains", "sequences[0].tracks[0].chains", Kind.Array),
         ("chain", "source", "sequences[0].tracks[0].chains[0].source", Kind.String),
@@ -74,9 +72,9 @@ public class SequenceListSaveMalformedTests
     [InlineData("-1e50")]
     public void FromJsonString_NumberTooBigForAFloat_ThrowsInsteadOfLoadingInfinity(string raw)
     {
-        var error = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(With("track", "x", raw)));
+        var error = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(With("chain", "loops", raw)));
 
-        error.Message.ShouldStartWith("sequences[0].tracks[0].x must be");
+        error.Message.ShouldStartWith("sequences[0].tracks[0].chains[0].loops must be");
     }
 
     [Theory]
@@ -116,12 +114,12 @@ public class SequenceListSaveMalformedTests
     public void FromJsonString_MalformedFieldInALaterSequence_NamesThatSequence()
     {
         const string json = """
-            { "sequences": [ { "name": "A" }, { "name": "B", "tracks": [ { "x": "far" } ] } ] }
+            { "sequences": [ { "name": "A" }, { "name": "B", "tracks": [ { "name": 5 } ] } ] }
             """;
 
         var error = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(json));
 
-        error.Message.ShouldStartWith("sequences[1].tracks[0].x must be a number");
+        error.Message.ShouldStartWith("sequences[1].tracks[0].name must be a string");
     }
 
     [Fact]
@@ -149,16 +147,16 @@ public class SequenceListSaveMalformedTests
     [Fact]
     public void FromJsonString_FieldsOfTheRightKind_StillLoad()
     {
-        var loaded = SequenceListSave.FromJsonString(With("track", "x", "7"));
+        var loaded = SequenceListSave.FromJsonString(With("track", "flipHorizontal", "true"));
 
-        loaded.Sequences[0].Tracks[0].X.ShouldBe(7);
+        loaded.Sequences[0].Tracks[0].FlipHorizontal.ShouldBeTrue();
     }
 
     // A complete, valid document with one property of one object replaced by raw JSON.
     private static string With(string level, string property, string raw)
     {
         var chain = Parse("""{ "source": "a.achx", "chain": "Walk", "start": 0, "loops": 1 }""");
-        var track = Parse("""{ "name": "T", "x": 0, "y": 0, "flipHorizontal": false }""");
+        var track = Parse("""{ "name": "T", "flipHorizontal": false }""");
         track["chains"] = new JsonArray((JsonNode)chain);
         var sequence = Parse("""{ "name": "S", "loop": false }""");
         sequence["tracks"] = new JsonArray((JsonNode)track);
