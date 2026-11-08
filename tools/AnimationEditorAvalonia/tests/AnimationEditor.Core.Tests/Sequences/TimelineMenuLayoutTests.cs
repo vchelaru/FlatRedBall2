@@ -66,13 +66,6 @@ public class TimelineMenuLayoutTests
         TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleVisibility, 1, trackHidden: true).ShouldBe("Show Track");
     }
 
-    [Fact]
-    public void ToggleVisibility_CountsSeveralSelectedTracks_LikeDuplicateAndDelete()
-    {
-        TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleVisibility, 3, trackHidden: false).ShouldBe("Hide 3 Tracks");
-        TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleVisibility, 2, trackHidden: true).ShouldBe("Show 2 Tracks");
-    }
-
     [Theory]
     [InlineData(Cmd.Copy, TreeMenuIcon.Copy)]
     [InlineData(Cmd.Cut, TreeMenuIcon.Cut)]

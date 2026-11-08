@@ -66,7 +66,7 @@ public static class TimelineMenuLayout
         };
     }
 
-    /// <summary>The item's text with <paramref name="selected"/> tracks or chains selected; <paramref name="trackHidden"/> says whether Hide / Show will show (the clicked track is hidden, or every selected track is: see <see cref="TrackVisibilityPlan"/>).</summary>
+    /// <summary>The item's text with <paramref name="selected"/> tracks or chains selected; <paramref name="trackHidden"/> says whether the clicked track is hidden.</summary>
     public static string Header(TimelineMenuTarget target, TimelineMenuCommand command, int selected, bool trackHidden = false)
     {
         string plural = target == TimelineMenuTarget.Chain ? "Chains" : "Tracks";
@@ -80,7 +80,7 @@ public static class TimelineMenuLayout
                 ? (several ? $"Duplicate {selected} Chains" : "Duplicate")
                 : (several ? $"Duplicate {selected} Tracks" : "Duplicate Track"),
             TimelineMenuCommand.RenameTrack => "Rename Track…",
-            TimelineMenuCommand.ToggleVisibility => $"{(trackHidden ? "Show" : "Hide")} {(several ? $"{selected} Tracks" : "Track")}",
+            TimelineMenuCommand.ToggleVisibility => trackHidden ? "Show Track" : "Hide Track",
             TimelineMenuCommand.ShowAllTracks => "Show All Tracks",
             TimelineMenuCommand.GoToDefinition => "Go to Definition",
             TimelineMenuCommand.Delete => target == TimelineMenuTarget.Chain

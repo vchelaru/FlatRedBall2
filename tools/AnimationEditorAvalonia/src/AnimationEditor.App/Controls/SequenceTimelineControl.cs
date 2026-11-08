@@ -166,19 +166,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     public bool IsTrackHidden(int track) =>
         Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && !sequence.Tracks[track].Visible;
 
-    /// <summary>
-    /// Hides track <paramref name="track"/>, or shows it again; when it is part of a multi-selection of tracks, the
-    /// whole selection (<see cref="TrackVisibilityPlan"/>). One undo entry, saved with the file; the track stays on the timeline, faint.
-    /// </summary>
+    /// <summary>Hides track <paramref name="track"/>, or shows it again. One undo entry, saved with the file; the track stays on the timeline, faint.</summary>
     public void ToggleTrackVisibility(int track)
     {
         if (_document is not { } document || _undo is not { } undo || Sequence is null || track < 0 || track >= TrackCount) return;
-        var plan = VisibilityPlanFor(track);
-        if (plan.Tracks.Count == 1) document.SetTrackVisible(undo, _sequenceIndex, plan.Tracks[0], plan.Visible);
-        else document.SetTracksVisible(undo, _sequenceIndex, plan.Tracks, plan.Visible);
+        document.SetTrackVisible(undo, _sequenceIndex, track, IsTrackHidden(track));
     }
-
-    private TrackVisibilityPlan VisibilityPlanFor(int track) => TrackVisibilityPlan.For(SelectedTracks, track, IsTrackHidden);
 
     /// <summary>Where lane <paramref name="lane"/>'s eye and name are centered vertically, in this control's coordinates. They share one line.</summary>
     public (double Eye, double Name) HeaderCenters(int lane)
@@ -1148,8 +1141,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         InvalidateVisual();
 
         int selected = _model.Count;
-        var visibility = target == TimelineMenuTarget.TrackHeader ? VisibilityPlanFor(track) : default;
-        bool trackHidden = target == TimelineMenuTarget.TrackHeader && visibility.Visible;
+        bool trackHidden = target == TimelineMenuTarget.TrackHeader && IsTrackHidden(track);
         var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible));
         for (int i = 0; i < groups.Count; i++)
         {
@@ -1168,7 +1160,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     TimelineMenuCommand.AddTrack => AddTrackAndRename,
                     _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                 };
-                string header = TimelineMenuLayout.Header(target, command, command == TimelineMenuCommand.ToggleVisibility ? visibility.Tracks.Count : selected, trackHidden);
+                string header = TimelineMenuLayout.Header(target, command, selected, trackHidden);
                 _menu.Items.Add(TimelineMenuLayout.Icon(command) is { } icon
                     ? TreeMenuRenderer.CreateMenuItem(header, onClick, icon)
                     : CreatePlainItem(header, onClick));

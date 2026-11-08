@@ -186,8 +186,9 @@ public class SequenceTrackEyeScenarioTests
         foreach (int lane in lanes.Skip(1)) editor.ClickAt(OnName(editor, lane), RawInputModifiers.Control);
     }
 
+    // The eye is a per-row control: you multi-select to edit, but hide one track at a time. Bulk visibility is the Inspector's Visible box.
     [AvaloniaFact]
-    public async Task ClickingTheEyeOfASelectedHeader_HidesEverySelectedTrack_InOneUndoEntry()
+    public async Task WithSeveralHeadersSelected_TheEyeActsOnItsOwnRowOnly_AndTheSelectionStays()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
@@ -195,44 +196,15 @@ public class SequenceTrackEyeScenarioTests
 
         editor.ClickAt(OnEye(editor, 1));
 
-        ShownTracks(editor).ShouldBeEmpty();
-        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks" });
+        ShownTracks(editor).ShouldBe(new[] { 0, 2 });
+        editor.UndoLabels.ShouldBe(new[] { "Hide Track 'BlackMoon'" });
         Timeline(editor).SelectedTracks.ShouldBe(new[] { 0, 1, 2 });
         editor.Press(Key.Z, RawInputModifiers.Control);
         ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
-        editor.UndoLabels.ShouldBeEmpty();
     }
 
     [AvaloniaFact]
-    public async Task ClickingTheEyeOfAHeaderOutsideTheSelection_HidesOnlyThatTrack()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor));
-        SelectHeaders(editor, 0, 1);
-
-        editor.ClickAt(OnEye(editor, 2));
-
-        ShownTracks(editor).ShouldBe(new[] { 0, 1 });
-        editor.UndoLabels.ShouldBe(new[] { "Hide Track 'Sun'" });
-    }
-
-    [AvaloniaFact]
-    public async Task ASelectionOfMixedVisibility_HidesAll_WhileAnyIsVisible_ThenShowsAll()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, "Moon"));
-        SelectHeaders(editor, 0, 1, 2);
-
-        editor.ClickAt(OnEye(editor, 0));
-        ShownTracks(editor).ShouldBeEmpty();
-        editor.ClickAt(OnEye(editor, 2));
-
-        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
-        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks", "Show 3 tracks" });
-    }
-
-    [AvaloniaFact]
-    public async Task HeaderMenuOnASelection_CountsTheTracks_AndHidesOrShowsThemAllTogether()
+    public async Task WithSeveralHeadersSelected_HideTrackInTheMenu_IsSingularAndActsOnTheClickedTrackOnly()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
@@ -240,30 +212,29 @@ public class SequenceTrackEyeScenarioTests
         SelectHeaders(editor, 0, 1, 2);
 
         editor.RightClickAt(OnName(editor, 1));
-        Menu(timeline).ShouldContain("Hide 3 Tracks");
-        editor.PickMenuItem(timeline.Menu, "Hide 3 Tracks");
-
-        ShownTracks(editor).ShouldBeEmpty();
-        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks" });
-        editor.RightClickAt(OnName(editor, 1));
-        Menu(timeline).ShouldContain("Show 3 Tracks");
-        editor.PickMenuItem(timeline.Menu, "Show 3 Tracks");
-        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
-    }
-
-    [AvaloniaFact]
-    public async Task HeaderMenuOnAHeaderOutsideTheSelection_StaysSingular_AndActsOnThatTrack()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor));
-        var timeline = Timeline(editor);
-        SelectHeaders(editor, 0, 1);
-
-        editor.RightClickAt(OnName(editor, 2));
         Menu(timeline).ShouldContain("Hide Track");
         editor.PickMenuItem(timeline.Menu, "Hide Track");
 
-        ShownTracks(editor).ShouldBe(new[] { 0, 1 });
+        ShownTracks(editor).ShouldBe(new[] { 0, 2 });
+        editor.UndoLabels.ShouldBe(new[] { "Hide Track 'BlackMoon'" });
+        timeline.SelectedTracks.ShouldBe(new[] { 0, 1, 2 });
+    }
+
+    [AvaloniaFact]
+    public async Task WithSeveralHeadersSelected_TheInspectorVisibleBox_HidesAndShowsAllOfThemInOneUndoEntry()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var inspector = editor.Control<SequenceInspectorControl>("SequenceInspector");
+        SelectHeaders(editor, 0, 1, 2);
+
+        editor.Click(inspector.TrackVisibleBox);
+        ShownTracks(editor).ShouldBeEmpty();
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks" });
+
+        editor.Click(inspector.TrackVisibleBox);
+        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks", "Show 3 tracks" });
     }
 
     [AvaloniaFact]

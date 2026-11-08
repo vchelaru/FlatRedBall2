@@ -154,7 +154,7 @@ Selection is `TimelineSelection` (chains or track headers, never both; view stat
 
 With several tracks or chains selected, `SequenceInspectorControl` edits them all like the `.achx` frame Inspector (blank fields with "(mixed)" from `SequenceBulkState`, `+ 4` shifts each, Name disabled), through the plural `SequenceDocument.SetTracks*`/`SetChains*` methods, which apply the whole set in one snapshot; loop the single-item edits and each item becomes its own undo entry.
 
-**The eye and the header menu's Hide/Show follow the track selection (`TrackVisibilityPlan`, Core):** on a header inside a multi-selection they act on all selected tracks through `SetTracksVisible` (one undo entry, "Hide 3 tracks"; menu "Hide 3 Tracks"), on a header outside it on that track only; the set hides if any of it is visible, else shows.
+**Landmine: per-row eye/lock toggles act on their own row only, even inside a multi-selection** (you multi-select to edit, but hide one track at a time, like the `.achx` per-row lock); the track eye and the header menu's "Hide Track" stay singular. Bulk visibility is the Inspector's Visible checkbox (`SetTracksVisible`).
 
 **Chains paste depends on the selection (`SequenceDocument.PasteChains`).** With nothing selected, each chain returns to the track of the same name, and a missing track is created. With a chain or track header selected, the first copied track lands on that track and the other copied tracks keep their lane distance from it. Tracks paste right below the lowest selected track, or at the end.
 

@@ -205,7 +205,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(Timeline(editor).Menu).ShouldBe(new[]
         {
-            "Copy 2 Tracks", "Cut 2 Tracks", "Paste", "Duplicate 2 Tracks", "-", "Rename Track…", "Hide 2 Tracks", "-", "Delete 2 Tracks",
+            "Copy 2 Tracks", "Cut 2 Tracks", "Paste", "Duplicate 2 Tracks", "-", "Rename Track…", "Hide Track", "-", "Delete 2 Tracks",
         });
     }
 
