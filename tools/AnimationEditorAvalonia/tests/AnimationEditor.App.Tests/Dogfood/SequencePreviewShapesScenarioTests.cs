@@ -12,8 +12,8 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// What the composited sequence preview draws for each frame's collision shapes (rects, circles, polygons): the
-/// active frame's shapes at the track's offset, mirrored by the track flip, for visible tracks inside their chain,
-/// stacked like the sprites, and hidden by the Shapes toggle. Shapes are read from the same snapshot the draw uses
+/// active frame's shapes at their own entity-space coordinates (a track adds no offset), for visible tracks inside
+/// their chain, stacked like the sprites, and hidden by the Shapes toggle. Shapes are read from the same snapshot the draw uses
 /// (<see cref="PreviewControl.GetShapeInfosForTest"/>), and time moves by ruler clicks or the fake tick clock.
 /// </summary>
 public class SequencePreviewShapesScenarioTests
