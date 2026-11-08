@@ -29,13 +29,26 @@ public static class LogFileLocation
         new FilePath(Path.Combine(applicationDataRoot, AppSettingsLocation.FolderName, FileName));
 
     /// <summary>
-    /// Picks <see cref="NextToExecutable"/> when its directory is writable, otherwise
-    /// <see cref="ForApplicationDataRoot"/>. The writability probe is injected so callers
-    /// (and tests) control the side effect.
+    /// Picks <see cref="NextToExecutable"/> when its directory is writable and is not a Velopack
+    /// <c>current</c> folder, otherwise <see cref="ForApplicationDataRoot"/>. The probes are injected so callers
+    /// (and tests) control the side effects; <paramref name="fileExists"/> defaults to <see cref="File.Exists"/>.
     /// </summary>
     public static FilePath Resolve(string baseDirectory, string applicationDataRoot,
-        Func<string, bool> isDirectoryWritable) =>
-        isDirectoryWritable(baseDirectory)
+        Func<string, bool> isDirectoryWritable, Func<string, bool>? fileExists = null) =>
+        !IsVelopackCurrentFolder(baseDirectory, fileExists ?? File.Exists) && isDirectoryWritable(baseDirectory)
             ? NextToExecutable(baseDirectory)
             : ForApplicationDataRoot(applicationDataRoot);
+
+    /// <summary>
+    /// Whether <paramref name="baseDirectory"/> is the <c>current</c> folder of a Velopack install (an <c>Update.exe</c>
+    /// sits beside it). Velopack replaces that folder wholesale on each update, taking a log kept there with it.
+    /// </summary>
+    public static bool IsVelopackCurrentFolder(string baseDirectory, Func<string, bool> fileExists)
+    {
+        var folder = new FilePath(baseDirectory.TrimEnd('\\', '/'));
+        if (!string.Equals(folder.NoPath, "current", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return fileExists(folder.GetDirectoryContainingThis().FullPath.TrimEnd('/') + "/Update.exe");
+    }
 }

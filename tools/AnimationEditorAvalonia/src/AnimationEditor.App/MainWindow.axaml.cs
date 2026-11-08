@@ -1080,7 +1080,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"AnimationEditor update restart failed: {ex}");
+            Services.AppLog.Error("Update restart failed.", ex);
             ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
         }
     }
@@ -2575,6 +2575,7 @@ public partial class MainWindow : Window
         MenuExportWebp.Click += (_, _) => _ = ExportAnimatedImageAsync(AnimatedImageFormat.Webp);
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
+        MenuOpenLogFolder.Click += OnOpenLogFolderClick;
         MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
         // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
         // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
@@ -2647,7 +2648,7 @@ public partial class MainWindow : Window
     private MenuItem[] AppScopedMenuItems =>
     [
         MenuNavBack, MenuNavForward, MenuNew, MenuNewSequence, MenuLoad, MenuLoadRecent, MenuOpenProjectFolder, MenuCloseProject, MenuEnableHotReload,
-        MenuSettings, MenuShowDiagnostics, MenuShowShortcuts, MenuViewLog, MenuChatOnDiscord, MenuAbout,
+        MenuSettings, MenuShowDiagnostics, MenuShowShortcuts, MenuViewLog, MenuOpenLogFolder, MenuChatOnDiscord, MenuAbout,
     ];
 
     // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
@@ -3202,6 +3203,19 @@ public partial class MainWindow : Window
         // Avalonia's own frames-per-second readout for the whole window. Not its layout and render time graphs: those repaint
         // the whole window on every frame, which would slow exactly what is being measured.
         RendererDiagnostics.DebugOverlays = on ? Avalonia.Rendering.RendererDebugOverlays.Fps : Avalonia.Rendering.RendererDebugOverlays.None;
+    }
+
+    private void OnOpenLogFolderClick(object? sender, RoutedEventArgs e)
+    {
+        var path = Services.CrashLogging.LogFilePath;
+        if (path == null)
+        {
+            ShowStatusMessage("No log yet.");
+            return;
+        }
+        var error = Services.ShellExplorer.RevealFile(path);
+        if (error != null)
+            ShowStatusMessage($"\u26a0 Could not open the log folder: {error}", isError: true);
     }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)

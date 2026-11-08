@@ -16,7 +16,11 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Managed installs must initialize Velopack before any app code so an already-applied
+        // Install crash logging first so even a failure during startup, or a Velopack update hook, gets recorded.
+        CrashLogging.Install(AppContext.BaseDirectory,
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), args);
+
+        // Managed installs must initialize Velopack before any other app code so an already-applied
         // update can complete its bootstrap work. Local builds and legacy archive downloads
         // pass through without changing their launch behavior.
         var velopack = VelopackApp.Build().SetAutoApplyOnStartup(false);
@@ -24,13 +28,12 @@ class Program
             AddAchxAssociationHooks(velopack);
         velopack.Run();
 
-        // Install crash logging first so even a failure during startup gets recorded.
-        CrashLogging.Install(AppContext.BaseDirectory,
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
-
         string? fileArg = args.Length >= 1 && File.Exists(args[0]) ? args[0] : null;
 
         var singleInstance = new SingleInstanceServer();
+        AppLog.Info(singleInstance.IsOwner
+            ? "Single-instance mutex acquired: this process is the primary."
+            : "Single-instance mutex already held: this is a secondary launch.");
         if (!singleInstance.IsOwner)
         {
             // Another instance is running. A successful hand-off to a healthy primary means exit
@@ -40,21 +43,30 @@ class Program
             // hand-off (slow-but-fine or frozen, ambiguous), fall through into the Avalonia boot
             // below, which shows a recovery dialog (see App.OnFrameworkInitializationCompleted).
             bool reachedPrimary = SingleInstanceServer.SendToRunningInstanceAsync(fileArg).GetAwaiter().GetResult();
+            AppLog.Info($"Hand-off to the primary over the pipe: {(reachedPrimary ? "reached" : "FAILED")} (file arg: {fileArg ?? "none"}).");
             if (reachedPrimary)
             {
-                var action = SingleInstanceRecoveryDecision.Decide(
-                    reachedPrimary: true, PrimaryInstanceHangChecker.Check(reachedPrimary: true));
+                var hang = PrimaryInstanceHangChecker.Check(reachedPrimary: true);
+                var action = SingleInstanceRecoveryDecision.Decide(reachedPrimary: true, hang);
+                AppLog.Info($"Primary classified {hang}; second-launch action {action}.");
                 if (action == SingleInstanceRecoveryAction.SilentExit)
                 {
                     PrimaryInstanceHangChecker.ActivatePrimaryWindow();
                     singleInstance.Dispose();
+                    AppLog.Info("Main returning: secondary launch handed off to a healthy primary.");
                     return;
                 }
                 App.RecoveryActionForReachedPrimary = action;
             }
+            else
+            {
+                AppLog.Info("Booting Avalonia to show a recovery dialog (hand-off failed, so the primary is slow or frozen).");
+            }
         }
         else
         {
+            AppLifecycle.OwnerStarted();
+
             // We are (immediately) the primary instance. Start the pipe listener before Avalonia
             // so requests that arrive during startup are queued in the server.
             singleInstance.StartListening();
@@ -76,7 +88,9 @@ class Program
         App.SingleInstance = singleInstance;
         try
         {
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            AppLog.Info("Starting the Avalonia desktop lifetime.");
+            int exitCode = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            AppLifecycle.MainReturning(exitCode);
         }
         catch (Exception ex)
         {
@@ -98,9 +112,9 @@ class Program
     [SupportedOSPlatform("windows")]
     private static void AddAchxAssociationHooks(VelopackApp velopack) =>
         velopack
-            .OnAfterInstallFastCallback(_ => RegisterAchxAssociation())
-            .OnAfterUpdateFastCallback(_ => RegisterAchxAssociation())
-            .OnBeforeUninstallFastCallback(_ => WindowsAchxRegistration.Unregister());
+            .OnAfterInstallFastCallback(_ => { AppLog.Info("Velopack hook: after install."); RegisterAchxAssociation(); })
+            .OnAfterUpdateFastCallback(_ => { AppLog.Info("Velopack hook: after update."); RegisterAchxAssociation(); })
+            .OnBeforeUninstallFastCallback(_ => { AppLog.Info("Velopack hook: before uninstall."); WindowsAchxRegistration.Unregister(); });
 
     [SupportedOSPlatform("windows")]
     private static void RegisterAchxAssociation()
