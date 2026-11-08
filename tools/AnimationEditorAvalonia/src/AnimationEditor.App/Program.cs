@@ -25,7 +25,7 @@ class Program
         // pass through without changing their launch behavior.
         var velopack = VelopackApp.Build().SetAutoApplyOnStartup(false);
         if (OperatingSystem.IsWindows())
-            AddAchxAssociationHooks(velopack);
+            AddFileAssociationHooks(velopack);
         velopack.Run();
 
         string? fileArg = args.Length >= 1 && File.Exists(args[0]) ? args[0] : null;
@@ -107,22 +107,22 @@ class Program
         }
     }
 
-    // Registers .achx/.achj against the installed exe so the editor shows up in Default apps
+    // Registers .achx/.achj/.seqj against the installed exe so the editor shows up in Default apps
     // and Open with; uninstall removes only our entries.
     [SupportedOSPlatform("windows")]
-    private static void AddAchxAssociationHooks(VelopackApp velopack) =>
+    private static void AddFileAssociationHooks(VelopackApp velopack) =>
         velopack
-            .OnAfterInstallFastCallback(_ => { AppLog.Info("Velopack hook: after install."); RegisterAchxAssociation(); })
-            .OnAfterUpdateFastCallback(_ => { AppLog.Info("Velopack hook: after update."); RegisterAchxAssociation(); })
-            .OnBeforeUninstallFastCallback(_ => { AppLog.Info("Velopack hook: before uninstall."); WindowsAchxRegistration.Unregister(); });
+            .OnAfterInstallFastCallback(_ => { AppLog.Info("Velopack hook: after install."); RegisterFileAssociations(); })
+            .OnAfterUpdateFastCallback(_ => { AppLog.Info("Velopack hook: after update."); RegisterFileAssociations(); })
+            .OnBeforeUninstallFastCallback(_ => { AppLog.Info("Velopack hook: before uninstall."); WindowsFileAssociations.Unregister(); });
 
     [SupportedOSPlatform("windows")]
-    private static void RegisterAchxAssociation()
+    private static void RegisterFileAssociations()
     {
         // The update hook also runs for a self-updating portable build; skip that one, same
         // gate as Settings' "Set as default".
         if (Environment.ProcessPath is { } exe && VelopackInstallState.IsSetupInstall())
-            WindowsAchxRegistration.Register(exe);
+            WindowsFileAssociations.Register(exe);
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
