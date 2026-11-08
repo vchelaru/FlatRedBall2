@@ -78,7 +78,7 @@ public class SequencePreviewShapesScenarioTests
         return track;
     }
 
-    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, false, true, (chain, start));
+    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, true, (chain, start));
 
     private static SequenceSave Sequence(string name, params SequenceTrackSave[] tracks)
     {

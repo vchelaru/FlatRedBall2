@@ -4,7 +4,7 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// Where a track's sprite sits on screen: its centre and half size, in the preview's pixels. Built from the sprite as the
-/// preview draws it, so a flipped track is boxed where its mirrored frame lands.
+/// preview draws it, at its frame's offset.
 /// </summary>
 public readonly record struct SpriteBox(int Sequence, int Track, double CenterX, double CenterY, double HalfWidth, double HalfHeight)
 {
