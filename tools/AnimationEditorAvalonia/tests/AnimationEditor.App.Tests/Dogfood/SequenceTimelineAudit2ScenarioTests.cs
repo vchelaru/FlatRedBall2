@@ -76,7 +76,7 @@ public class SequenceTimelineAudit2ScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CtrlV_OfACopiedTrack_WithHeadersSelected_InsertsBelowTheLowestSelectedHeader()
+    public async Task CtrlV_OfACopiedTrack_WithHeadersSelected_InsertsInFrontOfTheTopmostSelectedHeader()
     {
         using var editor = await OpenAsync();
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
@@ -87,23 +87,23 @@ public class SequenceTimelineAudit2ScenarioTests
 
         await CtrlAsync(editor, Key.V, () => editor.UndoLabels.Count == 1);
 
-        TrackNames(boss).ShouldBe(new[] { "Body", "Head", "Tail 2", "Tail" });
+        TrackNames(boss).ShouldBe(new[] { "Tail 2", "Body", "Head", "Tail" });
     }
 
     [AvaloniaFact]
-    public async Task CtrlV_OfACopiedTrack_WithChainsSelected_InsertsBelowTheLowestSelectedChainsTrack()
+    public async Task CtrlV_OfACopiedTrack_WithChainsSelected_InsertsInFrontOfTheTopmostSelectedChainsTrack()
     {
         using var editor = await OpenAsync();
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
         editor.ClickAt(Header(editor, 2));
         await CopyAsync(editor);
-        // The first chain selected is on the upper track; the lowest one is on Head.
+        // The first chain selected is on the upper track (Body, the topmost); the other is on Head.
         editor.ClickAt(At(editor, 0, 0.25));
         editor.ClickAt(At(editor, 1, 1.75), RawInputModifiers.Control);
 
         await CtrlAsync(editor, Key.V, () => editor.UndoLabels.Count == 1);
 
-        TrackNames(boss).ShouldBe(new[] { "Body", "Head", "Tail 2", "Tail" });
+        TrackNames(boss).ShouldBe(new[] { "Tail 2", "Body", "Head", "Tail" });
     }
 
     [AvaloniaFact]

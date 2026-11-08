@@ -142,7 +142,7 @@ public class SequenceDocumentTimelinePasteTests
     }
 
     [Fact]
-    public void PasteTracks_GoRightAfterTheSelectedTrack_WithFreeNames_KeepingEverythingTheyHad_AsOneUndoEntry()
+    public void PasteTracks_GoRightInFrontOfTheSelectedTrack_WithFreeNames_KeepingEverythingTheyHad_AsOneUndoEntry()
     {
         using var dir = new TestHelpers.TempDir();
         var body = Track("Body", Chain("Walk", 0.5, loops: 2), Chain("Run", 2));
@@ -152,30 +152,46 @@ public class SequenceDocumentTimelinePasteTests
         var undo = new UndoManager();
         var content = Read(document.CopyTracks(0, new[] { 0, 1 }));
 
-        var result = document.PasteTracks(undo, 0, content, afterTrack: 1);
+        var result = document.PasteTracks(undo, 0, content, selectedTrack: 1);
 
-        Names(document).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
-        var copy = document.Save.Sequences[0].Tracks[2];
+        Names(document).ShouldBe(new[] { "Body", "Body 2", "Head 2", "Head", "Tail" });
+        var copy = document.Save.Sequences[0].Tracks[1];
         (copy.X, copy.Y, copy.FlipHorizontal, copy.Visible).ShouldBe((3f, -1f, true, false));
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.5, 2f, "hero.achx"), ("Run", 2.0, 1f, "hero.achx") });
-        result.Tracks.ShouldBe(new[] { 2, 3 });
+        result.Tracks.ShouldBe(new[] { 1, 2 });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 tracks" });
         undo.Undo();
         Names(document).ShouldBe(new[] { "Body", "Head", "Tail" });
     }
 
     [Fact]
-    public void PasteTracks_WithNoSelectedTrack_GoAtTheEnd()
+    public void PasteTracks_WithNoSelectedTrack_GoOnTop_InFront()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir.Path, new string[0], Track("Body"), Track("Head"));
         var content = Read(document.CopyTracks(0, new[] { 0 }));
 
-        var result = document.PasteTracks(new UndoManager(), 0, content, afterTrack: null);
+        var result = document.PasteTracks(new UndoManager(), 0, content, selectedTrack: null);
 
-        Names(document).ShouldBe(new[] { "Body", "Head", "Body 2" });
-        result.Tracks.ShouldBe(new[] { 2 });
+        Names(document).ShouldBe(new[] { "Body 2", "Body", "Head" });
+        result.Tracks.ShouldBe(new[] { 0 });
+    }
+
+    [Fact]
+    public void PasteTracks_OfSeveralTracks_KeepTheirCopiedOrder_AboveTheSelectedTrack_AndUndoRestores()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Open(dir.Path, new string[0], Track("A"), Track("B"), Track("C"));
+        var undo = new UndoManager();
+        var content = Read(document.CopyTracks(0, new[] { 0, 2 }));
+
+        var result = document.PasteTracks(undo, 0, content, selectedTrack: 2);
+
+        Names(document).ShouldBe(new[] { "A", "B", "A 2", "C 2", "C" });
+        result.Tracks.ShouldBe(new[] { 2, 3 });
+        undo.Undo();
+        Names(document).ShouldBe(new[] { "A", "B", "C" });
     }
 
     [Fact]
@@ -188,9 +204,9 @@ public class SequenceDocumentTimelinePasteTests
         var undo = new UndoManager();
         var content = Read(source.CopyTracks(0, new[] { 0 }));
 
-        destination.PasteTracks(undo, 0, content, afterTrack: 0);
+        destination.PasteTracks(undo, 0, content, selectedTrack: 0);
 
-        Names(destination).ShouldBe(new[] { "Other", "Body" });
+        Names(destination).ShouldBe(new[] { "Body", "Other" });
         destination.Save.Sources.ShouldBe(new[] { "../a/hero.achx", "../a/fx.achx" });
         undo.UndoHistory.Count.ShouldBe(1);
         undo.Undo();

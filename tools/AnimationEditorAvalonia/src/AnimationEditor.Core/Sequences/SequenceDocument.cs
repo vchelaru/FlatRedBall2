@@ -529,15 +529,15 @@ public sealed class SequenceDocument
     }
 
     /// <summary>
-    /// Pastes copied tracks into <paramref name="sequence"/> right after track <paramref name="afterTrack"/> (at the end when
-    /// it is null or not a track), each with a free name. Their sources join this file's source list as
-    /// <see cref="PasteChains"/> does, all as one undo entry.
+    /// Pastes copied tracks into <paramref name="sequence"/> directly in front of track <paramref name="selectedTrack"/> (the
+    /// topmost selected one; on top, in front of every track, when it is null or not a track), in copied order, each with a free
+    /// name. Their sources join this file's source list as <see cref="PasteChains"/> does, all as one undo entry.
     /// </summary>
-    public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? afterTrack)
+    public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack)
     {
         if (content.Tracks.Count == 0) return TimelinePasteResult.Empty;
         var tracks = Save.Sequences[sequence].Tracks;
-        int insertAt = afterTrack is { } after && after >= 0 && after < tracks.Count ? after + 1 : tracks.Count;
+        int insertAt = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected : 0;
         var used = tracks.Select(t => t.Name).ToList();
         var names = new List<string>();
         foreach (var track in content.Tracks)
@@ -555,7 +555,7 @@ public sealed class SequenceDocument
             for (int i = 0; i < pasted.Count; i++) pasted[i].Name = names[i];
             MergeSources(save, pasted.SelectMany(track => track.Chains), folder, errors);
             save.Sequences[sequence].Tracks.InsertRange(insertAt, pasted);
-        }, trackBefore: afterTrack, trackAfter: insertAt);
+        }, trackBefore: selectedTrack, trackAfter: insertAt);
         return new TimelinePasteResult(Array.Empty<TimelineChainId>(), Enumerable.Range(insertAt, names.Count).ToList(), errors);
     }
 
@@ -597,13 +597,13 @@ public sealed class SequenceDocument
         return new TimelinePasteResult(made, Array.Empty<int>(), Array.Empty<string>());
     }
 
-    /// <summary>Copies the given tracks, with their chains, as a block right below the lowest of them, each with a free name. One undo entry.</summary>
+    /// <summary>Copies the given tracks, with their chains, as a block directly in front of the topmost of them (their relative order kept), each with a free name. One undo entry.</summary>
     public TimelinePasteResult DuplicateTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks)
     {
         var indices = tracks.Distinct().OrderBy(track => track).ToList();
         if (indices.Count == 0) return TimelinePasteResult.Empty;
         var existing = Save.Sequences[sequence].Tracks;
-        int insertAt = indices[^1] + 1;
+        int insertAt = indices[0];
         var used = existing.Select(t => t.Name).ToList();
         var names = new List<string>();
         foreach (int index in indices)

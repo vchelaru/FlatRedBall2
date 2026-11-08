@@ -210,7 +210,7 @@ public class SequenceClipboardMenuScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ATrackHeaderMenu_CopyThenPaste_AddsTheTrackAtTheEnd()
+    public async Task ATrackHeaderMenu_CopyThenPaste_AddsTheTrackInFrontOfTheClickedOne()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
@@ -221,7 +221,7 @@ public class SequenceClipboardMenuScenarioTests
         editor.PickMenuItem(Timeline(editor).Menu, "Paste");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
-        SavedTrackNames(path).ShouldBe(new[] { "Body", "Head", "Tail", "Body 2" });
+        SavedTrackNames(path).ShouldBe(new[] { "Body", "Head", "Body 2", "Tail" });
     }
 
     [AvaloniaFact]
