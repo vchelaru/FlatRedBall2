@@ -312,7 +312,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             ? document.Save.Sequences[_sequenceIndex]
             : null;
 
-    private int TrackCount => Sequence?.Tracks.Count ?? 0;
+    internal int TrackCount => Sequence?.Tracks.Count ?? 0;
 
     /// <summary>Shows sequence <paramref name="sequenceIndex"/> of <paramref name="document"/>, or nothing when null.</summary>
     public void Show(SequenceDocument? document, int sequenceIndex, IUndoManager? undo)
