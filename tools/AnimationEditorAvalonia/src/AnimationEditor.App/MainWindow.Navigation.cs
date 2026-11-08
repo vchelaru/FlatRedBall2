@@ -86,10 +86,15 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Applies the name typed into an in-place rename that is still open, before whatever the user did next. Every way
-    /// out of a rename other than Enter and Escape funnels here; see <see cref="SequenceTabPane.CommitPendingRename"/>.
+    /// Applies the name typed into an in-place rename that is still open (a sequence row, a track header, an ANIMATIONS
+    /// tree row), before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
+    /// see <see cref="SequenceTabPane.CommitPendingRename"/> and <see cref="CommitPendingTreeRename"/>.
     /// </summary>
-    private void CommitPendingRename() => _sequencePane.CommitPendingRename();
+    private void CommitPendingRename()
+    {
+        _sequencePane.CommitPendingRename();
+        CommitPendingTreeRename();
+    }
 
     /// <summary>-1 for the mouse Back button, +1 for Forward, null for any other press.</summary>
     internal static int? MouseNavigationDirection(PointerUpdateKind kind) => kind switch
