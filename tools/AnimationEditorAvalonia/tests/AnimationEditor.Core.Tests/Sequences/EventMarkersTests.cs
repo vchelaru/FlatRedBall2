@@ -171,6 +171,104 @@ public class EventMarkersTests
         EventMarkers.Occurrences(new[] { F(0.1, "A") }, false, false, 0).ShouldBeEmpty();
     }
 
+    // ---- every cycle of a chain reference's block fires (#1730), through the real block geometry
+
+    // A chain of 0.1 s frames, each carrying the events named at its index.
+    private static AnimationChainSave Chain(int frameCount, params (int Frame, string Name)[] events)
+    {
+        var chain = new AnimationChainSave { Name = "C" };
+        for (int i = 0; i < frameCount; i++)
+        {
+            var frame = new AnimationFrameSave { FrameLength = 0.1f };
+            foreach (var (index, name) in events)
+                if (index == i) frame.Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = name });
+            chain.Frames.Add(frame);
+        }
+        return chain;
+    }
+
+    // The occurrences of the first block of a one-track sequence holding `references`, as the timeline computes them.
+    private static IReadOnlyList<EventOccurrence> FiredByFirstBlock(AnimationChainSave chain, params SequenceChainReferenceSave[] references)
+    {
+        var track = new SequenceTrackSave { Name = "T" };
+        track.Chains.AddRange(references);
+        var sequence = new SequenceSave { Name = "S" };
+        sequence.Tracks.Add(track);
+        double cycle = chain.Frames.Sum(f => (double)f.FrameLength) * (chain.PingPong ? 2 : 1);
+        var block = TimelineLayout.Blocks(sequence, _ => cycle).First(b => ReferenceEquals(b.Reference, references[0]));
+        return EventMarkers.Occurrences(EventMarkers.FramesOf(chain), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
+    }
+
+    private static SequenceChainReferenceSave Ref(double start, float loops) => new() { Source = "s.achx", Chain = "C", Start = start, Loops = loops };
+
+    [Fact]
+    public void ABlockRepeatedThreeTimes_FiresAFrameThreeEventInEveryCycle()
+    {
+        // Frame 3 (index 2) of a 4 x 0.1 s chain: 0.2, 0.6 and 1.0 s from the block start.
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3));
+
+        Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6), ("Step", 1.0) });
+        occurrences.Select(o => o.Cycle).ShouldBe(new[] { 0, 1, 2 });
+    }
+
+    [Fact]
+    public void ABlockCutByTheNextChain_FiresOnlyTheOccurrencesBeforeTheCut()
+    {
+        // The next chain starts at 0.7 s: the Step at 0.2 and 0.6 play, the one at 1.0 is in the cut part.
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3), Ref(0.7, 1));
+
+        Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6) });
+    }
+
+    [Fact]
+    public void ABlockCutInsideAFrame_DoesNotFireTheFrameThatNeverStarts()
+    {
+        // Cut at 0.55 s: the cycle-two Step frame would start at 0.6 s, after the cut.
+        Fired(FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3), Ref(0.55, 1))).ShouldBe(new[] { ("Step", 0.2) });
+    }
+
+    [Fact]
+    public void APingPongBlockRepeated_RaisesNothingAtTheTurnaroundOrTheLoopPoint()
+    {
+        // Frames 0 1 2 3 3 2 1 0 per cycle (0.8 s). The doubled ends re-enter nothing, so End fires once per cycle at 0.3 s
+        // and Start on the way back at 0.7 s; the loop point (frame 0 into frame 0) raises no second Start at 0.8 s.
+        var chain = Chain(4, (0, "Start"), (3, "End"));
+        chain.PingPong = true;
+
+        Fired(FiredByFirstBlock(chain, Ref(0, 2))).ShouldBe(new[]
+        {
+            ("Start", 0.0), ("End", 0.3), ("Start", 0.7),
+            ("End", 1.1), ("Start", 1.5),
+        });
+    }
+
+    [Fact]
+    public void ALoopOffSequence_HoldingItsFinalPose_FiresNothingMoreThanItsBlocksPlay()
+    {
+        // Sequence Loop off only holds the pose past the length; the hold is no block, so it adds no occurrence.
+        var chain = Chain(4, (2, "Step"));
+        var track = new SequenceTrackSave { Name = "T" };
+        track.Chains.Add(Ref(0, 2));
+        var sequence = new SequenceSave { Name = "S", Loop = false };
+        sequence.Tracks.Add(track);
+
+        var blocks = TimelineLayout.Blocks(sequence, _ => 0.4);
+        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain), false, false, blocks[0].Played, chain.Loop);
+
+        blocks[0].PlayedEnd.ShouldBe(0.8, 1e-9);
+        Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6) });
+    }
+
+    [Fact]
+    public void TheMarkerRowOfARepeatedBlock_HasAMarkerPerCycle_AndCollidingOnesStillMerge()
+    {
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3));
+
+        EventMarkers.Group(occurrences, pixelsPerSecond: 100).Select(m => m.Count).ShouldBe(new[] { 1, 1, 1 });
+        // Zoomed out to 10 px/s the three are 4 px apart: one flag counting all three.
+        EventMarkers.Group(occurrences, pixelsPerSecond: 10).Select(m => m.Count).ShouldBe(new[] { 3 });
+    }
+
     private static EventOccurrence At(string name, double time) => new(name, 0, time, 0, false);
 
     [Fact]
