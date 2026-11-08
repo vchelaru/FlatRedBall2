@@ -540,8 +540,8 @@ public partial class ProjectPanelControl : UserControl
     private void OnPendingNameLostFocus(object? sender, RoutedEventArgs e) =>
         CancelPendingNewAnimationFile();
 
-    // Every row's template carries this TextBox, collapsed -- an unguarded Focus() here would let
-    // any newly-realized row steal focus (from the search box, say), not just the pending one.
+    // Only a row being named builds this TextBox (NameEditorContent); the guard keeps a TextBox
+    // that outlives its editing state from stealing focus (from the search box, say) on re-attach.
     private void OnPendingNameAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is not TextBox { DataContext: AchxTreeNodeVm { IsEditing: true } } textBox) return;
@@ -600,6 +600,28 @@ public partial class ProjectPanelControl : UserControl
 /// </summary>
 public readonly record struct NewAnimationFileRequest(string FolderRelativePath, string FileName);
 
+/// <summary>An SVG icon a project tree row shows in place of a thumbnail (shared, one per kind).</summary>
+public sealed class ProjectRowSvgIcon
+{
+    private ProjectRowSvgIcon(string path) => Path = path;
+
+    public string Path { get; }
+
+    public static ProjectRowSvgIcon Chain { get; } =
+        new("avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg");
+
+    public static ProjectRowSvgIcon Sequence { get; } =
+        new("avares://AnimationEditor.Views/Assets/icons/svg/IconSequence.svg");
+}
+
+/// <summary>Marker for the Tiled icon on a <c>.tsx</c> project tree row.</summary>
+public sealed class ProjectRowTsxIcon
+{
+    private ProjectRowTsxIcon() { }
+
+    public static ProjectRowTsxIcon Instance { get; } = new();
+}
+
 /// <summary>Tree node view-model for <see cref="ProjectPanelControl"/>'s <c>TreeView</c>.</summary>
 public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
 {
@@ -643,6 +665,7 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
             _isEditing = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsNotEditing));
+            OnPropertyChanged(nameof(NameEditorContent));
         }
     }
 
@@ -688,8 +711,31 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasThumbnail));
             OnPropertyChanged(nameof(ShowFallbackIcon));
+            OnPropertyChanged(nameof(FileIconContent));
         }
     }
+
+    /// <summary>
+    /// What the folder-toggle slot of the row shows: the node itself for a folder (the row template
+    /// maps it to a <see cref="FolderExpanderIcon"/>), null for every other row so it builds no control.
+    /// </summary>
+    public object? FolderToggleContent => IsFolder ? this : null;
+
+    /// <summary>The node itself while its name is being edited (the row template maps it to the
+    /// rename TextBox), null otherwise so ordinary rows build no TextBox.</summary>
+    public object? NameEditorContent => _isEditing ? this : null;
+
+    /// <summary>
+    /// What the icon slot of the row shows, or null when it shows nothing (a thumbnail replaces the
+    /// chain icon once it arrives). Each kind maps to one template, so a row builds only the icon
+    /// control it needs: a hidden <c>Svg</c> still parses its file, which cost ~0.8 s per 130 rows.
+    /// </summary>
+    public object? FileIconContent =>
+        Entry is null ? null
+        : IsTsx ? ProjectRowTsxIcon.Instance
+        : IsSequence ? ProjectRowSvgIcon.Sequence
+        : ShowFallbackIcon ? ProjectRowSvgIcon.Chain
+        : null;
 
     public bool HasThumbnail => _thumbnail is not null;
 
