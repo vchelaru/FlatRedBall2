@@ -358,6 +358,10 @@ knows where to look. Add to it whenever a scenario has to route around something
   `AvaloniaHeadlessPlatform.ForceRenderTimerTick()` after `UpdateLayout` for that reason; without
   it a row realized since the last tick hit-tests as its scroll presenter and a click "does not
   land". Call `Layout()` (every gesture does) before computing a point from `Bounds`.
+- **Two clicks on one spot inside half a second are a double-click.** The tree handles a
+  double-click without selecting the row, so "delete a row, click the one that moved into its
+  place" silently selected nothing. `ClickAt` waits out the window when the previous click was on
+  the same spot, so a single click stays single; use `DoubleClickAt` for the double.
 - **Text is not hit-testable.** A `TextBlock` with no background hit-tests as nothing, so a
   click at a row label's centre lands on the row's panel. That is fine for selecting, and the
   chain-row double-click (fit to view) is reachable, but the label-only double-tap that starts an
