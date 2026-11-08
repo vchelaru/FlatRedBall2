@@ -96,6 +96,12 @@ internal interface ITabPane
     /// </summary>
     void DuplicateSelection();
 
+    /// <summary>
+    /// File &gt; Reload from Disk: reads this kind's document from its file again, discarding what the file lacks. Only
+    /// called while <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void ReloadFromDisk();
+
     /// <summary>Whether Edit &gt; Copy, Cut, Paste and Duplicate are enabled while this kind is active.</summary>
     bool CanCopyPaste { get; }
 

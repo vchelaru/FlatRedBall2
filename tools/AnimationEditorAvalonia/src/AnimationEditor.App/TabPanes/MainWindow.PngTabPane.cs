@@ -112,6 +112,8 @@ public partial class MainWindow
 
         public void DuplicateSelection() { }
 
+        public void ReloadFromDisk() { }
+
         public bool CanCopyPaste => false;
 
         public void TogglePlayback() { }

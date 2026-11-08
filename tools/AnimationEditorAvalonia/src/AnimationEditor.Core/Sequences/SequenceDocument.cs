@@ -36,10 +36,15 @@ public sealed class SequenceDocument
 
     private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length);
 
-    private SequenceDocument(string path, SequenceListSave save)
+    // SHA-256 of the file as this document last read or wrote it (the hash the hot-reload watcher uses), or null when it
+    // could not be read then. A file whose content still hashes to this has not changed under us.
+    private byte[]? _diskHash;
+
+    private SequenceDocument(string path, SequenceListSave save, byte[]? diskHash)
     {
         Path = new FilePath(path);
         Save = save;
+        _diskHash = diskHash;
         SelectedSequence = save.Sequences.Count > 0 ? 0 : -1;
         SyncSources();
     }
@@ -129,6 +134,8 @@ public sealed class SequenceDocument
     public SequenceReloadResult ReloadFromDisk()
     {
         SequenceListSave loaded;
+        // Recorded even when the read fails, so an unchanged bad file is not retried at every tab switch.
+        _diskHash = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
         try
         {
             loaded = SequenceListSave.FromFile(Path.FullPath);
@@ -143,6 +150,8 @@ public sealed class SequenceDocument
         StaleOnDiskReason = null;
         if (loaded.ToJsonString() == Save.ToJsonString()) return new SequenceReloadResult(false, null);
 
+        // Memory now equals the file again, so a failed write of edits that were just discarded no longer applies.
+        SaveError = null;
         string? selectedName = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count
             ? Save.Sequences[SelectedSequence].Name
             : null;
@@ -156,9 +165,29 @@ public sealed class SequenceDocument
         return new SequenceReloadResult(true, null);
     }
 
+    /// <summary>
+    /// Re-reads the file only when its content differs from what this document last read or wrote. For a tab coming back
+    /// to the front: a file rewritten while it was away (a git pull) is picked up, while our own saves and rewrites with
+    /// identical content are not mistaken for a change. A file gone from disk reports <see cref="SequenceReloadResult.Deleted"/>
+    /// and the document stays as it is.
+    /// </summary>
+    public SequenceReloadResult ReloadIfChangedOnDisk()
+    {
+        byte[]? current = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
+        if (current is null && !File.Exists(Path.FullPath)) return new SequenceReloadResult(false, null, Deleted: true);
+        if (current is not null && _diskHash is not null && current.AsSpan().SequenceEqual(_diskHash))
+            return new SequenceReloadResult(false, null);
+        return ReloadFromDisk();
+    }
+
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
     /// <exception cref="System.Text.Json.JsonException">The file is not a valid <c>.seqj</c>.</exception>
-    public static SequenceDocument Load(string path) => new(path, SequenceListSave.FromFile(path));
+    public static SequenceDocument Load(string path)
+    {
+        // Hashed before the read: a write in between makes the next catch-up read once more, never miss.
+        byte[]? hash = HotReload.HotReloadWatcher.TryHash(path);
+        return new SequenceDocument(path, SequenceListSave.FromFile(path), hash);
+    }
 
     /// <summary>
     /// Re-reads every source whose file changed since it was loaded (or could not be read and now can), and raises
@@ -784,7 +813,11 @@ public sealed class SequenceDocument
         }
         try
         {
-            SaveRunner(Path.FullPath, () => Save.Save(Path.FullPath));
+            SaveRunner(Path.FullPath, () =>
+            {
+                Save.Save(Path.FullPath);
+                _diskHash = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
+            });
             SaveError = null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
