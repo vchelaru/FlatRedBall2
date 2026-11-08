@@ -1,4 +1,5 @@
 using AnimationEditor.App.Controls;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
@@ -95,6 +96,39 @@ public class SequenceSaveAsAndRelinkScenarioTests
         RecentTips(editor)[0].ShouldBe(new FilePath(target).FullPath);
         editor.ErrorBannerText.ShouldBeNull();
         editor.Dialogs.ThrowIfUnanswered();
+    }
+
+    [AvaloniaFact]
+    public async Task SaveAs_OnASequenceTab_OpensTheDialogInTheFilesFolder_WithItsNameFilledIn()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteBoss(editor);
+        await editor.OpenAsync(boss);
+
+        editor.Dialogs.AnswerNextSaveFile(null);
+        editor.Press(Key.S, RawInputModifiers.Control | RawInputModifiers.Shift);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        SaveDialogStart start = editor.Dialogs.SaveStarts.ShouldHaveSingleItem();
+        start.Folder!.TrimEnd('/').ShouldBe(new FilePath(editor.ProjectFolder).FullPath.TrimEnd('/'));
+        start.FileName.ShouldBe("boss.seqj");
+    }
+
+    [AvaloniaFact]
+    public async Task SaveAs_OnAnAchxTab_OpensTheDialogInTheFilesFolder_WithItsNameFilledIn()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+
+        editor.Dialogs.AnswerNextSaveFile(null);
+        editor.Press(Key.S, RawInputModifiers.Control | RawInputModifiers.Shift);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        SaveDialogStart start = editor.Dialogs.SaveStarts.ShouldHaveSingleItem();
+        start.Folder!.TrimEnd('/').ShouldBe(new FilePath(editor.ProjectFolder).FullPath.TrimEnd('/'));
+        start.FileName.ShouldBe("hero.achx");
     }
 
     [AvaloniaFact]

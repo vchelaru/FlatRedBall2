@@ -361,7 +361,7 @@ public partial class MainWindow
         {
             if (tab is null || _document is not { } document || !_documents.TryGetValue(tab.Path, out var known) || known != document) return;
             string? picked = await _window._appCommands.FileDialogService.PickSaveFileAsync("Save Sequence", "seqj",
-                new[] { new FileTypeChoice("seqj", "Sequence") });
+                new[] { new FileTypeChoice("seqj", "Sequence") }, SaveDialogStart.For(tab.Path.FullPath));
             if (string.IsNullOrEmpty(picked) || document != _document) return;
 
             var oldPath = tab.Path;
