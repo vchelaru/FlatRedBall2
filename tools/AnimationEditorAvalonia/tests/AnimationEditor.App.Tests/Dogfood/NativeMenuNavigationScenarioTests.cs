@@ -31,7 +31,7 @@ public class NativeMenuNavigationScenarioTests
     }
 
     private static NativeMenu BuildBar(AnimationEditorHarness editor) =>
-        NativeMenuBuilder.Build(editor.Window.CreateNativeMenuActions());
+        NativeMenuTestSupport.Build(editor);
 
     private static async Task SettleAsync(AnimationEditorHarness editor) => await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 

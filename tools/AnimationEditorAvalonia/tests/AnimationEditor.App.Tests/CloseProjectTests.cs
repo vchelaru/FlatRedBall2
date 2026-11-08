@@ -139,7 +139,7 @@ public class CloseProjectTests
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
-            window.CreateNativeMenuActions().CloseProjectFolder();
+            Dogfood.NativeMenuTestSupport.Activate(window.CreateNativeMenu(), "File", "Close Project Folder");
             Dispatcher.UIThread.RunJobs();
 
             Assert.Empty(tabManager.Tabs);
