@@ -656,6 +656,26 @@ public sealed class SequenceDocument
         return true;
     }
 
+    /// <summary>
+    /// Moves the library sources at <paramref name="indices"/> (into <see cref="SequenceListSave.Sources"/>) to gap
+    /// <paramref name="slot"/> as one block, as one undo entry. Returns false when the drop changes nothing.
+    /// </summary>
+    public bool MoveSources(IUndoManager undo, IReadOnlyList<int> indices, int slot)
+    {
+        if (SequenceReorder.Plan(Save.Sources.Count, indices, slot) is not { } plan) return false;
+        var moved = indices.Where(index => index >= 0 && index < Save.Sources.Count).Distinct().OrderBy(index => index).ToList();
+        string description = moved.Count == 1
+            ? $"Move Source '{new FilePath(Save.Sources[moved[0]]).NoPath}'"
+            : $"Move {moved.Count} Sources";
+        Edit(undo, description, save =>
+        {
+            var reordered = plan.Order.Select(old => save.Sources[old]).ToList();
+            save.Sources.Clear();
+            save.Sources.AddRange(reordered);
+        });
+        return true;
+    }
+
     /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
     public void SetLoop(IUndoManager undo, int index, bool loop)
     {
