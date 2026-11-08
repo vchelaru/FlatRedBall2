@@ -257,7 +257,7 @@ public class SequenceFocusRoutingScenarioTests
         // A track header is selected, so the inspector shows its checkboxes.
         editor.ClickAt(Header(editor, 0));
         Control focusTarget = target == "TrackFlipBox"
-            ? editor.Control<SequenceInspectorControl>("SequenceInspector").FindControl<CheckBox>(target)!
+            ? editor.Control<SequenceInspectorControl>("SequenceInspector").FindControl<Avalonia.Controls.Primitives.ToggleButton>(target)!
             : editor.Control<Control>(target);
         editor.Click(focusTarget);
         editor.ClickAt(Header(editor, 0));
