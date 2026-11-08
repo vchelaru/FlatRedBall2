@@ -85,4 +85,13 @@ public class AchxDropProcessorTests
 
         Assert.Equal(new[] { @"C:\anims\hero.achx", @"C:\tilesets\hero.tsx" }, result);
     }
+
+    [Fact]
+    public void SelectAchxFiles_SeqjIsOpenedLikeAnAchx()
+    {
+        var result = AchxDropProcessor.SelectAchxFiles(new[] { @"C:\anims\boss.seqj", @"C:\art\hero.png" });
+
+        Assert.Equal(new[] { @"C:\anims\boss.seqj" }, result);
+        Assert.True(AchxDropProcessor.ContainsAchx(new[] { @"C:\anims\Boss.SEQJ" }));
+    }
 }

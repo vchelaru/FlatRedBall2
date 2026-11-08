@@ -41,6 +41,7 @@ public sealed class SequenceLibraryControl : UserControl
     private bool _autoplayAll;
     private bool _attached;
     private readonly LibraryGroupDragController _groupDrag;
+    private readonly Grid _headerRow;
 
     public SequenceLibraryControl()
     {
@@ -78,10 +79,23 @@ public sealed class SequenceLibraryControl : UserControl
             RefreshPlayback();
             AutoplayAllToggled?.Invoke(on);
         };
-        Grid.SetColumn(_autoplayToggle, 1);
-        var headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        headerRow.Children.Add(title);
-        headerRow.Children.Add(_autoplayToggle);
+        AddSourceButton.Content = "+ Add Source…";
+        AddSourceButton.FontSize = 11;
+        AddSourceButton.Height = 22;
+        AddSourceButton.Padding = new Thickness(8, 0);
+        AddSourceButton.Margin = new Thickness(0, 0, 6, 0);
+        AddSourceButton.VerticalAlignment = VerticalAlignment.Center;
+        AddSourceButton.VerticalContentAlignment = VerticalAlignment.Center;
+        ToolTip.SetTip(AddSourceButton, "Add .achx or .achj files to the library");
+        Avalonia.Automation.AutomationProperties.SetName(AddSourceButton, "Add Source");
+        AddSourceButton.Click += (_, _) => AddSourceRequested?.Invoke();
+        Grid.SetColumn(AddSourceButton, 1);
+        Grid.SetColumn(_autoplayToggle, 2);
+        _headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
+        _headerRow.Children.Add(title);
+        _headerRow.Children.Add(AddSourceButton);
+        _headerRow.Children.Add(_autoplayToggle);
+        var headerRow = _headerRow;
         var header = new Border { Height = 36, BorderThickness = new Thickness(0, 0, 0, 1), Child = headerRow };
         BindResource(header, Border.BackgroundProperty, "BgRail");
         BindResource(header, Border.BorderBrushProperty, "LineBrush");
@@ -124,6 +138,26 @@ public sealed class SequenceLibraryControl : UserControl
     }
 
     public ThumbnailService? Thumbnails { get; set; }
+
+    /// <summary>
+    /// The "+ Add Source…" button: in the header while the library has sources, in the empty state while it has none. It
+    /// only raises <see cref="AddSourceRequested"/>; the host owns the file dialog.
+    /// </summary>
+    public Button AddSourceButton { get; } = new();
+
+    /// <summary>Raised when the user clicks <see cref="AddSourceButton"/>.</summary>
+    public event Action? AddSourceRequested;
+
+    /// <summary>
+    /// Raised when the user adds a chip's chain without dragging it: a double-click or Enter adds it on a new track, the
+    /// chip's menu also offers the selected track. The host decides where it lands and says so when it cannot.
+    /// </summary>
+    public event Action<LibraryChip, ChipAddMode>? AddChipRequested;
+
+    /// <summary>Asked when a chip's menu opens whether "Add to Selected Track" has a track to add to. Unset, it is disabled.</summary>
+    public Func<bool>? CanAddToSelectedTrack { get; set; }
+
+    internal void RaiseAddChip(LibraryChip chip, ChipAddMode mode) => AddChipRequested?.Invoke(chip, mode);
 
     /// <summary>
     /// The sources whose chips are hidden. View state the host persists: toggling it never touches the document.
@@ -315,20 +349,36 @@ public sealed class SequenceLibraryControl : UserControl
         if (_document is null) return;
         if (Sources.Count == 0)
         {
-            var empty = new TextBlock
-            {
-                Name = "LibraryEmptyMessage",
-                Text = "No sources yet. Drag an .achx or .achj file here from the Animations tab to use its chains.",
-                TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(2, 4),
-            };
-            BindResource(empty, TextBlock.ForegroundProperty, "InkMid");
+            // The button moves out of the header into the empty state, so a new file shows one clear next step.
+            var empty = new StackPanel { Name = "LibraryEmptyMessage", Spacing = 8, Margin = new Thickness(2, 4) };
+            var none = new TextBlock { Text = "No sources yet", FontSize = 12, FontWeight = FontWeight.SemiBold };
+            BindResource(none, TextBlock.ForegroundProperty, "Ink");
+            var hint = new TextBlock { Text = "Drag .achx or .achj files here", FontSize = 11, TextWrapping = TextWrapping.Wrap };
+            BindResource(hint, TextBlock.ForegroundProperty, "InkMid");
+            empty.Children.Add(none);
+            MoveAddSourceButton(empty);
+            AddSourceButton.HorizontalAlignment = HorizontalAlignment.Left;
+            AddSourceButton.Margin = new Thickness(0);
+            empty.Children.Add(hint);
             _groups.Children.Add(empty);
             return;
         }
 
+        MoveAddSourceButton(_headerRow);
+        AddSourceButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        AddSourceButton.Margin = new Thickness(0, 0, 6, 0);
+
         foreach (var source in Sources)
             _groups.Children.Add(BuildGroup(source));
         RefreshPlayback();
+    }
+
+    // The one button sits in the header, or in the empty state while there is nothing else to click.
+    private void MoveAddSourceButton(Panel host)
+    {
+        if (ReferenceEquals(AddSourceButton.Parent, host)) return;
+        (AddSourceButton.Parent as Panel)?.Children.Remove(AddSourceButton);
+        host.Children.Add(AddSourceButton);
     }
 
     private Control BuildGroup(LibrarySource source)
@@ -494,6 +544,7 @@ public sealed class LibraryChipView : Border
     private static readonly Cursor GrabCursor = new(StandardCursorType.Hand);
 
     private Point? _pressedAt;
+    private bool _doubleClick;
     private bool _dragging;
     private ChipDragGhost? _ghost;
     private readonly ResolvedFrameColor[] _colors;
@@ -516,10 +567,21 @@ public sealed class LibraryChipView : Border
         SequenceLibraryControl.BindResource(this, BackgroundProperty, "BgRail");
         ToolTip.SetTip(this, chip.Chain.Name);
         Cursor = GrabCursor;
+        // Focusable so Enter can add the chain from the keyboard; a click does not take the focus (the press is handled).
+        Focusable = true;
+        var addToTimeline = new MenuItem { Header = "Add to Timeline" };
+        addToTimeline.Click += (_, _) => _library.RaiseAddChip(Chip, ChipAddMode.NewTrack);
+        var addToTrack = new MenuItem { Header = "Add to Selected Track", IsEnabled = false };
+        addToTrack.Click += (_, _) => _library.RaiseAddChip(Chip, ChipAddMode.SelectedTrack);
         var definition = new MenuItem { Header = "Go to Definition" };
         definition.Click += (_, _) => _library.RaiseGoToDefinition(
             new SequenceChainReferenceSave { Source = chip.Source, Chain = chip.Chain.Name });
-        var menu = new ContextMenu { Items = { definition } };
+        // The source alone, as the group header's open button sends it: the file opens in its own tab with nothing selected.
+        var openSource = new MenuItem { Header = "Open Source" };
+        openSource.Click += (_, _) => _library.RaiseGoToDefinition(new SequenceChainReferenceSave { Source = chip.Source });
+        var menu = new ContextMenu { Items = { addToTimeline, addToTrack, new Separator(), definition, openSource } };
+        // Whether a track is selected is only known when the menu opens.
+        menu.Opening += (_, _) => addToTrack.IsEnabled = _library.CanAddToSelectedTrack?.Invoke() == true;
         ContextMenu = menu;
 
         // The thumbnail's square corners would paint over the outline's rounded top corners (ClipToBounds clips to the
@@ -556,6 +618,7 @@ public sealed class LibraryChipView : Border
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         _pressedAt = e.GetPosition(this);
+        _doubleClick = e.ClickCount == 2;
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -589,9 +652,20 @@ public sealed class LibraryChipView : Border
         base.OnPointerReleased(e);
         if (_pressedAt is null) return;
         bool dragged = _dragging;
+        bool doubleClick = _doubleClick;
         EndPress();
         e.Pointer.Capture(null);
         if (dragged) _library.RaiseChipDragEnded(Chip, e);
+        // The second click of a double-click that did not move: add the chain, as Enter does.
+        else if (doubleClick) _library.RaiseAddChip(Chip, ChipAddMode.NewTrack);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None) return;
+        _library.RaiseAddChip(Chip, ChipAddMode.NewTrack);
+        e.Handled = true;
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -607,6 +681,7 @@ public sealed class LibraryChipView : Border
     {
         bool wasDragging = _dragging;
         _pressedAt = null;
+        _doubleClick = false;
         _dragging = false;
         Opacity = 1;
         DragCursor = null;
@@ -633,8 +708,29 @@ public sealed class LibraryChipView : Border
     {
         base.OnPropertyChanged(change);
         if (change.Property != IsPointerOverProperty) return;
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver ? "Accent" : "LineBrush");
+        ShowOutline();
         _library.RefreshPlayback();
+    }
+
+    // A chip reached with the keyboard (Tab, then Enter adds it) is outlined like a hovered one. A click or a closing menu
+    // that hands the focus back does not count: the outline then still means "the pointer is over it" (#1655).
+    private bool _keyboardFocused;
+
+    private void ShowOutline() =>
+        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver || _keyboardFocused ? "Accent" : "LineBrush");
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        _keyboardFocused = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
+        ShowOutline();
+    }
+
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        _keyboardFocused = false;
+        ShowOutline();
     }
 
     /// <summary>Starts or stops the chip. <paramref name="now"/> is the library clock's time, so a started chip begins on its first frame.</summary>
