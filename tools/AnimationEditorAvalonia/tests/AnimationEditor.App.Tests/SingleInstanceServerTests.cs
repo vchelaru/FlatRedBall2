@@ -41,4 +41,39 @@ public class SingleInstanceServerTests
         var ex = Record.Exception(() => owner.Dispose());
         Assert.Null(ex);
     }
+
+    private static string UniquePipeName() => $"AnimationEditorAvalonia_TestPipe_{Guid.NewGuid():N}";
+
+    [Fact]
+    public async Task HandOffWithoutAFile_RaisesActivationRequested()
+    {
+        var pipe = UniquePipeName();
+        using var owner = new SingleInstanceServer(UniqueMutexName($"Activate_{Guid.NewGuid():N}"), pipe);
+        var activated = new TaskCompletionSource();
+        owner.ActivationRequested += () => activated.TrySetResult();
+        owner.StartListening();
+
+        bool reached = await SingleInstanceServer.SendToRunningInstanceAsync(null, pipe);
+        await activated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(reached);
+    }
+
+    [Fact]
+    public async Task HandOffWithAFile_RaisesFileOpenRequested_AndNotActivationRequested()
+    {
+        var pipe = UniquePipeName();
+        using var owner = new SingleInstanceServer(UniqueMutexName($"OpenFile_{Guid.NewGuid():N}"), pipe);
+        var opened = new TaskCompletionSource<string>();
+        bool activated = false;
+        owner.FileOpenRequested += path => opened.TrySetResult(path);
+        owner.ActivationRequested += () => activated = true;
+        owner.StartListening();
+
+        await SingleInstanceServer.SendToRunningInstanceAsync("some.achx", pipe);
+
+        string received = await opened.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("some.achx", received);
+        Assert.False(activated);
+    }
 }

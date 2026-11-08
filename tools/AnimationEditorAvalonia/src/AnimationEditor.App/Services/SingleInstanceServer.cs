@@ -22,6 +22,7 @@ public sealed class SingleInstanceServer : IDisposable
     private const string PipeName    = "AnimationEditorAvalonia_IPC";
 
     private readonly Mutex _mutex;
+    private readonly string _pipeName;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
 
@@ -38,12 +39,22 @@ public sealed class SingleInstanceServer : IDisposable
     /// </summary>
     public event Action<string>? FileOpenRequested;
 
-    public SingleInstanceServer() : this(MutexName) { }
+    /// <summary>
+    /// Raised on a background thread when a second process connects without a file path (a plain
+    /// re-launch). The UI layer must marshal to the UI thread and bring its window forward.
+    /// </summary>
+    public event Action? ActivationRequested;
+
+    public SingleInstanceServer() : this(MutexName, PipeName) { }
 
     // Test-only: lets tests isolate the named system mutex so it can't collide
     // with a real running AnimationEditor instance.
-    internal SingleInstanceServer(string mutexName)
+    internal SingleInstanceServer(string mutexName) : this(mutexName, PipeName) { }
+
+    // Test-only: also isolates the pipe, since a real running AnimationEditor listens on the default one.
+    internal SingleInstanceServer(string mutexName, string pipeName)
     {
+        _pipeName = pipeName;
         _mutex = new Mutex(initiallyOwned: true, name: mutexName, out bool createdNew);
         IsOwner = createdNew;
     }
@@ -65,7 +76,7 @@ public sealed class SingleInstanceServer : IDisposable
             try
             {
                 using var server = new NamedPipeServerStream(
-                    PipeName,
+                    _pipeName,
                     PipeDirection.In,
                     maxNumberOfServerInstances: 1,
                     transmissionMode: PipeTransmissionMode.Byte,
@@ -77,6 +88,8 @@ public sealed class SingleInstanceServer : IDisposable
                 var path = await reader.ReadLineAsync(ct);
                 if (!string.IsNullOrEmpty(path))
                     FileOpenRequested?.Invoke(path);
+                else
+                    ActivationRequested?.Invoke();
             }
             catch (OperationCanceledException)
             {
@@ -101,21 +114,24 @@ public sealed class SingleInstanceServer : IDisposable
     /// second, OS-level signal (see <c>PrimaryInstanceHangChecker</c> in the App layer) before
     /// concluding the primary is actually hung.</para>
     /// </summary>
-    public static async Task<bool> SendToRunningInstanceAsync(string? filePath)
+    public static Task<bool> SendToRunningInstanceAsync(string? filePath) =>
+        SendToRunningInstanceAsync(filePath, PipeName);
+
+    internal static async Task<bool> SendToRunningInstanceAsync(string? filePath, string pipeName)
     {
         try
         {
             using var client = new NamedPipeClientStream(
-                ".", PipeName, PipeDirection.Out, PipeOptions.Asynchronous);
+                ".", pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
 
             // 2-second timeout — if the server isn't listening yet, give up gracefully.
             await client.ConnectAsync(2000);
 
-            if (filePath != null)
-            {
-                using var writer = new StreamWriter(client) { AutoFlush = true };
-                await writer.WriteLineAsync(filePath);
-            }
+            // Always send a line: an empty one is a plain re-launch, which the primary answers by
+            // bringing its window forward. Closing without writing breaks the pipe under the
+            // listener's read, so it could not tell a re-launch from a failed connection.
+            using var writer = new StreamWriter(client) { AutoFlush = true };
+            await writer.WriteLineAsync(filePath ?? string.Empty);
 
             return true;
         }

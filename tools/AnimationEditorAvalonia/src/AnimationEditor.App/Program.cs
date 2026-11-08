@@ -33,16 +33,24 @@ class Program
         var singleInstance = new SingleInstanceServer();
         if (!singleInstance.IsOwner)
         {
-            // Another instance is running. A successful hand-off means it's alive and well, so
-            // exit immediately without paying Avalonia's startup cost, same as before (#1049).
-            // A failed hand-off is ambiguous — could be a slow-but-fine primary, could be a
-            // frozen one — so it falls through into the Avalonia boot below, which shows a
-            // recovery dialog instead of the normal MainWindow (see App.OnFrameworkInitializationCompleted).
+            // Another instance is running. A successful hand-off to a healthy primary means exit
+            // immediately without paying Avalonia's startup cost (#1049), after raising its window
+            // at the OS level: an older primary ignores a plain re-launch, and silence looks like
+            // nothing happened. A reachable primary that is frozen or has no window, and a failed
+            // hand-off (slow-but-fine or frozen, ambiguous), fall through into the Avalonia boot
+            // below, which shows a recovery dialog (see App.OnFrameworkInitializationCompleted).
             bool reachedPrimary = SingleInstanceServer.SendToRunningInstanceAsync(fileArg).GetAwaiter().GetResult();
             if (reachedPrimary)
             {
-                singleInstance.Dispose();
-                return;
+                var action = SingleInstanceRecoveryDecision.Decide(
+                    reachedPrimary: true, PrimaryInstanceHangChecker.Check(reachedPrimary: true));
+                if (action == SingleInstanceRecoveryAction.SilentExit)
+                {
+                    PrimaryInstanceHangChecker.ActivatePrimaryWindow();
+                    singleInstance.Dispose();
+                    return;
+                }
+                App.RecoveryActionForReachedPrimary = action;
             }
         }
         else

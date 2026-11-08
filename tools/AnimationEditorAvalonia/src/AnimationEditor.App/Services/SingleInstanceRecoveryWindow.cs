@@ -28,6 +28,9 @@ internal sealed class SingleInstanceRecoveryWindow : Window
     public static SingleInstanceRecoveryWindow CreateHungDialog() =>
         new("A previous instance of AnimationEditor is frozen.", offerRestart: true);
 
+    public static SingleInstanceRecoveryWindow CreateNoWindowDialog() =>
+        new("AnimationEditor is already running but has no window, so it can't be opened.", offerRestart: true);
+
     public static SingleInstanceRecoveryWindow CreateBusyDialog() =>
         new("AnimationEditor appears to be busy. Please wait and try again.", offerRestart: false);
 

@@ -21,24 +21,68 @@ internal static class PrimaryInstanceHangChecker
     [DllImport("user32.dll")]
     private static extern bool IsHungAppWindow(IntPtr hWnd);
 
-    public static PrimaryInstanceHangResult Check()
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    private const int SW_RESTORE = 9;
+
+    /// <param name="reachedPrimary">Whether the pipe hand-off succeeded. Off Windows there is no
+    /// window query, so an unreachable pipe alone counts as hung while a reachable one counts as fine.</param>
+    public static PrimaryInstanceHangResult Check(bool reachedPrimary = false)
     {
         if (!OperatingSystem.IsWindows())
         {
             // No IsHungAppWindow equivalent off Windows. A wedged pipe listener means the whole
             // process is stuck (not just its UI thread), so treat unreachable as sufficient
             // evidence on its own.
-            return PrimaryInstanceHangResult.Hung;
+            return reachedPrimary ? PrimaryInstanceHangResult.BusyNotHung : PrimaryInstanceHangResult.Hung;
         }
 
-        var other = FindOtherInstanceProcess();
+        using var other = FindOtherInstanceProcess();
         var handle = other?.MainWindowHandle ?? IntPtr.Zero;
-        if (handle != IntPtr.Zero && IsHungAppWindow(handle))
-            return PrimaryInstanceHangResult.Hung;
+        bool windowFound = handle != IntPtr.Zero;
 
-        // Either no other process was found, or its window isn't reporting hung — don't offer
-        // to kill a process that might just be busy.
-        return PrimaryInstanceHangResult.BusyNotHung;
+        // No process found at all (it exited between the hand-off and now) is not evidence of
+        // anything: stay on the quiet, no-kill side.
+        if (other == null)
+            return PrimaryInstanceHangResult.BusyNotHung;
+
+        return PrimaryInstanceHangClassifier.Classify(
+            windowFound,
+            windowFound && IsHungAppWindow(handle),
+            AgeOf(other));
+    }
+
+    /// <summary>Restores (if minimized) and raises the other instance's window. Windows only: the
+    /// stale primary may be an older build whose pipe handler ignores a plain re-launch, so the
+    /// launcher does it at the OS level rather than relying on the primary to.</summary>
+    public static void ActivatePrimaryWindow()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            using var other = FindOtherInstanceProcess();
+            var handle = other?.MainWindowHandle ?? IntPtr.Zero;
+            if (handle == IntPtr.Zero) return;
+            if (IsIconic(handle)) ShowWindow(handle, SW_RESTORE);
+            SetForegroundWindow(handle);
+        }
+        catch
+        {
+            // Best effort: the user can still click the taskbar button.
+        }
+    }
+
+    private static TimeSpan? AgeOf(Process process)
+    {
+        try { return DateTime.Now - process.StartTime; }
+        catch { return null; }
     }
 
     /// <summary>Kills the other AnimationEditor process and waits (best-effort) for it to exit.

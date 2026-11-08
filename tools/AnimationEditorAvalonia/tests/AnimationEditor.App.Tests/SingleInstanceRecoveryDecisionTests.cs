@@ -12,15 +12,6 @@ namespace AnimationEditor.App.Tests;
 public class SingleInstanceRecoveryDecisionTests
 {
     [Fact]
-    public void Decide_PipeReached_ReturnsSilentExit()
-    {
-        var action = SingleInstanceRecoveryDecision.Decide(
-            reachedPrimary: true, hangResult: PrimaryInstanceHangResult.Hung);
-
-        Assert.Equal(SingleInstanceRecoveryAction.SilentExit, action);
-    }
-
-    [Fact]
     public void Decide_PipeUnreachableAndBusyNotHung_ReturnsShowBusyMessage()
     {
         var action = SingleInstanceRecoveryDecision.Decide(
@@ -36,5 +27,41 @@ public class SingleInstanceRecoveryDecisionTests
             reachedPrimary: false, hangResult: PrimaryInstanceHangResult.Hung);
 
         Assert.Equal(SingleInstanceRecoveryAction.OfferRestart, action);
+    }
+
+    [Fact]
+    public void Decide_PipeReachedButPrimaryHasNoWindow_OffersToReplaceIt()
+    {
+        var action = SingleInstanceRecoveryDecision.Decide(
+            reachedPrimary: true, hangResult: PrimaryInstanceHangResult.NoWindow);
+
+        Assert.Equal(SingleInstanceRecoveryAction.OfferRestartNoWindow, action);
+    }
+
+    [Fact]
+    public void Decide_PipeReachedButPrimaryWindowFrozen_OffersRestart()
+    {
+        var action = SingleInstanceRecoveryDecision.Decide(
+            reachedPrimary: true, hangResult: PrimaryInstanceHangResult.Hung);
+
+        Assert.Equal(SingleInstanceRecoveryAction.OfferRestart, action);
+    }
+
+    [Fact]
+    public void Decide_PipeReachedAndWindowResponding_ExitsSilently()
+    {
+        var action = SingleInstanceRecoveryDecision.Decide(
+            reachedPrimary: true, hangResult: PrimaryInstanceHangResult.BusyNotHung);
+
+        Assert.Equal(SingleInstanceRecoveryAction.SilentExit, action);
+    }
+
+    [Fact]
+    public void Decide_PipeUnreachableAndPrimaryHasNoWindow_OffersToReplaceIt()
+    {
+        var action = SingleInstanceRecoveryDecision.Decide(
+            reachedPrimary: false, hangResult: PrimaryInstanceHangResult.NoWindow);
+
+        Assert.Equal(SingleInstanceRecoveryAction.OfferRestartNoWindow, action);
     }
 }
