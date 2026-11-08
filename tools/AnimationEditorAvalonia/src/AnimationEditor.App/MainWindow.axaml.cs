@@ -885,7 +885,7 @@ public partial class MainWindow : Window
     private bool _confirmingClose;
 
     /// <summary>
-    /// Closing the window with a tab whose last save failed would drop its edits, so it asks first, once per such tab
+    /// Closing the window with a tab whose last save failed, or an Untitled tab with content, would drop its edits, so it asks first, once per such tab
     /// (the window-level counterpart of <see cref="ITabPane.PrepareCloseAsync"/>).
     /// </summary>
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
@@ -2787,6 +2787,9 @@ public partial class MainWindow : Window
 
     private void OnNewClick(object? sender, RoutedEventArgs e)
     {
+        // The open tab is being left for the new one: snapshot it, or switching back finds it blank (and
+        // closing the window cannot tell it holds an unsaved Untitled document).
+        CaptureLeavingActiveTab();
         // Register the currently-open file (if any) as a tab before we clear it.
         EnsureCurrentEditorContentHasTab();
 
