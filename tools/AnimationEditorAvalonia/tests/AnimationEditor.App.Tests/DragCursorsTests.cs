@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Sequences;
+using Avalonia.Headless.XUnit;
 using Shouldly;
 using Xunit;
 
@@ -31,5 +32,16 @@ public class DragCursorsTests
     public void StockCursorId_PanIsSizeAll()
     {
         DragCursors.StockCursorId(TimelineCursor.Pan).ShouldBe(32646);
+    }
+
+    [AvaloniaFact]
+    public void ForHover_GivesEachTimelineCursorItsOwnShape_AndNothingForTheDefault()
+    {
+        DragCursors.ForHover(TimelineCursor.Default).ShouldBeNull();
+
+        var shapes = new[] { TimelineCursor.ResizeHorizontal, TimelineCursor.Reorder, TimelineCursor.Pan }
+            .Select(cursor => DragCursors.ForHover(cursor).ShouldNotBeNull()).ToArray();
+
+        shapes.Distinct().Count().ShouldBe(3);
     }
 }
