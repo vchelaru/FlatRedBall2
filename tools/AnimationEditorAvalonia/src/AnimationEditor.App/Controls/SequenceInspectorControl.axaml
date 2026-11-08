@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:viewsControls="clr-namespace:AnimationEditor.Views.Controls;assembly=AnimationEditor.Views"
-             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.App.Controls.SequenceInspectorControl">
     <!-- The Inspector tab's content while a .seqj tab is active: one section per kind of timeline selection
          (nothing = the sequence, a track header, a chain). Only one section shows at a time. With several tracks or
@@ -72,23 +71,6 @@
                             </Grid>
                             <CheckBox x:Name="TrackVisibleBox" Content="Visible"
                                       AutomationProperties.AutomationId="seq-track-visible" />
-                        </StackPanel>
-                    </Border>
-
-                    <!-- TRANSFORM: the flip button of the .achx Inspector's frame TRANSFORM section (MainWindow.axaml PropFlipH).
-                         A track has no X / Y: sprites sit at their frames' offsets. -->
-                    <Border Padding="12,8,12,10" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="TRANSFORM" Classes="heading" />
-                            <ToggleButton x:Name="TrackFlipBox" ToolTip.Tip="Flip Horizontal"
-                                          HorizontalAlignment="Left" Width="32" Height="26"
-                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          AutomationProperties.AutomationId="seq-track-flip">
-                                <svg:Svg Width="16" Height="16"
-                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFlipH.svg"
-                                         CurrentColor="{DynamicResource IconInk}"
-                                         VerticalAlignment="Center" />
-                            </ToggleButton>
                         </StackPanel>
                     </Border>
                 </StackPanel>

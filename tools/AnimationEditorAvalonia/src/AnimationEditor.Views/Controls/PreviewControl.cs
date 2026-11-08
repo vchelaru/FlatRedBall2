@@ -302,7 +302,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
     /// <summary>
     /// Sprites to draw back to front in place of the achx selection: a sequence tab's composited preview. Each draws
-    /// from its own texture at its frame offsets, mirrored by its track's flip, with its chain's shapes. Null (the default) shows the
+    /// from its own texture at its frame offsets, with its frame's own flip and its chain's shapes. Null (the default) shows the
     /// selection. A control used this way should be given an <see cref="ISelectedState"/> of its own that nothing
     /// selects in, so its shape and sprite gestures have nothing to edit.
     /// </summary>
@@ -649,7 +649,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             string? texPath = CacheKey(sprite.TexturePath);
             _thumbnailService!.GetImage(texPath);
             var sample = sprite.Sample();
-            layers[i] = new PreviewLayer(sprite.Frame, texPath, sample.OffsetX, sample.OffsetY, sample.Color, sprite.FlipMatrix);
+            layers[i] = new PreviewLayer(sprite.Frame, texPath, sample.OffsetX, sample.OffsetY, sample.Color);
         }
         return layers;
     }
@@ -661,17 +661,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     {
         if (!_showShapes) return Array.Empty<PreviewShapeInfo>();
         return sprites
-            .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Chain)
-                .Select(shape => MirrorOnTrack(shape, sprite.FlipHorizontal)))
+            .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Chain))
             .ToArray();
-    }
-
-    /// <summary>Mirrors a frame's shape across the entity origin's X when its track flips; a track has no offset, so nothing else moves it.</summary>
-    internal static PreviewShapeInfo MirrorOnTrack(PreviewShapeInfo shape, bool flipHorizontal)
-    {
-        if (!flipHorizontal) return shape;
-        float[]? points = shape.Points?.Select((value, i) => i % 2 == 0 ? -value : value).ToArray();
-        return shape with { X = -shape.X, Points = points };
     }
 
     /// <summary>
@@ -3409,9 +3400,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// <summary>One composited chain in a multi-select group preview (#576) — its current frame,
     /// resolved texture path, and its own resting RelativeX/Y offset and effective color.</summary>
     private record PreviewLayer(
-        AnimationFrameSave Frame, string? TexturePath, float OffsetX, float OffsetY, ResolvedFrameColor Color,
-        // Replaces the frame's own flip when set: a sequence track that mirrors its sprite.
-        (float a, float b, float c, float d)? Flip = null);
+        AnimationFrameSave Frame, string? TexturePath, float OffsetX, float OffsetY, ResolvedFrameColor Color);
 
     /// <summary>
     /// Resolves a frame's sticky effective color within its chain. Returns an all-unset result
@@ -3519,7 +3508,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
                 float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
                 float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu, layer.Flip);
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox, s.RenderScaling, gpu);
             }
         }
         else

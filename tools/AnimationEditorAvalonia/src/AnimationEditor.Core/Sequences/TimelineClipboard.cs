@@ -30,7 +30,7 @@ public sealed record TimelineClipboardContent(TimelineClipboardKind Kind, IReadO
 public sealed record CopiedChain(SequenceChainReferenceSave Chain, SequenceTrackSave Track, int Lane);
 
 /// <summary>A track the copied chains came from: its lane in the source sequence and the settings a missing track is made with.</summary>
-public sealed record CopiedTrack(string Name, int Lane, bool FlipHorizontal, bool Visible);
+public sealed record CopiedTrack(string Name, int Lane, bool Visible);
 
 /// <summary>What a timeline paste or duplicate made: where the new chains and tracks are, and a message for each source refused.</summary>
 public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, IReadOnlyList<int> Tracks, IReadOnlyList<string> Errors)
@@ -45,7 +45,7 @@ public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, 
 /// </summary>
 /// <remarks>
 /// <code>{ "kind": "frb2-animation-editor-chains", "version": 1, "sources": ["C:/a/hero.achx"], "track": "Body",
-///   "sourceTracks": [ { "name": "Body", "lane": 0, "flipHorizontal": false, "visible": true } ],
+///   "sourceTracks": [ { "name": "Body", "lane": 0, "visible": true } ],
 ///   "chainTracks": [ 0 ],
 ///   "chains": [ { "source": "C:/a/hero.achx", "chain": "Walk", "start": 0, "loops": 1 } ] }</code>
 /// A chain's <c>start</c> is seconds after the earliest copied chain, so a paste can put that one anywhere. <c>track</c>
@@ -102,7 +102,6 @@ public static class TimelineClipboard
                 {
                     ["name"] = item.Track.Name,
                     ["lane"] = item.Lane,
-                    ["flipHorizontal"] = item.Track.FlipHorizontal,
                     ["visible"] = item.Track.Visible,
                 });
             }
@@ -212,10 +211,9 @@ public static class TimelineClipboard
         foreach (var node in tracksArray)
         {
             if (node is not JsonObject track || !TryGet(track, "name", out string? name) || name is null || !TryGet(track, "lane", out int lane)) return false;
-            // An "x"/"y" from a copy made before tracks lost their offset is left unread, whatever type it holds.
-            if (!TryGetOptional(track, "flipHorizontal", false, out bool flip) || !TryGetOptional(track, "visible", true, out bool visible))
-                return false;
-            tracks.Add(new CopiedTrack(name, lane, flip, visible));
+            // An "x"/"y" or "flipHorizontal" from a copy made before tracks lost them is left unread, whatever type it holds.
+            if (!TryGetOptional(track, "visible", true, out bool visible)) return false;
+            tracks.Add(new CopiedTrack(name, lane, visible));
         }
         var indices = new List<int>();
         foreach (var node in indicesArray)

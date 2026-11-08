@@ -20,7 +20,7 @@ public class SequenceListSaveTests
             {
                 new SequenceTrackSave
                 {
-                    Name = "Wing R", FlipHorizontal = true,
+                    Name = "Wing R", Visible = false,
                     Chains = { new SequenceChainReferenceSave { Source = "Boss.achj", Chain = "WingFlap", Start = 0.25, Loops = 11.5f } },
                 },
             },
@@ -33,7 +33,7 @@ public class SequenceListSaveTests
         sequence.Name.ShouldBe("Attack");
         sequence.Loop.ShouldBeTrue();
         var track = sequence.Tracks.ShouldHaveSingleItem();
-        (track.Name, track.FlipHorizontal).ShouldBe(("Wing R", true));
+        (track.Name, track.Visible).ShouldBe(("Wing R", false));
         var reference = track.Chains.ShouldHaveSingleItem();
         (reference.Source, reference.Chain, reference.Start, reference.Loops).ShouldBe(("Boss.achj", "WingFlap", 0.25, 11.5f));
     }

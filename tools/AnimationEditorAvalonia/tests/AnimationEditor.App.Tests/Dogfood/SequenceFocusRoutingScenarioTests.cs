@@ -248,7 +248,7 @@ public class SequenceFocusRoutingScenarioTests
     [InlineData("SequencePlayButton")]
     [InlineData("SequenceStopButton")]
     [InlineData("SequencePreview")]
-    [InlineData("TrackFlipBox")]
+    [InlineData("TrackVisibleBox")]
     public async Task WithTheTimelineLastTouched_CopyPasteDuplicateAndDelete_WorkWhereverTheFocusSits(string target)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
@@ -256,7 +256,7 @@ public class SequenceFocusRoutingScenarioTests
         await editor.OpenAsync(path);
         // A track header is selected, so the inspector shows its checkboxes.
         editor.ClickAt(Header(editor, 0));
-        Control focusTarget = target == "TrackFlipBox"
+        Control focusTarget = target == "TrackVisibleBox"
             ? editor.Control<SequenceInspectorControl>("SequenceInspector").FindControl<Avalonia.Controls.Primitives.ToggleButton>(target)!
             : editor.Control<Control>(target);
         editor.Click(focusTarget);

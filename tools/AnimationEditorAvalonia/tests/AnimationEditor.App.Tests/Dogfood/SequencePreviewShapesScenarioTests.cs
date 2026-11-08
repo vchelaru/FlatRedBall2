@@ -12,8 +12,8 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// What the composited sequence preview draws for each frame's collision shapes (rects, circles, polygons): the
-/// active frame's shapes at their own entity-space coordinates (a track adds no offset), for visible tracks inside
-/// their chain, stacked like the sprites, and hidden by the Shapes toggle. Shapes are read from the same snapshot the draw uses
+/// active frame's shapes in entity space, for visible tracks inside their chain,
+/// stacked like the sprites, and hidden by the Shapes toggle. Shapes are read from the same snapshot the draw uses
 /// (<see cref="PreviewControl.GetShapeInfosForTest"/>), and time moves by ruler clicks or the fake tick clock.
 /// </summary>
 public class SequencePreviewShapesScenarioTests
@@ -67,9 +67,9 @@ public class SequencePreviewShapesScenarioTests
         return shapes;
     }
 
-    private static SequenceTrackSave Track(string name, bool flip, bool visible, params (string Chain, double Start)[] chains)
+    private static SequenceTrackSave Track(string name, bool visible, params (string Chain, double Start)[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, FlipHorizontal = flip, Visible = visible };
+        var track = new SequenceTrackSave { Name = name, Visible = visible };
         foreach (var (chain, start) in chains)
             track.Chains.Add(new SequenceChainReferenceSave
             {
@@ -78,7 +78,7 @@ public class SequencePreviewShapesScenarioTests
         return track;
     }
 
-    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, false, true, (chain, start));
+    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, true, (chain, start));
 
     private static SequenceSave Sequence(string name, params SequenceTrackSave[] tracks)
     {
@@ -156,22 +156,6 @@ public class SequencePreviewShapesScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task AFlippedTrack_MirrorsRectCircleAndPolygonAcrossTheEntityOrigin()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", true, true, ("Guard", 0))));
-
-        Scrub(editor, 0.05);
-        ShouldBeShapes(Current(editor), Rect(-5, 2, 4, 3));
-        Scrub(editor, 0.15);
-        ShouldBeShapes(Current(editor), Circle(3, 1, 6));
-        Scrub(editor, 0.35);
-        var wedge = Current(editor).Single();
-        (wedge.X, wedge.Y).ShouldBe((-1f, 1f));
-        wedge.Points.ShouldBe(new[] { -2f, 3f, -5f, 3f, -5f, 6f });
-    }
-
-    [AvaloniaFact]
     public async Task TheFramesOwnOffsetMovesTheSprite_NotTheShape()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
@@ -190,8 +174,8 @@ public class SequencePreviewShapesScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await OpenAsync(editor, Sequence("Attack",
-            Track("Fx", false, true, ("Spark", 0)),
-            Track("Body", false, false, ("Guard", 0))));
+            Track("Fx", true, ("Spark", 0)),
+            Track("Body", false, ("Guard", 0))));
 
         Scrub(editor, 0.05);
 
@@ -221,7 +205,7 @@ public class SequencePreviewShapesScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Guard would run 0 to 0.4 s; Spark starts at 0.15 s on the same track and cuts it.
-        var track = Track("Body", false, true, ("Guard", 0), ("Spark", 0.15));
+        var track = Track("Body", true, ("Guard", 0), ("Spark", 0.15));
         await OpenAsync(editor, Sequence("Attack", track));
 
         Scrub(editor, 0.1);
@@ -287,7 +271,7 @@ public class SequencePreviewShapesScenarioTests
     public async Task ZoomAndPan_DoNotChangeWhichShapesDraw()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", true, true, ("Guard", 0))));
+        await OpenAsync(editor, Sequence("Attack", Track("Body", true, ("Guard", 0))));
         Scrub(editor, 0.15);
         var before = Current(editor);
 
@@ -295,6 +279,6 @@ public class SequencePreviewShapesScenarioTests
         Preview(editor).SetPan(37, -12);
 
         Current(editor).ShouldBe(before);
-        ShouldBeShapes(Current(editor), Circle(3, 1, 6));
+        ShouldBeShapes(Current(editor), Circle(-3, 1, 6));
     }
 }

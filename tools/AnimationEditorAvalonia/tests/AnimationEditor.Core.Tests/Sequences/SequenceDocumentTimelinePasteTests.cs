@@ -146,7 +146,7 @@ public class SequenceDocumentTimelinePasteTests
     {
         using var dir = new TestHelpers.TempDir();
         var body = Track("Body", Chain("Walk", 0.5, loops: 2), Chain("Run", 2));
-        body.FlipHorizontal = true; body.Visible = false;
+        body.Visible = false;
         body.UnknownProperties["tag"] = "boss";
         var document = Open(dir.Path, new[] { "hero.achx" }, body, Track("Head"), Track("Tail"));
         var undo = new UndoManager();
@@ -156,7 +156,7 @@ public class SequenceDocumentTimelinePasteTests
 
         Names(document).ShouldBe(new[] { "Body", "Body 2", "Head 2", "Head", "Tail" });
         var copy = document.Save.Sequences[0].Tracks[1];
-        (copy.FlipHorizontal, copy.Visible).ShouldBe((true, false));
+        copy.Visible.ShouldBeFalse();
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.5, 2f, "hero.achx"), ("Run", 2.0, 1f, "hero.achx") });
         result.Tracks.ShouldBe(new[] { 1, 2 });

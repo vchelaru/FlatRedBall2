@@ -193,17 +193,4 @@ public class SequenceTrackClickScenarioTests
         File.ReadAllText(path).ShouldBe(before);
     }
 
-    [AvaloniaFact]
-    public async Task TheInspectorTrackPanel_ShowsNameVisibleAndFlipOnly()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor);
-        editor.ClickAt(OnHeader(editor, 0));
-
-        var inspector = Inspector(editor);
-        inspector.TrackNameBox.IsEffectivelyVisible.ShouldBeTrue();
-        inspector.TrackVisibleBox.IsEffectivelyVisible.ShouldBeTrue();
-        inspector.TrackFlipBox.IsEffectivelyVisible.ShouldBeTrue();
-        inspector.GetVisualDescendants().OfType<NumericUpDown>().Where(f => f.IsEffectivelyVisible).ShouldBeEmpty();
-    }
 }

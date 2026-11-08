@@ -3,18 +3,16 @@ using System.Text.Json.Nodes;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// One sprite's lane in a <see cref="SequenceSave"/>. Its flip holds for the whole sequence. Outside every
-/// chain on the track, the sprite is hidden. A track has no position: the sprite sits at its frames' own offsets (the
-/// animation's), mirrored by the flip, so the offset comes from one place. A track has no depth value: the tracks of a sequence stack in list order, the
-/// first in front and the last at the back, like layers in an image editor (the editor shows them as lanes, the top lane in front).
+/// One sprite's lane in a <see cref="SequenceSave"/>. Outside every chain on the track, the sprite is hidden. A track
+/// has a name and a visibility flag, nothing else: the sprite sits at its frames' own offsets and draws with their own
+/// flips (the animation's), so each comes from one place. A track has no depth value: the tracks of a sequence stack in
+/// list order, the first in front and the last at the back, like layers in an image editor (the editor shows them as
+/// lanes, the top lane in front).
 /// </summary>
 public class SequenceTrackSave
 {
     /// <summary>Display name of the sprite.</summary>
     public string Name { get; set; } = "";
-
-    /// <summary>Mirrors the sprite and its frame offsets across the entity origin's X.</summary>
-    public bool FlipHorizontal { get; set; }
 
     /// <summary>
     /// Initial visibility of the track. The editor preview hides the track when false and runtimes may skip drawing
