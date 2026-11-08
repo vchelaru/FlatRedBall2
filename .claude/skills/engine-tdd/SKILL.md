@@ -5,7 +5,7 @@ description: "Test-first discipline for FlatRedBall2 engine changes. Triggers wh
 
 # Engine Changes Require a Failing Test First
 
-Behavior changes in `src/` require a failing test in `tests/FlatRedBall2.Tests/` **before** the source edit. Write it, run it, watch it fail, then fix.
+Behavior changes in `src/` require a failing test in `tests/FlatRedBall2.Tests/` **before** the source edit. Write it, run it (`python scripts/run_tests.py <TestClass>`, only that class, never the whole suite), watch it fail, then fix.
 
 No "the cause is obvious, I'll skip the test" exception — that reasoning is how silent regressions ship. If you're about to edit `src/` without a failing test open, stop.
 

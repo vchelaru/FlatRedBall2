@@ -86,6 +86,7 @@ public sealed class SingleInstanceServer : IDisposable
 
                 using var reader = new StreamReader(server);
                 var path = await reader.ReadLineAsync(ct);
+                AppLog.Info($"Pipe request from a second launch: {(string.IsNullOrEmpty(path) ? "activate window" : "open " + path)}.");
                 if (!string.IsNullOrEmpty(path))
                     FileOpenRequested?.Invoke(path);
                 else
@@ -95,9 +96,10 @@ public sealed class SingleInstanceServer : IDisposable
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
                 // Connection errors on the listener side are transient — keep listening.
+                AppLog.Warn("Pipe listener error (will keep listening).", ex);
                 await Task.Delay(200, CancellationToken.None);
             }
         }
@@ -135,9 +137,10 @@ public sealed class SingleInstanceServer : IDisposable
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
             // Could not reach the running instance.
+            AppLog.Warn($"Could not reach the running instance over pipe '{pipeName}'.", ex);
             return false;
         }
     }

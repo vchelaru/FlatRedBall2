@@ -108,7 +108,7 @@ FRB2 does not have a migration path from FRB1 projects. It is a fresh start with
 
 Contributions welcome. Before submitting a PR:
 
-- Run `dotnet test tests/FlatRedBall2.Tests/` — all tests must pass
+- Run `dotnet test tests/FlatRedBall2.Tests/` — all tests must pass (AI agents use `python scripts/run_tests.py <Class>` instead; see `CLAUDE.md`)
 - Engine behavior changes require a failing test first (see `.claude/skills/engine-tdd`)
 - Code style rules are in `.claude/code-style.md`
 

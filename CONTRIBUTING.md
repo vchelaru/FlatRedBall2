@@ -14,7 +14,7 @@ If you find a bug, please open an issue and include:
 1. **Fork** the repository.
 2. **Branch** off of `main` for your work.
 3. **Commit** your changes, keeping messages clear and descriptive.
-4. **Test** your changes locally (ensure `dotnet test` passes).
+4. **Test** your changes locally (ensure `dotnet test` passes). AI agents run only the tests for their change with `python scripts/run_tests.py <Class>`; CI runs the full suite.
 5. **Open a PR** against the `main` branch.
 
 Please ensure any new features or bug fixes are accompanied by tests in the `tests/` directory when appropriate.

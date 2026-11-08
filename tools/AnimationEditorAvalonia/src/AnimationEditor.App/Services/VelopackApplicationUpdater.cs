@@ -84,6 +84,7 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
         CancellationToken cancellationToken = default)
     {
         var updateManager = CreateUpdateManager();
+        AppLog.Info($"Update check started (source {_updateSource}, installed version {updateManager.CurrentVersion?.ToString() ?? "none: not a managed install"}).");
 
         // Local development builds and the legacy archive distribution are not managed installs.
         // Their normal behavior is unchanged: they never attempt to overwrite themselves.
@@ -94,9 +95,14 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
         {
             var update = await updateManager.CheckForUpdatesAsync().ConfigureAwait(false);
             if (update is null)
+            {
+                AppLog.Info("Update check: no update available.");
                 return ApplicationUpdateResult.NoUpdate;
+            }
 
+            AppLog.Info($"Update found: {update.TargetFullRelease.Version}; downloading.");
             await updateManager.DownloadUpdatesAsync(update, progress, cancellationToken).ConfigureAwait(false);
+            AppLog.Info($"Update {update.TargetFullRelease.Version} downloaded; ready to restart.");
             _updateManager = updateManager;
             _downloadedUpdate = update;
             return new ApplicationUpdateResult(
@@ -105,7 +111,7 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"AnimationEditor update download failed: {ex}");
+            AppLog.Error("Update check or download failed.", ex);
             return ApplicationUpdateResult.Failed("The update could not be downloaded. Please try again.");
         }
     }
@@ -121,9 +127,27 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
     public void ApplyUpdateAndRestart()
     {
         if (_updateManager is null || _downloadedUpdate is null)
+        {
+            AppLog.Warn("Restart for update requested, but no update has been downloaded.");
             return;
+        }
 
-        _updateManager.ApplyUpdatesAndRestart(_downloadedUpdate);
+        AppLog.Info($"Calling ApplyUpdatesAndRestart for {_downloadedUpdate.TargetFullRelease.Version}.");
+        AppLifecycle.UpdateRestartStarting();
+        try
+        {
+            _updateManager.ApplyUpdatesAndRestart(_downloadedUpdate);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("ApplyUpdatesAndRestart threw.", ex);
+            AppLifecycle.UpdateRestartFailed();
+            throw;
+        }
+
+        // A successful call ends this process before getting here.
+        AppLog.Warn("ApplyUpdatesAndRestart returned but the process is still running.");
+        AppLifecycle.UpdateRestartFailed();
     }
 }
 

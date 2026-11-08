@@ -32,6 +32,30 @@ public class LogFileLocationTests
         Assert.Equal("C:/Apps/AnimationEditor/log.txt", result.FullPath);
     }
 
+    // Velopack replaces the whole `current` folder on every update, so a log there is lost exactly
+    // when an update misbehaves.
+    [Fact]
+    public void Resolve_InsideAVelopackCurrentFolder_UsesApplicationDataEvenWhenWritable()
+    {
+        var result = LogFileLocation.Resolve(
+            @"C:\Users\dev\AppData\Local\AnimationEditor\current\", @"C:\Users\dev\AppData\Roaming",
+            isDirectoryWritable: _ => true,
+            fileExists: path => path == "C:/Users/dev/AppData/Local/AnimationEditor/Update.exe");
+
+        Assert.Equal("C:/Users/dev/AppData/Roaming/AnimationEditor/log.txt", result.FullPath);
+    }
+
+    [Fact]
+    public void Resolve_InACurrentFolderWithoutUpdateExe_StaysNextToExecutable()
+    {
+        var result = LogFileLocation.Resolve(
+            @"C:\dev\current", @"C:\Users\dev\AppData\Roaming",
+            isDirectoryWritable: _ => true,
+            fileExists: _ => false);
+
+        Assert.Equal("C:/dev/current/log.txt", result.FullPath);
+    }
+
     [Fact]
     public void Resolve_WhenExeDirNotWritable_FallsBackToApplicationData()
     {
