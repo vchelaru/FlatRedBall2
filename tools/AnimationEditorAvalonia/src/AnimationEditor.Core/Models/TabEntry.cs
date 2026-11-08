@@ -79,6 +79,13 @@ namespace AnimationEditor.Core.Models
         public AnimationChainListSave? CachedEditorModel { get; set; }
 
         /// <summary>
+        /// True when this tab's last save failed (read-only file, disk full, the stale-on-disk pause), so
+        /// <see cref="CachedEditorModel"/> holds edits the file lacks. Captured with the model; the active tab's
+        /// live answer is <see cref="IUndoManager.SaveState"/>. Cleared by a later successful save or a reload.
+        /// </summary>
+        public bool SaveFailed { get; set; }
+
+        /// <summary>
         /// <see cref="IProjectManager.OnDiskCoordinateType"/> captured with
         /// <see cref="CachedEditorModel"/>.
         /// </summary>
