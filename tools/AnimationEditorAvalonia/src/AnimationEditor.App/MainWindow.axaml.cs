@@ -2677,50 +2677,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Runs <paramref name="item"/>'s Click handlers when it is enabled. The macOS menu bar routes
-    /// document commands through here so it obeys the same enabled state as the in-window menu.
+    /// The macOS system menu bar: a live mirror of the in-window menu (<see cref="NativeMenuBuilder"/>), so a new
+    /// item or gesture needs adding only to <c>MainMenu</c>.
     /// </summary>
-    private static void ClickIfEnabled(MenuItem item)
-    {
-        if (item.IsEnabled)
-            item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-    }
-
-    /// <summary>
-    /// Returns delegates for every actionable menu item so that the macOS NativeMenu
-    /// can be wired from <see cref="App"/> without reaching into private window state.
-    /// </summary>
-    internal NativeMenuActions CreateNativeMenuActions() => new(
-        New:             () => OnNewClick(null, null!),
-        Load:            () => _ = LoadAsync(),
-        RecentFiles:     () => _appSettings.RecentFiles
-                                    .Take(5)
-                                    .Select(f => (System.IO.Path.GetFileName(f), (Action)(() => _ = LoadAnimationFileAsync(f))))
-                                    .ToList(),
-        OpenProjectFolder:  () => _ = OpenProjectFolderAsync(),
-        CloseProjectFolder: CloseProjectFolder,
-        HasProjectFolder: () => HasProjectFolderOpen,
-        Save:            () => ClickIfEnabled(MenuSave),
-        SaveAs:          () => ClickIfEnabled(MenuSaveAs),
-        Undo:            () => ClickIfEnabled(MenuUndo),
-        Redo:            () => ClickIfEnabled(MenuRedo),
-        Copy:            () => ClickIfEnabled(MenuCopy),
-        Cut:             () => ClickIfEnabled(MenuCut),
-        Paste:           () => ClickIfEnabled(MenuPaste),
-        Duplicate:       () => ClickIfEnabled(MenuDuplicate),
-        ReloadFromDisk:  () => ClickIfEnabled(MenuReloadFromDisk),
-        ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
-        ResizeTexture:   () => ClickIfEnabled(MenuResizeTexture),
-        NavBack:         () => _ = NavigateHistoryAsync(back: true),
-        NavForward:      () => _ = NavigateHistoryAsync(back: false),
-        CanGoBack:       () => _navigationHistory.CanGoBack,
-        CanGoForward:    () => _navigationHistory.CanGoForward,
-        SubscribeNavigationChanged: handler => _navigationHistory.Changed += handler,
-        NavBackGesture:    HotkeyMenuGesture("nav-back"),
-        NavForwardGesture: HotkeyMenuGesture("nav-forward"),
-        ShowHistory:     () => ClickIfEnabled(MenuShowHistory),
-        ViewLog:         () => OnViewLogClick(null, null!),
-        About:           () => _ = ShowAboutDialogAsync());
+    internal NativeMenu CreateNativeMenu() => NativeMenuBuilder.Build(MainMenu);
 
     private void RefreshRecentFiles()
     {

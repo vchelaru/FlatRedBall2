@@ -230,7 +230,7 @@ public class TabKindScenarioTests
         await editor.OpenPngTabAsync(sheet);
 
         // The macOS menu bar calls these delegates directly, with its own Cmd+Z gesture.
-        editor.Window.CreateNativeMenuActions().Undo();
+        NativeMenuTestSupport.Activate(NativeMenuTestSupport.Build(editor), "Edit", "Undo");
         editor.Layout();
 
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk" });
