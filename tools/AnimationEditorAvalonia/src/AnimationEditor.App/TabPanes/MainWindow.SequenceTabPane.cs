@@ -71,6 +71,7 @@ public partial class MainWindow
         private bool _refreshing;
         private bool _restoringZoom;
         private List<SequenceListItem> _items = new();
+        private Controls.SequenceListDragController? _listDrag;
 
         // One clock per selected sequence, each on its own length and loop flag. Replaced on every load, since names are per file.
         private SequencePlayback _playback = new();
@@ -513,6 +514,9 @@ public partial class MainWindow
             w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressed, RoutingStrategies.Bubble, handledEventsToo: true);
             w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressedTunnel, RoutingStrategies.Tunnel);
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
+            _listDrag = new Controls.SequenceListDragController(w.SequenceList, () => _document?.SelectedIndices ?? Array.Empty<int>(),
+                CommitPendingRename, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
+                point => w.SequenceList.TranslatePoint(point, w.DragOverlayCanvas));
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
             w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
             // A press that does not move the focus (a library chip, a toolbar button, blank space) would leave a rename open.
@@ -1087,11 +1091,23 @@ public partial class MainWindow
             }
         }
 
+        // Dropping the dragged rows on a gap: one undo entry, and a move is an edit rather than a place to come back to,
+        // so it records no Back entry.
+        private void MoveSequences(IReadOnlyList<int> indices, int slot)
+        {
+            if (_document is not { } document) return;
+            using (_window._navigation.Suppress())
+                document.MoveSequences(_window._undoManager, indices, slot);
+            FocusSelectedRow();
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
             if (_document is null) return;
-            _items = _document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
+            // Its rows are about to be replaced; a drag still holding the old ones would drop on the wrong sequences.
+            _listDrag?.CancelDrag();
+            _items =_document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
             // The document says which sequence an edit, undo or redo left selected.
             int selected = Math.Min(_document.SelectedSequence, _items.Count - 1);
             _document.SelectedSequence = selected;
