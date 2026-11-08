@@ -56,11 +56,81 @@ public sealed class SequenceDocument
     /// </summary>
     public int SelectedSequence { get; set; }
 
+    /// <summary>Counts the times any source file was (re)read, so a view that drew from the sources can tell they changed under it.</summary>
+    public int SourcesVersion { get; private set; }
+
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
 
-    /// <summary>Raised after any edit, undo, redo or source reload.</summary>
+    /// <summary>Raised after any edit, undo, redo, source reload or reload from disk.</summary>
     public event Action? Changed;
+
+    /// <summary>
+    /// Runs the write of <see cref="Path"/> (given that path). The app sets it to the hot-reload watcher's own-save
+    /// guard so the file's change event is recognised as ours and does not reload the document.
+    /// </summary>
+    public Action<string, Action> SaveRunner { get; set; } = static (_, write) => write();
+
+    /// <summary>
+    /// Why the last <see cref="ReloadFromDisk"/> failed, or null. While set, the file on disk holds something this
+    /// document could not read, so saving is paused rather than overwrite it.
+    /// </summary>
+    public string? StaleOnDiskReason { get; private set; }
+
+    /// <summary>The absolute paths of every source in the file, whether or not it could be read.</summary>
+    public IReadOnlyList<string> WatchedSourceFiles =>
+        Save.Sources.Select(source => SourcePath(source).FullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>The absolute paths of every texture the loaded sources' frames use.</summary>
+    public IReadOnlyList<string> WatchedTextureFiles
+    {
+        get
+        {
+            var textures = new List<string>();
+            foreach (var source in Save.Sources)
+            {
+                if (SourceChains(source) is not { } list) continue;
+                foreach (var frame in list.AnimationChains.SelectMany(chain => chain.Frames))
+                    if (ResolveTexturePath(source, frame) is { } texture) textures.Add(texture);
+            }
+            return textures.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Re-reads the file itself after it changed on disk. Keeps the selected sequence (by name, else by position) and
+    /// leaves the file alone. A file that can't be read leaves the document as it is and reports why; a later
+    /// successful call recovers.
+    /// </summary>
+    public SequenceReloadResult ReloadFromDisk()
+    {
+        SequenceListSave loaded;
+        try
+        {
+            loaded = SequenceListSave.FromFile(Path.FullPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            StaleOnDiskReason = ex.Message;
+            return new SequenceReloadResult(false, ex.Message);
+        }
+        // The "saving is paused" failure is over once the file reads again; a real write failure is not.
+        if (StaleOnDiskReason is not null) SaveError = null;
+        StaleOnDiskReason = null;
+        if (loaded.ToJsonString() == Save.ToJsonString()) return new SequenceReloadResult(false, null);
+
+        string? selectedName = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count
+            ? Save.Sequences[SelectedSequence].Name
+            : null;
+        int previous = SelectedSequence;
+        Save = loaded;
+        int byName = selectedName is null ? -1 : loaded.Sequences.FindIndex(sequence => sequence.Name == selectedName);
+        SelectedSequence = byName >= 0 ? byName : Math.Min(previous, loaded.Sequences.Count - 1);
+        _trackToSelect = null;
+        SyncSources();
+        Changed?.Invoke();
+        return new SequenceReloadResult(true, null);
+    }
 
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
     /// <exception cref="System.Text.Json.JsonException">The file is not a valid <c>.seqj</c>.</exception>
@@ -682,9 +752,15 @@ public sealed class SequenceDocument
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
+        if (StaleOnDiskReason is { } stale)
+        {
+            // The file holds something this document could not read; writing now would destroy it.
+            SaveError = $"{Path.NoPath} changed on disk and couldn't be reloaded ({stale}). Saving is paused until it reloads.";
+            return;
+        }
         try
         {
-            Save.Save(Path.FullPath);
+            SaveRunner(Path.FullPath, () => Save.Save(Path.FullPath));
             SaveError = null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -749,6 +825,7 @@ public sealed class SequenceDocument
             _stamps[source] = stamp;
             any = true;
         }
+        if (any) SourcesVersion++;
         return any;
     }
 

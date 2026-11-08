@@ -10,13 +10,16 @@ namespace AnimationEditor.Core.HotReload
     /// </summary>
     public interface IHotReloadWatcher : IDisposable
     {
-        /// <summary>Fired when the .achx file itself changes on disk. Arg: full path.</summary>
+        /// <summary>Fired when the main watched file (.achx, .achj, .tsx or .seqj) changes on disk. Arg: full path.</summary>
         event Action<string> AchxChangedOnDisk;
 
         /// <summary>Fired when a referenced PNG changes on disk. Arg: full absolute path.</summary>
         event Action<string> PngChangedOnDisk;
 
-        /// <summary>Fired when the .achx file is deleted from disk. Arg: full path.</summary>
+        /// <summary>Fired when a file from <see cref="UpdateSourceList"/> changes or is deleted on disk. Arg: full path.</summary>
+        event Action<string> SourceChangedOnDisk;
+
+        /// <summary>Fired when the main watched file is deleted from disk. Arg: full path.</summary>
         event Action<string> AchxDeletedOnDisk;
 
         /// <summary>Whether hot reload is active. Toggle from the UI.</summary>
@@ -27,6 +30,10 @@ namespace AnimationEditor.Core.HotReload
 
         /// <summary>Update the PNG watch list after an .achx reload (handles ref list drift).</summary>
         void UpdatePngList(IEnumerable<string> newPngPaths);
+
+        /// <summary>Watch these files too, raising <see cref="SourceChangedOnDisk"/> when one changes or is deleted
+        /// (a .seqj's source .achx files). Replaces the previous list; folders no longer needed stop being watched.</summary>
+        void UpdateSourceList(IEnumerable<string> sourcePaths);
 
         /// <summary>Stop all watching.</summary>
         void StopWatching();

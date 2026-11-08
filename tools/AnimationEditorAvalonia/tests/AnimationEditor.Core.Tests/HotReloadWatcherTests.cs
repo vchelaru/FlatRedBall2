@@ -1,5 +1,7 @@
 using AnimationEditor.Core.HotReload;
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -162,6 +164,134 @@ public class HotReloadWatcherTests
                 await Task.Delay(100);
 
             Assert.Single(changed);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    private static async Task<bool> WaitForAsync(Func<bool> condition, int timeoutMs = 5000)
+    {
+        for (int waited = 0; !condition() && waited < timeoutMs; waited += 50)
+            await Task.Delay(50);
+        return condition();
+    }
+
+    // A .seqj lists source files in other folders; each one changing must reach the consumer,
+    // and a file that was not listed (or no longer is) must stay silent.
+    [Fact]
+    public async Task SourceChangedOnDisk_ListedSourceInAnotherFolder_RaisedOnRewriteAndDelete_ButNotWhenUnlistedOrUnchanged()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var seqj = Path.Combine(root, "boss.seqj");
+            var art = Directory.CreateDirectory(Path.Combine(root, "art")).FullName;
+            var source = Path.Combine(art, "hero.achj");
+            var other = Path.Combine(art, "other.achj");
+            File.WriteAllText(seqj, "{}");
+            File.WriteAllText(source, "one");
+            File.WriteAllText(other, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.SourceChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(seqj, System.Array.Empty<string>());
+            watcher.UpdateSourceList(new[] { source });
+
+            File.WriteAllText(other, "two");
+            File.WriteAllText(source, "same");
+            File.WriteAllText(source, "one");
+            await Task.Delay(800);
+            Assert.True(changed.IsEmpty, "an unlisted file, and a listed one back to the content it had, must not raise");
+            changed.Clear();
+
+            File.WriteAllText(source, "two");
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty), "a rewritten source should raise");
+            changed.Clear();
+
+            File.Delete(source);
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty), "a deleted source should raise");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task UpdateSourceList_DroppedSource_StopsRaising_AndAddedSourceStartsRaising()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var seqj = Path.Combine(root, "boss.seqj");
+            var a = Directory.CreateDirectory(Path.Combine(root, "a")).FullName;
+            var b = Directory.CreateDirectory(Path.Combine(root, "b")).FullName;
+            var first = Path.Combine(a, "first.achj");
+            var second = Path.Combine(b, "second.achj");
+            File.WriteAllText(seqj, "{}");
+            File.WriteAllText(first, "one");
+            File.WriteAllText(second, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.SourceChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(seqj, System.Array.Empty<string>());
+            watcher.UpdateSourceList(new[] { first });
+
+            watcher.UpdateSourceList(new[] { second });
+            File.WriteAllText(first, "two");
+            await Task.Delay(800);
+            Assert.True(changed.IsEmpty, "a source dropped from the list must stay silent");
+
+            File.WriteAllText(second, "two");
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty), "a newly listed source should raise");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // Sources must keep their folders watched when the PNG list is refreshed, and vice versa.
+    [Fact]
+    public async Task UpdatePngList_DoesNotStopWatchingASourceFolder()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var seqj = Path.Combine(root, "boss.seqj");
+            var art = Directory.CreateDirectory(Path.Combine(root, "art")).FullName;
+            var source = Path.Combine(art, "hero.achj");
+            File.WriteAllText(seqj, "{}");
+            File.WriteAllText(source, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.SourceChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(seqj, System.Array.Empty<string>());
+            watcher.UpdateSourceList(new[] { source });
+
+            watcher.UpdatePngList(new[] { Path.Combine(root, "sheet.png") });
+            File.WriteAllText(source, "two");
+
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // Git checkout and most editors save by delete + create (or rename over): that is a change, not a deletion.
+    [Fact]
+    public async Task AchxChangedOnDisk_AtomicDeleteThenCreate_RaisesChangedNotDeleted()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var seqj = Path.Combine(root, "boss.seqj");
+            File.WriteAllText(seqj, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var deleted = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.AchxChangedOnDisk += changed.Enqueue;
+            watcher.AchxDeletedOnDisk += deleted.Enqueue;
+            watcher.StartWatching(seqj, System.Array.Empty<string>());
+
+            File.Delete(seqj);
+            File.WriteAllText(seqj, "two");
+
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty));
+            await Task.Delay(500);
+            Assert.True(deleted.IsEmpty);
         }
         finally { Directory.Delete(root, true); }
     }

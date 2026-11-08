@@ -1,5 +1,6 @@
 using AnimationEditor.App.Models;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
@@ -76,7 +77,112 @@ public partial class MainWindow
         // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
         private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
 
-        public SequenceTabPane(MainWindow window) => _window = window;
+        // Watches the shown document's file, its sources and their textures, and only while its tab is in front: a hidden
+        // tab catches up in LoadAsync, so a source edited in its own tab never races this. A second instance of the achx
+        // tab's HotReloadWatcher, whose own-save guard and coalescing are reused as they are.
+        private readonly HotReloadWatcher _watcher = new();
+        private IReadOnlyList<string> _watchedSources = Array.Empty<string>();
+        private IReadOnlyList<string> _watchedTextures = Array.Empty<string>();
+        private bool _watcherDisposed;
+
+        public SequenceTabPane(MainWindow window)
+        {
+            _window = window;
+            // The watcher raises on its timer thread; each reaction re-checks the document on the UI thread.
+            _watcher.AchxChangedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnFileChangedOnDisk(path));
+            _watcher.AchxDeletedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnFileDeletedOnDisk(path));
+            _watcher.SourceChangedOnDisk += _ => Dispatcher.UIThread.InvokeAsync(OnSourceChangedOnDisk);
+            _watcher.PngChangedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnTextureChangedOnDisk(path));
+        }
+
+        private bool IsShown(string path) =>
+            !_watcherDisposed && _document is { } document && document.Path == new FilePath(path);
+
+        /// <summary>The sequence file itself was rewritten (git pull, another editor, an agent): read it again, keeping what still applies.</summary>
+        private void OnFileChangedOnDisk(string path)
+        {
+            if (!IsShown(path)) return;
+            var document = _document!;
+            var timeline = _window.SequenceTimeline;
+            string? sequenceName = CurrentSequence?.Name;
+            var chains = timeline.SelectedChains.ToList();
+            var tracks = timeline.SelectedTracks.ToList();
+            var result = document.ReloadFromDisk();
+            if (result.Error is { } error)
+            {
+                // Mid-write or damaged: the open document stays, and the next change event tries again.
+                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+                return;
+            }
+            if (!result.Changed) return;
+            // The history describes the old file; undoing into it would write that back over the new one.
+            _window._undoManager.Clear();
+            // The timeline drops its selection when the sequence moved in the list; the same sequence keeps what still exists.
+            if (sequenceName is not null && CurrentSequence?.Name == sequenceName
+                && timeline.SelectedChains.Count == 0 && timeline.SelectedTracks.Count == 0)
+                RestoreTimelineSelection(CurrentSequence, chains, tracks);
+            _window.ShowToast($"Reloaded {document.Path.NoPath}");
+        }
+
+        private void RestoreTimelineSelection(SequenceSave sequence, List<TimelineChainId> chains, List<int> tracks)
+        {
+            var timeline = _window.SequenceTimeline;
+            var liveTracks = tracks.Where(track => track < sequence.Tracks.Count).ToList();
+            var liveChains = chains.Where(id => id.Track < sequence.Tracks.Count && id.Chain < sequence.Tracks[id.Track].Chains.Count).ToList();
+            if (liveTracks.Count > 0) timeline.SelectTracks(liveTracks);
+            else if (liveChains.Count > 0) timeline.SelectChains(liveChains);
+        }
+
+        private void OnFileDeletedOnDisk(string path)
+        {
+            if (IsShown(path)) _window.ShowToast($"'{new FilePath(path).NoPath}' was deleted from disk.");
+        }
+
+        /// <summary>A listed source file changed or vanished: re-read it, so chains, frames, timings and the missing flag follow.</summary>
+        private void OnSourceChangedOnDisk()
+        {
+            if (!_watcherDisposed) _document?.ReloadChangedSources();
+        }
+
+        private void OnTextureChangedOnDisk(string path)
+        {
+            // Raises PathInvalidated, which the filmstrip, the library chips and the preview redraw from.
+            if (!_watcherDisposed && _document is not null) _window._thumbnailService.InvalidatePath(path);
+        }
+
+        private void StartWatching(SequenceDocument document)
+        {
+            if (_watcherDisposed) return;
+            _watcher.IsEnabled = _window.MenuEnableHotReload.IsChecked != false;
+            _watchedTextures = document.WatchedTextureFiles;
+            _watchedSources = document.WatchedSourceFiles;
+            _watcher.StartWatching(document.Path.FullPath, _watchedTextures);
+            _watcher.UpdateSourceList(_watchedSources);
+        }
+
+        // Sources and textures come and go with edits, undo and a source's own reload; the watch follows.
+        private void SyncWatching()
+        {
+            if (_watcherDisposed || _document is not { } document) return;
+            var sources = document.WatchedSourceFiles;
+            if (!sources.SequenceEqual(_watchedSources))
+            {
+                _watchedSources = sources;
+                _watcher.UpdateSourceList(sources);
+            }
+            var textures = document.WatchedTextureFiles;
+            if (!textures.SequenceEqual(_watchedTextures))
+            {
+                _watchedTextures = textures;
+                _watcher.UpdatePngList(textures);
+            }
+        }
+
+        private void DisposeWatcher()
+        {
+            _watcherDisposed = true;
+            _watcher.Dispose();
+        }
 
         /// <summary>
         /// Shows the sequence list where the ANIMATIONS tree goes and the sequence editor where the achx editor goes.
@@ -137,6 +243,8 @@ public partial class MainWindow
                     return Task.FromResult(false);
                 }
                 _documents[tab.Path] = document;
+                // Our own saves go through the watcher's guard so their change events do not reload the document.
+                document.SaveRunner = _watcher.RunOwnSave;
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
@@ -156,6 +264,7 @@ public partial class MainWindow
                 _window._undoManager.RestoreSnapshot(tab.UndoSnapshot);
             Refresh();
             RestoreZoom();
+            StartWatching(document);
             return Task.FromResult(true);
         }
 
@@ -415,6 +524,14 @@ public partial class MainWindow
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
             w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+
+            w.MenuEnableHotReload.Click += (_, _) => _watcher.IsEnabled = w.MenuEnableHotReload.IsChecked != false;
+            // The watcher's timer and folder watchers are rooted by the runtime, so they must not outlive the window.
+            w.Closed += (_, _) =>
+            {
+                try { DisposeWatcher(); }
+                catch (Exception ex) { Debug.WriteLine($"[Sequence] watcher dispose failed: {ex.Message}"); }
+            };
 
             _timer.Tick += (_, _) => OnTick();
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
@@ -810,6 +927,7 @@ public partial class MainWindow
             if (_document != null)
                 _document.Changed -= Refresh;
             _document = null;
+            _watcher.StopWatching();
         }
 
         // Collapsed sources persist per .seqj file. They are view state, so no undo entry and the file is not touched.
@@ -886,6 +1004,7 @@ public partial class MainWindow
             _window.SequenceLibrary.CollapsedSources.Load(
                 _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
             _window.SequenceLibrary.Show(_document);
+            SyncWatching();
             // Rebuilding the timeline raises ContentChanged, which refreshes the inspector, Loop toggle, playhead and preview.
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
             _window.UpdateStatusBar();

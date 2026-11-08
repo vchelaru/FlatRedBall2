@@ -10,9 +10,11 @@ namespace AnimationEditor.Core.HotReload
         public event Action<string>? AchxChangedOnDisk { add { } remove { } }
         public event Action<string>? PngChangedOnDisk  { add { } remove { } }
         public event Action<string>? AchxDeletedOnDisk { add { } remove { } }
+        public event Action<string>? SourceChangedOnDisk { add { } remove { } }
         public bool IsEnabled { get; set; }
         public void StartWatching(string achxPath, IEnumerable<string> pngPaths) { }
         public void UpdatePngList(IEnumerable<string> newPngPaths) { }
+        public void UpdateSourceList(IEnumerable<string> sourcePaths) { }
         public void StopWatching() { }
         public void RunOwnSave(string filePath, Action write) => write();
         public void Dispose() { }

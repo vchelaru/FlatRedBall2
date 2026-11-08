@@ -126,6 +126,10 @@ Shapes use the same machinery per shape (`ShapeKeyframeGroup.Offset`/`Size`, `Ke
 
 Each `TabKind` (`.achx`, `.png`, `.seqj`) has one `ITabPane` in `AnimationEditor.App/TabPanes/`. `MainWindow` routes tab lifecycle through `PaneFor`; a new kind is an `ITabPane` implementation plus a case in `PaneFor`. Hotkeys (`HotkeyDefinition.Scope`) and main-menu items carry a `HotkeyScope`: `Achx` (the default), `Document`, or `App`. A pane lists the scopes it takes in `Accepts`, and refused scopes do nothing (menu items are disabled). So a new hotkey or menu item works only in `.achx` tabs unless it is set to `Document` or `App`; for menu items that means adding it to `DocumentScopedMenuItems` or `AppScopedMenuItems` in `MainWindow.axaml.cs`.
 
+## Sequence tabs reload live through their own watcher
+
+`SequenceTabPane` owns a second `HotReloadWatcher` (not the achx tab's one on `IAppCommands`) that runs only while a `.seqj` tab is in front, watching the file (`SequenceDocument.ReloadFromDisk`, which clears the shared undo stack like `ReloadAchxFromDisk`), every source via `UpdateSourceList` (`ReloadChangedSources`) and the sources' textures (`ThumbnailService.InvalidatePath`). The document's saves must go through `SequenceDocument.SaveRunner` (the watcher's `RunOwnSave`) or its own writes reload it, and a view that caches what it drew from a source must key on `SequenceDocument.SourcesVersion`, as `SequenceLibraryControl.Show` does, since the source list alone does not change when a source's chains do.
+
 ## Sequence timeline snapping is one mechanism
 
 Resizing a chain's right edge, moving a chain (its start and its end both snap) and dropping a library chip all go through `TimelineSnap` (`AnimationChain.Common`, pure) with targets from `TimelineSnapTargets` (Core). The snap distance is in pixels, and targets closer than twice that are thinned by `SnapKind` priority, so extend that enum and `Thin` rather than adding a second magnet or grid. The targets are taken when the drag starts, so a moved chain never snaps to its own edges or to a neighbour end it is cutting. Alt bypasses; the ruler scrub is deliberately not snapped.
