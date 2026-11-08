@@ -28,8 +28,13 @@ public class SequenceUndoLabelConventionTests
         return track;
     }
 
-    private static SequenceDocument Open(string folder)
+    private static int _case;
+
+    // A new folder per document: rewriting one file over and over can be refused on Windows (a scanner holds the last copy).
+    private static SequenceDocument Open(string parent)
     {
+        string folder = Path.Combine(parent, $"case{System.Threading.Interlocked.Increment(ref _case)}");
+        Directory.CreateDirectory(folder);
         var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         foreach (string chain in new[] { "Walk", "Run", "Jump" }) list.AnimationChains.Add(new AnimationChainSave { Name = chain });
         list.Save(Path.Combine(folder, "hero.achx"));
@@ -73,6 +78,8 @@ public class SequenceUndoLabelConventionTests
         var documentForClipboard = Open(folder);
         var copied = Read(documentForClipboard.CopyChains(0, chains3));
         var copiedOne = Read(documentForClipboard.CopyChains(0, new[] { chains3[0] }));
+        var copiedTracks = Read(documentForClipboard.CopyTracks(0, new[] { 0, 1 }));
+        var copiedTrack = Read(documentForClipboard.CopyTracks(0, new[] { 1 }));
 
         Run((document, undo) => document.DeleteChains(undo, 0, new[] { new TimelineChainId(0, 0) }));
         Run((document, undo) => document.DeleteChains(undo, 0, new[] { new TimelineChainId(2, 0), new TimelineChainId(1, 0) }));
@@ -81,7 +88,8 @@ public class SequenceUndoLabelConventionTests
         Run((document, undo) => document.DeleteTracks(undo, 0, new[] { 0, 1 }));
         Run((document, undo) => document.PasteChains(undo, 0, copied, selectedTrack: null, time: 5));
         Run((document, undo) => document.PasteChains(undo, 0, copiedOne, selectedTrack: 0, time: 5));
-        Run((document, undo) => document.PasteTracks(undo, 0, copied, afterTrack: null));
+        Run((document, undo) => document.PasteTracks(undo, 0, copiedTracks, afterTrack: null));
+        Run((document, undo) => document.PasteTracks(undo, 0, copiedTrack, afterTrack: null));
         Run((document, undo) => document.DuplicateChains(undo, 0, chains2));
         Run((document, undo) => document.DuplicateChains(undo, 0, new[] { chains2[0] }));
         Run((document, undo) => document.DuplicateTracks(undo, 0, new[] { 0, 1 }));
