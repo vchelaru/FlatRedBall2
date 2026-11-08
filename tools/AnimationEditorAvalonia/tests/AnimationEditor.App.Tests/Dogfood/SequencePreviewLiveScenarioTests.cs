@@ -92,6 +92,9 @@ public class SequencePreviewLiveScenarioTests
     private static void TypeInto(AnimationEditorHarness editor, FlankerNumericField field, string text) =>
         editor.TypeAndEnter(BoxOf(field), text);
 
+    private static void TypeInto(AnimationEditorHarness editor, NumericUpDown field, string text) =>
+        editor.TypeAndEnter(field.GetVisualDescendants().OfType<TextBox>().First(), text);
+
     private static void Undo(AnimationEditorHarness editor) => editor.Press(Key.Z, RawInputModifiers.Control);
 
     private static void Redo(AnimationEditorHarness editor) => editor.Press(Key.Y, RawInputModifiers.Control);

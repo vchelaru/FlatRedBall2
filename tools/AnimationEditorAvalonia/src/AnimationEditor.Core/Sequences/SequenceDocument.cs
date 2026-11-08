@@ -810,14 +810,17 @@ public sealed class SequenceDocument
         return null;
     }
 
-    /// <summary>Sets a track's offset from the entity origin.</summary>
+    /// <summary>
+    /// Sets a track's offset from the entity origin. Like the .achx inspector's number fields, repeated calls merge into
+    /// one undo entry until <see cref="IUndoManager.SealCoalescing"/>, so typing or stepping a field is one step.
+    /// </summary>
     public void SetTrackOffset(IUndoManager undo, int sequence, int track, float x, float y) =>
         Edit(undo, $"Set Offset of '{Save.Sequences[sequence].Tracks[track].Name}' to ({Format(x)}, {Format(y)})", save =>
         {
             var target = save.Sequences[sequence].Tracks[track];
             target.X = x;
             target.Y = y;
-        });
+        }, coalesceGroup: $"offset:{sequence}:{track}");
 
     /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
@@ -875,7 +878,8 @@ public sealed class SequenceDocument
         if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Start of '{name}' to {Format(start)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start,
+            coalesceGroup: $"start:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -888,7 +892,8 @@ public sealed class SequenceDocument
         if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops,
+            coalesceGroup: $"cycles:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -939,7 +944,7 @@ public sealed class SequenceDocument
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
         int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
-        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null)
+        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null, string? coalesceGroup = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -950,7 +955,7 @@ public sealed class SequenceDocument
         if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
         undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
-            stateBefore, stateAfter));
+            stateBefore, stateAfter, coalesceGroup));
     }
 
     /// <summary>
@@ -1028,9 +1033,24 @@ public sealed class SequenceDocument
     // leaves the selection alone the first time the edit runs (redo still applies selectAfter).
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
-        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null) : IUndoableCommand
+        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
+        string? coalesceGroup = null) : IUndoableCommand
     {
         public string Description => description;
+
+        // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
+        public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
+
+        // The merged entry undoes to where the first one started and redoes to where this one ended.
+        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
+            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
+            : this;
+
+        private string Before => before;
+        private int? SelectBefore => selectBefore;
+        private int? TrackBefore => trackBefore;
+        private SequenceSelectionState? StateBefore => stateBefore;
 
         public bool Do()
         {

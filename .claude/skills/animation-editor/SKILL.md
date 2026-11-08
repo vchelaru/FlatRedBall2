@@ -75,7 +75,7 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 **Scan for an existing control before adding one to a second surface; extract on the second copy.** `ZoomControl` exists because the widget was first duplicated as raw XAML plus per-host event wiring across three toolbars. When a control *and its wiring* would be copied a second time, factor it into a reusable `UserControl` — duplicated markup and its feedback-loop plumbing drift apart otherwise. (Testing an extracted `UserControl` has a namescope gotcha — see `animation-editor-testing`.)
 
-**Number fields never pad trailing zeros.** Every `FlankerNumericField`/`NumericUpDown` `FormatString` uses optional decimals (`0.###`, not `0.000` or `0.0#`), so 0.1 shows as `0.1`; `NumberFieldFormatTests` enforces this for `MainWindow`.
+**Number fields never pad trailing zeros.** Every `FlankerNumericField`/`NumericUpDown` `FormatString` uses optional decimals (`0.###`, not `0.000` or `0.0#`), so 0.1 shows as `0.1`; `NumberFieldFormatTests` enforces this for `MainWindow`. Position-like values (offsets, pixel rects, color channels) use a plain `NumericUpDown` with short `X`/`Y` labels, and stepped scalars (length, speed, grid size, a chain's start and cycles) use `FlankerNumericField`; the sequence Inspector's TRACK section copies the `.achx` frame TRANSFORM section, and `SequenceInspectorParityScenarioTests` compares the two live.
 
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 

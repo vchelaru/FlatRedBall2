@@ -74,6 +74,11 @@ public class SequenceInspectorScenarioTests
     private static void TypeInto(AnimationEditorHarness editor, FlankerNumericField field, string text) =>
         editor.TypeAndEnter(BoxOf(field), text);
 
+    private static TextBox BoxOf(NumericUpDown field) => field.GetVisualDescendants().OfType<TextBox>().First();
+
+    private static void TypeInto(AnimationEditorHarness editor, NumericUpDown field, string text) =>
+        editor.TypeAndEnter(BoxOf(field), text);
+
     [AvaloniaFact]
     public async Task Selecting_ShowsTheSequenceTrackOrChainFields_OneAtATime()
     {
@@ -298,21 +303,22 @@ public class SequenceInspectorScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task InvalidValues_AreRefusedWithABanner_AndTheFieldGoesBack()
+    public async Task InvalidValues_ChainNumbersClamp_NamesAreRefusedWithABanner_AndTheFieldGoesBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0.5, 1)), Track("Arms"));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
 
+        // Out-of-range chain numbers clamp to the field's limits, as the .achx Inspector's Length field does (no banner).
         editor.ClickAt(OnChain(editor, 0, 0.6));
         TypeInto(editor, inspector.ChainLoopsField, "0");
-        editor.ErrorBannerText.ShouldBe("Cycles must be above 0.");
-        inspector.ChainLoopsField.Value.ShouldBe(1m);
-        BoxOf(inspector.ChainLoopsField).Text.ShouldBe("1");
+        inspector.ChainLoopsField.Value.ShouldBe(0.001m);
         TypeInto(editor, inspector.ChainStartField, "-2");
-        editor.ErrorBannerText.ShouldBe("Start must be 0 or more.");
-        inspector.ChainStartField.Value.ShouldBe(0.5m);
+        inspector.ChainStartField.Value.ShouldBe(0m);
+        editor.ErrorBannerText.ShouldBeNull();
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        editor.Press(Key.Z, RawInputModifiers.Control);
 
         editor.ClickAt(OnHeader(editor, 1));
         editor.TypeAndEnter(inspector.TrackNameBox, "Body");
