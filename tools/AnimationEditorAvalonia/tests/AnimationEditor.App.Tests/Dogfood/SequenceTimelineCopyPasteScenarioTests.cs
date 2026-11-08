@@ -242,7 +242,7 @@ public class SequenceTimelineCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task WithTheSequenceListFocused_CopyIsStillTheSequence_AndAChainsEnvelopeIsNotPastedThere()
+    public async Task WithTheSequenceListFocused_CopyIsStillTheSequence_AndAChainsEnvelopePastesIntoTheTimeline()
     {
         var (editor, boss) = await OpenAsync();
         using var _ = editor;
@@ -255,8 +255,11 @@ public class SequenceTimelineCopyPasteScenarioTests
         await CtrlAsync(editor, Key.V);
 
         editor.SequenceNames.Count.ShouldBe(1);
-        editor.UndoLabels.ShouldBeEmpty();
+        editor.UndoLabels.ShouldBe(new[] { "Paste 'Walk' on 'Body'" });
         editor.ErrorBannerText.ShouldBeNull();
+        Chains(boss, 0).Length.ShouldBe(4);
+        Timeline(editor).IsFocused.ShouldBeTrue();
+        editor.Click((Control)list.ContainerFromIndex(0)!);
         await CtrlAsync(editor, Key.C);
         JsonNode.Parse((await ClipboardAsync(editor))!)!["kind"]!.GetValue<string>().ShouldBe("frb2-animation-editor-sequence");
         chains.ShouldContain("frb2-animation-editor-chains");

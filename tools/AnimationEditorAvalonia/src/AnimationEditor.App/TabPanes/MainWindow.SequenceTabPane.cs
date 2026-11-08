@@ -399,17 +399,14 @@ public partial class MainWindow
         }
 
         /// <summary>
-        /// Ctrl+V and Edit &gt; Paste read a copied sequence (list) or copied chains or tracks (timeline) from the clipboard
-        /// and insert them. Text that is not the right kind of copy is ignored without a word; a damaged copy shows the error banner.
+        /// Ctrl+V and Edit &gt; Paste read the clipboard and paste what it holds, whichever pane has the focus
+        /// (<see cref="PasteRoute"/>): copied sequences into the list, copied chains or tracks into the selected sequence's
+        /// timeline. A paste that cannot apply says why in a toast; a damaged copy shows the error banner.
         /// </summary>
         public void PasteSelection()
         {
             if (_document is not { } document) return;
-            var surface = Surface;
-            if (surface == ClipboardSurface.List)
-                _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
-            else if (surface == ClipboardSurface.Timeline)
-                _ = _window.RunGuardedAsync(() => PasteIntoTimelineAsync(document), "Paste");
+            _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
         }
 
         /// <summary>Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal.</summary>
@@ -451,34 +448,45 @@ public partial class MainWindow
 
         public bool CanCopyPaste => Surface != ClipboardSurface.None;
 
-        private async Task PasteIntoTimelineAsync(SequenceDocument document)
-        {
-            if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard) return;
-            string? text = await clipboard.TryGetTextAsync();
-            if (document != _document) return;
-            if (!TimelineClipboard.TryRead(text, out var content, out var error))
-            {
-                if (error is not null) _window.ShowErrorBanner(error);
-                return;
-            }
-            _window.SequenceTimeline.Paste(content!);
-        }
-
         private async Task PasteAsync(SequenceDocument document)
         {
             if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard) return;
             string? text = await clipboard.TryGetTextAsync();
             if (document != _document) return;
-            if (!SequenceClipboard.TryRead(text, out var content, out var error))
+            var route = PasteRoute.For(text);
+            switch (route.Kind)
             {
-                if (error is not null) _window.ShowErrorBanner(error);
+                case PasteRouteKind.Sequences:
+                    var result = document.PasteSequences(_window._undoManager, route.Sequences!);
+                    // The pasted sequences start from their beginning.
+                    StopPlayback();
+                    if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
+                    FocusSelectedRow();
+                    break;
+                case PasteRouteKind.Timeline:
+                    PasteIntoTimeline(document, route.Timeline!);
+                    break;
+                default:
+                    if (route.IsDamaged)
+                        _window.ShowErrorBanner(route.Message!);
+                    else
+                        _window.ShowToast(route.Message!);
+                    break;
+            }
+        }
+
+        private void PasteIntoTimeline(SequenceDocument document, TimelineClipboardContent content)
+        {
+            string noun = content.Kind == TimelineClipboardKind.Chains ? "chains" : "tracks";
+            if (document.Save.Sequences.Count == 0)
+            {
+                _window.ShowToast($"Can't paste the copied {noun}: the file has no sequence to paste into. Add a sequence first.");
                 return;
             }
-            var result = document.PasteSequences(_window._undoManager, content!);
-            // The pasted sequences start from their beginning.
-            StopPlayback();
-            if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
-            FocusSelectedRow();
+            // The pasted items become the timeline's selection, so it takes the keyboard: with the list focused, Delete would remove the sequence instead.
+            _window.SequenceTimeline.Focus();
+            if (!_window.SequenceTimeline.Paste(content))
+                _window.ShowToast($"Nothing to paste: the copied {noun} are empty.");
         }
 
         // Rebuilding the list drops its focus once the old rows are gone; lay it out now and take it back so the keys keep working.
