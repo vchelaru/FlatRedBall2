@@ -143,7 +143,7 @@ public class SequenceTabScenarioTests
         string[] achxItems =
         {
             "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
-            "MenuCopy", "MenuCut", "MenuPaste", "MenuDuplicate",
+            // Copy, Cut, Paste and Duplicate are the pane's, not the scope's: a sequence tab takes them once its list or timeline was touched.
             "MenuResizeTexture", "MenuAssociateTiledTileset",
             "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut",
         };
@@ -162,13 +162,14 @@ public class SequenceTabScenarioTests
         editor.Click(editor.Control<Button>("AddSequenceButton"));
         editor.Press(Key.Z, RawInputModifiers.Control);
 
-        editor.Press(Key.Delete);
-
         achxItems.Where(name => editor.Control<MenuItem>(name).IsEnabled).ShouldBeEmpty();
         documentItems.Where(name => !editor.Control<MenuItem>(name).IsEnabled).ShouldBeEmpty();
-        editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk", "Run" });
         editor.ClickMenu("MenuRedo");
         editor.SequenceNames.ShouldBe(new[] { "Sequence", "Sequence 2", "Sequence 3" });
+
+        // Delete acts on the sequence tab's own selection, never on the achx document hidden behind it.
+        editor.Press(Key.Delete);
+        editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk", "Run" });
     }
 
     [AvaloniaFact]

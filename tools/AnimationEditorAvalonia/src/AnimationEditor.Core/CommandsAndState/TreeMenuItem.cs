@@ -74,6 +74,8 @@ public enum TreeMenuIcon
     Offsets,
     RevealFile,
     MatchSize,
+    Sequence,
+    Plus,
 }
 
 /// <summary>

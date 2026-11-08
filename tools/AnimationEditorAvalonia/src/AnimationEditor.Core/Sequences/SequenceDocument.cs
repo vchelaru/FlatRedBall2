@@ -867,6 +867,31 @@ public sealed class SequenceDocument
             target.Y = y;
         }, coalesceGroup: $"offset:{sequence}:{track}");
 
+    /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
+    public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
+        ? $"Move Track '{Save.Sequences[sequence].Tracks[tracks[0]].Name}'"
+        : $"Move {Plural.Format(tracks.Count, "track")}";
+
+    /// <summary>
+    /// Moves tracks by (<paramref name="dx"/>, <paramref name="dy"/>) as an arrow key does, keeping each offset as it
+    /// is plus the step (no rounding). Consecutive nudges of the same tracks are one undo entry until
+    /// <see cref="IUndoManager.SealCoalescing"/> (the key coming up, focus leaving) or another edit ends the run.
+    /// </summary>
+    public void NudgeTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, float dx, float dy)
+    {
+        var moved = tracks.Distinct().OrderBy(track => track).ToList();
+        if (moved.Count == 0) return;
+        Edit(undo, DescribeMove(sequence, moved), save =>
+        {
+            foreach (int track in moved)
+            {
+                var target = save.Sequences[sequence].Tracks[track];
+                target.X += dx;
+                target.Y += dy;
+            }
+        }, coalesceGroup: $"nudge:{sequence}:{string.Join(',', moved)}");
+    }
+
     /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
     /// (no undo entry) when the track already is that way.

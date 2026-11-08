@@ -296,10 +296,10 @@ public class SequenceTimelineCopyPasteScenarioTests
         editor.Layout();
         (copy.IsEnabled, paste.IsEnabled, cut.IsEnabled).ShouldBe((true, true, true));
 
-        // A button in the sequence list's header is neither the list nor the timeline.
+        // A button in the sequence list's footer is neither the list nor the timeline: the timeline stays the last pane touched.
         editor.Control<Button>("AddSequenceButton").Focus();
         editor.Layout();
-        (copy.IsEnabled, paste.IsEnabled).ShouldBe((false, false));
+        (copy.IsEnabled, paste.IsEnabled, cut.IsEnabled).ShouldBe((true, true, true));
     }
 
     [AvaloniaFact]

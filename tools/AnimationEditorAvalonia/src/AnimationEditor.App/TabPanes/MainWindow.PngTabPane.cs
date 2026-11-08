@@ -114,6 +114,10 @@ public partial class MainWindow
 
         public void DuplicateSelection() { }
 
+        public void RenameSelection() { }
+
+        public void MoveSelection(int delta) { }
+
         public void ReloadFromDisk() { }
 
         public bool CanCopyPaste => false;
