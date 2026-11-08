@@ -21,9 +21,29 @@ public partial class FolderExpanderIcon : UserControl
         set => SetValue(IsOpenProperty, value);
     }
 
+    private const string OpenIconPath = "avares://AnimationEditor.Views/Assets/icons/svg/IconFolderOpen.svg";
+    private const string ClosedIconPath = "avares://AnimationEditor.Views/Assets/icons/svg/IconFolder.svg";
+
+    public static readonly StyledProperty<string> IconPathProperty =
+        AvaloniaProperty.Register<FolderExpanderIcon, string>(nameof(IconPath), ClosedIconPath);
+
+    /// <summary>The SVG for the current <see cref="IsOpen"/> state.</summary>
+    public string IconPath
+    {
+        get => GetValue(IconPathProperty);
+        private set => SetValue(IconPathProperty, value);
+    }
+
     public event EventHandler? Toggled;
 
     public FolderExpanderIcon() => InitializeComponent();
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsOpenProperty)
+            IconPath = IsOpen ? OpenIconPath : ClosedIconPath;
+    }
 
     private void OnPressed(object? sender, PointerPressedEventArgs e)
     {
