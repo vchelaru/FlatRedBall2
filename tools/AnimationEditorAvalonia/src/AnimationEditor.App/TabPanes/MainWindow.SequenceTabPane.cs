@@ -335,9 +335,7 @@ public partial class MainWindow
         // open (the toast says why), since closing would lose the edits.
         private async Task<bool> ConfirmCloseAsync(SequenceDocument document)
         {
-            var choice = await _window.ShowSaveDiscardCancelDialogAsync(
-                $"\"{document.Path.NoPath}\" has unsaved changes. Save before closing?",
-                "Unsaved Changes");
+            var choice = await _window.AskSaveBeforeClosingAsync(document.Path.NoPath);
             if (choice == SaveDiscardCancelChoice.Cancel) return false;
             if (choice == SaveDiscardCancelChoice.Discard) return true;
             document.SaveToDisk();

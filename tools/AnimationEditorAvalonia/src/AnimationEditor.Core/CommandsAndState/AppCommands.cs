@@ -439,6 +439,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void CaptureTabEditorState(TabEntry tab)
         {
             TabEditorCache.CaptureFromProject(tab, _pm);
+            tab.SaveFailed = _undoManager.SaveState == SaveState.Failed;
             tab.CachedSelectedChainName = _selectedState.SelectedChain?.Name;
             tab.CachedSelectedFrameIndex = _selectedState.SelectedFrame != null
                 ? _selectedState.SelectedChain?.Frames.IndexOf(_selectedState.SelectedFrame)
@@ -455,6 +456,11 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             TabEditorCache.ApplyToProject(tab, _pm);
+            // The undo manager is shared by every tab, so the save state shown (and asked about on close) must be this tab's.
+            if (tab.SaveFailed)
+                _undoManager.MarkSaveFailed();
+            else if (_undoManager.SaveState == SaveState.Failed)
+                _undoManager.MarkSaved();
             RestoreTabSelection(tab);
             RefreshEditorSurfaceForActiveProject(tab.Path.FullPath);
 
