@@ -224,7 +224,7 @@ public class SequenceTimelineCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TextThatIsNotAnEnvelope_PastesNothing_AndShowsNoBanner_ADamagedOneShowsTheError()
+    public async Task TextThatIsNotAnEnvelope_PastesNothing_AndSaysSo_ADamagedOneShowsTheError()
     {
         var (editor, boss) = await OpenAsync();
         using var _ = editor;
@@ -233,7 +233,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         await SetClipboardAsync(editor, "just some text");
         await CtrlAsync(editor, Key.V);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ProblemText.ShouldBeNull();
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to paste");
 
         await SetClipboardAsync(editor, "{ \"kind\": \"frb2-animation-editor-chains\", \"version\": 1 }");
         await CtrlAsync(editor, Key.V);

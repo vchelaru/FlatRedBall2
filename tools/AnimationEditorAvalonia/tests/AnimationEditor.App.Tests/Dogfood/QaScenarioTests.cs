@@ -546,8 +546,8 @@ public class QaScenarioTests
         // A pixel-coordinate file cannot be written without the texture's size, so the editor
         // refuses the save and says so, rather than writing a file with made-up coordinates.
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
-        editor.InfoText.ShouldNotBeNull();
-        editor.InfoText!.ShouldContain("gone.png");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("gone.png");
         AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Count.ShouldBe(1, "the file on disk is left as it was");
     }
 

@@ -66,14 +66,14 @@ public class AchxFailedSaveScenarioTests
         (int)AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Single().LeftCoordinate;
 
     [AvaloniaFact]
-    public async Task FailedSave_StillShowsTheAutoSaveFailedToast()
+    public async Task FailedSave_StillShowsTheAutoSaveFailedProblemBanner()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = await OpenAndFailASave(editor);
         try
         {
-            editor.ToastText.ShouldNotBeNull();
-            editor.ToastText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.ProblemText.ShouldNotBeNull();
+            editor.ProblemText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
         }
         finally
@@ -136,7 +136,7 @@ public class AchxFailedSaveScenarioTests
             editor.CloseTab("hero.achx");
 
             editor.TabLabels.ShouldBe(new[] { "hero.achx" });
-            editor.ToastText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.ProblemText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Dialogs.Shown.Count.ShouldBe(1);
         }
         finally
@@ -419,7 +419,7 @@ public class AchxFailedSaveScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = await OpenAsync(editor, "hero.achx");
         File.WriteAllText(path, "<AnimationChainArrayS");
-        editor.WaitUntil(() => editor.ErrorBannerText?.Contains("Reload skipped") == true, TimeSpan.FromSeconds(5))
+        editor.WaitUntil(() => editor.ProblemText?.Contains("Reload skipped") == true, TimeSpan.FromSeconds(5))
             .ShouldBeTrue("the editor reports the file it could not reload");
         EditFirstFrame(editor, "8");
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed", "saving is paused until the file reloads");

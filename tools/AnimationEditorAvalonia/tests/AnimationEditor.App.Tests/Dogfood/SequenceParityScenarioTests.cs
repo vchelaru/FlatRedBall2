@@ -31,7 +31,7 @@ public class SequenceParityScenarioTests
     // ---- failed save ----
 
     [AvaloniaFact]
-    public async Task FailedSave_ShowsTheAutoSaveFailedToast_AsAnAchxDoes()
+    public async Task FailedSave_ShowsTheAutoSaveFailedProblemBanner_AsAnAchxDoes()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = editor.WriteSeqj("boss.seqj", "Sequence");
@@ -41,8 +41,8 @@ public class SequenceParityScenarioTests
         {
             AddSequence(editor);
 
-            editor.InfoText.ShouldNotBeNull();
-            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.ProblemText.ShouldNotBeNull();
+            editor.ProblemText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
         }
         finally
@@ -63,7 +63,7 @@ public class SequenceParityScenarioTests
             AddSequence(editor);
             editor.Press(Key.S, RawInputModifiers.Control);
 
-            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.ProblemText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
         }
         finally
@@ -139,7 +139,7 @@ public class SequenceParityScenarioTests
             editor.CloseTab("boss.seqj");
 
             editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
-            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.ProblemText!.ShouldStartWith(AutoSaveFailedPrefix);
         }
         finally
         {

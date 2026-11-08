@@ -376,7 +376,7 @@ public class UnusualProjectScenarioTests
 
             editor.PixelRectOf(walk.Frames[0]).X.ShouldBe(8, "the edit itself is kept");
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
-            editor.InfoText.ShouldNotBeNull("the user is told the save did not happen");
+            editor.ProblemText.ShouldNotBeNull("the user is told the save did not happen");
             AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Single().LeftCoordinate.ShouldBe(0);
         }
         finally

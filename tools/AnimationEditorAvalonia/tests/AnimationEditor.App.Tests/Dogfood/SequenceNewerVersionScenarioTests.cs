@@ -25,7 +25,7 @@ public class SequenceNewerVersionScenarioTests
     private const string Notice = "Newer file format (v2). Unknown data is kept when you save.";
 
     private static void DismissNotice(AnimationEditorHarness editor) =>
-        editor.Click(editor.Notifications.ErrorBannerDismissBtn);
+        editor.Click(editor.Notifications.ToastDismissBtn);
 
     [AvaloniaFact]
     public async Task OpeningANewerSeqj_ShowsTheNotice_AndSavingKeepsTheVersionAndUnknownFields()
@@ -49,19 +49,16 @@ public class SequenceNewerVersionScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TheNotice_StaysUntilDismissed_AndDoesNotReturnOnTabSwitchOrEdit()
+    public async Task TheNotice_IsAnInfoToast_ThatAutoHides_AndDoesNotReturnOnTabSwitchOrEdit()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
         File.WriteAllText(boss, NewerJson);
         string other = editor.WriteSeqj("other.seqj", "Walk");
         await editor.OpenAsync(boss);
-        // Longer than the 8 seconds an error banner lasts.
-        await editor.WaitAsync(TimeSpan.FromSeconds(9));
+        // The notice is an info toast: it hides itself after about 6 seconds.
         editor.InfoText.ShouldBe(Notice);
-
-        DismissNotice(editor);
-        editor.InfoText.ShouldBeNull();
+        (await editor.WaitUntilAsync(() => editor.InfoText == null, TimeSpan.FromSeconds(9))).ShouldBeTrue();
         await editor.OpenAsync(other);
         editor.ClickTab("boss.seqj");
         editor.ClickTab("other.seqj");

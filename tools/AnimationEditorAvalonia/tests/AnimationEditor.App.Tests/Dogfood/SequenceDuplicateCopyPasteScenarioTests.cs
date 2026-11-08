@@ -222,7 +222,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task Paste_OfTextThatIsNotACopy_ChangesNothing_AndSaysWhyInAToast()
+    public async Task Paste_OfTextThatIsNotACopy_ChangesNothing_AndSaysWhyInAProblemBanner()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteBoss(editor));
@@ -232,12 +232,12 @@ public class SequenceDuplicateCopyPasteScenarioTests
         {
             await SetClipboardAsync(editor, text);
             await CtrlAsync(editor, Key.V);
-            editor.InfoText.ShouldNotBeNull().ShouldStartWith("Nothing to paste");
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Nothing to paste");
         }
 
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack" });
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ProblemText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -293,7 +293,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         await CtrlAsync(editor, Key.C);
         // Nothing is selected on the timeline: Copy says so and empties the clipboard rather than leave an older copy to paste.
         (await ClipboardAsync(editor)).ShouldBeNullOrEmpty();
-        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to copy");
         await SetClipboardAsync(editor, envelope);
         await CtrlAsync(editor, Key.V);
 
