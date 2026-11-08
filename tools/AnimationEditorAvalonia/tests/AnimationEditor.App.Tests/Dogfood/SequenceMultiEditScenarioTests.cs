@@ -404,13 +404,13 @@ public class SequenceMultiEditScenarioTests
         ClickRow(editor, 1);
         editor.RightClick(Row(editor, 1));
 
-        RowMenuHeaders(editor).ShouldBe(new[] { "Add Sequence", "Copy", "Cut", "Paste", "Duplicate", "Rename…", "Copy Qualified Name", "Delete Sequence" });
+        RowMenuHeaders(editor).ShouldBe(new[] { "Move To Top", "Move Up", "Move Down", "Move To Bottom", "Add Sequence", "Copy", "Cut", "Paste", "Duplicate", "Rename…", "Copy Qualified Name", "Delete Sequence", "Sort Sequences Alphabetically" });
         List(editor).ContextMenu!.Close();
 
         SelectRows(editor, 0, 1, 2);
         editor.RightClick(Row(editor, 1));
 
-        RowMenuHeaders(editor).ShouldBe(new[] { "Add Sequence", "Copy 3 Sequences", "Cut 3 Sequences", "Paste", "Duplicate 3 Sequences", "Rename…", "Copy Qualified Name", "Delete 3 Sequences" });
+        RowMenuHeaders(editor).ShouldBe(new[] { "Move Down", "Move To Bottom", "Add Sequence", "Copy 3 Sequences", "Cut 3 Sequences", "Paste", "Duplicate 3 Sequences", "Rename…", "Copy Qualified Name", "Delete 3 Sequences", "Sort Sequences Alphabetically" });
     }
 
     [AvaloniaFact]

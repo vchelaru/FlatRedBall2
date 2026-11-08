@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
@@ -28,6 +32,28 @@ public static class TrackReorder
     /// </summary>
     public static int? StepSlot(int from, int trackCount, int delta) =>
         delta < 0 ? (from > 0 ? from - 1 : null) : (from < trackCount - 1 ? from + 2 : null);
+
+    /// <summary>
+    /// The gap that <paramref name="move"/> drops track <paramref name="from"/> on, or null when it would change nothing. Up is
+    /// toward lane 0, the front lane, as Alt+Up is (<see cref="StepSlot"/>).
+    /// </summary>
+    public static int? MoveSlot(int from, int trackCount, ReorderMove move)
+    {
+        if (from < 0 || from >= trackCount) return null;
+        int? slot = move switch
+        {
+            ReorderMove.ToTop => 0,
+            ReorderMove.Up => StepSlot(from, trackCount, -1),
+            ReorderMove.Down => StepSlot(from, trackCount, +1),
+            ReorderMove.ToBottom => trackCount,
+            _ => null,
+        };
+        return slot is { } gap && TargetLane(from, gap) is not null ? gap : null;
+    }
+
+    /// <summary>The moves the track header menu offers for track <paramref name="from"/>, in the ANIMATIONS tree's order: only those that change something.</summary>
+    public static IReadOnlyList<ReorderMove> AvailableMoves(int trackCount, int from) =>
+        Enum.GetValues<ReorderMove>().Where(move => MoveSlot(from, trackCount, move) is not null).ToList();
 
     /// <summary>
     /// The lane track <paramref name="from"/> ends up in when dropped on gap <paramref name="slot"/>, or null when the drop

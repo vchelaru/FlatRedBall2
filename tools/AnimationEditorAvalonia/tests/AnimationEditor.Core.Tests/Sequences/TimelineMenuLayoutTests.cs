@@ -25,6 +25,37 @@ public class TimelineMenuLayoutTests
         });
 
     [Fact]
+    public void ATrackHeader_OffersTheMovesFirst_AsTheTreesMenuDoes_AndOnlyThePossibleOnes()
+    {
+        var all = new[] { ReorderMove.ToTop, ReorderMove.Up, ReorderMove.Down, ReorderMove.ToBottom };
+        TimelineMenuLayout.For(Target.TrackHeader, false, all).Select(group => group.ToArray()).ToArray().ShouldBe(new[]
+        {
+            new[] { Cmd.MoveToTop, Cmd.MoveUp, Cmd.MoveDown, Cmd.MoveToBottom },
+            new[] { Cmd.Copy, Cmd.Cut, Cmd.Paste, Cmd.Duplicate },
+            new[] { Cmd.RenameTrack, Cmd.ToggleVisibility },
+            new[] { Cmd.Delete },
+        });
+        TimelineMenuLayout.For(Target.TrackHeader, false, new[] { ReorderMove.Down, ReorderMove.ToBottom }).First().ShouldBe(new[] { Cmd.MoveDown, Cmd.MoveToBottom });
+    }
+
+    [Fact]
+    public void ChainsAndBlankSpace_HaveNoMoveItems() =>
+        TimelineMenuLayout.For(Target.Chain, false, new[] { ReorderMove.Up }).SelectMany(group => group)
+            .ShouldNotContain(Cmd.MoveUp);
+
+    [Theory]
+    [InlineData(Cmd.MoveToTop, ReorderMove.ToTop, "Move To Top", TreeMenuIcon.MoveToTop)]
+    [InlineData(Cmd.MoveUp, ReorderMove.Up, "Move Up", TreeMenuIcon.MoveUp)]
+    [InlineData(Cmd.MoveDown, ReorderMove.Down, "Move Down", TreeMenuIcon.MoveDown)]
+    [InlineData(Cmd.MoveToBottom, ReorderMove.ToBottom, "Move To Bottom", TreeMenuIcon.MoveToBottom)]
+    public void MoveItems_UseTheTreesWordingAndIcons(Cmd command, ReorderMove move, string header, TreeMenuIcon icon)
+    {
+        TimelineMenuLayout.MoveOf(command).ShouldBe(move);
+        TimelineMenuLayout.Header(Target.TrackHeader, command, 1).ShouldBe(header);
+        TimelineMenuLayout.Icon(command).ShouldBe(icon);
+    }
+
+    [Fact]
     public void ATrackHeader_OffersShowAllTracks_OnlyWhileATrackIsHidden() =>
         Groups(Target.TrackHeader, anyHidden: true)[1].ShouldBe(new[] { Cmd.RenameTrack, Cmd.ToggleVisibility, Cmd.ShowAllTracks });
 

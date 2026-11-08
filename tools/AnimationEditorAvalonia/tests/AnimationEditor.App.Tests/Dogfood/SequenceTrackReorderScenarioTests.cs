@@ -214,7 +214,7 @@ public class SequenceTrackReorderScenarioTests
         editor.Press(Key.Escape);
 
         editor.RightClickAt(Header(editor, 1));
-        Timeline(editor).Menu.Items.OfType<Avalonia.Controls.MenuItem>().Count().ShouldBe(7);
+        Timeline(editor).Menu.Items.OfType<Avalonia.Controls.MenuItem>().Count().ShouldBe(11);
         Timeline(editor).SelectedTrack.ShouldBe(1);
     }
 }

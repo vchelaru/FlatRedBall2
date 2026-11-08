@@ -21,6 +21,11 @@ public class SequenceListMenuLayoutTests
     [InlineData(Cmd.Delete, 2, "Delete 2 Sequences")]
     [InlineData(Cmd.CopyQualifiedName, 3, "Copy Qualified Name")]
     [InlineData(Cmd.AddSequence, 3, "Add Sequence")]
+    [InlineData(Cmd.MoveToTop, 1, "Move To Top")]
+    [InlineData(Cmd.MoveUp, 3, "Move Up")]
+    [InlineData(Cmd.MoveDown, 3, "Move Down")]
+    [InlineData(Cmd.MoveToBottom, 1, "Move To Bottom")]
+    [InlineData(Cmd.SortSequences, 3, "Sort Sequences Alphabetically")]
     public void Header_CountsTheSelection_OnlyWhereItActsOnAll(Cmd command, int selected, string expected) =>
         SequenceListMenuLayout.Header(command, selected).ShouldBe(expected);
 

@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -30,6 +31,10 @@ public enum TimelineMenuCommand
     GoToDefinition,
     Delete,
     AddTrack,
+    MoveToTop,
+    MoveUp,
+    MoveDown,
+    MoveToBottom,
 }
 
 /// <summary>
@@ -39,19 +44,42 @@ public enum TimelineMenuCommand
 /// </summary>
 public static class TimelineMenuLayout
 {
-    public static IReadOnlyList<IReadOnlyList<TimelineMenuCommand>> For(TimelineMenuTarget target, bool anyTrackHidden)
+    /// <summary>The reorder a Move item performs.</summary>
+    public static ReorderMove MoveOf(TimelineMenuCommand command) => command switch
+    {
+        TimelineMenuCommand.MoveToTop => ReorderMove.ToTop,
+        TimelineMenuCommand.MoveUp => ReorderMove.Up,
+        TimelineMenuCommand.MoveDown => ReorderMove.Down,
+        TimelineMenuCommand.MoveToBottom => ReorderMove.ToBottom,
+        _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Not a move item."),
+    };
+
+    /// <summary>
+    /// The menu's groups. <paramref name="moves"/> are the lane moves that would change something for the selected track
+    /// (<see cref="TrackReorder.AvailableMoves"/>), offered first on a track header as the tree menu offers its reorder items;
+    /// one that can't happen is left out, and so is the divider under the group when none can.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<TimelineMenuCommand>> For(TimelineMenuTarget target, bool anyTrackHidden, IReadOnlyList<ReorderMove>? moves = null)
     {
         var clipboard = new[] { TimelineMenuCommand.Copy, TimelineMenuCommand.Cut, TimelineMenuCommand.Paste, TimelineMenuCommand.Duplicate };
+        var moveItems = new List<TimelineMenuCommand>();
+        if (moves is not null)
+        {
+            if (moves.Contains(ReorderMove.ToTop)) moveItems.Add(TimelineMenuCommand.MoveToTop);
+            if (moves.Contains(ReorderMove.Up)) moveItems.Add(TimelineMenuCommand.MoveUp);
+            if (moves.Contains(ReorderMove.Down)) moveItems.Add(TimelineMenuCommand.MoveDown);
+            if (moves.Contains(ReorderMove.ToBottom)) moveItems.Add(TimelineMenuCommand.MoveToBottom);
+        }
+        var header = new List<IReadOnlyList<TimelineMenuCommand>>();
+        if (moveItems.Count > 0) header.Add(moveItems.ToArray());
+        header.Add(clipboard);
+        header.Add(anyTrackHidden
+            ? new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility, TimelineMenuCommand.ShowAllTracks }
+            : new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility });
+        header.Add(new[] { TimelineMenuCommand.Delete });
         return target switch
         {
-            TimelineMenuTarget.TrackHeader => new IReadOnlyList<TimelineMenuCommand>[]
-            {
-                clipboard,
-                anyTrackHidden
-                    ? new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility, TimelineMenuCommand.ShowAllTracks }
-                    : new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility },
-                new[] { TimelineMenuCommand.Delete },
-            },
+            TimelineMenuTarget.TrackHeader => header,
             TimelineMenuTarget.Chain => new IReadOnlyList<TimelineMenuCommand>[]
             {
                 clipboard,
@@ -87,6 +115,10 @@ public static class TimelineMenuLayout
                 ? (several ? $"Remove {selected} Chains" : "Remove from Track")
                 : (several ? $"Delete {selected} Tracks" : "Delete Track"),
             TimelineMenuCommand.AddTrack => "Add Track",
+            TimelineMenuCommand.MoveToTop => "Move To Top",
+            TimelineMenuCommand.MoveUp => "Move Up",
+            TimelineMenuCommand.MoveDown => "Move Down",
+            TimelineMenuCommand.MoveToBottom => "Move To Bottom",
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
         };
     }
@@ -103,6 +135,10 @@ public static class TimelineMenuLayout
         TimelineMenuCommand.AddTrack => TreeMenuIcon.Plus,
         TimelineMenuCommand.ToggleVisibility or TimelineMenuCommand.ShowAllTracks => TreeMenuIcon.Visibility,
         TimelineMenuCommand.GoToDefinition => TreeMenuIcon.Animation,
+        TimelineMenuCommand.MoveToTop => TreeMenuIcon.MoveToTop,
+        TimelineMenuCommand.MoveUp => TreeMenuIcon.MoveUp,
+        TimelineMenuCommand.MoveDown => TreeMenuIcon.MoveDown,
+        TimelineMenuCommand.MoveToBottom => TreeMenuIcon.MoveToBottom,
         _ => null,
     };
 }

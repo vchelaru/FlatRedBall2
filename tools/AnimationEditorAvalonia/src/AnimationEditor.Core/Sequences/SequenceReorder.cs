@@ -1,7 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
+
+/// <summary>One of the four reorder moves of a list's menu, in the order the ANIMATIONS tree lists them.</summary>
+public enum ReorderMove
+{
+    ToTop,
+    Up,
+    Down,
+    ToBottom,
+}
 
 /// <summary>The result of dropping sequences on a gap: <c>Order[position]</c> is the old index of the sequence now at that position.</summary>
 public sealed record SequenceMovePlan(int[] Order);
@@ -72,6 +82,27 @@ public static class SequenceReorder
         // A gap sits above the row of the same number, so one below the last row is last + 2.
         return delta < 0 ? (first > 0 ? first - 1 : null) : (last < count - 1 ? last + 2 : null);
     }
+
+    /// <summary>
+    /// The gap that <paramref name="move"/> drops the <paramref name="indices"/> block on, or null when it would change nothing
+    /// (a block already at that end, or no valid index). Up and Down are the Alt+Up and Alt+Down gaps (<see cref="StepSlot"/>).
+    /// </summary>
+    public static int? MoveSlot(int count, IReadOnlyList<int> indices, ReorderMove move)
+    {
+        int? slot = move switch
+        {
+            ReorderMove.ToTop => 0,
+            ReorderMove.Up => StepSlot(count, indices, -1),
+            ReorderMove.Down => StepSlot(count, indices, +1),
+            ReorderMove.ToBottom => count,
+            _ => null,
+        };
+        return slot is { } gap && Plan(count, indices, gap) is not null ? gap : null;
+    }
+
+    /// <summary>The moves the menu offers for <paramref name="indices"/>, in the ANIMATIONS tree's order: only those that change something.</summary>
+    public static IReadOnlyList<ReorderMove> AvailableMoves(int count, IReadOnlyList<int> indices) =>
+        Enum.GetValues<ReorderMove>().Where(move => MoveSlot(count, indices, move) is not null).ToList();
 
     /// <summary>
     /// How far to scroll a list while a row is dragged with the pointer at <paramref name="y"/> in a viewport
