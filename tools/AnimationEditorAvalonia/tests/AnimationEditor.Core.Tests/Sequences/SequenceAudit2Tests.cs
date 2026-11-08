@@ -283,6 +283,26 @@ public class SequenceAudit2Tests
         Chains(document, 0).ShouldBe(new[] { ("Walk", 0.0), ("Run", 0.4), ("Walk", 1.0) });
     }
 
+    [Fact]
+    public void RenameSequence_KeepSelection_RedoStillSelectsTheRenamedOne_WhereverTheSelectionHasGone()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var save = new SequenceListSave();
+        foreach (string name in new[] { "A", "B", "C" }) save.Sequences.Add(new SequenceSave { Name = name });
+        string path = Path.Combine(dir.Path, "boss.seqj");
+        save.Save(path);
+        var document = SequenceDocument.Load(path);
+        var undo = new UndoManager();
+        document.SelectedSequence = 2;
+        document.RenameSequence(undo, 0, "Alpha", keepSelection: true);
+        undo.Undo();
+        document.SelectedSequence = 2;
+
+        undo.Redo();
+
+        document.SelectedSequence.ShouldBe(0);
+    }
+
     // ---- reload
 
     private static void WriteSource(string folder, string chainName, DateTime stamp)

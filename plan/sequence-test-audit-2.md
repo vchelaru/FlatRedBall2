@@ -4,8 +4,8 @@ Snapshot, 2026-11-07. Mutations ran against main at e04f2e7d (#1674), after the 
 
 ## Verdict
 
-- 375 behaviors audited by mutation (break the production line, run only the relevant tests). 295 failed a test. 80 survived.
-- Of the 80: 13 are equivalent or redundant (listed below), 65 were unpinned and now have a test that fails against the same mutation, 2 are still open because the surface cannot be staged headlessly.
+- 394 behaviors audited by mutation (break the production line, run only the relevant tests). 312 failed a test. 82 survived.
+- Of the 82 (the late PRs 1675 to 1677, merged while this ran, are in the table too): 13 are equivalent or redundant (listed below), 66 were unpinned and now have a test that fails against the same mutation, 3 are still open because the surface cannot be staged headlessly.
 - Riskiest gaps found: the guard that makes Ctrl+X do nothing when neither the list nor the timeline has the focus (without it, Cut would delete the timeline selection while a button held the focus); Edit > Cut and Edit > Duplicate menu clicks were not routed by any test; Ctrl+X, Ctrl+D and Delete typed into a text box were never checked (only Ctrl+C and Ctrl+V were); a paste anchored on a selected chain, and a track paste below several selected chains or headers, were never exercised with more than the trivial case; a refused source in a paste never reached the banner in any test; the snap tie between a dragged chain's start and end, and the own-cycle mark at the chain's start, had no test; Escape cancelling a Ctrl rubber band, the chip-drop Alt bypass, and zoom around the lane edge had no test.
 - Test discipline: every merged PR in scope shipped tests, but they pin the main path and skip boundaries (ties, one-sided clamps, exact edges, defaults, repeats). Whether the tests came before the code cannot be read from squash merges. One test was wall-clock dependent and would fail on a slow runner (fixed, see Hygiene).
 - Bugs found: none in production code. 33 hostile clipboard envelopes, weird loop and start values (0, negative, 1e30, 1e9 on an empty chain) and zoom extremes threw nothing and hung nothing.
@@ -47,6 +47,10 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 | 1669 multi-select, move, copy, cut, paste, duplicate | selection rules, clamping, envelopes, track mapping, routing | TimelineSelectionTests, TimelineMarqueeSelectorTests, TimelineMultiMoveTests, TimelineClipboardTests, SequenceDocumentTimeline*Tests, six scenario files | outcome for the main rules; envelope version 0, non-path sources, half a track list, default visible, created-track name, negative paste time, default track name, refusal once per file, distinct names for several pasted or duplicated tracks, duplicate shift of a cut chain, anchor by selected chain, track paste below the lowest selection, refusal banner, Cut without a surface, text-box keys, Edit > Cut and Duplicate, Escape on a band were none |
 | 1671 click on empty lane seeks | rule, gesture | TimelineEmptyClickTests, SequenceTimelineClickPlayheadScenarioTests | outcome (E01-E04, G22, G25) |
 | 1673 marquee performance | binary search, throttle, selection layer | TimelineMarqueeSelectorTests, SequenceTimelineMarqueePerformanceScenarioTests, TimelineSelectionLayerTests | outcome; exact-edge touches were none (Q03, Q04); the scenario count depended on the wall clock (fixed) |
+| 1675 sequence rename click-away | commit waits for the press, keeps the clicked selection, redo selects | SequenceRenameClickAwayScenarioTests, SequenceDocumentSelectionTests | outcome (SD1, SD2); redo of a keep-selection rename was asserted vacuously (the selection was already there): SD3 now has a test; the focus hand-off is open (RC1) |
+| 1676 drag a chain onto the new-track row | plan, tracks made, names, Z, description | TimelineNewTrackMoveTests, SequenceTimelineMoveToNewTrackScenarioTests | outcome (NM1-NM9, DP1, DP2, MV1-MV3) |
+| 1677 popups above the selection and playhead | layer order | TimelinePopupLayerTests (pixels) | outcome (PU1) |
+| 1678 Flip Diagonal menu | not sequence mode | not audited | n/a |
 
 ## Bugs
 
@@ -69,6 +73,7 @@ None in production code. Hygiene finding, fixed: see below.
 | Real timers (playback tick, chip timer, zoom ease, banner, F3 sampling) | `SequenceClock.AdvanceTick`, `SettleZoomAnimation`, `BurstRate`, `SelectionChangeThrottle` | the `DispatcherTimer` wrappers |
 | Drop pill font | none | the typeface choice could be a function of `mono` and the theme |
 | Stale-document guard after the async clipboard read (X17) | none | an `IClipboard` seam on the pane |
+| Focus hand-off when a rename commits by click-away (RC1) | the selection rules are tested | the focus rule is one bool in the pane; no headless click target distinguishes it |
 | Preview redraw after a texture swap on disk (PL1) | `ThumbnailService.PathInvalidated` is tested | a draw counter on the preview control |
 
 ## Equivalent or redundant survivors
@@ -408,6 +413,25 @@ Q, S, L, M, C, D, R, T, V, J, K, B, Z, Y, P, N, H, W, E, EV, FL, FP, ER, FR: Com
 | ER3 | event card: lists at most 8 events then an ellipsis | UNPINNED -> pinned | EventReadout_MoreThanEightEventsInOneMarker_ListsTheFirstEightThenAnEllipsis |
 | FR3 | film card: merged frames listed once each | UNPINNED -> pinned | FilmstripReadout_AMergedCellThatShowsOneFrameTwice_ListsThatFrameOnce |
 | DC5 | cursor: hover cursor for resize on non-Windows | UNPINNED -> pinned | ForHover_GivesEachTimelineCursorItsOwnShape_AndNothingForTheDefault |
+| NM1 | new-track move: only the dragged chains leave their tracks | caught | Apply_OneChain_LeavesItsTrackEmptyAndMakesATrackNamedAfterTheChain |
+| NM2 | new-track move: chains are removed from their old track | caught | Apply_OneChain_LeavesItsTrackEmptyAndMakesATrackNamedAfterTheChain |
+| NM3 | new-track move: one new track per source track | caught | Apply_ChainsFromTwoTracks_MakeOneNewTrackPerSourceTrack_InLaneOrder_KeepingTheirOrder |
+| NM4 | new-track move: track named after its first chain | caught | Apply_ANameThatIsTaken_GetsANumber |
+| NM5 | new-track move: blank chain name falls back to Track | caught | Apply_AChainWithNoName_MakesATrackCalledTrack |
+| NM6 | new-track move: unique track name | caught | Apply_ANameThatIsTaken_GetsANumber |
+| NM7 | new-track move: Z puts the track on top | caught | Apply_ChainsFromTwoTracks_MakeOneNewTrackPerSourceTrack_InLaneOrder_KeepingTheirOrder |
+| NM8 | new-track move: result lists the new track indices | caught | Apply_ChainsFromTwoTracks_MakeOneNewTrackPerSourceTrack_InLaneOrder_KeepingTheirOrder |
+| NM9 | new-track move: empty source tracks skipped | caught | ASelectionInOneTrack_GetsOneNewTrackHoldingAllOfIt |
+| DP1 | move drop plan: only over the new-track row | caught | ForMove_OverALaneOrBelowTheNewTrackRow_IsNone |
+| DP2 | move drop plan: width is the chain's full length in pixels | caught | ForMove_OverTheNewTrackRow_TargetsANewTrackAtTheGivenStart |
+| SD1 | rename click-away leaves the selection alone | caught | RenameSequence_KeepSelection_LeavesTheSelectionAlone_ButUndoAndRedoStillSelectTheRenamedOne |
+| SD2 | selectOnDo=false skips the select on the first run | caught | RenameSequence_KeepSelection_LeavesTheSelectionAlone_ButUndoAndRedoStillSelectTheRenamedOne |
+| SD3 | redo of such an edit still selects | UNPINNED -> pinned | RenameSequence_KeepSelection_RedoStillSelectsTheRenamedOne_WhereverTheSelectionHasGone |
+| MV1 | release on the new-track row makes the track(s) | caught | AMissingChain_MovesToo_WithItsOneSecondPlaceholderAsTheGhost |
+| MV2 | plan shown only while over the new-track row | caught | AMissingChain_MovesToo_WithItsOneSecondPlaceholderAsTheGhost |
+| MV3 | move description names the new track | caught | DraggingAChainToTheNewTrackRow_MakesATrackForIt_AsOneUndoEntry_AndSelectsIt |
+| RC1 | click-away rename waits for the press and keeps its selection | UNPINNED (open) | a click-away commit refocusing the list; every click target the headless run can reach takes the focus from the list anyway |
+| PU1 | popups draw in their own layer above the selection | caught | TheHoverCard_DrawsOverASelectedChainsOutline |
 | HK01 | hotkey copy ignored while a text box has focus | caught | CtrlC_AndCtrlV_InTheRenameBox_EditTheText_NotTheSequences |
 | HK02 | hotkey cut ignored while a text box has focus | UNPINNED -> pinned | DeleteCutAndDuplicate_InTheTrackRenameBox_EditTheText_NotTheTimeline |
 | HK03 | hotkey paste ignored while a text box has focus | caught | CtrlC_AndCtrlV_InTheRenameBox_EditTheText_NotTheSequences |
