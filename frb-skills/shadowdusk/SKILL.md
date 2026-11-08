@@ -9,4 +9,6 @@ Compiles `.fx` HLSL into `.mgfx` (MonoGame/KNI) or `.fxb` (FNA) on any OS — no
 
 Two forms: `ShadowDusk.Compiler` (NuGet, in-memory `EffectCompiler.CompileAsync(hlslSource, options)` — use this for build-time embedding of engine-shipped shaders) and `ShadowDuskCLI` (drop-in `mgfxc` replacement for existing content-pipeline builds).
 
+**KNI 4.3+ target:** `ShadowDuskCLI in.fx out.knifx --target-runtime kni-knifx-v12` writes KNIFX v12 (header `KNIF 0c 00 00 00`), the version KNI 4.3 reads without the "older version of KNI" notice. `.mgfx` output is v10.
+
 **Gotcha:** Metal (macOS/iOS) isn't implemented yet — Metal targets still need the traditional Windows/Wine path (see `shaders` skill). Output is behaviorally equivalent to `mgfxc`, not byte-identical — don't diff bytecode across compilers in a test.

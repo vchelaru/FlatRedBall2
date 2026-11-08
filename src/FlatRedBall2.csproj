@@ -82,11 +82,11 @@
 
   <!--
     Precompiled ColorOperation.Add pixel shader (see src/Shaders/AddColor.fx for HLSL source).
-    Compiled once via ShadowDusk.Compiler (Target=OpenGL, Mgfx v10 container - see the
-    `shadowdusk` skill) since this library has no content pipeline of its own; loaded via
-    `new Effect(graphicsDevice, bytes)`.
+    Compiled once via ShadowDuskCLI 0.25.0 (target runtime `kni-knifx-v12`, KNIFX v12 container
+    that KNI 4.3 reads without the "older version of KNI" notice - see the `shadowdusk` skill)
+    since this library has no content pipeline of its own; loaded via `new Effect(graphicsDevice, bytes)`.
   -->
   <ItemGroup>
-    <EmbeddedResource Include="Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
+    <EmbeddedResource Include="Rendering\Shaders\AddColor.knifx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.knifx" />
   </ItemGroup>
 </Project>

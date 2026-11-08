@@ -20,7 +20,7 @@ internal static class AddColorEffect
             return existing;
 
         using var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("FlatRedBall2.Rendering.Shaders.AddColor.mgfx")!;
+            .GetManifestResourceStream("FlatRedBall2.Rendering.Shaders.AddColor.knifx")!;
         using var memoryStream = new MemoryStream();
         stream.CopyTo(memoryStream);
 
