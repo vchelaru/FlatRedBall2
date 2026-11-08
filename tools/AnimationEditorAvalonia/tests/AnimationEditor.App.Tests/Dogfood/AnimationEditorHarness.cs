@@ -693,6 +693,9 @@ internal sealed class AnimationEditorHarness : IDisposable
         {
             return;
         }
+        // The pointer waits outside the window: parked on a control for half a second it would raise that
+        // control's tooltip, which then covers whatever the test clicks next.
+        Window.MouseMove(new Point(-50, -50), RawInputModifiers.None);
         TimeSpan window = TimeSpan.FromMilliseconds(DoubleClickWindowMilliseconds + 100);
         WaitUntil(() => _sinceLastClick.Elapsed > window, window);
     }
@@ -706,6 +709,17 @@ internal sealed class AnimationEditorHarness : IDisposable
     public void ClickAt(Point point, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         OutrunDoubleClickWindow(point);
+        PressAndRelease(point, modifiers);
+    }
+
+    /// <summary>
+    /// Clicks <paramref name="control"/> without waiting out the double-click window, as a user mashing a button does:
+    /// the presses after the first count as part of a double-click.
+    /// </summary>
+    public void ClickRapidly(Control control) => PressAndRelease(CenterOf(control), RawInputModifiers.None);
+
+    private void PressAndRelease(Point point, RawInputModifiers modifiers)
+    {
         Window.MouseMove(point, modifiers);
         Window.MouseDown(point, MouseButton.Left, modifiers);
         Window.MouseUp(point, MouseButton.Left, modifiers);
