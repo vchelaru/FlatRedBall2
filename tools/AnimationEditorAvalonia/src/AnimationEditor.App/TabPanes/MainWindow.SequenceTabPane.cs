@@ -403,7 +403,7 @@ public partial class MainWindow
             var newPath = new FilePath(picked);
             if (newPath != oldPath && _window._tabManager.Tabs.Any(other => other.Path == newPath))
             {
-                _window.ShowErrorBanner($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
+                _window.ShowProblem($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
                 return;
             }
 
@@ -412,7 +412,7 @@ public partial class MainWindow
             var collapsedIndices = Enumerable.Range(0, oldSources.Count).Where(i => _window.SequenceLibrary.IsCollapsed(oldSources[i])).ToList();
             if (document.SaveAs(newPath.FullPath) is { } error)
             {
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
                 return;
             }
             if (newPath == oldPath) return;
@@ -1338,7 +1338,7 @@ public partial class MainWindow
             bool collapsed = library.IsCollapsed(source);
             if (document.ReplaceSource(_window._undoManager, source, picked) is { } error)
             {
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
                 return;
             }
             // The collapsed state is keyed by the source as written, which the replace changed; the new source starts as the old one was.
