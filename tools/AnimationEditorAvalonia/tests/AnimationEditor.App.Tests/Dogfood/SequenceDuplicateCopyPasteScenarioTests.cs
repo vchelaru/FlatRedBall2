@@ -222,7 +222,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task Paste_OfTextThatIsNotASequence_DoesNothing_AndShowsNoBanner()
+    public async Task Paste_OfTextThatIsNotACopy_ChangesNothing_AndSaysWhyInAToast()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteBoss(editor));
@@ -232,12 +232,12 @@ public class SequenceDuplicateCopyPasteScenarioTests
         {
             await SetClipboardAsync(editor, text);
             await CtrlAsync(editor, Key.V);
+            editor.ToastText.ShouldNotBeNull().ShouldStartWith("Nothing to paste");
         }
 
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack" });
         editor.UndoLabels.ShouldBeEmpty();
         editor.ErrorBannerText.ShouldBeNull();
-        editor.ToastText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -280,7 +280,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CtrlC_AndCtrlV_WithTheTimelineFocused_NeitherCopyNorPasteASequence()
+    public async Task CtrlC_WithTheTimelineFocused_DoesNotCopyASequence_ButCtrlVStillPastesACopiedSequence()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteBoss(editor));
@@ -295,8 +295,9 @@ public class SequenceDuplicateCopyPasteScenarioTests
         await SetClipboardAsync(editor, envelope);
         await CtrlAsync(editor, Key.V);
 
-        editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack" });
-        editor.UndoLabels.ShouldBeEmpty();
+        // Paste follows what the clipboard holds, so the copied sequence lands after the selected one even from the timeline.
+        editor.SequenceNames.ShouldBe(new[] { "Idle", "Idle 2", "Attack" });
+        editor.UndoLabels.ShouldBe(new[] { "Paste Sequence 'Idle 2'" });
     }
 
     [AvaloniaFact]
