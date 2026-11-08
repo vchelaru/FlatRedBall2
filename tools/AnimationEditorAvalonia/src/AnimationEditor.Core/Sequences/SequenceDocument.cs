@@ -257,6 +257,20 @@ public sealed class SequenceDocument
         return name;
     }
 
+    /// <summary>
+    /// The indices of the sequences the list has selected, in selection order, primary included; just
+    /// <see cref="SelectedSequence"/> when the selection holds nothing, and empty when nothing is selected.
+    /// </summary>
+    public IReadOnlyList<int> SelectedIndices => throw new NotImplementedException();
+
+    public void DeleteSequences(IUndoManager undo, IReadOnlyList<int> indices) => throw new NotImplementedException();
+
+    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices) => throw new NotImplementedException();
+
+    public string CopySequences(IReadOnlyList<int> indices) => throw new NotImplementedException();
+
+    public SequencePasteResult PasteSequences(IUndoManager undo, SequenceClipboardContent content) => throw new NotImplementedException();
+
     /// <summary>The clipboard text for the sequence at <paramref name="index"/> (see <see cref="SequenceClipboard"/>).</summary>
     public string CopySequence(int index) =>
         SequenceClipboard.Write(Save.Sequences[index], Path.GetDirectoryContainingThis().FullPath);
@@ -270,17 +284,17 @@ public sealed class SequenceDocument
         int selected = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count ? SelectedSequence : Save.Sequences.Count - 1;
         int insertAt = selected + 1;
         string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name),
-            string.IsNullOrWhiteSpace(content.Sequence.Name) ? DefaultSequenceName : content.Sequence.Name.Trim());
+            string.IsNullOrWhiteSpace(content.Sequences[0].Name) ? DefaultSequenceName : content.Sequences[0].Name.Trim());
         var errors = new List<string>();
         var folder = Path.GetDirectoryContainingThis();
         Edit(undo, $"Paste Sequence '{name}'", save =>
         {
-            var pasted = SequenceClipboard.Clone(content.Sequence);
+            var pasted = SequenceClipboard.Clone(content.Sequences[0]);
             pasted.Name = name;
             MergeSources(save, pasted.Tracks.SelectMany(track => track.Chains), folder, errors);
             save.Sequences.Insert(insertAt, pasted);
         }, selectBefore: SelectedSequence, selectAfter: insertAt);
-        return new SequencePasteResult(name, errors);
+        return new SequencePasteResult(new[] { name }, errors);
     }
 
     /// <summary>The clipboard text for the given chains of <paramref name="sequence"/>, in document order (see <see cref="TimelineClipboard"/>).</summary>

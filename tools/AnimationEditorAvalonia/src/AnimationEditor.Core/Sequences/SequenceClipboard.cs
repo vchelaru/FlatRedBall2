@@ -8,12 +8,12 @@ using System.Text.Json.Nodes;
 namespace AnimationEditor.Core.Sequences;
 
 /// <summary>What a valid sequence envelope on the clipboard holds.</summary>
-/// <param name="Sequence">The copied sequence. Each chain reference's source is an absolute path with <c>/</c> separators.</param>
-/// <param name="Sources">The distinct absolute source paths the sequence uses, in first-use order.</param>
-public sealed record SequenceClipboardContent(SequenceSave Sequence, IReadOnlyList<string> Sources);
+/// <param name="Sequences">The copied sequences in the order they were copied (never empty). Each chain reference's source is an absolute path with <c>/</c> separators.</param>
+/// <param name="Sources">The distinct absolute source paths the sequences use, in first-use order.</param>
+public sealed record SequenceClipboardContent(IReadOnlyList<SequenceSave> Sequences, IReadOnlyList<string> Sources);
 
-/// <summary>What <see cref="SequenceDocument.PasteSequence"/> did: the pasted sequence's name, and a message for each source refused.</summary>
-public sealed record SequencePasteResult(string Name, IReadOnlyList<string> Errors);
+/// <summary>What <see cref="SequenceDocument.PasteSequences"/> did: the pasted sequences' names in order, and a message for each source refused.</summary>
+public sealed record SequencePasteResult(IReadOnlyList<string> Names, IReadOnlyList<string> Errors);
 
 /// <summary>
 /// The clipboard text for a copied sequence: a JSON envelope with a marker and version around the sequence in the
@@ -37,6 +37,8 @@ public static class SequenceClipboard
     /// The envelope for <paramref name="sequence"/>, whose relative sources are resolved against
     /// <paramref name="sourceFolder"/> (the folder of the <c>.seqj</c> that holds it).
     /// </summary>
+    public static string Write(IReadOnlyList<SequenceSave> sequences, string sourceFolder) => throw new System.NotImplementedException();
+
     public static string Write(SequenceSave sequence, string sourceFolder)
     {
         var copy = Clone(sequence);
@@ -113,7 +115,7 @@ public static class SequenceClipboard
         foreach (var reference in sequence.Tracks.SelectMany(track => track.Chains))
             if (reference.Source.Length > 0 && !used.Contains(reference.Source, System.StringComparer.OrdinalIgnoreCase))
                 used.Add(reference.Source);
-        content = new SequenceClipboardContent(sequence, used);
+        content = new SequenceClipboardContent(new[] { sequence }, used);
         return true;
     }
 

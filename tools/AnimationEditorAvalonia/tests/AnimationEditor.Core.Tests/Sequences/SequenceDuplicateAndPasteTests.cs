@@ -113,7 +113,7 @@ public class SequenceDuplicateAndPasteTests
 
         var result = document.PasteSequence(undo, content!);
 
-        result.Name.ShouldBe("Attack 2");
+        result.Names.ShouldBe(new[] { "Attack 2" });
         result.Errors.ShouldBeEmpty();
         Names(document).ShouldBe(new[] { "Idle", "Attack 2", "Attack" });
         document.SelectedSequence.ShouldBe(1);
@@ -209,7 +209,7 @@ public class SequenceDuplicateAndPasteTests
         pasted.Tracks[0].Chains[0].Source = bPath.Replace('\\', '/');
         pasted.Tracks[0].Chains.Add(new SequenceChainReferenceSave { Source = folderA + "/boss.seqj", Chain = "X" });
         pasted.Tracks[0].Chains.Add(new SequenceChainReferenceSave { Source = folderA + "/ok.achx", Chain = "Y" });
-        var content = new SequenceClipboardContent(pasted, new[] { bPath.Replace('\\', '/'), folderA + "/boss.seqj", folderA + "/ok.achx" });
+        var content = new SequenceClipboardContent(new[] { pasted }, new[] { bPath.Replace('\\', '/'), folderA + "/boss.seqj", folderA + "/ok.achx" });
 
         var result = b.PasteSequence(new UndoManager(), content);
 
