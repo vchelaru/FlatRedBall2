@@ -103,7 +103,9 @@
                         </Grid>
                         <Grid ColumnDefinitions="78,*">
                             <TextBlock Text="Chain" Classes="label" />
-                            <TextBlock x:Name="ChainNameText" Grid.Column="1" Classes="value" />
+                            <ComboBox x:Name="ChainNameBox" Grid.Column="1" HorizontalAlignment="Stretch" FontSize="11"
+                                      ToolTip.Tip="Point this block at another chain of the same source. A chain the source no longer has shows as missing."
+                                      AutomationProperties.AutomationId="seq-chain-name" />
                         </Grid>
                         <Grid ColumnDefinitions="78,*,Auto">
                             <TextBlock Text="Start" Classes="label" />

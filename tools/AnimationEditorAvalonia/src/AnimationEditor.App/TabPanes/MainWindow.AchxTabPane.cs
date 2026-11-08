@@ -145,6 +145,8 @@ public partial class MainWindow
             }
         }
 
+        public Task SaveAsAsync(TabEntry? tab) => _window._appCommands.SaveCurrentAnimationChainListAsync();
+
         /// <summary>
         /// True when <paramref name="tab"/>'s document has content worth prompting to save (issue
         /// #928): the live model for the active tab, or the snapshot captured when a background

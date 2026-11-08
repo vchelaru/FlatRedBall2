@@ -114,7 +114,7 @@ public class SequenceInspectorBulkEditScenarioTests
         inspector.ChainStartField.PlaceholderText.ShouldBe("(mixed)");
         inspector.ChainLoopsField.Value.ShouldBe(1m);
         inspector.ChainSourceText.Text.ShouldBe("hero.achx");
-        inspector.ChainNameText.Text.ShouldBe("Walk");
+        SequenceInspectorScenarioTests.ChainCombo(inspector).SelectedItem.ShouldBe("Walk");
 
         editor.TypeAndEnter(BoxOf(inspector.ChainStartField), "3");
         Saved(path).Tracks[0].Chains[0].Start.ShouldBe(3d);
@@ -139,11 +139,11 @@ public class SequenceInspectorBulkEditScenarioTests
         editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 0, 0.25));
         var inspector = Inspector(editor);
         inspector.GoToDefinitionButton.IsVisible.ShouldBeTrue();
-        inspector.ChainNameText.Text.ShouldBe("Walk");
+        SequenceInspectorScenarioTests.ChainCombo(inspector).SelectedItem.ShouldBe("Walk");
 
         editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 0, 2.1), RawInputModifiers.Control);
 
-        inspector.ChainNameText.Text.ShouldBe("2 chains");
+        SequenceInspectorScenarioTests.ChainCombo(inspector).SelectedItem.ShouldBe("2 chains");
         inspector.ChainSourceText.Text.ShouldBe("hero.achx");
         inspector.GoToDefinitionButton.IsVisible.ShouldBeFalse("Go to Definition is for one chain");
     }

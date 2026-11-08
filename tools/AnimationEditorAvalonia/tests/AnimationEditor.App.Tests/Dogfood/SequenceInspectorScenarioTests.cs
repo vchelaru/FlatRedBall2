@@ -50,6 +50,10 @@ public class SequenceInspectorScenarioTests
     private static SequenceTimelineControl Timeline(AnimationEditorHarness editor) =>
         editor.Control<SequenceTimelineControl>("SequenceTimeline");
 
+    // The Chain row's dropdown, found by type so the scenarios say what a user sees and not what the field is called.
+    internal static ComboBox ChainCombo(SequenceInspectorControl inspector) =>
+        inspector.ChainPanel.GetVisualDescendants().OfType<ComboBox>().Single();
+
     private static SequenceInspectorControl Inspector(AnimationEditorHarness editor) =>
         editor.Control<SequenceInspectorControl>("SequenceInspector");
 
@@ -103,7 +107,7 @@ public class SequenceInspectorScenarioTests
         (inspector.SequencePanel.IsVisible, inspector.TrackPanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((false, false, true));
         Timeline(editor).SelectedTrack.ShouldBeNull();
         inspector.ChainSourceText.Text.ShouldBe("hero.achx");
-        inspector.ChainNameText.Text.ShouldBe("Walk");
+        ChainCombo(inspector).SelectedItem.ShouldBe("Walk");
         inspector.ChainStartField.Value.ShouldBe(0.5m);
         inspector.ChainLoopsField.Value.ShouldBe(2m);
         inspector.ChainLengthText.Text.ShouldBe("1 s (0.5 s × 2)");
@@ -220,7 +224,7 @@ public class SequenceInspectorScenarioTests
         (inspector.SequencePanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((true, false));
         editor.ClickAt(OnChain(editor, 0, 0.1));
         (inspector.SequencePanel.IsVisible, inspector.ChainPanel.IsVisible).ShouldBe((false, true));
-        inspector.ChainNameText.Text.ShouldBe("Run");
+        ChainCombo(inspector).SelectedItem.ShouldBe("Run");
     }
 
     [AvaloniaFact]

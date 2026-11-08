@@ -96,6 +96,24 @@ internal sealed class ScriptedDialogs : IFileDialogService, IEditorDialogHost
     public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription) =>
         Task.FromResult(Take(_openFiles, $"open file: {title} (.{defaultExtension})"));
 
+    /// <summary>The folder and file name each save dialog was asked to open with, in order.</summary>
+    public List<SaveDialogStart> SaveStarts { get; } = new();
+
+    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices, SaveDialogStart start)
+    {
+        SaveStarts.Add(start);
+        return PickSaveFileAsync(title, defaultExtension, fileTypeChoices);
+    }
+
+    /// <summary>The filters each single-file open dialog with a filter list offered, as "Description: patterns".</summary>
+    public List<string> OpenFileFiltersOffered { get; } = new();
+
+    public Task<string?> PickOpenFileAsync(string title, IReadOnlyList<OpenFileFilter> filters)
+    {
+        OpenFileFiltersOffered.AddRange(filters.Select(filter => $"{filter.Description}: {string.Join(" ", filter.Patterns)}"));
+        return Task.FromResult(Take(_openFiles, $"open file: {title}"));
+    }
+
     /// <summary>The filters each multi-file open dialog offered, as "Description: patterns".</summary>
     public List<string> OpenFilesFilters { get; } = new();
 

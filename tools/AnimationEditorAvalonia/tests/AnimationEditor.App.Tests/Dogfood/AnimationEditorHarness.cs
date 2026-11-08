@@ -901,9 +901,12 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// content is <paramref name="item"/>. The dropdown is its own popup top level, so the item
     /// click goes to that popup rather than the window.
     /// </summary>
-    public void PickComboItem(string name, string item)
+    public void PickComboItem(string name, string item) => PickComboItem(Control<ComboBox>(name), item);
+
+    /// <summary>As <see cref="PickComboItem(string, string)"/> for a combo box inside a control with its own name scope, found by the caller.</summary>
+    public void PickComboItem(ComboBox combo, string item)
     {
-        ComboBox combo = Control<ComboBox>(name);
+        string name = combo.Name ?? combo.GetType().Name;
         // The inspector scrolls; a user scrolls a field into view before clicking it.
         combo.BringIntoView();
         Layout();
