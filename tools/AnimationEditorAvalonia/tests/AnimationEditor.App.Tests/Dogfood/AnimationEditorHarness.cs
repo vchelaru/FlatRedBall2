@@ -969,7 +969,8 @@ internal sealed class AnimationEditorHarness : IDisposable
         {
             // The control may already be gone.
         }
-        Window.Close();
+        // Not Window.Close(): a scenario may end on a failed .seqj save on purpose, and the window would ask what to do.
+        Window.CloseWithoutPrompt();
         Dispatcher.UIThread.RunJobs();
         try
         {

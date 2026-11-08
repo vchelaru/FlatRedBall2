@@ -401,7 +401,7 @@ public partial class MainWindow : Window
 
         Opened += OnOpened;
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
-        Closing += (_, _) => CommitPendingRename();
+        Closing += OnWindowClosing;
         AddHandler(PointerPressedEvent, OnWindowPointerPressedCommitTreeRename, RoutingStrategies.Tunnel, handledEventsToo: true);
         Closed += (_, _) =>
         {
@@ -529,7 +529,7 @@ public partial class MainWindow : Window
                 tabMenu.Items.Add(new MenuItem
                 {
                     Header = "Detach to New Window",
-                    Command = new RelayCommand(() => DetachTab(captured)),
+                    Command = new RelayCommand(() => _ = DetachTabAsync(captured)),
                 });
             // Issue #881: same action as the title-bar "Open Containing Folder", but for the
             // right-clicked tab (which may not be the active one).
@@ -738,8 +738,21 @@ public partial class MainWindow : Window
         EnsureCurrentEditorContentHasTab();
         var filePath = new FilePath(path);
         var result = asPreview ? _tabManager.OpenPreview(filePath) : _tabManager.OpenOrFocus(filePath);
-        if (!await ShowTabAsync(_tabManager.ActiveTab!) && result != TabOpenResult.Focused)
+        bool shown = await ShowTabAsync(_tabManager.ActiveTab!);
+        if (!shown && result != TabOpenResult.Focused)
             DropUnloadedTab(filePath);
+        // An achx records itself through CurrentFileChanged; a sequence file raises no such event. A .png is a viewer,
+        // not a document to come back to, so it stays out of the list.
+        else if (shown && TabEntry.ResolveKind(filePath) == TabKind.Sequence)
+            RecordRecentFile(path);
+    }
+
+    /// <summary>Puts <paramref name="path"/> at the top of File &gt; Open Recent and saves the list.</summary>
+    private void RecordRecentFile(string path)
+    {
+        _appSettings.AddFile(new FilePath(path));
+        SaveSettingsFile();
+        RefreshRecentFiles();
     }
 
     /// <summary>
@@ -854,6 +867,46 @@ public partial class MainWindow : Window
     /// an untitled tab with content prompts to save, #928). Discarding falls through to
     /// <see cref="CloseTabCore"/>, which is what clears the crash-recovery file (#927).
     /// </summary>
+    private bool _closeConfirmed;
+    private bool _confirmingClose;
+
+    /// <summary>
+    /// Closing the window with a .seqj whose last save failed would drop its edits, so it asks first (the window-level
+    /// counterpart of <see cref="ITabPane.PrepareCloseAsync"/>).
+    /// </summary>
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // Before the settings and tabs are written, so a name typed into an open rename is kept.
+        CommitPendingRename();
+        if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown || !_sequencePane.HasUnsavedEdits) return;
+
+        e.Cancel = true;
+        if (_confirmingClose) return;
+        _ = ConfirmWindowCloseAsync();
+    }
+
+    private async Task ConfirmWindowCloseAsync()
+    {
+        _confirmingClose = true;
+        try
+        {
+            if (!await _sequencePane.ConfirmWindowCloseAsync()) return;
+            _closeConfirmed = true;
+        }
+        finally
+        {
+            _confirmingClose = false;
+        }
+        Close();
+    }
+
+    /// <summary>Closes the window without the unsaved-edits prompt. For tests that end with a failed save on purpose.</summary>
+    internal void CloseWithoutPrompt()
+    {
+        _closeConfirmed = true;
+        Close();
+    }
+
     private async Task CloseTabAsync(TabEntry tab)
     {
         // Closing the active tab moves the user to another one, which is a history entry.
@@ -1171,9 +1224,7 @@ public partial class MainWindow : Window
             var toPromote = _tabManager.ActiveTab;
             Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _appSettings.AddFile(new FilePath(path));
-                SaveSettingsFile();
-                RefreshRecentFiles();
+                RecordRecentFile(path);
                 UpdateTitle();
                 UpdateStatusBar();
                 RefreshFilesPanel();
@@ -7023,15 +7074,20 @@ public partial class MainWindow : Window
     /// fully-independent <see cref="MainWindow"/> instance.
     /// No-op for Untitled (unsaved) tabs — there is no file to move.
     /// </summary>
-    private void DetachTab(TabEntry tab)
+    private async Task DetachTabAsync(TabEntry tab)
     {
         if (IsUntitledTab(tab)) return;
         var filePath = tab.Path.FullPath;
-        CloseTabCore(tab);
-        var window = App.CreateDetachedWindow();
+        // Detaching closes the tab here, so a .seqj whose last save failed asks first, as closing it does.
+        if (await PaneFor(tab).PrepareCloseAsync(tab) is not { } toClose) return;
+        CloseTabCore(toClose);
+        var window = DetachedWindowFactory();
         window.Show();
-        _ = window.OpenFileAsTab(filePath);
+        await window.OpenFileAsTab(filePath);
     }
+
+    /// <summary>Makes the window Detach to New Window opens. Tests replace it so the window uses temp settings.</summary>
+    internal Func<MainWindow> DetachedWindowFactory { get; set; } = () => App.CreateDetachedWindow();
 
     private void UpdateTitle()
     {
@@ -7075,7 +7131,9 @@ public partial class MainWindow : Window
     {
         WireframeCtrl.CanvasBackgroundOverride = _appSettings.CanvasBackgroundArgb;
         PreviewCtrl.CanvasBackgroundOverride   = _appSettings.CanvasBackgroundArgb;
+        SequencePreview.CanvasBackgroundOverride = _appSettings.CanvasBackgroundArgb;
         PreviewCtrl.GuideLineOverride          = _appSettings.GuideLineArgb;
+        SequencePreview.GuideLineOverride      = _appSettings.GuideLineArgb;
         WireframeCtrl.FillFrames               = _appSettings.FillFrameRectangles;
     }
 
@@ -7084,6 +7142,7 @@ public partial class MainWindow : Window
         _appSettings.CanvasBackgroundArgb = argb;
         WireframeCtrl.CanvasBackgroundOverride = argb;
         PreviewCtrl.CanvasBackgroundOverride   = argb;
+        SequencePreview.CanvasBackgroundOverride = argb;
         SaveSettingsFile();
     }
 
@@ -7091,6 +7150,7 @@ public partial class MainWindow : Window
     {
         _appSettings.GuideLineArgb = argb;
         PreviewCtrl.GuideLineOverride = argb;
+        SequencePreview.GuideLineOverride = argb;
         SaveSettingsFile();
     }
 
