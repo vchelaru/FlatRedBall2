@@ -1,6 +1,5 @@
 using System;
-using System.IO;
-using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using Apos.Shapes;
@@ -28,24 +27,28 @@ public class AposShapesEmbeddedShaderPortabilityTests
     public void EmbeddedOpenGLShader_DoesNotCallBareTrunc()
     {
         var assembly = typeof(ShapeBatch).Assembly;
-        // Gzipped since Apos.Shapes 0.9.0; one resource per shader technique ("apos-shapes.N.knifx.gz")
-        // since 0.9.3. The dx11 .mgfx.gz holds no GLSL.
-        var names = Array.FindAll(assembly.GetManifestResourceNames(),
-            n => n.StartsWith("Apos.Shapes.apos-shapes.", StringComparison.Ordinal) && n.EndsWith(".knifx.gz", StringComparison.Ordinal));
-        if (names.Length == 0)
+        // Since Apos.Shapes 0.10.0 the 16 shader techniques ship as one chunked, compressed pack
+        // ("apos-shapes.knifx.pack"); its internal ShaderArchive unpacks one .knifx per technique.
+        // The dx11 pack holds no GLSL.
+        const string Resource = "Apos.Shapes.apos-shapes.knifx.pack";
+        var archiveType = assembly.GetType("Apos.Shapes.ShaderArchive");
+        var forMethod = archiveType?.GetMethod("For", BindingFlags.Public | BindingFlags.Static);
+        var namesProperty = archiveType?.GetProperty("Names", BindingFlags.Public | BindingFlags.Instance);
+        var readMethod = archiveType?.GetMethod("Read", BindingFlags.Public | BindingFlags.Instance);
+        if (forMethod == null || namesProperty == null || readMethod == null || assembly.GetManifestResourceStream(Resource) == null)
             throw new InvalidOperationException(
-                "Apos.Shapes.KNI.dll no longer embeds resources named 'apos-shapes.*.knifx.gz' -- " +
-                "update this test's resource names to match the current package.");
+                "Apos.Shapes.KNI.dll no longer has the internal ShaderArchive over the embedded resource '" + Resource + "' -- " +
+                "update this test to match the current package.");
 
+        var archive = forMethod.Invoke(null, new object[] { Resource })!;
         var sb = new StringBuilder();
-        foreach (var name in names)
+        foreach (var name in (System.Collections.Generic.IEnumerable<int>)namesProperty.GetValue(archive)!)
         {
-            using var stream = assembly.GetManifestResourceStream(name)!;
-            using var gzip = new GZipStream(stream, CompressionMode.Decompress);
-            using var reader = new StreamReader(gzip, Encoding.Latin1);
-            sb.Append(reader.ReadToEnd());
+            var knifx = (byte[])readMethod.Invoke(archive, new object[] { name })!;
+            sb.Append(Encoding.Latin1.GetString(knifx));
         }
         var glsl = sb.ToString();
+        glsl.Contains("gl_FragColor").ShouldBeTrue("the unpacked shader pack should hold GLSL, or this test checks nothing");
 
         BareTrunc.IsMatch(glsl).ShouldBeFalse(
             "The embedded OpenGL shader calls trunc(), a GLSL 1.30/ES 3.00 builtin absent from the " +
