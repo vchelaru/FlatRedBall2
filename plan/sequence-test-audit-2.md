@@ -54,7 +54,7 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 | 1679 leaving an open rename commits it | tab switch, library click, close, hotkeys, track and list boxes | SequenceRenameLeaveScenarioTests | outcome (CP1-CP3, CP6, CP8); focus hand-off and the same-document guard are open (CP4, CP5, RC1) |
 | 1680 skill signpost | docs | n/a | n/a |
 | 1681 macOS native menu Back and Forward | not sequence mode | not audited | n/a |
-| 1682 non-looping chain holds its last frame | scene, filmstrip, readout | SequenceSceneTests, SequencePingPongAndLoopTests, FilmstripLayoutTests, SequenceHoldTailTests | merged after the mutation runs; not mutation-audited |
+| 1682 non-looping chain holds its last frame | scene, filmstrip, readout | SequenceSceneTests, SequencePingPongAndLoopTests, FilmstripLayoutTests, SequenceHoldTailTests | merged after the mutation runs; mutation-audited in `plan/sequence-test-audit-3.md` |
 
 ## Bugs
 

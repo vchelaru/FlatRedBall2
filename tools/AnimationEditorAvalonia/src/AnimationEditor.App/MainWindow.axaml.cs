@@ -401,6 +401,7 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         Closing += (_, _) => CommitPendingRename();
+        AddHandler(PointerPressedEvent, OnWindowPointerPressedCommitTreeRename, RoutingStrategies.Tunnel, handledEventsToo: true);
         Closed += (_, _) =>
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
@@ -8513,6 +8514,64 @@ public partial class MainWindow : Window
 
     internal void CommitInlineRenamePublic(TreeNodeVm vm, string newName) =>
         CommitInlineRename(vm, newName);
+
+    /// <summary>
+    /// Applies the text typed into the inspector's name or texture box while it still has the focus, as Enter would.
+    /// Those boxes otherwise commit only on Enter or focus loss, which a tab switch, Ctrl+S, back/forward or opening
+    /// another file does not cause. The Apply methods read the selection, so this runs before the selection changes.
+    /// </summary>
+    private void CommitPendingInspectorName()
+    {
+        object? focused = FocusManager?.GetFocusedElement();
+        if (ReferenceEquals(focused, PropChainName)) ApplyChainName();
+        else if (ReferenceEquals(focused, PropRectName)) ApplyRectProps();
+        else if (ReferenceEquals(focused, PropCircleName)) ApplyCircleProps();
+        else if (ReferenceEquals(focused, PropPolygonName)) ApplyPolygonProps();
+        else if (ReferenceEquals(focused, PropTextureName)) ApplyTextureName();
+    }
+
+    /// <summary>The ANIMATIONS tree nodes whose in-place rename box is open.</summary>
+    private List<TreeNodeVm> EditingTreeNodes()
+    {
+        var editing = new List<TreeNodeVm>();
+        void Collect(IEnumerable<TreeNodeVm> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.IsEditing) editing.Add(node);
+                Collect(node.Children);
+            }
+        }
+        Collect(_treeRoots);
+        return editing;
+    }
+
+    /// <summary>
+    /// Applies the name typed into an open ANIMATIONS-tree rename, as Enter would. The tree's own commit is the box
+    /// losing focus, which a tab switch, a hotkey, undo, back/forward or a press on blank space does not cause; those
+    /// reach it through <see cref="CommitPendingRename"/>. A refused name shows the message and keeps the old one.
+    /// </summary>
+    private void CommitPendingTreeRename()
+    {
+        CommitPendingInspectorName();
+        foreach (var vm in EditingTreeNodes())
+            CommitInlineRename(vm, vm.EditingText);
+    }
+
+    // A press that leaves the focus where it is (blank tree space, a label) would leave a rename open. When the press
+    // does take the focus off the box, its focus-loss commit has run by the time this post does.
+    private void OnWindowPointerPressedCommitTreeRename(object? sender, PointerPressedEventArgs e)
+    {
+        var editing = EditingTreeNodes();
+        if (editing.Count == 0) return;
+        if (e.Source is Avalonia.Visual source && source.GetSelfAndVisualAncestors().OfType<TextBox>().Any(box => box.DataContext is TreeNodeVm { IsEditing: true })) return;
+        // Posted, and limited to what was open now: a double-click's second press begins a new rename that this must not end.
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var vm in editing)
+                if (vm.IsEditing) CommitInlineRename(vm, vm.EditingText);
+        });
+    }
 
     internal IReadOnlyList<TreeNodeVm> GetTreeRoots() => _treeRoots;
 
