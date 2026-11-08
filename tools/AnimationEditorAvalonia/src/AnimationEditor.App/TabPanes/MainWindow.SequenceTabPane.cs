@@ -78,7 +78,7 @@ public partial class MainWindow
         private SequencePlayback _playback = new();
         private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(16) };
         // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
-        private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
+        private TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
 
         // Watches the shown document's file, its sources and their textures, and only while its tab is in front: a hidden
         // tab catches up in LoadAsync, so a source edited in its own tab never races this. A second instance of the achx
@@ -96,6 +96,46 @@ public partial class MainWindow
             _watcher.AchxDeletedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnFileDeletedOnDisk(path));
             _watcher.SourceChangedOnDisk += _ => Dispatcher.UIThread.InvokeAsync(OnSourceChangedOnDisk);
             _watcher.PngChangedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnTextureChangedOnDisk(path));
+        }
+
+        internal void SetPlaybackClock(TickClock clock) => _tick = clock;
+
+        internal void TickPlayback() => OnTick();
+
+        // The Speed field's value, kept across loads: each load starts a fresh SequencePlayback that takes it.
+        private double SpeedValue => (double)(_window.SequenceSpeedInput.Value ?? 1.0m);
+
+        /// <summary>Whether the playhead keys act: a sequence is shown and the timeline or the preview holds the focus.</summary>
+        public bool PlayheadKeysApply =>
+            _document is not null && _window.SequenceEditorPane.IsVisible
+            && _window.FocusManager?.GetFocusedElement() is Visual focused
+            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused)
+                || focused == _window.SequencePreview || _window.SequencePreview.IsVisualAncestorOf(focused));
+
+        /// <summary>Whether Left and Right nudge the selected tracks (<see cref="Controls.TrackNudgeKeys"/>) instead of stepping the playhead.</summary>
+        public bool ArrowKeysNudge => _window.SequenceTimeline.SelectedTracks.Count > 0;
+
+        /// <summary>
+        /// Moves the primary sequence's playhead to the next (<paramref name="direction"/> 1) or previous (-1) frame boundary
+        /// (<see cref="PlayheadSteps"/>), the way a scrub does: a playing sequence keeps playing.
+        /// </summary>
+        public void StepPlayhead(int direction)
+        {
+            if (_document is not { } document || CurrentSequence is not { } sequence) return;
+            var blocks = TimelineLayout.Blocks(sequence, document.CycleLength);
+            var steps = PlayheadSteps.Boundaries(sequence, blocks, document.FindChain, _window.SequenceTimeline.SequenceLength);
+            double now = _window.SequenceTimeline.Playhead;
+            SeekPrimary(direction > 0 ? PlayheadSteps.Next(steps, now) : PlayheadSteps.Previous(steps, now));
+        }
+
+        /// <summary>Moves the primary sequence's playhead to its start, or to its end (the sequence length).</summary>
+        public void JumpPlayhead(bool toEnd) => SeekPrimary(toEnd ? _window.SequenceTimeline.SequenceLength : 0);
+
+        private void SeekPrimary(double time)
+        {
+            if (_document?.Selection.Primary is not { } primary) return;
+            _playback.Seek(primary, time, _window.SequenceTimeline.SequenceLength);
+            ShowPlayhead();
         }
 
         private bool IsShown(string path) =>
@@ -273,13 +313,14 @@ public partial class MainWindow
             _document = document;
             _document.Changed += Refresh;
             _document.SequenceRenamed += OnSequenceRenamed;
-            _playback = new SequencePlayback();
+            _playback = new SequencePlayback { Speed = SpeedValue };
             // The undo stack is shared by every tab; this tab's own history lives in its snapshot.
             _window._undoManager.Clear();
             if (tab.UndoSnapshot != null)
                 _window._undoManager.RestoreSnapshot(tab.UndoSnapshot);
             Refresh();
             RestoreZoom();
+            RestorePreviewView();
             RestoreGuides();
             StartWatching(document);
             return Task.FromResult(true);
@@ -630,6 +671,10 @@ public partial class MainWindow
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
             w.SequenceStopButton.Click += (_, _) => StopPlayback();
             w.SequenceLoopToggle.Click += (_, _) => SetLoop(w.SequenceLoopToggle.IsChecked == true);
+            // The achx Speed field's twin: a session-wide value, applied to every selected sequence's clock.
+            w.SequenceSpeedInput.Value = 1.0m;
+            w.SequenceSpeedInput.ValueChanged += (_, _) => _playback.Speed = SpeedValue;
+            w.SequenceTimelineFit.Click += (_, _) => w.SequenceTimeline.FitToSequence();
             // The timeline shows the primary sequence, so a scrub moves its playhead alone; the others keep theirs.
             w.SequenceTimeline.Scrubbed += time =>
             {
@@ -647,9 +692,27 @@ public partial class MainWindow
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
             WireTrackPlacement();
-            w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
-            w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
-            w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+            // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
+            // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
+            w.SequenceShowShapes.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
+                w._appSettings.SequenceShowShapes = preview.ShowShapes;
+            };
+            w.SequenceShowOrigin.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
+                w._appSettings.SequenceShowOrigin = preview.ShowOrigin;
+            };
+            w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+                w._appSettings.ShowBoundingBox = preview.ShowBoundingBox;
+                w.ShowBoundingBoxCheck.IsChecked = preview.ShowBoundingBox;
+            };
+            // Zoom and pan are per file, like the timeline's zoom: settled values only, not every tick of an ease.
+            preview.ZoomChanged += _ => RememberPreviewView();
+            preview.PanChanged += (_, _) => RememberPreviewView();
 
             // Guides work as on the achx preview: the toggle shows once a guide exists, and placing one while hidden reveals them.
             w.SequenceShowUserGuides.IsCheckedChanged += (_, _) =>
@@ -1214,6 +1277,38 @@ public partial class MainWindow
             finally
             {
                 _restoringZoom = false;
+            }
+        }
+
+        private bool _restoringPreviewView;
+
+        // The sequence preview's zoom and pan persist per .seqj file, as the achx preview's do in its companion file: view
+        // state, so no undo entry and the file is not touched. The settings are written only when the stored view changed.
+        private void RememberPreviewView()
+        {
+            var preview = _window.SequencePreview;
+            if (_restoringPreviewView || _document is null || preview.IsZoomAnimating) return;
+            if (SequencePreviewViewMemory.Remember(_window._appSettings.SequencePreviewViews, _document.Path.Standardized,
+                    preview.Zoom * 100.0, preview.PanOffset.X, preview.PanOffset.Y))
+                _window.SaveSettingsFile();
+        }
+
+        // Applies the file's remembered view without easing. Every load comes through here and the one preview is shared by
+        // all .seqj tabs, so each load sets its own zoom and pan (the default view when it has none).
+        private void RestorePreviewView()
+        {
+            if (_document is null) return;
+            var preview = _window.SequencePreview;
+            var view = SequencePreviewViewMemory.ViewToRestore(_window._appSettings.SequencePreviewViews, _document.Path.Standardized);
+            _restoringPreviewView = true;
+            try
+            {
+                preview.SetZoomPercent(view.ZoomPercent);
+                preview.SetPan(view.PanX, view.PanY);
+            }
+            finally
+            {
+                _restoringPreviewView = false;
             }
         }
 

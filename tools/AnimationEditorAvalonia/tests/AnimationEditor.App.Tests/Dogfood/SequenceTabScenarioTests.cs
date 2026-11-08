@@ -145,9 +145,10 @@ public class SequenceTabScenarioTests
             "MenuSaveAs", "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
             "MenuCopy", "MenuCut", "MenuPaste", "MenuDuplicate",
             "MenuResizeTexture", "MenuAssociateTiledTileset",
-            "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut",
+            "MenuWireframeZoomIn", "MenuWireframeZoomOut",
         };
-        string[] documentItems = { "MenuSave", "MenuUndo", "MenuRedo", "MenuShowHistory", "MenuReloadFromDisk" };
+        // Preview Zoom In/Out drive the sequence preview here, so they are document items now.
+        string[] documentItems = { "MenuSave", "MenuUndo", "MenuRedo", "MenuShowHistory", "MenuReloadFromDisk", "MenuPreviewZoomIn", "MenuPreviewZoomOut" };
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         string hero = editor.WriteAchx("hero.achx",

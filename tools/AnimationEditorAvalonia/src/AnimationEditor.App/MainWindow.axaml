@@ -476,6 +476,11 @@
                         <MenuItem Header="Preview Zoom _In"     x:Name="MenuPreviewZoomIn" />
                         <MenuItem Header="Preview Zoom O_ut"    x:Name="MenuPreviewZoomOut" />
                         <Separator />
+                        <!-- Sequence tabs only: the timeline's own zoom (the Preview items above follow the active tab's preview). -->
+                        <MenuItem Header="Ti_meline Zoom In"    x:Name="MenuTimelineZoomIn" />
+                        <MenuItem Header="Timeline Zoom Ou_t"   x:Name="MenuTimelineZoomOut" />
+                        <MenuItem Header="Fit Time_line"        x:Name="MenuTimelineFit" />
+                        <Separator />
                         <MenuItem Header="Show _History" x:Name="MenuShowHistory"
                                   AutomationProperties.Name="Show History"
                                   AutomationProperties.AutomationId="show-history" />
@@ -2231,7 +2236,7 @@
                  composited preview below. The preview is a placeholder until its stage lands. -->
             <Grid x:Name="SequenceEditorPane" Grid.Column="2" RowDefinitions="*,4,250"
                   Background="{DynamicResource BgCanvas}" IsVisible="False">
-                <Grid Grid.Row="0" ColumnDefinitions="220,4,*">
+                <Grid x:Name="SequenceTopGrid" Grid.Row="0" ColumnDefinitions="220,4,*">
                     <controls:SequenceLibraryControl x:Name="SequenceLibrary" Grid.Column="0" />
                     <GridSplitter Grid.Column="1" ResizeDirection="Columns"
                                   Background="{DynamicResource LineStrong}" />
@@ -2281,12 +2286,23 @@
                                              CurrentColor="{DynamicResource IconInk}"
                                              VerticalAlignment="Center" HorizontalAlignment="Center" />
                                 </ToggleButton>
+                                <!-- The achx transport's Speed field, unchanged: it scales every selected sequence's clock. -->
+                                <viewsControls:FlankerNumericField x:Name="SequenceSpeedInput"
+                                                                    Width="92" Margin="4,0,0,0" VerticalAlignment="Center"
+                                                                    ToolTip.Tip="Playback speed (1.0 = runtime speed)"
+                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                                 <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
                                         Margin="8,0" VerticalAlignment="Center" />
                                 <TextBlock Text="Zoom:" VerticalAlignment="Center"
                                            Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
                                            FontSize="11" />
                                 <views:ZoomControl x:Name="SequenceTimelineZoom" VerticalAlignment="Center" />
+                                <Button x:Name="SequenceTimelineFit"
+                                        Height="26" Margin="4,0,0,0" Padding="8,0"
+                                        Foreground="{DynamicResource Ink}"
+                                        VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                        Content="Fit"
+                                        ToolTip.Tip="Zoom the timeline to fit the whole sequence" />
                             </WrapPanel>
                         </Border>
                         <!-- The scrollbars sit beside the timeline (own column and row), not over it, so the

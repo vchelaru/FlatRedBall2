@@ -280,6 +280,20 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     }
 
     /// <summary>
+    /// Zooms so the whole sequence shows between the track headers and the right edge (<see cref="TimelineViewport.PixelsPerSecondToFit"/>)
+    /// and scrolls to the start. An empty sequence is left at the default zoom. Instant, like <see cref="SetZoomPercent"/>.
+    /// </summary>
+    public void FitToSequence()
+    {
+        _zoomAnimator.Cancel();
+        ClearHover();
+        Viewport.SetPixelsPerSecond(TimelineViewport.PixelsPerSecondToFit(SequenceLength, Bounds.Width));
+        Viewport.SetScrollSeconds(0);
+        ZoomChanged?.Invoke(Zoom * 100f);
+        InvalidateVisual();
+    }
+
+    /// <summary>
     /// Sets the zoom a file opens at (#1665): instantly, with no ease, and never past the timeline limits. The view start
     /// is kept within the shown sequence, since the zoom and the sequence may both differ from what it was scrolled for.
     /// Call it after <see cref="Show"/>.

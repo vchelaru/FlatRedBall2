@@ -144,6 +144,18 @@ public sealed class TimelineViewport
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// The zoom that shows a sequence of <paramref name="length"/> seconds whole in a timeline <paramref name="viewWidth"/>
+    /// pixels wide: the width left after the track headers and the end margin the scrollbar reserves, held within the zoom
+    /// limits. An empty sequence keeps the default zoom.
+    /// </summary>
+    public static double PixelsPerSecondToFit(double length, double viewWidth)
+    {
+        if (length <= 0) return DefaultPixelsPerSecond;
+        double room = viewWidth - HeaderWidth - TimelineScrollBars.EndMarginPixels;
+        return Math.Clamp(room / length, MinPixelsPerSecond, MaxPixelsPerSecond);
+    }
+
     /// <summary>The playhead time for a ruler press or drag at <paramref name="x"/>: the time there, clamped to 0..<paramref name="length"/>.</summary>
     public double ScrubTime(double x, double length) => Math.Clamp(TimeAt(x), 0, Math.Max(0, length));
 
