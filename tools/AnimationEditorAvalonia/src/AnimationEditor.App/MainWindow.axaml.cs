@@ -7572,6 +7572,8 @@ public partial class MainWindow : Window
             {
                 Id = "undo", Description = "Undo", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Z", Command, Forbidden: Shift) },
+                // An open sequence rename box undoes its own typed text, like any text box.
+                ShouldSkip = IsInlineRenameBoxFocused,
                 Scope = HotkeyScope.Document,
                 Action = Undo,
             },
@@ -7585,6 +7587,7 @@ public partial class MainWindow : Window
                 },
                 // Mac convention; Ctrl+Y stays first for Windows/Linux. Menus show whichever fits the host.
                 MacPreferredGesture = new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
+                ShouldSkip = IsInlineRenameBoxFocused,
                 Scope = HotkeyScope.Document,
                 Action = Redo,
             },
@@ -7880,6 +7883,11 @@ public partial class MainWindow : Window
     // the text control instead of being swallowed by the window-level handler.
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
+
+    // True while a sequence list row or track header rename box has focus. Undo and Redo then belong to the box's own
+    // text, not the document; the Edit menu still commits the rename first.
+    private bool IsInlineRenameBoxFocused()
+        => FocusManager?.GetFocusedElement() is AnimationEditor.Views.Controls.InlineRenameBox;
 
     // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
     // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.
