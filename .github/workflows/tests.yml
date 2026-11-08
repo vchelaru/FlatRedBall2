@@ -9,10 +9,19 @@ on:
   # not trigger pull_request/push runs, so without this the PR would keep the stale red check.
   workflow_dispatch:
 
+# A newer push to the same PR cancels the superseded run. Only pull_request runs share a group;
+# every other event (push to main, workflow_dispatch) gets a run-unique group, because a shared
+# group would let a newer main push cancel the pending run of an older one, and main must always
+# get a full run per commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   engine-tests:
     name: Engine and AnimationEditor tests (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 23
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,7 +127,7 @@ jobs:
   golden-image-tests:
     name: Golden image tests (ubuntu, llvmpipe)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     env:
       LIBGL_ALWAYS_SOFTWARE: "1"
       GALLIUM_DRIVER: llvmpipe
@@ -176,6 +185,7 @@ jobs:
   animationchain-pack:
     name: Pack AnimationChain NuGet (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -211,6 +221,7 @@ jobs:
   animationchain-common-pack:
     name: Pack AnimationChain.Common NuGet (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -250,7 +261,7 @@ jobs:
   kni-blazorgl-build:
     name: Build KNI and BlazorGL head (ubuntu)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -281,9 +292,12 @@ jobs:
   # existing required-status-check entry in the main-protection ruleset keeps matching.
   # always() + an explicit result check: with the default success() condition a failed need leaves
   # this job *skipped*, and branch protection treats a skipped required check as passing.
+  # A run cancelled by the concurrency group above ends this check cancelled/red on the superseded
+  # commit only; branch protection reads the PR's latest head commit, which has its own run.
   test:
     name: dotnet test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [engine-tests, golden-image-tests, kni-blazorgl-build, animationchain-pack, animationchain-common-pack]
     if: ${{ always() }}
     steps:
