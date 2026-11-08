@@ -171,7 +171,7 @@ public class SequenceTimelineClickPlayheadScenarioTests
         timeline.Selection.ShouldBe(new TimelineChainId(0, 0));
         editor.ClickAt(editor.PointIn(timeline, 70, timeline.HeaderCenters(1).Name));
         timeline.SelectedTrack.ShouldBe(1);
-        editor.ClickAt(editor.PointIn(timeline, timeline.Viewport.XAt(1.0), timeline.Viewport.LaneTop(3) + 20));
+        editor.ClickAt(editor.PointIn(timeline, timeline.Viewport.XAt(1.0), timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + 20));
         editor.RightClickAt(EmptyLane(editor, 1.5));
         editor.Press(Key.Escape);
 
@@ -188,7 +188,7 @@ public class SequenceTimelineClickPlayheadScenarioTests
         var timeline = Timeline(editor);
         editor.ClickAt(RulerAt(editor, 0.4));
 
-        editor.ClickAt(editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(3) + TimelineViewport.LaneHeight / 2));
+        editor.ClickAt(editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + TimelineViewport.LaneHeight / 2));
 
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(4);
         timeline.Playhead.ShouldBe(0.4, 1e-6);

@@ -22,13 +22,13 @@ public class TimelineDropPlanTests
 
         var inEventRow = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(0) + TimelineViewport.LaneHeight + 6, 0.5);
         var firstOfNext = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(1) + 2, 0.5);
-        var newTrack = TimelineDropPlan.For(viewport, ViewWidth, 2, x, viewport.LaneTop(2) + 2, 0.5);
+        var newTrack = TimelineDropPlan.For(viewport, ViewWidth, 2, x, TimelineViewport.RulerHeight + 2, 0.5);
 
         inEventRow.Row.ShouldBe(0);
         inEventRow.Kind.ShouldBe(TimelineDropKind.Track);
         firstOfNext.Row.ShouldBe(1);
         newTrack.Kind.ShouldBe(TimelineDropKind.NewTrack);
-        newTrack.Row.ShouldBe(2);
+        newTrack.Row.ShouldBe(-1);
     }
 
     [Fact]
@@ -48,15 +48,16 @@ public class TimelineDropPlanTests
     }
 
     [Fact]
-    public void For_OverTheNewTrackRow_TargetsANewTrackAtTheSameSnappedTime()
+    public void For_OverTheNewTrackRowAtTheTop_TargetsANewTrackAtTheSameSnappedTime()
     {
         var viewport = new TimelineViewport();
-        var (x, y) = Point(viewport, 0.87, row: 2);
+        double x = viewport.XAt(0.87);
+        double y = TimelineViewport.RulerHeight + TimelineViewport.LaneHeight / 2;
 
         var plan = TimelineDropPlan.For(viewport, ViewWidth, trackCount: 2, x, y, cycleLength: 0.2);
 
         plan.Kind.ShouldBe(TimelineDropKind.NewTrack);
-        plan.Row.ShouldBe(2);
+        plan.Row.ShouldBe(-1);
         plan.Start.ShouldBe(0.85, 1e-9);
         plan.TimeLabel.ShouldBe("0.85 s");
     }
@@ -83,7 +84,7 @@ public class TimelineDropPlanTests
     }
 
     [Fact]
-    public void For_OverTheRulerOrBelowTheNewTrackRow_TargetsNothing()
+    public void For_OverTheRulerOrBelowTheLastLane_TargetsNothing()
     {
         var viewport = new TimelineViewport();
         double x = viewport.XAt(1);

@@ -145,9 +145,10 @@ public class SequenceTabScenarioTests
             "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
             // Copy, Cut, Paste and Duplicate are the pane's, not the scope's: a sequence tab takes them once its list or timeline was touched.
             "MenuResizeTexture", "MenuAssociateTiledTileset",
-            "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut",
+            "MenuWireframeZoomIn", "MenuWireframeZoomOut",
         };
-        string[] documentItems = { "MenuSave", "MenuSaveAs", "MenuUndo", "MenuRedo", "MenuShowHistory", "MenuReloadFromDisk" };
+        // Preview Zoom In/Out drive the sequence preview here, so they are document items now.
+        string[] documentItems = { "MenuSave", "MenuSaveAs", "MenuUndo", "MenuRedo", "MenuShowHistory", "MenuReloadFromDisk", "MenuPreviewZoomIn", "MenuPreviewZoomOut" };
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         string hero = editor.WriteAchx("hero.achx",

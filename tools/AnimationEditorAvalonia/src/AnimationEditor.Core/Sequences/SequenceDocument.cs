@@ -436,8 +436,8 @@ public sealed class SequenceDocument
     /// <summary>
     /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
     /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
-    /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made at the end
-    /// with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made on top, in
+    /// front, with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
     /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
     /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
     /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
@@ -482,23 +482,38 @@ public sealed class SequenceDocument
         {
             var destination = save.Sequences[sequence].Tracks;
             var target = new int[sourceTracks.Count];
+            // Without a selected track, a missing track is a new track like any other: it goes on top (index 0, in front),
+            // in the copied lane order, which moves every existing track down by the number made. With a selected track the
+            // copied lanes continue below it, so lanes past the last track are made at the end to keep their distances.
+            bool atFront = anchor is null;
+            int madeAtFront = 0;
+            int shift = atFront ? landing.Count(lane => lane is null) : 0;
             for (int i = 0; i < sourceTracks.Count; i++)
             {
                 if (landing[i] is { } index)
                 {
-                    target[i] = index;
+                    target[i] = index + shift;
                     continue;
                 }
                 var source = sourceTracks[i];
-                destination.Add(new SequenceTrackSave
+                var newTrack = new SequenceTrackSave
                 {
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
                     X = source.X,
                     Y = source.Y,
                     FlipHorizontal = source.FlipHorizontal,
                     Visible = source.Visible,
-                });
-                target[i] = destination.Count - 1;
+                };
+                if (atFront)
+                {
+                    destination.Insert(madeAtFront, newTrack);
+                    target[i] = madeAtFront++;
+                }
+                else
+                {
+                    destination.Add(newTrack);
+                    target[i] = destination.Count - 1;
+                }
             }
             var pasted = TimelineClipboard.CloneChains(content.Chains);
             MergeSources(save, pasted, folder, errors);
@@ -754,7 +769,7 @@ public sealed class SequenceDocument
     /// <summary>
     /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on
     /// track <paramref name="track"/> of sequence <paramref name="sequence"/>. A null track adds a new track named
-    /// after the chain.
+    /// after the chain, as the first track (index 0), so it is drawn in front. The caller selects the placed chain.
     /// </summary>
     public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start)
     {
@@ -769,13 +784,13 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name, Chains = { reference } });
+            tracks.Insert(0, new SequenceTrackSave { Name = name, Chains = { reference } });
         });
     }
 
     /// <summary>
-    /// Adds an empty track to the end of sequence <paramref name="sequence"/>, named <c>Track</c> (or <c>Track 2</c>, and
-    /// so on, when that is taken). Returns the name.
+    /// Adds an empty track as the first track of sequence <paramref name="sequence"/> (index 0, so it is drawn in front of
+    /// the rest), named <c>Track</c> (or <c>Track 2</c>, and so on, when that is taken), and selects it. Returns the name.
     /// </summary>
     public string AddTrack(IUndoManager undo, int sequence)
     {
@@ -783,8 +798,8 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name });
-        });
+            tracks.Insert(0, new SequenceTrackSave { Name = name });
+        }, trackAfter: 0);
         return name;
     }
 

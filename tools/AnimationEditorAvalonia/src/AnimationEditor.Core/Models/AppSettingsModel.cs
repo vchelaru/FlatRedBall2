@@ -120,6 +120,28 @@ namespace AnimationEditor.Core.Models
         public Dictionary<string, int> TimelineZooms { get; set; } = new();
 
         /// <summary>
+        /// The preview zoom and pan of a <c>.seqj</c> tab, keyed by the <c>.seqj</c> file's <see cref="FilePath.Standardized"/>
+        /// path: the counterpart of an <c>.achx</c>'s <c>PreviewZoomPercent</c> and <c>PreviewPan</c> in its companion file. A
+        /// file at the default view (100%, no pan) has no entry.
+        /// </summary>
+        public Dictionary<string, Sequences.SequencePreviewView> SequencePreviewViews { get; set; } = new();
+
+        /// <summary>Whether a <c>.seqj</c> tab's preview draws the chains' collision shapes. One setting for all files, like <see cref="ShowBoundingBox"/>.</summary>
+        public bool SequenceShowShapes { get; set; } = true;
+
+        /// <summary>Whether a <c>.seqj</c> tab's preview draws the origin crosshair. One setting for all files.</summary>
+        public bool SequenceShowOrigin { get; set; } = true;
+
+        /// <summary>
+        /// The <c>.seqj</c> tab's preview row height in pixels, as last dragged via its splitter: the counterpart of
+        /// <see cref="PreviewPaneHeight"/>. <c>null</c> falls back to the default; see <see cref="Layout.PersistedDimensionValidator"/>.
+        /// </summary>
+        public double? SequencePreviewPaneHeight { get; set; }
+
+        /// <summary>The <c>.seqj</c> tab's library column width in pixels, as last dragged via its splitter. <c>null</c> falls back to the default.</summary>
+        public double? SequenceLibraryWidth { get; set; }
+
+        /// <summary>
         /// True when a <c>.seqj</c> tab's library plays every chip's chain at once (#1622) instead of only the hovered one.
         /// One setting for all files: it is how the user likes to browse, not a property of any one sequence file.
         /// </summary>
