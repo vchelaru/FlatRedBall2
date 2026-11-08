@@ -113,7 +113,7 @@ jobs:
   animationeditor-app-tests:
     name: AnimationEditor App tests (ubuntu)
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
