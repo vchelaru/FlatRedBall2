@@ -15,7 +15,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// <summary>
 /// Delete, duplicate, copy, cut and paste act on every sequence the list has selected, like the <c>.achx</c> tab acts on
 /// every selected chain, through the Delete key, Ctrl+C/X/V/D, the Edit menu and the row menu alike. Each is one undo
-/// entry for the whole set. Rename stays on the primary.
+/// entry for the whole set. Rename is available only with a single selection.
 /// </summary>
 public class SequenceMultiEditScenarioTests
 {
@@ -157,7 +157,7 @@ public class SequenceMultiEditScenarioTests
 
         editor.RightClick(Row(editor, 2));
         Selected(editor).ShouldBe(new[] { "Idle", "Run" });
-        editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Delete 2 Sequences");
         editor.Layout();
 
         SavedNames(boss).ShouldBe(new[] { "Attack", "Jump" });
@@ -190,7 +190,7 @@ public class SequenceMultiEditScenarioTests
         SelectRows(editor, 0, 2);
 
         editor.RightClick(Row(editor, 0));
-        editor.PickMenuItem(List(editor).ContextMenu!, "Duplicate Sequence");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Duplicate 2 Sequences");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack", "Run", "Idle 2", "Run 2", "Jump" });
@@ -329,8 +329,14 @@ public class SequenceMultiEditScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Fly" });
     }
 
+    private static MenuItem RowMenuItem(AnimationEditorHarness editor, string header) =>
+        List(editor).ContextMenu!.Items.OfType<MenuItem>().Single(item => (string?)item.Header == header);
+
+    private static List<string> RowMenuHeaders(AnimationEditorHarness editor) =>
+        List(editor).ContextMenu!.Items.OfType<MenuItem>().Select(item => (string)item.Header!).ToList();
+
     [AvaloniaFact]
-    public async Task Rename_FromTheRowMenu_RenamesThePrimaryOnly_AndKeepsTheSelection()
+    public async Task RowMenuRename_IsDisabled_WhileSeveralAreSelected_AndEnablesOnceOneIsLeft()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteBoss(editor);
@@ -338,13 +344,74 @@ public class SequenceMultiEditScenarioTests
         SelectRows(editor, 0, 2);
 
         editor.RightClick(Row(editor, 0));
+
+        RowMenuItem(editor, "Rename…").IsEnabled.ShouldBeFalse();
+        RowMenuItem(editor, "Duplicate 2 Sequences").IsEnabled.ShouldBeTrue();
+        RowMenuItem(editor, "Delete 2 Sequences").IsEnabled.ShouldBeTrue();
+        Selected(editor).ShouldBe(new[] { "Idle", "Run" });
+        List(editor).ContextMenu!.Close();
+
+        ClickRow(editor, 2, RawInputModifiers.Control);
+        editor.RightClick(Row(editor, 0));
+
+        Selected(editor).ShouldBe(new[] { "Idle" });
+        RowMenuItem(editor, "Rename…").IsEnabled.ShouldBeTrue();
         editor.Dialogs.AnswerNextPrompt("Charge");
         editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
         editor.Layout();
-
         SavedNames(boss).ShouldBe(new[] { "Charge", "Attack", "Run", "Jump" });
-        Selected(editor).ShouldBe(new[] { "Charge", "Run" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Charge'" });
+    }
+
+    [AvaloniaFact]
+    public async Task RenameHotkey_DoesNothing_WhileSeveralAreSelected()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteBoss(editor);
+        await editor.OpenAsync(boss);
+        SelectRows(editor, 0, 2);
+
+        editor.Press(Key.F2);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+        editor.Layout();
+
+        AnyRenameBoxOpen(editor).ShouldBeFalse();
+        SavedNames(boss).ShouldBe(new[] { "Idle", "Attack", "Run", "Jump" });
+        editor.UndoLabels.ShouldBeEmpty();
+        Selected(editor).ShouldBe(new[] { "Idle", "Run" });
+    }
+
+    [AvaloniaFact]
+    public async Task InspectorNameBox_IsDisabled_WhileSeveralAreSelected_AndEnablesOnceOneIsLeft()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteBoss(editor));
+        var inspector = editor.Control<SequenceInspectorControl>("SequenceInspector");
+        ClickRow(editor, 0);
+        inspector.SequenceNameBox.IsEnabled.ShouldBeTrue();
+
+        ClickRow(editor, 2, RawInputModifiers.Control);
+        inspector.SequenceNameBox.IsEnabled.ShouldBeFalse();
+
+        ClickRow(editor, 2, RawInputModifiers.Control);
+        inspector.SequenceNameBox.IsEnabled.ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
+    public async Task RowMenuLabels_NameASingleSequence_AndCountSeveral()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteBoss(editor));
+        ClickRow(editor, 1);
+        editor.RightClick(Row(editor, 1));
+
+        RowMenuHeaders(editor).ShouldBe(new[] { "Copy Qualified Name", "Rename…", "Duplicate Sequence", "Delete", "Add Sequence" });
+        List(editor).ContextMenu!.Close();
+
+        SelectRows(editor, 0, 1, 2);
+        editor.RightClick(Row(editor, 1));
+
+        RowMenuHeaders(editor).ShouldBe(new[] { "Copy Qualified Name", "Rename…", "Duplicate 3 Sequences", "Delete 3 Sequences", "Add Sequence" });
     }
 
     [AvaloniaFact]

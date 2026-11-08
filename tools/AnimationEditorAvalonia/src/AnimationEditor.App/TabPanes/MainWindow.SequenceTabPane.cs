@@ -657,22 +657,27 @@ public partial class MainWindow
             if (hit?.DataContext is SequenceListItem hitRow && !w.SequenceList.SelectedItems!.Contains(hitRow) && _items.IndexOf(hitRow) is >= 0 and var hitIndex)
                 w.SequenceList.SelectedIndex = hitIndex;
             menu.Items.Clear();
+            int selectedCount = w.SequenceList.SelectedItems!.Count;
             var groups = SequenceListMenuLayout.For(onSequence);
             for (int i = 0; i < groups.Count; i++)
             {
                 if (i > 0) menu.Items.Add(new Separator());
                 foreach (var command in groups[i])
                 {
-                    var (header, onClick) = command switch
+                    var onClick = command switch
                     {
-                        SequenceListMenuCommand.CopyQualifiedName => ("Copy Qualified Name", (Action)CopyQualifiedName),
-                        SequenceListMenuCommand.Rename => ("Rename…", () => _ = RenameSelectedAsync()),
-                        SequenceListMenuCommand.DuplicateSequence => ("Duplicate Sequence", DuplicateSelected),
-                        SequenceListMenuCommand.Delete => ("Delete", DeleteSelected),
-                        SequenceListMenuCommand.AddSequence => ("Add Sequence", AddSequence),
+                        SequenceListMenuCommand.CopyQualifiedName => (Action)CopyQualifiedName,
+                        SequenceListMenuCommand.Rename => () => _ = RenameSelectedAsync(),
+                        SequenceListMenuCommand.DuplicateSequence => DuplicateSelected,
+                        SequenceListMenuCommand.Delete => DeleteSelected,
+                        SequenceListMenuCommand.AddSequence => AddSequence,
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                     };
-                    var item = new MenuItem { Header = header };
+                    var item = new MenuItem
+                    {
+                        Header = SequenceListMenuLayout.Header(command, selectedCount),
+                        IsEnabled = SequenceListMenuLayout.IsEnabled(command, selectedCount),
+                    };
                     item.Click += (_, _) => onClick();
                     menu.Items.Add(item);
                 }
@@ -690,7 +695,7 @@ public partial class MainWindow
         private void OnSequenceListDoubleTapped(object? sender, TappedEventArgs e)
         {
             if (_document is null || e.Source is not Visual source || source is InlineRenameBox || source.FindAncestorOfType<InlineRenameBox>() is not null) return;
-            if (source.FindAncestorOfType<ListBoxItem>() is not { DataContext: SequenceListItem item } container) return;
+            if (source.FindAncestorOfType<ListBoxItem>() is not { DataContext: SequenceListItem item } container || !CanRenameSequence) return;
             item.IsEditing = true;
             container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(item.Name);
             e.Handled = true;
@@ -788,8 +793,11 @@ public partial class MainWindow
         {
             var w = _window;
             w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack,
-                w.SequenceTimeline.SelectionSummary);
+                w.SequenceTimeline.SelectionSummary, CanRenameSequence);
         }
+
+        /// <summary>Rename is for a single selected sequence: with several, no rename starts from the menu, the inline box or the Inspector.</summary>
+        private bool CanRenameSequence => SequenceListMenuLayout.CanRename(_document?.SelectedIndices.Count ?? 0);
 
         /// <summary>
         /// The one path from what the sequence says to what every view shows. The timeline rebuilds from the document
@@ -1004,7 +1012,7 @@ public partial class MainWindow
 
         private async Task RenameSelectedAsync()
         {
-            if (_document is not { } document || SequenceIndex is not (>= 0 and var index)) return;
+            if (_document is not { } document || SequenceIndex is not (>= 0 and var index) || !CanRenameSequence) return;
             string oldName = document.Save.Sequences[index].Name;
             string? name = await _window._appCommands.PromptStringAsync("Rename Sequence", "Sequence name:", oldName);
             if (name is null || document != _document) return;
