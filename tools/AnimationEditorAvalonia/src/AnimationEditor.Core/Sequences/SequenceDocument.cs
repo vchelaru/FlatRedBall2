@@ -71,6 +71,12 @@ public sealed class SequenceDocument
             ? SequenceTimeline.Length(Save.Sequences[index], reference => CycleLength(reference) ?? 0)
             : 0;
 
+    /// <summary>The grey text after sequence <paramref name="index"/>'s name in the list: its track count and length (<see cref="SequenceListSummary"/>).</summary>
+    public string SequenceSummary(int index) =>
+        index >= 0 && index < Save.Sequences.Count
+            ? SequenceListSummary.Format(Save.Sequences[index].Tracks.Count, SequenceLength(index))
+            : "";
+
     /// <summary>
     /// Every sequence the list has selected, primary included. View state like <see cref="SelectedSequence"/>, which is
     /// the primary's index: neither is saved, and both outlive tab switches with the document.
@@ -709,6 +715,27 @@ public sealed class SequenceDocument
             save.Sequences.Clear();
             save.Sequences.AddRange(reordered);
         }, stateBefore: Selection.State, stateAfter: after);
+        return true;
+    }
+
+    /// <summary>
+    /// Orders the sequences by name, ignoring case (a stable sort, as the ANIMATIONS tree's Sort Animations Alphabetically), as one
+    /// undo entry. The selection and its primary stay (by name); undo puts back the order and the selection. Returns false, with
+    /// no undo entry, when they are already in that order.
+    /// </summary>
+    public bool SortSequences(IUndoManager undo)
+    {
+        static List<SequenceSave> Sorted(SequenceListSave save) =>
+            save.Sequences.OrderBy(sequence => sequence.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+
+        if (Sorted(Save).Select(s => s.Name).SequenceEqual(Save.Sequences.Select(s => s.Name))) return false;
+        var selection = SelectionOf(SelectedIndices);
+        Edit(undo, "Sort Sequences Alphabetically", save =>
+        {
+            var sorted = Sorted(save);
+            save.Sequences.Clear();
+            save.Sequences.AddRange(sorted);
+        }, stateBefore: selection, stateAfter: selection);
         return true;
     }
 
