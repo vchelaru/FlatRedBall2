@@ -67,7 +67,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
         TrackNames(boss).ShouldBe(new[] { "Run", "Body", "Head", "Tail" });
         SavedTrack(boss, 2).Chains.Select(c => c.Chain).ShouldBe(new[] { "Walk" });
         SavedTrack(boss, 0).Chains.Select(c => (c.Chain, c.Start)).ShouldBe(new[] { ("Run", 1.0) });
-        editor.UndoLabels.ShouldBe(new[] { "Move 'Run' to new track 'Run'" });
+        editor.UndoLabels.ShouldBe(new[] { "Move 'Run' to New Track 'Run'" });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0) });
         timeline.IsDropTargetNewTrack.ShouldBeFalse();
 
@@ -195,7 +195,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
         SavedTrack(boss, 3).Chains.Select(c => (c.Chain, c.Start)).ShouldBe(new[] { ("Run", 0.5) });
         SavedTrack(boss, 0).Chains.Select(c => (c.Chain, c.Start)).ShouldBe(new[] { ("Walk", 0.5) });
         SavedTrack(boss, 1).Chains.Select(c => (c.Chain, c.Start)).ShouldBe(new[] { ("Walk", 2.0) });
-        editor.UndoLabels.ShouldBe(new[] { "Move 2 chains to 2 new tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Move 2 Chains to 2 New Tracks" });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0), new TimelineChainId(1, 0) });
         editor.Press(Key.Z, RawInputModifiers.Control);
         TrackNames(boss).ShouldBe(new[] { "Body", "Head", "Tail" });
@@ -217,7 +217,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
         TrackNames(boss).ShouldBe(new[] { "Walk", "Body", "Head", "Tail" });
         SavedTrack(boss, 0).Chains.Select(c => (c.Chain, c.Start)).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0) });
         SavedTrack(boss, 1).Chains.Select(c => c.Chain).ShouldBe(new[] { "Run" });
-        editor.UndoLabels.ShouldBe(new[] { "Move 2 chains to new track 'Walk'" });
+        editor.UndoLabels.ShouldBe(new[] { "Move 2 Chains to New Track 'Walk'" });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0), new TimelineChainId(0, 1) });
     }
 

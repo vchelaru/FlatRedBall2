@@ -273,7 +273,7 @@ public sealed class SequenceDocument
         }
         if (added.Count == 0) return errors;
 
-        string description = added.Count == 1 ? $"Add Source '{added[0].NoPath}'" : $"Add {added.Count} Sources";
+        string description = SequenceLabel.OneOrMany("Add", "Source", added.Select(file => file.NoPath).ToList());
         var folder = Path.GetDirectoryContainingThis();
         Edit(undo, description, save => save.Sources.AddRange(added.Select(file => file.RelativeTo(folder))));
         return errors;
@@ -289,7 +289,7 @@ public sealed class SequenceDocument
             .Count(reference => string.Equals(reference.Source, source, StringComparison.OrdinalIgnoreCase));
         if (uses > 0)
             return $"{source} is used by {Plural.Format(uses, "chain")} on the timeline. Remove those first.";
-        Edit(undo, $"Remove Source '{new FilePath(source).NoPath}'", save => save.Sources.Remove(source));
+        Edit(undo, SequenceLabel.Named("Remove", "Source", new FilePath(source).NoPath), save => save.Sources.Remove(source));
         return null;
     }
 
@@ -309,7 +309,7 @@ public sealed class SequenceDocument
     public string AddSequence(IUndoManager undo)
     {
         string name = NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
-        Edit(undo, $"Add Sequence '{name}'", save => save.Sequences.Add(new SequenceSave { Name = name }),
+        Edit(undo, SequenceLabel.Named("Add", "Sequence", name), save => save.Sequences.Add(new SequenceSave { Name = name }),
             selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
     }
@@ -358,9 +358,7 @@ public sealed class SequenceDocument
             used.Add(name);
         }
         int insertAt = ordered[^1] + 1;
-        string description = ordered.Count == 1
-            ? $"Duplicate Sequence '{Save.Sequences[ordered[0]].Name}'"
-            : $"Duplicate {ordered.Count} Sequences";
+        string description = SequenceLabel.OneOrMany("Duplicate", "Sequence", ordered.Select(index => Save.Sequences[index].Name).ToList());
         var before = SelectionOf(indices);
         Edit(undo, description, save =>
         {
@@ -404,7 +402,7 @@ public sealed class SequenceDocument
             names.Add(name);
             used.Add(name);
         }
-        string description = names.Count == 1 ? $"Paste Sequence '{names[0]}'" : $"Paste {names.Count} Sequences";
+        string description = SequenceLabel.OneOrMany("Paste", "Sequence", names);
         var errors = new List<string>();
         var folder = Path.GetDirectoryContainingThis();
         var before = SelectionOf(selected);
@@ -473,7 +471,7 @@ public sealed class SequenceDocument
         string firstName = landing[ChainTrack(0)] is { } existing ? tracks[existing].Name : sourceTracks[ChainTrack(0)].Name;
         string description = content.Chains.Count == 1
             ? $"Paste '{content.Chains[0].Chain}' on '{firstName}'"
-            : $"Paste {Plural.Format(content.Chains.Count, "chain")}";
+            : SequenceLabel.Counted("Paste", content.Chains.Count, "Chain");
 
         var errors = new List<string>();
         var made = new List<TimelineChainId>();
@@ -544,7 +542,7 @@ public sealed class SequenceDocument
             names.Add(name);
             used.Add(name);
         }
-        string description = names.Count == 1 ? $"Paste Track '{names[0]}'" : $"Paste {Plural.Format(names.Count, "track")}";
+        string description = SequenceLabel.OneOrMany("Paste", "Track", names);
         var errors = new List<string>();
         var folder = Path.GetDirectoryContainingThis();
         Edit(undo, description, save =>
@@ -572,7 +570,7 @@ public sealed class SequenceDocument
         double shift = TimelineDuplicate.Shift(selected);
         string description = ids.Count == 1
             ? $"Duplicate '{tracks[ids[0].Track].Chains[ids[0].Chain].Chain}'"
-            : $"Duplicate {Plural.Format(ids.Count, "chain")}";
+            : SequenceLabel.Counted("Duplicate", ids.Count, "Chain");
         // Copies are appended to their track in order, so each lands after the chains the track has now and the copies before it.
         var appended = new Dictionary<int, int>();
         var made = new List<TimelineChainId>();
@@ -610,7 +608,7 @@ public sealed class SequenceDocument
             names.Add(name);
             used.Add(name);
         }
-        string description = indices.Count == 1 ? $"Duplicate Track '{existing[indices[0]].Name}'" : $"Duplicate {Plural.Format(indices.Count, "track")}";
+        string description = SequenceLabel.OneOrMany("Duplicate", "Track", indices.Select(index => existing[index].Name).ToList());
         Edit(undo, description, save =>
         {
             var destination = save.Sequences[sequence].Tracks;
@@ -667,7 +665,7 @@ public sealed class SequenceDocument
         if (name == oldName) return null;
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
-        Edit(undo, $"Rename Sequence '{oldName}' to '{name}'", save => save.Sequences[index].Name = name,
+        Edit(undo, SequenceLabel.Renamed("Sequence", oldName, name), save => save.Sequences[index].Name = name,
             selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
         return null;
     }
@@ -686,7 +684,7 @@ public sealed class SequenceDocument
         var after = next < 0
             ? new SequenceSelectionState(Array.Empty<string>(), null)
             : new SequenceSelectionState(new[] { survivors[next] }, survivors[next]);
-        string description = doomed.Count == 1 ? $"Delete Sequence '{Save.Sequences[doomed[0]].Name}'" : $"Delete {doomed.Count} Sequences";
+        string description = SequenceLabel.OneOrMany("Delete", "Sequence", doomed.Select(index => Save.Sequences[index].Name).ToList());
         var before = SelectionOf(indices);
         // Highest index first, so earlier removals do not move the ones still to go.
         Edit(undo, description, save => doomed.AsEnumerable().Reverse().ToList().ForEach(save.Sequences.RemoveAt),
@@ -703,7 +701,7 @@ public sealed class SequenceDocument
     {
         if (SequenceReorder.Plan(Save.Sequences.Count, indices, slot) is not { } plan) return false;
         var moved = InDocumentOrder(indices);
-        string description = moved.Count == 1 ? $"Move Sequence '{Save.Sequences[moved[0]].Name}'" : $"Move {moved.Count} Sequences";
+        string description = SequenceLabel.OneOrMany("Move", "Sequence", moved.Select(index => Save.Sequences[index].Name).ToList());
         var after = SelectionOf(indices);
         Edit(undo, description, save =>
         {
@@ -722,9 +720,7 @@ public sealed class SequenceDocument
     {
         if (SequenceReorder.Plan(Save.Sources.Count, indices, slot) is not { } plan) return false;
         var moved = indices.Where(index => index >= 0 && index < Save.Sources.Count).Distinct().OrderBy(index => index).ToList();
-        string description = moved.Count == 1
-            ? $"Move Source '{new FilePath(Save.Sources[moved[0]]).NoPath}'"
-            : $"Move {moved.Count} Sources";
+        string description = SequenceLabel.OneOrMany("Move", "Source", moved.Select(index => new FilePath(Save.Sources[index]).NoPath).ToList());
         Edit(undo, description, save =>
         {
             var reordered = plan.Order.Select(old => save.Sources[old]).ToList();
@@ -738,7 +734,7 @@ public sealed class SequenceDocument
     public void SetLoop(IUndoManager undo, int index, bool loop)
     {
         string name = Save.Sequences[index].Name;
-        Edit(undo, $"Turn Loop {(loop ? "On" : "Off")} for '{name}'", save => save.Sequences[index].Loop = loop);
+        Edit(undo, SequenceLabel.Toggled("Loop", loop, SequenceLabel.Quoted(name)), save => save.Sequences[index].Loop = loop);
     }
 
     /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
@@ -779,7 +775,7 @@ public sealed class SequenceDocument
             return;
         }
         string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
-        Edit(undo, $"Add Track '{name}'", save =>
+        Edit(undo, SequenceLabel.Named("Add", "Track", name), save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
             tracks.Insert(0, new SequenceTrackSave { Name = name, Chains = { reference } });
@@ -793,7 +789,7 @@ public sealed class SequenceDocument
     public string AddTrack(IUndoManager undo, int sequence)
     {
         string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
-        Edit(undo, $"Add Track '{name}'", save =>
+        Edit(undo, SequenceLabel.Named("Add", "Track", name), save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
             tracks.Insert(0, new SequenceTrackSave { Name = name });
@@ -819,7 +815,7 @@ public sealed class SequenceDocument
             DeleteChain(undo, sequence, distinct[0].Track, distinct[0].Chain);
             return;
         }
-        Edit(undo, $"Remove {Plural.Format(distinct.Count, "chain")}", save =>
+        Edit(undo, SequenceLabel.Counted("Remove", distinct.Count, "Chain"), save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
             // Highest index first, so earlier removals do not move the ones still to go.
@@ -838,7 +834,7 @@ public sealed class SequenceDocument
             DeleteTrack(undo, sequence, distinct[0]);
             return;
         }
-        Edit(undo, $"Delete {Plural.Format(distinct.Count, "track")}", save =>
+        Edit(undo, SequenceLabel.Counted("Delete", distinct.Count, "Track"), save =>
         {
             foreach (int track in distinct.OrderByDescending(track => track))
                 save.Sequences[sequence].Tracks.RemoveAt(track);
@@ -846,7 +842,7 @@ public sealed class SequenceDocument
     }
 
     public void DeleteTrack(IUndoManager undo, int sequence, int track) =>
-        Edit(undo, $"Delete Track '{Save.Sequences[sequence].Tracks[track].Name}'",
+        Edit(undo, SequenceLabel.Named("Delete", "Track", Save.Sequences[sequence].Tracks[track].Name),
             save => save.Sequences[sequence].Tracks.RemoveAt(track));
 
     /// <summary>
@@ -863,7 +859,7 @@ public sealed class SequenceDocument
         if (name == oldName) return null;
         if (tracks.Where((_, i) => i != track).Any(t => t.Name == name))
             return $"A track named \"{name}\" already exists.";
-        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name,
+        Edit(undo, SequenceLabel.Renamed("Track", oldName, name), save => save.Sequences[sequence].Tracks[track].Name = name,
             selectOnDo: !keepSelection);
         return null;
     }
@@ -873,7 +869,7 @@ public sealed class SequenceDocument
     /// (no undo entry) when the track already is that way.
     /// </summary>
     public void SetTrackVisible(IUndoManager undo, int sequence, int track, bool visible) =>
-        Edit(undo, $"{(visible ? "Show" : "Hide")} Track '{Save.Sequences[sequence].Tracks[track].Name}'",
+        Edit(undo, SequenceLabel.Named(visible ? "Show" : "Hide", "Track", Save.Sequences[sequence].Tracks[track].Name),
             save => save.Sequences[sequence].Tracks[track].Visible = visible);
 
     /// <summary>Shows every track of a sequence again, as one undo entry; none when all are already shown.</summary>
@@ -884,7 +880,7 @@ public sealed class SequenceDocument
         });
 
     public void SetTrackFlip(IUndoManager undo, int sequence, int track, bool flip) =>
-        Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for '{Save.Sequences[sequence].Tracks[track].Name}'",
+        Edit(undo, SequenceLabel.Toggled("Flip", flip, SequenceLabel.Quoted(Save.Sequences[sequence].Tracks[track].Name)),
             save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
 
     // ── Plural edits: the Inspector's fields applied to a multi-selection as ONE snapshot, so one undo entry ──
@@ -894,7 +890,7 @@ public sealed class SequenceDocument
     {
         var set = tracks.Distinct().OrderBy(track => track).ToList();
         if (set.Count == 0) return;
-        Edit(undo, $"{(visible ? "Show" : "Hide")} {TracksNamed(sequence, set)}", save =>
+        Edit(undo, SequenceLabel.OneOrMany(visible ? "Show" : "Hide", "Track", set.Select(index => Save.Sequences[sequence].Tracks[index].Name).ToList()), save =>
         {
             foreach (int index in set) save.Sequences[sequence].Tracks[index].Visible = visible;
         });
@@ -905,7 +901,7 @@ public sealed class SequenceDocument
     {
         var set = tracks.Distinct().OrderBy(track => track).ToList();
         if (set.Count == 0) return;
-        Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for {TracksNamed(sequence, set)}", save =>
+        Edit(undo, SequenceLabel.Toggled("Flip", flip, TracksNamed(sequence, set)), save =>
         {
             foreach (int index in set) save.Sequences[sequence].Tracks[index].FlipHorizontal = flip;
         });
@@ -949,14 +945,14 @@ public sealed class SequenceDocument
     private static string ChainSetKey(IEnumerable<TimelineChainId> set) =>
         string.Join(",", set.OrderBy(id => id.Track).ThenBy(id => id.Chain).Select(id => $"{id.Track}.{id.Chain}"));
 
-    // One track by name ('Body'), several by count (3 tracks), as the other plural labels do.
+    // One track by name ('Body'), several by count (3 Tracks), as the other plural labels do.
     private string TracksNamed(int sequence, IReadOnlyList<int> set) => set.Count == 1
-        ? $"'{Save.Sequences[sequence].Tracks[set[0]].Name}'"
-        : Plural.Format(set.Count, "track");
+        ? SequenceLabel.Quoted(Save.Sequences[sequence].Tracks[set[0]].Name)
+        : SequenceLabel.Count(set.Count, "Track");
 
     private string ChainsNamed(int sequence, IReadOnlyList<TimelineChainId> set) => set.Count == 1
-        ? $"'{Save.Sequences[sequence].Tracks[set[0].Track].Chains[set[0].Chain].Chain}'"
-        : Plural.Format(set.Count, "chain");
+        ? SequenceLabel.Quoted(Save.Sequences[sequence].Tracks[set[0].Track].Chains[set[0].Chain].Chain)
+        : SequenceLabel.Count(set.Count, "Chain");
 
     /// <summary>
     /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
@@ -968,7 +964,7 @@ public sealed class SequenceDocument
     {
         var tracks = Save.Sequences[sequence].Tracks;
         if (TrackReorder.TargetLane(from, slot) is not { } to) return null;
-        Edit(undo, $"Move Track '{tracks[from].Name}'", save =>
+        Edit(undo, SequenceLabel.Named("Move", "Track", tracks[from].Name), save =>
         {
             var target = save.Sequences[sequence].Tracks;
             var moved = target[from];
@@ -1105,7 +1101,7 @@ public sealed class SequenceDocument
 
         string written = file.RelativeTo(Folder);
         var selection = SelectionOf(SelectedIndices);
-        Edit(undo, $"Replace Source '{new FilePath(old).NoPath}' with '{file.NoPath}'", save =>
+        Edit(undo, $"{SequenceLabel.Named("Replace", "Source", new FilePath(old).NoPath)} with '{file.NoPath}'", save =>
         {
             save.Sources[index] = written;
             foreach (var reference in save.Sequences.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains))
@@ -1133,9 +1129,7 @@ public sealed class SequenceDocument
         }
         var changing = references.Where(item => item.Reference.Chain != chainName).ToList();
         if (changing.Count == 0) return null;
-        string description = changing.Count == 1
-            ? $"Relink Chain '{changing[0].Reference.Chain}' to '{chainName}'"
-            : $"Relink {changing.Count} Chains to '{chainName}'";
+        string description = $"{SequenceLabel.OneOrMany("Relink", "Chain", changing.Select(item => item.Reference.Chain).ToList())} to '{chainName}'";
         Edit(undo, description, save =>
         {
             foreach (var (id, _) in changing)

@@ -59,7 +59,7 @@ public class SequencePasteRoutingScenarioTests
         pasted[0].Chains.ShouldBe(new[] { "Walk", "Walk", "Run" });
         pasted[1].Chains.ShouldBe(new[] { "Run", "Walk" });
         Timeline(editor).SelectedTracks.ShouldBe(new[] { 0, 1 });
-        editor.UndoLabels.Last().ShouldBe("Paste 2 tracks");
+        editor.UndoLabels.Last().ShouldBe("Paste 2 Tracks");
     }
 
     [AvaloniaFact]

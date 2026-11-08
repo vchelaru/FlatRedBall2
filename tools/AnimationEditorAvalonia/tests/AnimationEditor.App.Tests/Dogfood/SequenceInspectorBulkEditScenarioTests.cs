@@ -82,11 +82,11 @@ public class SequenceInspectorBulkEditScenarioTests
         editor.Click(inspector.TrackVisibleBox);
         Saved(path).Tracks.Select(t => t.Visible).Take(2).ShouldBe(new[] { false, false });
         inspector.TrackVisibleBox.IsChecked.ShouldBe(false);
-        editor.UndoLabels.ShouldBe(new[] { "Hide 2 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Hide 2 Tracks" });
 
         editor.Click(inspector.TrackFlipBox);
         Saved(path).Tracks.Select(t => t.FlipHorizontal).Take(2).ShouldBe(new[] { false, false });
-        editor.UndoLabels.ShouldBe(new[] { "Hide 2 tracks", "Turn Flip Off for 2 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Hide 2 Tracks", "Turn Flip Off for 2 Tracks" });
         editor.Click(inspector.TrackFlipBox);
         Saved(path).Tracks.Select(t => t.FlipHorizontal).Take(2).ShouldBe(new[] { true, true });
         editor.Press(Key.Z, RawInputModifiers.Control);
@@ -122,7 +122,7 @@ public class SequenceInspectorBulkEditScenarioTests
         editor.TypeAndEnter(BoxOf(inspector.ChainLoopsField), "2");
         Saved(path).Tracks[0].Chains[0].Loops.ShouldBe(2f);
         Saved(path).Tracks[1].Chains[1].Loops.ShouldBe(2f);
-        editor.UndoLabels.ShouldBe(new[] { "Set Start of 2 chains to 3", "Set Cycles of 2 chains to 2" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Start of 2 Chains to 3", "Set Cycles of 2 Chains to 2" });
 
         editor.Press(Key.Z, RawInputModifiers.Control);
         editor.Press(Key.Z, RawInputModifiers.Control);
