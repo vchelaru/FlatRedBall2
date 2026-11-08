@@ -166,7 +166,7 @@ public partial class App : Application
     }
 
     private void RegisterNativeMenu(MainWindow window) =>
-        NativeMenu.SetMenu(window, NativeMenuBuilder.Build(window.CreateNativeMenuActions()));
+        NativeMenu.SetMenu(window, window.CreateNativeMenu());
 
     internal static MainWindow CreateDetachedWindow()
     {
