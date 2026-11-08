@@ -701,6 +701,7 @@ public partial class MainWindow : Window
         _visiblePane = pane;
         pane.Show();
         UpdateDocumentMenuItems();
+        RefreshShortcutsPanel();
     }
 
     /// <summary>Snapshots the active tab before another one replaces it.</summary>
@@ -7473,8 +7474,9 @@ public partial class MainWindow : Window
                 Gestures = _useMacOSChrome
                     ? new[] { new HotkeyGesture("Delete"), new HotkeyGesture("Back") }
                     : new[] { new HotkeyGesture("Delete") },
-                // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection.
-                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
+                // Delete meant for an Inspector field (e.g. clearing the color Mode) never deletes the selection. A sequence tab's
+                // Inspector holds only text boxes and checkboxes, so there Delete acts like it does from any other non-text control.
+                ShouldSkip = () => IsTextInputFocused() || (IsInspectorFocused() && ActivePane is not SequenceTabPane),
                 // Each tab kind deletes its own selection, so a sequence tab never deletes from the hidden achx.
                 Scope = HotkeyScope.Document,
                 Action = () => ActivePane.DeleteSelection(),
@@ -7483,7 +7485,9 @@ public partial class MainWindow : Window
             {
                 Id = "rename", Description = "Rename", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("F2") },
-                Action = HandleRenameHotkey,
+                // Each tab kind renames its own selection in place; a PNG tab refuses it.
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.RenameSelection(),
             },
             new()
             {
@@ -7524,18 +7528,21 @@ public partial class MainWindow : Window
             },
             new()
             {
-                Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
+                Id = "move-up", Description = "Move Selected Up", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Up", Alt) },
                 // Alt+Up/Down opens a focused Inspector combo; don't reorder the selection instead.
-                ShouldSkip = IsInspectorFocused,
-                Action = () => HandleReorderHotkey(-1),
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
+                // Each tab kind moves its own selection (chains and frames, sequences, tracks); a PNG tab refuses it.
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.MoveSelection(-1),
             },
             new()
             {
-                Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
+                Id = "move-down", Description = "Move Selected Down", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
-                ShouldSkip = IsInspectorFocused,
-                Action = () => HandleReorderHotkey(+1),
+                ShouldSkip = () => IsTextInputFocused() || IsInspectorFocused(),
+                Scope = HotkeyScope.Document,
+                Action = () => ActivePane.MoveSelection(+1),
             },
             new()
             {
@@ -7688,9 +7695,11 @@ public partial class MainWindow : Window
 
     // Sourced from the same registry the KeyDown dispatch and menu gesture text use (#632), so
     // this list can never drift from what a keypress actually does (#634).
+    // Lists only what works in the active tab kind: a hotkey whose scope the pane refuses (Save As on a sequence tab) does nothing there.
     private void RefreshShortcutsPanel()
     {
         ShortcutsList.ItemsSource = _hotkeys
+            .Where(h => _visiblePane?.Accepts(h.Scope) ?? true)
             .GroupBy(h => h.Category)
             .Select(g => new Models.HotkeyCategoryVm(
                 g.Key,

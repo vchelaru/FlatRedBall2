@@ -55,6 +55,25 @@ public static class SequenceReorder
     }
 
     /// <summary>
+    /// The gap that moves the <paramref name="indices"/> one row up (<paramref name="delta"/> -1) or down (+1) when passed to
+    /// <see cref="Plan"/>, or null when the first of them is already at the top (or the last at the bottom). This is what Alt+Up
+    /// and Alt+Down drop the selection on, so a key press and a drag go through the same move.
+    /// </summary>
+    public static int? StepSlot(int count, IReadOnlyList<int> indices, int delta)
+    {
+        int first = int.MaxValue, last = int.MinValue;
+        foreach (int index in indices)
+        {
+            if (index < 0 || index >= count) continue;
+            first = Math.Min(first, index);
+            last = Math.Max(last, index);
+        }
+        if (last < 0) return null;
+        // A gap sits above the row of the same number, so one below the last row is last + 2.
+        return delta < 0 ? (first > 0 ? first - 1 : null) : (last < count - 1 ? last + 2 : null);
+    }
+
+    /// <summary>
     /// How far to scroll a list while a row is dragged with the pointer at <paramref name="y"/> in a viewport
     /// <paramref name="viewportHeight"/> tall: negative (up) within <paramref name="edge"/> of the top, positive within it of the
     /// bottom, ramping up to <paramref name="maxStep"/> at the edge itself, and 0 elsewhere.

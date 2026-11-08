@@ -269,6 +269,8 @@ public partial class MainWindow
                     _window.Notifications.ShowWarningBanner(duplicates);
             }
 
+            // Showing another file starts with no pane owning the edit hotkeys, as a fresh tab does.
+            if (!ReferenceEquals(_document, document)) _surface = EditSurface.None;
             Detach();
             _document = document;
             _document.Changed += Refresh;
@@ -371,14 +373,59 @@ public partial class MainWindow
 
         public bool Accepts(HotkeyScope scope) => scope is HotkeyScope.App or HotkeyScope.Document;
 
+        // The pane that owns Copy, Cut, Duplicate, Delete, Rename, Alt+Up/Down and the Edit menu: the last of the list and the
+        // timeline that was touched, wherever the focus sits now (SequenceEditRule). Reset to none when another file is shown.
+        private EditSurface _surface;
+
+        private EditSurface Surface => _document is null ? EditSurface.None : _surface;
+
+        private bool SequenceListHasFocus => InSequenceList(_window.FocusManager?.GetFocusedElement());
+
+        private bool TimelineHasFocus => InTimeline(_window.FocusManager?.GetFocusedElement());
+
+        private bool InSequenceList(object? element) =>
+            element is Visual visual && (visual == _window.SequenceList || _window.SequenceList.IsVisualAncestorOf(visual));
+
+        private bool InTimeline(object? element) =>
+            element is Visual visual && (visual == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(visual));
+
+        private void NoteSurface(bool inList, bool inTimeline)
+        {
+            var after = SequenceEditRule.After(_surface, inList, inTimeline);
+            if (after == _surface) return;
+            _surface = after;
+            _window.UpdateDocumentMenuItems();
+        }
+
+        // Selected sequences on the list, chains and tracks on the timeline.
+        private int SelectedCount(EditSurface surface) => surface switch
+        {
+            EditSurface.List => _document?.SelectedIndices.Count ?? 0,
+            EditSurface.Timeline => _window.SequenceTimeline.SelectedChains.Count + _window.SequenceTimeline.SelectedTracks.Count,
+            _ => 0,
+        };
+
         /// <summary>
-        /// Delete removes what was last clicked: every selected sequence when the list holds the keyboard focus, else the timeline's
-        /// selected chain or track. Clicking a row drops the timeline selection and clicking the timeline moves the
-        /// focus there, so the two never both apply.
+        /// True, after saying why in a toast, when <paramref name="verb"/> has nothing to act on. With a pane that holds no selection
+        /// the clipboard is emptied too when <paramref name="clearClipboard"/>, so a later paste cannot bring back an older copy.
+        /// </summary>
+        private bool RefusedForNothingSelected(string verb, EditSurface surface, bool clearClipboard = false)
+        {
+            if (SequenceEditRule.NothingToDo(verb, surface, SelectedCount(surface)) is not { } message) return false;
+            if (clearClipboard && surface != EditSurface.None) _window.CopyTextToClipboard(string.Empty);
+            _window.ShowToast(message);
+            return true;
+        }
+
+        /// <summary>
+        /// Delete removes what the owning pane has selected: every selected sequence, or the timeline's selected chains or
+        /// tracks. Says why in a toast when there is nothing to remove.
         /// </summary>
         public void DeleteSelection()
         {
-            if (SequenceListHasFocus)
+            var surface = Surface;
+            if (RefusedForNothingSelected("delete", surface)) return;
+            if (surface == EditSurface.List)
             {
                 DeleteSelected();
                 FocusSelectedRow();
@@ -389,59 +436,24 @@ public partial class MainWindow
             }
         }
 
-        private bool SequenceListHasFocus =>
-            _window.FocusManager?.GetFocusedElement() is Visual focused
-            && (focused == _window.SequenceList || _window.SequenceList.IsVisualAncestorOf(focused));
-
-        // Opening a menu moves the keyboard focus onto its item, so Edit > Copy and Paste ask which surface held the focus
-        // just before the menu took it. Hotkeys never see a menu item focused and read the live focus.
-        private ClipboardSurface _surfaceBeforeMenu;
-
-        private enum ClipboardSurface { None, List, Timeline }
-
-        /// <summary>
-        /// Where Copy, Cut, Paste and Duplicate act: the sequence list when it holds the focus, the timeline when it does,
-        /// else nowhere. The same last-clicked-surface idea as <see cref="DeleteSelection"/>; clicking a list row or the
-        /// timeline moves the focus there, so the two never both apply.
-        /// </summary>
-        private ClipboardSurface Surface =>
-            _document is null ? ClipboardSurface.None
-            : FocusIsInMenu ? _surfaceBeforeMenu
-            : LiveSurface;
-
-        private ClipboardSurface LiveSurface =>
-            SequenceListHasFocus ? ClipboardSurface.List
-            : TimelineHasFocus ? ClipboardSurface.Timeline
-            : ClipboardSurface.None;
-
-        private bool TimelineHasFocus =>
-            _window.FocusManager?.GetFocusedElement() is Visual focused
-            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused));
-
-        private bool FocusIsInMenu =>
-            _window.FocusManager?.GetFocusedElement() is Visual focused
-            && (focused is MenuItem || focused.FindAncestorOfType<MenuItem>() is not null);
-
         /// <summary>
         /// Ctrl+C and Edit &gt; Copy put the selection on the clipboard as JSON: every selected sequence when the sequence list
-        /// is the focused surface, the selected chains or tracks when the timeline is.
+        /// owns the edit hotkeys, the selected chains or tracks when the timeline does. With nothing selected the clipboard is
+        /// emptied and a toast says so, so a later paste cannot bring back an older copy.
         /// </summary>
         public void CopySelection()
         {
             if (_document is not { } document) return;
-            switch (Surface)
-            {
-                case ClipboardSurface.List when document.SelectedIndices.Count > 0:
-                    _window.CopyTextToClipboard(document.CopySequences(document.SelectedIndices));
-                    break;
-                case ClipboardSurface.Timeline when _window.SequenceTimeline.CopySelectionText() is { } text:
-                    _window.CopyTextToClipboard(text);
-                    break;
-            }
+            var surface = Surface;
+            if (RefusedForNothingSelected("copy", surface, clearClipboard: true)) return;
+            string? text = surface == EditSurface.List
+                ? document.CopySequences(document.SelectedIndices)
+                : _window.SequenceTimeline.CopySelectionText();
+            if (text is not null) _window.CopyTextToClipboard(text);
         }
 
         /// <summary>
-        /// Ctrl+V and Edit &gt; Paste read the clipboard and paste what it holds, whichever pane has the focus
+        /// Ctrl+V and Edit &gt; Paste read the clipboard and paste what it holds, whichever pane owns the edit hotkeys
         /// (<see cref="PasteRoute"/>): copied sequences into the list, copied chains or tracks into the selected sequence's
         /// timeline. A paste that cannot apply says why in a toast; a damaged copy shows the error banner.
         /// </summary>
@@ -455,9 +467,9 @@ public partial class MainWindow
         public void CutSelection()
         {
             var surface = Surface;
-            if (surface == ClipboardSurface.None) return;
+            if (RefusedForNothingSelected("cut", surface, clearClipboard: true)) return;
             CopySelection();
-            if (surface == ClipboardSurface.List)
+            if (surface == EditSurface.List)
             {
                 DeleteSelected();
                 FocusSelectedRow();
@@ -472,10 +484,60 @@ public partial class MainWindow
         public void DuplicateSelection()
         {
             var surface = Surface;
-            if (surface == ClipboardSurface.List)
+            if (RefusedForNothingSelected("duplicate", surface)) return;
+            if (surface == EditSurface.List)
                 DuplicateSelected();
-            else if (surface == ClipboardSurface.Timeline)
+            else
                 _window.SequenceTimeline.DuplicateSelected();
+        }
+
+        /// <summary>
+        /// F2 renames in place, as double-clicking does: the one selected sequence on the list, the one selected track on the
+        /// timeline. Says why in a toast when it cannot.
+        /// </summary>
+        public void RenameSelection()
+        {
+            if (_document is not { } document || _window.IsTextInputFocused()) return;
+            var surface = Surface;
+            var timeline = _window.SequenceTimeline;
+            if (SequenceEditRule.RenameRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
+            {
+                _window.ShowToast(message);
+                return;
+            }
+            if (surface == EditSurface.List)
+            {
+                if (CurrentSequence is { } sequence) BeginRenameInPlace(document, sequence.Name);
+            }
+            else
+            {
+                timeline.BeginRenameTrack(timeline.SelectedTracks[0]);
+            }
+        }
+
+        /// <summary>
+        /// Alt+Up and Alt+Down move what the owning pane has selected one place up or down, as a drag would: the selected
+        /// sequences as a block, or the one selected track. One undo entry; already first or last changes nothing.
+        /// </summary>
+        public void MoveSelection(int delta)
+        {
+            if (_document is not { } document) return;
+            var surface = Surface;
+            var timeline = _window.SequenceTimeline;
+            if (SequenceEditRule.MoveRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
+            {
+                _window.ShowToast(message);
+                return;
+            }
+            if (surface == EditSurface.List)
+            {
+                if (SequenceReorder.StepSlot(document.Save.Sequences.Count, document.SelectedIndices, delta) is { } slot)
+                    MoveSequences(document.SelectedIndices.ToList(), slot);
+            }
+            else
+            {
+                timeline.MoveSelectedTrack(delta);
+            }
         }
 
         /// <summary>File &gt; Reload from Disk. Unlike the watcher it reads the file whatever it holds; an identical file changes nothing.</summary>
@@ -488,7 +550,8 @@ public partial class MainWindow
                 ReloadShownFromDisk(document);
         }
 
-        public bool CanCopyPaste => Surface != ClipboardSurface.None;
+        /// <summary>The Edit menu follows the same owner as the hotkeys: on once a pane was touched, whatever has the focus now.</summary>
+        public bool CanCopyPaste => Surface != EditSurface.None;
 
         private async Task PasteAsync(SequenceDocument document)
         {
@@ -538,6 +601,21 @@ public partial class MainWindow
             _window.SequenceList.ContainerFromIndex(SequenceIndex)?.Focus();
         }
 
+        // The list itself does not take the focus (only its rows do), so "give the list the focus" means its selected row.
+        // After an in-place rename or a menu command the box or menu goes away and the rows may be rebuilt, and Avalonia's own
+        // focus fallback runs a tick later and leaves nothing focused: take the focus back now and again once that has run,
+        // unless the user has moved it somewhere else meanwhile.
+        private void RefocusListSoon()
+        {
+            FocusSelectedRow();
+            Dispatcher.UIThread.Post(() =>
+            {
+                var focused = _window.FocusManager?.GetFocusedElement();
+                if (_document is not null && _window._visiblePane == this && (focused is null || focused == _window || (InSequenceList(focused) && focused is not TextBox)))
+                    FocusSelectedRow();
+            }, DispatcherPriority.Background);
+        }
+
         public void TogglePlayback()
         {
             if (_playback.IsPlaying)
@@ -573,6 +651,15 @@ public partial class MainWindow
             w.AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             // Edit > Copy and Paste follow the focus, so they are re-evaluated whenever it moves.
             w.AddHandler(InputElement.GotFocusEvent, OnWindowGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
+            w.AddHandler(InputElement.PointerPressedEvent, OnSurfacePressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+            w.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Bubble);
+            w.SequenceList.AddHandler(InputElement.KeyDownEvent, OnSequenceListKeyDown, RoutingStrategies.Tunnel);
+            w.SequenceTimeline.ClipboardCommandRequested += command =>
+            {
+                if (command == TimelineMenuCommand.Copy) CopySelection();
+                else if (command == TimelineMenuCommand.Cut) CutSelection();
+                else PasteSelection();
+            };
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
             w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
             w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
@@ -712,8 +799,46 @@ public partial class MainWindow
         private void OnWindowGotFocus(object? sender, RoutedEventArgs e)
         {
             if (_window._visiblePane != this) return;
-            if (!FocusIsInMenu) _surfaceBeforeMenu = _document is null ? ClipboardSurface.None : LiveSurface;
+            NoteSurface(InSequenceList(e.Source), InTimeline(e.Source));
             _window.UpdateDocumentMenuItems();
+        }
+
+        // A press on the list or timeline owns the edit hotkeys even when it moves no focus (blank list space does not take it).
+        private void OnSurfacePressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_window._visiblePane != this) return;
+            NoteSurface(InSequenceList(e.Source), InTimeline(e.Source));
+        }
+
+        // Ctrl+A and Escape from a control that is neither pane (Play button, preview, library, an Inspector checkbox) act on
+        // the owning pane. A control that handled the key itself (a text box, the panes) never gets here.
+        private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Handled || _window._visiblePane != this || _document is null || e.Key is not (Key.A or Key.Escape)) return;
+            if (_window.IsTextInputFocused() || InSequenceList(e.Source) || InTimeline(e.Source)) return;
+            bool selectAll = e.Key == Key.A && e.KeyModifiers is KeyModifiers.Control or KeyModifiers.Meta;
+            if (e.Key == Key.A && !selectAll) return;
+            switch (Surface)
+            {
+                case EditSurface.Timeline:
+                    if (selectAll) _window.SequenceTimeline.SelectAllItems();
+                    else _window.SequenceTimeline.ClearSelection();
+                    break;
+                case EditSurface.List when selectAll:
+                    _window.SequenceList.SelectAll();
+                    break;
+                default:
+                    return;
+            }
+            e.Handled = true;
+        }
+
+        // Enter on a sequence goes into it, as Enter on an ANIMATIONS row opens it: the timeline takes the focus.
+        private void OnSequenceListKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || e.Source is TextBox || _document is null) return;
+            _window.SequenceTimeline.Focus();
+            e.Handled = true;
         }
 
         // Ctrl+click toggles a row, and toggling the only selected one off would leave nothing selected, which the list
@@ -763,19 +888,18 @@ public partial class MainWindow
                 {
                     var onClick = command switch
                     {
-                        SequenceListMenuCommand.CopyQualifiedName => (Action)CopyQualifiedName,
+                        SequenceListMenuCommand.Copy => (Action)CopySelection,
+                        SequenceListMenuCommand.Cut => CutSelection,
+                        SequenceListMenuCommand.Paste => PasteSelection,
+                        SequenceListMenuCommand.CopyQualifiedName => CopyQualifiedName,
                         SequenceListMenuCommand.Rename => () => _ = RenameSelectedAsync(),
                         SequenceListMenuCommand.DuplicateSequence => DuplicateSelected,
-                        SequenceListMenuCommand.Delete => DeleteSelected,
+                        SequenceListMenuCommand.Delete => () => { DeleteSelected(); RefocusListSoon(); },
                         SequenceListMenuCommand.AddSequence => AddSequence,
                         _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                     };
-                    var item = new MenuItem
-                    {
-                        Header = SequenceListMenuLayout.Header(command, selectedCount),
-                        IsEnabled = SequenceListMenuLayout.IsEnabled(command, selectedCount),
-                    };
-                    item.Click += (_, _) => onClick();
+                    var item = TreeMenuRenderer.CreateMenuItem(SequenceListMenuLayout.Header(command, selectedCount), onClick, SequenceListMenuLayout.Icon(command));
+                    item.IsEnabled = SequenceListMenuLayout.IsEnabled(command, selectedCount);
                     menu.Items.Add(item);
                 }
             }
@@ -805,13 +929,16 @@ public partial class MainWindow
             // to whatever was clicked, which keeps it.
             bool refocusList = box.IsFocused;
             item.IsEditing = false;
-            if (refocusList) _window.SequenceList.Focus();
             var document = _document;
             string text = box.Text ?? string.Empty;
             // A click on another row loses the box's focus in the middle of that press, before the row is selected.
             // Renaming rebuilds the list, which would drop the press's selection, so the rename waits for the press to
             // finish and then leaves whatever it selected alone.
-            Dispatcher.UIThread.Post(() => ApplySequenceRename(document, item, text));
+            Dispatcher.UIThread.Post(() =>
+            {
+                ApplySequenceRename(document, item, text);
+                if (refocusList) RefocusListSoon();
+            });
         }
 
         private void ApplySequenceRename(SequenceDocument? document, SequenceListItem item, string text)
@@ -882,7 +1009,7 @@ public partial class MainWindow
         {
             if (e.Source is not InlineRenameBox { DataContext: SequenceListItem item }) return;
             item.IsEditing = false;
-            _window.SequenceList.Focus();
+            RefocusListSoon();
         }
 
         /// <summary>Points the inspector at the timeline's selection. It reads the document, so a drag shows live.</summary>
@@ -1097,14 +1224,14 @@ public partial class MainWindow
             StopPlayback();
             // Name it right away: the default is selected, so typing replaces it and Escape keeps it. Posted so a
             // closing menu has handed focus back first and cannot take it from the box.
-            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(() => BeginRenameInPlace(document, name), DispatcherPriority.Background);
         }
 
         /// <summary>
         /// Scrolls the sequence called <paramref name="name"/> into view and swaps its name for the inline box, with the
         /// text selected. Does nothing when the document or the list has moved on since the sequence was added.
         /// </summary>
-        private void BeginRenameNewSequence(SequenceDocument document, string name)
+        private void BeginRenameInPlace(SequenceDocument document, string name)
         {
             var list = _window.SequenceList;
             int index = _items.FindIndex(item => item.Name == name);
@@ -1130,7 +1257,9 @@ public partial class MainWindow
             // are not renamed in place (rename is for the primary alone). Posted so a closing menu has handed focus back
             // first and cannot take it from the box.
             if (names.Count == 1)
-                Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, names[0]), DispatcherPriority.Background);
+                Dispatcher.UIThread.Post(() => BeginRenameInPlace(document, names[0]), DispatcherPriority.Background);
+            else
+                RefocusListSoon();
         }
 
         private async Task RenameSelectedAsync()

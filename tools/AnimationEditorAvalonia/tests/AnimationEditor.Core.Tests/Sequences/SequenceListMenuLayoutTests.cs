@@ -1,3 +1,4 @@
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Sequences;
 using Shouldly;
 using System.Linq;
@@ -10,22 +11,35 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceListMenuLayoutTests
 {
     [Fact]
-    public void OnASequence_OffersCopyQualifiedName_ThenRenameDuplicateAndDelete_ThenAddSequence()
+    public void OnASequence_FollowsTheTreesChainMenu_CopyCutPasteDuplicate_RenameCopyName_Delete_ThenAddSequence()
     {
         SequenceListMenuLayout.For(onSequence: true).Select(group => group.ToArray()).ShouldBe(new[]
         {
-            new[] { Cmd.CopyQualifiedName },
-            new[] { Cmd.Rename, Cmd.DuplicateSequence, Cmd.Delete },
+            new[] { Cmd.Copy, Cmd.Cut, Cmd.Paste, Cmd.DuplicateSequence },
+            new[] { Cmd.Rename, Cmd.CopyQualifiedName },
+            new[] { Cmd.Delete },
             new[] { Cmd.AddSequence },
         });
     }
 
     [Fact]
-    public void OnBlankSpace_OffersOnlyAddSequence()
+    public void OnBlankSpace_OffersAddSequenceAndPaste()
     {
         SequenceListMenuLayout.For(onSequence: false).Select(group => group.ToArray()).ShouldBe(new[]
         {
             new[] { Cmd.AddSequence },
+            new[] { Cmd.Paste },
         });
     }
+
+    [Theory]
+    [InlineData(Cmd.Copy, TreeMenuIcon.Copy)]
+    [InlineData(Cmd.Cut, TreeMenuIcon.Cut)]
+    [InlineData(Cmd.Paste, TreeMenuIcon.Paste)]
+    [InlineData(Cmd.DuplicateSequence, TreeMenuIcon.Duplicate)]
+    [InlineData(Cmd.Rename, TreeMenuIcon.Rename)]
+    [InlineData(Cmd.CopyQualifiedName, TreeMenuIcon.CopyName)]
+    [InlineData(Cmd.Delete, TreeMenuIcon.Delete)]
+    public void EachItem_UsesTheIconTheTreeMenuGivesTheSameItem(Cmd command, TreeMenuIcon expected) =>
+        SequenceListMenuLayout.Icon(command).ShouldBe(expected);
 }

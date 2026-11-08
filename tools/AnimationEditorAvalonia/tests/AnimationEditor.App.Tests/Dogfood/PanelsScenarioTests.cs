@@ -221,7 +221,7 @@ public class PanelsScenarioTests
         editor.Control<Control>("ShortcutsTab").IsVisible.ShouldBeTrue();
         ItemsControl list = editor.Control<ItemsControl>("ShortcutsList");
         List<AnimationEditor.App.Models.HotkeyCategoryVm> groups = list.ItemsSource!.Cast<AnimationEditor.App.Models.HotkeyCategoryVm>().ToList();
-        groups.Select(group => group.Category).ShouldBe(new[] { "Edit", "View", "Playback", "Tree", "File" }, ignoreOrder: true);
+        groups.Select(group => group.Category).ShouldBe(new[] { "Edit", "View", "Playback", "File" }, ignoreOrder: true);
         groups.Sum(group => group.Hotkeys.Count).ShouldBeGreaterThanOrEqualTo(15);
 
         editor.Click(editor.Control<Button>("ShortcutsTabCloseButton"));
