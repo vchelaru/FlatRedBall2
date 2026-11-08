@@ -405,22 +405,26 @@ public partial class MainWindow : Window
         AddHandler(PointerPressedEvent, OnWindowPointerPressedCommitTreeRename, RoutingStrategies.Tunnel, handledEventsToo: true);
         Closed += (_, _) =>
         {
+            // Each step is isolated: an exception escaping Closed skips Avalonia's own Closed handler (the one
+            // that lets the desktop lifetime shut down) and, on Windows, kills the process with a fatal
+            // callback exception, so a failed cleanup must never stop the steps after it.
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
-            _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value;
-            _appSettings.SidebarWidth = MainContentGrid.ColumnDefinitions[0].Width.Value;
-            _appSettings.WindowMaximized = WindowState == WindowState.Maximized;
-            SaveTabsToSettings();
-            // A normal close is not a crash -- clear any stray recovery file so the next
-            // launch doesn't falsely report "closed unexpectedly" (#894).
-            _appCommands.HandleApplicationClosing();
-            _appCommands.HotReloadWatcher.Dispose();
-            PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
-            PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon;
-            // The thumbnail service owns every cached chain/timeline icon; disposing it here
-            // releases them all (and the decoded source sheets) as the window tears down.
-            _thumbnailService.Dispose();
-            _pngFolderWatcher.Dispose();
-            _projectFolderWatcher.Dispose();
+            Services.CloseCleanup.Run(
+                () => _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value,
+                () => _appSettings.SidebarWidth = MainContentGrid.ColumnDefinitions[0].Width.Value,
+                () => _appSettings.WindowMaximized = WindowState == WindowState.Maximized,
+                SaveTabsToSettings,
+                // A normal close is not a crash -- clear any stray recovery file so the next
+                // launch doesn't falsely report "closed unexpectedly" (#894).
+                _appCommands.HandleApplicationClosing,
+                () => _appCommands.HotReloadWatcher.Dispose(),
+                () => PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged,
+                () => PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon,
+                // The thumbnail service owns every cached chain/timeline icon; disposing it here
+                // releases them all (and the decoded source sheets) as the window tears down.
+                _thumbnailService.Dispose,
+                _pngFolderWatcher.Dispose,
+                _projectFolderWatcher.Dispose);
         };
     }
 
@@ -7216,9 +7220,9 @@ public partial class MainWindow : Window
             File.WriteAllText(settingsFile.FullPath,
                 JsonSerializer.Serialize(_appSettings, new JsonSerializerOptions { WriteIndented = true }));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // File in use — ignore
+            // File in use or read-only — ignore
         }
     }
 
