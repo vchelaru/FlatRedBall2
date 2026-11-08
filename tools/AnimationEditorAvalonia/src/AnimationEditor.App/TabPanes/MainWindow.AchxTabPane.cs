@@ -102,17 +102,24 @@ public partial class MainWindow
             !IsUntitledTab(tab)
             && (tab == _window._tabManager.ActiveTab ? _window._undoManager.SaveState == SaveState.Failed : tab.SaveFailed);
 
-        /// <summary>Whether any open file-backed .achx/.achj/.tsx tab has a failed save, for the window-close check.</summary>
-        public bool HasUnsavedEdits => _window._tabManager.Tabs.Any(tab => tab.Kind == TabKind.Achx && HasFailedSave(tab));
+        /// <summary>
+        /// Whether <paramref name="tab"/> holds edits no file has: a failed save, or an Untitled document with content.
+        /// </summary>
+        private bool NeedsSavePrompt(TabEntry tab) =>
+            tab.Kind == TabKind.Achx && (HasFailedSave(tab) || (IsUntitledTab(tab) && UntitledTabHasContent(tab)));
+
+        /// <summary>Whether any open .achx/.achj/.tsx tab has a failed save or is Untitled with content, for the window-close check.</summary>
+        public bool HasUnsavedEdits => _window._tabManager.Tabs.Any(NeedsSavePrompt);
 
         /// <summary>
-        /// The window is closing: asks about each tab with a failed save. Returns false when the user cancelled or a
-        /// chosen save failed again, so the window stays open.
+        /// The window is closing: asks about each such tab in tab-strip order, through the same prompt as closing it
+        /// (<see cref="PrepareCloseAsync"/>). Returns false when the user cancelled, a Save As was cancelled or a chosen
+        /// save failed again, so the window stays open.
         /// </summary>
         public async Task<bool> ConfirmWindowCloseAsync()
         {
-            foreach (var tab in _window._tabManager.Tabs.Where(tab => tab.Kind == TabKind.Achx && HasFailedSave(tab)).ToList())
-                if (!await ConfirmFailedSaveAsync(tab)) return false;
+            foreach (var tab in _window._tabManager.Tabs.Where(NeedsSavePrompt).ToList())
+                if (await PrepareCloseAsync(tab) is null) return false;
             return true;
         }
 

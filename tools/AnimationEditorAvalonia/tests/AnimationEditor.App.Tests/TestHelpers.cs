@@ -90,12 +90,21 @@ internal sealed class TestServices
     /// <param name="useMacOSChrome">
     /// Off by default so every OS gets the in-window title bar and menu the harness clicks.
     /// </param>
-    public MainWindow CreateMainWindow(bool useMacOSChrome = false, CommandModifier? commandModifier = null) =>
-        new MainWindow(
+    /// <remarks>
+    /// Closing the window asks about an Untitled tab with content; the default answer is Don't Save, so a test that
+    /// ends with <c>window.Close()</c> does not park on the real dialog. A test that cares assigns its own.
+    /// </remarks>
+    public MainWindow CreateMainWindow(bool useMacOSChrome = false, CommandModifier? commandModifier = null)
+    {
+        var window = new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
             ThumbnailService, ProjectTreeThumbnailService, SettingsRoot,
             ApplicationUpdater, EditorDialogHost, useMacOSChrome, commandModifier);
+        window.ShowSaveDiscardCancelDialogAsync = (_, _) =>
+            Task.FromResult(AnimationEditor.Views.Dialogs.SaveDiscardCancelChoice.Discard);
+        return window;
+    }
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {
