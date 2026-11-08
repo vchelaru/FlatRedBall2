@@ -137,4 +137,90 @@ public class SequenceRenameBoxKeysScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Rest" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Rest'" });
     }
+
+    private static readonly TimeSpan ReloadTimeout = TimeSpan.FromSeconds(6);
+
+    private static void RewriteOnDisk(string path, Action<SequenceListSave> change)
+    {
+        var rewritten = SequenceListSave.FromFile(path);
+        change(rewritten);
+        rewritten.Save(path);
+    }
+
+    private static InlineRenameBox? OpenListBox(AnimationEditorHarness editor) =>
+        Enumerable.Range(0, editor.SequenceNames.Count)
+            .Select(row => List(editor).ContainerFromIndex(row)?.GetVisualDescendants().OfType<InlineRenameBox>().SingleOrDefault())
+            .FirstOrDefault(box => box is { IsEditing: true });
+
+    [AvaloniaFact]
+    public async Task LiveReload_KeepsAnOpenSequenceRenameBox_WhenTheSequenceStillExists()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        await editor.OpenAsync(path);
+        OpenSequenceBox(editor, 1, "Zed");
+
+        RewriteOnDisk(path, save => save.Sequences.Insert(0, new SequenceSave { Name = "Die" }));
+        (await editor.WaitUntilAsync(() => editor.SequenceNames.Count == 3, ReloadTimeout)).ShouldBeTrue();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        var box = OpenListBox(editor).ShouldNotBeNull("the box survives the reload");
+        box.Text.ShouldBe("Zed");
+        editor.Window.FocusManager!.GetFocusedElement().ShouldBe(box);
+        editor.Press(Key.Enter);
+        editor.SequenceNames.ShouldBe(new[] { "Die", "Attack", "Zed" });
+    }
+
+    [AvaloniaFact]
+    public async Task LiveReload_ClosesAnOpenSequenceRenameBox_WhenTheSequenceIsGone()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        await editor.OpenAsync(path);
+        OpenSequenceBox(editor, 1, "Zed");
+
+        RewriteOnDisk(path, save => save.Sequences.RemoveAt(1));
+        (await editor.WaitUntilAsync(() => editor.SequenceNames.Count == 1, ReloadTimeout)).ShouldBeTrue();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        OpenListBox(editor).ShouldBeNull();
+        editor.SequenceNames.ShouldBe(new[] { "Attack" });
+        editor.UndoLabels.ShouldBeEmpty();
+        editor.ProblemText.ShouldBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task LiveReload_KeepsAnOpenTrackRenameBox_OnTheSameTrackByName()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        await editor.OpenAsync(path);
+        OpenTrackBox(editor, 1, "Legs");
+
+        RewriteOnDisk(path, save => save.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Head" }));
+        (await editor.WaitUntilAsync(() => Timeline(editor).TrackCount == 3, ReloadTimeout)).ShouldBeTrue();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        Timeline(editor).RenamingTrack.ShouldBe(2, "Arms moved from lane 1 to lane 2");
+        Timeline(editor).GetVisualChildren().OfType<InlineRenameBox>().Single().Text.ShouldBe("Legs");
+        editor.Press(Key.Enter);
+        editor.UndoLabels.ShouldBe(new[] { "Rename Track 'Arms' to 'Legs'" });
+    }
+
+    [AvaloniaFact]
+    public async Task LiveReload_ClosesAnOpenTrackRenameBox_WhenTheTrackIsGone()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        await editor.OpenAsync(path);
+        OpenTrackBox(editor, 1, "Legs");
+
+        RewriteOnDisk(path, save => save.Sequences[0].Tracks.RemoveAt(1));
+        (await editor.WaitUntilAsync(() => Timeline(editor).TrackCount == 1, ReloadTimeout)).ShouldBeTrue();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        Timeline(editor).IsRenamingTrack.ShouldBeFalse();
+        editor.UndoLabels.ShouldBeEmpty();
+        editor.ProblemText.ShouldBeNull();
+    }
 }

@@ -57,8 +57,11 @@ public sealed class InlineRenameBox : TextBox
     /// <summary>True from <see cref="Begin"/> until the edit is committed or cancelled.</summary>
     public bool IsEditing => _editing;
 
-    /// <summary>Shows <paramref name="text"/> selected, with focus, once the box has been laid out.</summary>
-    public void Begin(string text)
+    /// <summary>
+    /// Shows <paramref name="text"/> selected, with focus, once the box has been laid out. With <paramref name="selectAll"/>
+    /// off the caret goes to the end instead, to resume text the user had already typed.
+    /// </summary>
+    public void Begin(string text, bool selectAll = true)
     {
         _editing = true;
         Text = text;
@@ -66,7 +69,8 @@ public sealed class InlineRenameBox : TextBox
         {
             if (!_editing) return;
             Focus();
-            SelectAll();
+            if (selectAll) SelectAll();
+            else CaretIndex = Text?.Length ?? 0;
         }, DispatcherPriority.Render);
     }
 
