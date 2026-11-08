@@ -14,7 +14,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// <summary>
 /// Ctrl+click and Shift+click in the sequence list select several sequences, and the preview plays them together, each
 /// on its own clock and loop flag, like several selected chains in an <c>.achx</c> tab. The first selected one stays the
-/// primary: the timeline, Inspector and editing commands act on it alone.
+/// primary: the timeline, Inspector and rename act on it alone (delete, duplicate, copy, cut and paste take the whole selection).
 /// </summary>
 public class SequenceMultiSelectScenarioTests
 {
@@ -251,24 +251,24 @@ public class SequenceMultiSelectScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DeletingThePrimary_DropsItFromTheSelection_AndUndoSelectsTheRestoredOne()
+    public async Task Deleting_TheWholeSelection_SelectsTheSurvivor_AndUndoRestoresTheSelection()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
         ClickRow(editor, 0);
         ClickRow(editor, 1, RawInputModifiers.Control);
-        ClickRow(editor, 2, RawInputModifiers.Control);
 
         editor.Press(Key.Delete);
 
-        editor.SequenceNames.ShouldBe(new[] { "Aura", "Idle" });
-        Selected(editor).ShouldBe(new[] { "Aura", "Idle" });
-        Shown(editor).ShouldBe(new[] { "Spark:0", "Run:0" });
-        InspectorName(editor).ShouldBe("Aura");
+        editor.SequenceNames.ShouldBe(new[] { "Idle" });
+        Selected(editor).ShouldBe(new[] { "Idle" });
+        Shown(editor).ShouldBe(new[] { "Run:0" });
+        InspectorName(editor).ShouldBe("Idle");
 
         Undo(editor);
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Aura", "Idle" });
-        Selected(editor).ShouldBe(new[] { "Attack" });
+        Selected(editor).ShouldBe(new[] { "Attack", "Aura" });
+        Shown(editor).ShouldBe(new[] { "Walk:0", "Spark:0" });
     }
 
     [AvaloniaFact]
@@ -286,7 +286,7 @@ public class SequenceMultiSelectScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task RightClick_OnANonPrimarySelectedRow_NarrowsToItSoRenameAndDeleteActOnTheRowHit()
+    public async Task RightClick_OnANonPrimarySelectedRow_KeepsTheSelection_SoDeleteActsOnAllOfIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor);
@@ -295,9 +295,10 @@ public class SequenceMultiSelectScenarioTests
         ClickRow(editor, 1, RawInputModifiers.Control);
 
         editor.RightClick(Row(editor, 1));
+        Selected(editor).ShouldBe(new[] { "Attack", "Aura" });
         editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
 
-        SequenceListSave.FromFile(boss).Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Attack", "Idle" });
+        SequenceListSave.FromFile(boss).Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Idle" });
     }
 
     [AvaloniaFact]

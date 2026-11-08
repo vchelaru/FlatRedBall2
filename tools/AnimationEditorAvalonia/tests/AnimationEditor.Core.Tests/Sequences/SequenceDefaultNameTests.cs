@@ -59,7 +59,7 @@ public class SequenceDefaultNameTests
         document.AddSequence(undo).ShouldBe("Sequence");
         document.AddSequence(undo).ShouldBe("Sequence 2");
 
-        document.DeleteSequence(undo, 1);
+        document.DeleteSequences(undo, new[] { 1 });
 
         document.AddSequence(undo).ShouldBe("Sequence");
         document.Save.Sequences.Select(s => s.Name).ShouldBe(new[] { "Idle", "Sequence 2", "Sequence" });
