@@ -30,7 +30,8 @@
         </Style>
     </UserControl.Styles>
     <Grid>
-        <TextBlock x:Name="NothingLabel" Text="No sequence" Classes="note" FontStyle="Italic"
+        <TextBlock x:Name="NothingLabel" Text="No selection" Foreground="{DynamicResource InkDim}" FontStyle="Italic"
+                   TextWrapping="Wrap" TextAlignment="Center"
                    HorizontalAlignment="Center" Margin="0,12,0,0" />
 
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -46,7 +47,7 @@
                                      AutomationProperties.AutomationId="seq-name" />
                         </Grid>
                         <CheckBox x:Name="SequenceLoopBox" Content="Loop"
-                                  ToolTip.Tip="Restart at 0 once the last chain ends"
+                                  ToolTip.Tip="Loop playback (restarts at 0 once the last chain ends; saved in the file)"
                                   AutomationProperties.AutomationId="seq-loop" />
                         <Grid ColumnDefinitions="78,*">
                             <TextBlock Text="Length" Classes="label" />

@@ -431,7 +431,7 @@
                         <Separator />
                         <MenuItem Header="_Save"          x:Name="MenuSave" />
                         <MenuItem Header="Save _As…"      x:Name="MenuSaveAs" />
-                        <MenuItem Header="_Export">
+                        <MenuItem Header="_Export" x:Name="MenuExport">
                             <MenuItem Header="_PixiJS…" x:Name="MenuExportPixiJs" />
                             <MenuItem Header="_Godot SpriteFrames…" x:Name="MenuExportGodot" />
                             <MenuItem Header="Animated _GIF…" x:Name="MenuExportGif" />
@@ -972,10 +972,9 @@
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource InkMid}" />
-                                                <Grid ColumnDefinitions="Auto,*">
+                                                <Grid ColumnDefinitions="78,*">
                                                     <TextBlock Text="Name"
                                                                VerticalAlignment="Center"
-                                                               Margin="0,0,8,0"
                                                                Foreground="{DynamicResource InkMid}"
                                                                FontSize="11" />
                                                     <!-- Tsx: empty = auto "ID:{tileId}" name (no Name
@@ -2280,7 +2279,7 @@
                                               Height="26" Width="32"
                                               Foreground="{DynamicResource Ink}"
                                               VerticalAlignment="Center"
-                                              ToolTip.Tip="Loop: the sequence restarts at 0 once it ends (saved in the file)">
+                                              ToolTip.Tip="Loop playback (restarts at 0 once the last chain ends; saved in the file)">
                                     <svg:Svg Width="14" Height="14"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
                                              CurrentColor="{DynamicResource IconInk}"
@@ -2339,7 +2338,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0"
                                           IsChecked="True"
-                                          ToolTip.Tip="Show the active chains' collision shapes">
+                                          ToolTip.Tip="Show collision shapes (view only, not saved)">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
@@ -2353,7 +2352,7 @@
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="4,0,4,0"
-                                          ToolTip.Tip="Show the entity origin crosshair">
+                                          ToolTip.Tip="Show origin crosshair">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCrosshair.svg"
@@ -2368,7 +2367,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0,0,4,0"
                                           IsChecked="False"
-                                          ToolTip.Tip="Show each sprite's bounding box outline">
+                                          ToolTip.Tip="Show sprite bounding box outline">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"

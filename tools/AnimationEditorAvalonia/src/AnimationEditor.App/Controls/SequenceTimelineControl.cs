@@ -1360,16 +1360,26 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void DrawEyeTooltip(DrawingContext context, Size size)
     {
         if (EyeTooltip is not { } tip) return;
-        var text = Text(tip, 11, Brush("Ink"), FontWeight.SemiBold);
-        var note = Text(EyeTooltipNote, 10, Brush("InkMid"));
-        var pill = new Rect(_eyePoint.X + 12, _eyePoint.Y + 16, Math.Max(text.Width, note.Width) + 12, text.Height + note.Height + 8);
+        // The look of a standard ToolTip (EyeTooltipStyleTests pins the font size and padding against a real one).
+        var ink = Brush("ToolTipForeground");
+        var text = Text(tip, EyeTooltipFontSize, ink);
+        var note = Text(EyeTooltipNote, EyeTooltipFontSize, ink);
+        var pad = EyeTooltipPadding;
+        var pill = new Rect(_eyePoint.X + 12, _eyePoint.Y + 16, Math.Max(text.Width, note.Width) + pad.Left + pad.Right,
+            text.Height + note.Height + pad.Top + pad.Bottom);
         pill = pill.WithX(Math.Clamp(pill.X, 0, Math.Max(0, size.Width - pill.Width)))
                    .WithY(Math.Clamp(pill.Y, 0, Math.Max(0, size.Height - pill.Height)));
-        context.FillRectangle(Brush("BgPanel"), pill, 3);
-        context.DrawRectangle(null, new Pen(Brush("LineStrong"), 1), pill, 3, 3);
-        context.DrawText(text, new Point(pill.X + 6, pill.Y + 3));
-        context.DrawText(note, new Point(pill.X + 6, pill.Y + 4 + text.Height));
+        double radius = this.TryFindResource("OverlayCornerRadius", ActualThemeVariant, out var found) && found is CornerRadius corner ? corner.TopLeft : 8;
+        context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
+        context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
+        context.DrawText(note, new Point(pill.X + pad.Left, pill.Y + pad.Top + text.Height));
     }
+
+    /// <summary>The eye tooltip's font size and padding: a standard ToolTip's.</summary>
+    public const double EyeTooltipFontSize = 12;
+
+    /// <summary>The padding inside the eye tooltip's border: a standard ToolTip's.</summary>
+    public static readonly Thickness EyeTooltipPadding = new(8, 5, 8, 7);
 
     // While a header is dragged: the dragged lane tinted across the lanes, and a line across the whole timeline at the gap it would drop into.
     private void DrawTrackDrop(DrawingContext context, Size size)

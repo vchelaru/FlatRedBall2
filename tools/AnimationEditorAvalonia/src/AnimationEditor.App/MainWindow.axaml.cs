@@ -2700,7 +2700,7 @@ public partial class MainWindow : Window
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
 
         RefreshRecentFiles();
-        CollectScopedMenuItems(MainMenu.Items);
+        CollectScopedMenuItems(MainMenu.Items, topLevel: true);
         UpdateDocumentMenuItems();
 
         // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
@@ -2731,7 +2731,10 @@ public partial class MainWindow : Window
 
     private readonly List<(MenuItem Item, HotkeyScope Scope)> _scopedMenuItems = new();
 
-    private void CollectScopedMenuItems(IEnumerable<object?> items)
+    // A submenu parent (File > Export) is not a command, so it follows its children: enabled while any child is.
+    private readonly List<MenuItem> _scopedParentItems = new();
+
+    private void CollectScopedMenuItems(IEnumerable<object?> items, bool topLevel = false)
     {
         var appScoped = AppScopedMenuItems;
         var documentScoped = DocumentScopedMenuItems;
@@ -2741,7 +2744,10 @@ public partial class MainWindow : Window
         {
             if (appScoped.Contains(item) || paneEnabled.Contains(item) || sequenceOnly.Contains(item)) continue;
             if (item.Items.OfType<MenuItem>().Any())
+            {
                 CollectScopedMenuItems(item.Items);
+                if (!topLevel) _scopedParentItems.Add(item);
+            }
             else
                 _scopedMenuItems.Add((item, documentScoped.Contains(item) ? HotkeyScope.Document : HotkeyScope.Achx));
         }
@@ -2759,6 +2765,9 @@ public partial class MainWindow : Window
         MenuCopy.IsEnabled = MenuCut.IsEnabled = MenuPaste.IsEnabled = MenuDuplicate.IsEnabled = _visiblePane.CanCopyPaste;
         foreach (var item in SequenceOnlyMenuItems)
             item.IsEnabled = ReferenceEquals(_visiblePane, _sequencePane);
+        // Nested parents were collected before the parents holding them, so each sees its children's final state.
+        foreach (var parent in _scopedParentItems)
+            parent.IsEnabled = parent.Items.OfType<MenuItem>().Any(child => child.IsEnabled);
         MenuUndo.IsEnabled = documentActive && _undoManager.CanUndo;
         MenuRedo.IsEnabled = documentActive && _undoManager.CanRedo;
     }

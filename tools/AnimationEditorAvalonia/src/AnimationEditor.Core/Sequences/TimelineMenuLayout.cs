@@ -91,7 +91,7 @@ public static class TimelineMenuLayout
         };
     }
 
-    /// <summary>The icon the ANIMATIONS tree's menu gives the matching item, or null for a command the tree has no counterpart of.</summary>
+    /// <summary>The icon the ANIMATIONS tree's menu gives the matching item; the tree has no counterpart of Hide/Show or Go to Definition, so those reuse the nearest existing art.</summary>
     public static TreeMenuIcon? Icon(TimelineMenuCommand command) => command switch
     {
         TimelineMenuCommand.Copy => TreeMenuIcon.Copy,
@@ -101,6 +101,8 @@ public static class TimelineMenuLayout
         TimelineMenuCommand.RenameTrack => TreeMenuIcon.Rename,
         TimelineMenuCommand.Delete => TreeMenuIcon.Delete,
         TimelineMenuCommand.AddTrack => TreeMenuIcon.Plus,
+        TimelineMenuCommand.ToggleVisibility or TimelineMenuCommand.ShowAllTracks => TreeMenuIcon.Visibility,
+        TimelineMenuCommand.GoToDefinition => TreeMenuIcon.Animation,
         _ => null,
     };
 }
