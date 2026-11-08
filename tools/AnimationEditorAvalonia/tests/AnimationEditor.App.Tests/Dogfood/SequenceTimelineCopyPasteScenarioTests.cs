@@ -233,12 +233,12 @@ public class SequenceTimelineCopyPasteScenarioTests
         await SetClipboardAsync(editor, "just some text");
         await CtrlAsync(editor, Key.V);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
 
         await SetClipboardAsync(editor, "{ \"kind\": \"frb2-animation-editor-chains\", \"version\": 1 }");
         await CtrlAsync(editor, Key.V);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("damaged");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("damaged");
     }
 
     [AvaloniaFact]
@@ -256,7 +256,7 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         editor.SequenceNames.Count.ShouldBe(1);
         editor.UndoLabels.ShouldBe(new[] { "Paste 'Walk' on 'Body'" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         Chains(boss, 0).Length.ShouldBe(4);
         Timeline(editor).IsFocused.ShouldBeTrue();
         editor.Click((Control)list.ContainerFromIndex(0)!);

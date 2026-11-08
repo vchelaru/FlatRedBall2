@@ -41,8 +41,8 @@ public class SequenceParityScenarioTests
         {
             AddSequence(editor);
 
-            editor.ToastText.ShouldNotBeNull();
-            editor.ToastText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.InfoText.ShouldNotBeNull();
+            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
         }
         finally
@@ -63,7 +63,7 @@ public class SequenceParityScenarioTests
             AddSequence(editor);
             editor.Press(Key.S, RawInputModifiers.Control);
 
-            editor.ToastText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
         }
         finally
@@ -139,7 +139,7 @@ public class SequenceParityScenarioTests
             editor.CloseTab("boss.seqj");
 
             editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
-            editor.ToastText!.ShouldStartWith(AutoSaveFailedPrefix);
+            editor.InfoText!.ShouldStartWith(AutoSaveFailedPrefix);
         }
         finally
         {
@@ -269,7 +269,7 @@ public class SequenceParityScenarioTests
 
         await SequenceLibraryScenarioTests.Drop(editor, editor.Control<SequenceLibraryControl>("SequenceLibrary"), other);
 
-        editor.ErrorBannerText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
+        editor.ProblemText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
     }
 
@@ -373,8 +373,8 @@ public class SequenceParityScenarioTests
         await editor.OpenAsync(path);
 
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Idle 2" });
-        editor.WarningBannerText.ShouldNotBeNull();
-        editor.WarningBannerText!.ShouldContain("'Idle' as 'Idle 2'");
+        editor.InfoText.ShouldNotBeNull();
+        editor.InfoText!.ShouldContain("'Idle' as 'Idle 2'");
         File.ReadAllText(path).ShouldBe(before, "opening never rewrites the file");
         ListBox list = editor.Control<ListBox>("SequenceList");
         editor.ClickAt(editor.CenterOf((Control)list.ContainerFromIndex(1)!));

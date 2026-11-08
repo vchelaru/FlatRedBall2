@@ -35,7 +35,7 @@ public class NotificationDismissGlyphCenteredTests
 
         try
         {
-            overlay.ShowToast("Exported spritesheet.json");
+            overlay.ShowInfo("Exported spritesheet.json");
             Dispatcher.UIThread.RunJobs();
 
             AssertIconCentered("ToastDismissBtn", overlay.ToastDismissBtn);
@@ -53,7 +53,7 @@ public class NotificationDismissGlyphCenteredTests
 
         try
         {
-            overlay.ShowErrorBanner("Save failed");
+            overlay.ShowProblem("Save failed");
             Dispatcher.UIThread.RunJobs();
 
             AssertIconCentered("ErrorBannerDismissBtn", overlay.ErrorBannerDismissBtn);

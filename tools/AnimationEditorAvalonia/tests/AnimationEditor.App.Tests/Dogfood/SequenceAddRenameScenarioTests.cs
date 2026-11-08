@@ -99,7 +99,7 @@ public class SequenceAddRenameScenarioTests
         SavedNames(boss).ShouldBe(new[] { "Idle", "Charge" });
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'", "Rename Sequence 'Sequence' to 'Charge'" });
         List(editor).SelectedIndex.ShouldBe(1);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
 
         editor.Press(Key.Z, RawInputModifiers.Control);
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Sequence" });
@@ -126,7 +126,7 @@ public class SequenceAddRenameScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Sequence" });
         SavedNames(boss).ShouldBe(new[] { "Idle", "Sequence" });
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -141,7 +141,7 @@ public class SequenceAddRenameScenarioTests
         editor.Type("Idle");
         editor.Press(Key.Enter);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Sequence" });
         SavedNames(boss).ShouldBe(new[] { "Idle", "Sequence" });
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
@@ -159,7 +159,7 @@ public class SequenceAddRenameScenarioTests
         box.Text = "  ";
         editor.Press(Key.Enter);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("needs a name");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("needs a name");
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Sequence" });
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
     }

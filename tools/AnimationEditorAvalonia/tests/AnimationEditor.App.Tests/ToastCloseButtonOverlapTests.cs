@@ -29,7 +29,7 @@ public class ToastCloseButtonOverlapTests
 
         try
         {
-            window.Notifications.ShowToast("Exported spritesheet.json");
+            window.Notifications.ShowInfo("Exported spritesheet.json");
             Dispatcher.UIThread.RunJobs();
 
             var closeBtn = window.FindControl<Button>("CloseBtn")

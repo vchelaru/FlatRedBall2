@@ -2535,8 +2535,8 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        /// <inheritdoc cref="IAppCommands.Notified"/>
-        public event Action<string>? Notified;
+        /// <inheritdoc cref="IAppCommands.InfoRaised"/>
+        public event Action<string>? InfoRaised;
 
         private enum VertexOp { Move, Insert, Delete }
 
@@ -2593,7 +2593,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (skipped > 0)
             {
                 string verb = op switch { VertexOp.Insert => "Added", VertexOp.Delete => "Deleted", _ => "Moved" };
-                Notified?.Invoke($"{verb} vertex on {entries.Count} of {peers.Count + 1} polygons, " +
+                InfoRaised?.Invoke($"{verb} vertex on {entries.Count} of {peers.Count + 1} polygons, " +
                     $"{skipped} skipped: different vertex count");
             }
             return true;

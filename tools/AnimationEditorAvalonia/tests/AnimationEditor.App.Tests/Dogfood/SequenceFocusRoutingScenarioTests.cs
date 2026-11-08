@@ -308,7 +308,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.C, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to copy");
         (await ClipboardAsync(editor)).ShouldBeNullOrEmpty();
         await PressAsync(editor, Key.V, RawInputModifiers.Control);
         editor.SequenceNames.Count.ShouldBe(3);
@@ -322,7 +322,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.C, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to copy");
     }
 
     [AvaloniaFact]
@@ -335,7 +335,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.D, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -347,7 +347,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.D, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
         editor.UndoLabels.ShouldBeEmpty();
     }
 

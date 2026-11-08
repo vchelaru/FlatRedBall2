@@ -108,16 +108,12 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public EditorNotificationOverlay Notifications => Control<EditorNotificationOverlay>("Notifications");
 
-    /// <summary>The error banner's text while it shows, else null.</summary>
-    public string? ErrorBannerText =>
-        Notifications.ErrorBanner.IsVisible && !Notifications.IsBannerWarning ? Notifications.ErrorBannerText.Text : null;
+    /// <summary>The PROBLEM banner's text (top-centre) while it shows, else null.</summary>
+    public string? ProblemText =>
+        Notifications.ErrorBanner.IsVisible ? Notifications.ErrorBannerText.Text : null;
 
-    /// <summary>The warning banner's text while it shows, else null.</summary>
-    public string? WarningBannerText =>
-        Notifications.ErrorBanner.IsVisible && Notifications.IsBannerWarning ? Notifications.ErrorBannerText.Text : null;
-
-    /// <summary>The toast's text while it shows, else null.</summary>
-    public string? ToastText => Notifications.ToastPanel.IsVisible ? Notifications.ToastMessage.Text : null;
+    /// <summary>The INFO toast's text (top-right) while it shows, else null.</summary>
+    public string? InfoText => Notifications.ToastPanel.IsVisible ? Notifications.ToastMessage.Text : null;
 
     /// <summary>The "… deleted" toast's text while it shows, else null.</summary>
     public string? DeletedToastText => Notifications.ItemDeletedToastPanel.IsVisible ? Notifications.ItemDeletedToastLabel.Text : null;
@@ -603,7 +599,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     public void ThrowIfErrorShown()
     {
         Layout();
-        if (ErrorBannerText is { } error)
+        if (ProblemText is { } error)
         {
             throw new InvalidOperationException("The editor showed an error: " + error);
         }

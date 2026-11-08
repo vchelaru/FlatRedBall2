@@ -11,19 +11,18 @@ using System.Threading.Tasks;
 namespace AnimationEditor.Views.Controls;
 
 /// <summary>
-/// Phase 15: shared toast/banner overlays matching desktop <c>MainWindow</c>'s three notification
-/// surfaces (item-deleted undo toast, generic dismissible/retryable toast, error banner).
+/// The editor's pop-up notifications, in two kinds. <see cref="ShowInfo"/> is a confirmation or FYI that needs nothing
+/// from the user (top-right toast, about 6 s). <see cref="ShowProblem"/> is work that is not saved or an action the user
+/// asked for that failed (top-centre banner, about 8 s, dismissable, optional Retry). <see cref="ShowItemDeleted"/> is
+/// the info kind with an Undo button. The status bar message is a separate, ambient label and is not part of this.
 /// </summary>
 public partial class EditorNotificationOverlay : UserControl
 {
     private DispatcherTimer? _toastTimer;
     private DispatcherTimer? _errorBannerTimer;
     private CancellationTokenSource? _itemDeletedCts;
-    private Action? _toastRetryAction;
+    private Action? _bannerRetryAction;
     private Action? _undoAction;
-
-    /// <summary>True while the banner shows a warning (<see cref="ShowWarningBanner"/>) rather than an error.</summary>
-    public bool IsBannerWarning { get; private set; }
 
     /// <summary>Internal seam so tests can drive hover state without synthesizing pointer events.</summary>
     internal bool IsToastHovered { get; set; }
@@ -45,10 +44,10 @@ public partial class EditorNotificationOverlay : UserControl
         ToastCopyBtn.Click += async (_, _) => await ClipboardWriter(ToastMessage.Text ?? string.Empty);
         ErrorBannerCopyBtn.Click += async (_, _) => await ClipboardWriter(ErrorBannerText.Text ?? string.Empty);
         ToastDismissBtn.Click += (_, _) => HideToast();
-        ToastRetryBtn.Click += (_, _) =>
+        ErrorBannerRetryBtn.Click += (_, _) =>
         {
-            HideToast();
-            _toastRetryAction?.Invoke();
+            HideErrorBanner();
+            _bannerRetryAction?.Invoke();
         };
         ErrorBannerDismissBtn.Click += (_, _) => HideErrorBanner();
         ItemDeletedToastUndoBtn.Click += (_, _) =>
@@ -84,11 +83,13 @@ public partial class EditorNotificationOverlay : UserControl
         _ = AutoHideItemDeletedAsync(token);
     }
 
-    public void ShowToast(string message, Action? retryAction = null)
+    /// <summary>
+    /// INFO: a confirmation or FYI that needs nothing from the user ("Reloaded x", "Exported x"). Shows the
+    /// top-right toast for about 6 s; hovering it keeps it up.
+    /// </summary>
+    public void ShowInfo(string message)
     {
-        _toastRetryAction = retryAction;
         ToastMessage.Text = message;
-        ToastRetryBtn.IsVisible = retryAction is not null;
         ToastPanel.IsVisible = true;
 
         _toastTimer?.Stop();
@@ -97,41 +98,23 @@ public partial class EditorNotificationOverlay : UserControl
         _toastTimer.Start();
     }
 
-    public void ShowErrorBanner(string text)
+    /// <summary>
+    /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
+    /// "Could not open x", "Nothing to paste"). Shows the prominent top-centre banner for about 8 s; hovering it keeps
+    /// it up and the dismiss button closes it. <paramref name="retry"/>, when given, adds a Retry button that closes
+    /// the banner and runs it.
+    /// </summary>
+    public void ShowProblem(string message, Action? retry = null)
     {
-        StyleBanner(warning: false);
-        ErrorBannerText.Text = text.TrimStart('⚠', ' ');
+        _bannerRetryAction = retry;
+        ErrorBannerRetryBtn.IsVisible = retry is not null;
+        ErrorBannerText.Text = message.TrimStart('⚠', ' ');
         ErrorBanner.IsVisible = true;
 
         _errorBannerTimer?.Stop();
         _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
         _errorBannerTimer.Tick += (_, _) => HideErrorBannerIfNotHovered();
         _errorBannerTimer.Start();
-    }
-
-    /// <summary>
-    /// Shows the top-centre banner in amber for something the user should know but did not do wrong. Stays until
-    /// dismissed, so it cannot be missed.
-    /// </summary>
-    public void ShowWarningBanner(string text)
-    {
-        _errorBannerTimer?.Stop();
-        StyleBanner(warning: true);
-        ErrorBannerText.Text = text;
-        ErrorBanner.IsVisible = true;
-    }
-
-    // The banner is one control in two looks; the amber one stands out from the dark theme where the red one is calm.
-    private void StyleBanner(bool warning)
-    {
-        IsBannerWarning = warning;
-        ErrorBanner.Background = Brush.Parse(warning ? "#5C4208" : "#2D2122");
-        ErrorBanner.BorderBrush = Brush.Parse(warning ? "#FFB84D" : "#E0533F");
-        ErrorBannerText.Foreground = Brush.Parse(warning ? "#FFF3D6" : "#F5E2DF");
-        ErrorBannerText.FontSize = warning ? 13 : 12;
-        ErrorBannerIcon.Foreground = Brush.Parse(warning ? "#FFD27A" : "#F2A03E");
-        foreach (var glyph in ErrorBanner.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>())
-            glyph.Fill = Brush.Parse(warning ? "#FFE3A8" : "#E8B0A8");
     }
 
     private async Task AutoHideItemDeletedAsync(CancellationToken token)

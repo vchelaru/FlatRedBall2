@@ -163,7 +163,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Idle 2", "Attack" });
         List(editor).SelectedIndex.ShouldBe(1);
         SavedNames(boss).ShouldBe(new[] { "Idle", "Idle 2", "Attack" });
@@ -232,12 +232,12 @@ public class SequenceDuplicateCopyPasteScenarioTests
         {
             await SetClipboardAsync(editor, text);
             await CtrlAsync(editor, Key.V);
-            editor.ToastText.ShouldNotBeNull().ShouldStartWith("Nothing to paste");
+            editor.InfoText.ShouldNotBeNull().ShouldStartWith("Nothing to paste");
         }
 
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack" });
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -250,7 +250,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("Can't paste");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Can't paste");
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack" });
         editor.UndoLabels.ShouldBeEmpty();
     }
@@ -293,7 +293,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         await CtrlAsync(editor, Key.C);
         // Nothing is selected on the timeline: Copy says so and empties the clipboard rather than leave an older copy to paste.
         (await ClipboardAsync(editor)).ShouldBeNullOrEmpty();
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to copy");
         await SetClipboardAsync(editor, envelope);
         await CtrlAsync(editor, Key.V);
 
@@ -321,7 +321,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         await CtrlAsync(editor, Key.V);
 
         SavedNames(boss).ShouldBe(new[] { "Idle", "Attack" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]

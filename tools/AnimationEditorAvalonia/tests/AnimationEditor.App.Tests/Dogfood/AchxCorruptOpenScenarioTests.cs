@@ -16,8 +16,8 @@ public class AchxCorruptOpenScenarioTests
 
     private static void ShouldShowTheBannerFor(AnimationEditorHarness editor, string file)
     {
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain(file);
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain(file);
     }
 
     private static void WriteFixtures(string folder)
@@ -60,7 +60,7 @@ public class AchxCorruptOpenScenarioTests
             {
                 editor.WaitUntil(() => editor.TabLabels.Count == 2, TimeSpan.FromSeconds(5));
                 editor.Layout();
-                editor.ErrorBannerText.ShouldBeNull();
+                editor.ProblemText.ShouldBeNull();
 
                 editor.ClickTab("broken.achx");
                 editor.Layout();
@@ -79,7 +79,7 @@ public class AchxCorruptOpenScenarioTests
             folder => (new[] { Path.Combine(folder, "broken.achx"), Path.Combine(folder, "good.achx") }, Path.Combine(folder, "broken.achx")),
             editor =>
             {
-                editor.WaitUntil(() => editor.ErrorBannerText != null, TimeSpan.FromSeconds(5));
+                editor.WaitUntil(() => editor.ProblemText != null, TimeSpan.FromSeconds(5));
                 editor.Layout();
 
                 ShouldShowTheBannerFor(editor, "broken.achx");
@@ -96,7 +96,7 @@ public class AchxCorruptOpenScenarioTests
             folder => (new[] { Path.Combine(folder, "broken.achx") }, Path.Combine(folder, "broken.achx")),
             editor =>
             {
-                editor.WaitUntil(() => editor.ErrorBannerText != null, TimeSpan.FromSeconds(5));
+                editor.WaitUntil(() => editor.ProblemText != null, TimeSpan.FromSeconds(5));
                 editor.Layout();
 
                 ShouldShowTheBannerFor(editor, "broken.achx");

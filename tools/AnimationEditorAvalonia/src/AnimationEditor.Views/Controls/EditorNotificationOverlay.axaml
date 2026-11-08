@@ -2,14 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="AnimationEditor.Views.Controls.EditorNotificationOverlay">
     <!--
-        Item-deleted undo toast, generic status toast, and error banner, with their
-        timer/dismiss logic, lifted out of MainWindow.axaml so it can be tested on its own.
+        The two notification kinds, with their timer/dismiss logic, lifted out of MainWindow.axaml so
+        it can be tested on its own: INFO is ToastPanel (top-right, ShowInfo) and PROBLEM is ErrorBanner
+        (top-centre, ShowProblem, optional ErrorBannerRetryBtn). ItemDeletedToastPanel is the info kind
+        with an Undo button.
 
         #1130 follow-up: this root UserControl (and the Panel below it) used to carry
         IsHitTestVisible="False", on the theory that each panel's own IsHitTestVisible="True"
         would "re-enable" hit-testing for itself. It doesn't: Avalonia's hit-test walk prunes an
         element's entire subtree once an ancestor is IsHitTestVisible=False, so none of
-        ToastDismissBtn/ToastRetryBtn/ErrorBannerDismissBtn/ItemDeletedToastUndoBtn were ever
+        ToastDismissBtn/ErrorBannerRetryBtn/ErrorBannerDismissBtn/ItemDeletedToastUndoBtn were ever
         reachable by a real pointer click (confirmed by simulating a click at the actual button
         bounds in a headless test; it did nothing until this was removed). The "pass clicks
         through when nothing is shown" goal this was trying to achieve doesn't need it anyway:
@@ -83,6 +85,14 @@
                           Fill="#E8B0A8"
                           Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
                 </Button>
+                <Button x:Name="ErrorBannerRetryBtn" x:FieldModifier="Public"
+                        IsVisible="False"
+                        DockPanel.Dock="Right"
+                        Content="Retry"
+                        Height="22"
+                        Padding="8,0"
+                        Margin="10,0,0,0"
+                        VerticalAlignment="Top" />
                 <TextBlock x:Name="ErrorBannerIcon" DockPanel.Dock="Left"
                            Text="⚠"
                            FontSize="15"
@@ -170,13 +180,6 @@
                           Fill="{DynamicResource InkMid}"
                           Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
                 </Button>
-                    <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
-                            DockPanel.Dock="Right"
-                            Content="Retry"
-                            Height="22"
-                            Padding="8,0"
-                            Margin="0,0,4,0"
-                            VerticalAlignment="Top" />
                     <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
                                VerticalAlignment="Center"
                                FontSize="12"

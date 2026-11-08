@@ -18,7 +18,7 @@ public class WebpExportScenarioTests
 
         editor.ClickMenu("MenuExportWebp");
 
-        (await editor.WaitUntilAsync(() => editor.ToastText is not null || editor.ErrorBannerText is not null, TimeSpan.FromSeconds(10)))
+        (await editor.WaitUntilAsync(() => editor.InfoText is not null || editor.ProblemText is not null, TimeSpan.FromSeconds(10)))
             .ShouldBeTrue("the export should finish with a toast or an error");
         editor.ThrowIfErrorShown();
     }
@@ -40,7 +40,7 @@ public class WebpExportScenarioTests
         codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Webp);
         (codec.Info.Width, codec.Info.Height).ShouldBe((16, 16));
         codec.FrameInfo.Select(frame => frame.Duration).ShouldBe(new[] { 100, 100 });
-        editor.ToastText!.ShouldContain("walk.webp");
+        editor.InfoText!.ShouldContain("walk.webp");
     }
 
     [AvaloniaFact]

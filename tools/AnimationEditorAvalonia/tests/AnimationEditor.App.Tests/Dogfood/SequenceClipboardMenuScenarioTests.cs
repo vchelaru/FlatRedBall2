@@ -173,7 +173,7 @@ public class SequenceClipboardMenuScenarioTests
         editor.PickMenuItem(List(editor).ContextMenu!, "Paste");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to paste");
+        editor.InfoText.ShouldNotBeNull().ShouldContain("Nothing to paste");
     }
 
     // ── Timeline ────────────────────────────────────────────────────────────────────────

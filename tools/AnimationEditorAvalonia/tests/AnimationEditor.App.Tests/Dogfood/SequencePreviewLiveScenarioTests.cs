@@ -484,7 +484,7 @@ public class SequencePreviewLiveScenarioTests
         await editor.OpenAsync(boss);
 
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]

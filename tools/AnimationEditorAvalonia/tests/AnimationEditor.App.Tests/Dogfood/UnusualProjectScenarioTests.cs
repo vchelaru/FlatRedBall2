@@ -270,7 +270,7 @@ public class UnusualProjectScenarioTests
         await editor.OpenAsync(path);
 
         editor.TabLabels.ShouldBe(new[] { "hero.achx" }, Case.Sensitive, "No means the file is not opened, so it gets no tab");
-        editor.ErrorBannerText.ShouldBeNull("declining is not an error");
+        editor.ProblemText.ShouldBeNull("declining is not an error");
         File.ReadAllBytes(path).ShouldBe(before);
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Run" }, "the document that was open stays open");
         editor.Click(editor.RowButton(editor.ChainNamed("Run"), "Add Frame"));
@@ -286,8 +286,8 @@ public class UnusualProjectScenarioTests
         await editor.OpenAsync(path);
 
         editor.TabLabels.ShouldBeEmpty("a UV file cannot be converted without its texture, so it does not open");
-        editor.ErrorBannerText.ShouldNotBeNull("the user is told why");
-        editor.ErrorBannerText!.ShouldContain("sheet.png");
+        editor.ProblemText.ShouldNotBeNull("the user is told why");
+        editor.ProblemText!.ShouldContain("sheet.png");
         editor.Dialogs.Shown.ShouldBeEmpty("no conversion question is asked when it cannot be done");
     }
 
@@ -376,7 +376,7 @@ public class UnusualProjectScenarioTests
 
             editor.PixelRectOf(walk.Frames[0]).X.ShouldBe(8, "the edit itself is kept");
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
-            editor.ToastText.ShouldNotBeNull("the user is told the save did not happen");
+            editor.InfoText.ShouldNotBeNull("the user is told the save did not happen");
             AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Single().LeftCoordinate.ShouldBe(0);
         }
         finally

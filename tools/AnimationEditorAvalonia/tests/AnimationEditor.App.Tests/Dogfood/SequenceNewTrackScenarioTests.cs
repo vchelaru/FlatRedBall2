@@ -113,14 +113,14 @@ public class SequenceNewTrackScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
         editor.Type("Body");
         editor.Press(Key.Enter);
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2" });
 
         editor.ClickAt(NewTrackCell(editor, 3));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
         TrackBox(editor)!.Text = "  ";
         editor.Press(Key.Enter);
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("needs a name");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("needs a name");
         SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2", "Track 3" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'", "Add Track 'Track 2'", "Add Track 'Track 3'" });
     }

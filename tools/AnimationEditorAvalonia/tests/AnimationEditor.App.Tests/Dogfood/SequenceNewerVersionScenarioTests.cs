@@ -36,8 +36,8 @@ public class SequenceNewerVersionScenarioTests
 
         await editor.OpenAsync(boss);
 
-        editor.WarningBannerText.ShouldBe(Notice);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.InfoText.ShouldBe(Notice);
+        editor.ProblemText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "Idle" });
 
         editor.Click(editor.Control<Button>("AddSequenceButton"));
@@ -58,17 +58,17 @@ public class SequenceNewerVersionScenarioTests
         await editor.OpenAsync(boss);
         // Longer than the 8 seconds an error banner lasts.
         await editor.WaitAsync(TimeSpan.FromSeconds(9));
-        editor.WarningBannerText.ShouldBe(Notice);
+        editor.InfoText.ShouldBe(Notice);
 
         DismissNotice(editor);
-        editor.WarningBannerText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
         await editor.OpenAsync(other);
         editor.ClickTab("boss.seqj");
         editor.ClickTab("other.seqj");
         editor.ClickTab("boss.seqj");
         editor.Click(editor.Control<Button>("AddSequenceButton"));
 
-        editor.WarningBannerText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -79,9 +79,9 @@ public class SequenceNewerVersionScenarioTests
 
         await editor.OpenAsync(boss);
 
-        editor.WarningBannerText.ShouldBeNull();
-        editor.ErrorBannerText.ShouldBeNull();
-        editor.ToastText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -105,14 +105,14 @@ public class SequenceNewerVersionScenarioTests
         try
         {
             using AnimationEditorHarness editor = new AnimationEditorHarness(settingsRoot);
-            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.WarningBannerText != null, TimeSpan.FromSeconds(5));
+            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.InfoText != null, TimeSpan.FromSeconds(5));
             editor.Layout();
 
-            editor.WarningBannerText.ShouldBe(Notice);
+            editor.InfoText.ShouldBe(Notice);
             DismissNotice(editor);
             editor.ClickTab("other.seqj");
             editor.ClickTab("boss.seqj");
-            editor.WarningBannerText.ShouldBeNull();
+            editor.InfoText.ShouldBeNull();
         }
         finally
         {

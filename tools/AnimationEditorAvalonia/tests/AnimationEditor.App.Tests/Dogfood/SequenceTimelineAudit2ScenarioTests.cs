@@ -114,9 +114,9 @@ public class SequenceTimelineAudit2ScenarioTests
         await editor.Window.Clipboard!.SetTextAsync(
             "{\"kind\":\"frb2-animation-editor-chains\",\"version\":1,\"sources\":[],\"chains\":[{\"source\":\"sheet.png\",\"chain\":\"Walk\",\"start\":0,\"loops\":1}]}");
 
-        await CtrlAsync(editor, Key.V, () => editor.ErrorBannerText is not null);
+        await CtrlAsync(editor, Key.V, () => editor.ProblemText is not null);
 
-        editor.ErrorBannerText!.ShouldContain("sheet.png");
+        editor.ProblemText!.ShouldContain("sheet.png");
     }
 
     [AvaloniaFact]

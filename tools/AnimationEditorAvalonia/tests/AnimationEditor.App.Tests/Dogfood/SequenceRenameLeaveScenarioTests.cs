@@ -101,7 +101,7 @@ public class SequenceRenameLeaveScenarioTests
         editor.ClickTab("other.seqj");
 
         SavedNames(boss).ShouldBe(new[] { "Attack", "Rest" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.ClickTab("boss.seqj");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Rest" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Rest'" });
@@ -168,7 +168,7 @@ public class SequenceRenameLeaveScenarioTests
         SavedNames(boss).ShouldBe(new[] { "Attack", "Rest" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Rest'" });
         List(editor).SelectedIndex.ShouldBe(1);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -384,7 +384,7 @@ public class SequenceRenameLeaveScenarioTests
         BeginSequenceRename(editor, 1, "Attack");
         editor.Press(Key.S, RawInputModifiers.Control);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         List(editor).ContainerFromIndex(1)!.GetVisualDescendants().OfType<InlineRenameBox>().Single().IsEditing.ShouldBeFalse();
         SavedNames(boss).ShouldBe(new[] { "Attack", "Idle" });
     }
@@ -415,7 +415,7 @@ public class SequenceRenameLeaveScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
         SavedNames(boss).ShouldBe(new[] { "Attack", "Rest" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -446,7 +446,7 @@ public class SequenceRenameLeaveScenarioTests
         BeginSequenceRename(editor, 1, "Attack");
         editor.ClickTab("other.seqj");
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         SavedNames(boss).ShouldBe(new[] { "Attack", "Idle" });
         editor.ClickTab("boss.seqj");
         editor.UndoLabels.ShouldBeEmpty();

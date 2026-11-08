@@ -52,7 +52,7 @@ public class SequenceAddSourceScenarioTests
         Library(editor).ChipFor("hero.achx", "Walk").ShouldNotBeNull();
         Library(editor).ChipFor("foe.achx", "Bite").ShouldNotBeNull();
         SequenceListSave.FromFile(boss).Sources.ShouldBe(new[] { "hero.achx", "foe.achx" });
-        editor.ErrorBannerText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
+        editor.ProblemText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
         editor.UndoLabels.ShouldBe(new[] { "Add 2 Sources" });
         editor.Dialogs.OpenFilesFilters.ShouldBe(new[] { "Animation Chain: *.achx *.achj" });
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
@@ -72,7 +72,7 @@ public class SequenceAddSourceScenarioTests
 
         editor.Click(Library(editor).AddSourceButton);
 
-        editor.ErrorBannerText.ShouldBe("hero.achx is already in the library.");
+        editor.ProblemText.ShouldBe("hero.achx is already in the library.");
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -86,7 +86,7 @@ public class SequenceAddSourceScenarioTests
 
         editor.Click(Library(editor).AddSourceButton);
 
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.UndoLabels.ShouldBeEmpty();
         editor.Dialogs.Shown.Count.ShouldBe(1);
     }
