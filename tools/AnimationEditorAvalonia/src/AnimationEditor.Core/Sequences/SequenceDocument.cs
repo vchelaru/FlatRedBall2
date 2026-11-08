@@ -820,8 +820,8 @@ public sealed class SequenceDocument
 
     /// <summary>
     /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
-    /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the bottom
-    /// lane is in front), so nothing but the list order changes. Returns the track's new index, or null when the drop
+    /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the top
+    /// lane is in front, the bottom lane at the back), so nothing but the list order changes. Returns the track's new index, or null when the drop
     /// changes nothing.
     /// </summary>
     public int? MoveTrack(IUndoManager undo, int sequence, int from, int slot)

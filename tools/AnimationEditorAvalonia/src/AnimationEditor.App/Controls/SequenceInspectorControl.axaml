@@ -82,7 +82,7 @@
                         <CheckBox x:Name="TrackFlipBox" Content="Flip Horizontal"
                                   AutomationProperties.AutomationId="seq-track-flip" />
                         <TextBlock Classes="note"
-                                   Text="Relative to the entity origin, Y up. The lower lane draws in front. Drag a track header to reorder." />
+                                   Text="Relative to the entity origin, Y up. The top lane draws in front. Drag a track header to reorder." />
                     </StackPanel>
                 </Border>
 

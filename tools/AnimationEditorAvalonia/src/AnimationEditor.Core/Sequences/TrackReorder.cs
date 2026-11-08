@@ -2,7 +2,7 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// Reordering tracks by dragging a lane header. The lanes show the file's track order top to bottom and the preview
-/// draws in that order, so the top lane is at the back and the bottom lane is in front. A move is only a move in the
+/// draws them in reverse, so the top lane is in front and the bottom lane is at the back, like layers in an image editor. A move is only a move in the
 /// list: no other property of any track changes.
 /// </summary>
 public static class TrackReorder

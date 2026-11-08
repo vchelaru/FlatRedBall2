@@ -60,8 +60,9 @@ public class SequenceTrackEyeScenarioTests
     private static Point OnName(AnimationEditorHarness editor, int lane) =>
         editor.PointIn(Timeline(editor), 60, Timeline(editor).HeaderCenters(lane).Name);
 
+    // The shown tracks in lane order, top first (the composite is back to front, so the top lane is last).
     private static List<int> ShownTracks(AnimationEditorHarness editor) =>
-        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.Track).ToList();
+        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.Track).Reverse().ToList();
 
     private static List<string> Menu(SequenceTimelineControl timeline) =>
         timeline.Menu.Items.OfType<MenuItem>().Select(item => (string)item.Header!).ToList();
