@@ -170,8 +170,8 @@ public class SequenceAuditScenarioTests
 
         await editor.OpenAsync(path);
 
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain("Could not open");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("Could not open");
         editor.TabLabels.ShouldNotContain("broken.seqj");
     }
 
@@ -186,8 +186,8 @@ public class SequenceAuditScenarioTests
 
         editor.Click(remove);
 
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain("used by 2 chains");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("used by 2 chains");
         library.Sources.Select(source => source.Source).ShouldBe(new[] { "hero.achx" });
         SequenceListSave.FromFile(boss).Sources.ShouldBe(new[] { "hero.achx" });
         editor.UndoLabels.ShouldBeEmpty();

@@ -46,7 +46,7 @@ public class SequenceDiskCatchUpScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Intro", "Attack", "Idle" });
         List(editor).SelectedIndex.ShouldBe(1, "the selected sequence is followed by name");
         editor.UndoLabels.ShouldBeEmpty("history of the old file does not apply to the new one");
-        editor.ToastText!.ShouldContain("Reloaded boss.seqj");
+        editor.InfoText!.ShouldContain("Reloaded boss.seqj");
 
         editor.Click(editor.Control<Button>("AddSequenceButton"));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
@@ -72,7 +72,7 @@ public class SequenceDiskCatchUpScenarioTests
 
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Sequence" });
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
-        editor.ToastText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -86,8 +86,8 @@ public class SequenceDiskCatchUpScenarioTests
         editor.ClickTab("boss.seqj");
         editor.Layout();
 
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain("boss.seqj");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("boss.seqj");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
         editor.Click(editor.Control<Button>("AddSequenceButton"));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
@@ -109,7 +109,7 @@ public class SequenceDiskCatchUpScenarioTests
         editor.ClickTab("boss.seqj");
         editor.Layout();
 
-        editor.ToastText!.ShouldContain("deleted from disk");
+        editor.InfoText!.ShouldContain("deleted from disk");
         editor.TabLabels.ShouldContain("boss.seqj");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
     }
@@ -144,7 +144,7 @@ public class SequenceDiskCatchUpScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Intro", "Attack", "Idle" });
         List(editor).SelectedIndex.ShouldBe(1);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ToastText!.ShouldContain("Reloaded boss.seqj");
+        editor.InfoText!.ShouldContain("Reloaded boss.seqj");
     }
 
     [AvaloniaFact]
@@ -177,7 +177,7 @@ public class SequenceDiskCatchUpScenarioTests
         File.WriteAllText(seqj, "{ nope");
         editor.ClickMenu("MenuReloadFromDisk");
 
-        editor.ErrorBannerText!.ShouldContain("boss.seqj");
+        editor.ProblemText!.ShouldContain("boss.seqj");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
 
         Rewrite(seqj, "Attack", "Idle", "Die");
@@ -197,7 +197,7 @@ public class SequenceDiskCatchUpScenarioTests
         File.Delete(seqj);
         editor.ClickMenu("MenuReloadFromDisk");
 
-        editor.ToastText!.ShouldContain("deleted from disk");
+        editor.InfoText!.ShouldContain("deleted from disk");
         editor.SequenceNames.ShouldBe(new[] { "Attack" });
     }
 }

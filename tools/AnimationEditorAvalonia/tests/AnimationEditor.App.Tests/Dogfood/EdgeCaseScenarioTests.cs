@@ -44,9 +44,9 @@ public class EdgeCaseScenarioTests
         editor.ClickRow(walk);
 
         File.Delete(path);
-        (await editor.WaitUntilAsync(() => editor.ToastText != null, TimeSpan.FromSeconds(5)))
+        (await editor.WaitUntilAsync(() => editor.InfoText != null, TimeSpan.FromSeconds(5)))
             .ShouldBeTrue("the editor should say the file was deleted");
-        editor.ToastText!.ShouldContain("hero.achx");
+        editor.InfoText!.ShouldContain("hero.achx");
 
         // The document is still there and an edit still works (and auto-saves it back).
         editor.Click(editor.RowButton(walk, "Add Frame"));
@@ -129,7 +129,7 @@ public class EdgeCaseScenarioTests
         editor.Press(Key.Enter);
 
         walk.Name.ShouldBe("Walk");
-        editor.ErrorBannerText.ShouldNotBeNull();
+        editor.ProblemText.ShouldNotBeNull();
     }
 
     [AvaloniaFact]

@@ -50,7 +50,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowErrorBanner($"Could not create {new FilePath(path).NoPath}: {ex.Message}");
+            ShowProblem($"Could not create {new FilePath(path).NoPath}: {ex.Message}");
             return;
         }
         await LoadAnimationFileAsync(path);
@@ -153,7 +153,7 @@ public partial class MainWindow
             if (result.Error is { } error)
             {
                 // Mid-write or damaged: the open document stays, and the next change event tries again.
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
                 return;
             }
             if (!result.Changed) return;
@@ -163,7 +163,7 @@ public partial class MainWindow
             if (sequenceName is not null && CurrentSequence?.Name == sequenceName
                 && timeline.SelectedChains.Count == 0 && timeline.SelectedTracks.Count == 0)
                 RestoreTimelineSelection(CurrentSequence, chains, tracks);
-            _window.ShowToast($"Reloaded {document.Path.NoPath}");
+            _window.ShowInfo($"Reloaded {document.Path.NoPath}");
         }
 
         private void RestoreTimelineSelection(SequenceSave sequence, List<TimelineChainId> chains, List<int> tracks)
@@ -177,10 +177,10 @@ public partial class MainWindow
 
         private void OnFileDeletedOnDisk(string path)
         {
-            if (IsShown(path)) ShowDeletedToast(new FilePath(path));
+            if (IsShown(path)) ShowDeletedInfo(new FilePath(path));
         }
 
-        private void ShowDeletedToast(FilePath path) => _window.ShowToast($"'{path.NoPath}' was deleted from disk.");
+        private void ShowDeletedInfo(FilePath path) => _window.ShowInfo($"'{path.NoPath}' was deleted from disk.");
 
         /// <summary>A listed source file changed or vanished: re-read it, so chains, frames, timings and the missing flag follow.</summary>
         private void OnSourceChangedOnDisk()
@@ -285,24 +285,24 @@ public partial class MainWindow
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                 {
-                    _window.ShowErrorBanner($"Could not open {tab.DisplayName}: {ex.Message}");
+                    _window.ShowProblem($"Could not open {tab.DisplayName}: {ex.Message}");
                     return Task.FromResult(false);
                 }
                 _documents[tab.Path] = document;
                 // Our own saves go through the watcher's guard so their change events do not reload the document.
                 document.SaveRunner = _watcher.RunOwnSave;
                 // The same toast an achx shows (MainWindow wires AppCommands.SaveFailed), so a failed write is never silent.
-                document.SaveFailed += message => _window.ShowToast($"Auto save failed — {message}");
+                document.SaveFailed += message => _window.ShowProblem($"Auto save failed — {message}");
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
-                    _window.Notifications.ShowWarningBanner(notice);
+                    _window.ShowInfo(notice);
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
                 if (document.DuplicateNamesNotice is { } duplicates)
-                    _window.Notifications.ShowWarningBanner(duplicates);
+                    _window.ShowInfo(duplicates);
             }
 
             // Showing another file starts with no pane owning the edit hotkeys, as a fresh tab does.
@@ -330,17 +330,17 @@ public partial class MainWindow
         {
             var result = document.ReloadIfChangedOnDisk();
             if (result.Deleted)
-                ShowDeletedToast(document.Path);
+                ShowDeletedInfo(document.Path);
             else if (result.Error is { } error)
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
             else if (document.StaleOnDiskReason is { } stale)
                 // Still the same unreadable file: saving stays paused, so say so again.
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {stale}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {stale}");
             else if (result.Changed)
             {
                 // The history describes the old file; undoing into it would write that back over the new one.
                 tab.UndoSnapshot = null;
-                _window.ShowToast($"Reloaded {document.Path.NoPath}");
+                _window.ShowInfo($"Reloaded {document.Path.NoPath}");
             }
         }
 
@@ -452,7 +452,7 @@ public partial class MainWindow
         {
             if (SequenceEditRule.NothingToDo(verb, surface, SelectedCount(surface)) is not { } message) return false;
             if (clearClipboard && surface != EditSurface.None) _window.CopyTextToClipboard(string.Empty);
-            _window.ShowToast(message);
+            _window.ShowProblem(message);
             return true;
         }
 
@@ -541,7 +541,7 @@ public partial class MainWindow
             var timeline = _window.SequenceTimeline;
             if (SequenceEditRule.RenameRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
             {
-                _window.ShowToast(message);
+                _window.ShowProblem(message);
                 return;
             }
             if (surface == EditSurface.List)
@@ -565,7 +565,7 @@ public partial class MainWindow
             var timeline = _window.SequenceTimeline;
             if (SequenceEditRule.MoveRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
             {
-                _window.ShowToast(message);
+                _window.ShowProblem(message);
                 return;
             }
             if (surface == EditSurface.List)
@@ -584,7 +584,7 @@ public partial class MainWindow
         {
             if (_document is not { } document) return;
             if (!File.Exists(document.Path.FullPath))
-                ShowDeletedToast(document.Path);
+                ShowDeletedInfo(document.Path);
             else
                 ReloadShownFromDisk(document);
         }
@@ -604,17 +604,14 @@ public partial class MainWindow
                     var result = document.PasteSequences(_window._undoManager, route.Sequences!);
                     // The pasted sequences start from their beginning.
                     StopPlayback();
-                    if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
+                    if (result.Errors.Count > 0) _window.ShowProblem(string.Join(" ", result.Errors));
                     FocusSelectedRow();
                     break;
                 case PasteRouteKind.Timeline:
                     PasteIntoTimeline(document, route.Timeline!);
                     break;
                 default:
-                    if (route.IsDamaged)
-                        _window.ShowErrorBanner(route.Message!);
-                    else
-                        _window.ShowToast(route.Message!);
+                    _window.ShowProblem(route.Message!);
                     break;
             }
         }
@@ -624,13 +621,13 @@ public partial class MainWindow
             string noun = content.Kind == TimelineClipboardKind.Chains ? "chains" : "tracks";
             if (document.Save.Sequences.Count == 0)
             {
-                _window.ShowToast($"Can't paste the copied {noun}: the file has no sequence to paste into. Add a sequence first.");
+                _window.ShowProblem($"Can't paste the copied {noun}: the file has no sequence to paste into. Add a sequence first.");
                 return;
             }
             // The pasted items become the timeline's selection, so it takes the keyboard: with the list focused, Delete would remove the sequence instead.
             _window.SequenceTimeline.Focus();
             if (!_window.SequenceTimeline.Paste(content))
-                _window.ShowToast($"Nothing to paste: the copied {noun} are empty.");
+                _window.ShowProblem($"Nothing to paste: the copied {noun} are empty.");
         }
 
         // Rebuilding the list drops its focus once the old rows are gone; lay it out now and take it back so the keys keep working.
@@ -701,12 +698,12 @@ public partial class MainWindow
             };
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
             w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
-            w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
+            w.SequenceTimeline.ErrorRaised += message => w.ShowProblem(message);
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
-            w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
+            w.SequenceInspector.ErrorRaised += message => w.ShowProblem(message);
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
@@ -1007,7 +1004,7 @@ public partial class MainWindow
             int index = _items.IndexOf(item);
             if (document is null || document != _document || index < 0) return;
             if (document.RenameSequence(_window._undoManager, index, text, keepSelection: true) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         /// <summary>True while a sequence row or a track header is being renamed in place.</summary>
@@ -1113,7 +1110,7 @@ public partial class MainWindow
             var (path, error) = document.LocateDefinition(reference);
             if (path is null)
             {
-                _window.ShowErrorBanner(error!);
+                _window.ShowProblem(error!);
                 return;
             }
             await _window.OpenAndSelectChainAsync(path, reference.Chain);
@@ -1237,7 +1234,7 @@ public partial class MainWindow
             string? name = await _window._appCommands.PromptStringAsync("Rename Track", "Track name:", oldName);
             if (name is null || document != _document) return;
             if (document.RenameTrack(_window._undoManager, sequence, track, name) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         private void AddSources(IReadOnlyList<string> paths)
@@ -1245,7 +1242,7 @@ public partial class MainWindow
             if (_document is null) return;
             var errors = _document.AddSources(_window._undoManager, paths);
             if (errors.Count > 0)
-                _window.ShowErrorBanner(string.Join(" ", errors));
+                _window.ShowProblem(string.Join(" ", errors));
         }
 
         // Same refusals and one undo entry as a drop; a cancelled dialog changes nothing.
@@ -1262,13 +1259,13 @@ public partial class MainWindow
         {
             if (_document is null) return;
             if (_window.SequenceTimeline.AddChip(chip, mode) is { } refusal)
-                _window.ShowToast(refusal);
+                _window.ShowProblem(refusal);
         }
 
         private void RemoveSource(string source)
         {
             if (_document?.RemoveSource(_window._undoManager, source) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         // Dropping a source's group on a gap: one undo entry, and an edit rather than a place to come back to, so no Back entry.
@@ -1332,7 +1329,7 @@ public partial class MainWindow
             string? name = await _window._appCommands.PromptStringAsync("Rename Sequence", "Sequence name:", oldName);
             if (name is null || document != _document) return;
             if (document.RenameSequence(_window._undoManager, index, name) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         private void DeleteSelected()

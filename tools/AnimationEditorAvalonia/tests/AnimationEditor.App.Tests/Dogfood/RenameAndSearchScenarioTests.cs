@@ -89,8 +89,8 @@ public class RenameAndSearchScenarioTests
         editor.Press(Key.Enter);
 
         walk.Name.ShouldBe("Walk");
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText.ShouldContain("empty");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText.ShouldContain("empty");
     }
 
     [AvaloniaFact]

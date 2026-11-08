@@ -144,7 +144,7 @@ public class SequencePasteRoutingScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("no sequence");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("no sequence");
     }
 
     [AvaloniaFact]
@@ -208,7 +208,7 @@ public class SequencePasteRoutingScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        editor.ToastText.ShouldNotBeNull();
+        editor.ProblemText.ShouldNotBeNull();
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -223,6 +223,6 @@ public class SequencePasteRoutingScenarioTests
 
         await CtrlAsync(editor, Key.V);
 
-        editor.ToastText.ShouldNotBeNull();
+        editor.ProblemText.ShouldNotBeNull();
     }
 }

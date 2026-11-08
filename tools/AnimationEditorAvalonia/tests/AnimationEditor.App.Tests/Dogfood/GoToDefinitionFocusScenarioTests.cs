@@ -86,7 +86,7 @@ public class GoToDefinitionFocusScenarioTests
         focused.ShouldNotBe((0f, 0f, 1f));
         // The same state a double-click on that row produces.
         CameraAfterDoubleClick(editor, run).ShouldBe(focused);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]

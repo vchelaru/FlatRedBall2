@@ -113,7 +113,7 @@ public class SequenceLiveReloadScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Sequence" });
         List(editor).SelectedIndex.ShouldBe(1);
         editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
-        editor.ToastText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -125,9 +125,9 @@ public class SequenceLiveReloadScenarioTests
 
         File.WriteAllText(path, "{ \"sequences\": [ { \"name\": \"Hal");
 
-        (await editor.WaitUntilAsync(() => editor.ErrorBannerText is not null, ReloadTimeout))
+        (await editor.WaitUntilAsync(() => editor.ProblemText is not null, ReloadTimeout))
             .ShouldBeTrue("an unreadable file should raise the error banner");
-        editor.ErrorBannerText!.ShouldContain("boss.seqj");
+        editor.ProblemText!.ShouldContain("boss.seqj");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
 
         var finished = new SequenceListSave { Sources = { Source } };
@@ -156,7 +156,7 @@ public class SequenceLiveReloadScenarioTests
 
         (await editor.WaitUntilAsync(() => editor.SequenceNames.Count == 2, ReloadTimeout))
             .ShouldBeTrue("an atomic replace is a change, not a deletion");
-        (editor.ToastText ?? "").ShouldNotContain("deleted");
+        (editor.InfoText ?? "").ShouldNotContain("deleted");
     }
 
     [AvaloniaFact]
@@ -168,7 +168,7 @@ public class SequenceLiveReloadScenarioTests
 
         File.Delete(path);
 
-        (await editor.WaitUntilAsync(() => editor.ToastText?.Contains("deleted from disk") == true, ReloadTimeout))
+        (await editor.WaitUntilAsync(() => editor.InfoText?.Contains("deleted from disk") == true, ReloadTimeout))
             .ShouldBeTrue("a deleted file is announced the way a deleted .achx is");
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });

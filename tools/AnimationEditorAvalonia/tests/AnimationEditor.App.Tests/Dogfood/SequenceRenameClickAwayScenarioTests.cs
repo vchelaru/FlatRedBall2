@@ -86,7 +86,7 @@ public class SequenceRenameClickAwayScenarioTests
         SavedNames(boss).ShouldBe(new[] { "Zero", "Mid", "Attack" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Zero'" });
         ShouldShowSequence(editor, 2, "Attack");
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -116,7 +116,7 @@ public class SequenceRenameClickAwayScenarioTests
         BeginRenameByDoubleTap(editor, 0, "Mid");
         ClickRow(editor, 2);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         SavedNames(boss).ShouldBe(new[] { "Idle", "Mid", "Attack" });
         editor.UndoLabels.ShouldBeEmpty();
         ShouldShowSequence(editor, 2, "Attack");
@@ -132,7 +132,7 @@ public class SequenceRenameClickAwayScenarioTests
         BeginRenameByDoubleTap(editor, 0, "  ");
         ClickRow(editor, 2);
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("needs a name");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("needs a name");
         SavedNames(boss).ShouldBe(new[] { "Idle", "Mid", "Attack" });
         ShouldShowSequence(editor, 2, "Attack");
     }

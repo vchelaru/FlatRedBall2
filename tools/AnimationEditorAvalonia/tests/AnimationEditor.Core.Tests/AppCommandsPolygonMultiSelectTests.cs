@@ -78,7 +78,7 @@ public class AppCommandsPolygonMultiSelectTests
         var (ctx, _, polygons) = SelectedPolygons(3);
         PolygonVertices.Insert(polygons[2], 1, 0, -10);
         var notices = new List<string>();
-        ctx.AppCommands.Notified += notices.Add;
+        ctx.AppCommands.InfoRaised += notices.Add;
 
         ctx.AppCommands.MovePolygonVertex(polygons[0], 1, 8, -12);
 

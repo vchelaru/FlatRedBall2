@@ -323,14 +323,14 @@ public partial class MainWindow : Window
         WireUpdateAvailableBanner();
 
         WireframeCtrl.CommandModifier = _commandModifier;
-        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
-        PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowProblem(msg));
+        PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowProblem(msg));
         // The sequence preview gets a selection of its own that nothing ever selects in, so its shape and sprite
         // gestures have nothing of the achx document to edit. Its own playback timer has nothing to play.
-        SequencePreview.InitializeServices(new SelectedState(_projectManager), _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        SequencePreview.InitializeServices(new SelectedState(_projectManager), _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowProblem(msg));
         SequencePreview.PauseAutoPlayback();
         FilesPanel.Initialize(_thumbnailService, this,
-            msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
+            msg => ShowProblem(msg), OpenPngAsTab);
         ProjectPanel.Initialize(_projectTreeThumbnailService);
         ProjectPanel.FolderRevealRequested += relativePath => RevealProjectFolderInExplorer(relativePath);
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
@@ -543,7 +543,7 @@ public partial class MainWindow : Window
                 {
                     var error = Services.ShellExplorer.RevealFile(captured.Path.FullPath);
                     if (error is not null)
-                        ShowStatusMessage($"⚠ {error}", isError: true);
+                        ShowProblem($"⚠ {error}");
                 }),
             });
             // Issue #546: same action as the title-bar "Copy Full Path", but for the right-clicked
@@ -1197,7 +1197,7 @@ public partial class MainWindow : Window
 
         _appCommands.HotReloadFailed += (path, reason) =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason} Saving to it is paused until it reloads.", isError: true));
+                ShowProblem($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason} Saving to it is paused until it reloads."));
 
         _appCommands.TiledSyncFailed += (tsxPath, ex) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
@@ -1274,23 +1274,23 @@ public partial class MainWindow : Window
         _selectedState.SelectionChanged   += HandleSelectionChanged;
 
         _appCommands.ItemsDeleted += label =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
+            Dispatcher.UIThread.InvokeAsync(() => ShowItemDeleted(label));
 
         _appCommands.ExportCompleted += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var name = System.IO.Path.GetFileName(path);
-                ShowToast(warnings.Count == 0
+                ShowInfo(warnings.Count == 0
                     ? $"Exported {name}"
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
         _appCommands.TsxSaveCompletedWithWarnings += warnings =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowToast($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+                ShowProblem($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.SaveFailed += message =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowToast($"Auto save failed — {message}"));
-        _appCommands.Notified += message => Dispatcher.UIThread.InvokeAsync(() => ShowToast(message));
+            Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"Auto save failed — {message}"));
+        _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));
 
         Notifications.WireUndo(Undo);
 
@@ -1302,10 +1302,10 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() => OnPngChangedOnDisk(path));
         _events.AchxDeletedOnDisk += path =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowToast($"'{System.IO.Path.GetFileName(path)}' was deleted from disk."));
+                ShowInfo($"'{System.IO.Path.GetFileName(path)}' was deleted from disk."));
         _events.AchxReloadedFromDisk += path =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowToast($"Reloaded {System.IO.Path.GetFileName(path)}"));
+                ShowInfo($"Reloaded {System.IO.Path.GetFileName(path)}"));
 
         _ioManager.SettingsLoaded += s => Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
     }
@@ -1455,8 +1455,8 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         // An image too big to decode (#1552); every texture load path raises it, so no call site checks.
-        WireframeCtrl.TextureLoadError += ShowErrorBanner;
-        PngPane.TextureLoadError += ShowErrorBanner;
+        WireframeCtrl.TextureLoadError += message => ShowProblem(message);
+        PngPane.TextureLoadError += message => ShowProblem(message);
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
@@ -2358,7 +2358,7 @@ public partial class MainWindow : Window
 
         if (!Directory.Exists(absolutePath))
         {
-            ShowStatusMessage($"Folder not found: {absolutePath}", isError: true);
+            ShowProblem($"Folder not found: {absolutePath}");
             return;
         }
 
@@ -2374,7 +2374,7 @@ public partial class MainWindow : Window
 
         var error = Services.ShellExplorer.RevealFile(absolutePath);
         if (error is not null)
-            ShowStatusMessage($"⚠ {error}", isError: true);
+            ShowProblem($"⚠ {error}");
     }
 
     private void CopyProjectFilePathToClipboard(string relativePath)
@@ -2410,7 +2410,7 @@ public partial class MainWindow : Window
         var error = DeleteToRecycleBin(absolutePath);
         if (error is not null)
         {
-            ShowStatusMessage($"⚠ {error}", isError: true);
+            ShowProblem($"⚠ {error}");
             return;
         }
 
@@ -2445,7 +2445,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowStatusMessage($"⚠ Could not duplicate {new FilePath(sourcePath).NoPath}: {ex.Message}", isError: true);
+            ShowProblem($"⚠ Could not duplicate {new FilePath(sourcePath).NoPath}: {ex.Message}");
             return;
         }
 
@@ -2530,7 +2530,7 @@ public partial class MainWindow : Window
         }
 
         if (problems.Count > 0)
-            ShowStatusMessage($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}", isError: true);
+            ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}");
         else
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
@@ -2566,7 +2566,7 @@ public partial class MainWindow : Window
             // Unlike File > New Sequence File there is no save dialog to confirm an overwrite.
             if (File.Exists(absolutePath))
             {
-                ShowStatusMessage($"⚠ Could not create {request.FileName}: it already exists.", isError: true);
+                ShowProblem($"⚠ Could not create {request.FileName}: it already exists.");
                 return;
             }
             await CreateSequenceFileAsync(absolutePath);
@@ -2580,7 +2580,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowStatusMessage($"⚠ Could not create {request.FileName}: {ex.Message}", isError: true);
+            ShowProblem($"⚠ Could not create {request.FileName}: {ex.Message}");
             return;
         }
 
@@ -2959,7 +2959,7 @@ public partial class MainWindow : Window
         ProjectPanel.SetEntries(scan);
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
-            : $"Found {Plural.Format(entries.Count, ".achx file")} under \"{rootFolder.Name}\".", isError: false);
+            : $"Found {Plural.Format(entries.Count, ".achx file")} under \"{rootFolder.Name}\".");
         RefreshFilesPanel();
         return entries.Count;
     }
@@ -3078,7 +3078,7 @@ public partial class MainWindow : Window
             .ToList();
         if (sources.Count == 0)
         {
-            ShowStatusMessage($"Select an animation with frames to export as a {format.Name}.", isError: true);
+            ShowProblem($"Select an animation with frames to export as a {format.Name}.");
             return;
         }
 
@@ -3106,11 +3106,11 @@ public partial class MainWindow : Window
             byte[] image = await Task.Run(() => AnimatedImageRenderers.Render(
                 format, sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
             await File.WriteAllBytesAsync(path, image);
-            ShowToast($"Exported {Path.GetFileName(path)}");
+            ShowInfo($"Exported {Path.GetFileName(path)}");
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            ShowErrorBanner($"{format.Name} export failed: {ex.Message}");
+            ShowProblem($"{format.Name} export failed: {ex.Message}");
         }
     }
 
@@ -3285,7 +3285,7 @@ public partial class MainWindow : Window
         }
         var error = Services.ShellExplorer.RevealFile(path);
         if (error != null)
-            ShowStatusMessage($"\u26a0 Could not open the log folder: {error}", isError: true);
+            ShowProblem($"\u26a0 Could not open the log folder: {error}");
     }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)
@@ -3302,7 +3302,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowStatusMessage($"⚠ Could not open log: {ex.Message}", isError: true);
+            ShowProblem($"⚠ Could not open log: {ex.Message}");
         }
     }
 
@@ -3936,7 +3936,7 @@ public partial class MainWindow : Window
             if (target.IsValid)
                 _appCommands.MoveShapeToIndex(shapeDrag.Shape, shapeDrag.Frame, target.InsertIndex);
             else if (target.Outcome == ShapeDropOutcome.CrossType)
-                ShowStatusMessage(ShapeReorderNotice.Message(_projectManager.FileName), isError: true);
+                ShowProblem(ShapeReorderNotice.Message(_projectManager.FileName));
             e.Handled = true;
             return;
         }
@@ -4164,7 +4164,7 @@ public partial class MainWindow : Window
         string message = validity == FrameDragValidity.MultipleSourceChains
             ? "Can't drag frames from multiple animations yet — select frames from one animation."
             : "Can't reorder a mixed selection — select only frames.";
-        ShowStatusMessage(message, isError: true);
+        ShowProblem(message);
     }
 
     private FrameDropTarget ResolveFrameDrop(DragEventArgs e, FrameDragSource drag)
@@ -4478,8 +4478,8 @@ public partial class MainWindow : Window
             }
             if (classified.Validity is ChainDragValidity.MixedTypes)
             {
-                ShowStatusMessage(
-                    "Can't reorder a mixed selection — select only animations.", isError: true);
+                ShowProblem(
+                    "Can't reorder a mixed selection — select only animations.");
                 return false;
             }
         }
@@ -4962,7 +4962,7 @@ public partial class MainWindow : Window
         RefreshTimelineStrip();
         _appCommands.RefreshAnimationFrameDisplay();
         RefreshFilesPanel();
-        ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
+        ShowInfo($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
     }
 
     /// <summary>
@@ -5869,7 +5869,7 @@ public partial class MainWindow : Window
     {
         if (!WireframeCtrl.LoadTexture(absolutePath))
         {
-            ShowStatusMessage($"⚠ Could not load image: {absolutePath}", isError: true);
+            ShowProblem($"⚠ Could not load image: {absolutePath}");
             WireframeCtrl.RefreshAll();   // restore the display to the frame's current texture
             return;
         }
@@ -5947,7 +5947,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+            ShowProblem($"Could not copy: {ex.Message}", retry: () =>
             {
                 try
                 {
@@ -5956,7 +5956,7 @@ public partial class MainWindow : Window
                 }
                 catch (Exception retryEx)
                 {
-                    ShowToast($"Retry failed: {retryEx.Message}");
+                    ShowProblem($"Retry failed: {retryEx.Message}");
                 }
             });
             return null;
@@ -6504,7 +6504,7 @@ public partial class MainWindow : Window
 
         var text = PropChainName.Text ?? string.Empty;
         if (!_appCommands.RenameChain(chain, text))
-            ShowStatusMessage(text.Trim().Length == 0 ? "Chain name cannot be empty." : $"Another chain is already named \"{text.Trim()}\".", isError: true);
+            ShowProblem(text.Trim().Length == 0 ? "Chain name cannot be empty." : $"Another chain is already named \"{text.Trim()}\".");
         RefreshChainNameBox(chain);
     }
 
@@ -7346,7 +7346,7 @@ public partial class MainWindow : Window
     private Task ShowLoadFailedDialogAsync(string filePath, Exception ex)
     {
         var fileName = Path.GetFileName(filePath);
-        ShowStatusMessage($"⚠ Could not load '{fileName}': {ex.Message}", isError: true);
+        ShowProblem($"⚠ Could not load '{fileName}': {ex.Message}");
         return Task.CompletedTask;
     }
 
@@ -7406,16 +7406,11 @@ public partial class MainWindow : Window
 
     private DispatcherTimer? _statusMessageTimer;
 
-    private void ShowStatusMessage(string text, bool isError = false)
+    /// <summary>
+    /// The ambient status bar label (5 s). Not a pop-up: a failure or refusal calls <see cref="ShowProblem"/> instead.
+    /// </summary>
+    private void ShowStatusMessage(string text)
     {
-        // Errors route to the prominent top-centre banner so they can't be missed; the thin
-        // bottom status bar (low-contrast, easy to overlook) is reserved for informational text.
-        if (isError)
-        {
-            ShowErrorBanner(text);
-            return;
-        }
-
         StatusMessage.Text = text;
         StatusMessage.Foreground = ThemedBrush("InkMid");
         StatusMessage.IsVisible = true;
@@ -7431,18 +7426,21 @@ public partial class MainWindow : Window
         _statusMessageTimer.Start();
     }
 
-    // ── Toast / banner notifications ──────────────────────────────────────────
-    // All three surfaces (item-deleted undo toast, generic toast, error banner) live in the
-    // shared EditorNotificationOverlay hosted as "Notifications" — see MainWindow.axaml.
+    // ── Pop-up notifications ──────────────────────────────────────────────────
+    // Two kinds, both drawn by the shared EditorNotificationOverlay hosted as "Notifications".
 
     /// <summary>
-    /// Shows the prominent top-centre error banner. Auto-dismisses after 8s (longer than the
-    /// informational status bar's 5s — errors deserve more dwell time) or on manual dismiss.
+    /// INFO: a confirmation or FYI that needs nothing from the user ("Reloaded x", "Exported x", "'x' was deleted from
+    /// disk"). Shows the top-right toast for about 6 s; hovering keeps it. The status bar message is separate.
     /// </summary>
-    private void ShowErrorBanner(string text) => Notifications.ShowErrorBanner(text);
+    public void ShowInfo(string message) => Notifications.ShowInfo(message);
 
-    private void ShowToast(string message, Action? retryAction = null) =>
-        Notifications.ShowToast(message, retryAction);
+    /// <summary>
+    /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
+    /// "Could not open x", "Nothing to paste", "Start must be 0 or more"). Shows the top-centre banner for about 8 s,
+    /// dismissable, with a Retry button when <paramref name="retry"/> is given. The status bar message is separate.
+    /// </summary>
+    public void ShowProblem(string message, Action? retry = null) => Notifications.ShowProblem(message, retry);
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
@@ -7882,7 +7880,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowStatusMessage($"⚠ {actionName} failed: {ex.Message}", isError: true);
+            ShowProblem($"⚠ {actionName} failed: {ex.Message}");
         }
     }
 
@@ -7912,7 +7910,7 @@ public partial class MainWindow : Window
         {
             if (failureMessage is not null)
             {
-                ShowStatusMessage(failureMessage, isError: true);
+                ShowProblem(failureMessage);
                 await clipboard.SetTextAsync(string.Empty);
             }
             return;
@@ -7935,7 +7933,7 @@ public partial class MainWindow : Window
         {
             if (failureMessage is not null)
             {
-                ShowStatusMessage(failureMessage, isError: true);
+                ShowProblem(failureMessage);
                 await clipboard.SetTextAsync(string.Empty);
             }
             return;
@@ -8142,7 +8140,7 @@ public partial class MainWindow : Window
                 out var payload, out var failureMessage))
         {
             if (failureMessage is not null)
-                ShowStatusMessage(failureMessage, isError: true);
+                ShowProblem(failureMessage);
             return;
         }
 
@@ -8234,7 +8232,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowItemDeletedToast(string label) => Notifications.ShowItemDeleted(label);
+    private void ShowItemDeleted(string label) => Notifications.ShowItemDeleted(label);
 
     /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>
     internal void HandleDeleteForTest() => HandleDelete();
@@ -8264,7 +8262,7 @@ public partial class MainWindow : Window
         var frame = _selectedState.SelectedFrame;
         if (frame is null || string.IsNullOrEmpty(frame.TextureName))
         {
-            ShowStatusMessage("Select a frame with a texture before resizing.", isError: true);
+            ShowProblem("Select a frame with a texture before resizing.");
             return;
         }
 
@@ -8278,7 +8276,7 @@ public partial class MainWindow : Window
 
         if (!File.Exists(absTexPath))
         {
-            ShowStatusMessage($"⚠ Texture file not found: {absTexPath}", isError: true);
+            ShowProblem($"⚠ Texture file not found: {absTexPath}");
             return;
         }
 
@@ -8288,7 +8286,7 @@ public partial class MainWindow : Window
         {
             if (bmp is null)
             {
-                ShowStatusMessage("⚠ Could not read texture file.", isError: true);
+                ShowProblem("⚠ Could not read texture file.");
                 return;
             }
             oldW = bmp.Width;
@@ -8366,7 +8364,7 @@ public partial class MainWindow : Window
             // race doesn't crash the app on the dispatcher (issue #479).
             if (src is null)
             {
-                ShowStatusMessage("⚠ Could not read texture file.", isError: true);
+                ShowProblem("⚠ Could not read texture file.");
                 return;
             }
 
@@ -8671,7 +8669,7 @@ public partial class MainWindow : Window
             // outside a tsx project.
             if (string.IsNullOrEmpty(newName) && !_appCommands.RenameChain(chain, newName))
             {
-                ShowStatusMessage("Chain name cannot be empty.", isError: true);
+                ShowProblem("Chain name cannot be empty.");
             }
             else if (newName.Length > 0 && newName != chain.Name)
             {
@@ -8772,7 +8770,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(frame.TextureName))
         {
-            ShowStatusMessage("This frame has no texture path set.", isError: true);
+            ShowProblem("This frame has no texture path set.");
             return;
         }
 
@@ -8786,13 +8784,13 @@ public partial class MainWindow : Window
 
         if (!File.Exists(absPath))
         {
-            ShowStatusMessage($"⚠ Texture file not found: {absPath}", isError: true);
+            ShowProblem($"⚠ Texture file not found: {absPath}");
             return;
         }
 
         var error = Services.ShellExplorer.RevealFile(absPath);
         if (error is not null)
-            ShowStatusMessage($"⚠ {error}", isError: true);
+            ShowProblem($"⚠ {error}");
     }
 }
 

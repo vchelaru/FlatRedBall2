@@ -45,7 +45,7 @@ public class NotificationDismissClickThroughTests
         var (window, overlay) = CreateHostedOverlay();
         try
         {
-            overlay.ShowToast("Exported spritesheet.json");
+            overlay.ShowInfo("Exported spritesheet.json");
             Dispatcher.UIThread.RunJobs();
 
             ClickAt(window, overlay.ToastDismissBtn);
@@ -61,7 +61,7 @@ public class NotificationDismissClickThroughTests
         var (window, overlay) = CreateHostedOverlay();
         try
         {
-            overlay.ShowErrorBanner("Save failed");
+            overlay.ShowProblem("Save failed");
             Dispatcher.UIThread.RunJobs();
 
             ClickAt(window, overlay.ErrorBannerDismissBtn);
