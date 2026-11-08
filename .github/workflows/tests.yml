@@ -100,6 +100,37 @@ jobs:
       - name: Test AnimationEditor.Core
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      - name: Test AnimationEditor.Views
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+
+      # Separate assembly from AnimationEditor.App.Tests so it can run headless with real
+      # (non-no-op) Skia drawing — see AnimationEditor.DocScreenshots/TestAppBuilder.cs.
+      - name: Test AnimationEditor.DocScreenshots
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
+
+  # Split out of engine-tests: AnimationEditor.App.Tests alone was ~5 of that job's ~7 minutes, so
+  # running it on its own runner in parallel shortens the critical path. Still gates "dotnet test".
+  animationeditor-app-tests:
+    name: AnimationEditor App tests (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
       # headless platform — no display server needed.
       - name: Test AnimationEditor.App
@@ -110,14 +141,6 @@ jobs:
       - name: Show unhandled exceptions from AnimationEditor.App tests
         if: failure()
         run: cat /tmp/AnimationEditorAppTests/unhandled-exceptions.log || echo "no unhandled exceptions were logged"
-
-      - name: Test AnimationEditor.Views
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      # Separate assembly from AnimationEditor.App.Tests so it can run headless with real
-      # (non-no-op) Skia drawing — see AnimationEditor.DocScreenshots/TestAppBuilder.cs.
-      - name: Test AnimationEditor.DocScreenshots
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
   # Renders scenes offscreen on Mesa llvmpipe (software OpenGL under xvfb) and compares them to the
   # checked-in PNGs in tests/FlatRedBall2.GoldenImage.Tests/Golden (#1420). Its own job because
@@ -298,7 +321,7 @@ jobs:
     name: dotnet test
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [engine-tests, golden-image-tests, kni-blazorgl-build, animationchain-pack, animationchain-common-pack]
+    needs: [engine-tests, animationeditor-app-tests, golden-image-tests, kni-blazorgl-build, animationchain-pack, animationchain-common-pack]
     if: ${{ always() }}
     steps:
       - name: All test and packaging jobs passed
