@@ -5,7 +5,7 @@ Snapshot, 2026-11-07. Mutations ran against main at e04f2e7d (#1674), after the 
 ## Verdict
 
 - 402 behaviors audited by mutation (break the production line, run only the relevant tests). 317 failed a test. 85 survived.
-- Of the 85 (the late PRs 1675 to 1679, merged while this ran, are in the table too): 14 are equivalent or redundant (listed below), 66 were unpinned and now have a test that fails against the same mutation, 5 are still open because the surface cannot be staged headlessly.
+- Of the 85 (the late PRs 1675 to 1679, merged while this ran; 1682 landed after the last run and is not mutated, are in the table too): 14 are equivalent or redundant (listed below), 66 were unpinned and now have a test that fails against the same mutation, 5 are still open because the surface cannot be staged headlessly.
 - Riskiest gaps found: the guard that makes Ctrl+X do nothing when neither the list nor the timeline has the focus (without it, Cut would delete the timeline selection while a button held the focus); Edit > Cut and Edit > Duplicate menu clicks were not routed by any test; Ctrl+X, Ctrl+D and Delete typed into a text box were never checked (only Ctrl+C and Ctrl+V were); a paste anchored on a selected chain, and a track paste below several selected chains or headers, were never exercised with more than the trivial case; a refused source in a paste never reached the banner in any test; the snap tie between a dragged chain's start and end, and the own-cycle mark at the chain's start, had no test; Escape cancelling a Ctrl rubber band, the chip-drop Alt bypass, and zoom around the lane edge had no test.
 - Test discipline: every merged PR in scope shipped tests, but they pin the main path and skip boundaries (ties, one-sided clamps, exact edges, defaults, repeats). Whether the tests came before the code cannot be read from squash merges. One test was wall-clock dependent and would fail on a slow runner (fixed, see Hygiene).
 - Bugs found: none in production code. 33 hostile clipboard envelopes, weird loop and start values (0, negative, 1e30, 1e9 on an empty chain) and zoom extremes threw nothing and hung nothing.
@@ -53,6 +53,8 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 | 1678 Flip Diagonal menu | not sequence mode | not audited | n/a |
 | 1679 leaving an open rename commits it | tab switch, library click, close, hotkeys, track and list boxes | SequenceRenameLeaveScenarioTests | outcome (CP1-CP3, CP6, CP8); focus hand-off and the same-document guard are open (CP4, CP5, RC1) |
 | 1680 skill signpost | docs | n/a | n/a |
+| 1681 macOS native menu Back and Forward | not sequence mode | not audited | n/a |
+| 1682 non-looping chain holds its last frame | scene, filmstrip, readout | SequenceSceneTests, SequencePingPongAndLoopTests, FilmstripLayoutTests, SequenceHoldTailTests | merged after the mutation runs; not mutation-audited |
 
 ## Bugs
 
