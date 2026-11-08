@@ -75,13 +75,21 @@ public partial class MainWindow
 
     private void Undo()
     {
+        CommitPendingRename();
         using (_navigation.Suppress()) _undoManager.Undo();
     }
 
     private void Redo()
     {
+        CommitPendingRename();
         using (_navigation.Suppress()) _undoManager.Redo();
     }
+
+    /// <summary>
+    /// Applies the name typed into an in-place rename that is still open, before whatever the user did next. Every way
+    /// out of a rename other than Enter and Escape funnels here; see <see cref="SequenceTabPane.CommitPendingRename"/>.
+    /// </summary>
+    private void CommitPendingRename() => _sequencePane.CommitPendingRename();
 
     /// <summary>-1 for the mouse Back button, +1 for Forward, null for any other press.</summary>
     internal static int? MouseNavigationDirection(PointerUpdateKind kind) => kind switch
@@ -125,6 +133,7 @@ public partial class MainWindow
     private async Task NavigateHistoryAsync(bool back)
     {
         if (_navigatingHistory) return;
+        CommitPendingRename();
         var here = CaptureNavigationLocation() ?? new NavigationLocation(string.Empty);
         _navigatingHistory = true;
         using var suppress = _navigation.Suppress();
