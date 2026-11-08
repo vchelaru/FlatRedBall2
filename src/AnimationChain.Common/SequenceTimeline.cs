@@ -14,6 +14,9 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <item>Outside every chain, the track's sprite is hidden. That includes the time before the first chain starts,
 /// on purpose: it is how a sprite appears partway through a sequence. If it showed before its chain, it would always
 /// be visible.</item>
+/// <item>A sequence with <see cref="SequenceSave.Loop"/> off does not end by going blank: it stops at its length and holds
+/// its final pose (<see cref="PoseTime"/>). The hold is the composite of the last instant, so a track whose chains finished
+/// earlier stays hidden. With Loop on the sequence repeats from 0.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
 /// chain data.
@@ -113,6 +116,18 @@ public static class SequenceTimeline
         if (time < length) return Math.Max(0, time);
         return loop ? time % length : length;
     }
+
+    /// <summary>How far before the end of a non-looping sequence its held final pose is sampled, in seconds.</summary>
+    public const double HoldEpsilon = 1e-4;
+
+    /// <summary>
+    /// The time to sample a sequence's pose at for a playhead at <paramref name="time"/>. A sequence with
+    /// <paramref name="loop"/> off stops at its end and holds its final pose: at or past <paramref name="length"/> the pose
+    /// is the one at the last instant before the end (<see cref="HoldEpsilon"/> earlier), so a track whose chains already
+    /// finished stays hidden and the rest keep their last frame. Otherwise, and for an empty sequence, the time is unchanged.
+    /// </summary>
+    public static double PoseTime(double time, double length, bool loop) =>
+        !loop && length > 0 && time >= length ? length - Math.Min(HoldEpsilon, length) : time;
 
     /// <summary>The earliest a chain's right edge can sit: <see cref="MinimumLoops"/> cycles after <paramref name="start"/>.</summary>
     public static double MinimumEdge(double start, double cycleLength) => start + MinimumLoops * cycleLength;

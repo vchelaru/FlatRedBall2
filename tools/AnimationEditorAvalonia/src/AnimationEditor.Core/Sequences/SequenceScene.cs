@@ -64,12 +64,16 @@ public static class SequenceScene
     /// whose chain is missing or empty, is left out (its sprite is hidden). A track is hidden before its first chain and
     /// after its last one on purpose: this is how a sprite appears or disappears partway through a sequence. A track whose
     /// <see cref="SequenceTrackSave.Visible"/> is false is left out too, shapes included; the sequence's length and
-    /// playback do not change.
+    /// playback do not change. A sequence with <see cref="SequenceSave.Loop"/> off holds its final pose: at or past its
+    /// length the sprites are those of its last instant (<see cref="SequenceTimeline.PoseTime"/>), so a track whose chains
+    /// finished earlier stays hidden. A looping sequence is sampled at exactly <paramref name="time"/>.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time)
     {
         if (sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count) return [];
-        var tracks = document.Save.Sequences[sequenceIndex].Tracks;
+        var sequence = document.Save.Sequences[sequenceIndex];
+        var tracks = sequence.Tracks;
+        time = SequenceTimeline.PoseTime(time, document.SequenceLength(sequenceIndex), sequence.Loop);
         var sprites = new List<SequenceSprite>();
         for (int t = tracks.Count - 1; t >= 0; t--)
         {

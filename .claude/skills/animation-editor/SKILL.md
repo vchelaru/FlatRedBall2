@@ -77,6 +77,8 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 **Number fields never pad trailing zeros.** Every `FlankerNumericField`/`NumericUpDown` `FormatString` uses optional decimals (`0.###`, not `0.000` or `0.0#`), so 0.1 shows as `0.1`; `NumberFieldFormatTests` enforces this for `MainWindow`. Position-like values (offsets, pixel rects, color channels) use a plain `NumericUpDown` with short `X`/`Y` labels, and stepped scalars (length, speed, grid size, a chain's start and cycles) use `FlankerNumericField`; the sequence Inspector's TRANSFORM section holds the same flip button as the `.achx` frame TRANSFORM section, and `SequenceInspectorParityScenarioTests` compares the two live.
 
+**Numeric fields show no up/down chevron spinner anywhere** (the `NumericUpDown` default in `ThemeStyles.axaml`; arrow keys and the wheel still step). Never set `ShowButtonSpinner` per control: opt in with `Classes="spinner"` and add the name to `NumericSpinnerRuleScenarioTests`, which fails on any other field showing one. The `[-][+]` flanker buttons (zoom, Speed, Grid, Length, Start, Cycles) are a separate widget and stay.
+
 ## Pop-ups are INFO or PROBLEM, nothing else
 
 Call `MainWindow.ShowInfo(message)` for a confirmation or FYI that needs nothing from the user (top-right toast, about 6 s), and `ShowProblem(message, retry?)` when work is not saved or an action the user asked for failed or was refused (top-centre banner, about 8 s, dismissable, optional Retry); `NotificationEntryPointGuardTests` fails on any other entry point. The status bar message (`ShowStatusMessage`) is a separate ambient label, so a failure never goes there.
@@ -117,6 +119,10 @@ the two gestures onto one shared size-preserving helper again — see
 ## Flipping a frame animates the preview, never the data
 
 `FlipCommand` changes the flags and offset at once, then raises `IApplicationEvents.FramesFlipped` with each frame's before and after `FlipPose`. `PreviewControl` plays `FlipTransition` (`AnimationEditor.Core/Rendering/`) from the old pose: a straight blend of the two flip matrices, which squashes the sprite flat on its mirror axis halfway through, plus a slide of the offset. Only the frame on screen animates, export always draws the final pose, and tests step it with `AdvanceFlipAnimation` instead of waiting on the timer.
+
+## Sequence Loop is on by default; Loop off stops and holds the final pose
+
+`SequenceSave.Loop` defaults to true like a chain's, and a `.seqj` with no `loop` key reads as true (an explicit `"loop": false` stays false; the writer always writes the key). A sequence with Loop off stops at its end and holds its final pose: `SequenceScene.At` samples any time at or past the length at the last instant before the end (`SequenceTimeline.PoseTime`), so tracks whose chains already finished stay hidden (sprites are still hidden outside their chains before the end) and the rest keep their last frame. Each selected sequence follows its own flag. Play at the end restarts from 0, like a non-looping chain in the `.achx` preview.
 
 ## Keyframe curves: Transform and Color play what the file stores
 
