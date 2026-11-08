@@ -76,6 +76,8 @@ public enum TreeMenuIcon
     MatchSize,
     Sequence,
     Plus,
+    Visibility,
+    Replace,
 }
 
 /// <summary>

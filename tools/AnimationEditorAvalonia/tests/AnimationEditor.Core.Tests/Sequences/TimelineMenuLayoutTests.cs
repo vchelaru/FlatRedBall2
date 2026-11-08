@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Sequences;
 using Shouldly;
+using System;
 using System.Linq;
 using Xunit;
 using Cmd = AnimationEditor.Core.Sequences.TimelineMenuCommand;
@@ -76,10 +77,18 @@ public class TimelineMenuLayoutTests
     public void ItemsWithATreeCounterpart_UseItsIcon(Cmd command, TreeMenuIcon expected) =>
         TimelineMenuLayout.Icon(command).ShouldBe(expected);
 
+    [Theory]
+    [InlineData(Cmd.ToggleVisibility, TreeMenuIcon.Visibility)]
+    [InlineData(Cmd.ShowAllTracks, TreeMenuIcon.Visibility)]
+    [InlineData(Cmd.GoToDefinition, TreeMenuIcon.Animation)]
+    [InlineData(Cmd.AddTrack, TreeMenuIcon.Plus)]
+    public void ItemsWithoutATreeCounterpart_UseTheNearestExistingIcon(Cmd command, TreeMenuIcon expected) =>
+        TimelineMenuLayout.Icon(command).ShouldBe(expected);
+
     [Fact]
-    public void ItemsWithoutATreeCounterpart_HaveNoIcon()
+    public void EveryCommand_HasAnIcon_AsEveryTreeMenuItemDoes()
     {
-        TimelineMenuLayout.Icon(Cmd.GoToDefinition).ShouldBeNull();
-        TimelineMenuLayout.Icon(Cmd.ToggleVisibility).ShouldBeNull();
+        foreach (var command in Enum.GetValues<Cmd>())
+            TimelineMenuLayout.Icon(command).ShouldNotBeNull($"{command} has no icon");
     }
 }

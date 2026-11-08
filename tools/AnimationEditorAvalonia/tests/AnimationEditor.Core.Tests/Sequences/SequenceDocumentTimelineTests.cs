@@ -112,7 +112,7 @@ public class SequenceDocumentTimelineTests
         var walk = sequence.Tracks[0].Chains[0];
         walk.Start = 2.5;
         TimelineNewTrackMove.Apply(sequence, new[] { walk });
-        document.CommitGesture(undo, "Move 'Walk' to new track 'Walk'", before);
+        document.CommitGesture(undo, "Move 'Walk' to New Track 'Walk'", before);
 
         var saved = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
         saved.Select(t => t.Name).ShouldBe(new[] { "Walk", "Body" });

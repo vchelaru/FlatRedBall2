@@ -61,9 +61,8 @@ public class SequenceClipboardMenuScenarioTests
 
     private static void ItemsShowTheTreesIcons(ContextMenu menu)
     {
-        // Go to Definition and the track visibility commands have no counterpart in the tree, so no icon to match.
-        string[] withoutTreeCounterpart = { "Go to Definition", "Hide Track", "Show Track", "Show All Tracks" };
-        foreach (var item in menu.Items.OfType<MenuItem>().Where(item => !withoutTreeCounterpart.Contains((string)item.Header!)))
+        // Every item has an icon, as every tree menu item does (Go to Definition and Hide/Show Track reuse the nearest art).
+        foreach (var item in menu.Items.OfType<MenuItem>())
             item.Icon.ShouldNotBeNull($"\"{item.Header}\" has no icon");
     }
 

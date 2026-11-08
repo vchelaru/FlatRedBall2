@@ -45,7 +45,7 @@ public class SequenceTimelineMultiMoveScenarioTests
 
         Chains(boss, 0).ShouldBe(new[] { ("Walk", 0.5), ("Walk", 1.0), ("Run", 2.0) });
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 2.0) });
-        editor.UndoLabels.ShouldBe(new[] { "Move 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Move 2 Chains" });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0), new TimelineChainId(1, 1) });
         editor.Press(Key.Z, RawInputModifiers.Control);
         Chains(boss, 0)[0].ShouldBe(("Walk", 0.0));
@@ -83,7 +83,7 @@ public class SequenceTimelineMultiMoveScenarioTests
         Chains(boss, 0).ShouldBe(new[] { ("Walk", 1.0), ("Run", 2.0) });
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 0.0) });
         Chains(boss, 2).ShouldBe(new[] { ("Walk", 1.5) });
-        editor.UndoLabels.ShouldBe(new[] { "Move 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Move 2 Chains" });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(1, 1), new TimelineChainId(2, 0) });
         editor.Press(Key.Z, RawInputModifiers.Control);
         Chains(boss, 2).ShouldBeEmpty();
@@ -173,7 +173,7 @@ public class SequenceTimelineMultiMoveScenarioTests
 
         Chains(boss, 0).ShouldBe(new[] { ("Walk", 1.0) });
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5) });
-        editor.UndoLabels.ShouldBe(new[] { "Remove 3 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Remove 3 Chains" });
         timeline.SelectedChains.ShouldBeEmpty();
         editor.Press(Key.Z, RawInputModifiers.Control);
         Chains(boss, 0).Length.ShouldBe(3);
@@ -192,7 +192,7 @@ public class SequenceTimelineMultiMoveScenarioTests
         editor.Press(Key.Delete);
 
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Head" });
-        editor.UndoLabels.ShouldBe(new[] { "Delete 2 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Delete 2 Tracks" });
         timeline.SelectedTracks.ShouldBeEmpty();
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(3);
@@ -213,6 +213,6 @@ public class SequenceTimelineMultiMoveScenarioTests
 
         Chains(boss, 0).Length.ShouldBe(2);
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5) });
-        editor.UndoLabels.ShouldBe(new[] { "Remove 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Remove 2 Chains" });
     }
 }

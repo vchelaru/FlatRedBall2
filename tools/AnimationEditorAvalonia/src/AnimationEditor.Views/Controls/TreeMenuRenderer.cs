@@ -67,6 +67,10 @@ public static class TreeMenuRenderer
         TreeMenuIcon.MatchSize      => "IconBoundingBox",
         TreeMenuIcon.Sequence       => "IconSequence",
         TreeMenuIcon.Plus           => "IconPlus",
+        // No eye icon exists; the layers mark stands for a track (nearest existing art).
+        TreeMenuIcon.Visibility     => "IconOnionSkin",
+        // Nearest existing art for "swap".
+        TreeMenuIcon.Replace        => "IconReverse",
         _ => throw new ArgumentOutOfRangeException(nameof(icon), icon, null),
     };
 

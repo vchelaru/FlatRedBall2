@@ -49,7 +49,7 @@ public class SequenceDocumentTimelineDuplicateTests
         // Each missing chain is drawn 1 s: the selection spans 0 to 2.5, so the copies start at 2.5 and 4.0.
         Chains(document, 0).ShouldBe(new[] { ("Walk", 0.0), ("Run", 1.5), ("Jump", 9.0), ("Walk", 2.5), ("Run", 4.0) });
         result.Chains.ShouldBe(new[] { new TimelineChainId(0, 3), new TimelineChainId(0, 4) });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 chains" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 Chains" });
         undo.Undo();
         Chains(document, 0).Length.ShouldBe(3);
     }
@@ -100,7 +100,7 @@ public class SequenceDocumentTimelineDuplicateTests
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.25, 2f, "gone.achx") });
         result.Tracks.ShouldBe(new[] { 0, 1 });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 tracks" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 Tracks" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Tail" });
     }
