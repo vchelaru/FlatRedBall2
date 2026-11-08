@@ -6,6 +6,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using System.Reflection;
 using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
@@ -51,6 +52,10 @@ public class SequenceTimelineMarqueePerformanceScenarioTests
         int contentChanged = 0, selectionChanged = 0;
         timeline.ContentChanged += () => contentChanged++;
         timeline.SelectionChanged += () => selectionChanged++;
+        // The throttle reads the wall clock, so how many events 60 moves raise depends on how fast this machine runs them. Hold it
+        // open (its own tick-driven behavior is pinned in TimelineMarqueeSelectorTests) so the count is the same on any runner.
+        typeof(SequenceTimelineControl).GetField("_marqueeThrottle", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(timeline, new SelectionChangeThrottle(long.MaxValue));
         int contentRenders = timeline.RenderCount;
         int layerRenders = timeline.SelectionLayerRenderCount;
         double X(double time) => timeline.Viewport.XAt(time);
@@ -72,9 +77,9 @@ public class SequenceTimelineMarqueePerformanceScenarioTests
         contentChanged.ShouldBe(0, "a selection change is not a content change: no layout rebuild, no preview refresh");
         timeline.RenderCount.ShouldBe(contentRenders, "the chains, lanes and filmstrips are not redrawn while selecting");
         timeline.SelectionLayerRenderCount.ShouldBeGreaterThan(layerRenders);
-        // Listeners are told at most once per ~33 ms and once more at the end, not once per touched chain: the 60 moves above
+        // Listeners are told on the first change and once more when the band ends, not once per touched chain: the 60 moves above
         // touch new chains on most of them.
-        selectionChanged.ShouldBeInRange(1, 6);
+        selectionChanged.ShouldBe(2);
         editor.Control<SequenceInspectorControl>("SequenceInspector").MultiCountText.Text.ShouldBe("203 chains selected");
     }
 
