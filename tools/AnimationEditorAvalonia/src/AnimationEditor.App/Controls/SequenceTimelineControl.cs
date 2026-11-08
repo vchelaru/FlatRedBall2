@@ -20,7 +20,7 @@ namespace AnimationEditor.App.Controls;
 /// <summary>
 /// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a lane per track with its chains, and a dashed row that
 /// makes a new track. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
-/// count; drop a library chip to add a chain; drag a track header up or down to reorder the lanes (the bottom lane
+/// count; drop a library chip to add a chain; drag a track header up or down to reorder the lanes (the top lane
 /// draws in front, see <see cref="TrackReorder"/>). Each gesture is one undo entry, recorded on release. Ctrl+wheel zooms
 /// around the pointer; the wheel scrolls (Shift+wheel always sideways). Pressing or dragging on the ruler scrubs: the
 /// host moves its clock on <see cref="Scrubbed"/> and sets <see cref="Playhead"/> back. Geometry and hit-testing live in
@@ -1316,7 +1316,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double ruler = TimelineViewport.RulerHeight;
         context.FillRectangle(Brush("BgRail"), new Rect(0, 0, size.Width, ruler));
         // Which end of the lane stack draws in front; the header column is otherwise empty up here.
-        var order = Text("↑ back   ↓ front", 10, Brush("InkMid"));
+        var order = Text("↑ front   ↓ back", 10, Brush("InkMid"));
         context.DrawText(order, new Point(8, (ruler - order.Height) / 2));
         using (context.PushClip(new Rect(header, 0, Math.Max(0, size.Width - header), ruler)))
         {

@@ -48,21 +48,21 @@ public class SequenceSceneTests
     }
 
     [Fact]
-    public void At_TwoTracksFromTwoSources_DrawsBothInLaneOrderWithTheirOwnTextures()
+    public void At_TwoTracksFromTwoSources_DrawsTheTopLaneInFront_EachWithItsOwnTexture()
     {
         using var dir = new TestHelpers.TempDir();
-        // The first lane is at the back, the last one in front.
+        // The first (top) lane is in front, so it is drawn last.
         var document = Load(dir,
             Track("Fx", ("fx/fx.achj", "Spark", 0, 1)),
             Track("Body", ("body/body.achj", "Walk", 0, 1)));
 
         var sprites = SequenceScene.At(document, 0, 0.3);
 
-        sprites.Select(s => s.Chain.Name).ShouldBe(new[] { "Spark", "Walk" });
-        sprites.Select(s => s.Track).ShouldBe(new[] { 0, 1 });
-        sprites[1].FrameIndex.ShouldBe(1);
-        sprites[1].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "body", "body.png")).FullPath);
-        sprites[0].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "fx", "spark.png")).FullPath);
+        sprites.Select(s => s.Chain.Name).ShouldBe(new[] { "Walk", "Spark" });
+        sprites.Select(s => s.Track).ShouldBe(new[] { 1, 0 });
+        sprites[0].FrameIndex.ShouldBe(1);
+        sprites[0].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "body", "body.png")).FullPath);
+        sprites[1].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "fx", "spark.png")).FullPath);
     }
 
     [Fact]
