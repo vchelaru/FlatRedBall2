@@ -14,11 +14,11 @@ strip are all part of what is tested.
 ## Run it
 
 ```
-scripts/test-ae.py --filter "FullyQualifiedName~Dogfood"
+python scripts/run_tests.py GridAndWandScenarioTests,ChainListScenarioTests   # the scenario classes you touched
 ```
 
-About 230 scenarios. The runner splits them across processes, so this takes under a minute
-instead of the ~100 seconds a single `dotnet test` process needs. The GitHub build runs this assembly on Ubuntu, so run the folder on Linux too before pushing (WSL is enough; see Gotchas).
+About 230 scenarios across the `*ScenarioTests.cs` files. Run only the classes you added or changed;
+the GitHub build runs the whole assembly on Windows and Ubuntu.
 
 ## The pieces
 
@@ -314,7 +314,7 @@ This is the whole method; nothing else is needed to pick the work up.
    permissions, watchers), and every note left open in the tables above.
 3. Write each scenario with the user's expectation stated up front, in the test name and the
    assertion messages. Let the editor disagree. Ten to twenty scenarios per pass is the right size.
-4. Run them: `dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~<ClassName>"`.
+4. Run them: `python scripts/run_tests.py <ClassName>`.
 5. Triage every failure before touching anything, by reading the handler behind it: harness gap,
    your expectation, or the editor. Expect most failures to be the first two; five editor bugs
    came out of about 150 scenarios, then three more from the eighteen unusual-project ones. Fix a
@@ -328,11 +328,9 @@ This is the whole method; nothing else is needed to pick the work up.
    `IEditorDialogHost` parameter is the precedent).
 7. Record the pass as a table in this file (finding, kind, outcome), add anything the harness had
    to route around to the real-window list below, update the scenario count under "Run it", and
-   commit the scenarios, any fix and this file together. Run the whole App assembly before
-   committing; the Core and Views assemblies too when `src/AnimationEditor.Core` changed. Run
-   the App assembly on Linux as well (WSL, from a clone in the Linux filesystem so Windows build
-   outputs stay untouched): the GitHub build uses Ubuntu, and the ninth pass found two Linux-only
-   differences that Windows could not show.
+   commit the scenarios, any fix and this file together. Run the scenario classes you added or
+   changed before committing, plus the test classes of any code you fixed. CI runs the whole
+   App assembly on Windows and Ubuntu, so Linux-only differences surface there.
 
 ## Needs real input: the non-headless list
 
@@ -402,11 +400,10 @@ knows where to look. Add to it whenever a scenario has to route around something
 - **The preview auto-plays once a chain is selected**, and the Play button toggles. A scenario
   that wants playback running checks `Preview.IsPlaying` first and only clicks when stopped;
   clicking blindly pauses it and every later assertion reads as "playback stopped".
-- **Linux differs in three places the harness has met.** Paths: the viewport's identity path is
+- **Linux differs in two places the harness has met.** Paths: the viewport's identity path is
   lowercased, so anything that re-reads a file must use the case-preserved path (that was the
   PNG reload bug). Permissions: a read-only file is replaced by the atomic save's rename, so an
-  unwritable folder is how to refuse a save. Shell: pass `|` in a `dotnet test` filter through
-  `wsl.exe` with a placeholder, since the WSL shell re-parses the argument line.
+  unwritable folder is how to refuse a save.
 - **Focus does not leave an inspector box on Enter.** Enter commits the value (and seals its
   undo entry); the `NumericUpDown` keeps the keyboard, and the tree itself is not focusable, so
   `AnimTree.Focus()` changes nothing. Click a row or press Tab to move focus for real.

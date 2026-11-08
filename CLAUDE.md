@@ -49,8 +49,11 @@ design write-ups here — those go in `design/*.md`. Game design documents stay 
 
 ```
 dotnet build src/FlatRedBall2.csproj
-dotnet test tests/FlatRedBall2.Tests/
+python scripts/run_tests.py CircleTests,AARectTests   # only these classes; builds and runs just their test project
+python scripts/run_tests.py CircleTests.Radius_Grows  # one method
 ```
+
+**AI agents run only the tests for the code they changed, never a whole test project or the whole suite; CI runs the full suites.** `scripts/run_tests.py` takes test class names, finds the owning project (engine, Common or AnimationEditor), builds only that project, and runs it once with a time limit. A `dotnet test` without a class `--filter`, and `scripts/test-ae.py`, are blocked by `.claude/hooks/block-full-test-runs.sh`. A command that times out or is killed is never rerun unchanged: narrow it. Do not run the suite on both `main` and the branch to diff outcomes; CI is the regression check.
 
 **Animation editor work: dogfood it headlessly.** `tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/Dogfood/README.md` describes the harness that drives the real editor window with simulated input (clicks, drags, keys, scripted dialogs, tab strip, wireframe geometry) and the find-a-bug, pin-it, fix-it loop built on it. Read it before changing the animation editor. It never touches the desktop, so it is safe to run while the machine is in use.
 
@@ -119,7 +122,7 @@ When (b) applies, the explanation must be in the PR/commit body and must say:
 
 If you cannot honestly write (1)-(3), the answer is: write the test.
 
-Run tests yourself via Bash — don't reason about whether a test would pass/fail instead of actually running it.
+Run the tests for the classes you changed yourself via Bash (`python scripts/run_tests.py <Class>`), don't reason about whether a test would pass/fail instead of actually running it.
 
 ## Reuse Before You Duplicate (Repo-Wide)
 
