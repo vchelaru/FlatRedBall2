@@ -8,7 +8,7 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests.Sequences;
 
-/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's offset, flip and z, a chain's start and loops.</summary>
+/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's flip, a chain's start and loops.</summary>
 public class SequenceDocumentInspectorEditTests
 {
     private static SequenceDocument Load(TestHelpers.TempDir dir)
@@ -28,25 +28,18 @@ public class SequenceDocumentInspectorEditTests
         SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0];
 
     [Fact]
-    public void TrackEdits_OffsetAndFlip_EachIsOneUndoStepAndSaves()
+    public void TrackEdits_Flip_IsOneUndoStepAndSaves()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetTrackOffset(undo, 0, 0, 4.5f, -2f);
         document.SetTrackFlip(undo, 0, 0, true);
 
-        var saved = SavedTrack(document);
-        (saved.X, saved.Y, saved.FlipHorizontal).ShouldBe((4.5f, -2f, true));
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[]
-        {
-            "Set Offset of 'Body' to (4.5, -2)", "Turn Flip On for 'Body'",
-        });
+        SavedTrack(document).FlipHorizontal.ShouldBeTrue();
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Turn Flip On for 'Body'" });
         undo.Undo();
         SavedTrack(document).FlipHorizontal.ShouldBeFalse();
-        undo.Undo();
-        SavedTrack(document).X.ShouldBe(0f);
     }
 
     [Fact]
@@ -56,7 +49,6 @@ public class SequenceDocumentInspectorEditTests
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetTrackOffset(undo, 0, 0, 0, 0);
         document.SetTrackFlip(undo, 0, 0, false);
 
         undo.UndoHistory.ShouldBeEmpty();
@@ -192,36 +184,6 @@ public class SequenceDocumentInspectorEditTests
         undo.UndoHistory.ShouldBeEmpty();
     }
 
-    // A numeric field commits as it is typed in, like the .achx inspector's: every step lands in the document at once and
-    // the entries merge until the user seals them (Enter, leaving the field).
-    [Fact]
-    public void TrackOffset_StepsOfOneEdit_MergeIntoOneUndoStep_UntilSealed()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir);
-        var undo = new UndoManager();
-
-        document.SetTrackOffset(undo, 0, 0, 1f, 0f);
-        document.SetTrackOffset(undo, 0, 0, 12f, 0f);
-        document.SetTrackOffset(undo, 0, 0, 12.5f, 0f);
-
-        SavedTrack(document).X.ShouldBe(12.5f);
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Offset of 'Body' to (12.5, 0)" });
-        undo.SealCoalescing();
-        document.SetTrackOffset(undo, 0, 0, 12.5f, -3f);
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[]
-        {
-            "Set Offset of 'Body' to (12.5, 0)", "Set Offset of 'Body' to (12.5, -3)",
-        });
-
-        undo.Undo();
-        SavedTrack(document).Y.ShouldBe(0f);
-        undo.Undo();
-        SavedTrack(document).X.ShouldBe(0f);
-        undo.Redo();
-        SavedTrack(document).X.ShouldBe(12.5f);
-    }
-
     [Fact]
     public void ChainStartAndCycles_StepsOfOneEdit_MergeIntoOneUndoStepEach()
     {
@@ -239,19 +201,5 @@ public class SequenceDocumentInspectorEditTests
         SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
         undo.Undo();
         SavedTrack(document).Chains.Single().Start.ShouldBe(0.5);
-    }
-
-    [Fact]
-    public void OffsetsOfTwoTracks_NeverMerge()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir);
-        var undo = new UndoManager();
-        document.AddTrack(undo, 0);
-
-        document.SetTrackOffset(undo, 0, 0, 1f, 0f);
-        document.SetTrackOffset(undo, 0, 1, 2f, 0f);
-
-        undo.UndoHistory.Count(c => c.Description.StartsWith("Set Offset")).ShouldBe(2);
     }
 }

@@ -403,7 +403,7 @@ public partial class MainWindow
             var newPath = new FilePath(picked);
             if (newPath != oldPath && _window._tabManager.Tabs.Any(other => other.Path == newPath))
             {
-                _window.ShowErrorBanner($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
+                _window.ShowProblem($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
                 return;
             }
 
@@ -412,7 +412,7 @@ public partial class MainWindow
             var collapsedIndices = Enumerable.Range(0, oldSources.Count).Where(i => _window.SequenceLibrary.IsCollapsed(oldSources[i])).ToList();
             if (document.SaveAs(newPath.FullPath) is { } error)
             {
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
                 return;
             }
             if (newPath == oldPath) return;
@@ -828,7 +828,11 @@ public partial class MainWindow
             preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
-            WireTrackPlacement();
+            // A click on a sprite selects its track (the timeline and Inspector follow); nothing drags, a track has no offset.
+            preview.TrackClicked += track =>
+            {
+                if (_document is not null && SequenceIndex >= 0) w.SequenceTimeline.SelectTracks(new[] { track });
+            };
             // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
             // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
             w.SequenceShowShapes.IsCheckedChanged += (_, _) =>
@@ -1338,7 +1342,7 @@ public partial class MainWindow
             bool collapsed = library.IsCollapsed(source);
             if (document.ReplaceSource(_window._undoManager, source, picked) is { } error)
             {
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
                 return;
             }
             // The collapsed state is keyed by the source as written, which the replace changed; the new source starts as the old one was.

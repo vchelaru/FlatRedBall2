@@ -139,8 +139,6 @@ public class SequenceListSave
         var result = new JsonObject
         {
             ["name"] = track.Name,
-            ["x"] = track.X,
-            ["y"] = track.Y,
         };
         // Written only when set, so the common unflipped track stays short.
         if (track.FlipHorizontal) result["flipHorizontal"] = true;
@@ -194,13 +192,12 @@ public class SequenceListSave
         var track = new SequenceTrackSave
         {
             Name = node.String("name"),
-            X = node.Float("x"),
-            Y = node.Float("y"),
             FlipHorizontal = node.Bool("flipHorizontal"),
             Visible = node.Bool("visible", fallback: true),
         };
-        // "z" is listed so it is dropped, not kept as an unknown property: files written before tracks lost their Z still
-        // hold one, and saving them must not write it back. Draw order is the track order.
+        // "x", "y" and "z" are listed so they are dropped unread, not kept as unknown properties: files written before tracks
+        // lost their offset and Z still hold them, and saving must not write them back. Sprites sit at their frames' offsets
+        // and draw in track order.
         CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "chains");
         foreach (var chain in node.Objects("chains"))
         {

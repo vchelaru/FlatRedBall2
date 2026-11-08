@@ -21,7 +21,7 @@ public class SequenceTrackNoZTests
         var loaded = SequenceListSave.FromJsonString(FileWithZ);
 
         var tracks = loaded.Sequences.ShouldHaveSingleItem().Tracks;
-        tracks.Select(t => (t.Name, t.X, t.Y, t.Chains.Count)).ShouldBe(new[] { ("Body", 1f, 2f, 1), ("Wing", 0f, 0f, 0) });
+        tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Body", 1), ("Wing", 0) });
         tracks[1].UnknownProperties["tag"]!.GetValue<string>().ShouldBe("keep");
     }
 
@@ -63,6 +63,6 @@ public class SequenceTrackNoZTests
 
         var keys = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject().Select(p => p.Key);
 
-        keys.ShouldBe(new[] { "name", "x", "y", "chains" });
+        keys.ShouldBe(new[] { "name", "chains" });
     }
 }

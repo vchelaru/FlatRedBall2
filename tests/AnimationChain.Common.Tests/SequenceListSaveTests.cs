@@ -20,7 +20,7 @@ public class SequenceListSaveTests
             {
                 new SequenceTrackSave
                 {
-                    Name = "Wing R", X = 75, Y = 95.5f, FlipHorizontal = true,
+                    Name = "Wing R", FlipHorizontal = true,
                     Chains = { new SequenceChainReferenceSave { Source = "Boss.achj", Chain = "WingFlap", Start = 0.25, Loops = 11.5f } },
                 },
             },
@@ -33,7 +33,7 @@ public class SequenceListSaveTests
         sequence.Name.ShouldBe("Attack");
         sequence.Loop.ShouldBeTrue();
         var track = sequence.Tracks.ShouldHaveSingleItem();
-        (track.Name, track.X, track.Y, track.FlipHorizontal).ShouldBe(("Wing R", 75f, 95.5f, true));
+        (track.Name, track.FlipHorizontal).ShouldBe(("Wing R", true));
         var reference = track.Chains.ShouldHaveSingleItem();
         (reference.Source, reference.Chain, reference.Start, reference.Loops).ShouldBe(("Boss.achj", "WingFlap", 0.25, 11.5f));
     }
@@ -55,8 +55,6 @@ public class SequenceListSaveTests
                   "tracks": [
                     {
                       "name": "Body",
-                      "x": 0,
-                      "y": 0,
                       "chains": [
                         {
                           "source": "Gone.achj",
@@ -160,7 +158,7 @@ public class SequenceListSaveTests
               {{UnknownProps}},
               "tracks": [
                 {
-                  "name": "Body", "x": 1, "y": 2,
+                  "name": "Body",
                   {{UnknownProps}},
                   "chains": [
                     { "source": "A.achj", "chain": "Walk", "start": 0.5, "loops": 2, {{UnknownProps}} }
@@ -204,7 +202,7 @@ public class SequenceListSaveTests
 
         root.Select(p => p.Key).Take(3).ShouldBe(new[] { "version", "sources", "sequences" });
         sequence.Select(p => p.Key).Take(3).ShouldBe(new[] { "name", "loop", "tracks" });
-        track.Select(p => p.Key).Take(4).ShouldBe(new[] { "name", "x", "y", "chains" });
+        track.Select(p => p.Key).Take(2).ShouldBe(new[] { "name", "chains" });
         chain.Select(p => p.Key).Take(4).ShouldBe(new[] { "source", "chain", "start", "loops" });
     }
 
@@ -241,7 +239,7 @@ public class SequenceListSaveTests
         var loaded = SequenceListSave.FromJsonString(WithUnknownEverywhere());
         var chain = loaded.Sequences[0].Tracks[0].Chains[0];
         chain.Start = 9;
-        loaded.Sequences[0].Tracks[0].X = 4;
+        loaded.Sequences[0].Tracks[0].Name = "Renamed";
 
         var chainNode = JsonNode.Parse(loaded.ToJsonString())!["sequences"]![0]!["tracks"]![0]!["chains"]![0]!;
         chainNode["start"]!.GetValue<double>().ShouldBe(9);

@@ -94,7 +94,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         Library(editor).Sources.Select(source => (source.Source, source.IsMissing)).ShouldBe(new[] { ("../chars/hero.achx", false) });
         Library(editor).ChipFor("../chars/hero.achx", "Walk").ShouldNotBeNull();
         RecentTips(editor)[0].ShouldBe(new FilePath(target).FullPath);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.Dialogs.ThrowIfUnanswered();
     }
 
@@ -166,7 +166,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         await editor.WaitAsync(TimeSpan.FromSeconds(1.5));
 
         editor.UndoLabels.ShouldBe(labelsBefore);
-        editor.ToastText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
         editor.Press(Key.Z, RawInputModifiers.Control);
         editor.SequenceNames.ShouldBe(new[] { "Attack" });
         Library(editor).Sources[0].IsMissing.ShouldBeFalse();
@@ -209,7 +209,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.Dialogs.ThrowIfUnanswered();
     }
 
@@ -226,7 +226,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         editor.Press(Key.S, RawInputModifiers.Control | RawInputModifiers.Shift);
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("other.seqj");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("other.seqj");
         editor.TabLabels.ShouldBe(new[] { "other.seqj", "boss.seqj" });
         SequenceListSave.FromFile(other).Sequences.Select(s => s.Name).ShouldBe(new[] { "Idle" });
     }
@@ -243,7 +243,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         editor.Press(Key.S, RawInputModifiers.Control | RawInputModifiers.Shift);
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain(".seqj");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain(".seqj");
         File.Exists(target).ShouldBeFalse();
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
     }
@@ -269,7 +269,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         editor.Click(ReplaceButton(editor, "chars/hero.achx"));
         bool replaced = await editor.WaitUntilAsync(() => !Library(editor).Sources[0].IsMissing, TimeSpan.FromSeconds(5));
 
-        replaced.ShouldBeTrue($"dialogs [{string.Join("; ", editor.Dialogs.Shown)}] banner [{editor.ErrorBannerText}]");
+        replaced.ShouldBeTrue($"dialogs [{string.Join("; ", editor.Dialogs.Shown)}] banner [{editor.ProblemText}]");
         Library(editor).Sources.Select(source => (source.Source, source.IsMissing)).ShouldBe(new[] { ("moved/hero.achx", false) });
         Library(editor).ChipFor("moved/hero.achx", "Walk").ShouldNotBeNull();
         editor.UndoLabels.ShouldBe(new[] { "Replace Source 'hero.achx' with 'hero.achx'" });
@@ -321,9 +321,9 @@ public class SequenceSaveAsAndRelinkScenarioTests
         editor.RightClickAt(OnHeaderTitle(editor, header));
         editor.Dialogs.AnswerNextOpenFile(tail);
         editor.PickMenuItem(header.ContextMenu!, "Replace Source…");
-        await editor.WaitUntilAsync(() => editor.ErrorBannerText is not null, TimeSpan.FromSeconds(5));
+        await editor.WaitUntilAsync(() => editor.ProblemText is not null, TimeSpan.FromSeconds(5));
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already in the library");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already in the library");
         Library(editor).Sources.Select(source => source.Source).ShouldBe(new[] { "chars/hero.achx", "tail.achx" });
         editor.UndoLabels.ShouldBeEmpty();
     }
@@ -342,7 +342,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     // ---- Relink a chain ----
