@@ -65,7 +65,7 @@ public sealed partial class SequenceTimelineControl
     /// <summary>Every selected track header, ascending. Empty while chains are selected.</summary>
     public IReadOnlyList<int> SelectedTracks => _model.Tracks;
 
-    /// <summary>"3 chains selected" when more than one chain or track is, else null; the Inspector shows it in place of any field.</summary>
+    /// <summary>"3 chains selected" when more than one chain or track is, else null; the status bar shows it.</summary>
     public string? SelectionSummary =>
         !_model.IsMulti ? null
         : _model.Kind == TimelineSelectionKind.Chains ? $"{Plural.Format(_model.Count, "chain")} selected"
