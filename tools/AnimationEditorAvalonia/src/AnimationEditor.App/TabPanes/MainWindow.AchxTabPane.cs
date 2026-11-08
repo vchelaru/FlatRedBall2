@@ -38,6 +38,8 @@ public partial class MainWindow
 
         public void CaptureLeaving(TabEntry tab)
         {
+            // Before the snapshot, so the rename is in this tab's history.
+            _window.CommitPendingTreeRename();
             _window._tabController.CaptureLeavingTab(tab);
             _window.SaveCompanionFile();
         }
@@ -121,6 +123,7 @@ public partial class MainWindow
         /// </summary>
         public void Closing(TabEntry tab)
         {
+            _window.CommitPendingTreeRename();
             if (IsUntitledTab(tab))
                 _window._ioManager.DeleteRecoveryFile();
         }
