@@ -298,6 +298,7 @@ public partial class MainWindow : Window
         ApplyPersistedPreviewPaneHeight();
         ShowBoundingBoxCheck.IsChecked = _appSettings.ShowBoundingBox;
         PreviewCtrl.ShowBoundingBox = _appSettings.ShowBoundingBox;
+        ApplyPersistedSequenceView();
         ProjectPanel.ShowAllFolders = _appSettings.ShowAllProjectFolders;
         ProjectPanel.ShowAllFoldersChanged += show => _appSettings.ShowAllProjectFolders = show;
         ApplyPersistedSidebarWidth();
@@ -411,6 +412,8 @@ public partial class MainWindow : Window
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
             Services.CloseCleanup.Run(
                 () => _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value,
+                () => _appSettings.SequencePreviewPaneHeight = SequenceEditorPane.RowDefinitions[2].Height.Value,
+                () => _appSettings.SequenceLibraryWidth = SequenceTopGrid.ColumnDefinitions[0].Width.Value,
                 () => _appSettings.SidebarWidth = MainContentGrid.ColumnDefinitions[0].Width.Value,
                 () => _appSettings.WindowMaximized = WindowState == WindowState.Maximized,
                 SaveTabsToSettings,
@@ -680,6 +683,12 @@ public partial class MainWindow : Window
     private readonly AchxTabPane _achxPane;
     private readonly PngTabPane _pngPane;
     private readonly SequenceTabPane _sequencePane;
+
+    /// <summary>Replaces the sequence preview's playback clock, so a test drives time without waiting (as <see cref="PreviewControl.SetPlaybackClock"/> does).</summary>
+    internal void SetSequencePlaybackClock(TickClock clock) => _sequencePane.SetPlaybackClock(clock);
+
+    /// <summary>Runs one sequence playback tick now, as the timer would.</summary>
+    internal void TickSequencePlayback() => _sequencePane.TickPlayback();
     private ITabPane _visiblePane;
 
     private ITabPane PaneFor(TabKind kind) => kind switch
@@ -2675,8 +2684,12 @@ public partial class MainWindow : Window
 
         MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
         MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();
-        MenuPreviewZoomIn.Click    += (_, _) => PreviewZoom.StepUp();
-        MenuPreviewZoomOut.Click   += (_, _) => PreviewZoom.StepDown();
+        // Preview zoom drives whichever preview the active tab shows: the achx one, or the sequence tab's.
+        MenuPreviewZoomIn.Click    += (_, _) => ActivePreviewZoom.StepUp();
+        MenuPreviewZoomOut.Click   += (_, _) => ActivePreviewZoom.StepDown();
+        MenuTimelineZoomIn.Click   += (_, _) => SequenceTimelineZoom.StepUp();
+        MenuTimelineZoomOut.Click  += (_, _) => SequenceTimelineZoom.StepDown();
+        MenuTimelineFit.Click      += (_, _) => SequenceTimeline.FitToSequence();
 
         // C#-built surfaces (tab strip, history rows) hold static brush snapshots, so
         // rebuild them when the variant changes. XAML surfaces follow via DynamicResource.
@@ -2701,7 +2714,12 @@ public partial class MainWindow : Window
     ];
 
     // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
-    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory, MenuReloadFromDisk];
+    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory, MenuReloadFromDisk, MenuPreviewZoomIn, MenuPreviewZoomOut];
+
+    // Items that act on the sequence timeline, so only a sequence tab takes them.
+    private MenuItem[] SequenceOnlyMenuItems => [MenuTimelineZoomIn, MenuTimelineZoomOut, MenuTimelineFit];
+
+    private ZoomControl ActivePreviewZoom => ReferenceEquals(_visiblePane, _sequencePane) ? SequencePreviewZoom : PreviewZoom;
 
     // Copy, Cut, Paste and Duplicate are enabled by the active pane (ITabPane.CanCopyPaste), not by scope: a sequence tab
     // takes them only while its list or its timeline is the focused surface.
@@ -2714,9 +2732,10 @@ public partial class MainWindow : Window
         var appScoped = AppScopedMenuItems;
         var documentScoped = DocumentScopedMenuItems;
         var paneEnabled = PaneEnabledMenuItems;
+        var sequenceOnly = SequenceOnlyMenuItems;
         foreach (var item in items.OfType<MenuItem>())
         {
-            if (appScoped.Contains(item) || paneEnabled.Contains(item)) continue;
+            if (appScoped.Contains(item) || paneEnabled.Contains(item) || sequenceOnly.Contains(item)) continue;
             if (item.Items.OfType<MenuItem>().Any())
                 CollectScopedMenuItems(item.Items);
             else
@@ -2734,6 +2753,8 @@ public partial class MainWindow : Window
             item.IsEnabled = _visiblePane.Accepts(scope);
         bool documentActive = _visiblePane.Accepts(HotkeyScope.Document);
         MenuCopy.IsEnabled = MenuCut.IsEnabled = MenuPaste.IsEnabled = MenuDuplicate.IsEnabled = _visiblePane.CanCopyPaste;
+        foreach (var item in SequenceOnlyMenuItems)
+            item.IsEnabled = ReferenceEquals(_visiblePane, _sequencePane);
         MenuUndo.IsEnabled = documentActive && _undoManager.CanUndo;
         MenuRedo.IsEnabled = documentActive && _undoManager.CanRedo;
     }
@@ -3403,6 +3424,8 @@ public partial class MainWindow : Window
             var show = ShowBoundingBoxCheck.IsChecked == true;
             PreviewCtrl.ShowBoundingBox = show;
             _appSettings.ShowBoundingBox = show;
+            // One setting for both tab kinds: the sequence preview's toggle follows.
+            SequenceShowBoundingBox.IsChecked = show;
         };
 
         ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
@@ -7179,6 +7202,26 @@ public partial class MainWindow : Window
         AchxEditorPane.RowDefinitions[3].Height = new GridLength(resolved, GridUnitType.Pixel);
     }
 
+    /// <summary>
+    /// Applies what a <c>.seqj</c> tab's preview remembers across launches: the Shapes and Origin toggles, the Bounding Box
+    /// toggle (the same <see cref="AppSettingsModel.ShowBoundingBox"/> the achx toggle uses, so a user sees one setting), and
+    /// the preview row height and library column width (siblings of <see cref="AppSettingsModel.PreviewPaneHeight"/>).
+    /// </summary>
+    private void ApplyPersistedSequenceView()
+    {
+        SequenceShowShapes.IsChecked = _appSettings.SequenceShowShapes;
+        SequenceShowOrigin.IsChecked = _appSettings.SequenceShowOrigin;
+        SequenceShowBoundingBox.IsChecked = _appSettings.ShowBoundingBox;
+        SequenceEditorPane.RowDefinitions[2].Height = new GridLength(PersistedDimensionValidator.Resolve(
+            _appSettings.SequencePreviewPaneHeight, MinPreviewPaneHeight, MaxPreviewPaneHeight, DefaultPreviewPaneHeight), GridUnitType.Pixel);
+        SequenceTopGrid.ColumnDefinitions[0].Width = new GridLength(PersistedDimensionValidator.Resolve(
+            _appSettings.SequenceLibraryWidth, MinSequenceLibraryWidth, MaxSequenceLibraryWidth, DefaultSequenceLibraryWidth), GridUnitType.Pixel);
+    }
+
+    private const double MinSequenceLibraryWidth = 100;
+    private const double MaxSequenceLibraryWidth = 1200;
+    private const double DefaultSequenceLibraryWidth = 220;
+
     /// <summary>Restores the maximized/restored window state from the last session (#1045).</summary>
     private void ApplyPersistedWindowState()
     {
@@ -7524,6 +7567,40 @@ public partial class MainWindow : Window
                 Scope = HotkeyScope.Document,
                 Action = () => ActivePane.TogglePlayback(),
             },
+            // The .achx player has no keyboard stepping, so these are the sequence tab's own. All four need the sequence
+            // timeline to hold the focus, so the list, the tree, the preview and every text box keep their own keys.
+            new()
+            {
+                Id = "playhead-step-back", Description = "Step Playhead to Previous Frame", Category = "Playback",
+                Gestures = new[] { new HotkeyGesture("Left", Forbidden: Command | Shift | Alt) },
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
+                Scope = HotkeyScope.Document,
+                Action = () => _sequencePane.StepPlayhead(-1),
+            },
+            new()
+            {
+                Id = "playhead-step-forward", Description = "Step Playhead to Next Frame", Category = "Playback",
+                Gestures = new[] { new HotkeyGesture("Right", Forbidden: Command | Shift | Alt) },
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
+                Scope = HotkeyScope.Document,
+                Action = () => _sequencePane.StepPlayhead(+1),
+            },
+            new()
+            {
+                Id = "playhead-start", Description = "Playhead to Start", Category = "Playback",
+                Gestures = new[] { new HotkeyGesture("Home", Forbidden: Command | Shift | Alt) },
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
+                Scope = HotkeyScope.Document,
+                Action = () => _sequencePane.JumpPlayhead(toEnd: false),
+            },
+            new()
+            {
+                Id = "playhead-end", Description = "Playhead to End", Category = "Playback",
+                Gestures = new[] { new HotkeyGesture("End", Forbidden: Command | Shift | Alt) },
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
+                Scope = HotkeyScope.Document,
+                Action = () => _sequencePane.JumpPlayhead(toEnd: true),
+            },
             new()
             {
                 Id = "move-up", Description = "Move Selected Up", Category = "Edit",
@@ -7615,7 +7692,7 @@ public partial class MainWindow : Window
     }
 
     // Resolves which pane's ZoomControl the panel-zoom-in/out hotkeys should drive: whichever of
-    // WireframeCtrl/PreviewCtrl/PngPane currently owns keyboard focus (or is an ancestor of the
+    // WireframeCtrl/PreviewCtrl/PngPane or the sequence preview/timeline currently owns keyboard focus (or is an ancestor of the
     // focused element), else null when none does (e.g. the tree or a text field is focused instead).
     private ZoomControl? FocusedPanelZoom()
     {
@@ -7623,6 +7700,8 @@ public partial class MainWindow : Window
         if (focused == WireframeCtrl || WireframeCtrl.IsVisualAncestorOf(focused)) return WireframeZoom;
         if (focused == PreviewCtrl || PreviewCtrl.IsVisualAncestorOf(focused)) return PreviewZoom;
         if (focused == PngPane || PngPane.IsVisualAncestorOf(focused)) return PngZoom;
+        if (focused == SequencePreview || SequencePreview.IsVisualAncestorOf(focused)) return SequencePreviewZoom;
+        if (focused == SequenceTimeline || SequenceTimeline.IsVisualAncestorOf(focused)) return SequenceTimelineZoom;
         return null;
     }
 
@@ -7683,6 +7762,8 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuWireframeZoomOut, "panel-zoom-out");
         SetMenuGesture(MenuPreviewZoomIn, "panel-zoom-in");
         SetMenuGesture(MenuPreviewZoomOut, "panel-zoom-out");
+        SetMenuGesture(MenuTimelineZoomIn, "panel-zoom-in");
+        SetMenuGesture(MenuTimelineZoomOut, "panel-zoom-out");
     }
 
     private KeyGesture HotkeyMenuGesture(string hotkeyId) =>

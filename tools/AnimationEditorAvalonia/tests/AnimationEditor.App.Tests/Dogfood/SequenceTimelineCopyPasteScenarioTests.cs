@@ -179,8 +179,8 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         var saved = SequenceListSave.FromFile(other);
         saved.Sources.ShouldBe(new[] { "../hero.achx" });
-        saved.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Lane", "Body" });
-        saved.Sequences[0].Tracks[1].Chains.Select(c => (c.Source, c.Start)).ShouldBe(new[] { ("../hero.achx", 0.0), ("../hero.achx", 1.0) });
+        saved.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Lane" });
+        saved.Sequences[0].Tracks[0].Chains.Select(c => (c.Source, c.Start)).ShouldBe(new[] { ("../hero.achx", 0.0), ("../hero.achx", 1.0) });
         editor.UndoLabels.ShouldBe(new[] { "Paste 2 chains" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(other).Sources.ShouldBeEmpty();

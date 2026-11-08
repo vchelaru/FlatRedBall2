@@ -273,8 +273,9 @@ public class SequenceEventRowScenarioTests
             editor.ClickAt(Body(editor, lane, 0.15));
             timeline.Selection.ShouldBe(new TimelineChainId(lane, 0));
         }
-        // The new-track row sits right below the last lane's real height.
-        timeline.Viewport.RowAt(timeline.Viewport.LaneTop(4) + 4, 4).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        // The new-track row sits above the first lane, whatever the lane heights below it.
+        timeline.Viewport.RowAt(timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + 4, 4).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        timeline.Viewport.RowAt(timeline.Viewport.LaneTop(4) + 4, 4).ShouldBe(new TimelineRow(TimelineRowKind.None));
     }
 
     [AvaloniaFact]
@@ -314,7 +315,7 @@ public class SequenceEventRowScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task VerticalScrolling_CoversTheTallLanes_AndEndsWithTheNewTrackRowInView()
+    public async Task VerticalScrolling_CoversTheTallLanes_AndEndsWithTheLastLaneInView()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var tracks = Enumerable.Range(0, 14).Select(i => Track($"T{i}", (i % 2 == 0 ? "Walk" : "Run", 0, 1))).ToArray();
@@ -324,10 +325,10 @@ public class SequenceEventRowScenarioTests
 
         for (int i = 0; i < 40; i++) editor.Wheel(editor.PointIn(timeline, 300, 100), -1);
 
-        // Seven tall and seven normal lanes plus the new-track row, ruler on top.
+        // Seven tall and seven normal lanes under the new-track row, ruler on top.
         double content = TimelineViewport.RulerHeight + 7 * TallLane + 7 * BaseLane + BaseLane;
         viewport.ContentHeight(14).ShouldBe(content);
         viewport.ScrollY.ShouldBe(content - timeline.Bounds.Height, 1e-3);
-        (viewport.LaneTop(14) + BaseLane).ShouldBe(timeline.Bounds.Height, 1e-3);
+        viewport.LaneTop(14).ShouldBe(timeline.Bounds.Height, 1e-3);
     }
 }
