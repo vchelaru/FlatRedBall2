@@ -72,7 +72,8 @@ public partial class MainWindow
         private bool _restoringZoom;
         private List<SequenceListItem> _items = new();
 
-        private readonly SequenceClock _clock = new();
+        // One clock per selected sequence, each on its own length and loop flag. Replaced on every load, since names are per file.
+        private SequencePlayback _playback = new();
         private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(16) };
         // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
         private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
@@ -257,7 +258,8 @@ public partial class MainWindow
             Detach();
             _document = document;
             _document.Changed += Refresh;
-            _clock.Stop();
+            _document.SequenceRenamed += OnSequenceRenamed;
+            _playback = new SequencePlayback();
             // The undo stack is shared by every tab; this tab's own history lives in its snapshot.
             _window._undoManager.Clear();
             if (tab.UndoSnapshot != null)
@@ -445,12 +447,12 @@ public partial class MainWindow
         private void FocusSelectedRow()
         {
             _window.SequenceList.UpdateLayout();
-            _window.SequenceList.ContainerFromIndex(_window.SequenceList.SelectedIndex)?.Focus();
+            _window.SequenceList.ContainerFromIndex(SequenceIndex)?.Focus();
         }
 
         public void TogglePlayback()
         {
-            if (_clock.IsPlaying)
+            if (_playback.IsPlaying)
                 PausePlayback();
             else
                 Play();
@@ -468,19 +470,11 @@ public partial class MainWindow
         {
             var w = _window;
             w.AddSequenceButton.Click += (_, _) => AddSequence();
-            w.SequenceList.SelectionChanged += (_, _) =>
-            {
-                if (_refreshing || _document is null) return;
-                _document.SelectedSequence = w.SequenceList.SelectedIndex;
-                RememberSelection();
-                w.SequenceTimeline.Show(_document, w.SequenceList.SelectedIndex, w._undoManager);
-                ShowInspector();
-                // Another sequence starts from its beginning.
-                StopPlayback();
-            };
+            w.SequenceList.SelectionChanged += (_, _) => OnSequenceListSelectionChanged();
             // Clicking the row that is already selected raises no SelectionChanged, so the press itself says "the
             // sequence": it drops the timeline selection and brings the sequence fields forward.
             w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+            w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressedTunnel, RoutingStrategies.Tunnel);
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
             w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
@@ -537,9 +531,11 @@ public partial class MainWindow
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
             w.SequenceStopButton.Click += (_, _) => StopPlayback();
             w.SequenceLoopToggle.Click += (_, _) => SetLoop(w.SequenceLoopToggle.IsChecked == true);
+            // The timeline shows the primary sequence, so a scrub moves its playhead alone; the others keep theirs.
             w.SequenceTimeline.Scrubbed += time =>
             {
-                _clock.Seek(time, w.SequenceTimeline.SequenceLength);
+                if (_document?.Selection.Primary is { } primary)
+                    _playback.Seek(primary, time, w.SequenceTimeline.SequenceLength);
                 ShowPlayhead();
             };
             w.SequenceTimelineZoom.Attach(w.SequenceTimeline);
@@ -582,11 +578,25 @@ public partial class MainWindow
             _window.UpdateDocumentMenuItems();
         }
 
+        // Ctrl+click toggles a row, and toggling the only selected one off would leave nothing selected, which the list
+        // never shows: the click does nothing instead.
+        private void OnSequenceListPressedTunnel(object? sender, PointerPressedEventArgs e)
+        {
+            var list = _window.SequenceList;
+            if (!e.GetCurrentPoint(list).Properties.IsLeftButtonPressed || list.SelectedItems!.Count != 1) return;
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Meta)) return;
+            if (e.Source is Visual source && source.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { DataContext: { } row }
+                && ReferenceEquals(row, list.SelectedItems[0]))
+                e.Handled = true;
+        }
+
         private void OnSequenceListPressed(object? sender, PointerPressedEventArgs e)
         {
             var w = _window;
             if (_document is null || !e.GetCurrentPoint(w.SequenceList).Properties.IsLeftButtonPressed) return;
             if (e.Source is not Visual source || source.FindAncestorOfType<ListBoxItem>() is null || source.FindAncestorOfType<InlineRenameBox>() is not null || source is InlineRenameBox) return;
+            // Extending the selection leaves the primary sequence, and so the timeline selection, alone.
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Shift) || e.KeyModifiers.HasFlag(KeyModifiers.Meta)) return;
             w.SequenceTimeline.ClearSelection();
             ShowInspector();
             BringInspectorForward();
@@ -600,7 +610,11 @@ public partial class MainWindow
         {
             var w = _window;
             if (w.SequenceList.ContextMenu is not { } menu) return;
-            bool onSequence = e.Source is Visual source && source.FindAncestorOfType<ListBoxItem>(includeSelf: true) is not null;
+            var hit = e.Source is Visual source ? source.FindAncestorOfType<ListBoxItem>(includeSelf: true) : null;
+            bool onSequence = hit is not null;
+            // The commands act on the primary, so a row hit inside a multi-selection becomes the whole selection.
+            if (hit?.DataContext is SequenceListItem hitRow && _items.IndexOf(hitRow) is >= 0 and var hitIndex && hitIndex != SequenceIndex)
+                w.SequenceList.SelectedIndex = hitIndex;
             menu.Items.Clear();
             var groups = SequenceListMenuLayout.For(onSequence);
             for (int i = 0; i < groups.Count; i++)
@@ -752,7 +766,7 @@ public partial class MainWindow
             // An edit can shorten the sequence under the playhead. A drag step does not move it: Escape restores the
             // length, and the playhead should be where the user left it.
             if (!w.SequenceTimeline.IsDraggingChain)
-                _clock.Seek(_clock.Time, w.SequenceTimeline.SequenceLength);
+                _playback.Clamp(LengthOf);
             ShowPlayhead();
         }
 
@@ -769,17 +783,52 @@ public partial class MainWindow
             await _window.OpenAndSelectChainAsync(path, reference.Chain);
         }
 
-        private int SequenceIndex => _window.SequenceList.SelectedIndex;
+        /// <summary>The primary sequence's index: what the timeline, Inspector and every editing command act on. -1 for none.</summary>
+        public int PrimaryIndex => SequenceIndex;
+
+        private int SequenceIndex => _document?.SelectedSequence ?? -1;
 
         private SequenceSave? CurrentSequence =>
             _document is { } document && SequenceIndex >= 0 && SequenceIndex < document.Save.Sequences.Count
                 ? document.Save.Sequences[SequenceIndex]
                 : null;
 
+        private int IndexOf(string? name) =>
+            _document is { } document && name is not null ? document.Save.Sequences.FindIndex(sequence => sequence.Name == name) : -1;
+
+        private double LengthOf(string name) => _document?.SequenceLength(IndexOf(name)) ?? 0;
+
+        private bool LoopOf(string name) =>
+            _document is { } document && IndexOf(name) is >= 0 and var index && document.Save.Sequences[index].Loop;
+
+        private void OnSequenceRenamed(string from, string to) => _playback.Rename(from, to);
+
+        /// <summary>
+        /// The list's selection changed by the user: Ctrl+click and Shift+click extend it, a plain click narrows it to one row.
+        /// The first selected row stays primary until it is deselected. The timeline only reloads when the primary changed.
+        /// </summary>
+        private void OnSequenceListSelectionChanged()
+        {
+            var w = _window;
+            if (_refreshing || _document is not { } document) return;
+            int previousPrimary = document.SelectedSequence;
+            var names = w.SequenceList.SelectedItems!.OfType<SequenceListItem>().Select(item => item.Name).ToList();
+            document.Selection.Apply(names);
+            document.SelectedSequence = IndexOf(document.Selection.Primary);
+            RememberSelection();
+            // Selecting another sequence starts it from its beginning; extending the selection leaves the others playing.
+            _playback.Select(document.Selection.Names, LengthOf);
+            if (!_playback.IsPlaying) _timer.Stop();
+            if (document.SelectedSequence != previousPrimary)
+                w.SequenceTimeline.Show(document, document.SelectedSequence, w._undoManager);
+            ShowInspector();
+            ShowPlayhead();
+        }
+
         private void Play()
         {
-            _clock.Play(_window.SequenceTimeline.SequenceLength);
-            if (_clock.IsPlaying)
+            _playback.Play(LengthOf);
+            if (_playback.IsPlaying)
             {
                 _tick.Reset();
                 _tick.Tick();
@@ -790,35 +839,42 @@ public partial class MainWindow
 
         private void PausePlayback()
         {
-            _clock.Pause();
+            _playback.Pause();
             _timer.Stop();
             ShowPlayhead();
         }
 
         private void StopPlayback()
         {
-            _clock.Stop();
+            _playback.Stop();
             _timer.Stop();
             ShowPlayhead();
         }
 
         private void OnTick()
         {
-            _clock.AdvanceTick(_tick.Tick(), _window.SequenceTimeline.SequenceLength, CurrentSequence?.Loop == true);
-            if (!_clock.IsPlaying) _timer.Stop();
+            _playback.AdvanceTick(_tick.Tick(), LengthOf, LoopOf);
+            if (!_playback.IsPlaying) _timer.Stop();
             ShowPlayhead();
         }
 
-        /// <summary>Moves the playhead, the preview, the time readout and the play button to the clock.</summary>
+        /// <summary>
+        /// Moves the playheads, the preview, the time readout and the play button to the clocks. The timeline and the
+        /// readout follow the primary sequence; the preview composites every selected sequence at its own time, in
+        /// selection order from the back (<see cref="SequenceScene.At(SequenceDocument, IEnumerable{SequenceTime})"/>).
+        /// </summary>
         private void ShowPlayhead()
         {
             var w = _window;
-            double time = _clock.Time;
+            double time = _document?.Selection.Primary is { } primary ? _playback.TimeOf(primary) : 0;
             w.SequenceTimeline.Playhead = time;
-            w.SequencePreview.Composite = _document is null ? null : SequenceScene.At(_document, SequenceIndex, time);
+            w.SequencePreview.Composite = _document is not { } document
+                ? null
+                : SequenceScene.At(document, document.Selection.Names
+                    .Select(name => new SequenceTime(IndexOf(name), _playback.TimeOf(name))).ToList());
             w.SequenceTimeText.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.00} s / {1:0.00} s",
                 time, w.SequenceTimeline.SequenceLength);
-            w.SequencePlayIcon.Path = _clock.IsPlaying
+            w.SequencePlayIcon.Path = _playback.IsPlaying
                 ? "avares://AnimationEditor.Views/Assets/icons/svg/IconPause.svg"
                 : "avares://AnimationEditor.Views/Assets/icons/svg/IconPlay.svg";
         }
@@ -839,7 +895,7 @@ public partial class MainWindow
 
         private async Task RenameTrackAsync(int track)
         {
-            if (_document is not { } document || _window.SequenceList.SelectedIndex is not (>= 0 and var sequence)) return;
+            if (_document is not { } document || SequenceIndex is not (>= 0 and var sequence)) return;
             string oldName = document.Save.Sequences[sequence].Tracks[track].Name;
             string? name = await _window._appCommands.PromptStringAsync("Rename Track", "Track name:", oldName);
             if (name is null || document != _document) return;
@@ -880,7 +936,7 @@ public partial class MainWindow
         {
             var list = _window.SequenceList;
             int index = _items.FindIndex(item => item.Name == name);
-            if (document != _document || index < 0 || index != list.SelectedIndex) return;
+            if (document != _document || index < 0 || index != SequenceIndex) return;
             list.ScrollIntoView(index);
             list.UpdateLayout();
             if (list.ContainerFromIndex(index) is not ListBoxItem container) return;
@@ -905,7 +961,7 @@ public partial class MainWindow
 
         private async Task RenameSelectedAsync()
         {
-            if (_document is not { } document || _window.SequenceList.SelectedIndex is not (>= 0 and var index)) return;
+            if (_document is not { } document || SequenceIndex is not (>= 0 and var index)) return;
             string oldName = document.Save.Sequences[index].Name;
             string? name = await _window._appCommands.PromptStringAsync("Rename Sequence", "Sequence name:", oldName);
             if (name is null || document != _document) return;
@@ -915,7 +971,7 @@ public partial class MainWindow
 
         private void DeleteSelected()
         {
-            if (_document is null || _window.SequenceList.SelectedIndex is not (>= 0 and var index)) return;
+            if (_document is null || SequenceIndex is not (>= 0 and var index)) return;
             _document.DeleteSequence(_window._undoManager, index);
         }
 
@@ -925,7 +981,10 @@ public partial class MainWindow
             if (_document != null)
                 _window.SequenceTimeline.SettleZoomAnimation();
             if (_document != null)
+            {
                 _document.Changed -= Refresh;
+                _document.SequenceRenamed -= OnSequenceRenamed;
+            }
             _document = null;
             _watcher.StopWatching();
         }
@@ -988,18 +1047,27 @@ public partial class MainWindow
             _items = _document.Save.Sequences.Select(sequence => new SequenceListItem(sequence.Name)).ToList();
             // The document says which sequence an edit, undo or redo left selected.
             int selected = Math.Min(_document.SelectedSequence, _items.Count - 1);
+            _document.SelectedSequence = selected;
+            // Selected sequences that no longer exist drop out; a selected sequence outside the multi-selection narrows it.
+            _document.Selection.Reconcile(SequenceNames(_document), selected);
+            var rows = _document.Selection.Names.Select(IndexOf).ToList();
             _refreshing = true;
             try
             {
-                _window.SequenceList.ItemsSource = _items;
-                _window.SequenceList.SelectedIndex = selected;
+                var list = _window.SequenceList;
+                list.ItemsSource = _items;
+                // The list's own selection order is the draw order, so the rows go back in the order they were selected.
+                list.SelectedIndex = rows.Count > 0 ? rows[0] : selected;
+                foreach (int row in rows.Skip(1))
+                    list.Selection.Select(row);
             }
             finally
             {
                 _refreshing = false;
             }
-            _document.SelectedSequence = selected;
             RememberSelection();
+            _playback.Select(_document.Selection.Names, LengthOf);
+            if (!_playback.IsPlaying) _timer.Stop();
             // The settings copy is current after every toggle, so reloading it on each refresh is safe.
             _window.SequenceLibrary.CollapsedSources.Load(
                 _window._appSettings.CollapsedLibrarySources.GetValueOrDefault(_document.Path.Standardized));
