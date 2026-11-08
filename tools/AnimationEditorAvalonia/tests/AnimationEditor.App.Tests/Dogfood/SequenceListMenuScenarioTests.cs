@@ -37,7 +37,7 @@ public class SequenceListMenuScenarioTests
         RightClickBlankSpace(editor);
 
         List(editor).ContextMenu!.IsOpen.ShouldBeTrue();
-        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste" });
+        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste", "-", "Sort Sequences Alphabetically" });
     }
 
     [AvaloniaFact]
@@ -50,7 +50,12 @@ public class SequenceListMenuScenarioTests
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
         List(editor).SelectedIndex.ShouldBe(1);
-        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence" });
+        // Row 1 is the last of two: it can only move up.
+        Headers(List(editor)).ShouldBe(new[]
+        {
+            "Move To Top", "Move Up", "-",
+            "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence", "-", "Sort Sequences Alphabetically",
+        });
     }
 
     [AvaloniaFact]
@@ -74,13 +79,13 @@ public class SequenceListMenuScenarioTests
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "Idle"));
 
         RightClickBlankSpace(editor);
-        Headers(List(editor)).Count.ShouldBe(3);
+        Headers(List(editor)).Count.ShouldBe(5);
         List(editor).ContextMenu!.Close();
         editor.RightClick(List(editor).ContainerFromIndex(0)!);
-        Headers(List(editor)).Count.ShouldBe(11);
+        Headers(List(editor)).Count.ShouldBe(13);
         List(editor).ContextMenu!.Close();
         RightClickBlankSpace(editor);
-        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste" });
+        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste", "-", "Sort Sequences Alphabetically" });
     }
 
     [AvaloniaFact]

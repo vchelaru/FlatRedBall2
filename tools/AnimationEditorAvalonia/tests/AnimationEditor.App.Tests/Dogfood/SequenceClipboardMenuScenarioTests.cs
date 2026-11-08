@@ -78,7 +78,8 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(List(editor).ContextMenu!).ShouldBe(new[]
         {
-            "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence",
+            "Move To Top", "Move Up", "Move Down", "Move To Bottom", "-",
+            "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence", "-", "Sort Sequences Alphabetically",
         });
         ItemsShowTheTreesIcons(List(editor).ContextMenu!);
     }
@@ -96,7 +97,8 @@ public class SequenceClipboardMenuScenarioTests
         var menu = List(editor).ContextMenu!;
         Headers(menu).ShouldBe(new[]
         {
-            "Add Sequence", "-", "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences",
+            "Move Down", "Move To Bottom", "-",
+            "Add Sequence", "-", "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences", "-", "Sort Sequences Alphabetically",
         });
         ItemOf(menu, "Rename…").IsEnabled.ShouldBeFalse();
     }
@@ -109,7 +111,7 @@ public class SequenceClipboardMenuScenarioTests
 
         RightClickBlankList(editor);
 
-        Headers(List(editor).ContextMenu!).ShouldBe(new[] { "Add Sequence", "-", "Paste" });
+        Headers(List(editor).ContextMenu!).ShouldBe(new[] { "Add Sequence", "-", "Paste", "-", "Sort Sequences Alphabetically" });
     }
 
     [AvaloniaFact]
@@ -187,6 +189,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(Timeline(editor).Menu).ShouldBe(new[]
         {
+            "Move To Top", "Move Up", "Move Down", "Move To Bottom", "-",
             "Copy", "Cut", "Paste", "Duplicate", "-", "Rename Track…", "Hide Track", "-", "Delete Track",
         });
         ItemsShowTheTreesIcons(Timeline(editor).Menu);
