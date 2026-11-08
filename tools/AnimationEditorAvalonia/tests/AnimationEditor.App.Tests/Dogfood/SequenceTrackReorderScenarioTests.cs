@@ -16,7 +16,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 public class SequenceTrackReorderScenarioTests
 {
     // Four tracks, back to front, with offsets 10, 20, 30, 40 so the preview's draw order can be read off their X.
-    // Walk has frame events, so lane 1 ("Mid") is taller than the others.
+    // Walk has frame events, so lane 1 ("Second") is taller than the others.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
         editor.WritePng("sheet.png", 64, 64);
@@ -26,7 +26,7 @@ public class SequenceTrackReorderScenarioTests
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        string[] names = { "Back", "Mid", "Upper", "Front" };
+        string[] names = { "Top", "Second", "Third", "Bottom" };
         for (int i = 0; i < names.Length; i++)
         {
             var track = new SequenceTrackSave { Name = names[i], X = 10 * (i + 1) };
@@ -63,23 +63,23 @@ public class SequenceTrackReorderScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DraggingTheTopHeaderToTheBottom_MovesItToTheFront_AsOneUndoStep_AndKeepsItSelected()
+    public async Task DraggingTheTopHeaderToTheBottom_MovesItToTheBack_AsOneUndoStep_AndKeepsItSelected()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor);
         await editor.OpenAsync(boss);
-        DrawnBackToFront(editor).ShouldBe(new[] { 10f, 20f, 30f, 40f });
+        DrawnBackToFront(editor).ShouldBe(new[] { 40f, 30f, 20f, 10f });
 
         editor.Drag(Header(editor, 0), GapBelowLast(editor));
 
-        SavedNames(boss).ShouldBe(new[] { "Mid", "Upper", "Front", "Back" });
+        SavedNames(boss).ShouldBe(new[] { "Second", "Third", "Bottom", "Top" });
         File.ReadAllText(boss).ShouldNotContain("\"z\"");
-        editor.UndoLabels.ShouldBe(new[] { "Move Track 'Back'" });
-        DrawnBackToFront(editor).ShouldBe(new[] { 20f, 30f, 40f, 10f });
+        editor.UndoLabels.ShouldBe(new[] { "Move Track 'Top'" });
+        DrawnBackToFront(editor).ShouldBe(new[] { 10f, 40f, 30f, 20f });
         Timeline(editor).SelectedTrack.ShouldBe(3);
         var inspector = editor.Control<SequenceInspectorControl>("SequenceInspector");
         inspector.TrackPanel.IsVisible.ShouldBeTrue();
-        inspector.TrackNameBox.Text.ShouldBe("Back");
+        inspector.TrackNameBox.Text.ShouldBe("Top");
         Timeline(editor).DraggedTrack.ShouldBeNull();
         Timeline(editor).TrackDropSlot.ShouldBeNull();
         Timeline(editor).ShownCursor.ShouldBe(TimelineCursor.Default);
@@ -95,14 +95,14 @@ public class SequenceTrackReorderScenarioTests
 
         editor.Press(Key.Z, RawInputModifiers.Control);
 
-        SavedNames(boss).ShouldBe(new[] { "Back", "Mid", "Upper", "Front" });
-        DrawnBackToFront(editor).ShouldBe(new[] { 10f, 20f, 30f, 40f });
+        SavedNames(boss).ShouldBe(new[] { "Top", "Second", "Third", "Bottom" });
+        DrawnBackToFront(editor).ShouldBe(new[] { 40f, 30f, 20f, 10f });
         Timeline(editor).SelectedTrack.ShouldBe(0);
-        editor.Control<SequenceInspectorControl>("SequenceInspector").TrackNameBox.Text.ShouldBe("Back");
+        editor.Control<SequenceInspectorControl>("SequenceInspector").TrackNameBox.Text.ShouldBe("Top");
 
         editor.Press(Key.Y, RawInputModifiers.Control);
 
-        SavedNames(boss).ShouldBe(new[] { "Mid", "Upper", "Front", "Back" });
+        SavedNames(boss).ShouldBe(new[] { "Second", "Third", "Bottom", "Top" });
         Timeline(editor).SelectedTrack.ShouldBe(3);
     }
 
@@ -136,7 +136,7 @@ public class SequenceTrackReorderScenarioTests
         timeline.TrackDropSlot.ShouldBeNull();
         editor.DragRelease(GapAbove(editor, 3));
         editor.UndoLabels.ShouldBeEmpty();
-        SavedNames(boss).ShouldBe(new[] { "Back", "Mid", "Upper", "Front" });
+        SavedNames(boss).ShouldBe(new[] { "Top", "Second", "Third", "Bottom" });
     }
 
     [AvaloniaFact]
@@ -153,7 +153,7 @@ public class SequenceTrackReorderScenarioTests
 
         Timeline(editor).DraggedTrack.ShouldBeNull();
         Timeline(editor).TrackDropSlot.ShouldBeNull();
-        SavedNames(boss).ShouldBe(new[] { "Back", "Mid", "Upper", "Front" });
+        SavedNames(boss).ShouldBe(new[] { "Top", "Second", "Third", "Bottom" });
         editor.UndoLabels.ShouldBeEmpty();
         Timeline(editor).SelectedTrack.ShouldBe(0);
     }
@@ -174,7 +174,7 @@ public class SequenceTrackReorderScenarioTests
 
         Timeline(editor).SelectedTrack.ShouldBe(1);
         editor.UndoLabels.ShouldBeEmpty();
-        SavedNames(boss).ShouldBe(new[] { "Back", "Mid", "Upper", "Front" });
+        SavedNames(boss).ShouldBe(new[] { "Top", "Second", "Third", "Bottom" });
     }
 
     [AvaloniaFact]
@@ -184,14 +184,14 @@ public class SequenceTrackReorderScenarioTests
         string boss = WriteFixture(editor);
         await editor.OpenAsync(boss);
 
-        // Over the tall lane's event row (its lower half): the gap below "Mid", so "Front" lands between "Mid" and "Upper".
+        // Over the tall lane's event row (its lower half): the gap below "Second", so "Bottom" lands between "Second" and "Third".
         var timeline = Timeline(editor);
         editor.Drag(Header(editor, 3), editor.PointIn(timeline, 20, timeline.Viewport.LaneTop(1) + timeline.Viewport.LaneHeightOf(1) - 3));
 
-        SavedNames(boss).ShouldBe(new[] { "Back", "Mid", "Front", "Upper" });
-        editor.UndoLabels.ShouldBe(new[] { "Move Track 'Front'" });
+        SavedNames(boss).ShouldBe(new[] { "Top", "Second", "Bottom", "Third" });
+        editor.UndoLabels.ShouldBe(new[] { "Move Track 'Bottom'" });
         timeline.SelectedTrack.ShouldBe(2);
-        DrawnBackToFront(editor).ShouldBe(new[] { 10f, 20f, 40f, 30f });
+        DrawnBackToFront(editor).ShouldBe(new[] { 30f, 40f, 20f, 10f });
     }
 
     [AvaloniaFact]

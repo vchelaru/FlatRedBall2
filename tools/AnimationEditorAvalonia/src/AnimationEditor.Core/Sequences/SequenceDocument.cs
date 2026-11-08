@@ -656,6 +656,26 @@ public sealed class SequenceDocument
         return true;
     }
 
+    /// <summary>
+    /// Moves the library sources at <paramref name="indices"/> (into <see cref="SequenceListSave.Sources"/>) to gap
+    /// <paramref name="slot"/> as one block, as one undo entry. Returns false when the drop changes nothing.
+    /// </summary>
+    public bool MoveSources(IUndoManager undo, IReadOnlyList<int> indices, int slot)
+    {
+        if (SequenceReorder.Plan(Save.Sources.Count, indices, slot) is not { } plan) return false;
+        var moved = indices.Where(index => index >= 0 && index < Save.Sources.Count).Distinct().OrderBy(index => index).ToList();
+        string description = moved.Count == 1
+            ? $"Move Source '{new FilePath(Save.Sources[moved[0]]).NoPath}'"
+            : $"Move {moved.Count} Sources";
+        Edit(undo, description, save =>
+        {
+            var reordered = plan.Order.Select(old => save.Sources[old]).ToList();
+            save.Sources.Clear();
+            save.Sources.AddRange(reordered);
+        });
+        return true;
+    }
+
     /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
     public void SetLoop(IUndoManager undo, int index, bool loop)
     {
@@ -820,8 +840,8 @@ public sealed class SequenceDocument
 
     /// <summary>
     /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
-    /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the bottom
-    /// lane is in front), so nothing but the list order changes. Returns the track's new index, or null when the drop
+    /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the top
+    /// lane is in front, the bottom lane at the back), so nothing but the list order changes. Returns the track's new index, or null when the drop
     /// changes nothing.
     /// </summary>
     public int? MoveTrack(IUndoManager undo, int sequence, int from, int slot)

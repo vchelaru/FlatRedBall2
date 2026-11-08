@@ -62,7 +62,7 @@ public class SequencePreviewScenarioTests
         SequencePreview(editor).Composite!.Select(sprite => $"{sprite.Chain.Name}:{sprite.FrameIndex}").ToList();
 
     [AvaloniaFact]
-    public async Task Scrubbing_ShowsBothTracksComposited_EachFromItsOwnTexture_InLaneOrder()
+    public async Task Scrubbing_ShowsBothTracksComposited_EachFromItsOwnTexture_TopLaneInFront()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, loop: false,
@@ -73,9 +73,9 @@ public class SequencePreviewScenarioTests
         editor.ClickAt(RulerAt(editor, 0.15));
 
         Timeline(editor).Playhead.ShouldBe(0.15, 0.01);
-        Shown(editor).ShouldBe(new[] { "Spark:1", "Walk:1" });
+        Shown(editor).ShouldBe(new[] { "Walk:1", "Spark:1" });
         SequencePreview(editor).Composite!.Select(sprite => Path.GetFileName(sprite.TexturePath))
-            .ShouldBe(new[] { "fx.png", "hero.png" });
+            .ShouldBe(new[] { "hero.png", "fx.png" });
         editor.Control<TextBlock>("SequenceTimeText").Text.ShouldBe("0.15 s / 0.50 s");
     }
 
@@ -105,7 +105,7 @@ public class SequencePreviewScenarioTests
         editor.ClickAt(RulerAt(editor, 0.1));
         Shown(editor).ShouldBe(new[] { "Walk:1" });
         editor.ClickAt(RulerAt(editor, 0.35));
-        Shown(editor).ShouldBe(new[] { "Walk:3", "Spark:0" });
+        Shown(editor).ShouldBe(new[] { "Spark:0", "Walk:3" });
     }
 
     [AvaloniaFact]

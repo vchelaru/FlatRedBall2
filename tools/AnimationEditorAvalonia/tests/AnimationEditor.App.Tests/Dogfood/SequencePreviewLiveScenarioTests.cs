@@ -437,7 +437,7 @@ public class SequencePreviewLiveScenarioTests
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
         steps.Check("hide");
         Undo(editor);
-        ShownChains(editor).ShouldBe(new[] { "Walk:0", "Run:0" });
+        ShownChains(editor).ShouldBe(new[] { "Run:0", "Walk:0" });
         steps.Check("undo hide");
         Redo(editor);
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
