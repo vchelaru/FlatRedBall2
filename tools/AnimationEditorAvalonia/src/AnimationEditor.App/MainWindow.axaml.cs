@@ -881,7 +881,7 @@ public partial class MainWindow : Window
     private bool _confirmingClose;
 
     /// <summary>
-    /// Closing the window with a tab whose last save failed would drop its edits, so it asks first, once per such tab
+    /// Closing the window with a tab whose last save failed, or an Untitled tab with content, would drop its edits, so it asks first, once per such tab
     /// (the window-level counterpart of <see cref="ITabPane.PrepareCloseAsync"/>).
     /// </summary>
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
@@ -2792,6 +2792,9 @@ public partial class MainWindow : Window
 
     private void OnNewClick(object? sender, RoutedEventArgs e)
     {
+        // The open tab is being left for the new one: snapshot it, or switching back finds it blank (and
+        // closing the window cannot tell it holds an unsaved Untitled document).
+        CaptureLeavingActiveTab();
         // Register the currently-open file (if any) as a tab before we clear it.
         EnsureCurrentEditorContentHasTab();
 
@@ -6437,7 +6440,7 @@ public partial class MainWindow : Window
     private static NumericUpDown NewVertexInput(string name, string watermark) => new()
     {
         Name = name, Minimum = -10000, Maximum = 10000, Increment = 1, FormatString = "0.###",
-        FontSize = 11, PlaceholderText = watermark, ShowButtonSpinner = false,
+        FontSize = 11, PlaceholderText = watermark,
     };
 
     private void ApplyPolygonVertex(int index)
@@ -6600,14 +6603,13 @@ public partial class MainWindow : Window
     private List<KeyframeColor> InspectorColors(IReadOnlyList<AnimationFrameSave> frames) =>
         frames.Select(f => KeyframeInspectorState.DisplayColor(f, _objectFinder.GetAnimationChainContaining(f))).ToList();
 
-    /// <summary>Makes numeric fields read-only and dimmed, with no spinner, while they show a computed value.</summary>
+    /// <summary>Makes numeric fields read-only and dimmed while they show a computed value.</summary>
     private static void SetComputedLook(bool editable, params NumericUpDown[] fields)
     {
         foreach (var field in fields)
         {
             field.IsReadOnly = !editable;
             field.AllowSpin = editable;
-            field.ShowButtonSpinner = editable;
             field.Opacity = editable ? 1.0 : 0.6;
         }
     }
