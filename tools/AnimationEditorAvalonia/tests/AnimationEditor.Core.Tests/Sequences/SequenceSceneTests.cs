@@ -25,11 +25,14 @@ public class SequenceSceneTests
         return SequenceDocument.Load(path);
     }
 
-    private static void WriteSource(string path, string chain, string texture, params float[] lengths)
+    private static void WriteSource(string path, string chain, string texture, params float[] lengths) =>
+        WriteSource(path, chain, texture, loop: true, lengths);
+
+    private static void WriteSource(string path, string chain, string texture, bool loop, params float[] lengths)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var list = new AnimationChainListSave();
-        var save = new AnimationChainSave { Name = chain };
+        var save = new AnimationChainSave { Name = chain, Loop = loop };
         foreach (float length in lengths)
             save.Frames.Add(new AnimationFrameSave { TextureName = texture, FrameLength = length, RightCoordinate = 1, BottomCoordinate = 1 });
         list.AnimationChains.Add(save);
@@ -111,7 +114,7 @@ public class SequenceSceneTests
     }
 
     [Fact]
-    public void At_ALoopedChain_WrapsIntoItsCycleEvenWhenTheChainDoesNotLoop()
+    public void At_ALoopingChain_RepeatsAcrossTheBlockLength()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0, 3)));
@@ -121,6 +124,30 @@ public class SequenceSceneTests
 
         sprite.FrameIndex.ShouldBe(0);
         sprite.ElapsedInFrame.ShouldBe(0.1, 1e-6);
+    }
+
+    // Was At_ALoopedChain_WrapsIntoItsCycleEvenWhenTheChainDoesNotLoop: the reference's loops used to override a chain's
+    // Loop flag. By design decision a chain that does not loop plays once and holds its last frame for the block's length.
+    [Fact]
+    public void At_ANonLoopingChain_PlaysOnceThenHoldsItsLastFrameForTheBlockLength()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteSource(Path.Combine(dir.Path, "body", "body.achj"), "Walk", "body.png", loop: false, 0.25f, 0.25f);
+        var save = new SequenceListSave { Sources = { "body/body.achj" } };
+        var sequence = new SequenceSave { Name = "Attack" };
+        sequence.Tracks.Add(Track("Body", 0, ("body/body.achj", "Walk", 0, 3)));
+        save.Sequences.Add(sequence);
+        string path = Path.Combine(dir.Path, "boss.seqj");
+        save.Save(path);
+        var document = SequenceDocument.Load(path);
+
+        // 0.6 s is past the first 0.5 s cycle: the last frame, held, not frame 0 again.
+        var sprite = SequenceScene.At(document, 0, 0.6).Single();
+        sprite.FrameIndex.ShouldBe(1);
+        sprite.ElapsedInFrame.ShouldBe(0.25, 1e-6);
+        SequenceScene.At(document, 0, 1.4).Single().FrameIndex.ShouldBe(1);
+        // The block is 1.5 s long: the hold ends there.
+        SequenceScene.At(document, 0, 1.5).ShouldBeEmpty();
     }
 
     [Fact]

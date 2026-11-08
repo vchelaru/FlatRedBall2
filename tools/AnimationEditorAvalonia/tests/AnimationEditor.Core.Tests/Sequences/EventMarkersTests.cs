@@ -57,6 +57,25 @@ public class EventMarkersTests
     }
 
     [Fact]
+    public void Occurrences_ANonLoopingChain_FiresOnlyDuringItsFirstCycle_NotDuringTheHold()
+    {
+        // 0.4 s cycle in a 1.0 s block: A and B fire once; the held last frame (which carries B) does not fire again.
+        var frames = new[] { F(0.1, "A"), F(0.2), F(0.1, "B") };
+
+        var occurrences = EventMarkers.Occurrences(frames, false, false, played: 1.0, loop: false);
+
+        Fired(occurrences).ShouldBe(new[] { ("A", 0.0), ("B", 0.3) });
+    }
+
+    [Fact]
+    public void Occurrences_ANonLoopingChainCutBeforeItsCycleEnds_FollowsTheCutRule()
+    {
+        var frames = new[] { F(0.1, "A"), F(0.2), F(0.1, "B") };
+
+        Fired(EventMarkers.Occurrences(frames, false, false, played: 0.3, loop: false)).ShouldBe(new[] { ("A", 0.0) });
+    }
+
+    [Fact]
     public void Occurrences_AFrameEnteredBeforeThePlayedEnd_FiresEvenIfItIsCutShort()
     {
         var frames = new[] { F(0.5, "A"), F(0.5, "B") };

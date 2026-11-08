@@ -70,9 +70,9 @@ public static class SequenceScene
             var reference = SequenceTimeline.ActiveAt(track, time, r => document.CycleLength(r) ?? 0, out double local);
             if (reference is null || document.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
 
-            // The loop count overrides the chain's own Loop flag, so wrap into a cycle here rather than in ChainClock.
-            double cycle = ChainClock.TotalLength(chain);
-            var (frame, elapsed) = ChainClock.Locate(chain, local % cycle);
+            // The chain's own Loop flag decides what happens past one cycle: a looping chain wraps, a non-looping one holds
+            // its last frame until the block ends (ChainClock does both).
+            var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
             sprites.Add((track.Z, new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal)));
         }

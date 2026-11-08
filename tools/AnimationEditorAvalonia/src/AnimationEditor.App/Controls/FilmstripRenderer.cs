@@ -34,7 +34,7 @@ internal sealed class FilmstripRenderer
         public readonly ResolvedFrameColor[] Colors = colors;
     }
 
-    private readonly record struct LayoutKey(AnimationChainSave Chain, double Played, double PixelsPerSecond, double Height);
+    private readonly record struct LayoutKey(AnimationChainSave Chain, bool Loop, double Played, double PixelsPerSecond, double Height);
 
     private readonly ConditionalWeakTable<AnimationChainSave, ChainInfo> _infos = new();
     // The texture paths a layout was sized from, so a texture changing on disk drops only the layouts that used it.
@@ -97,12 +97,12 @@ internal sealed class FilmstripRenderer
 
     public IReadOnlyList<FilmstripCell> CellsFor(SequenceDocument document, string source, AnimationChainSave chain, double played, double pixelsPerSecond, double height)
     {
-        var key = new LayoutKey(chain, played, pixelsPerSecond, height);
+        var key = new LayoutKey(chain, chain.Loop, played, pixelsPerSecond, height);
         if (_layouts.TryGetValue(key, out var cached)) return cached.Cells;
         var paths = InfoFor(document, source, chain).Paths;
         var frames = FilmstripLayout.FramesOf(chain, frame =>
             Thumbnails?.GetBitmap(document.ResolveTexturePath(source, frame)) is { } bitmap ? (bitmap.Width, bitmap.Height) : null);
-        var cells = FilmstripLayout.Cells(frames, chain.PingPong, chain.Reverse, played, pixelsPerSecond, height);
+        var cells = FilmstripLayout.Cells(frames, chain.PingPong, chain.Reverse, played, pixelsPerSecond, height, chain.Loop);
         if (_layouts.Count >= MaxCachedLayouts) _layouts.Clear();
         _layouts[key] = new Layout(cells, paths);
         return cells;

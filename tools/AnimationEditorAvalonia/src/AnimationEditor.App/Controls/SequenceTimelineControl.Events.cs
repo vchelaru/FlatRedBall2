@@ -15,9 +15,9 @@ public sealed partial class SequenceTimelineControl
 {
     private const int MaxCachedEventLayouts = 256;
 
-    private readonly record struct EventLayoutKey(AnimationChainSave Chain, double Played, double PixelsPerSecond);
+    private readonly record struct EventLayoutKey(AnimationChainSave Chain, bool Loop, double Played, double PixelsPerSecond);
 
-    private readonly Dictionary<(AnimationChainSave Chain, double Played), IReadOnlyList<EventOccurrence>> _eventOccurrences = new();
+    private readonly Dictionary<(AnimationChainSave Chain, bool Loop, double Played), IReadOnlyList<EventOccurrence>> _eventOccurrences = new();
     private readonly Dictionary<EventLayoutKey, IReadOnlyList<EventMarker>> _eventLayouts = new();
 
     private void InvalidateEvents()
@@ -30,9 +30,9 @@ public sealed partial class SequenceTimelineControl
     {
         if (block.IsMissing || _document is not { } document || document.FindChain(block.Reference) is not { Frames.Count: > 0 } chain)
             return Array.Empty<EventOccurrence>();
-        var key = (chain, block.Played);
+        var key = (chain, chain.Loop, block.Played);
         if (_eventOccurrences.TryGetValue(key, out var cached)) return cached;
-        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain), chain.PingPong, chain.Reverse, block.Played);
+        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
         if (_eventOccurrences.Count >= MaxCachedEventLayouts) _eventOccurrences.Clear();
         _eventOccurrences[key] = occurrences;
         return occurrences;
@@ -46,7 +46,7 @@ public sealed partial class SequenceTimelineControl
     {
         var occurrences = EventOccurrencesOf(block);
         if (occurrences.Count == 0 || _document?.FindChain(block.Reference) is not { } chain) return Array.Empty<EventMarker>();
-        var key = new EventLayoutKey(chain, block.Played, Viewport.PixelsPerSecond);
+        var key = new EventLayoutKey(chain, chain.Loop, block.Played, Viewport.PixelsPerSecond);
         if (_eventLayouts.TryGetValue(key, out var cached)) return cached;
         var markers = EventMarkers.Group(occurrences, Viewport.PixelsPerSecond);
         if (_eventLayouts.Count >= MaxCachedEventLayouts) _eventLayouts.Clear();

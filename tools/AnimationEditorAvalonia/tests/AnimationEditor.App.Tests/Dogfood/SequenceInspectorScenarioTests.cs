@@ -308,7 +308,7 @@ public class SequenceInspectorScenarioTests
 
         editor.ClickAt(OnChain(editor, 0, 0.6));
         TypeInto(editor, inspector.ChainLoopsField, "0");
-        editor.ErrorBannerText.ShouldBe("Loops must be above 0.");
+        editor.ErrorBannerText.ShouldBe("Cycles must be above 0.");
         inspector.ChainLoopsField.Value.ShouldBe(1m);
         BoxOf(inspector.ChainLoopsField).Text.ShouldBe("1");
         TypeInto(editor, inspector.ChainStartField, "-2");

@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
-/// <summary>The loop count an edge drag asks for, and the snap that produced the edge time.</summary>
+/// <summary>The length in cycles an edge drag asks for, and the snap that produced the edge time.</summary>
 public readonly record struct EdgeDragResult(float Loops, SnapResult Snap);
 
 /// <summary>
@@ -74,14 +74,19 @@ public static class TimelineSnapTargets
     /// The right-edge drag of <paramref name="block"/> to <paramref name="edgeTime"/>: snaps to <paramref name="others"/>,
     /// the block's own whole-cycle marks, and its frame boundaries (<paramref name="frameBoundaries"/>, from
     /// <see cref="FrameBoundaries"/>, or null), then converts to a loop count. The edge never goes below the minimum loops.
+    /// <paramref name="repeats"/> is whether the chain repeats its frames across the block (its Loop flag): when false the
+    /// block past the first cycle is a held last frame, which has no frame boundaries to snap to.
     /// </summary>
     public static EdgeDragResult ResizeEdge(TimelineBlock block, double edgeTime, IReadOnlyList<SnapTarget> others,
-        IReadOnlyList<double>? frameBoundaries, double pixelsPerSecond, bool bypass)
+        IReadOnlyList<double>? frameBoundaries, double pixelsPerSecond, bool bypass, bool repeats = true)
     {
         var targets = new List<SnapTarget>(others);
         targets.AddRange(TimelineSnap.CycleMarks(block.Start, block.CycleLength, edgeTime, pixelsPerSecond));
         if (frameBoundaries is not null)
-            targets.AddRange(TimelineSnap.FrameMarks(block.Start, block.CycleLength, frameBoundaries, edgeTime, pixelsPerSecond));
+        {
+            var marks = TimelineSnap.FrameMarks(block.Start, block.CycleLength, frameBoundaries, edgeTime, pixelsPerSecond);
+            targets.AddRange(repeats ? marks : marks.Where(mark => mark.Time <= block.Start + block.CycleLength + 1e-9));
+        }
 
         double minEdge = SequenceTimeline.MinimumEdge(block.Start, block.CycleLength);
         var snap = TimelineSnap.Edge(edgeTime, targets, pixelsPerSecond, bypass, minEdge);

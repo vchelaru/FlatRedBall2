@@ -37,8 +37,11 @@ public static class EventMarkers
         chain.Frames.Select(frame => new EventFrame(
             PlaybackController.FrameLength(frame), frame.Events.Select(e => e.Name ?? string.Empty).ToArray())).ToArray();
 
-    /// <summary>Every event that fires while <paramref name="frames"/> play for <paramref name="played"/> seconds, in time order.</summary>
-    public static IReadOnlyList<EventOccurrence> Occurrences(IReadOnlyList<EventFrame> frames, bool pingPong, bool reverse, double played)
+    /// <summary>
+    /// Every event that fires while <paramref name="frames"/> play for <paramref name="played"/> seconds, in time order.
+    /// With <paramref name="loop"/> false only the first cycle fires; the rest of <paramref name="played"/> is the hold.
+    /// </summary>
+    public static IReadOnlyList<EventOccurrence> Occurrences(IReadOnlyList<EventFrame> frames, bool pingPong, bool reverse, double played, bool loop = true)
     {
         int count = frames.Count;
         if (count == 0 || played <= 0) return Array.Empty<EventOccurrence>();
@@ -48,7 +51,8 @@ public static class EventMarkers
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
-        int cycles = (int)Math.Ceiling(played / cycle - 1e-9);
+        // A chain that does not loop plays one cycle, then holds its last frame: the hold enters no frame, so it fires nothing.
+        int cycles = loop ? (int)Math.Ceiling(played / cycle - 1e-9) : 1;
 
         var result = new List<EventOccurrence>();
         for (int k = 0; k < cycles && result.Count < MaxOccurrences; k++)
@@ -103,8 +107,8 @@ public static class EventMarkers
         return markers;
     }
 
-    public static IReadOnlyList<EventMarker> For(IReadOnlyList<EventFrame> frames, bool pingPong, bool reverse, double played, double pixelsPerSecond, double markerWidth = MarkerPixels) =>
-        Group(Occurrences(frames, pingPong, reverse, played), pixelsPerSecond, markerWidth);
+    public static IReadOnlyList<EventMarker> For(IReadOnlyList<EventFrame> frames, bool pingPong, bool reverse, double played, double pixelsPerSecond, double markerWidth = MarkerPixels, bool loop = true) =>
+        Group(Occurrences(frames, pingPong, reverse, played, loop), pixelsPerSecond, markerWidth);
 
     /// <summary>The flag whose span [X, X + <paramref name="markerWidth"/>) holds <paramref name="x"/> (pixels from the block's left edge), or null.</summary>
     public static EventMarker? MarkerAt(IReadOnlyList<EventMarker> markers, double x, double markerWidth = MarkerPixels)

@@ -49,6 +49,61 @@ public class FilmstripLayoutTests
     }
 
     [Fact]
+    public void Cells_ANonLoopingChain_HoldsItsLastFrameAsOneStretchedCellAfterItsFirstCycle()
+    {
+        // 0.3 s cycle, block 0.9 s long: one cycle of three cells, then the last frame held until 0.9 s. No repeats.
+        var cells = FilmstripLayout.Cells(Frames(0.1, 0.1, 0.1), false, false, 0.9, 100, Height, loop: false);
+
+        Order(cells).ShouldBe(new[] { 0, 1, 2 });
+        ShouldBeSpans(cells, (0, 10), (10, 10), (20, 70));
+        cells[2].Visits.Single().Start.ShouldBe(0.2, 1e-9);
+        cells[2].Visits.Single().End.ShouldBe(0.9, 1e-9);
+        cells[2].Visits.Single().IsHold.ShouldBeTrue();
+        cells[1].Visits.Single().IsHold.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Cells_ANonLoopingChainCutBeforeItsCycleEnds_HasNoHold()
+    {
+        var cells = FilmstripLayout.Cells(Frames(0.1, 0.1, 0.1), false, false, 0.25, 100, Height, loop: false);
+
+        Order(cells).ShouldBe(new[] { 0, 1, 2 });
+        cells[2].End.ShouldBe(0.25, 1e-9);
+        cells[2].Visits.Single().IsHold.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Cells_ANonLoopingChainPlayedExactlyOneCycle_HasNoHold()
+    {
+        var cells = FilmstripLayout.Cells(Frames(0.1, 0.1, 0.1), false, false, 0.3, 100, Height, loop: false);
+
+        ShouldBeSpans(cells, (0, 10), (10, 10), (20, 10));
+        cells[2].Visits.Single().IsHold.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Cells_ANonLoopingReverseChain_HoldsFrameZero_BecauseThatIsWhereItsCycleEnds()
+    {
+        var cells = FilmstripLayout.Cells(Frames(0.1, 0.2, 0.3), false, true, 1.0, 100, Height, loop: false);
+
+        Order(cells).ShouldBe(new[] { 2, 1, 0 });
+        cells.Last().End.ShouldBe(1.0, 1e-9);
+        cells.Last().Visits.Single().IsHold.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Cells_ANonLoopingPingPong_HoldsTheFinalShowingOfItsReturnHalf()
+    {
+        // Cycle is 0.6 s (0 1 2 2 1 0); the block is 1.2 s, so frame 0 on the way back is held from 0.5 s to 1.2 s.
+        var cells = FilmstripLayout.Cells(Frames(0.1, 0.1, 0.1), true, false, 1.2, 100, Height, loop: false);
+
+        Order(cells).ShouldBe(new[] { 0, 1, 2, 1, 0 });
+        cells.Last().End.ShouldBe(1.2, 1e-9);
+        cells.Last().Visits.Single().IsReturn.ShouldBeTrue();
+        cells.Last().Visits.Single().IsHold.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Cells_ACutChainDrawsOnlyUpToThePlayedEnd()
     {
         var cells = FilmstripLayout.Cells(Frames(0.5, 0.5), false, false, 0.7, 100, Height);
