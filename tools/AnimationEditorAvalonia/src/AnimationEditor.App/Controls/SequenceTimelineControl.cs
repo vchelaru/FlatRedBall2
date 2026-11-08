@@ -96,14 +96,22 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _selectionLayer = new SelectionLayer(this);
         VisualChildren.Add(_selectionLayer);
         LogicalChildren.Add(_selectionLayer);
+        _popupSurface = new PopupSurface(this);
+        VisualChildren.Add(_popupSurface);
+        LogicalChildren.Add(_popupSurface);
         ActualThemeVariantChanged += (_, _) =>
         {
             ClearThemeCaches();
             RefreshPlayheadLayer();
             _selectionLayer.InvalidateVisual();
+            InvalidatePopups();
             InvalidateVisual();
         };
-        _filmstrip.TextureChanged += InvalidateVisual;
+        _filmstrip.TextureChanged += () =>
+        {
+            InvalidatePopups();
+            InvalidateVisual();
+        };
         Viewport.Changed += () =>
         {
             Diagnostics.NoteInput();
@@ -391,6 +399,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override Size MeasureOverride(Size availableSize)
     {
         _selectionLayer.Measure(availableSize);
+        _popupSurface.Measure(availableSize);
         _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         return default;
     }
@@ -398,6 +407,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override Size ArrangeOverride(Size finalSize)
     {
         _selectionLayer.Arrange(new Rect(finalSize));
+        _popupSurface.Arrange(new Rect(finalSize));
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
             box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + TimelineLayout.HeaderCenterY - RenameBoxHeight / 2,
@@ -838,6 +848,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (track == _hoverEyeTrack) return;
         _hoverEyeTrack = track;
         if (point is { } at) _eyePoint = at;
+        InvalidatePopups();
         InvalidateVisual();
     }
 
@@ -1131,8 +1142,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawDropTime(context, size, drop);
         DrawSnapGuide(context, size);
         if (PlayheadLayer is null) DrawPlayhead(context, size);
-        DrawHover(context, size);
-        DrawEyeTooltip(context, size);
     }
 
     // A thin accent line at the snap target, over every lane, plus a tick on the edge of the chain it snapped to.

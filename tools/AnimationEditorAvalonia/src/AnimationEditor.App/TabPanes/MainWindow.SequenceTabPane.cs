@@ -372,6 +372,7 @@ public partial class MainWindow
             // Edit > Copy and Paste follow the focus, so they are re-evaluated whenever it moves.
             w.AddHandler(InputElement.GotFocusEvent, OnWindowGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
+            w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
             w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
