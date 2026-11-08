@@ -88,8 +88,8 @@ public class SequenceUndoLabelConventionTests
         Run((document, undo) => document.DeleteTracks(undo, 0, new[] { 0, 1 }));
         Run((document, undo) => document.PasteChains(undo, 0, copied, selectedTrack: null, time: 5));
         Run((document, undo) => document.PasteChains(undo, 0, copiedOne, selectedTrack: 0, time: 5));
-        Run((document, undo) => document.PasteTracks(undo, 0, copiedTracks, afterTrack: null));
-        Run((document, undo) => document.PasteTracks(undo, 0, copiedTrack, afterTrack: null));
+        Run((document, undo) => document.PasteTracks(undo, 0, copiedTracks, selectedTrack: null));
+        Run((document, undo) => document.PasteTracks(undo, 0, copiedTrack, selectedTrack: null));
         Run((document, undo) => document.DuplicateChains(undo, 0, chains2));
         Run((document, undo) => document.DuplicateChains(undo, 0, new[] { chains2[0] }));
         Run((document, undo) => document.DuplicateTracks(undo, 0, new[] { 0, 1 }));
