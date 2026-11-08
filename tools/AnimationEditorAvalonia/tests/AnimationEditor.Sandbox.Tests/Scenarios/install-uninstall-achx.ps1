@@ -1,5 +1,5 @@
 # Runs inside Windows Sandbox (Windows PowerShell 5.1) as the logon command. Installs Setup.exe,
-# checks the .achx/.achj registration, uninstalls, checks cleanup, writes results.json, shuts down.
+# checks the .achx/.achj/.seqj registration, uninstalls, checks cleanup, writes results.json, shuts down.
 # Every check is recorded rather than thrown, so one boot reports every failure.
 param([Parameter(Mandatory)] [string] $Folder)
 
@@ -20,6 +20,7 @@ function RegValue($path, $name) {
 }
 
 $progId = 'FlatRedBall.AnimationEditor.achx'
+$seqjProgId = 'FlatRedBall.AnimationEditor.seqj'
 $classes = 'HKCU:\Software\Classes'
 $capabilities = 'HKCU:\Software\FlatRedBall\AnimationEditor\Capabilities'
 $registeredApps = 'HKCU:\Software\RegisteredApplications'
@@ -60,16 +61,21 @@ try {
     $exe = if ($command -match '^"([^"]+)"') { $Matches[1] } else { $null }
     Check 'open-command-targets-installed-exe' `
         ($exe -and $exe.StartsWith($installRoot, 'OrdinalIgnoreCase') -and (Test-Path $exe)) $command
+    $seqjCommand = RegValue "$classes\$seqjProgId\shell\open\command" ''
+    Check 'seqj-open-command-passes-file-path' ($seqjCommand -eq "`"$exe`" `"%1`"") $seqjCommand
+    Check 'seqj-default-icon-is-exe' ((RegValue "$classes\$seqjProgId\DefaultIcon" '') -eq "`"$exe`",0") `
+        (RegValue "$classes\$seqjProgId\DefaultIcon" '')
     Check 'registered-applications' `
         ((RegValue $registeredApps $appName) -eq 'Software\FlatRedBall\AnimationEditor\Capabilities') `
         (RegValue $registeredApps $appName)
 
-    foreach ($extension in '.achx', '.achj') {
-        Check "capabilities-$extension" ((RegValue "$capabilities\FileAssociations" $extension) -eq $progId) `
+    foreach ($extension in '.achx', '.achj', '.seqj') {
+        $expectedProgId = if ($extension -eq '.seqj') { $seqjProgId } else { $progId }
+        Check "capabilities-$extension" ((RegValue "$capabilities\FileAssociations" $extension) -eq $expectedProgId) `
             (RegValue "$capabilities\FileAssociations" $extension)
-        Check "extension-default-$extension" ((RegValue "$classes\$extension" '') -eq $progId) `
+        Check "extension-default-$extension" ((RegValue "$classes\$extension" '') -eq $expectedProgId) `
             (RegValue "$classes\$extension" '')
-        Check "open-with-progids-$extension" ($null -ne (RegValue "$classes\$extension\OpenWithProgids" $progId)) ''
+        Check "open-with-progids-$extension" ($null -ne (RegValue "$classes\$extension\OpenWithProgids" $expectedProgId)) ''
         $resolved = [Assoc]::Executable($extension)
         Check "double-click-resolves-$extension" ($resolved -and $exe -and ($resolved -ieq $exe)) $resolved
     }
@@ -93,6 +99,10 @@ try {
     Check 'uninstall-keeps-other-apps-achj-default' ((RegValue "$classes\.achj" '') -eq 'Other.App.achj') `
         (RegValue "$classes\.achj" '')
     Check 'uninstall-removes-open-with-progid' ($null -eq (RegValue "$classes\.achx\OpenWithProgids" $progId)) ''
+    Check 'uninstall-removes-seqj-progid' (-not (Test-Path "$classes\$seqjProgId")) ''
+    Check 'uninstall-clears-our-seqj-default' ([string]::IsNullOrEmpty((RegValue "$classes\.seqj" ''))) `
+        (RegValue "$classes\.seqj" '')
+    Check 'uninstall-removes-seqj-open-with-progid' ($null -eq (RegValue "$classes\.seqj\OpenWithProgids" $seqjProgId)) ''
 }
 catch {
     Check 'scenario-script' $false $_

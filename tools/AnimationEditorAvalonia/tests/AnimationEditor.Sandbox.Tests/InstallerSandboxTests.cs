@@ -5,8 +5,8 @@ namespace AnimationEditor.Sandbox.Tests;
 public class InstallerSandboxTests
 {
     /// <summary>
-    /// A Setup.exe install registers .achx and .achj so Windows lists the editor in Default apps
-    /// and Open with, and double-clicking either opens it; uninstall removes only our entries.
+    /// A Setup.exe install registers .achx, .achj and .seqj so Windows lists the editor in Default apps
+    /// and Open with, and double-clicking any opens it; uninstall removes only our entries.
     /// One sandbox boot covers install, every registry/association check, and uninstall.
     /// </summary>
     [Fact(Timeout = 30 * 60 * 1000)]
