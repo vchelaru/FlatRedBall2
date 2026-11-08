@@ -72,11 +72,11 @@ public partial class MainWindow
         /// </summary>
         public async Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
         {
+            if (HasFailedSave(tab))
+                return await ConfirmFailedSaveAsync(tab) ? tab : null;
             if (!IsUntitledTab(tab) || !UntitledTabHasContent(tab)) return tab;
 
-            var choice = await _window.ShowSaveDiscardCancelDialogAsync(
-                $"\"{tab.DisplayName}\" has unsaved changes. Save before closing?",
-                "Unsaved Changes");
+            var choice = await _window.AskSaveBeforeClosingAsync(tab.DisplayName);
             if (choice == SaveDiscardCancelChoice.Cancel) return null;
             if (choice == SaveDiscardCancelChoice.Discard) return tab;
 
@@ -91,6 +91,44 @@ public partial class MainWindow
             // handler's Rename), which replaces the TabEntry instance -- re-resolve through
             // ActiveTab rather than closing the now-stale `tab` reference.
             return _window._tabManager.ActiveTab ?? tab;
+        }
+
+        /// <summary>
+        /// Whether a file-backed <paramref name="tab"/> holds edits its file lacks because its last save failed. The
+        /// active tab answers from the live save state (the undo manager is shared by every tab); a background tab
+        /// from what <see cref="TabController.CaptureLeavingTab"/> recorded.
+        /// </summary>
+        public bool HasFailedSave(TabEntry tab) =>
+            !IsUntitledTab(tab)
+            && (tab == _window._tabManager.ActiveTab ? _window._undoManager.SaveState == SaveState.Failed : tab.SaveFailed);
+
+        /// <summary>Whether any open file-backed .achx/.achj/.tsx tab has a failed save, for the window-close check.</summary>
+        public bool HasUnsavedEdits => _window._tabManager.Tabs.Any(tab => tab.Kind == TabKind.Achx && HasFailedSave(tab));
+
+        /// <summary>
+        /// The window is closing: asks about each tab with a failed save. Returns false when the user cancelled or a
+        /// chosen save failed again, so the window stays open.
+        /// </summary>
+        public async Task<bool> ConfirmWindowCloseAsync()
+        {
+            foreach (var tab in _window._tabManager.Tabs.Where(tab => tab.Kind == TabKind.Achx && HasFailedSave(tab)).ToList())
+                if (!await ConfirmFailedSaveAsync(tab)) return false;
+            return true;
+        }
+
+        // The prompt and Save/Discard/Cancel meanings the .seqj tab and the Untitled tab use. Save retries the write on
+        // the tab's own document; a retry that fails again keeps the tab open (the toast says why).
+        private async Task<bool> ConfirmFailedSaveAsync(TabEntry tab)
+        {
+            var choice = await _window.AskSaveBeforeClosingAsync(tab.Path.NoPath);
+            if (choice == SaveDiscardCancelChoice.Cancel) return false;
+            if (choice == SaveDiscardCancelChoice.Discard) return true;
+
+            if (tab != _window._tabManager.ActiveTab)
+                await _window.ActivateTabAsync(tab);
+            _window._appCommands.SaveCurrentAnimationChainList();
+            _window.UpdateStatusBar();
+            return !HasFailedSave(tab);
         }
 
         /// <summary>An Untitled document goes through Save As; a file-backed one saves in place.</summary>
