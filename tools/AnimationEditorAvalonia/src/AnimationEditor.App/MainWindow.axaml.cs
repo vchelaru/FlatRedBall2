@@ -2688,7 +2688,8 @@ public partial class MainWindow : Window
         MenuLoadRecent.Items.Clear();
         foreach (var file in _appSettings.RecentFiles.Take(5))
         {
-            var item = new MenuItem { Header = System.IO.Path.GetFileName(file) };
+            // A menu header treats "_x" as an access key, so a literal underscore in the name is doubled.
+            var item = new MenuItem { Header = System.IO.Path.GetFileName(file).Replace("_", "__") };
             ToolTip.SetTip(item, file);
             var captured = file;
             item.Click += async (_, _) => await LoadAnimationFileAsync(captured);
