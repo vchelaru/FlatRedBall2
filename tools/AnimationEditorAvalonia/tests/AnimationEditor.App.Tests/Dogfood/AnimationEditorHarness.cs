@@ -42,9 +42,17 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// The platform command modifier the window is built with; <see cref="CommandModifier.Meta"/>
     /// runs the scenario as macOS would. Defaults to Ctrl.
     /// </param>
-    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null, CommandModifier? commandModifier = null)
+    public AnimationEditorHarness(string? settingsRoot = null, string? recoveryFilePath = null, CommandModifier? commandModifier = null, AnimationEditor.App.Services.ProjectTreeThumbnailService? projectTreeThumbnails = null)
     {
-        Services = settingsRoot is null ? new TestServices() : new TestServices { SettingsRoot = settingsRoot };
+        Services = new TestServices();
+        if (settingsRoot is not null || projectTreeThumbnails is not null)
+        {
+            Services = new TestServices
+            {
+                SettingsRoot = settingsRoot ?? Services.SettingsRoot,
+                ProjectTreeThumbnailService = projectTreeThumbnails ?? Services.ProjectTreeThumbnailService,
+            };
+        }
         if (recoveryFilePath != null)
         {
             Services.IoManager.RecoveryFilePath = recoveryFilePath;
