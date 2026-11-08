@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -360,7 +361,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_renameBox is null)
         {
             _renameBox = new InlineRenameBox();
-            _renameBox.Committed += (_, _) => CommitTrackRename();
+            // Losing focus commits in the middle of the press that took it; see CommitTrackRename.
+            _renameBox.Committed += (_, _) => CommitTrackRename(deferred: true);
             _renameBox.Cancelled += (_, _) =>
             {
                 EndTrackRename();
@@ -375,16 +377,41 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _renameBox.Begin(sequence.Tracks[track].Name);
     }
 
-    private void CommitTrackRename()
+    /// <summary>The track whose name is being edited in place, or null.</summary>
+    public int? RenamingTrack => IsRenamingTrack ? _renameTrack : null;
+
+    /// <summary>
+    /// Applies the name typed into an open track rename now, as Enter would, for a host that is about to do something
+    /// else (switch tabs, undo, close). Does nothing when no rename is open.
+    /// </summary>
+    public void CommitRename()
+    {
+        if (IsRenamingTrack) CommitTrackRename(deferred: false);
+    }
+
+    // A click on another row loses the box's focus in the middle of that press, before the row is selected. Renaming
+    // rebuilds the list, which would drop the press's selection, so a focus-loss commit (deferred) waits for the press
+    // to finish and no longer pulls focus back from whatever was clicked; Enter keeps the focus on the timeline.
+    private void CommitTrackRename(bool deferred)
     {
         if (_renameBox is null) return;
         string name = _renameBox.Text ?? string.Empty;
         int track = _renameTrack;
+        var document = _document;
+        int sequenceIndex = _sequenceIndex;
+        bool refocus = _renameBox.IsFocused;
         EndTrackRename();
-        Focus();
-        if (_document is { } document && _undo is { } undo && track < TrackCount
-            && document.RenameTrack(undo, _sequenceIndex, track, name) is { } error)
-            ErrorRaised?.Invoke(error);
+        if (refocus) Focus();
+        void Apply()
+        {
+            // The click that took the focus may have selected another sequence; the rename still belongs to the one it began in.
+            if (document is null || !ReferenceEquals(document, _document) || _undo is not { } undo
+                || sequenceIndex >= document.Save.Sequences.Count || track >= document.Save.Sequences[sequenceIndex].Tracks.Count) return;
+            if (document.RenameTrack(undo, sequenceIndex, track, name, keepSelection: true) is { } error)
+                ErrorRaised?.Invoke(error);
+        }
+        if (deferred) Dispatcher.UIThread.Post(Apply);
+        else Apply();
     }
 
     private void EndTrackRename()

@@ -111,7 +111,12 @@ public partial class MainWindow
             w.AchxInspector.IsVisible = true;
         }
 
-        public void CaptureLeaving(TabEntry tab) => tab.UndoSnapshot = _window._undoManager.TakeSnapshot();
+        public void CaptureLeaving(TabEntry tab)
+        {
+            // Before the snapshot, so the rename is in this tab's history.
+            CommitPendingRename();
+            tab.UndoSnapshot = _window._undoManager.TakeSnapshot();
+        }
 
         public Task<bool> LoadAsync(TabEntry tab, TabLoad load)
         {
@@ -166,6 +171,7 @@ public partial class MainWindow
 
         public void Closing(TabEntry tab)
         {
+            CommitPendingRename();
             if (_documents.TryGetValue(tab.Path, out var document) && document == _document)
                 Detach();
             _documents.Remove(tab.Path);
@@ -369,6 +375,8 @@ public partial class MainWindow
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
             w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
+            // A press that does not move the focus (a library chip, a toolbar button, blank space) would leave a rename open.
+            w.AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             // Edit > Copy and Paste follow the focus, so they are re-evaluated whenever it moves.
             w.AddHandler(InputElement.GotFocusEvent, OnWindowGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
@@ -529,12 +537,70 @@ public partial class MainWindow
             // A click on another row loses the box's focus in the middle of that press, before the row is selected.
             // Renaming rebuilds the list, which would drop the press's selection, so the rename waits for the press to
             // finish and then leaves whatever it selected alone.
+            Dispatcher.UIThread.Post(() => ApplySequenceRename(document, item, text));
+        }
+
+        private void ApplySequenceRename(SequenceDocument? document, SequenceListItem item, string text)
+        {
+            int index = _items.IndexOf(item);
+            if (document is null || document != _document || index < 0) return;
+            if (document.RenameSequence(_window._undoManager, index, text, keepSelection: true) is { } error)
+                _window.ShowErrorBanner(error);
+        }
+
+        /// <summary>True while a sequence row or a track header is being renamed in place.</summary>
+        private bool HasPendingRename => _items.Any(item => item.IsEditing) || _window.SequenceTimeline.IsRenamingTrack;
+
+        /// <summary>
+        /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would. This
+        /// is the one path for every way of leaving a rename that Enter and Escape are not: another tab or file, closing
+        /// the tab or the window, undo and redo, Back and Forward, a hotkey, and a press that moves no focus. A name
+        /// that fails validation shows the banner and keeps the old name, as on a click-away. Does nothing when no
+        /// rename is open.
+        /// </summary>
+        public void CommitPendingRename()
+        {
+            if (_document is not { } document) return;
+            for (int index = 0; index < _items.Count; index++)
+            {
+                if (_items[index].IsEditing) CommitListRename(document, index);
+            }
+            _window.SequenceTimeline.CommitRename();
+        }
+
+        private void CommitListRename(SequenceDocument document, int index)
+        {
+            var item = _items[index];
+            // The box is the only holder of the typed text. Abandon it first: hiding it (IsEditing false) takes its
+            // focus, and a box that is still editing would then commit a second time, later.
+            if (_window.SequenceList.ContainerFromIndex(index) is Control container
+                && container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault() is { IsEditing: true } box)
+            {
+                string text = box.Text ?? string.Empty;
+                box.Abandon();
+                item.IsEditing = false;
+                ApplySequenceRename(document, item, text);
+            }
+            else
+            {
+                item.IsEditing = false;
+            }
+        }
+
+        // A press anywhere but in the rename box itself. When it takes the focus off the box, the box's own focus-loss
+        // commit has run by the time this post does; when it does not (a library chip, blank space), this is the commit.
+        private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_window._visiblePane != this || _document is null || !HasPendingRename) return;
+            if (e.Source is Visual source && (source is InlineRenameBox || source.FindAncestorOfType<InlineRenameBox>() is not null)) return;
+            var editing = _items.FirstOrDefault(item => item.IsEditing);
+            int? track = _window.SequenceTimeline.RenamingTrack;
+            // Posted, and limited to what was open now: a double-click's second press begins a new rename that this must not end.
             Dispatcher.UIThread.Post(() =>
             {
-                int index = _items.IndexOf(item);
-                if (document is null || document != _document || index < 0) return;
-                if (document.RenameSequence(_window._undoManager, index, text, keepSelection: true) is { } error)
-                    _window.ShowErrorBanner(error);
+                if (_document is not { } document) return;
+                if (editing is { IsEditing: true } && _items.IndexOf(editing) is >= 0 and var index) CommitListRename(document, index);
+                if (track is { } t && _window.SequenceTimeline.RenamingTrack == t) _window.SequenceTimeline.CommitRename();
             });
         }
 

@@ -48,49 +48,59 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private static FlipPose PoseOf(AnimationFrameSave frame) =>
             new(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, frame.RelativeX, frame.RelativeY);
 
+        /// <summary>
+        /// Toggles one flip axis on <paramref name="frame"/> and bakes the matching change into its
+        /// sprite offset and shape offsets. Shared with the duplicate-with-flip path so a flipped
+        /// copy and an in-place flip produce identical data.
+        /// </summary>
+        internal static void FlipFrame(AnimationFrameSave frame, FlipAxis axis)
+        {
+            switch (axis)
+            {
+                case FlipAxis.Horizontal:
+                    frame.FlipHorizontal = !frame.FlipHorizontal;
+                    frame.RelativeX = -frame.RelativeX;   // mirror sprite offset about the entity origin
+                    break;
+                case FlipAxis.Vertical:
+                    frame.FlipVertical = !frame.FlipVertical;
+                    frame.RelativeY = -frame.RelativeY;
+                    break;
+                case FlipAxis.Diagonal:
+                    frame.FlipDiagonal = !frame.FlipDiagonal;
+                    // RelativeX/RelativeY are already baked for the frame's current H/V state, so
+                    // toggling diagonal must apply the delta between the old and new baked state,
+                    // not a fixed transpose: a plain (x,y) -> (y,x) swap when H and V currently
+                    // agree, a negated (x,y) -> (-y,-x) swap when exactly one is set. See
+                    // ShapeFlip.Transpose's remarks for the derivation — using a fixed swap
+                    // regardless of H/V put the offset in the wrong spot whenever diagonal was
+                    // toggled after horizontal or vertical (issue #592 follow-up).
+                    bool negateRelative = frame.FlipHorizontal ^ frame.FlipVertical;
+                    (frame.RelativeX, frame.RelativeY) = negateRelative
+                        ? (-frame.RelativeY, -frame.RelativeX)
+                        : (frame.RelativeY, frame.RelativeX);
+                    break;
+            }
+
+            // Mirror/transpose attached shape offsets about the same origin so collision geometry
+            // tracks the flipped/transposed sprite. Both operations are self-inverse, so undo/redo
+            // (which re-toggle) restore the sprite offset and the shape offsets exactly.
+            if (frame.ShapesSave != null)
+                foreach (var shape in frame.ShapesSave.Shapes)
+                {
+                    if (axis == FlipAxis.Diagonal)
+                        ShapeFlip.Transpose(shape, frame.FlipHorizontal, frame.FlipVertical);
+                    else
+                        ShapeFlip.Mirror(shape, axis == FlipAxis.Horizontal, axis == FlipAxis.Vertical);
+                }
+        }
+
         private void Toggle()
         {
             var changes = new List<FrameFlipChange>(_frames.Count);
             foreach (var frame in _frames)
             {
                 var before = PoseOf(frame);
-                switch (_axis)
-                {
-                    case FlipAxis.Horizontal:
-                        frame.FlipHorizontal = !frame.FlipHorizontal;
-                        frame.RelativeX = -frame.RelativeX;   // mirror sprite offset about the entity origin
-                        break;
-                    case FlipAxis.Vertical:
-                        frame.FlipVertical = !frame.FlipVertical;
-                        frame.RelativeY = -frame.RelativeY;
-                        break;
-                    case FlipAxis.Diagonal:
-                        frame.FlipDiagonal = !frame.FlipDiagonal;
-                        // RelativeX/RelativeY are already baked for the frame's current H/V state, so
-                        // toggling diagonal must apply the delta between the old and new baked state,
-                        // not a fixed transpose: a plain (x,y) -> (y,x) swap when H and V currently
-                        // agree, a negated (x,y) -> (-y,-x) swap when exactly one is set. See
-                        // ShapeFlip.Transpose's remarks for the derivation — using a fixed swap
-                        // regardless of H/V put the offset in the wrong spot whenever diagonal was
-                        // toggled after horizontal or vertical (issue #592 follow-up).
-                        bool negateRelative = frame.FlipHorizontal ^ frame.FlipVertical;
-                        (frame.RelativeX, frame.RelativeY) = negateRelative
-                            ? (-frame.RelativeY, -frame.RelativeX)
-                            : (frame.RelativeY, frame.RelativeX);
-                        break;
-                }
-
-                // Mirror/transpose attached shape offsets about the same origin so collision geometry
-                // tracks the flipped/transposed sprite. Both operations are self-inverse, so undo/redo
-                // (which re-toggle) restore the sprite offset and the shape offsets exactly.
-                if (frame.ShapesSave != null)
-                    foreach (var shape in frame.ShapesSave.Shapes)
-                    {
-                        if (_axis == FlipAxis.Diagonal)
-                            ShapeFlip.Transpose(shape, frame.FlipHorizontal, frame.FlipVertical);
-                        else
-                            ShapeFlip.Mirror(shape, _axis == FlipAxis.Horizontal, _axis == FlipAxis.Vertical);
-                    }
+                FlipFrame(frame, _axis);
                 changes.Add(new FrameFlipChange(frame, before, PoseOf(frame)));
             }
             _events.RaiseFramesFlipped(changes);

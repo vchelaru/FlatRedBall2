@@ -554,8 +554,12 @@ public sealed class SequenceDocument
         Edit(undo, $"Delete Track '{Save.Sequences[sequence].Tracks[track].Name}'",
             save => save.Sequences[sequence].Tracks.RemoveAt(track));
 
-    /// <summary>Renames a track. Returns why it was refused (empty, or another track of the sequence has the name), or null.</summary>
-    public string? RenameTrack(IUndoManager undo, int sequence, int track, string name)
+    /// <summary>
+    /// Renames a track. Returns why it was refused (empty, or another track of the sequence has the name), or null.
+    /// The rename selects its sequence, unless <paramref name="keepSelection"/> is set, for a rename committed by a click
+    /// on another sequence, which must stay selected (undo and redo still select the renamed one).
+    /// </summary>
+    public string? RenameTrack(IUndoManager undo, int sequence, int track, string name, bool keepSelection = false)
     {
         name = name.Trim();
         var tracks = Save.Sequences[sequence].Tracks;
@@ -564,7 +568,8 @@ public sealed class SequenceDocument
         if (name == oldName) return null;
         if (tracks.Where((_, i) => i != track).Any(t => t.Name == name))
             return $"A track named \"{name}\" already exists.";
-        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name);
+        Edit(undo, $"Rename Track '{oldName}' to '{name}'", save => save.Sequences[sequence].Tracks[track].Name = name,
+            selectOnDo: !keepSelection);
         return null;
     }
 

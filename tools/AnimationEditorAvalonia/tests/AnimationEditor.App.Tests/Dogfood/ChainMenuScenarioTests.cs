@@ -99,6 +99,42 @@ public class ChainMenuScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task FlipDiagonally_FlipsEveryFrame_InOneUndoStep()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+
+        editor.RightClickRow(walk);
+        editor.PickTreeMenuItem("Flip Diagonally");
+
+        walk.Frames.ShouldAllBe(frame => frame.FlipDiagonal);
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        walk.Frames.ShouldAllBe(frame => !frame.FlipDiagonal);
+    }
+
+    [AvaloniaFact]
+    public async Task DuplicateFlipDiagonal_AddsATransposedCopy()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+
+        editor.RightClickRow(walk);
+        editor.PickTreeMenuItem("Duplicate", "Flip Diagonal");
+
+        editor.Project.AnimationChains.Count.ShouldBe(2);
+        editor.Project.AnimationChains[1].Frames.Single().FlipDiagonal.ShouldBeTrue();
+        walk.Frames.Single().FlipDiagonal.ShouldBeFalse("the source is left alone");
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        editor.Project.AnimationChains.Count.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
     public async Task RowLockButton_LocksTheChain_AndDeleteLeavesItsFramesAlone()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

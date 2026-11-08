@@ -399,6 +399,8 @@ public partial class MainWindow : Window
         }
 
         Opened += OnOpened;
+        // Before the settings and tabs are written, so a name typed into an open rename is kept.
+        Closing += (_, _) => CommitPendingRename();
         Closed += (_, _) =>
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
@@ -5538,8 +5540,8 @@ public partial class MainWindow : Window
             AnimationChainSave chain => () => BeginInlineRenameSelected(chain),
             _                        => null
         };
-        Action<bool, bool>? duplicateChainFlip = data is AnimationChainSave flipChain
-            ? (flipH, flipV) => HandleDuplicateChainsFlip(flipChain, flipH, flipV)
+        Action<ChainFlip>? duplicateChainFlip = data is AnimationChainSave flipChain
+            ? flip => HandleDuplicateChainsFlip(flipChain, flip)
             : null;
 
         var actions = new TreeMenuActions(
@@ -7657,6 +7659,8 @@ public partial class MainWindow : Window
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;
+            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first.
+            CommitPendingRename();
             match.Action();
         }), RoutingStrategies.Tunnel);
 
@@ -8005,11 +8009,11 @@ public partial class MainWindow : Window
     // so this mirrors its multi-select dispatch for chains only: duplicate every selected
     // chain (falling back to the right-clicked one when nothing is selected) with the flip
     // flag applied, via the same AppCommands.DuplicateChains batch HandleDuplicate uses.
-    private void HandleDuplicateChainsFlip(AnimationChainSave rightClicked, bool flipH, bool flipV)
+    private void HandleDuplicateChainsFlip(AnimationChainSave rightClicked, ChainFlip flip)
     {
         var selected = _selectedState.SelectedChains;
         var sources = selected.Count > 0 ? selected : new List<AnimationChainSave> { rightClicked };
-        var copies = _appCommands.DuplicateChains(sources, flipH, flipV);
+        var copies = _appCommands.DuplicateChains(sources, flip);
         QueuePastedChainExpandFromSources(sources, copies);
         RefreshTreeView();
     }

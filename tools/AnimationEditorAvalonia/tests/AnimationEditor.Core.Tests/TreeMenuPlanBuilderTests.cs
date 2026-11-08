@@ -10,7 +10,7 @@ public class TreeMenuPlanBuilderTests
 {
     private static TreeMenuActions NoOpActions() => new(
         Copy: () => { }, Cut: () => { }, Paste: () => { }, Duplicate: () => { }, Delete: () => { },
-        Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: (_, _) => { });
+        Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: _ => { });
 
     private static int IndexOf(IReadOnlyList<TreeMenuItem> items, string header) =>
         items.ToList().FindIndex(i => i.Header == header);
@@ -69,7 +69,30 @@ public class TreeMenuPlanBuilderTests
             chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
 
         var duplicate = items.Single(i => i.Header == "Duplicate");
-        Assert.Equal(new[] { "Original", "Flip Horizontal", "Flip Vertical" }, duplicate.Children!.Select(c => c.Header));
+        Assert.Equal(new[] { "Original", "Flip Horizontal", "Flip Vertical", "Flip Diagonal" }, duplicate.Children!.Select(c => c.Header));
+    }
+
+    [Fact]
+    public void Build_ChainNode_FlipDiagonalItems_UseTheDiagonalIconAndPassTheDiagonalFlip()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ChainFlip? requested = null;
+        var actions = NoOpActions() with { DuplicateChainFlip = f => requested = f };
+
+        var items = TreeMenuPlanBuilder.Build(
+            chain, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, actions);
+
+        var flip = items.Single(i => i.Header == "Flip Diagonally");
+        Assert.Equal(TreeMenuIcon.FlipDiagonal, flip.Icon);
+        Assert.Equal(IndexOf(items, "Flip Vertically") + 1, IndexOf(items, "Flip Diagonally"));
+        var duplicateDiagonal = items.Single(i => i.Header == "Duplicate").Children!.Single(c => c.Header == "Flip Diagonal");
+        Assert.Equal(TreeMenuIcon.FlipDiagonal, duplicateDiagonal.Icon);
+        duplicateDiagonal.OnClick!();
+        Assert.Equal(ChainFlip.Diagonal, requested);
+
+        flip.OnClick!();
+        Assert.All(chain.Frames, f => Assert.True(f.FlipDiagonal));
     }
 
     [Fact]
@@ -349,7 +372,7 @@ public class TreeMenuPlanBuilderTests
         Assert.Contains(items, i => i.Header == "Copy 2 Animations");
         Assert.Contains(items, i => i.Header == "Duplicate 2 Animations" && i.Children is not null);
         // These only touch the right-clicked chain, so a multi-selection must not offer them.
-        Assert.DoesNotContain(items, i => i.Header is "Flip Horizontally" or "Flip Vertically" or "Invert Frame Order");
+        Assert.DoesNotContain(items, i => i.Header is "Flip Horizontally" or "Flip Vertically" or "Flip Diagonally" or "Invert Frame Order");
         Assert.DoesNotContain(items, i => i.Header == "Copy Qualified Name");
     }
 
@@ -363,6 +386,7 @@ public class TreeMenuPlanBuilderTests
 
         Assert.Contains(items, i => i.Header == "Delete Animation");
         Assert.Contains(items, i => i.Header == "Flip Horizontally");
+        Assert.Contains(items, i => i.Header == "Flip Diagonally");
         Assert.Contains(items, i => i.Header == "Invert Frame Order");
     }
 
