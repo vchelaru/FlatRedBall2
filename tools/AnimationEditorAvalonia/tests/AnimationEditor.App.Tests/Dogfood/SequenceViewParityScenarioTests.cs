@@ -382,7 +382,7 @@ public class SequenceViewParityScenarioTests
         using (AnimationEditorHarness editor = session.Start())
         {
             await editor.OpenAsync(session.Boss);
-            editor.Control<ToggleButton>("SequenceShowOrigin").IsChecked = false;
+            editor.Control<ToggleButton>("SequenceShowOrigin").IsChecked = true;
             editor.Control<ToggleButton>("SequenceShowShapes").IsChecked = false;
             editor.Control<ToggleButton>("SequenceShowBoundingBox").IsChecked = false;
             // The one Bounding Box setting: the achx toggle follows it.
@@ -391,10 +391,10 @@ public class SequenceViewParityScenarioTests
 
         using (AnimationEditorHarness editor = session.Restart())
         {
-            editor.Control<ToggleButton>("SequenceShowOrigin").IsChecked.ShouldBe(false);
+            editor.Control<ToggleButton>("SequenceShowOrigin").IsChecked.ShouldBe(true);
             editor.Control<ToggleButton>("SequenceShowShapes").IsChecked.ShouldBe(false);
             editor.Control<ToggleButton>("SequenceShowBoundingBox").IsChecked.ShouldBe(false);
-            Preview(editor).ShowOrigin.ShouldBeFalse();
+            Preview(editor).ShowOrigin.ShouldBeTrue();
             Preview(editor).ShowShapes.ShouldBeFalse();
             Preview(editor).ShowBoundingBox.ShouldBeFalse();
         }

@@ -297,9 +297,10 @@ public partial class MainWindow
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
-                // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
+                // later tab switches reuse it, so the notice shows once per open. A problem, since editing may lose data
+                // or miss functionality, so it stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
-                    _window.ShowInfo(notice);
+                    _window.ShowProblem(notice, sticky: true);
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
                 if (document.DuplicateNamesNotice is { } duplicates)
                     _window.ShowInfo(duplicates);
@@ -832,17 +833,19 @@ public partial class MainWindow
             {
                 if (_document is not null && SequenceIndex >= 0) w.SequenceTimeline.SelectTracks(new[] { track });
             };
-            // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
-            // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
+            // Shapes, Origin and Bounding Box are the achx previews' own settings (remembered for all files in the settings the
+            // window writes on close), so flipping one here flips the achx toggle.
             w.SequenceShowShapes.IsCheckedChanged += (_, _) =>
             {
                 preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
-                w._appSettings.SequenceShowShapes = preview.ShowShapes;
+                w._appSettings.ShowShapes = preview.ShowShapes;
+                w.ShowShapesCheck.IsChecked = preview.ShowShapes;
             };
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) =>
             {
                 preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
-                w._appSettings.SequenceShowOrigin = preview.ShowOrigin;
+                w._appSettings.ShowOrigin = preview.ShowOrigin;
+                w.ShowOriginCheck.IsChecked = preview.ShowOrigin;
             };
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) =>
             {
