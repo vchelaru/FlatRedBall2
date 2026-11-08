@@ -21,10 +21,16 @@ jobs:
   engine-tests:
     name: Engine and AnimationEditor tests (ubuntu)
     runs-on: ubuntu-latest
-    timeout-minutes: 23
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # The last App-test shard is "everything not named in another shard", which covers every
+      # class only if the matrix below runs exactly the shards the script defines. This checks
+      # that, and that no test class is in two shards or none.
+      - name: Test App test shard script
+        run: python3 scripts/test_app_test_shards.py
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -108,12 +114,20 @@ jobs:
       - name: Test AnimationEditor.DocScreenshots
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
-  # Split out of engine-tests: AnimationEditor.App.Tests alone was ~5 of that job's ~7 minutes, so
-  # running it on its own runner in parallel shortens the critical path. Still gates "dotnet test".
+  # Split out of engine-tests: AnimationEditor.App.Tests alone was ~5 of that job's ~7 minutes.
+  # It is sharded by test class (scripts/app_test_shards.py prints each shard's --filter; Avalonia
+  # headless runs a class on one UI thread, so classes are never split). The shard list below must
+  # match the script's SHARDS; scripts/test_app_test_shards.py checks it. fail-fast is off so one
+  # red shard does not hide another's result. The "dotnet test" umbrella needs this job, and a
+  # job's result is failure/cancelled if any matrix leg is, so any red shard blocks merge.
   animationeditor-app-tests:
-    name: AnimationEditor App tests (ubuntu)
+    name: AnimationEditor App tests (ubuntu, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,14 +147,16 @@ jobs:
 
       # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
       # headless platform — no display server needed.
-      - name: Test AnimationEditor.App
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+      - name: Test AnimationEditor.App (shard ${{ matrix.shard }})
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --filter "$(python3 scripts/app_test_shards.py ${{ matrix.shard }})"
 
       # Names the exception behind a headless-session death (every later test fails with "idle test
       # context"); written by UnhandledExceptionLog in AnimationEditor.App.Tests.
-      - name: Show unhandled exceptions from AnimationEditor.App tests
+      - name: Show unhandled exceptions from AnimationEditor.App tests (shard ${{ matrix.shard }})
         if: failure()
-        run: cat /tmp/AnimationEditorAppTests/unhandled-exceptions.log || echo "no unhandled exceptions were logged"
+        run: |
+          echo "== shard ${{ matrix.shard }}"
+          cat /tmp/AnimationEditorAppTests/unhandled-exceptions.log || echo "no unhandled exceptions were logged"
 
   # Renders scenes offscreen on Mesa llvmpipe (software OpenGL under xvfb) and compares them to the
   # checked-in PNGs in tests/FlatRedBall2.GoldenImage.Tests/Golden (#1420). Its own job because

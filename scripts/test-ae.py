@@ -19,6 +19,7 @@ import argparse, os, re, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 from run_tests import failure_details
+from app_test_shards import shard_filters, test_classes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AE = os.path.join(ROOT, "tools", "AnimationEditorAvalonia")
@@ -30,26 +31,6 @@ APP_SHARDS = 6
 HANG_TIMEOUT = "60s"
 
 
-def app_shard_filters():
-    """Splits App.Tests test classes (one per file) into shards balanced by file size."""
-    app = os.path.join(TESTS, "AnimationEditor.App.Tests")
-    files = []
-    for folder, _, names in os.walk(app):
-        if os.sep + "bin" in folder or os.sep + "obj" in folder:
-            continue
-        for name in names:
-            if name.endswith("Tests.cs"):
-                files.append((os.path.getsize(os.path.join(folder, name)), name[:-3]))
-    buckets = [[0, []] for _ in range(APP_SHARDS)]
-    for size, cls in sorted(files, reverse=True):
-        bucket = min(buckets, key=lambda b: b[0])
-        bucket[0] += size
-        bucket[1].append(cls)
-    explicit = buckets[:-1]
-    filters = ["|".join(f"FullyQualifiedName~.{c}." for c in b[1]) for b in explicit]
-    listed = [c for b in explicit for c in b[1]]
-    filters.append("&".join(f"FullyQualifiedName!~.{c}." for c in listed))
-    return filters
 
 
 def run(label, project, test_filter, log_dir):
@@ -95,7 +76,7 @@ def main():
     for project in PROJECTS:
         short = project.replace("AnimationEditor.", "")
         if project == "AnimationEditor.App.Tests":
-            for i, shard in enumerate(app_shard_filters(), 1):
+            for i, shard in enumerate(shard_filters(test_classes(), APP_SHARDS), 1):
                 combined = f"({args.filter})&({shard})" if args.filter else shard
                 jobs.append((f"{short}-{i}", project, combined))
         else:
