@@ -54,4 +54,41 @@ public class HotkeyDefinitionTests
 
         Assert.Equal("F3", hotkey.DisplayText);
     }
+
+    [Fact]
+    public void DisplayTextFor_MacPreferredGesture_UsedOnlyOnMac()
+    {
+        var hotkey = new HotkeyDefinition
+        {
+            Id = "redo",
+            Description = "Redo",
+            Category = "Edit",
+            Gestures = new[]
+            {
+                new HotkeyGesture("Y", HotkeyModifiers.Command),
+                new HotkeyGesture("Z", HotkeyModifiers.Command | HotkeyModifiers.Shift),
+            },
+            MacPreferredGesture = new HotkeyGesture("Z", HotkeyModifiers.Command | HotkeyModifiers.Shift),
+            Action = () => { },
+        };
+
+        Assert.Equal("Ctrl+Y", hotkey.DisplayTextFor(isMacOS: false));
+        Assert.Equal("Ctrl+Shift+Z", hotkey.DisplayTextFor(isMacOS: true));
+    }
+
+    [Fact]
+    public void DisplayTextFor_NoMacPreferredGesture_IsTheFirstGestureOnEveryPlatform()
+    {
+        var hotkey = new HotkeyDefinition
+        {
+            Id = "save",
+            Description = "Save",
+            Category = "File",
+            Gestures = new[] { new HotkeyGesture("S", HotkeyModifiers.Command) },
+            Action = () => { },
+        };
+
+        Assert.Equal("Ctrl+S", hotkey.DisplayTextFor(isMacOS: true));
+        Assert.Equal("Ctrl+S", hotkey.DisplayTextFor(isMacOS: false));
+    }
 }
