@@ -17,7 +17,7 @@ public class SequenceDocumentMoveSequencesTests
     private static SequenceDocument Open(TestHelpers.TempDir dir, params string[] names)
     {
         var save = new SequenceListSave();
-        save.Sequences.AddRange(names.Select(name => new SequenceSave { Name = name }));
+        save.Sequences.AddRange(names.Select(name => new SequenceSave { Name = name, Loop = false }));
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
         return SequenceDocument.Load(path);

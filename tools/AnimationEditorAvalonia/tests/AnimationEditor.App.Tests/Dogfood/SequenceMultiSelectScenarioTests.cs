@@ -201,9 +201,10 @@ public class SequenceMultiSelectScenarioTests
         (await editor.WaitUntilAsync(() => Timeline(editor).Playhead < 0.1, TimeSpan.FromSeconds(3))).ShouldBeTrue();
         Shown(editor).ShouldContain(shown => shown.StartsWith("Walk:"));
 
-        // Attack ends at 0.5 s and disappears; Idle keeps looping, so the preview is still playing.
-        (await editor.WaitUntilAsync(() => !Shown(editor).Any(shown => shown.StartsWith("Walk:")), TimeSpan.FromSeconds(3))).ShouldBeTrue();
+        // Attack ends at 0.5 s and holds its final pose (its last Walk frame); Idle keeps looping, so the preview is still playing.
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(700));
         IsPlaying(editor).ShouldBeTrue();
+        Shown(editor).ShouldContain("Walk:4");
         Shown(editor).ShouldContain(shown => shown.StartsWith("Run:"));
     }
 
