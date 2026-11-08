@@ -557,6 +557,9 @@ public partial class MainWindow
             w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+            w.SequenceLibrary.SourceMoveRequested += MoveSource;
+            w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
+                point => w.SequenceLibrary.GroupsPanel.TranslatePoint(point, w.DragOverlayCanvas));
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
             w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
 
@@ -964,6 +967,14 @@ public partial class MainWindow
         {
             if (_document?.RemoveSource(_window._undoManager, source) is { } error)
                 _window.ShowErrorBanner(error);
+        }
+
+        // Dropping a source's group on a gap: one undo entry, and an edit rather than a place to come back to, so no Back entry.
+        private void MoveSource(int index, int slot)
+        {
+            if (_document is not { } document) return;
+            using (_window._navigation.Suppress())
+                document.MoveSources(_window._undoManager, new[] { index }, slot);
         }
 
         private void AddSequence()

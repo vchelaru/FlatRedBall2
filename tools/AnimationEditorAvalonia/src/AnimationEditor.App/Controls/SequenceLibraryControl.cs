@@ -31,6 +31,7 @@ public sealed class SequenceLibraryControl : UserControl
     private readonly Border _frame = new() { BorderThickness = new Thickness(1) };
     private readonly Dictionary<(string Source, string Chain), LibraryChipView> _chips = new();
     private readonly Dictionary<string, Control> _headers = new();
+    private readonly Dictionary<string, Control> _groupControls = new();
     private SequenceDocument? _document;
     private string? _shownKey;
     private readonly Dictionary<string, Action> _groupApply = new(StringComparer.OrdinalIgnoreCase);
@@ -39,6 +40,7 @@ public sealed class SequenceLibraryControl : UserControl
     private readonly Stopwatch _playbackClock = new();
     private bool _autoplayAll;
     private bool _attached;
+    private readonly LibraryGroupDragController _groupDrag;
 
     public SequenceLibraryControl()
     {
@@ -87,11 +89,13 @@ public sealed class SequenceLibraryControl : UserControl
 
         var body = new DockPanel();
         body.Children.Add(header);
-        body.Children.Add(new ScrollViewer
+        Scroller = new ScrollViewer
         {
             Content = _groups,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-        });
+        };
+        body.Children.Add(Scroller);
+        _groupDrag = new LibraryGroupDragController(this, (index, slot) => SourceMoveRequested?.Invoke(index, slot), ClickHeader);
         _frame.Child = body;
         _frame.BorderBrush = Brushes.Transparent;
         BindResource(_frame, Border.BackgroundProperty, "BgPanel");
@@ -192,6 +196,45 @@ public sealed class SequenceLibraryControl : UserControl
         RefreshPlayback();
     }
 
+    /// <summary>The scrolling panel the groups sit in.</summary>
+    internal ScrollViewer Scroller { get; }
+
+    /// <summary>The panel holding one group per source, in source order.</summary>
+    internal Panel GroupsPanel => _groups;
+
+    /// <summary>
+    /// Raised when the user drops a group's header on a gap, with the source's index and the gap
+    /// (see <see cref="SequenceReorder"/>). The host moves it in the document; this control never edits it.
+    /// </summary>
+    public event Action<int, int>? SourceMoveRequested;
+
+    /// <summary>Connects the insertion line a group drag shows. See <see cref="LibraryGroupDragController.ConnectDropLine"/>.</summary>
+    internal void ConnectDropLine(Action<double, double, double> showLine, Action hideLine, Func<Point, Point?> toOverlay) =>
+        _groupDrag.ConnectDropLine(showLine, hideLine, toOverlay);
+
+    /// <summary>
+    /// The index of the source whose header <paramref name="visual"/> is in, or -1 when it is elsewhere or inside one of
+    /// the header's buttons (chevron, open, remove), which have their own clicks.
+    /// </summary>
+    internal int HeaderIndexAt(Visual? visual)
+    {
+        if (visual is null) return -1;
+        for (int index = 0; index < Sources.Count; index++)
+        {
+            if (!_headers.TryGetValue(Sources[index].Source, out var header) || !IsWithin(visual, header)) continue;
+            for (Visual? up = visual; up is not null && !ReferenceEquals(up, header); up = up.GetVisualParent())
+                if (up is Button) return -1;
+            return index;
+        }
+        return -1;
+    }
+
+    // A click anywhere on a header that is not one of its buttons collapses or expands it. A missing source has nothing to hide.
+    private void ClickHeader(int index)
+    {
+        if (index < Sources.Count && !Sources[index].IsMissing) ToggleSource(Sources[index].Source);
+    }
+
     /// <summary>Raised with the local paths of files dropped on the library. Marks the drop handled.</summary>
     public event Action<IReadOnlyList<string>>? FilesDropped;
 
@@ -234,6 +277,9 @@ public sealed class SequenceLibraryControl : UserControl
     /// <summary>The header row of <paramref name="source"/>, or null when it isn't shown.</summary>
     public Control? HeaderFor(string source) => _headers.GetValueOrDefault(source);
 
+    /// <summary>The whole group of <paramref name="source"/> (header and chips), or null when it isn't shown.</summary>
+    public Control? GroupFor(string source) => _groupControls.GetValueOrDefault(source);
+
     /// <summary>
     /// Shows <paramref name="document"/>'s sources. Rebuilds the chips only when the document or its source list changed,
     /// so a chip that is playing keeps playing through unrelated edits.
@@ -258,10 +304,13 @@ public sealed class SequenceLibraryControl : UserControl
 
     private void Rebuild()
     {
+        // A drag in progress holds the old groups.
+        _groupDrag.Cancel();
         _groups.Children.Clear();
         _chips.Clear();
         _groupApply.Clear();
         _headers.Clear();
+        _groupControls.Clear();
         RefreshPlayback();
         if (_document is null) return;
         if (Sources.Count == 0)
@@ -346,13 +395,6 @@ public sealed class SequenceLibraryControl : UserControl
             };
             button.Click += (_, _) => ToggleSource(source.Source);
             toggle = button;
-            header.PointerPressed += (_, e) =>
-            {
-                // The open and remove buttons are inside the header and have their own clicks.
-                if (!e.GetCurrentPoint(header).Properties.IsLeftButtonPressed || IsWithin(e.Source, remove) || IsWithin(e.Source, open)) return;
-                ToggleSource(source.Source);
-                e.Handled = true;
-            };
         }
         else
         {
@@ -401,6 +443,7 @@ public sealed class SequenceLibraryControl : UserControl
         }
         Apply();
         _groupApply[source.Source] = Apply;
+        _groupControls[source.Source] = group;
         return group;
     }
 
