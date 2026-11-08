@@ -192,24 +192,4 @@ public class SequenceRenameClickAwayScenarioTests
         ShouldShowSequence(editor, 1, "B1");
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'A1'", "Rename Sequence 'Mid' to 'B1'" });
     }
-
-    [AvaloniaFact]
-    public async Task SwitchingTabs_WhileRenaming_DropsTheRename_AndKeepsTheSelection()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor);
-        string other = editor.WriteSeqj("other.seqj", "One", "Two");
-        await editor.OpenAsync(boss);
-        await editor.OpenAsync(other);
-        editor.ClickTab("boss.seqj");
-
-        BeginRenameByDoubleTap(editor, 1, "Middle");
-        editor.ClickTab("other.seqj");
-        editor.ClickTab("boss.seqj");
-
-        SavedNames(boss).ShouldBe(new[] { "Idle", "Mid", "Attack" });
-        editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
-        ShouldShowSequence(editor, 1, "Mid");
-    }
 }

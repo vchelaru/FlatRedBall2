@@ -69,6 +69,28 @@ public class SequenceDocumentSelectionTests
         document.SelectedSequence.ShouldBe(0);
     }
 
+    [Fact]
+    public void RenameTrack_SelectsItsSequence_UnlessKeepSelection_AndUndoAndRedoAlwaysDo()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var (document, undo) = Open(dir, "A", "B");
+        document.Save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Body" });
+        document.Save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Arms" });
+        document.SelectedSequence = 1;
+
+        document.RenameTrack(undo, 0, 1, "Legs", keepSelection: true);
+        document.SelectedSequence.ShouldBe(1);
+        undo.Undo();
+        document.SelectedSequence.ShouldBe(0);
+        document.SelectedSequence = 1;
+        undo.Redo();
+        document.SelectedSequence.ShouldBe(0);
+
+        document.SelectedSequence = 1;
+        document.RenameTrack(undo, 0, 0, "Torso");
+        document.SelectedSequence.ShouldBe(0);
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(1, 1)]

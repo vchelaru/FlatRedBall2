@@ -399,6 +399,8 @@ public partial class MainWindow : Window
         }
 
         Opened += OnOpened;
+        // Before the settings and tabs are written, so a name typed into an open rename is kept.
+        Closing += (_, _) => CommitPendingRename();
         Closed += (_, _) =>
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
@@ -7657,6 +7659,8 @@ public partial class MainWindow : Window
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;
+            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first.
+            CommitPendingRename();
             match.Action();
         }), RoutingStrategies.Tunnel);
 
