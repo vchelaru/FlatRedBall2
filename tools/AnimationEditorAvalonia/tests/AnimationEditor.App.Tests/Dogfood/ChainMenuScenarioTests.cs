@@ -135,6 +135,20 @@ public class ChainMenuScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DuplicateFlipDiagonal_SwapsDirectionWordsAcrossTheMainDiagonal()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("WalkRight", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+
+        editor.RightClickRow(editor.ChainNamed("WalkRight"));
+        editor.PickTreeMenuItem("Duplicate", "Flip Diagonal");
+
+        editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "WalkRight", "WalkDown" });
+    }
+
+    [AvaloniaFact]
     public async Task RowLockButton_LocksTheChain_AndDeleteLeavesItsFramesAlone()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
