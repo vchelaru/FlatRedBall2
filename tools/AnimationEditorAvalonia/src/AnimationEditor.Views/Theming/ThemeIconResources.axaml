@@ -4,7 +4,7 @@
     <!-- Icon-dependent resources. SVG assets live under AnimationEditor.Views/Assets/icons/svg/. -->
 
     <!-- Compact stacked chevron spinner — replaces Fluent default for all ButtonSpinner/NumericUpDown.
-         Safe because every NumericUpDown except PropFrameLen has ShowButtonSpinner="False". -->
+         Only shown on a NumericUpDown with Classes="spinner" (none today); see ThemeStyles.axaml. -->
     <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
         <Setter Property="Foreground"   Value="{DynamicResource TextControlForeground}" />
         <Setter Property="Background"   Value="{DynamicResource TextControlBackground}" />

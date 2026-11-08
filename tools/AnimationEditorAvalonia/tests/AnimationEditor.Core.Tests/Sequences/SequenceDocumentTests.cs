@@ -72,6 +72,19 @@ public class SequenceDocumentTests
     }
 
     [Fact]
+    public void AddSequence_TheNewSequenceLoops_LikeANewChain()
+    {
+        using var dir = new TestHelpers.TempDir();
+        string path = WriteSeqj(dir.Path, new SequenceListSave());
+        var document = SequenceDocument.Load(path);
+
+        document.AddSequence(new UndoManager());
+
+        document.Save.Sequences.Single().Loop.ShouldBeTrue();
+        SequenceListSave.FromFile(path).Sequences.Single().Loop.ShouldBeTrue();
+    }
+
+    [Fact]
     public void RenameSequence_DuplicateName_IsRefused()
     {
         using var dir = new TestHelpers.TempDir();
@@ -201,7 +214,7 @@ public class SequenceDocumentTests
     {
         using var dir = new TestHelpers.TempDir();
         var save = new SequenceListSave();
-        save.Sequences.Add(new SequenceSave { Name = "Attack" });
+        save.Sequences.Add(new SequenceSave { Name = "Attack", Loop = false });
         string path = WriteSeqj(dir.Path, save);
         var document = SequenceDocument.Load(path);
         var undo = new UndoManager();

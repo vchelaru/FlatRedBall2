@@ -33,7 +33,7 @@ public class SequencePreviewLiveScenarioTests
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         for (int i = 0; i < sequences.Length; i++)
         {
-            var sequence = new SequenceSave { Name = i == 0 ? "Attack" : $"Other {i}" };
+            var sequence = new SequenceSave { Name = i == 0 ? "Attack" : $"Other {i}", Loop = false };
             sequence.Tracks.AddRange(sequences[i]);
             save.Sequences.Add(sequence);
         }
@@ -377,7 +377,7 @@ public class SequencePreviewLiveScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ResizingAChainBelowThePlayhead_RemovesItFromThePreviewWhileDragging_AndEscapeBringsItBack()
+    public async Task ResizingAChainBelowThePlayhead_ShowsTheShortenedSequencesHeldFinalPoseWhileDragging_AndEscapeBringsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0)));
@@ -388,7 +388,7 @@ public class SequencePreviewLiveScenarioTests
         editor.DragHold(At(editor, 0, 0.5), At(editor, 0, 0.2));
 
         Timeline(editor).Blocks.Single().Full.ShouldBeLessThan(0.3);
-        ShownChains(editor).ShouldBeEmpty();
+        ShownChains(editor).ShouldBe(new[] { "Walk:1" });
         editor.Press(Key.Escape);
         ShownChains(editor).ShouldBe(new[] { "Walk:4" });
         Shown(editor).ShouldBe(Expected(editor, boss));
