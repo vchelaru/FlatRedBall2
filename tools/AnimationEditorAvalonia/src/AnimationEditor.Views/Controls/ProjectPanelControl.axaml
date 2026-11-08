@@ -6,12 +6,33 @@
              x:DataType="controls:ProjectPanelControl">
     <UserControl.Resources>
         <x:Double x:Key="ProjectTreeThumbSize">28</x:Double>
-    </UserControl.Resources>
-    <UserControl.DataTemplates>
-        <DataTemplate DataType="controls:AchxTreeNodeVm">
+        <!-- Both are shown through a ContentPresenter whose Content is null on rows that need
+             neither, so only folder rows build the glyph and only the row being named builds
+             the TextBox: each hidden control a row built anyway cost a share of the tab switch. -->
+        <DataTemplate x:Key="FolderToggleTemplate" x:DataType="controls:AchxTreeNodeVm">
             <controls:FolderExpanderIcon IsOpen="{Binding IsFolderOpen}"
                                           Toggled="OnFolderExpanderToggled" />
         </DataTemplate>
+        <!-- Inline rename for a not-yet-created file (#1018). The extension is neither shown
+             nor edited here; the project's convention picks it. -->
+        <DataTemplate x:Key="NameEditorTemplate" x:DataType="controls:AchxTreeNodeVm">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBox Classes="inline-rename"
+                         Text="{Binding EditText, Mode=TwoWay}"
+                         Width="140"
+                         VerticalAlignment="Center"
+                         AttachedToVisualTree="OnPendingNameAttached"
+                         KeyDown="OnPendingNameKeyDown"
+                         LostFocus="OnPendingNameLostFocus" />
+                <TextBlock Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding HasError}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Accent}" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+    <UserControl.DataTemplates>
         <DataTemplate DataType="controls:ProjectRowSvgIcon">
             <svg:Svg Width="16" Height="16"
                      Path="{Binding Path}"
@@ -104,8 +125,9 @@
                              its SVG on creation, and four per row (two of them the hidden folder
                              glyphs on every file row) froze the tab switch for over a second on a
                              130-file project. -->
-                        <ContentControl Content="{Binding FolderToggleContent}" />
-                        <ContentControl Content="{Binding FileIconContent}" />
+                        <ContentPresenter Content="{Binding FolderToggleContent}"
+                                        ContentTemplate="{StaticResource FolderToggleTemplate}" />
+                        <ContentPresenter Content="{Binding FileIconContent}" />
                         <Image IsVisible="{Binding HasThumbnail}"
                                Width="{StaticResource ProjectTreeThumbSize}"
                                Height="{StaticResource ProjectTreeThumbSize}"
@@ -117,21 +139,8 @@
                                    FontSize="11"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
-                        <!-- Inline rename for a not-yet-created file (#1018). The extension is
-                             neither shown nor edited here; the project's convention picks it. -->
-                        <TextBox Classes="inline-rename"
-                                 Text="{Binding EditText, Mode=TwoWay}"
-                                 IsVisible="{Binding IsEditing}"
-                                 Width="140"
-                                 VerticalAlignment="Center"
-                                 AttachedToVisualTree="OnPendingNameAttached"
-                                 KeyDown="OnPendingNameKeyDown"
-                                 LostFocus="OnPendingNameLostFocus" />
-                        <TextBlock Text="{Binding ErrorMessage}"
-                                   IsVisible="{Binding HasError}"
-                                   FontSize="11"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Accent}" />
+                        <ContentPresenter Content="{Binding NameEditorContent}"
+                                        ContentTemplate="{StaticResource NameEditorTemplate}" />
                     </StackPanel>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>

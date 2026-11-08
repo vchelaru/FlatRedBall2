@@ -56,7 +56,8 @@ public class ProjectTabStallProbe
             while (panel.TreeRoots.Count == 0 && sw.ElapsedMilliseconds < 60000)
                 await Task.Delay(5);
             meter.Flush();
-            Log($"scan done: {sw.ElapsedMilliseconds} ms, roots={panel.TreeRoots.Count}");
+            static int Collapsed(IEnumerable<AchxTreeNodeVm> nodes) => nodes.Sum(n => (n.IsFolder && !n.IsExpanded ? 1 : 0) + Collapsed(n.Children));
+            Log($"scan done: {sw.ElapsedMilliseconds} ms, roots={panel.TreeRoots.Count}, collapsedFolders={Collapsed(panel.TreeRoots)}");
 
             sw.Restart();
             meter.Mark("thumbs-hidden");

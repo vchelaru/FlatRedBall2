@@ -540,8 +540,8 @@ public partial class ProjectPanelControl : UserControl
     private void OnPendingNameLostFocus(object? sender, RoutedEventArgs e) =>
         CancelPendingNewAnimationFile();
 
-    // Every row's template carries this TextBox, collapsed -- an unguarded Focus() here would let
-    // any newly-realized row steal focus (from the search box, say), not just the pending one.
+    // Only a row being named builds this TextBox (NameEditorContent); the guard keeps a TextBox
+    // that outlives its editing state from stealing focus (from the search box, say) on re-attach.
     private void OnPendingNameAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is not TextBox { DataContext: AchxTreeNodeVm { IsEditing: true } } textBox) return;
@@ -665,6 +665,7 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
             _isEditing = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsNotEditing));
+            OnPropertyChanged(nameof(NameEditorContent));
         }
     }
 
@@ -719,6 +720,10 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
     /// maps it to a <see cref="FolderExpanderIcon"/>), null for every other row so it builds no control.
     /// </summary>
     public object? FolderToggleContent => IsFolder ? this : null;
+
+    /// <summary>The node itself while its name is being edited (the row template maps it to the
+    /// rename TextBox), null otherwise so ordinary rows build no TextBox.</summary>
+    public object? NameEditorContent => _isEditing ? this : null;
 
     /// <summary>
     /// What the icon slot of the row shows, or null when it shows nothing (a thumbnail replaces the
