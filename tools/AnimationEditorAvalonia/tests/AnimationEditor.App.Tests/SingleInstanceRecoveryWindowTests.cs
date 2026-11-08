@@ -46,4 +46,16 @@ public class SingleInstanceRecoveryWindowTests
 
         Assert.False(window.RestartRequested);
     }
+
+    [AvaloniaFact]
+    public void CreateNoWindowDialog_OffersRestart()
+    {
+        var window = SingleInstanceRecoveryWindow.CreateNoWindowDialog();
+
+        var buttonRow = (StackPanel)((StackPanel)window.Content!).Children[1];
+        var hasRestartButton = buttonRow.Children.OfType<Button>()
+            .Any(b => b.Content as string == "Restart AnimationEditor");
+
+        Assert.True(hasRestartButton);
+    }
 }

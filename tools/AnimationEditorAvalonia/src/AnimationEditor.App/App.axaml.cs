@@ -27,6 +27,12 @@ public partial class App : Application
     /// </summary>
     internal static SingleInstanceServer? SingleInstance { get; set; }
 
+    /// <summary>
+    /// Set by <see cref="Program.Main"/> when the pipe hand-off reached a primary that is frozen or has
+    /// no window; null when the hand-off failed and the action must be worked out here.
+    /// </summary>
+    internal static SingleInstanceRecoveryAction? RecoveryActionForReachedPrimary { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -54,14 +60,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Classifies why the primary was unreachable and shows the matching recovery dialog. Called
-    /// only when <see cref="SingleInstance"/> is not the mutex owner and its pipe hand-off
-    /// already failed in <see cref="Program.Main"/>.
+    /// Shows the recovery dialog matching why the primary could not be used. Called only when
+    /// <see cref="SingleInstance"/> is not the mutex owner: its pipe hand-off failed, or it
+    /// reached a primary that is frozen or window-less, in <see cref="Program.Main"/>.
     /// </summary>
     private void HandleUnreachablePrimary(IClassicDesktopStyleApplicationLifetime desktop)
     {
-        var hangResult = PrimaryInstanceHangChecker.Check();
-        var action = SingleInstanceRecoveryDecision.Decide(reachedPrimary: false, hangResult);
+        var action = RecoveryActionForReachedPrimary
+            ?? SingleInstanceRecoveryDecision.Decide(reachedPrimary: false, PrimaryInstanceHangChecker.Check());
 
         switch (action)
         {
@@ -74,9 +80,14 @@ public partial class App : Application
                     onRestartConfirmed: () => RestartAndTakeOver(desktop));
                 break;
 
+            case SingleInstanceRecoveryAction.OfferRestartNoWindow:
+                ShowRecoveryDialog(desktop, SingleInstanceRecoveryWindow.CreateNoWindowDialog(),
+                    onRestartConfirmed: () => RestartAndTakeOver(desktop));
+                break;
+
             default:
-                // SilentExit only happens when reachedPrimary is true, which can't be the case
-                // here — Program.Main already returned in that branch without booting Avalonia.
+                // SilentExit only happens for a healthy reachable primary, and Program.Main
+                // already returned in that branch without booting Avalonia.
                 desktop.Shutdown(0);
                 break;
         }
@@ -139,6 +150,8 @@ public partial class App : Application
                     await window.OpenFileAsTab(path);
                     window.BringToForeground();
                 });
+            SingleInstance.ActivationRequested += () =>
+                Dispatcher.UIThread.Post(() => { if (window.IsVisible) window.BringToForeground(); });
         }
 
         // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
