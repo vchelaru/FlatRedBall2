@@ -658,7 +658,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    _ = ActivateTabAsync(captured);
+                    _tabSwitchInFlight = ActivateTabAsync(captured);
                 }
 
                 _dragTab = null;
@@ -765,6 +765,12 @@ public partial class MainWindow : Window
             : null;
         ProjectPanel.SyncSelectionToActiveFile(entry);
     }
+
+    // The switch a tab-strip click starts keeps loading after the click returns (a tab that has to reload from disk,
+    // then its undo history is restored), so tests await it here instead of reading state mid-switch.
+    private Task _tabSwitchInFlight = Task.CompletedTask;
+
+    internal Task WhenTabSwitchSettled() => _tabSwitchInFlight;
 
     private async Task ActivateTabAsync(TabEntry tab)
     {

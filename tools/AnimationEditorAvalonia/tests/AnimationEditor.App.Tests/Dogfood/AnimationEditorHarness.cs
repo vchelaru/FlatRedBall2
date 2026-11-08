@@ -417,8 +417,15 @@ internal sealed class AnimationEditorHarness : IDisposable
             .Select(border => border.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault()?.Text ?? "")
             .ToList();
 
-    public void ClickTab(string displayName) =>
+    public void ClickTab(string displayName)
+    {
         Click(TabFor(displayName).GetVisualDescendants().OfType<TextBlock>().First(label => label.Text == displayName));
+        // The switch keeps loading after the click returns; a slow runner otherwise reads it half done.
+        if (!WaitUntil(() => Window.WhenTabSwitchSettled().IsCompleted, TimeSpan.FromSeconds(10)))
+        {
+            throw new InvalidOperationException($"Switching to the {displayName} tab did not finish within 10 seconds.");
+        }
+    }
 
     /// <summary>Clicks the ✕ on the tab labelled <paramref name="displayName"/>.</summary>
     public void CloseTab(string displayName) =>

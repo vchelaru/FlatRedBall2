@@ -15,10 +15,15 @@ public class DetachedWindowNativeMenuTests
     private static string NewSettingsRoot() =>
         Path.Combine(Path.GetTempPath(), "AnimationEditorTests", Guid.NewGuid().ToString("N"));
 
+    // Closing a window deletes its recovery file, so each test window gets its own rather than the shared real one.
+    private static MainWindow CreateDetached() =>
+        App.CreateDetachedWindow(NewSettingsRoot(),
+            Path.Combine(Path.GetTempPath(), "AnimationEditorAppTests", $"recovery_{Guid.NewGuid():N}.achx"));
+
     [AvaloniaFact]
     public void DetachedWindow_HasANativeMenu_ThatMirrorsItsInWindowMenu()
     {
-        MainWindow window = App.CreateDetachedWindow(NewSettingsRoot());
+        MainWindow window = CreateDetached();
         try
         {
             NativeMenu? native = NativeMenu.GetMenu(window);
@@ -35,8 +40,8 @@ public class DetachedWindowNativeMenuTests
     [AvaloniaFact]
     public void TwoDetachedWindows_EachGetTheirOwnNativeMenu()
     {
-        MainWindow first = App.CreateDetachedWindow(NewSettingsRoot());
-        MainWindow second = App.CreateDetachedWindow(NewSettingsRoot());
+        MainWindow first = CreateDetached();
+        MainWindow second = CreateDetached();
         try
         {
             NativeMenu? firstMenu = NativeMenu.GetMenu(first);

@@ -173,18 +173,23 @@ public partial class App : Application
     /// Application-data root for the window's settings and thumbnail cache; null is the user's real
     /// folder. Tests pass a temp folder.
     /// </param>
-    internal static MainWindow CreateDetachedWindow(string? settingsRoot = null)
+    /// <param name="recoveryFilePath">
+    /// Crash-recovery file the window clears on close; null is the shared one in the temp folder. Tests pass their own,
+    /// since closing a window deletes it.
+    /// </param>
+    internal static MainWindow CreateDetachedWindow(string? settingsRoot = null, string? recoveryFilePath = null)
     {
-        var services = BuildServices(settingsRoot);
+        var services = BuildServices(settingsRoot, recoveryFilePath);
         var window = services.GetRequiredService<MainWindow>();
         window.Icon = LoadAppIcon();
         RegisterNativeMenu(window);
         return window;
     }
 
-    private static ServiceProvider BuildServices(string? settingsRoot = null)
+    private static ServiceProvider BuildServices(string? settingsRoot = null, string? recoveryFilePath = null)
     {
         settingsRoot ??= Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        recoveryFilePath ??= System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx");
         var sc = new ServiceCollection();
 
         sc.AddSingleton<ProjectManager>();
@@ -204,7 +209,7 @@ public partial class App : Application
 
         sc.AddSingleton<IoManager>(sp =>
             new IoManager(sp.GetRequiredService<IAppState>(),
-                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditor_Recovery.achx")));
+                recoveryFilePath));
         sc.AddSingleton<IIoManager>(sp => sp.GetRequiredService<IoManager>());
 
         sc.AddSingleton<ObjectFinder>(sp =>
