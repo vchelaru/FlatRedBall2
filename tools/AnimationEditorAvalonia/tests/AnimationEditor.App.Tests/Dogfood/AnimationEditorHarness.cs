@@ -389,6 +389,17 @@ internal sealed class AnimationEditorHarness : IDisposable
             ?? throw new InvalidOperationException($"The row for {Describe(data)} is not editing its name.");
     }
 
+    /// <summary>
+    /// Types <paramref name="text"/> into the one sequence list or timeline name box that is open for editing (what a menu's
+    /// Rename… opens in place) and presses Enter. Fails if none is open.
+    /// </summary>
+    public void TypeIntoOpenSequenceRename(string text)
+    {
+        InlineRenameBox box = Window.GetVisualDescendants().OfType<InlineRenameBox>().SingleOrDefault(candidate => candidate.IsEditing)
+            ?? throw new InvalidOperationException("No name box is open for editing.");
+        TypeAndEnter(box, text);
+    }
+
     /// <summary>Rows of the History panel, oldest first, as the panel shows them.</summary>
     public List<string> HistoryRows =>
         (Control<ItemsControl>("HistoryList").ItemsSource?.OfType<HistoryEntryVm>() ?? Enumerable.Empty<HistoryEntryVm>())

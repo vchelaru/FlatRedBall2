@@ -96,11 +96,10 @@ public class SequenceTabScenarioTests
         ContextMenu menu = list.ContextMenu!;
         editor.RightClick(list.ContainerFromIndex(1)!);
 
-        editor.Dialogs.AnswerNextPrompt("Charge");
         editor.PickMenuItem(menu, "Rename…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Charge");
         editor.RightClick(list.ContainerFromIndex(1)!);
-        editor.PickMenuItem(menu, "Delete");
+        editor.PickMenuItem(menu, "Delete Sequence");
         editor.Layout();
 
         editor.SequenceNames.ShouldBe(new[] { "Idle" });

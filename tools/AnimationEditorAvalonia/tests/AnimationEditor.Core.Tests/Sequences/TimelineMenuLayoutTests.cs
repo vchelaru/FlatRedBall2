@@ -44,7 +44,7 @@ public class TimelineMenuLayoutTests
     [InlineData(Target.TrackHeader, Cmd.Copy, 1, "Copy")]
     [InlineData(Target.TrackHeader, Cmd.Copy, 3, "Copy 3 Tracks")]
     [InlineData(Target.TrackHeader, Cmd.Cut, 2, "Cut 2 Tracks")]
-    [InlineData(Target.TrackHeader, Cmd.Duplicate, 1, "Duplicate Track")]
+    [InlineData(Target.TrackHeader, Cmd.Duplicate, 1, "Duplicate")]
     [InlineData(Target.TrackHeader, Cmd.Duplicate, 2, "Duplicate 2 Tracks")]
     [InlineData(Target.TrackHeader, Cmd.Delete, 1, "Delete Track")]
     [InlineData(Target.TrackHeader, Cmd.Delete, 2, "Delete 2 Tracks")]

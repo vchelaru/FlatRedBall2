@@ -8,8 +8,8 @@ using Shouldly;
 namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
-/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Copy, Cut, Paste, Duplicate Sequence, Rename,
-/// Copy Qualified Name, Delete and Add Sequence; blank space offers Add Sequence and Paste. (The popup is not part of the headless back-buffer, so the
+/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Add Sequence, Copy, Cut, Paste, Duplicate, Rename,
+/// Copy Qualified Name and Delete Sequence; blank space offers Add Sequence and Paste. (The popup is not part of the headless back-buffer, so the
 /// menus are checked by their items rather than by screenshot.)
 /// </summary>
 public class SequenceListMenuScenarioTests
@@ -50,7 +50,7 @@ public class SequenceListMenuScenarioTests
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
         List(editor).SelectedIndex.ShouldBe(1);
-        Headers(List(editor)).ShouldBe(new[] { "Copy", "Cut", "Paste", "Duplicate Sequence", "-", "Rename…", "Copy Qualified Name", "-", "Delete", "-", "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence" });
     }
 
     [AvaloniaFact]
@@ -122,13 +122,12 @@ public class SequenceListMenuScenarioTests
         await editor.OpenAsync(boss);
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
-        editor.Dialogs.AnswerNextPrompt("Charge");
         editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Charge");
         SavedNames(boss).ShouldBe(new[] { "Idle", "Charge" });
 
         editor.RightClick(List(editor).ContainerFromIndex(0)!);
-        editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Delete Sequence");
         editor.Layout();
         SavedNames(boss).ShouldBe(new[] { "Charge" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Attack' to 'Charge'", "Delete Sequence 'Idle'" });
