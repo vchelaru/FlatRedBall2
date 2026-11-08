@@ -560,7 +560,12 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
         // The tree itself is not focusable, its rows are: give the keyboard back to the selected
         // row (or the window) so the next hotkey is not swallowed by the closed popup's item.
-        Control target = AnimTree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(row => row.IsSelected)
+        ListBox sequenceList = Control<ListBox>("SequenceList");
+        // On a sequence tab the animation tree is hidden and cannot take the focus; the sequence list is the surface.
+        Control target = (sequenceList.IsEffectivelyVisible
+                ? sequenceList.ContainerFromIndex(sequenceList.SelectedIndex) as Control ?? sequenceList
+                : null)
+            ?? AnimTree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(row => row.IsSelected)
             ?? AnimTree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault()
             ?? (Control)Window;
         target.Focus();
