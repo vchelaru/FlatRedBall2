@@ -39,4 +39,4 @@ For OpenGL/WebGL/DirectX targets, **`ShadowDusk`** compiles cross-platform witho
 
 ### KNI Backend
 
-ShadowDusk compiles for KNI on any OS, as `.mgfx` (v10) or experimental `.knifx` (v11, `--target-runtime kni-knifx`). KNI 4.3.9001 reads format v12, so both are expected to print the harmless "effect is for an older version of KNI" notice at startup (not confirmed by running KNI); no v12 output from ShadowDusk has been found.
+KNI 4.3 reads effect format KNIFX v12; anything older prints the harmless "effect is for an older version of KNI and needs to be rebuilt" notice at startup. Compile engine-shipped GL shaders with ShadowDusk 0.25.0+ and `--target-runtime kni-knifx-v12` (`kni-knifx` and `.mgfx` still emit v11 and v10). `src/Rendering/Shaders/AddColor.knifx` is built that way; `AnimationChain.MonoGame` and `AnimationChain.KNI` keep an `.mgfx` copy so one build also loads on MonoGame and older KNI.
