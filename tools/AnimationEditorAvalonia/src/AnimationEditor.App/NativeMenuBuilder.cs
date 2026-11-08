@@ -77,7 +77,7 @@ internal static class NativeMenuBuilder
             {
                 if (child is MenuItem item)
                 {
-                    var mirror = new ItemMirror(item);
+                    var mirror = new ItemMirror(item, Rebuild);
                     _children.Add(mirror);
                     _native.Add(mirror.Native);
                 }
@@ -102,21 +102,44 @@ internal static class NativeMenuBuilder
     }
 
     /// <summary>One native item kept equal to one in-window item.</summary>
+    /// <remarks>
+    /// An item is built either as a plain item (a command) or as a submenu, from whether the in-window item has children,
+    /// and never edited between the two: Avalonia's macOS exporter keeps one native submenu per native item and throws
+    /// (crashing the process) if that item's <see cref="NativeMenuItem.Menu"/> is later swapped or removed. When the
+    /// in-window item crosses between "no children" and "children" (File > Open Recent on every file opened), the parent
+    /// menu replaces the whole native item instead.
+    /// </remarks>
     private sealed class ItemMirror : IDisposable
     {
         private readonly MenuItem _source;
         private readonly ActivateCommand _activate;
+        private readonly Action _replaceMe;
+        private readonly bool _isSubmenu;
         private MenuMirror? _submenu;
+        private NativeMenu? _menu;
 
         internal NativeMenuItem Native { get; } = new();
 
-        internal ItemMirror(MenuItem source)
+        internal ItemMirror(MenuItem source, Action replaceMe)
         {
             _source = source;
+            _replaceMe = replaceMe;
             _activate = new ActivateCommand(_source, Activate);
             _source.PropertyChanged += OnSourcePropertyChanged;
             ((INotifyCollectionChanged)_source.Items).CollectionChanged += OnItemsChanged;
-            UpdateSubmenu();   // before CopyState: setting a command makes the native item recompute its enabled state
+            _isSubmenu = _source.Items.Count > 0;
+            // Before CopyState: setting a command makes the native item recompute its enabled state.
+            if (_isSubmenu)
+            {
+                _menu = new NativeMenu();
+                _menu.Opening += OnSubmenuOpening;
+                _submenu = new MenuMirror(_menu, _source.Items);
+                Native.Menu = _menu;
+            }
+            else
+            {
+                Native.Command = _activate;
+            }
             CopyState();
         }
 
@@ -138,29 +161,11 @@ internal static class NativeMenuBuilder
             Native.IsChecked = _source.IsChecked;
         }
 
-        private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e) => UpdateSubmenu();
-
         // An item with children is a submenu and has no action of its own; one that is empty (Open Recent before any
-        // file was opened) stays a plain item until children arrive.
-        private void UpdateSubmenu()
+        // file was opened) is a plain item until children arrive.
+        private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            bool hasChildren = _source.Items.Count > 0;
-            if (hasChildren && _submenu is null)
-            {
-                var menu = new NativeMenu();
-                menu.Opening += OnSubmenuOpening;
-                _submenu = new MenuMirror(menu, _source.Items);
-                Native.Menu = menu;
-                Native.Command = null;
-            }
-            else if (!hasChildren && _submenu is not null)
-            {
-                Native.Menu!.Opening -= OnSubmenuOpening;
-                _submenu.Dispose();
-                _submenu = null;
-                Native.Menu = null;
-            }
-            if (!hasChildren) Native.Command = _activate;
+            if ((_source.Items.Count > 0) != _isSubmenu) _replaceMe();
         }
 
         private void OnSubmenuOpening(object? sender, EventArgs e)
@@ -182,6 +187,7 @@ internal static class NativeMenuBuilder
         {
             _source.PropertyChanged -= OnSourcePropertyChanged;
             ((INotifyCollectionChanged)_source.Items).CollectionChanged -= OnItemsChanged;
+            if (_menu is not null) _menu.Opening -= OnSubmenuOpening;
             _submenu?.Dispose();
         }
     }

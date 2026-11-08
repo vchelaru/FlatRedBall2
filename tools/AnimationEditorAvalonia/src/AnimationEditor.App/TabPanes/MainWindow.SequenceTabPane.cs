@@ -151,21 +151,78 @@ public partial class MainWindow
             string? sequenceName = CurrentSequence?.Name;
             var chains = timeline.SelectedChains.ToList();
             var tracks = timeline.SelectedTracks.ToList();
+            var rename = TakePendingRename(document);
             var result = document.ReloadFromDisk();
             if (result.Error is { } error)
             {
                 // Mid-write or damaged: the open document stays, and the next change event tries again.
                 _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
+                ResumePendingRename(rename);
                 return;
             }
-            if (!result.Changed) return;
+            if (!result.Changed)
+            {
+                ResumePendingRename(rename);
+                return;
+            }
             // The history describes the old file; undoing into it would write that back over the new one.
             _window._undoManager.Clear();
             // The timeline drops its selection when the sequence moved in the list; the same sequence keeps what still exists.
             if (sequenceName is not null && CurrentSequence?.Name == sequenceName
                 && timeline.SelectedChains.Count == 0 && timeline.SelectedTracks.Count == 0)
                 RestoreTimelineSelection(CurrentSequence, chains, tracks);
+            ResumePendingRename(rename);
             _window.ShowInfo($"Reloaded {document.Path.NoPath}");
+        }
+
+        /// <summary>An in-place rename that was open when the file was reloaded: what it named (by name, as indexes may shift) and the text typed.</summary>
+        private sealed record PendingRename(string? Sequence, string? SequenceText, string? TrackSequence, string? Track, string? TrackText);
+
+        // Takes the open rename boxes out of the way before the reload rebuilds the list and timeline under them, without applying them.
+        private PendingRename? TakePendingRename(SequenceDocument document)
+        {
+            string? sequence = null, sequenceText = null, trackSequence = null, track = null, trackText = null;
+            for (int index = 0; index < _items.Count; index++)
+            {
+                if (!_items[index].IsEditing) continue;
+                if (_window.SequenceList.ContainerFromIndex(index) is Control container
+                    && container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault() is { IsEditing: true } box)
+                {
+                    sequence = _items[index].Name;
+                    sequenceText = box.Text ?? string.Empty;
+                    box.Abandon();
+                }
+                _items[index].IsEditing = false;
+            }
+            var timeline = _window.SequenceTimeline;
+            if (timeline.RenamingTrack is { } lane && CurrentSequence is { } current && lane < current.Tracks.Count)
+            {
+                trackSequence = current.Name;
+                track = current.Tracks[lane].Name;
+                trackText = timeline.RenameText;
+            }
+            return sequence is null && track is null ? null : new PendingRename(sequence, sequenceText, trackSequence, track, trackText);
+        }
+
+        // Reopens a taken rename on the same sequence or track by name, with the text typed so far; one that no longer exists stays closed.
+        private void ResumePendingRename(PendingRename? rename)
+        {
+            if (rename is null || _document is not { } document) return;
+            var timeline = _window.SequenceTimeline;
+            if (rename.Track is not null)
+            {
+                int lane = CurrentSequence is { } current && current.Name == rename.TrackSequence
+                    ? current.Tracks.FindIndex(t => t.Name == rename.Track)
+                    : -1;
+                if (lane >= 0) timeline.BeginRenameTrack(lane, rename.TrackText);
+                else timeline.CancelRename();
+            }
+            int row = IndexOf(rename.Sequence);
+            if (rename.Sequence is null || row < 0 || row >= _items.Count) return;
+            _items[row].IsEditing = true;
+            _window.SequenceList.UpdateLayout();
+            if (_window.SequenceList.ContainerFromIndex(row) is Control container)
+                container.GetVisualDescendants().OfType<InlineRenameBox>().FirstOrDefault()?.Begin(rename.SequenceText ?? _items[row].Name, selectAll: false);
         }
 
         private void RestoreTimelineSelection(SequenceSave sequence, List<TimelineChainId> chains, List<int> tracks)

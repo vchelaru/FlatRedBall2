@@ -2654,9 +2654,10 @@ public partial class MainWindow : Window
         SequenceTimeline.DiagnosticsExtraLines = _diagnosticsHub.Lines;
         MenuSettings.Click += OnSettingsClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
-        MenuCopy.Click          += (_, _) => ActivePane.CopySelection();
-        MenuCut.Click           += (_, _) => ActivePane.CutSelection();
-        MenuPaste.Click         += (_, _) => ActivePane.PasteSelection();
+        // A Mac runs Cmd+C/X/V through these items, so with a text box focused they edit its text, not the selection.
+        MenuCopy.Click          += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Copy(); else ActivePane.CopySelection(); };
+        MenuCut.Click           += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Cut(); else ActivePane.CutSelection(); };
+        MenuPaste.Click         += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Paste(); else ActivePane.PasteSelection(); };
         MenuDuplicate.Click     += (_, _) => ActivePane.DuplicateSelection();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
@@ -7584,6 +7585,8 @@ public partial class MainWindow : Window
             {
                 Id = "undo", Description = "Undo", Category = "Edit",
                 Gestures = new[] { new HotkeyGesture("Z", Command, Forbidden: Shift) },
+                // An open sequence rename box undoes its own typed text, like any text box.
+                ShouldSkip = IsInlineRenameBoxFocused,
                 Scope = HotkeyScope.Document,
                 Action = Undo,
             },
@@ -7597,6 +7600,7 @@ public partial class MainWindow : Window
                 },
                 // Mac convention; Ctrl+Y stays first for Windows/Linux. Menus show whichever fits the host.
                 MacPreferredGesture = new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
+                ShouldSkip = IsInlineRenameBoxFocused,
                 Scope = HotkeyScope.Document,
                 Action = Redo,
             },
@@ -7665,16 +7669,22 @@ public partial class MainWindow : Window
             new()
             {
                 Id = "nav-back", Description = "Back", Category = "View",
-                Gestures = new[] { new HotkeyGesture("Left", Alt) },
+                // Option+Left/Right is word navigation in a Mac text box, and AppKit hands a menu's key equivalent
+                // to the menu even there, so on a Mac Back is Cmd+[ (Finder's and browsers' Back) instead.
+                Gestures = IsMacOS
+                    ? new[] { new HotkeyGesture(Key.OemOpenBrackets.ToString(), Command, Forbidden: Shift | Alt) }
+                    : new[] { new HotkeyGesture("Left", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
             },
             new()
             {
                 Id = "nav-forward", Description = "Forward", Category = "View",
-                Gestures = new[] { new HotkeyGesture("Right", Alt) },
+                Gestures = IsMacOS
+                    ? new[] { new HotkeyGesture(Key.OemCloseBrackets.ToString(), Command, Forbidden: Shift | Alt) }
+                    : new[] { new HotkeyGesture("Right", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
             },
             new()
             {
@@ -7892,6 +7902,12 @@ public partial class MainWindow : Window
     // the text control instead of being swallowed by the window-level handler.
     private bool IsTextInputFocused()
         => FocusManager?.GetFocusedElement() is TextBox;
+
+    // True while a sequence list row or track header rename box has focus and the user has typed in it. Undo and Redo then
+    // belong to the box's own text, not the document; a box nothing was typed in (a fresh Add Sequence) has nothing to
+    // undo, so Ctrl+Z still takes the add back. The Edit menu still commits the rename first.
+    private bool IsInlineRenameBoxFocused()
+        => FocusManager?.GetFocusedElement() is AnimationEditor.Views.Controls.InlineRenameBox { HasTypedText: true };
 
     // True when keyboard focus is on any control inside the Inspector tab (combos, checkboxes,
     // toggles, buttons, fields). Gates hotkeys whose key the focused field could mean for itself.

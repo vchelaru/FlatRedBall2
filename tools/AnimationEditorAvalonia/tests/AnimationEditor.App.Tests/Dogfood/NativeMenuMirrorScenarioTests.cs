@@ -351,6 +351,7 @@ public class NativeMenuMirrorScenarioTests
 
         recent.Items.Clear();
 
+        native = Find(bar, "File", "Open Recent");   // a different native item: see TheBar_NeverChangesTheSubmenuOfAnItemItAlreadyShowed
         native.Menu.ShouldBeNull();
         native.Command.ShouldNotBeNull();
         Differences(editor, bar).ShouldBeEmpty();
@@ -364,9 +365,42 @@ public class NativeMenuMirrorScenarioTests
 
         recent.Items.Add(new MenuItem { Header = "again.achx" });
 
+        native = Find(bar, "File", "Open Recent");
         native.Menu.ShouldNotBeNull();
         native.Menu!.Items.OfType<NativeMenuItem>().Select(item => item.Header).ShouldBe(new[] { "again.achx" });
         native.Command.ShouldBeNull();
+        Differences(editor, bar).ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// Avalonia's macOS exporter keeps one native submenu per native item and throws "The menu being updated does not
+    /// match" (killing the process) the next time it lays the bar out if that item's <see cref="NativeMenuItem.Menu"/>
+    /// was swapped for another instance or removed after being shown. File > Open Recent does exactly that whenever a
+    /// second file is opened (Clear, then Add), so an item must be replaced, never edited, when it flips between a plain
+    /// item and a submenu.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task TheBar_NeverChangesTheSubmenuOfAnItemItAlreadyShowed()
+    {
+        using var editor = await OpenHeroAsync();
+        NativeMenu bar = BuildInSync(editor);
+        MenuItem recent = InWindow(editor, "File", "Open Recent");
+        var shown = new List<(NativeMenuItem Item, NativeMenu? Menu)>();
+        void Snapshot(NativeMenu menu)
+        {
+            foreach (NativeMenuItem item in menu.Items.OfType<NativeMenuItem>())
+            {
+                shown.Add((item, item.Menu));
+                if (item.Menu is { } submenu) Snapshot(submenu);
+            }
+        }
+        Snapshot(bar);
+
+        recent.Items.Clear();
+        recent.Items.Add(new MenuItem { Header = "again.achx" });
+
+        foreach ((NativeMenuItem item, NativeMenu? menu) in shown)
+            item.Menu.ShouldBeSameAs(menu, $"native item '{item.Header}' had its submenu changed after it was shown");
         Differences(editor, bar).ShouldBeEmpty();
     }
 
