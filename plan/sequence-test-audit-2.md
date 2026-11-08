@@ -4,8 +4,8 @@ Snapshot, 2026-11-07. Mutations ran against main at e04f2e7d (#1674), after the 
 
 ## Verdict
 
-- 394 behaviors audited by mutation (break the production line, run only the relevant tests). 312 failed a test. 82 survived.
-- Of the 82 (the late PRs 1675 to 1677, merged while this ran, are in the table too): 13 are equivalent or redundant (listed below), 66 were unpinned and now have a test that fails against the same mutation, 3 are still open because the surface cannot be staged headlessly.
+- 402 behaviors audited by mutation (break the production line, run only the relevant tests). 317 failed a test. 85 survived.
+- Of the 85 (the late PRs 1675 to 1679, merged while this ran, are in the table too): 14 are equivalent or redundant (listed below), 66 were unpinned and now have a test that fails against the same mutation, 5 are still open because the surface cannot be staged headlessly.
 - Riskiest gaps found: the guard that makes Ctrl+X do nothing when neither the list nor the timeline has the focus (without it, Cut would delete the timeline selection while a button held the focus); Edit > Cut and Edit > Duplicate menu clicks were not routed by any test; Ctrl+X, Ctrl+D and Delete typed into a text box were never checked (only Ctrl+C and Ctrl+V were); a paste anchored on a selected chain, and a track paste below several selected chains or headers, were never exercised with more than the trivial case; a refused source in a paste never reached the banner in any test; the snap tie between a dragged chain's start and end, and the own-cycle mark at the chain's start, had no test; Escape cancelling a Ctrl rubber band, the chip-drop Alt bypass, and zoom around the lane edge had no test.
 - Test discipline: every merged PR in scope shipped tests, but they pin the main path and skip boundaries (ties, one-sided clamps, exact edges, defaults, repeats). Whether the tests came before the code cannot be read from squash merges. One test was wall-clock dependent and would fail on a slow runner (fixed, see Hygiene).
 - Bugs found: none in production code. 33 hostile clipboard envelopes, weird loop and start values (0, negative, 1e30, 1e9 on an empty chain) and zoom extremes threw nothing and hung nothing.
@@ -51,6 +51,8 @@ Strength: **outcome** = asserts the observable result; **weak** = only that it d
 | 1676 drag a chain onto the new-track row | plan, tracks made, names, Z, description | TimelineNewTrackMoveTests, SequenceTimelineMoveToNewTrackScenarioTests | outcome (NM1-NM9, DP1, DP2, MV1-MV3) |
 | 1677 popups above the selection and playhead | layer order | TimelinePopupLayerTests (pixels) | outcome (PU1) |
 | 1678 Flip Diagonal menu | not sequence mode | not audited | n/a |
+| 1679 leaving an open rename commits it | tab switch, library click, close, hotkeys, track and list boxes | SequenceRenameLeaveScenarioTests | outcome (CP1-CP3, CP6, CP8); focus hand-off and the same-document guard are open (CP4, CP5, RC1) |
+| 1680 skill signpost | docs | n/a | n/a |
 
 ## Bugs
 
@@ -73,12 +75,12 @@ None in production code. Hygiene finding, fixed: see below.
 | Real timers (playback tick, chip timer, zoom ease, banner, F3 sampling) | `SequenceClock.AdvanceTick`, `SettleZoomAnimation`, `BurstRate`, `SelectionChangeThrottle` | the `DispatcherTimer` wrappers |
 | Drop pill font | none | the typeface choice could be a function of `mono` and the theme |
 | Stale-document guard after the async clipboard read (X17) | none | an `IClipboard` seam on the pane |
-| Focus hand-off when a rename commits by click-away (RC1) | the selection rules are tested | the focus rule is one bool in the pane; no headless click target distinguishes it |
+| Focus hand-off when a rename commits by click-away (RC1, CP4), same-document guard on a deferred track rename (CP5) | the selection rules are tested | the focus rule is one bool in the pane; no headless click target distinguishes it |
 | Preview redraw after a texture swap on disk (PL1) | `ThumbnailService.PathInvalidated` is tested | a draw counter on the preview control |
 
 ## Equivalent or redundant survivors
 
-L03, L15, Q02, C25, C26, D16, D40, FP02, G08, G15, X19, AR2, LB1. The table says why each is dead or covered by another path.
+L03, L15, Q02, C25, C26, D16, D40, FP02, G08, G15, X19, AR2, LB1, CP7. The table says why each is dead or covered by another path.
 
 ## Mutations
 
@@ -432,6 +434,14 @@ Q, S, L, M, C, D, R, T, V, J, K, B, Z, Y, P, N, H, W, E, EV, FL, FP, ER, FR: Com
 | MV3 | move description names the new track | caught | DraggingAChainToTheNewTrackRow_MakesATrackForIt_AsOneUndoEntry_AndSelectsIt |
 | RC1 | click-away rename waits for the press and keeps its selection | UNPINNED (open) | a click-away commit refocusing the list; every click target the headless run can reach takes the focus from the list anyway |
 | PU1 | popups draw in their own layer above the selection | caught | TheHoverCard_DrawsOverASelectedChainsOutline |
+| CP1 | leaving a tab commits an open rename into that tab's history | caught | OpeningAnotherFile_WhileRenamingASequence_CommitsTheRename |
+| CP2 | closing the window commits an open rename | caught | ClosingTheWindow_WhileRenamingASequence_CommitsTheRename |
+| CP3 | a press that moves no focus commits an open rename | caught | ClickingALibraryChip_WhileRenamingASequence_CommitsTheRename_AndKeepsTheSelection |
+| CP4 | timeline rename: Enter keeps the focus, click-away does not pull it | UNPINNED (open) | same focus hand-off as RC1, for the track rename box |
+| CP5 | track rename belongs to the sequence it began in | UNPINNED (open) | needs the document replaced between the press and the deferred commit; no headless gesture does that |
+| CP6 | timeline rename: focus-loss commit deferred past the press | caught | ClickingAnotherSequence_WhileRenamingATrack_CommitsTheRename_AndSelectsTheClickedRow |
+| CP7 | list rename: the box is abandoned before it is applied (no second commit) | survived (equivalent) | a second commit finds the name unchanged and records no undo entry |
+| CP8 | timeline rename commits with the pending list renames | caught | ClosingTheWindow_WhileRenamingATrack_CommitsTheRename |
 | HK01 | hotkey copy ignored while a text box has focus | caught | CtrlC_AndCtrlV_InTheRenameBox_EditTheText_NotTheSequences |
 | HK02 | hotkey cut ignored while a text box has focus | UNPINNED -> pinned | DeleteCutAndDuplicate_InTheTrackRenameBox_EditTheText_NotTheTimeline |
 | HK03 | hotkey paste ignored while a text box has focus | caught | CtrlC_AndCtrlV_InTheRenameBox_EditTheText_NotTheSequences |
