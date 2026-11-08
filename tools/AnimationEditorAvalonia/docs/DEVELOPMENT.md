@@ -8,6 +8,8 @@ dotnet build
 dotnet test
 ```
 
+`dotnet test` runs all four test projects; that is for human contributors. AI agents run only the tests for their change: `python scripts/run_tests.py <Class>` from the repo root.
+
 ---
 
 ## Dogfooding the editor without launching it
@@ -18,7 +20,7 @@ machine is in use and without starting the app. Its README covers the harness, t
 the find-pin-fix loop and the headless gotchas.
 
 ```
-dotnet test tests/AnimationEditor.App.Tests --filter "FullyQualifiedName~Dogfood"
+python scripts/run_tests.py <ScenarioClass>   # e.g. GridAndWandScenarioTests, from the repo root
 ```
 
 ---

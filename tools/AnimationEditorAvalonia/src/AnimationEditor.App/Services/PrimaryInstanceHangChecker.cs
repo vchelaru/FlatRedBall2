@@ -51,12 +51,17 @@ internal static class PrimaryInstanceHangChecker
         // No process found at all (it exited between the hand-off and now) is not evidence of
         // anything: stay on the quiet, no-kill side.
         if (other == null)
+        {
+            AppLog.Info("Other instance: no such process found (exited meanwhile) -> BusyNotHung.");
             return PrimaryInstanceHangResult.BusyNotHung;
+        }
 
-        return PrimaryInstanceHangClassifier.Classify(
-            windowFound,
-            windowFound && IsHungAppWindow(handle),
-            AgeOf(other));
+        bool windowHung = windowFound && IsHungAppWindow(handle);
+        var age = AgeOf(other);
+        var result = PrimaryInstanceHangClassifier.Classify(windowFound, windowHung, age);
+        AppLog.Info($"Other instance: pid={other.Id} windowFound={windowFound} windowHung={windowHung} " +
+                    $"age={(age is { } a ? $"{a.TotalSeconds:0}s" : "unknown")} -> {result}.");
+        return result;
     }
 
     /// <summary>Restores (if minimized) and raises the other instance's window. Windows only: the
@@ -95,12 +100,15 @@ internal static class PrimaryInstanceHangChecker
 
         try
         {
+            AppLog.Info($"Killing other instance pid={other.Id}.");
             other.Kill();
-            other.WaitForExit(5000);
+            bool exited = other.WaitForExit(5000);
+            AppLog.Info($"Other instance {(exited ? "exited" : "STILL RUNNING 5s after Kill")}.");
         }
-        catch
+        catch (Exception ex)
         {
             // Already exited, access denied, etc. — nothing more we can do here.
+            AppLog.Warn("Killing the other instance failed.", ex);
         }
     }
 

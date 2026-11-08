@@ -14,13 +14,17 @@ public sealed class FileLogger : ILogger
 {
     private readonly string _filePath;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly string? _context;
     private static readonly object _gate = new();
 
     /// <param name="clock">Injected for deterministic timestamps in tests; defaults to local now.</param>
-    public FileLogger(string filePath, Func<DateTimeOffset>? clock = null)
+    /// <param name="context">Process identity (pid, version) stamped on every entry, so lines from several processes
+    /// appending to one file can be told apart. A <c>t&lt;id&gt;</c> managed-thread tag is added per entry.</param>
+    public FileLogger(string filePath, Func<DateTimeOffset>? clock = null, string? context = null)
     {
         _filePath = filePath;
         _clock = clock ?? (() => DateTimeOffset.Now);
+        _context = context;
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -31,18 +35,24 @@ public sealed class FileLogger : ILogger
         Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (!IsEnabled(logLevel)) return;
-        Append(FormatEntry(_clock(), logLevel, formatter(state, exception), exception));
+        var context = _context == null ? null : $"{_context} t{Environment.CurrentManagedThreadId}";
+        Append(FormatEntry(_clock(), logLevel, formatter(state, exception), exception, context));
     }
 
     /// <summary>
-    /// Formats one entry as <c>[yyyy-MM-dd HH:mm:ss.fff] [Level] message</c>, followed by the
-    /// full exception (type, message, stack) on the next lines when present.
+    /// Formats one entry as <c>[yyyy-MM-dd HH:mm:ss.fff] [Level] [context] message</c> (no context bracket when
+    /// <paramref name="context"/> is null), followed by the full exception (type, message, inner exceptions, stack)
+    /// on the next lines when present.
     /// </summary>
-    public static string FormatEntry(DateTimeOffset timestamp, LogLevel level, string message, Exception? exception)
+    public static string FormatEntry(DateTimeOffset timestamp, LogLevel level, string message, Exception? exception,
+        string? context = null)
     {
         var sb = new StringBuilder();
         sb.Append('[').Append(timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")).Append("] [")
-          .Append(level).Append("] ").Append(message).AppendLine();
+          .Append(level).Append("] ");
+        if (context != null)
+            sb.Append('[').Append(context).Append("] ");
+        sb.Append(message).AppendLine();
         if (exception != null)
             sb.AppendLine(exception.ToString());
         return sb.ToString();
@@ -57,7 +67,11 @@ public sealed class FileLogger : ILogger
                 var dir = Path.GetDirectoryName(_filePath);
                 if (!string.IsNullOrEmpty(dir))
                     Directory.CreateDirectory(dir);
-                File.AppendAllText(_filePath, text);
+                // Opened per entry and closed straight away, so nothing sits in a buffer when the process is
+                // killed. ReadWrite sharing lets a second launch append (and the user read) while we have it open.
+                using var stream = new FileStream(_filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                var bytes = Encoding.UTF8.GetBytes(text);
+                stream.Write(bytes, 0, bytes.Length);
             }
         }
         catch

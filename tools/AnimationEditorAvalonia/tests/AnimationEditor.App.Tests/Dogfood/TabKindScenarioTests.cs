@@ -193,7 +193,7 @@ public class TabKindScenarioTests
             "MenuReloadFromDisk", "MenuResizeTexture", "MenuAssociateTiledTileset",
             "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut", "MenuShowHistory",
         };
-        string[] appItems = { "MenuNew", "MenuLoad", "MenuOpenProjectFolder", "MenuSettings", "MenuEnableHotReload", "MenuViewLog", "MenuAbout" };
+        string[] appItems = { "MenuNew", "MenuLoad", "MenuOpenProjectFolder", "MenuSettings", "MenuEnableHotReload", "MenuViewLog", "MenuOpenLogFolder", "MenuAbout" };
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string sheet = editor.WritePng("sheet.png", 64, 64);
         string hero = editor.WriteAchx("hero.achx",
