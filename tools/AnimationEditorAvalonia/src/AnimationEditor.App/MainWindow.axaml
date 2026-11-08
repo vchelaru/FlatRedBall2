@@ -2353,7 +2353,6 @@
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="4,0,4,0"
-                                          IsChecked="True"
                                           ToolTip.Tip="Show the entity origin crosshair">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"

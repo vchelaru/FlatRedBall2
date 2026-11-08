@@ -54,6 +54,15 @@ namespace AnimationEditor.Core.Models
         public bool ShowBoundingBox { get; set; } = true;
 
         /// <summary>
+        /// Whether the previews draw collision shapes. One setting for every file and for both the <c>.achx</c> and the
+        /// <c>.seqj</c> preview, like <see cref="ShowBoundingBox"/>.
+        /// </summary>
+        public bool ShowShapes { get; set; } = true;
+
+        /// <summary>Whether the previews draw the origin crosshair. One setting shared by the <c>.achx</c> and <c>.seqj</c> previews.</summary>
+        public bool ShowOrigin { get; set; }
+
+        /// <summary>
         /// Whether the Project tab also lists folders with no animation files (#1332). Defaults to
         /// <c>false</c>; the tab's "Show all folders" checkbox writes it.
         /// </summary>
@@ -125,12 +134,6 @@ namespace AnimationEditor.Core.Models
         /// file at the default view (100%, no pan) has no entry.
         /// </summary>
         public Dictionary<string, Sequences.SequencePreviewView> SequencePreviewViews { get; set; } = new();
-
-        /// <summary>Whether a <c>.seqj</c> tab's preview draws the chains' collision shapes. One setting for all files, like <see cref="ShowBoundingBox"/>.</summary>
-        public bool SequenceShowShapes { get; set; } = true;
-
-        /// <summary>Whether a <c>.seqj</c> tab's preview draws the origin crosshair. One setting for all files.</summary>
-        public bool SequenceShowOrigin { get; set; } = true;
 
         /// <summary>
         /// The <c>.seqj</c> tab's preview row height in pixels, as last dragged via its splitter: the counterpart of
