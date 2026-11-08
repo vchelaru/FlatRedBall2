@@ -296,7 +296,7 @@ public class SequenceMultiSelectScenarioTests
 
         editor.RightClick(Row(editor, 1));
         Selected(editor).ShouldBe(new[] { "Attack", "Aura" });
-        editor.PickMenuItem(List(editor).ContextMenu!, "Delete");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Delete 2 Sequences");
 
         SequenceListSave.FromFile(boss).Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Idle" });
     }
