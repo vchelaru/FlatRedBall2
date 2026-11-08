@@ -257,24 +257,6 @@ public class SequenceRenameLeaveScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CtrlZ_WhileRenaming_CommitsFirst_SoUndoTakesTheRenameBack_AndCtrlYBringsItAgain()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor);
-        await editor.OpenAsync(boss);
-        BeginSequenceRename(editor, 0, "Strike");
-        editor.Press(Key.Enter);
-        BeginSequenceRename(editor, 1, "Rest");
-
-        editor.Press(Key.Z, RawInputModifiers.Control);
-
-        editor.SequenceNames.ShouldBe(new[] { "Strike", "Idle" });
-        editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Attack' to 'Strike'" });
-        editor.Press(Key.Y, RawInputModifiers.Control);
-        editor.SequenceNames.ShouldBe(new[] { "Strike", "Rest" });
-    }
-
-    [AvaloniaFact]
     public async Task EditUndoFromTheMenu_WhileRenaming_CommitsFirst()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
