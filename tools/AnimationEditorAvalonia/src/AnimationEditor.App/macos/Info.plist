@@ -17,6 +17,36 @@
     <string>APPL</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
+    <!-- The file types Finder opens with this app. Keep the extensions equal to WindowsFileAssociations.FileTypes
+         (MacOSBundleDocumentTypesTests enforces it). -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>FlatRedBall Animation Chain</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>achx</string>
+                <string>achj</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>FlatRedBall Animation Sequence</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>seqj</string>
+            </array>
+        </dict>
+    </array>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>LSMinimumSystemVersion</key>
