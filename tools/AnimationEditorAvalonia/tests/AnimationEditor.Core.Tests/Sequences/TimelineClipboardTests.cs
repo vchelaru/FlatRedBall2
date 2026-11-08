@@ -14,11 +14,11 @@ public class TimelineClipboardTests
         new() { Source = source, Chain = name, Start = start, Loops = loops };
 
     private static CopiedChain Copied(SequenceChainReferenceSave chain, string track = "Body", int lane = 0) =>
-        new(chain, new SequenceTrackSave { Name = track, X = 3, Y = -2, FlipHorizontal = true, Visible = false }, lane);
+        new(chain, new SequenceTrackSave { Name = track, FlipHorizontal = true, Visible = false }, lane);
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, X = 3, Y = -2, FlipHorizontal = true, Visible = false };
+        var track = new SequenceTrackSave { Name = name, FlipHorizontal = true, Visible = false };
         track.UnknownProperties["tag"] = "boss";
         track.Chains.AddRange(chains);
         return track;
@@ -89,7 +89,7 @@ public class TimelineClipboardTests
         error.ShouldBeNull();
         content!.Sources.ShouldBe(new[] { "C:/game/hero.achx", "C:/game/fx.achx" });
         var body = content.Tracks[0];
-        (body.Name, body.X, body.Y, body.FlipHorizontal, body.Visible).ShouldBe(("Body", 3f, -2f, true, false));
+        (body.Name, body.FlipHorizontal, body.Visible).ShouldBe(("Body", true, false));
         body.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         body.Chains.Select(c => (c.Source, c.Chain, c.Start, c.Loops)).ShouldBe(new[]
         {
@@ -152,7 +152,8 @@ public class TimelineClipboardTests
         var tracks = json["sourceTracks"]!.AsArray();
         tracks.Select(t => (t!["name"]!.GetValue<string>(), t["lane"]!.GetValue<int>())).ShouldBe(new[] { ("Ship", 0), ("Booster", 2) });
         var ship = tracks[0]!;
-        (ship["x"]!.GetValue<float>(), ship["y"]!.GetValue<float>()).ShouldBe((3f, -2f));
+        ship.AsObject().ContainsKey("x").ShouldBeFalse("a copied track carries no offset");
+        ship.AsObject().ContainsKey("y").ShouldBeFalse("a copied track carries no offset");
         ship.AsObject().ContainsKey("z").ShouldBeFalse("a copied track carries no Z");
         ship["flipHorizontal"]!.GetValue<bool>().ShouldBeTrue();
         ship["visible"]!.GetValue<bool>().ShouldBeFalse();
@@ -171,8 +172,8 @@ public class TimelineClipboardTests
 
         TimelineClipboard.TryRead(TimelineClipboard.WriteChains(items, "C:/x"), out var content, out _).ShouldBeTrue();
 
-        content!.SourceTracks.Select(t => (t.Name, t.Lane, t.X, t.FlipHorizontal, t.Visible))
-            .ShouldBe(new[] { ("Ship", 0, 3f, true, false), ("Booster", 2, 3f, true, false) });
+        content!.SourceTracks.Select(t => (t.Name, t.Lane, t.FlipHorizontal, t.Visible))
+            .ShouldBe(new[] { ("Ship", 0, true, false), ("Booster", 2, true, false) });
         content.ChainTracks.ShouldBe(new[] { 0, 1 });
     }
 

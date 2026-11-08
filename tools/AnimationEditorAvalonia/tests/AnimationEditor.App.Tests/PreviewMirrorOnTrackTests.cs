@@ -4,26 +4,24 @@ using static AnimationEditor.App.Controls.PreviewControl;
 
 namespace AnimationEditor.App.Tests;
 
-public class PreviewPlaceOnTrackTests
+public class PreviewMirrorOnTrackTests
 {
     [Fact]
-    public void PlaceOnTrack_FlippedTrack_MirrorsThePolygonsOriginAndPointsAcrossTheTrack()
+    public void MirrorOnTrack_FlippedTrack_MirrorsThePolygonsOriginAndPointsAcrossX()
     {
         var polygon = new PreviewShapeInfo(PreviewShapeKind.Polygon, 3, 1, 0, 0, IsSelected: false, Points: new[] { 2f, 4f, -1f, 5f });
 
-        var placed = PlaceOnTrack(polygon, x: 10, y: 6, flipHorizontal: true);
+        var placed = MirrorOnTrack(polygon, flipHorizontal: true);
 
-        (placed.X, placed.Y).ShouldBe((7f, 7f));
+        (placed.X, placed.Y).ShouldBe((-3f, 1f));
         placed.Points.ShouldBe(new[] { -2f, 4f, 1f, 5f });
     }
 
     [Fact]
-    public void PlaceOnTrack_UnflippedTrack_OnlyMovesTheShape()
+    public void MirrorOnTrack_UnflippedTrack_LeavesTheShapeWhereTheFrameHasIt()
     {
         var rect = new PreviewShapeInfo(PreviewShapeKind.Rect, 3, 1, 4, 2, IsSelected: false);
 
-        var placed = PlaceOnTrack(rect, x: 10, y: 6, flipHorizontal: false);
-
-        placed.ShouldBe(rect with { X = 13, Y = 7 });
+        MirrorOnTrack(rect, flipHorizontal: false).ShouldBe(rect);
     }
 }

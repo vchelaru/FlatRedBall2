@@ -828,7 +828,11 @@ public partial class MainWindow
             preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
-            WireTrackPlacement();
+            // A click on a sprite selects its track (the timeline and Inspector follow); nothing drags, a track has no offset.
+            preview.TrackClicked += track =>
+            {
+                if (_document is not null && SequenceIndex >= 0) w.SequenceTimeline.SelectTracks(new[] { track });
+            };
             // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
             // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
             w.SequenceShowShapes.IsCheckedChanged += (_, _) =>

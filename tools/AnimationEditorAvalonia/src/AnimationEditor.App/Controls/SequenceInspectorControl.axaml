@@ -74,26 +74,11 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- TRANSFORM: the same X / Y row and flip button as the .achx Inspector's frame TRANSFORM section
-                         (MainWindow.axaml PropRelX / PropFlipH), so a track offset and a frame offset read the same.
-                         Neither shows a spinner (the app-wide rule in ThemeStyles). -->
+                    <!-- TRANSFORM: the flip button of the .achx Inspector's frame TRANSFORM section (MainWindow.axaml PropFlipH).
+                         A track has no X / Y: sprites sit at their frames' offsets. -->
                     <Border Padding="12,8,12,10" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
                         <StackPanel Spacing="8">
                             <TextBlock Text="TRANSFORM" Classes="heading" />
-                            <WrapPanel ToolTip.Tip="Offset from the entity origin, Y up">
-                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                    <TextBlock Text="X" VerticalAlignment="Center"
-                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                    <NumericUpDown x:Name="TrackXField" Grid.Column="1" MinWidth="66"
-                                                   Minimum="-10000" Maximum="10000" Increment="1" FormatString="0.###" />
-                                </Grid>
-                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                    <TextBlock Text="Y" VerticalAlignment="Center"
-                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                    <NumericUpDown x:Name="TrackYField" Grid.Column="1" MinWidth="66"
-                                                   Minimum="-10000" Maximum="10000" Increment="1" FormatString="0.###" />
-                                </Grid>
-                            </WrapPanel>
                             <ToggleButton x:Name="TrackFlipBox" ToolTip.Tip="Flip Horizontal"
                                           HorizontalAlignment="Left" Width="32" Height="26"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"

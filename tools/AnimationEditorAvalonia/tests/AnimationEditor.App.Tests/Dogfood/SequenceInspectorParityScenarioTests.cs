@@ -14,9 +14,8 @@ using Shouldly;
 namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
-/// The sequence Inspector's TRACK fields are the .achx Inspector's frame TRANSFORM fields: same section header, the same
-/// X / Y control with the same limits, format and keys, the same flip button. These compare the two live, so a change
-/// to one that is not made to the other fails here.
+/// The sequence Inspector's TRANSFORM section holds the .achx Inspector's frame flip button (a track has no X / Y): the same section header
+/// and the same button. These compare the two live, so a change to one that is not made to the other fails here.
 /// </summary>
 public class SequenceInspectorParityScenarioTests
 {
@@ -67,30 +66,6 @@ public class SequenceInspectorParityScenarioTests
             .Where(t => t.Length > 2 && t == t.ToUpperInvariant() && t.All(char.IsLetter));
 
     [AvaloniaFact]
-    public async Task TrackOffsetFields_AreTheFrameOffsetFields_SameControlLimitsFormatAndLook()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        var (_, frame) = await OpenBothTabsAsync(editor);
-        await SelectFrameAsync(editor, frame);
-        var frameFields = new Control[] { editor.Control<NumericUpDown>("PropRelX"), editor.Control<NumericUpDown>("PropRelY") };
-        var frameLook = frameFields.Select(f => (f.GetType(), Read(f, "Minimum"), Read(f, "Maximum"), Read(f, "Increment"),
-            Read(f, "FormatString"), Read(f, "ShowButtonSpinner"), f.MinWidth)).ToList();
-        await SelectTrackAsync(editor);
-
-        var trackFields = new Control[] { Inspector(editor).TrackXField, Inspector(editor).TrackYField };
-        var trackLook = trackFields.Select(f => (f.GetType(), Read(f, "Minimum"), Read(f, "Maximum"), Read(f, "Increment"),
-            Read(f, "FormatString"), Read(f, "ShowButtonSpinner"), f.MinWidth)).ToList();
-
-        trackLook.ShouldBe(frameLook);
-        // The same one-line label column and wrapping row as the frame's.
-        trackFields[0].FindAncestorOfType<WrapPanel>().ShouldNotBeNull();
-        trackFields[0].FindAncestorOfType<Grid>()!.ColumnDefinitions[0].Width.Value.ShouldBe(
-            frameFields[0].FindAncestorOfType<Grid>()!.ColumnDefinitions[0].Width.Value);
-        trackFields[0].FindAncestorOfType<Grid>()!.Children.OfType<TextBlock>().Single().Text.ShouldBe("X");
-        trackFields[1].FindAncestorOfType<Grid>()!.Children.OfType<TextBlock>().Single().Text.ShouldBe("Y");
-    }
-
-    [AvaloniaFact]
     public async Task TrackSections_UseTheFrameSectionHeaders_InTheSameStyle()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
@@ -123,29 +98,5 @@ public class SequenceInspectorParityScenarioTests
         flip.GetVisualDescendants().OfType<SvgControl>().Single().Path.ShouldBe(icon);
         ToolTip.GetTip(flip).ShouldBe(tip);
         (flip.Width, flip.Height).ShouldBe((frameFlip.Width, frameFlip.Height));
-    }
-
-    [AvaloniaFact]
-    public async Task TrackOffsetKeys_StepAndCommitLikeTheFrameOffsetFields()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        var (boss, frame) = await OpenBothTabsAsync(editor);
-        await SelectFrameAsync(editor, frame);
-        editor.TypeNumber("PropRelX", "5");
-        editor.Press(Key.Up);
-        editor.Control<NumericUpDown>("PropRelX").Value.ShouldBe(6m);
-        await SelectTrackAsync(editor);
-
-        // Typing commits as it goes and Enter ends the undo entry; Up steps by the increment; Ctrl+Z undoes one whole edit.
-        var x = Inspector(editor).TrackXField;
-        editor.TypeAndEnter(BoxOf(x), "5");
-        editor.Press(Key.Up);
-        x.Value.ShouldBe(6m);
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].X.ShouldBe(6f);
-        editor.Press(Key.Z, RawInputModifiers.Control);
-        x.Value.ShouldBe(5m);
-        editor.Press(Key.Z, RawInputModifiers.Control);
-        x.Value.ShouldBe(0m);
-        editor.UndoLabels.ShouldBeEmpty();
     }
 }

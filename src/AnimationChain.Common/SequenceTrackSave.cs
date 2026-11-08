@@ -3,8 +3,9 @@ using System.Text.Json.Nodes;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// One sprite's lane in a <see cref="SequenceSave"/>. Its offset and flip hold for the whole sequence. Outside every
-/// chain on the track, the sprite is hidden. A track has no depth value: the tracks of a sequence stack in list order, the
+/// One sprite's lane in a <see cref="SequenceSave"/>. Its flip holds for the whole sequence. Outside every
+/// chain on the track, the sprite is hidden. A track has no position: the sprite sits at its frames' own offsets (the
+/// animation's), mirrored by the flip, so the offset comes from one place. A track has no depth value: the tracks of a sequence stack in list order, the
 /// first in front and the last at the back, like layers in an image editor (the editor shows them as lanes, the top lane in front).
 /// </summary>
 public class SequenceTrackSave
@@ -12,13 +13,7 @@ public class SequenceTrackSave
     /// <summary>Display name of the sprite.</summary>
     public string Name { get; set; } = "";
 
-    /// <summary>Offset from the entity origin, Y+ up like a frame's own offsets.</summary>
-    public float X { get; set; }
-
-    /// <inheritdoc cref="X"/>
-    public float Y { get; set; }
-
-    /// <summary>Mirrors the sprite and its frame offsets across the track's X.</summary>
+    /// <summary>Mirrors the sprite and its frame offsets across the entity origin's X.</summary>
     public bool FlipHorizontal { get; set; }
 
     /// <summary>

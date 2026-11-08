@@ -67,9 +67,9 @@ public class SequencePreviewShapesScenarioTests
         return shapes;
     }
 
-    private static SequenceTrackSave Track(string name, float x, float y, bool flip, bool visible, params (string Chain, double Start)[] chains)
+    private static SequenceTrackSave Track(string name, bool flip, bool visible, params (string Chain, double Start)[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, X = x, Y = y, FlipHorizontal = flip, Visible = visible };
+        var track = new SequenceTrackSave { Name = name, FlipHorizontal = flip, Visible = visible };
         foreach (var (chain, start) in chains)
             track.Chains.Add(new SequenceChainReferenceSave
             {
@@ -78,7 +78,7 @@ public class SequencePreviewShapesScenarioTests
         return track;
     }
 
-    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, 0, 0, false, true, (chain, start));
+    private static SequenceTrackSave Plain(string chain, double start = 0) => Track(chain, false, true, (chain, start));
 
     private static SequenceSave Sequence(string name, params SequenceTrackSave[] tracks)
     {
@@ -119,21 +119,21 @@ public class SequencePreviewShapesScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task OnlyTheActiveFramesShapesDraw_AtTheTracksOffset_AndTheyChangeAsThePlayheadMoves()
+    public async Task OnlyTheActiveFramesShapesDraw_AtTheirFrameOffsets_AndTheyChangeAsThePlayheadMoves()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", 20, 4, false, true, ("Guard", 0))));
+        await OpenAsync(editor, Sequence("Attack", Plain("Guard")));
 
         Scrub(editor, 0.05);
-        ShouldBeShapes(Current(editor), Rect(25, 6, 4, 3));
+        ShouldBeShapes(Current(editor), Rect(5, 2, 4, 3));
         Scrub(editor, 0.15);
-        ShouldBeShapes(Current(editor), Circle(17, 5, 6));
+        ShouldBeShapes(Current(editor), Circle(-3, 1, 6));
         // Frame 2 holds no shapes: nothing of frames 0, 1 or 3 lingers.
         Scrub(editor, 0.25);
         Current(editor).ShouldBeEmpty();
         Scrub(editor, 0.35);
         var wedge = Current(editor).Single();
-        (wedge.Kind, wedge.X, wedge.Y).ShouldBe((PreviewControl.PreviewShapeKind.Polygon, 21f, 5f));
+        (wedge.Kind, wedge.X, wedge.Y).ShouldBe((PreviewControl.PreviewShapeKind.Polygon, 1f, 1f));
         wedge.Points.ShouldBe(new[] { 2f, 3f, 5f, 3f, 5f, 6f });
     }
 
@@ -156,18 +156,18 @@ public class SequencePreviewShapesScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task AFlippedTrack_MirrorsRectCircleAndPolygonAcrossItsOffset()
+    public async Task AFlippedTrack_MirrorsRectCircleAndPolygonAcrossTheEntityOrigin()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", 20, 4, true, true, ("Guard", 0))));
+        await OpenAsync(editor, Sequence("Attack", Track("Body", true, true, ("Guard", 0))));
 
         Scrub(editor, 0.05);
-        ShouldBeShapes(Current(editor), Rect(15, 6, 4, 3));
+        ShouldBeShapes(Current(editor), Rect(-5, 2, 4, 3));
         Scrub(editor, 0.15);
-        ShouldBeShapes(Current(editor), Circle(23, 5, 6));
+        ShouldBeShapes(Current(editor), Circle(3, 1, 6));
         Scrub(editor, 0.35);
         var wedge = Current(editor).Single();
-        (wedge.X, wedge.Y).ShouldBe((19f, 5f));
+        (wedge.X, wedge.Y).ShouldBe((-1f, 1f));
         wedge.Points.ShouldBe(new[] { -2f, 3f, -5f, 3f, -5f, 6f });
     }
 
@@ -175,14 +175,14 @@ public class SequencePreviewShapesScenarioTests
     public async Task TheFramesOwnOffsetMovesTheSprite_NotTheShape()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", 20, 4, false, true, ("Slide", 0))));
+        await OpenAsync(editor, Sequence("Attack", Plain("Slide")));
 
         Scrub(editor, 0.05);
 
         var sprite = Preview(editor).Composite!.Single().Sample();
-        (sprite.OffsetX, sprite.OffsetY).ShouldBe((30f, 11f));
-        // The shape is entity space: only the track offset applies.
-        ShouldBeShapes(Current(editor), Rect(21, 5, 2, 2));
+        (sprite.OffsetX, sprite.OffsetY).ShouldBe((10f, 7f));
+        // The shape is entity space: the frame offset does not move it.
+        ShouldBeShapes(Current(editor), Rect(1, 1, 2, 2));
     }
 
     [AvaloniaFact]
@@ -190,8 +190,8 @@ public class SequencePreviewShapesScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await OpenAsync(editor, Sequence("Attack",
-            Track("Fx", 0, 0, false, true, ("Spark", 0)),
-            Track("Body", 0, 0, false, false, ("Guard", 0))));
+            Track("Fx", false, true, ("Spark", 0)),
+            Track("Body", false, false, ("Guard", 0))));
 
         Scrub(editor, 0.05);
 
@@ -221,7 +221,7 @@ public class SequencePreviewShapesScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Guard would run 0 to 0.4 s; Spark starts at 0.15 s on the same track and cuts it.
-        var track = Track("Body", 0, 0, false, true, ("Guard", 0), ("Spark", 0.15));
+        var track = Track("Body", false, true, ("Guard", 0), ("Spark", 0.15));
         await OpenAsync(editor, Sequence("Attack", track));
 
         Scrub(editor, 0.1);
@@ -252,16 +252,16 @@ public class SequencePreviewShapesScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await OpenAsync(editor,
-            Sequence("Attack", Track("Body", 20, 0, false, true, ("Guard", 0))),
-            Sequence("Aura", Track("Glow", -5, 0, false, true, ("Spark", 0))));
+            Sequence("Attack", Plain("Guard")),
+            Sequence("Aura", Plain("Spark")));
         ListBox list = editor.Control<ListBox>("SequenceList");
 
         editor.Click((Avalonia.Controls.Control)list.ContainerFromIndex(1)!);
-        ShouldBeShapes(Current(editor), Rect(-25, 0, 2, 2));
+        ShouldBeShapes(Current(editor), Rect(-20, 0, 2, 2));
         editor.Click((Avalonia.Controls.Control)list.ContainerFromIndex(0)!, RawInputModifiers.Control);
 
         // Aura was selected first, so it is at the back.
-        ShouldBeShapes(Current(editor), Rect(-25, 0, 2, 2), Rect(25, 2, 4, 3));
+        ShouldBeShapes(Current(editor), Rect(-20, 0, 2, 2), Rect(5, 2, 4, 3));
     }
 
     [AvaloniaFact]
@@ -288,7 +288,7 @@ public class SequencePreviewShapesScenarioTests
     public async Task ZoomAndPan_DoNotChangeWhichShapesDraw()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, Sequence("Attack", Track("Body", 20, 4, true, true, ("Guard", 0))));
+        await OpenAsync(editor, Sequence("Attack", Track("Body", true, true, ("Guard", 0))));
         Scrub(editor, 0.15);
         var before = Current(editor);
 
@@ -296,6 +296,6 @@ public class SequencePreviewShapesScenarioTests
         Preview(editor).SetPan(37, -12);
 
         Current(editor).ShouldBe(before);
-        ShouldBeShapes(Current(editor), Circle(23, 5, 6));
+        ShouldBeShapes(Current(editor), Circle(3, 1, 6));
     }
 }
