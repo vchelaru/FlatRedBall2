@@ -155,7 +155,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
 
         string? text = await ClipboardAsync(editor);
         SequenceClipboard.TryRead(text, out var content, out _).ShouldBeTrue();
-        content!.Sequence.Name.ShouldBe("Idle");
+        content!.Sequences.Single().Name.ShouldBe("Idle");
         var envelope = JsonNode.Parse(text!)!;
         envelope["kind"]!.GetValue<string>().ShouldBe("frb2-animation-editor-sequence");
         content.Sources.ShouldBe(new[] { Path.Combine(editor.ProjectFolder, "hero.achx").Replace('\\', '/') });
@@ -355,7 +355,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
         editor.ClickMenu("MenuCopy");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
         SequenceClipboard.TryRead(await ClipboardAsync(editor), out var content, out _).ShouldBeTrue();
-        content!.Sequence.Name.ShouldBe("Idle");
+        content!.Sequences.Single().Name.ShouldBe("Idle");
 
         ClickRow(editor, 1);
         editor.ClickMenu("MenuPaste");

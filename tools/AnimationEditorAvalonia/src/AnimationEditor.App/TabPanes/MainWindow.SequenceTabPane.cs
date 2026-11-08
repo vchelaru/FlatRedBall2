@@ -329,7 +329,7 @@ public partial class MainWindow
         public bool Accepts(HotkeyScope scope) => scope is HotkeyScope.App or HotkeyScope.Document;
 
         /// <summary>
-        /// Delete removes what was last clicked: a sequence when the list holds the keyboard focus, else the timeline's
+        /// Delete removes what was last clicked: every selected sequence when the list holds the keyboard focus, else the timeline's
         /// selected chain or track. Clicking a row drops the timeline selection and clicking the timeline moves the
         /// focus there, so the two never both apply.
         /// </summary>
@@ -380,16 +380,16 @@ public partial class MainWindow
             && (focused is MenuItem || focused.FindAncestorOfType<MenuItem>() is not null);
 
         /// <summary>
-        /// Ctrl+C and Edit &gt; Copy put the selection on the clipboard as JSON: the selected sequence when the sequence list is
-        /// the focused surface, the selected chains or tracks when the timeline is.
+        /// Ctrl+C and Edit &gt; Copy put the selection on the clipboard as JSON: every selected sequence when the sequence list
+        /// is the focused surface, the selected chains or tracks when the timeline is.
         /// </summary>
         public void CopySelection()
         {
             if (_document is not { } document) return;
             switch (Surface)
             {
-                case ClipboardSurface.List when CurrentSequence is not null:
-                    _window.CopyTextToClipboard(document.CopySequence(SequenceIndex));
+                case ClipboardSurface.List when document.SelectedIndices.Count > 0:
+                    _window.CopyTextToClipboard(document.CopySequences(document.SelectedIndices));
                     break;
                 case ClipboardSurface.Timeline when _window.SequenceTimeline.CopySelectionText() is { } text:
                     _window.CopyTextToClipboard(text);
@@ -428,7 +428,7 @@ public partial class MainWindow
             }
         }
 
-        /// <summary>Ctrl+D and Edit &gt; Duplicate: the selected sequence (list) or the selected chains or tracks (timeline).</summary>
+        /// <summary>Ctrl+D and Edit &gt; Duplicate: every selected sequence (list) or the selected chains or tracks (timeline).</summary>
         public void DuplicateSelection()
         {
             var surface = Surface;
@@ -473,8 +473,8 @@ public partial class MainWindow
                 if (error is not null) _window.ShowErrorBanner(error);
                 return;
             }
-            var result = document.PasteSequence(_window._undoManager, content!);
-            // The pasted sequence starts from its beginning.
+            var result = document.PasteSequences(_window._undoManager, content!);
+            // The pasted sequences start from their beginning.
             StopPlayback();
             if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
             FocusSelectedRow();
@@ -649,8 +649,8 @@ public partial class MainWindow
             if (w.SequenceList.ContextMenu is not { } menu) return;
             var hit = e.Source is Visual source ? source.FindAncestorOfType<ListBoxItem>(includeSelf: true) : null;
             bool onSequence = hit is not null;
-            // The commands act on the primary, so a row hit inside a multi-selection becomes the whole selection.
-            if (hit?.DataContext is SequenceListItem hitRow && _items.IndexOf(hitRow) is >= 0 and var hitIndex && hitIndex != SequenceIndex)
+            // The commands act on the whole selection, so a row hit inside it leaves it alone; a row outside it becomes the selection.
+            if (hit?.DataContext is SequenceListItem hitRow && !w.SequenceList.SelectedItems!.Contains(hitRow) && _items.IndexOf(hitRow) is >= 0 and var hitIndex)
                 w.SequenceList.SelectedIndex = hitIndex;
             menu.Items.Clear();
             var groups = SequenceListMenuLayout.For(onSequence);
@@ -987,13 +987,15 @@ public partial class MainWindow
         /// </summary>
         private void DuplicateSelected()
         {
-            if (_document is not { } document || CurrentSequence is null) return;
-            string name = document.DuplicateSequence(_window._undoManager, SequenceIndex);
-            // The copy starts from its beginning.
+            if (_document is not { } document || document.SelectedIndices.Count == 0) return;
+            var names = document.DuplicateSequences(_window._undoManager, document.SelectedIndices);
+            // The copies start from their beginning.
             StopPlayback();
-            // Name it right away: the copy's name is selected, so typing replaces it and Escape keeps it. Posted so a
-            // closing menu has handed focus back first and cannot take it from the box.
-            Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, name), DispatcherPriority.Background);
+            // Name a lone copy right away: its name is selected, so typing replaces it and Escape keeps it. Several copies
+            // are not renamed in place (rename is for the primary alone). Posted so a closing menu has handed focus back
+            // first and cannot take it from the box.
+            if (names.Count == 1)
+                Dispatcher.UIThread.Post(() => BeginRenameNewSequence(document, names[0]), DispatcherPriority.Background);
         }
 
         private async Task RenameSelectedAsync()
@@ -1008,8 +1010,8 @@ public partial class MainWindow
 
         private void DeleteSelected()
         {
-            if (_document is null || SequenceIndex is not (>= 0 and var index)) return;
-            _document.DeleteSequence(_window._undoManager, index);
+            if (_document is not { } document || document.SelectedIndices.Count == 0) return;
+            document.DeleteSequences(_window._undoManager, document.SelectedIndices);
         }
 
         private void Detach()

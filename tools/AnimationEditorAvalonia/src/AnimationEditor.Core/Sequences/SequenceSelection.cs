@@ -3,6 +3,9 @@ using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
+/// <summary>A selection to put back: the selected names in selection order and which one is the primary (null for none).</summary>
+public sealed record SequenceSelectionState(IReadOnlyList<string> Names, string? Primary);
+
 /// <summary>
 /// Which sequences of a <c>.seqj</c> the list has selected, by name, in selection (click) order, and which one is the
 /// primary. View state: it is never saved to the file and has no undo entry. The primary is the one the timeline,
@@ -46,6 +49,16 @@ public sealed class SequenceSelection
         if (!kept.Contains(primary)) kept = new List<string> { primary };
         _names = kept;
         Primary = primary;
+    }
+
+    /// <summary>The selection as it is now, to put back later with <see cref="Restore"/>.</summary>
+    public SequenceSelectionState State => new(_names.ToList(), Primary);
+
+    /// <summary>Puts back a selection taken with <see cref="State"/>. A primary outside the names falls back to the first name.</summary>
+    public void Restore(SequenceSelectionState state)
+    {
+        _names = state.Names.Distinct().ToList();
+        Primary = state.Primary is { } primary && _names.Contains(primary) ? primary : _names.FirstOrDefault();
     }
 
     /// <summary>Follows a rename so the sequence stays selected.</summary>

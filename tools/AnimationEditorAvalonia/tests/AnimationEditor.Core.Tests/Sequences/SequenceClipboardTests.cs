@@ -58,7 +58,7 @@ public class SequenceClipboardTests
 
         error.ShouldBeNull();
         content!.Sources.ShouldBe(new[] { "C:/game/anims/hero.achx" });
-        var read = content.Sequence;
+        var read = content.Sequences.Single();
         read.Name.ShouldBe("Idle");
         read.Loop.ShouldBeTrue();
         read.UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep me");
@@ -99,6 +99,76 @@ public class SequenceClipboardTests
 
         content.ShouldBeNull();
         error.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void Write_OfSeveralSequences_ProducesAVersion2EnvelopeWithASequencesArray_AndOneSharedSourceList()
+    {
+        var first = SequenceUsing("hero.achx");
+        var second = SequenceUsing("hero.achx", "../shared/fx.achj");
+        second.Name = "Run";
+
+        var json = JsonNode.Parse(SequenceClipboard.Write(new[] { first, second }, @"C:\game\anims"))!.AsObject();
+
+        json["kind"]!.GetValue<string>().ShouldBe("frb2-animation-editor-sequence");
+        json["version"]!.GetValue<int>().ShouldBe(2);
+        json.ContainsKey("sequence").ShouldBeFalse();
+        json["sources"]!.AsArray().Select(node => node!.GetValue<string>())
+            .ShouldBe(new[] { "C:/game/anims/hero.achx", "C:/game/shared/fx.achj" });
+        var sequences = json["sequences"]!.AsArray();
+        sequences.Select(node => node!["name"]!.GetValue<string>()).ShouldBe(new[] { "Idle", "Run" });
+        sequences[1]!["tracks"]![0]!["chains"]![1]!["source"]!.GetValue<string>().ShouldBe("C:/game/shared/fx.achj");
+        first.Tracks[0].Chains[0].Source.ShouldBe("hero.achx");
+    }
+
+    [Fact]
+    public void Write_OfASingleSequenceInAList_IsExactlyTheSingleSequenceEnvelope()
+    {
+        var sequence = SequenceUsing("hero.achx");
+
+        SequenceClipboard.Write(new[] { sequence }, @"C:\game\anims").ShouldBe(SequenceClipboard.Write(sequence, @"C:\game\anims"));
+    }
+
+    [Fact]
+    public void TryRead_OfSeveralSequences_GivesThemAllBackInOrder_WithEverythingTheyHold()
+    {
+        var first = SequenceUsing("hero.achx");
+        first.UnknownProperties["note"] = "keep me";
+        var second = SequenceUsing("../shared/fx.achj");
+        second.Name = "Run";
+        second.Loop = false;
+
+        SequenceClipboard.TryRead(SequenceClipboard.Write(new[] { first, second }, @"C:\game\anims"), out var content, out var error).ShouldBeTrue();
+
+        error.ShouldBeNull();
+        content!.Sources.ShouldBe(new[] { "C:/game/anims/hero.achx", "C:/game/shared/fx.achj" });
+        content.Sequences.Select(s => s.Name).ShouldBe(new[] { "Idle", "Run" });
+        content.Sequences[0].UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep me");
+        content.Sequences[1].Loop.ShouldBeFalse();
+        content.Sequences[1].Tracks.Single().Chains.Single().Source.ShouldBe("C:/game/shared/fx.achj");
+    }
+
+    [Theory]
+    [InlineData("{ \"kind\": \"frb2-animation-editor-sequence\", \"version\": 2, \"sequences\": [] }")]
+    [InlineData("{ \"kind\": \"frb2-animation-editor-sequence\", \"version\": 2, \"sequences\": 5 }")]
+    [InlineData("{ \"kind\": \"frb2-animation-editor-sequence\", \"version\": 2, \"sequences\": [ 5 ] }")]
+    [InlineData("{ \"kind\": \"frb2-animation-editor-sequence\", \"version\": 2, \"sequences\": [ { \"name\": 7 } ] }")]
+    public void TryRead_OfABrokenSequencesArray_ReportsAnError(string text)
+    {
+        SequenceClipboard.TryRead(text, out var content, out var error).ShouldBeFalse();
+
+        content.ShouldBeNull();
+        error.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void TimelineClipboard_IgnoresAMultiSequenceEnvelope()
+    {
+        string several = SequenceClipboard.Write(new[] { SequenceUsing("hero.achx"), SequenceUsing("hero.achx") }, @"C:\game\anims");
+
+        TimelineClipboard.TryRead(several, out _, out var error).ShouldBeFalse();
+
+        error.ShouldBeNull();
     }
 
     [Fact]
