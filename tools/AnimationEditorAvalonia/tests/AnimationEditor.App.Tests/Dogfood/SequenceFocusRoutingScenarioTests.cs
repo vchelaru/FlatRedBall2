@@ -537,6 +537,37 @@ public class SequenceFocusRoutingScenarioTests
         editor.UndoLabels.ShouldBeEmpty();
     }
 
+    [AvaloniaFact]
+    public async Task CtrlAAndEscape_WithThePlayButtonFocused_ActOnTheTimeline_WhenItWasLastTouched()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteThreeSequences(editor));
+        editor.ClickAt(At(editor, 0, 0.25));
+        editor.Click(editor.Control<Button>("SequencePlayButton"));
+
+        // The first Ctrl+A takes the chain's track, the second the whole sequence.
+        await PressAsync(editor, Key.A, RawInputModifiers.Control);
+        Timeline(editor).SelectedChains.Count.ShouldBe(3);
+        await PressAsync(editor, Key.A, RawInputModifiers.Control);
+        Timeline(editor).SelectedChains.Count.ShouldBe(5);
+
+        await PressAsync(editor, Key.Escape);
+        Timeline(editor).SelectedChains.Count.ShouldBe(0);
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlA_WithThePlayButtonFocused_SelectsEverySequence_WhenTheListWasLastTouched()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteThreeSequences(editor));
+        ClickRow(editor, 0);
+        editor.Click(editor.Control<Button>("SequencePlayButton"));
+
+        await PressAsync(editor, Key.A, RawInputModifiers.Control);
+
+        List(editor).SelectedItems!.Count.ShouldBe(3);
+    }
+
     // ── Shortcuts panel ─────────────────────────────────────────────────────────────────
 
     private static Dictionary<string, string> Shortcuts(AnimationEditorHarness editor) =>
@@ -556,7 +587,7 @@ public class SequenceFocusRoutingScenarioTests
         shortcuts.Keys.ShouldNotContain("Save As…", "Save As is disabled on a sequence tab");
         shortcuts.Count(pair => pair.Value.StartsWith("Alt+") && (pair.Value.EndsWith("Up") || pair.Value.EndsWith("Down"))).ShouldBe(2);
         var working = editor.Window.Hotkeys.Where(h => h.Scope is HotkeyScope.Document or HotkeyScope.App).Select(h => h.Description).ToHashSet();
-        shortcuts.Keys.ToHashSet().ShouldBe(working, "the panel lists exactly the hotkeys a sequence tab accepts");
+        shortcuts.Keys.ToHashSet().ShouldBe(working, ignoreOrder: true, "the panel lists exactly the hotkeys a sequence tab accepts");
     }
 
     [AvaloniaFact]

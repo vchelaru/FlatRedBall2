@@ -173,6 +173,10 @@ public partial class MainWindow
 
         public void DuplicateSelection() => _window.HandleDuplicate();
 
+        public void RenameSelection() => _window.HandleRenameHotkey();
+
+        public void MoveSelection(int delta) => _window.HandleReorderHotkey(delta);
+
         public void ReloadFromDisk()
         {
             if (!string.IsNullOrEmpty(_window._projectManager.FileName))

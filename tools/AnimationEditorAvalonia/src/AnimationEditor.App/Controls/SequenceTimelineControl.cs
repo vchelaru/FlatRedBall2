@@ -346,6 +346,34 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         return true;
     }
 
+    /// <summary>
+    /// Adds an empty track at the end (the same edit a chip dropped on the new-track row makes, with no chain), selects it and
+    /// opens its name for editing, with the default selected so typing replaces it and Escape keeps it. One undo entry.
+    /// </summary>
+    public void AddTrackAndRename()
+    {
+        if (_document is null || _undo is not { } undo || Sequence is null) return;
+        _document.AddTrack(undo, _sequenceIndex);
+        SetSelection(null, TrackCount - 1);
+        Rebuild();
+        BeginRenameTrack(TrackCount - 1);
+    }
+
+    /// <summary>
+    /// Moves the one selected track a lane up (<paramref name="delta"/> -1) or down (+1), as dragging its header there does: one undo
+    /// entry, the track stays selected. False when no single track is selected or it is already in the last lane that way.
+    /// </summary>
+    public bool MoveSelectedTrack(int delta)
+    {
+        if (_document is null || _undo is not { } undo || Sequence is null || _model.Kind != TimelineSelectionKind.Tracks || _model.Tracks.Count != 1) return false;
+        int track = _model.Tracks[0];
+        if (TrackReorder.StepSlot(track, TrackCount, delta) is not { } slot) return false;
+        if (_document.MoveTrack(undo, _sequenceIndex, track, slot) is not { } moved) return false;
+        SetSelection(null, moved);
+        Rebuild();
+        return true;
+    }
+
     /// <summary>True while a track's name is being edited in place.</summary>
     public bool IsRenamingTrack => _renameBox is { IsEditing: true };
 
@@ -563,14 +591,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
-        if (row.Kind == TimelineRowKind.NewTrack && point.X < TimelineViewport.HeaderWidth && _undo is { } undo)
+        if (row.Kind == TimelineRowKind.NewTrack && point.X < TimelineViewport.HeaderWidth)
         {
-            // The same document edit a chip dropped on the new-track row makes, with no chain.
-            _document.AddTrack(undo, _sequenceIndex);
-            SetSelection(null, TrackCount - 1);
-            Rebuild();
-            // Name it right away: the default is selected, so typing replaces it and Escape keeps it.
-            BeginRenameTrack(TrackCount - 1);
+            AddTrackAndRename();
             return;
         }
 
@@ -1056,53 +1079,65 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     // ── Context menu ─────────────────────────────────────────────────────────
 
+    /// <summary>Raised when the menu's Copy, Cut or Paste is picked. The host moves the clipboard text; it acts on the pane that owns the edit hotkeys.</summary>
+    public event Action<TimelineMenuCommand>? ClipboardCommandRequested;
+
+    // A track header, a chain block, or blank space (empty lane space, the new-track row, below it). The ruler has no menu.
     private void BuildMenu(Point point, TimelineRow row)
     {
         _menu.Items.Clear();
-        if (_document is null || _undo is null || row.Kind != TimelineRowKind.Track) return;
+        if (_document is null || _undo is null || Sequence is null || row.Kind == TimelineRowKind.Ruler) return;
+        var target = TimelineMenuTarget.Blank;
+        TimelineBlock? hitBlock = null;
         int track = row.Track;
-        if (point.X < TimelineViewport.HeaderWidth)
+        if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
         {
+            target = TimelineMenuTarget.TrackHeader;
             if (!_model.ContainsTrack(track)) SetSelection(null, track);
-            InvalidateVisual();
-            var rename = new MenuItem { Header = "Rename Track…" };
-            var duplicateTrack = new MenuItem { Header = _model.IsMulti ? "Duplicate Selected Tracks" : "Duplicate Track" };
-            duplicateTrack.Click += (_, _) => DuplicateSelected();
-            rename.Click += (_, _) => RenameTrackRequested?.Invoke(track);
-            var visibility = new MenuItem { Header = IsTrackHidden(track) ? "Show Track" : "Hide Track" };
-            visibility.Click += (_, _) => ToggleTrackVisibility(track);
-            bool deletesSelection = _model.IsMulti;
-            var delete = new MenuItem { Header = deletesSelection ? "Delete Selected Tracks" : "Delete Track" };
-            delete.Click += (_, _) => DeleteSelected();
-            _menu.Items.Add(rename);
-            _menu.Items.Add(duplicateTrack);
-            _menu.Items.Add(visibility);
-            if (Sequence!.Tracks.Any(t => !t.Visible))
-            {
-                var showAll = new MenuItem { Header = "Show All Tracks" };
-                showAll.Click += (_, _) => _document.ShowAllTracks(_undo, _sequenceIndex);
-                _menu.Items.Add(showAll);
-            }
-            _menu.Items.Add(delete);
-            return;
         }
-        if (TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y) is { } hit)
+        else if (row.Kind == TimelineRowKind.Track && TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y) is { } hit)
         {
+            target = TimelineMenuTarget.Chain;
+            hitBlock = hit.Block;
             var hitId = new TimelineChainId(hit.Block.Track, hit.Block.Chain);
             if (!_model.Contains(hitId)) SetSelection(hitId, null);
             else NotifySelection(_model.MakePrimary(hitId));
-            InvalidateVisual();
-            var reference = hit.Block.Reference;
-            var definition = new MenuItem { Header = "Go to Definition" };
-            definition.Click += (_, _) => GoToDefinitionRequested?.Invoke(reference);
-            var duplicate = new MenuItem { Header = _model.IsMulti ? "Duplicate Selected Chains" : "Duplicate" };
-            duplicate.Click += (_, _) => DuplicateSelected();
-            var remove = new MenuItem { Header = _model.IsMulti ? "Remove Selected Chains" : "Remove from Track" };
-            remove.Click += (_, _) => DeleteSelected();
-            _menu.Items.Add(definition);
-            _menu.Items.Add(duplicate);
-            _menu.Items.Add(remove);
         }
+        InvalidateVisual();
+
+        int selected = _model.Count;
+        bool trackHidden = target == TimelineMenuTarget.TrackHeader && IsTrackHidden(track);
+        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible));
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i > 0) _menu.Items.Add(new Separator());
+            foreach (var command in groups[i])
+            {
+                Action onClick = command switch
+                {
+                    TimelineMenuCommand.Copy or TimelineMenuCommand.Cut or TimelineMenuCommand.Paste => () => ClipboardCommandRequested?.Invoke(command),
+                    TimelineMenuCommand.Duplicate => DuplicateSelected,
+                    TimelineMenuCommand.Delete => () => DeleteSelected(),
+                    TimelineMenuCommand.RenameTrack => () => RenameTrackRequested?.Invoke(track),
+                    TimelineMenuCommand.ToggleVisibility => () => ToggleTrackVisibility(track),
+                    TimelineMenuCommand.ShowAllTracks => () => _document.ShowAllTracks(_undo, _sequenceIndex),
+                    TimelineMenuCommand.GoToDefinition => () => GoToDefinitionRequested?.Invoke(hitBlock!.Reference),
+                    TimelineMenuCommand.AddTrack => AddTrackAndRename,
+                    _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
+                };
+                string header = TimelineMenuLayout.Header(target, command, selected, trackHidden);
+                _menu.Items.Add(TimelineMenuLayout.Icon(command) is { } icon
+                    ? TreeMenuRenderer.CreateMenuItem(header, onClick, icon)
+                    : CreatePlainItem(header, onClick));
+            }
+        }
+    }
+
+    private static MenuItem CreatePlainItem(string header, Action onClick)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => onClick();
+        return item;
     }
 
     // ── Drawing ──────────────────────────────────────────────────────────────

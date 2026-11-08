@@ -120,20 +120,20 @@ public class SequenceTimelineAudit2ScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task CtrlX_WithTheFocusOnNeitherTheListNorTheTimeline_RemovesNothing()
+    public async Task CtrlX_WithTheFocusOnAButton_StillCutsFromTheLastTouchedPane()
     {
         using var editor = await OpenAsync();
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
         editor.ClickAt(At(editor, 0, 0.25));
-        // A button in the sequence list's header is neither surface; the chain is still selected but is not what Cut acts on.
+        // A button in the sequence list's footer takes the focus but not the ownership: the timeline was touched last, so Cut acts on its chain.
         editor.Control<Button>("AddSequenceButton").Focus();
         editor.Layout();
 
         editor.Press(Key.X, RawInputModifiers.Control);
         editor.Layout();
 
-        Chains(boss, 0).Length.ShouldBe(3);
-        editor.UndoLabels.ShouldBeEmpty();
+        Chains(boss, 0).Length.ShouldBe(2);
+        editor.UndoLabels.Count.ShouldBe(1);
     }
     [AvaloniaFact]
     public async Task EditMenuCut_WithTheTimelineFocused_RemovesTheSelectedChain()
