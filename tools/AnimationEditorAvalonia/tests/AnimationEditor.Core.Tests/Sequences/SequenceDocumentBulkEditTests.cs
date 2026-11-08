@@ -16,20 +16,20 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// </summary>
 public class SequenceDocumentBulkEditTests
 {
-    // Tracks Body, Weapon and Shadow (flipped, hidden); each holds one chain.
+    // Tracks Body, Weapon and Shadow (hidden); each holds one chain.
     private static SequenceDocument Load(TestHelpers.TempDir dir)
     {
         var save = new SequenceListSave { Sources = { "hero.achj", "boss.achj" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        void AddTrack(string name, string source, string chain, double start, float loops, bool flip = false, bool visible = true)
+        void AddTrack(string name, string source, string chain, double start, float loops, bool visible = true)
         {
-            var track = new SequenceTrackSave { Name = name, FlipHorizontal = flip, Visible = visible };
+            var track = new SequenceTrackSave { Name = name, Visible = visible };
             track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
             sequence.Tracks.Add(track);
         }
         AddTrack("Body", "hero.achj", "Walk", 0.5, 1);
         AddTrack("Weapon", "hero.achj", "Walk", 1, 2);
-        AddTrack("Shadow", "boss.achj", "Idle", 2, 2, flip: true, visible: false);
+        AddTrack("Shadow", "boss.achj", "Idle", 2, 2, visible: false);
         save.Sequences.Add(sequence);
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
@@ -47,9 +47,8 @@ public class SequenceDocumentBulkEditTests
         using var dir = new TestHelpers.TempDir();
         var sequence = Load(dir).Save.Sequences[0];
 
-        SequenceBulkState.ForTracks(sequence, AllTracks).ShouldBe(new TrackBulkState(null, null));
+        SequenceBulkState.ForTracks(sequence, AllTracks).ShouldBe(new TrackBulkState(null));
         SequenceBulkState.ForTracks(sequence, new[] { 0, 1 }).Visible.ShouldBe(true);
-        SequenceBulkState.ForTracks(sequence, new[] { 0, 1 }).Flip.ShouldBe(false);
     }
 
     [Fact]
@@ -66,19 +65,16 @@ public class SequenceDocumentBulkEditTests
     }
 
     [Fact]
-    public void SetTracksVisible_AndFlip_ApplyToTheWholeSet_OneStepEach()
+    public void SetTracksVisible_AppliesToTheWholeSet_OneStep()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
         document.SetTracksVisible(undo, 0, AllTracks, true);
-        document.SetTracksFlip(undo, 0, AllTracks, true);
 
-        Saved(document).Tracks.Select(t => (t.Visible, t.FlipHorizontal)).ShouldBe(new[] { (true, true), (true, true), (true, true) });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Show 3 Tracks", "Turn Flip On for 3 Tracks" });
-        undo.Undo();
-        Saved(document).Tracks.Select(t => t.FlipHorizontal).ShouldBe(new[] { false, false, true });
+        Saved(document).Tracks.Select(t => t.Visible).ShouldBe(new[] { true, true, true });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Show 3 Tracks" });
         undo.Undo();
         Saved(document).Tracks.Select(t => t.Visible).ShouldBe(new[] { true, true, false });
     }

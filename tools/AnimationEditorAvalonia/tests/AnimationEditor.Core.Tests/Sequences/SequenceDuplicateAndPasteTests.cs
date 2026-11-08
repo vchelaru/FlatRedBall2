@@ -14,7 +14,7 @@ public class SequenceDuplicateAndPasteTests
 {
     private static SequenceSave Sequence(string name, params string[] sources)
     {
-        var track = new SequenceTrackSave { Name = "Body", FlipHorizontal = true };
+        var track = new SequenceTrackSave { Name = "Body" };
         foreach (string source in sources)
             track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = 0.25, Loops = 3 });
         var sequence = new SequenceSave { Name = name, Loop = true };

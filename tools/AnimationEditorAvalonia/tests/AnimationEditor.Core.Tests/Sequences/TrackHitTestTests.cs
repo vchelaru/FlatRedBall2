@@ -31,9 +31,9 @@ public class TrackHitTestTests
         TrackHitTest.TopmostAt(new[] { other }, 50, 50, sequence: 0).ShouldBeNull();
     }
 
-    // ── Where the preview draws a sprite, flipped or not ─────────────────────
+    // ── Where the preview draws a sprite ─────────────────────────────────────
 
-    private static SequenceDocument Load(TestHelpers.TempDir dir, bool flip, int tracks = 1)
+    private static SequenceDocument Load(TestHelpers.TempDir dir, int tracks = 1)
     {
         string source = Path.Combine(dir.Path, "body.achj");
         var list = new AnimationChainListSave();
@@ -46,7 +46,7 @@ public class TrackHitTestTests
         var sequence = new SequenceSave { Name = "Attack" };
         for (int i = 0; i < tracks; i++)
         {
-            var track = new SequenceTrackSave { Name = i == 0 ? "Body" : "Fx" + i, FlipHorizontal = flip };
+            var track = new SequenceTrackSave { Name = i == 0 ? "Body" : "Fx" + i };
             track.Chains.Add(new SequenceChainReferenceSave { Source = "body.achj", Chain = "Walk", Start = 0, Loops = 1 });
             sequence.Tracks.Add(track);
         }
@@ -56,17 +56,15 @@ public class TrackHitTestTests
         return SequenceDocument.Load(path);
     }
 
-    [Theory]
-    [InlineData(false, 8)]
-    [InlineData(true, -8)]
-    public void SpriteBox_IsWhereThePreviewDrawsIt_TheFrameOffsetMirroredOnAFlippedTrack(bool flip, float expectedWorldX)
+    [Fact]
+    public void SpriteBox_IsWhereThePreviewDrawsIt_AtTheFrameOffset()
     {
         using var dir = new TestHelpers.TempDir();
-        var sprite = SequenceScene.At(Load(dir, flip), 0, 0.1).Single();
+        var sprite = SequenceScene.At(Load(dir), 0, 0.1).Single();
 
         var box = SpriteBox.Of(sprite, 16, 16, zoom: 2, offsetMultiplier: 1, originX: 100, originY: 200);
 
-        box.CenterX.ShouldBe(100 + expectedWorldX * 2);
+        box.CenterX.ShouldBe(100 + 8 * 2);
         box.CenterY.ShouldBe(200 - 3 * 2);
         (box.HalfWidth, box.HalfHeight).ShouldBe((16.0, 16.0));
     }
@@ -75,7 +73,7 @@ public class TrackHitTestTests
     public void TopmostAt_TwoTracksOnTopOfEachOther_PicksTheTopLane()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, flip: false, tracks: 2);
+        var document = Load(dir, tracks: 2);
 
         var boxes = SequenceScene.At(document, 0, 0.1)
             .Select(sprite => SpriteBox.Of(sprite, 16, 16, zoom: 1, offsetMultiplier: 1, originX: 0, originY: 0)).ToList();

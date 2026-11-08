@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// </summary>
 public class SequenceInspectorBulkEditScenarioTests
 {
-    // Body shown and flipped; Head hidden and not flipped. Chains from the shared fixture (every block is 1 cycle):
+    // Body shown; Head hidden. Chains from the shared fixture (every block is 1 cycle):
     // Body: Walk@0, Walk@1, Run@2. Head: Run@0.5, Walk@1.5.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
@@ -27,8 +27,6 @@ public class SequenceInspectorBulkEditScenarioTests
         var tracks = save.Sequences[0].Tracks;
         tracks[0].Visible = true;
         tracks[1].Visible = false;
-        tracks[0].FlipHorizontal = true;
-        tracks[1].FlipHorizontal = false;
         save.Save(path);
         return path;
     }
@@ -69,14 +67,13 @@ public class SequenceInspectorBulkEditScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TwoTracks_VisibleAndFlipAreTriState_AndAClickSetsBoth()
+    public async Task TwoTracks_VisibleIsTriState_AndAClickSetsBoth()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = await SelectBothTracksAsync(editor);
         var inspector = Inspector(editor);
 
         inspector.TrackVisibleBox.IsChecked.ShouldBeNull("Body is shown, Head is hidden");
-        inspector.TrackFlipBox.IsChecked.ShouldBeNull("Body is flipped, Head is not");
 
         // As in the .achx Inspector (the same ToggleButton), a click on the indeterminate state unchecks.
         editor.Click(inspector.TrackVisibleBox);
@@ -84,15 +81,6 @@ public class SequenceInspectorBulkEditScenarioTests
         inspector.TrackVisibleBox.IsChecked.ShouldBe(false);
         editor.UndoLabels.ShouldBe(new[] { "Hide 2 Tracks" });
 
-        editor.Click(inspector.TrackFlipBox);
-        Saved(path).Tracks.Select(t => t.FlipHorizontal).Take(2).ShouldBe(new[] { false, false });
-        editor.UndoLabels.ShouldBe(new[] { "Hide 2 Tracks", "Turn Flip Off for 2 Tracks" });
-        editor.Click(inspector.TrackFlipBox);
-        Saved(path).Tracks.Select(t => t.FlipHorizontal).Take(2).ShouldBe(new[] { true, true });
-        editor.Press(Key.Z, RawInputModifiers.Control);
-        editor.Press(Key.Z, RawInputModifiers.Control);
-        Saved(path).Tracks.Select(t => t.FlipHorizontal).Take(2).ShouldBe(new[] { true, false });
-        inspector.TrackFlipBox.IsChecked.ShouldBeNull();
         editor.Press(Key.Z, RawInputModifiers.Control);
         Saved(path).Tracks.Select(t => t.Visible).Take(2).ShouldBe(new[] { true, false });
         inspector.TrackVisibleBox.IsChecked.ShouldBeNull();

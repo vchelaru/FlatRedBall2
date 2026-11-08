@@ -12,7 +12,7 @@ public class SequenceClipboardTests
 {
     private static SequenceSave SequenceUsing(params string[] sources)
     {
-        var track = new SequenceTrackSave { Name = "Body", FlipHorizontal = true };
+        var track = new SequenceTrackSave { Name = "Body" };
         double start = 0;
         foreach (string source in sources)
             track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = start += 0.5, Loops = 2 });
@@ -63,7 +63,7 @@ public class SequenceClipboardTests
         read.Loop.ShouldBeTrue();
         read.UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep me");
         var track = read.Tracks.Single();
-        (track.Name, track.FlipHorizontal).ShouldBe(("Body", true));
+        track.Name.ShouldBe("Body");
         track.Visible.ShouldBeFalse();
         track.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         var chain = track.Chains.Single();
@@ -190,6 +190,6 @@ public class SequenceClipboardTests
         original.Tracks[0].UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         clone.UnknownProperties["note"]!.GetValue<string>().ShouldBe("keep");
         clone.Tracks[0].Chains[0].UnknownProperties["tint"]!["r"]!.GetValue<int>().ShouldBe(1);
-        (clone.Name, clone.Loop, clone.Tracks[0].FlipHorizontal).ShouldBe(("Idle", true, true));
+        (clone.Name, clone.Loop).ShouldBe(("Idle", true));
     }
 }

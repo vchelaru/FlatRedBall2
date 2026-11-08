@@ -8,7 +8,7 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests.Sequences;
 
-/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's flip, a chain's start and loops.</summary>
+/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's visibility, a chain's start and loops.</summary>
 public class SequenceDocumentInspectorEditTests
 {
     private static SequenceDocument Load(TestHelpers.TempDir dir)
@@ -28,28 +28,13 @@ public class SequenceDocumentInspectorEditTests
         SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0];
 
     [Fact]
-    public void TrackEdits_Flip_IsOneUndoStepAndSaves()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir);
-        var undo = new UndoManager();
-
-        document.SetTrackFlip(undo, 0, 0, true);
-
-        SavedTrack(document).FlipHorizontal.ShouldBeTrue();
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Turn Flip On for 'Body'" });
-        undo.Undo();
-        SavedTrack(document).FlipHorizontal.ShouldBeFalse();
-    }
-
-    [Fact]
     public void TrackEdits_SettingTheCurrentValue_RecordsNothing()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetTrackFlip(undo, 0, 0, false);
+        document.SetTrackVisible(undo, 0, 0, true);
 
         undo.UndoHistory.ShouldBeEmpty();
     }

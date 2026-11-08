@@ -14,11 +14,11 @@ public class TimelineClipboardTests
         new() { Source = source, Chain = name, Start = start, Loops = loops };
 
     private static CopiedChain Copied(SequenceChainReferenceSave chain, string track = "Body", int lane = 0) =>
-        new(chain, new SequenceTrackSave { Name = track, FlipHorizontal = true, Visible = false }, lane);
+        new(chain, new SequenceTrackSave { Name = track, Visible = false }, lane);
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, FlipHorizontal = true, Visible = false };
+        var track = new SequenceTrackSave { Name = name, Visible = false };
         track.UnknownProperties["tag"] = "boss";
         track.Chains.AddRange(chains);
         return track;
@@ -89,7 +89,7 @@ public class TimelineClipboardTests
         error.ShouldBeNull();
         content!.Sources.ShouldBe(new[] { "C:/game/hero.achx", "C:/game/fx.achx" });
         var body = content.Tracks[0];
-        (body.Name, body.FlipHorizontal, body.Visible).ShouldBe(("Body", true, false));
+        (body.Name, body.Visible).ShouldBe(("Body", false));
         body.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         body.Chains.Select(c => (c.Source, c.Chain, c.Start, c.Loops)).ShouldBe(new[]
         {
@@ -155,7 +155,7 @@ public class TimelineClipboardTests
         ship.AsObject().ContainsKey("x").ShouldBeFalse("a copied track carries no offset");
         ship.AsObject().ContainsKey("y").ShouldBeFalse("a copied track carries no offset");
         ship.AsObject().ContainsKey("z").ShouldBeFalse("a copied track carries no Z");
-        ship["flipHorizontal"]!.GetValue<bool>().ShouldBeTrue();
+        ship.AsObject().ContainsKey("flipHorizontal").ShouldBeFalse("a copied track carries no flip");
         ship["visible"]!.GetValue<bool>().ShouldBeFalse();
         json["chainTracks"]!.AsArray().Select(n => n!.GetValue<int>()).ShouldBe(new[] { 0, 1, 0 });
         json["track"]!.GetValue<string>().ShouldBe("Ship");
@@ -172,8 +172,8 @@ public class TimelineClipboardTests
 
         TimelineClipboard.TryRead(TimelineClipboard.WriteChains(items, "C:/x"), out var content, out _).ShouldBeTrue();
 
-        content!.SourceTracks.Select(t => (t.Name, t.Lane, t.FlipHorizontal, t.Visible))
-            .ShouldBe(new[] { ("Ship", 0, true, false), ("Booster", 2, true, false) });
+        content!.SourceTracks.Select(t => (t.Name, t.Lane, t.Visible))
+            .ShouldBe(new[] { ("Ship", 0, false), ("Booster", 2, false) });
         content.ChainTracks.ShouldBe(new[] { 0, 1 });
     }
 

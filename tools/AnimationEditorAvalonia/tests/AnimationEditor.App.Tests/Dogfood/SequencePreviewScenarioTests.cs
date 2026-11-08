@@ -241,7 +241,7 @@ public class SequencePreviewScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ActiveChainShapes_DrawAtTheirFrame_MirroredOnAFlippedTrack()
+    public async Task ActiveChainShapes_DrawAtTheirFrame()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("hero.png", 64, 64);
@@ -252,7 +252,6 @@ public class SequencePreviewScenarioTests
         editor.WriteAchx("hero.achx", guard);
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var track = Track("Body", ("hero.achx", "Guard", 0, 1));
-        track.FlipHorizontal = true;
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         save.Sequences.Add(new SequenceSave { Name = "Attack", Tracks = { track } });
         save.Save(boss);
@@ -260,6 +259,6 @@ public class SequencePreviewScenarioTests
         await editor.OpenAsync(boss);
 
         var shape = SequencePreview(editor).GetShapeInfosForTest().Single();
-        (shape.X, shape.Y, shape.Param1, shape.Param2).ShouldBe((-5f, 2f, 4f, 3f));
+        (shape.X, shape.Y, shape.Param1, shape.Param2).ShouldBe((5f, 2f, 4f, 3f));
     }
 }

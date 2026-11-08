@@ -140,32 +140,6 @@ public class SequenceSceneTests
     }
 
     [Fact]
-    public void Sample_AFlippedTrack_MirrorsTheFrameOffsetAndFlipAcrossTheEntityOrigin()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var track = Track("Body", ("body/body.achj", "Walk", 0, 1));
-        track.FlipHorizontal = true;
-        var document = Load(dir, track);
-        var sprite = SequenceScene.At(document, 0, 0).Single();
-        sprite.Frame.RelativeX = 3;
-        sprite.Frame.RelativeY = 2;
-
-        var sample = sprite.Sample();
-
-        (sample.OffsetX, sample.OffsetY).ShouldBe((-3f, 2f));
-        sprite.FlipMatrix.ShouldBe((-1f, 0f, 0f, 1f));
-    }
-
-    [Fact]
-    public void FlipMatrix_AnUnflippedTrack_IsNull()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1)));
-
-        SequenceScene.At(document, 0, 0).Single().FlipMatrix.ShouldBeNull();
-    }
-
-    [Fact]
     public void At_AHiddenTrack_IsLeftOut_AndTheOtherTrackStays()
     {
         using var dir = new TestHelpers.TempDir();

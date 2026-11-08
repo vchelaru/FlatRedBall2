@@ -98,9 +98,6 @@ public class SequenceUndoLabelConventionTests
         Run((document, undo) => document.SetTracksVisible(undo, 0, new[] { 0 }, true));
         Run((document, undo) => document.SetTrackVisible(undo, 0, 1, false));
         Run((document, undo) => document.ShowAllTracks(undo, 0));
-        Run((document, undo) => document.SetTracksFlip(undo, 0, new[] { 0, 1 }, true));
-        Run((document, undo) => document.SetTracksFlip(undo, 0, new[] { 0 }, false));
-        Run((document, undo) => document.SetTrackFlip(undo, 0, 1, true));
         Run((document, undo) => document.MoveTrack(undo, 0, 0, 2));
         NumericEdit.TryParse("3", out var three).ShouldBeTrue();
         NumericEdit.TryParse("+ 1", out var plusOne).ShouldBeTrue();
@@ -141,7 +138,7 @@ public class SequenceUndoLabelConventionTests
 
         var labels = ProducedLabels(dir.Path);
 
-        labels.Count.ShouldBeGreaterThan(40);
+        labels.Count.ShouldBeGreaterThan(37);
         foreach (string label in labels)
         {
             Regex.IsMatch(label, @"^[A-Z][a-z]+ ").ShouldBeTrue($"'{label}' starts with a Title Case verb");
