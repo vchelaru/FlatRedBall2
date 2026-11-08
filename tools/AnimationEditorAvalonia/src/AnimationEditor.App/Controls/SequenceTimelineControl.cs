@@ -76,6 +76,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private int _renameTrack;
 
     private (LibraryChip Chip, Point Point)? _chipGhost;
+
+    // While a dragged chain is over the new-track row: the same plan a chip dropped there would have. The drop makes the track(s).
+    private TimelineDropPlan? _moveDrop;
     private double _playhead;
     private bool _scrubbing;
     private bool _panning;
@@ -92,14 +95,22 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _selectionLayer = new SelectionLayer(this);
         VisualChildren.Add(_selectionLayer);
         LogicalChildren.Add(_selectionLayer);
+        _popupSurface = new PopupSurface(this);
+        VisualChildren.Add(_popupSurface);
+        LogicalChildren.Add(_popupSurface);
         ActualThemeVariantChanged += (_, _) =>
         {
             ClearThemeCaches();
             RefreshPlayheadLayer();
             _selectionLayer.InvalidateVisual();
+            InvalidatePopups();
             InvalidateVisual();
         };
-        _filmstrip.TextureChanged += InvalidateVisual;
+        _filmstrip.TextureChanged += () =>
+        {
+            InvalidatePopups();
+            InvalidateVisual();
+        };
         Viewport.Changed += () =>
         {
             Diagnostics.NoteInput();
@@ -387,6 +398,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override Size MeasureOverride(Size availableSize)
     {
         _selectionLayer.Measure(availableSize);
+        _popupSurface.Measure(availableSize);
         _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
         return default;
     }
@@ -394,6 +406,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override Size ArrangeOverride(Size finalSize)
     {
         _selectionLayer.Arrange(new Rect(finalSize));
+        _popupSurface.Arrange(new Rect(finalSize));
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
             box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + TimelineLayout.HeaderCenterY - RenameBoxHeight / 2,
@@ -415,8 +428,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         InvalidateVisual();
     }
 
-    /// <summary>The dragged chip's current drop plan, or null when no chip is over a droppable row. The ghost is drawn from it and <see cref="DropChip"/> uses the same computation.</summary>
-    public TimelineDropPlan? DropPreview => _chipGhost is { } ghost ? PlanDrop(ghost.Chip, ghost.Point) : null;
+    /// <summary>
+    /// The current drop plan, or null when nothing is over a droppable row: a dragged chip over a lane or the new-track
+    /// row, or a dragged chain over the new-track row. The ghost is drawn from it and the drop uses the same computation.
+    /// </summary>
+    public TimelineDropPlan? DropPreview => _moveDrop ?? (_chipGhost is { } ghost ? PlanDrop(ghost.Chip, ghost.Point) : null);
 
     /// <summary>The track lane a dragged chip is over (its whole row is highlighted), or null over the new-track row or nowhere.</summary>
     public int? DropTargetTrack => DropPreview is { Kind: TimelineDropKind.Track } plan ? plan.Row : null;
@@ -680,6 +696,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var plan = TimelineMultiMove.Plan(_dragItems.Select(item => new TimelineMultiMove.Origin(item.Track, item.Start)).ToList(),
                 snap.Time - _dragOriginStart, _requestedTrackDelta, sequence.Tracks.Count);
             MoveDragItems(sequence, plan);
+            // Over the new-track row nothing is created yet (Escape must leave no trace); the release makes the track(s).
+            var onNewTrack = TimelineDropPlan.ForMove(Viewport, sequence.Tracks.Count, point.Y, _dragged.Start, _dragBlock.Full, snap.Target);
+            _moveDrop = onNewTrack.Kind == TimelineDropKind.None ? null : onNewTrack;
         }
         else
         {
@@ -703,12 +722,18 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             sequence.Tracks[current].Chains.Remove(item.Reference);
             sequence.Tracks[target].Chains.Add(item.Reference);
         }
+        SelectDragged(sequence, _dragItems, _dragged!);
+    }
+
+    // Selects the dragged chains where they are now, with the pressed one as the primary.
+    private void SelectDragged(SequenceSave sequence, IReadOnlyList<DragItem> items, SequenceChainReferenceSave primary)
+    {
         TimelineChainId IdOf(SequenceChainReferenceSave reference)
         {
             int track = sequence.Tracks.FindIndex(t => t.Chains.Contains(reference));
             return new TimelineChainId(track, sequence.Tracks[track].Chains.IndexOf(reference));
         }
-        NotifySelection(_model.SelectChains(_dragItems.Select(item => IdOf(item.Reference)).ToList(), IdOf(_dragged!)));
+        NotifySelection(_model.SelectChains(items.Select(item => IdOf(item.Reference)).ToList(), IdOf(primary)));
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -821,6 +846,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (track == _hoverEyeTrack) return;
         _hoverEyeTrack = track;
         if (point is { } at) _eyePoint = at;
+        InvalidatePopups();
         InvalidateVisual();
     }
 
@@ -898,7 +924,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         int originTrack = _dragOriginTrack;
         string? before = _gestureBefore;
         var collapse = _collapseOnRelease;
-        int movedCount = _dragItems.Count;
+        var items = _dragItems;
+        int movedCount = items.Count;
+        bool toNewTrack = _moveDrop is { Kind: TimelineDropKind.NewTrack };
         ResetDrag();
         if (kind == DragKind.Pending && collapse is { } clicked) SetSelection(clicked, null);
         if (kind == DragKind.Pending || dragged is null || before is null || _document is null || _undo is null
@@ -909,6 +937,15 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (kind == DragKind.Edge)
         {
             description = $"Set Loops of '{dragged.Chain}' to {dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
+        }
+        else if (toNewTrack)
+        {
+            // Released on the new-track row: the chains are already at their new times; now they leave for new tracks.
+            var created = TimelineNewTrackMove.Apply(sequence, items.Select(item => item.Reference).ToList());
+            SelectDragged(sequence, items, dragged);
+            description = movedCount > 1
+                ? $"Move {Plural.Format(movedCount, "chain")} to {(created.Count == 1 ? $"new track '{sequence.Tracks[created[0]].Name}'" : Plural.Format(created.Count, "new track"))}"
+                : $"Move '{dragged.Chain}' to new track '{sequence.Tracks[created[0]].Name}'";
         }
         else
         {
@@ -946,6 +983,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _snapOthers = Array.Empty<SnapTarget>();
         _frameBoundaries = null;
         _collapseOnRelease = null;
+        _moveDrop = null;
         _dragItems = Array.Empty<DragItem>();
         _marqueeBase = Array.Empty<TimelineChainId>();
     }
@@ -1101,8 +1139,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         DrawDropTime(context, size, drop);
         DrawSnapGuide(context, size);
         if (PlayheadLayer is null) DrawPlayhead(context, size);
-        DrawHover(context, size);
-        DrawEyeTooltip(context, size);
     }
 
     // A thin accent line at the snap target, over every lane, plus a tick on the edge of the chain it snapped to.
@@ -1376,12 +1412,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void DrawChipGhost(DrawingContext context, TimelineDropPlan drop)
     {
-        if (_chipGhost is not { } ghost || drop.Kind == TimelineDropKind.None) return;
+        string? name = _chipGhost?.Chip.Chain.Name ?? (_moveDrop is not null ? _dragged?.Chain : null);
+        if (name is null || drop.Kind == TimelineDropKind.None) return;
         double top = Viewport.LaneTop(drop.Row);
         var rect = new Rect(drop.Left, top + TimelineLayout.BodyTop, drop.Width, TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
         context.DrawRectangle(null, new Pen(Brush("AccentCool"), 2, new DashStyle(new double[] { 4, 3 }, 0)), rect, 3, 3);
         using (context.PushClip(rect))
-            context.DrawText(Text(ghost.Chip.Chain.Name, 11, Brush("AccentCool")), new Point(rect.X + 6, rect.Y + 4));
+            context.DrawText(Text(name, 11, Brush("AccentCool")), new Point(rect.X + 6, rect.Y + 4));
     }
 
     // A thin dotted line down from the ruler at the drop time, with its value on the ruler.

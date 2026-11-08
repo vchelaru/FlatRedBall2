@@ -68,6 +68,7 @@ public enum TreeMenuIcon
     Sort,
     FlipHorizontal,
     FlipVertical,
+    FlipDiagonal,
     Reverse,
     FrameTime,
     Offsets,
