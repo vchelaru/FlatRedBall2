@@ -34,6 +34,14 @@ public class FilmstripReadoutTests
     }
 
     [Fact]
+    public void At_HeldTail_SaysItIsHeld_AndItsDurationCoversTheWholeHold()
+    {
+        var visit = new FilmstripVisit(2, 0.2, 0.9, 0, IsHold: true);
+
+        FilmstripReadout.At("Once", 3, 0, Cell(2, visit), visit).Lines.ShouldBe(new[] { "3 / 3", "0.70 s", "at 0.20 s", "held" });
+    }
+
+    [Fact]
     public void At_SingleShowingOfAPingPong_HasNoHalfLine()
     {
         var visit = new FilmstripVisit(1, 0.1, 0.2, 0, IsReturn: true);

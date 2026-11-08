@@ -167,7 +167,7 @@ public class SequenceDocumentInspectorEditTests
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetChainLoops(undo, 0, 0, 0, loops).ShouldBe("Loops must be above 0.");
+        document.SetChainLoops(undo, 0, 0, 0, loops).ShouldBe("Cycles must be above 0.");
 
         SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
         undo.UndoHistory.ShouldBeEmpty();

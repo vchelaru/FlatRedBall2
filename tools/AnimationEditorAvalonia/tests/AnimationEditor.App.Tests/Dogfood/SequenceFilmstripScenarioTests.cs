@@ -10,13 +10,14 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// <summary>A block on the sequence timeline shows its chain's real frames as a filmstrip row under the label strip.</summary>
 public class SequenceFilmstripScenarioTests
 {
-    // Walk: five 0.1 s frames (0.5 s cycle). Run: two 0.1 s frames. Gone is not in hero.achx.
+    // Walk: five 0.1 s frames (0.5 s cycle). Run: two 0.1 s frames. Once: Walk with Loop off. Gone is not in hero.achx.
     private static string WriteFixture(AnimationEditorHarness editor, params SequenceTrackSave[] tracks)
     {
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx",
             AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16), (32, 0, 16, 16), (48, 0, 16, 16), (0, 16, 16, 16)),
-            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 32, 16, 16), (16, 32, 16, 16)));
+            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 32, 16, 16), (16, 32, 16, 16)),
+            OnceChain());
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
@@ -24,6 +25,13 @@ public class SequenceFilmstripScenarioTests
         save.Sequences.Add(sequence);
         save.Save(path);
         return path;
+    }
+
+    private static AnimationChainSave OnceChain()
+    {
+        var once = AnimationEditorHarness.Chain("Once", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16), (32, 0, 16, 16), (48, 0, 16, 16), (0, 16, 16, 16));
+        once.Loop = false;
+        return once;
     }
 
     private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
@@ -48,6 +56,22 @@ public class SequenceFilmstripScenarioTests
 
         cells.Select(c => c.Frame).ShouldBe(new[] { 0, 1, 2, 3, 4 });
         cells[0].Width.ShouldBe(0.1 * timeline.Viewport.PixelsPerSecond, 1e-6);
+    }
+
+    [AvaloniaFact]
+    public async Task ANonLoopingBlock_DrawsOneCycle_ThenItsLastFrameHeldToTheBlockEnd()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        // Once is 0.5 s a cycle; three cycles ask for 1.5 s, but it plays once and holds frame 4.
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 3))));
+        var timeline = Timeline(editor);
+
+        var cells = timeline.FilmstripCells(timeline.Blocks.Single());
+
+        cells.Select(c => c.Frame).ShouldBe(new[] { 0, 1, 2, 3, 4 });
+        cells.Last().End.ShouldBe(1.5, 1e-6);
+        cells.Last().Width.ShouldBe((1.5 - 0.4) * timeline.Viewport.PixelsPerSecond, 1e-3);
+        cells.Last().Visits.Single().IsHold.ShouldBeTrue();
     }
 
     [AvaloniaFact]

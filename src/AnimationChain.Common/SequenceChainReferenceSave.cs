@@ -21,8 +21,10 @@ public class SequenceChainReferenceSave
     public double Start { get; set; }
 
     /// <summary>
-    /// How many playback cycles play, overriding the chain's own Loop flag. One cycle is the chain's full length, twice
-    /// that for a ping-pong chain. A fraction plays part of the last cycle.
+    /// The block's length in playback cycles. One cycle is the chain's full length, twice that for a ping-pong chain. It
+    /// does not override the chain's own Loop flag: a chain with Loop on repeats across the length (a fraction plays part
+    /// of the last cycle), and one with Loop off plays one cycle, then holds its last frame until the length ends. The
+    /// JSON key stays <c>loops</c>.
     /// </summary>
     public float Loops { get; set; } = 1;
 

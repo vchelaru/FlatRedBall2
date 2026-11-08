@@ -26,7 +26,7 @@ public class SequenceEventRowScenarioTests
     }
 
     // Walk: five 0.1 s frames, "Start" on the first and "Step" on the third. Run: no events. Chomp: a ping-pong of three
-    // 0.1 s frames with "Bite" on the middle one. Rapid: Hit and Spark 0.02 s apart, then Sfx half a second later.
+    // 0.1 s frames with "Bite" on the middle one. Once: Walk with Loop off. Rapid: Hit and Spark 0.02 s apart, then Sfx half a second later.
     private static string WriteFixture(AnimationEditorHarness editor, params SequenceTrackSave[] tracks)
     {
         editor.WritePng("sheet.png", 64, 64);
@@ -45,7 +45,11 @@ public class SequenceEventRowScenarioTests
         Event(rapid.Frames[1], "Hit");
         Event(rapid.Frames[2], "Spark");
         Event(rapid.Frames[3], "Sfx");
-        editor.WriteAchx("hero.achx", walk, run, chomp, rapid);
+        var once = AnimationEditorHarness.Chain("Once", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16), (32, 0, 16, 16), (48, 0, 16, 16), (0, 16, 16, 16));
+        once.Loop = false;
+        Event(once.Frames[0], "Start");
+        Event(once.Frames[2], "Step");
+        editor.WriteAchx("hero.achx", walk, run, chomp, rapid, once);
 
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
@@ -124,6 +128,20 @@ public class SequenceEventRowScenarioTests
         // Walk's cycle is 0.5 s: Start at 0 and Step at 0.2 s, both again in the second cycle.
         markers.Select(m => m.X).ShouldBe(new[] { 0, 0.2 * pps, 0.5 * pps, 0.7 * pps }, 1e-3);
         markers.Select(m => m.Occurrences[0].Name).ShouldBe(new[] { "Start", "Step", "Start", "Step" });
+    }
+
+    [AvaloniaFact]
+    public async Task ANonLoopingChain_FlagsOnlyItsFirstCycle_NotTheHeldLastFrame()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0.5, 2))));
+        var timeline = Timeline(editor);
+        double pps = timeline.Viewport.PixelsPerSecond;
+
+        var markers = timeline.EventMarkersOf(timeline.Blocks.Single());
+
+        // Two cycles long, but it plays once and holds: Start at 0 and Step at 0.2 s, nothing in the hold.
+        markers.Select(m => m.X).ShouldBe(new[] { 0, 0.2 * pps }, 1e-3);
     }
 
     [AvaloniaFact]

@@ -646,10 +646,13 @@ public sealed class SequenceDocument
         return null;
     }
 
-    /// <summary>Sets how many cycles a chain plays. Returns why it was refused (zero, negative or not a number), or null.</summary>
+    /// <summary>
+    /// Sets the block's length in cycles (<see cref="SequenceChainReferenceSave.Loops"/>). Returns why it was refused (zero,
+    /// negative or not a number), or null.
+    /// </summary>
     public string? SetChainLoops(IUndoManager undo, int sequence, int track, int chain, float loops)
     {
-        if (!float.IsFinite(loops) || loops <= 0) return "Loops must be above 0.";
+        if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Loops of '{name}' to {Format(loops)}",
             save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);

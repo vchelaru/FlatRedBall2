@@ -62,6 +62,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private IReadOnlyList<TimelineChainId> _dragSelectionBefore = Array.Empty<TimelineChainId>();
     private TimelineChainId? _dragPrimaryBefore;
     private IReadOnlyList<double>? _frameBoundaries;
+    private bool _dragRepeats = true;
     private SnapTarget? _snapGuide;
     private bool _chipBypass;
 
@@ -666,6 +667,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragPrimaryBefore = _model.PrimaryChain;
         _snapOthers = TimelineSnapTargets.Others(_blocks, _dragItems.Select(item => item.Reference).ToList(), _playhead);
         _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain) : null;
+        _dragRepeats = _document.FindChain(block.Reference)?.Loop ?? true;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
         ShowCursor(point);
@@ -730,7 +732,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         else
         {
             var result = TimelineSnapTargets.ResizeEdge(_dragBlock, _dragOriginEdge + dt, _snapOthers, _frameBoundaries,
-                Viewport.PixelsPerSecond, bypass);
+                Viewport.PixelsPerSecond, bypass, _dragRepeats);
             _dragged.Loops = result.Loops;
             _snapGuide = result.Snap.Target;
         }
@@ -1009,6 +1011,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _snapGuide = null;
         _snapOthers = Array.Empty<SnapTarget>();
         _frameBoundaries = null;
+        _dragRepeats = true;
         _collapseOnRelease = null;
         _moveDrop = null;
         _dragItems = Array.Empty<DragItem>();
@@ -1378,7 +1381,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             Stats.LegacyDraws++;
             context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 1), body, 3, 3);
 
-            // Whole-cycle marks, so a float loop count reads at a glance.
+            // Whole-cycle marks, so a fractional length in cycles reads at a glance (also where a non-looping chain's hold starts).
             if (block.CycleLength > 0)
             {
                 var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
