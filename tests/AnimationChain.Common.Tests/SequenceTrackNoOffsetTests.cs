@@ -11,7 +11,7 @@ public class SequenceTrackNoOffsetTests
 {
     private const string FileWithOffsets = """
         { "version": 1, "sources": [ "Boss.achj" ], "sequences": [ { "name": "Idle", "tracks": [
-          { "name": "Body", "x": 12, "y": -3, "flipHorizontal": true, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
+          { "name": "Body", "x": 12, "y": -3, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
           { "name": "Wing", "x": 0, "y": 0, "tag": "keep", "visible": false, "chains": [] } ] } ] }
         """;
 
@@ -33,7 +33,7 @@ public class SequenceTrackNoOffsetTests
         var loaded = SequenceListSave.FromJsonString(FileWithOffsets);
 
         var tracks = loaded.Sequences.ShouldHaveSingleItem().Tracks;
-        tracks.Select(t => (t.Name, t.FlipHorizontal, t.Visible, t.Chains.Count)).ShouldBe(new[] { ("Body", true, true, 1), ("Wing", false, false, 0) });
+        tracks.Select(t => (t.Name, t.Visible, t.Chains.Count)).ShouldBe(new[] { ("Body", true, 1), ("Wing", false, 0) });
         tracks[1].UnknownProperties["tag"]!.GetValue<string>().ShouldBe("keep");
     }
 
@@ -49,7 +49,6 @@ public class SequenceTrackNoOffsetTests
             track!.AsObject().ContainsKey("x").ShouldBeFalse();
             track.AsObject().ContainsKey("y").ShouldBeFalse();
         }
-        written[0]!["flipHorizontal"]!.GetValue<bool>().ShouldBeTrue();
         written[1]!["tag"]!.GetValue<string>().ShouldBe("keep");
         written[1]!["visible"]!.GetValue<bool>().ShouldBeFalse();
     }

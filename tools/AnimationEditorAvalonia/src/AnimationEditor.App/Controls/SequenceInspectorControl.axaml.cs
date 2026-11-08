@@ -47,7 +47,6 @@ public partial class SequenceInspectorControl : UserControl
             document.SetLoop(_undo!, _sequence, SequenceLoopBox.IsChecked == true));
 
         TrackVisibleBox.IsCheckedChanged += (_, _) => CommitVisible();
-        TrackFlipBox.IsCheckedChanged += (_, _) => CommitFlip();
 
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
         ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
@@ -198,14 +197,12 @@ public partial class SequenceInspectorControl : UserControl
             TrackNameBox.Tag = null;
             TrackNameBox.PlaceholderText = "(multiple — same sequence)";
             TrackVisibleBox.IsChecked = state.Visible;
-            TrackFlipBox.IsChecked = state.Flip;
             return;
         }
         TrackNameBox.IsEnabled = true;
         TrackNameBox.PlaceholderText = null;
         Put(TrackNameBox, track.Name, force);
         TrackVisibleBox.IsChecked = track.Visible;
-        TrackFlipBox.IsChecked = track.FlipHorizontal;
     }
 
     private void ShowChain(SequenceChainReferenceSave reference, bool force)
@@ -362,18 +359,6 @@ public partial class SequenceInspectorControl : UserControl
             return;
         }
         Commit(document => document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
-    }
-
-    private void CommitFlip()
-    {
-        if (_refreshing) return;
-        if (BulkTracks() is { } tracks)
-        {
-            if (TrackFlipBox.IsChecked is { } flip)
-                Commit(document => document.SetTracksFlip(_undo!, _sequence, tracks, flip));
-            return;
-        }
-        Commit(document => document.SetTrackFlip(_undo!, _sequence, _track!.Value, TrackFlipBox.IsChecked == true));
     }
 
     private void CommitChainStart()

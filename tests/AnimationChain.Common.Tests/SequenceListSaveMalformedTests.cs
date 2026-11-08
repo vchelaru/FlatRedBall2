@@ -23,7 +23,7 @@ public class SequenceListSaveMalformedTests
         ("sequence", "loop", "sequences[0].loop", Kind.Bool),
         ("sequence", "tracks", "sequences[0].tracks", Kind.Array),
         ("track", "name", "sequences[0].tracks[0].name", Kind.String),
-        ("track", "flipHorizontal", "sequences[0].tracks[0].flipHorizontal", Kind.Bool),
+        ("track", "visible", "sequences[0].tracks[0].visible", Kind.Bool),
         ("track", "chains", "sequences[0].tracks[0].chains", Kind.Array),
         ("chain", "source", "sequences[0].tracks[0].chains[0].source", Kind.String),
         ("chain", "chain", "sequences[0].tracks[0].chains[0].chain", Kind.String),
@@ -147,16 +147,16 @@ public class SequenceListSaveMalformedTests
     [Fact]
     public void FromJsonString_FieldsOfTheRightKind_StillLoad()
     {
-        var loaded = SequenceListSave.FromJsonString(With("track", "flipHorizontal", "true"));
+        var loaded = SequenceListSave.FromJsonString(With("track", "visible", "false"));
 
-        loaded.Sequences[0].Tracks[0].FlipHorizontal.ShouldBeTrue();
+        loaded.Sequences[0].Tracks[0].Visible.ShouldBeFalse();
     }
 
     // A complete, valid document with one property of one object replaced by raw JSON.
     private static string With(string level, string property, string raw)
     {
         var chain = Parse("""{ "source": "a.achx", "chain": "Walk", "start": 0, "loops": 1 }""");
-        var track = Parse("""{ "name": "T", "flipHorizontal": false }""");
+        var track = Parse("""{ "name": "T", "visible": true }""");
         track["chains"] = new JsonArray((JsonNode)chain);
         var sequence = Parse("""{ "name": "S", "loop": false }""");
         sequence["tracks"] = new JsonArray((JsonNode)track);

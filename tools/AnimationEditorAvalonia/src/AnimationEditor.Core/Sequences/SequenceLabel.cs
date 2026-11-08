@@ -18,7 +18,7 @@ public static class SequenceLabel
     /// <summary><c>Rename Track 'Body' to 'Head'</c>.</summary>
     public static string Renamed(string noun, string oldName, string newName) => $"Rename {noun} '{oldName}' to '{newName}'";
 
-    /// <summary><c>Turn Flip On for 'Body'</c>; <paramref name="target"/> is a <see cref="Quoted"/> name or a <see cref="Count"/>.</summary>
+    /// <summary><c>Turn Loop On for 'Idle'</c>; <paramref name="target"/> is a <see cref="Quoted"/> name or a <see cref="Count"/>.</summary>
     public static string Toggled(string what, bool on, string target) => $"Turn {what} {(on ? "On" : "Off")} for {target}";
 
     /// <summary><c>'Body'</c>.</summary>

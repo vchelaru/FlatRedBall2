@@ -8,41 +8,22 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// One track's sprite at an instant of a sequence: the frame its active chain shows, the texture that frame resolves
-/// to through its own source, and the track's flip. A track has no offset: the sprite sits at its frame's.
+/// to through its own source. A track has no offset and no flip: the sprite sits at its frame's offset and draws with
+/// the frame's own flip flags.
 /// </summary>
 /// <param name="Track">The track's index in the sequence.</param>
 /// <param name="Chain">The active chain, from the reference's source.</param>
 /// <param name="FrameIndex">The frame shown.</param>
 /// <param name="ElapsedInFrame">Forward seconds into that frame, for keyframe sampling.</param>
 /// <param name="TexturePath">The frame's texture, resolved against its source's folder; null when it has none.</param>
-/// <param name="FlipHorizontal">Whether the track mirrors its sprite.</param>
 /// <param name="Sequence">The sequence's index in the file.</param>
 public sealed record SequenceSprite(
-    int Track, AnimationChainSave Chain, int FrameIndex, double ElapsedInFrame, string? TexturePath,
-    bool FlipHorizontal, int Sequence = 0)
+    int Track, AnimationChainSave Chain, int FrameIndex, double ElapsedInFrame, string? TexturePath, int Sequence = 0)
 {
     public AnimationFrameSave Frame => Chain.Frames[FrameIndex];
 
-    /// <summary>The frame's sampled offset, with X mirrored by the track flip, and its color.</summary>
-    public KeyframeSample Sample()
-    {
-        var sample = KeyframeSampler.Sample(Chain, FrameIndex, ElapsedInFrame);
-        return FlipHorizontal ? sample with { OffsetX = -sample.OffsetX } : sample;
-    }
-
-    /// <summary>
-    /// The 2x2 draw matrix when the track mirrors the frame (the frame's own flip with X negated), or null when the
-    /// frame's own flip flags apply unchanged.
-    /// </summary>
-    public (float a, float b, float c, float d)? FlipMatrix
-    {
-        get
-        {
-            if (!FlipHorizontal) return null;
-            var m = FlipScaleCalculator.ComputeMatrix(Frame.FlipHorizontal, Frame.FlipVertical, Frame.FlipDiagonal);
-            return (-m.a, -m.b, m.c, m.d);
-        }
-    }
+    /// <summary>The frame's sampled offset and color.</summary>
+    public KeyframeSample Sample() => KeyframeSampler.Sample(Chain, FrameIndex, ElapsedInFrame);
 }
 
 /// <summary>One selected sequence and the time its own playhead is at.</summary>
@@ -86,7 +67,7 @@ public static class SequenceScene
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, track.FlipHorizontal, sequenceIndex));
+            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, sequenceIndex));
         }
         return sprites;
     }
