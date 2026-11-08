@@ -53,7 +53,7 @@ public class ChipDragCursorScenarioTests
         chip.DragCursor.ShouldBe(ChipDragCursor.Copy);
         FloatingCardText(editor)!.ShouldContain("Add to Body");
 
-        editor.Window.MouseMove(Lane(editor, 1), RawInputModifiers.LeftMouseButton);
+        editor.Window.MouseMove(Lane(editor, TimelineViewport.NewTrackLane), RawInputModifiers.LeftMouseButton);
         FloatingCardText(editor)!.ShouldContain("Add as a new track");
 
         editor.Window.MouseMove(editor.PointIn(timeline, 300, 5), RawInputModifiers.LeftMouseButton);

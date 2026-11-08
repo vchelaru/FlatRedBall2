@@ -13,10 +13,10 @@ public enum TimelineRowKind
     /// <summary>A track's lane; <see cref="TimelineRow.Track"/> says which.</summary>
     Track,
 
-    /// <summary>The dashed row under the last lane, where a dropped chip makes a new track.</summary>
+    /// <summary>The dashed row above the first lane, where a dropped chip makes a new track in front of the others.</summary>
     NewTrack,
 
-    /// <summary>Below the new-track row.</summary>
+    /// <summary>Below the last lane.</summary>
     None,
 }
 
@@ -65,11 +65,17 @@ public sealed class TimelineViewport
 
     public double TimeAt(double x) => ScrollSeconds + (x - HeaderWidth) / PixelsPerSecond;
 
-    /// <summary>The top of row <paramref name="lane"/>, where the track count is the new-track row.</summary>
+    /// <summary>
+    /// The lane index of the new-track row, which sits right under the ruler, above lane 0: the top lane is in front, so a
+    /// new track made there lands in front. Pass it to <see cref="LaneTop"/>; <see cref="LaneHeightOf"/> gives a base lane.
+    /// </summary>
+    public const int NewTrackLane = -1;
+
+    /// <summary>The top of row <paramref name="lane"/>; <see cref="NewTrackLane"/> is the new-track row above lane 0.</summary>
     public double LaneTop(int lane) => RulerHeight + OffsetOf(lane) - ScrollY;
 
-    // Each track's own lane height (a track with events is taller), and where each lane starts below the ruler. A lane
-    // past the list, such as the new-track row, is a base lane.
+    // Each track's own lane height (a track with events is taller), and where each lane starts below the ruler's
+    // new-track row. A lane past the list is a base lane.
     private double[] _heights = Array.Empty<double>();
     private double[] _offsets = { 0 };
 
@@ -85,22 +91,27 @@ public sealed class TimelineViewport
         Changed?.Invoke();
     }
 
-    /// <summary>The height of lane <paramref name="lane"/>; the new-track row (the track count) is a base <see cref="LaneHeight"/>.</summary>
+    /// <summary>The height of lane <paramref name="lane"/>; the new-track row (<see cref="NewTrackLane"/>) is a base <see cref="LaneHeight"/>.</summary>
     public double LaneHeightOf(int lane) => lane >= 0 && lane < _heights.Length ? _heights[lane] : LaneHeight;
 
-    private double OffsetOf(int lane) =>
-        lane <= _heights.Length ? _offsets[lane] : _offsets[^1] + (lane - _heights.Length) * LaneHeight;
+    // Where lane `lane` starts below the ruler: the new-track row takes the first LaneHeight, then each track's lane.
+    private double OffsetOf(int lane)
+    {
+        if (lane < 0) return 0;
+        return LaneHeight + (lane <= _heights.Length ? _offsets[lane] : _offsets[^1] + (lane - _heights.Length) * LaneHeight);
+    }
 
-    /// <summary>The height every lane plus the new-track row needs, ruler included.</summary>
-    public double ContentHeight(int trackCount) => RulerHeight + OffsetOf(trackCount) + LaneHeight;
+    /// <summary>The height the new-track row plus every lane need, ruler included.</summary>
+    public double ContentHeight(int trackCount) => RulerHeight + OffsetOf(trackCount);
 
     public TimelineRow RowAt(double y, int trackCount)
     {
         if (y < RulerHeight) return new TimelineRow(TimelineRowKind.Ruler);
         double offset = y - RulerHeight + ScrollY;
+        if (offset < LaneHeight) return new TimelineRow(TimelineRowKind.NewTrack);
         for (int lane = 0; lane < trackCount; lane++)
             if (offset < OffsetOf(lane + 1)) return new TimelineRow(TimelineRowKind.Track, lane);
-        return offset < OffsetOf(trackCount) + LaneHeight ? new TimelineRow(TimelineRowKind.NewTrack) : new TimelineRow(TimelineRowKind.None);
+        return new TimelineRow(TimelineRowKind.None);
     }
 
     /// <summary>

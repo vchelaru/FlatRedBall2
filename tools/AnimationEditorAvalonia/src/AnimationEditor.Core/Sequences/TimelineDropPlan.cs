@@ -13,7 +13,7 @@ public enum TimelineDropKind
     /// <summary>On an existing track's lane.</summary>
     Track,
 
-    /// <summary>On the dashed row that makes a new track.</summary>
+    /// <summary>On the dashed row above the first lane that makes a new track in front.</summary>
     NewTrack,
 }
 
@@ -23,7 +23,7 @@ public enum TimelineDropKind
 /// <see cref="Start"/> from it, so the preview and the result cannot disagree.
 /// </summary>
 /// <param name="Kind">The target.</param>
-/// <param name="Row">The lane index: the track for <see cref="TimelineDropKind.Track"/>, the track count for <see cref="TimelineDropKind.NewTrack"/>.</param>
+/// <param name="Row">The lane index: the track for <see cref="TimelineDropKind.Track"/>, <see cref="TimelineViewport.NewTrackLane"/> for <see cref="TimelineDropKind.NewTrack"/>.</param>
 /// <param name="Start">The chain's start in seconds, snapped.</param>
 /// <param name="Length">The ghost's length in seconds.</param>
 /// <param name="Left">The ghost's left edge in pixels.</param>
@@ -57,7 +57,7 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
         double start = snap.Time;
         return new TimelineDropPlan(
             row.Kind == TimelineRowKind.Track ? TimelineDropKind.Track : TimelineDropKind.NewTrack,
-            row.Kind == TimelineRowKind.Track ? row.Track : trackCount,
+            row.Kind == TimelineRowKind.Track ? row.Track : TimelineViewport.NewTrackLane,
             start, length, viewport.XAt(start), length * viewport.PixelsPerSecond, snap.Target);
     }
 
@@ -70,7 +70,7 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
     public static TimelineDropPlan ForMove(TimelineViewport viewport, int trackCount, double y, double start, double length, SnapTarget? snapped = null)
     {
         if (viewport.RowAt(y, trackCount).Kind != TimelineRowKind.NewTrack) return None;
-        return new TimelineDropPlan(TimelineDropKind.NewTrack, trackCount, start, length, viewport.XAt(start),
+        return new TimelineDropPlan(TimelineDropKind.NewTrack, TimelineViewport.NewTrackLane, start, length, viewport.XAt(start),
             length * viewport.PixelsPerSecond, snapped);
     }
 }

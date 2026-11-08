@@ -33,20 +33,30 @@ public class TimelineViewportTests
     }
 
     [Fact]
-    public void RowAt_MapsRulerLanesNewTrackRowAndBelow_WithVerticalScroll()
+    public void RowAt_MapsRulerNewTrackRowLanesAndBelow_WithVerticalScroll()
     {
         var viewport = new TimelineViewport();
         double lane = TimelineViewport.LaneHeight;
-        double firstLane = TimelineViewport.RulerHeight + 1;
+        double firstRow = TimelineViewport.RulerHeight + 1;
 
         viewport.RowAt(5, trackCount: 2).ShouldBe(new TimelineRow(TimelineRowKind.Ruler));
-        viewport.RowAt(firstLane + lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
-        viewport.RowAt(firstLane + 2 * lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
-        viewport.RowAt(firstLane + 3 * lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.None));
+        viewport.RowAt(firstRow, 2).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        viewport.RowAt(firstRow + lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 0));
+        viewport.RowAt(firstRow + 2 * lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(firstRow + 3 * lane, 2).ShouldBe(new TimelineRow(TimelineRowKind.None));
 
-        // Scrolled one lane up in a view one lane tall, the first visible lane is track 1.
+        // Scrolled one lane up in a view one lane tall, the new-track row is gone and the first visible lane is track 0.
         viewport.ScrollVertically(lane, trackCount: 2, viewHeight: TimelineViewport.RulerHeight + lane);
-        viewport.RowAt(firstLane, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(firstRow, 2).ShouldBe(new TimelineRow(TimelineRowKind.Track, 0));
+    }
+
+    [Fact]
+    public void RowAt_NoTracks_TheNewTrackRowIsTheOnlyRowUnderTheRuler()
+    {
+        var viewport = new TimelineViewport();
+
+        viewport.RowAt(TimelineViewport.RulerHeight + 1, trackCount: 0).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        viewport.RowAt(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight + 1, 0).ShouldBe(new TimelineRow(TimelineRowKind.None));
     }
 
     // Lane 0 and 2 carry an event row (60 px), lane 1 does not (48 px).
@@ -58,33 +68,34 @@ public class TimelineViewportTests
     }
 
     [Fact]
-    public void LaneTop_FollowsEachTracksOwnHeight_AndTheNewTrackRowIsAFullBaseLane()
+    public void LaneTop_FollowsEachTracksOwnHeight_BelowTheNewTrackRowAtTheTop()
     {
         var viewport = MixedViewport();
         double ruler = TimelineViewport.RulerHeight;
+        double newRow = TimelineViewport.LaneHeight;
 
-        viewport.LaneTop(0).ShouldBe(ruler);
-        viewport.LaneTop(1).ShouldBe(ruler + 60);
-        viewport.LaneTop(2).ShouldBe(ruler + 108);
-        viewport.LaneTop(3).ShouldBe(ruler + 168);
+        viewport.LaneTop(0).ShouldBe(ruler + newRow);
+        viewport.LaneTop(1).ShouldBe(ruler + newRow + 60);
+        viewport.LaneTop(2).ShouldBe(ruler + newRow + 108);
+        viewport.LaneTop(3).ShouldBe(ruler + newRow + 168);
         viewport.LaneHeightOf(0).ShouldBe(60);
         viewport.LaneHeightOf(1).ShouldBe(48);
         viewport.LaneHeightOf(3).ShouldBe(TimelineViewport.LaneHeight);
-        viewport.ContentHeight(3).ShouldBe(ruler + 168 + TimelineViewport.LaneHeight);
+        viewport.ContentHeight(3).ShouldBe(ruler + newRow + 168);
     }
 
     [Fact]
     public void RowAt_AMixOfTallAndNormalLanes_PutsEachBoundaryAtItsOwnHeight()
     {
         var viewport = MixedViewport();
-        double ruler = TimelineViewport.RulerHeight;
+        double lanes = TimelineViewport.RulerHeight + TimelineViewport.LaneHeight;
 
-        viewport.RowAt(ruler + 59, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 0));
-        viewport.RowAt(ruler + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
-        viewport.RowAt(ruler + 107, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
-        viewport.RowAt(ruler + 109, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 2));
-        viewport.RowAt(ruler + 169, 3).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
-        viewport.RowAt(ruler + 168 + TimelineViewport.LaneHeight + 1, 3).ShouldBe(new TimelineRow(TimelineRowKind.None));
+        viewport.RowAt(TimelineViewport.RulerHeight + 1, 3).ShouldBe(new TimelineRow(TimelineRowKind.NewTrack));
+        viewport.RowAt(lanes + 59, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 0));
+        viewport.RowAt(lanes + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(lanes + 107, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        viewport.RowAt(lanes + 109, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 2));
+        viewport.RowAt(lanes + 169, 3).ShouldBe(new TimelineRow(TimelineRowKind.None));
     }
 
     [Fact]
@@ -128,8 +139,8 @@ public class TimelineViewportTests
 
         viewport.ScrollVertically(1_000_000, trackCount: 3, viewHeight: 100);
 
-        viewport.ScrollY.ShouldBe(TimelineViewport.RulerHeight + 168 + TimelineViewport.LaneHeight - 100);
-        viewport.LaneTop(0).ShouldBe(TimelineViewport.RulerHeight - viewport.ScrollY);
+        viewport.ScrollY.ShouldBe(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight + 168 - 100);
+        viewport.LaneTop(0).ShouldBe(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight - viewport.ScrollY);
     }
 
     [Fact]
@@ -138,8 +149,9 @@ public class TimelineViewportTests
         var viewport = new TimelineViewport();
         viewport.SetLaneHeights(new[] { 60.0 });
 
-        viewport.LaneTop(2).ShouldBe(TimelineViewport.RulerHeight + 60 + TimelineViewport.LaneHeight);
-        viewport.RowAt(TimelineViewport.RulerHeight + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
+        double lanes = TimelineViewport.RulerHeight + TimelineViewport.LaneHeight;
+        viewport.LaneTop(2).ShouldBe(lanes + 60 + TimelineViewport.LaneHeight);
+        viewport.RowAt(lanes + 61, 3).ShouldBe(new TimelineRow(TimelineRowKind.Track, 1));
     }
 
     [Fact]

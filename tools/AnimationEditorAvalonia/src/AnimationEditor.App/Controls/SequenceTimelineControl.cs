@@ -18,8 +18,8 @@ using System.Linq;
 namespace AnimationEditor.App.Controls;
 
 /// <summary>
-/// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a lane per track with its chains, and a dashed row that
-/// makes a new track. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
+/// A <c>.seqj</c> tab's timeline for one sequence: a ruler, a dashed row right under it that makes a new track (a new
+/// track lands on top, in front), and a lane per track with its chains. Drag a chain to move it in time or to another lane; drag its right edge to change its loop
 /// count; drop a library chip to add a chain; drag a track header up or down to reorder the lanes (the top lane
 /// draws in front, see <see cref="TrackReorder"/>). Each gesture is one undo entry, recorded on release. Ctrl+wheel zooms
 /// around the pointer; the wheel scrolls (Shift+wheel always sideways). Pressing or dragging on the ruler scrubs: the
@@ -156,7 +156,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>The cursor the timeline last asked for. The OS cursor itself is not observable headlessly.</summary>
     public TimelineCursor ShownCursor => _shownCursor;
 
-    /// <summary>True while the pointer is over the "+ new track" cell of the header column.</summary>
+    /// <summary>True while the pointer is over the "+ new track" cell of the header column (the top row).</summary>
     public bool IsNewTrackHot { get; private set; }
 
     /// <summary>True while a chain is being moved or resized and the change is not yet an undo entry.</summary>
@@ -494,7 +494,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         _document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start);
         var sequence = Sequence!;
-        int placed = track ?? sequence.Tracks.Count - 1;
+        int placed = track ?? 0; // a new track is the first one, in front
         SetSelection(new TimelineChainId(placed, sequence.Tracks[placed].Chains.Count - 1), null);
         Rebuild();
     }
@@ -504,7 +504,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Sequence is not null && ChipAddPlan.For(ChipAddMode.SelectedTrack, SelectedChains, SelectedTracks, _playhead).CanAdd;
 
     /// <summary>
-    /// Adds <paramref name="chip"/>'s chain at the playhead without a drag: on a new track at the end of the list, or on the
+    /// Adds <paramref name="chip"/>'s chain at the playhead without a drag: on a new track in front (the top of the list), or on the
     /// one selected track (see <see cref="ChipAddPlan"/>). The new chain is selected and scrolled into view, as a drop's is.
     /// Returns null when added, else why nothing was (no sequence in the file, or no single selected track).
     /// </summary>
@@ -602,10 +602,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             // The same document edit a chip dropped on the new-track row makes, with no chain.
             _document.AddTrack(undo, _sequenceIndex);
-            SetSelection(null, TrackCount - 1);
+            SetSelection(null, 0);
             Rebuild();
             // Name it right away: the default is selected, so typing replaces it and Escape keeps it.
-            BeginRenameTrack(TrackCount - 1);
+            BeginRenameTrack(0);
             return;
         }
 
@@ -1275,7 +1275,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
             }
-            double newTop = Viewport.LaneTop(sequence.Tracks.Count);
+            double newTop = Viewport.LaneTop(TimelineViewport.NewTrackLane);
             if (IsNewTrackHot)
             {
                 context.FillRectangle(new SolidColorBrush(AccentCoolColor(), DropRowOpacity), new Rect(0, newTop, header, TimelineViewport.LaneHeight));
@@ -1450,7 +1450,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void DrawNewTrackRow(DrawingContext context, SequenceSave sequence, Rect lanes, TimelineDropPlan drop)
     {
-        double top = Viewport.LaneTop(sequence.Tracks.Count);
+        double top = Viewport.LaneTop(TimelineViewport.NewTrackLane);
         var row = new Rect(lanes.X + 4, top + 4, Math.Max(0, lanes.Width - 8), TimelineViewport.LaneHeight - 8);
         bool target = drop.Kind == TimelineDropKind.NewTrack;
         if (target)

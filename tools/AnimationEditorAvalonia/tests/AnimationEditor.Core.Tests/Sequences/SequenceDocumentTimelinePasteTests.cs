@@ -103,9 +103,9 @@ public class SequenceDocumentTimelinePasteTests
 
         var result = destination.PasteChains(new UndoManager(), 0, content, selectedTrack: null, time: 2);
 
-        Names(destination).ShouldBe(new[] { "Head", "Body" });
-        Chains(destination, 1).ShouldBe(new[] { ("Walk", 2.0) });
-        result.Chains.ShouldBe(new[] { new TimelineChainId(1, 0) });
+        Names(destination).ShouldBe(new[] { "Body", "Head" }, "a track the paste makes lands on top, in front");
+        Chains(destination, 0).ShouldBe(new[] { ("Walk", 2.0) });
+        result.Chains.ShouldBe(new[] { new TimelineChainId(0, 0) });
     }
 
     [Fact]
