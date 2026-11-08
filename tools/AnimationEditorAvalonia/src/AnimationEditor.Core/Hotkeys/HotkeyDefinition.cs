@@ -32,6 +32,18 @@ public sealed class HotkeyDefinition
     /// </summary>
     public string DisplayText => Format(Gestures[0]);
 
+    /// <summary>
+    /// The gesture macOS shows and prefers when it differs from the first one (Redo is Cmd+Shift+Z there, Ctrl+Y
+    /// elsewhere). Must be one of <see cref="Gestures"/> so the menu never shows a shortcut that does nothing.
+    /// </summary>
+    public HotkeyGesture? MacPreferredGesture { get; init; }
+
+    /// <summary>
+    /// <see cref="DisplayText"/> for the host platform: the <see cref="MacPreferredGesture"/> on macOS, else the first gesture.
+    /// </summary>
+    public string DisplayTextFor(bool isMacOS) =>
+        Format(isMacOS && MacPreferredGesture is { } mac ? mac : Gestures[0]);
+
     private static string Format(HotkeyGesture gesture)
     {
         var parts = new List<string>(4);
