@@ -173,9 +173,8 @@ public class SequenceInlineRenameScenarioTests
 
         // The right-click item is still there.
         editor.RightClick((Control)List(editor).ContainerFromIndex(1)!);
-        editor.Dialogs.AnswerNextPrompt("Charge");
         editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Charge");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Charge" });
     }
 }

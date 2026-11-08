@@ -79,7 +79,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(List(editor).ContextMenu!).ShouldBe(new[]
         {
-            "Copy", "Cut", "Paste", "Duplicate Sequence", "-", "Rename…", "Copy Qualified Name", "-", "Delete", "-", "Add Sequence",
+            "Add Sequence", "-", "Copy", "Cut", "Paste", "Duplicate", "-", "Rename…", "Copy Qualified Name", "-", "Delete Sequence",
         });
         ItemsShowTheTreesIcons(List(editor).ContextMenu!);
     }
@@ -97,7 +97,7 @@ public class SequenceClipboardMenuScenarioTests
         var menu = List(editor).ContextMenu!;
         Headers(menu).ShouldBe(new[]
         {
-            "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences", "-", "Add Sequence",
+            "Add Sequence", "-", "Copy 2 Sequences", "Cut 2 Sequences", "Paste", "Duplicate 2 Sequences", "-", "Rename…", "Copy Qualified Name", "-", "Delete 2 Sequences",
         });
         ItemOf(menu, "Rename…").IsEnabled.ShouldBeFalse();
     }
@@ -188,7 +188,7 @@ public class SequenceClipboardMenuScenarioTests
 
         Headers(Timeline(editor).Menu).ShouldBe(new[]
         {
-            "Copy", "Cut", "Paste", "Duplicate Track", "-", "Rename Track…", "Hide Track", "-", "Delete Track",
+            "Copy", "Cut", "Paste", "Duplicate", "-", "Rename Track…", "Hide Track", "-", "Delete Track",
         });
         ItemsShowTheTreesIcons(Timeline(editor).Menu);
     }

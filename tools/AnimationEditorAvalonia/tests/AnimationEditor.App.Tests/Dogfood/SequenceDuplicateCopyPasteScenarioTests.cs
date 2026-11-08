@@ -86,7 +86,7 @@ public class SequenceDuplicateCopyPasteScenarioTests
     private static void DuplicateFromRowMenu(AnimationEditorHarness editor, int row)
     {
         editor.RightClick((Control)List(editor).ContainerFromIndex(row)!);
-        editor.PickMenuItem(List(editor).ContextMenu!, "Duplicate Sequence");
+        editor.PickMenuItem(List(editor).ContextMenu!, "Duplicate");
     }
 
     [AvaloniaFact]

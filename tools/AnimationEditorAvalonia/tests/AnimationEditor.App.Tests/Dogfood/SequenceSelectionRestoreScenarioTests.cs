@@ -121,9 +121,8 @@ public class SequenceSelectionRestoreScenarioTests
         {
             await editor.OpenAsync(session.Boss);
             editor.RightClick(List(editor).ContainerFromIndex(1)!);
-            editor.Dialogs.AnswerNextPrompt("Strike");
             editor.PickMenuItem(List(editor).ContextMenu!, "Rename…");
-            editor.Layout();
+            editor.TypeIntoOpenSequenceRename("Strike");
             ShouldShowSequence(editor, 1, "Strike");
         }
 

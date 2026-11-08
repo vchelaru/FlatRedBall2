@@ -93,7 +93,7 @@ public class SequenceTimelineDuplicateScenarioTests
         var timeline = Timeline(editor);
 
         editor.RightClickAt(Header(editor, 1));
-        editor.PickMenuItem(timeline.Menu, "Duplicate Track");
+        editor.PickMenuItem(timeline.Menu, "Duplicate");
 
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Head 2", "Tail" });
         timeline.SelectedTracks.ShouldBe(new[] { 2 });

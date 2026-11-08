@@ -312,9 +312,8 @@ public class SequencePreviewLiveScenarioTests
         Undo(editor);
         steps.Check("undo reorder");
         editor.RightClickAt(Header(editor, 1));
-        editor.Dialogs.AnswerNextPrompt("Legs");
         editor.PickMenuItem(timeline.Menu, "Rename Track…");
-        editor.Layout();
+        editor.TypeIntoOpenSequenceRename("Legs");
         steps.Check("rename a track");
         editor.RightClickAt(Header(editor, 0));
         editor.PickMenuItem(timeline.Menu, "Delete Track");

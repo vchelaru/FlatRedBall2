@@ -229,9 +229,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Raised when the user double-clicks a chain or picks Go to Definition on it.</summary>
     public event Action<SequenceChainReferenceSave>? GoToDefinitionRequested;
 
-    /// <summary>Raised when the user picks Rename on a track header, with the track index. The host prompts for the name.</summary>
-    public event Action<int>? RenameTrackRequested;
-
     /// <summary>Raised with the reason when an in-place rename is refused (an empty or taken name).</summary>
     public event Action<string>? ErrorRaised;
 
@@ -1167,7 +1164,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     TimelineMenuCommand.Copy or TimelineMenuCommand.Cut or TimelineMenuCommand.Paste => () => ClipboardCommandRequested?.Invoke(command),
                     TimelineMenuCommand.Duplicate => DuplicateSelected,
                     TimelineMenuCommand.Delete => () => DeleteSelected(),
-                    TimelineMenuCommand.RenameTrack => () => RenameTrackRequested?.Invoke(track),
+                    TimelineMenuCommand.RenameTrack => () => Dispatcher.UIThread.Post(() => BeginRenameTrack(track), DispatcherPriority.Background),
                     TimelineMenuCommand.ToggleVisibility => () => ToggleTrackVisibility(track),
                     TimelineMenuCommand.ShowAllTracks => () => _document.ShowAllTracks(_undo, _sequenceIndex),
                     TimelineMenuCommand.GoToDefinition => () => GoToDefinitionRequested?.Invoke(hitBlock!.Reference),
