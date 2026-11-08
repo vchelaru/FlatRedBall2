@@ -1,6 +1,7 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -80,7 +81,8 @@ public class SequenceTimelineMarqueePerformanceScenarioTests
         // Listeners are told on the first change and once more when the band ends, not once per touched chain: the 60 moves above
         // touch new chains on most of them.
         selectionChanged.ShouldBe(2);
-        editor.Control<SequenceInspectorControl>("SequenceInspector").MultiCountText.Text.ShouldBe("203 chains selected");
+        editor.Control<SequenceInspectorControl>("SequenceInspector").ChainPanel.IsVisible.ShouldBeTrue("the Inspector edits the whole selection");
+        editor.Control<TextBlock>("StatusCounts").Text.ShouldBe("203 chains selected");
     }
 
     [AvaloniaFact]
