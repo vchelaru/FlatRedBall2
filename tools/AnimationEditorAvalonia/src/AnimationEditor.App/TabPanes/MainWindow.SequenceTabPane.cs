@@ -564,6 +564,9 @@ public partial class MainWindow
             // A texture replaced on disk: the preview redraws its sprites from the re-decoded sheet.
             w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
             w.SequenceLibrary.FilesDropped += AddSources;
+            w.SequenceLibrary.AddSourceRequested += () => _ = AddSourcesFromPickerAsync();
+            w.SequenceLibrary.AddChipRequested += AddChip;
+            w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
@@ -969,6 +972,23 @@ public partial class MainWindow
             var errors = _document.AddSources(_window._undoManager, paths);
             if (errors.Count > 0)
                 _window.ShowErrorBanner(string.Join(" ", errors));
+        }
+
+        // Same refusals and one undo entry as a drop; a cancelled dialog changes nothing.
+        private async Task AddSourcesFromPickerAsync()
+        {
+            if (_document is not { } document) return;
+            var paths = await _window._appCommands.FileDialogService.PickOpenFilesAsync("Add Source", OpenFileFilters.SequenceSources);
+            if (paths.Count == 0 || document != _document) return;
+            AddSources(paths);
+        }
+
+        // A double-click, Enter or the chip's menu: where the chain lands is the timeline's rule; a refusal is said, never silent.
+        private void AddChip(LibraryChip chip, ChipAddMode mode)
+        {
+            if (_document is null) return;
+            if (_window.SequenceTimeline.AddChip(chip, mode) is { } refusal)
+                _window.ShowToast(refusal);
         }
 
         private void RemoveSource(string source)

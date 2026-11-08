@@ -8,6 +8,12 @@ public readonly record struct OpenFileFilter(string Description, IReadOnlyList<s
 /// <summary>File-type dropdown contents for the open dialogs.</summary>
 public static class OpenFileFilters
 {
+    /// <summary>The sequence library's "Add Source…": the animation chain files a <c>.seqj</c> can use as sources.</summary>
+    public static IReadOnlyList<OpenFileFilter> SequenceSources { get; } = new[]
+    {
+        new OpenFileFilter("Animation Chain", new[] { "*.achx", "*.achj" }),
+    };
+
     /// <summary>
     /// File &gt; Load. The first entry is the dropdown default and lists every openable format, so no
     /// format is hidden until the user switches filters; the per-format entries narrow it.
