@@ -63,7 +63,7 @@ public partial class MainWindow
     /// save work here while every achx-only command stays off. The playhead is a <see cref="SequenceClock"/> driven
     /// by a timer; each tick hands the preview the sprites <see cref="SequenceScene.At"/> finds.
     /// </summary>
-    private sealed class SequenceTabPane : ITabPane
+    private sealed partial class SequenceTabPane : ITabPane
     {
         private readonly MainWindow _window;
         private readonly Dictionary<FilePath, SequenceDocument> _documents = new();
@@ -644,6 +644,7 @@ public partial class MainWindow
             preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+            WireTrackPlacement();
             w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
@@ -1013,6 +1014,7 @@ public partial class MainWindow
             var w = _window;
             double time = _document?.Selection.Primary is { } primary ? _playback.TimeOf(primary) : 0;
             w.SequenceTimeline.Playhead = time;
+            w.SequencePreview.EditableSequence = _document is null ? -1 : SequenceIndex;
             w.SequencePreview.Composite = _document is not { } document
                 ? null
                 : SequenceScene.At(document, document.Selection.Names

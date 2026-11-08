@@ -855,6 +855,17 @@ internal sealed class AnimationEditorHarness : IDisposable
         Layout();
     }
 
+    /// <summary>Holds <paramref name="key"/> down so it repeats <paramref name="repeats"/> times, then releases it, as a held arrow key does.</summary>
+    public void HoldKey(Key key, int repeats, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        for (int repeat = 0; repeat < repeats; repeat++)
+        {
+            Window.KeyPress(key, modifiers, PhysicalKey.None, null);
+        }
+        Window.KeyRelease(key, modifiers, PhysicalKey.None, null);
+        Layout();
+    }
+
     /// <summary>Types <paramref name="text"/> into whatever has keyboard focus.</summary>
     public void Type(string text)
     {
