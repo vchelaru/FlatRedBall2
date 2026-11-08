@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Tests;
 /// <summary>
 /// Structure tests for the tree right-click menu (issue #454 follow-up):
 /// Duplicate is a single item grouped with Copy/Paste, and for chains it is a
-/// submenu (Original / Flip Horizontal / Flip Vertical) rather than three
+/// submenu (Original / Flip Horizontal / Flip Vertical / Flip Diagonal) rather than four
 /// top-level items.
 /// </summary>
 public class TreeContextMenuTests
@@ -60,7 +60,7 @@ public class TreeContextMenuTests
         items.FindIndex(o => o is MenuItem m && (string?)m.Header == header);
 
     [AvaloniaFact]
-    public void ChainMenu_DuplicateIsSubmenuWithThreeVariants()
+    public void ChainMenu_DuplicateIsSubmenuWithFourVariants()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -72,7 +72,7 @@ public class TreeContextMenuTests
             // Exactly one "Duplicate" entry (no "Duplicate (original)" etc. at top level).
             var duplicate = items.OfType<MenuItem>().Single(m => (string?)m.Header == "Duplicate");
             var children = duplicate.Items.OfType<MenuItem>().Select(m => (string?)m.Header).ToList();
-            Assert.Equal(new[] { "Original", "Flip Horizontal", "Flip Vertical" }, children);
+            Assert.Equal(new[] { "Original", "Flip Horizontal", "Flip Vertical", "Flip Diagonal" }, children);
         }
         finally { window.Close(); }
     }

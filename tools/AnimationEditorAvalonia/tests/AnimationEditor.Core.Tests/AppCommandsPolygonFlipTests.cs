@@ -157,7 +157,7 @@ public class AppCommandsPolygonFlipTests
         var (ctx, polygons) = Polygons(1);
         var actions = new TreeMenuActions(
             Copy: () => { }, Cut: () => { }, Paste: () => { }, Duplicate: () => { }, Delete: () => { },
-            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: (_, _) => { });
+            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: _ => { });
 
         var items = TreeMenuPlanBuilder.Build(
             polygons[0], ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, actions);

@@ -106,6 +106,7 @@ public static class TreeMenuPlanBuilder
                 {
                     items.Add(TreeMenuItem.Item("Flip Horizontally", () => appCommands.FlipChainHorizontally(chain2), TreeMenuIcon.FlipHorizontal));
                     items.Add(TreeMenuItem.Item("Flip Vertically", () => appCommands.FlipChainVertically(chain2), TreeMenuIcon.FlipVertical));
+                    items.Add(TreeMenuItem.Item("Flip Diagonally", () => appCommands.FlipChainDiagonally(chain2), TreeMenuIcon.FlipDiagonal));
                 }
                 if (selection is null)
                     items.Add(TreeMenuItem.Item("Invert Frame Order", () => appCommands.InvertFrameOrder(chain2), TreeMenuIcon.Reverse));
@@ -127,8 +128,9 @@ public static class TreeMenuPlanBuilder
                 else
                     items.Add(TreeMenuItem.SubMenu(CountedVerb("Duplicate", selection), TreeMenuIcon.Duplicate,
                         TreeMenuItem.Item("Original", actions.Duplicate, TreeMenuIcon.Duplicate),
-                        TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(true, false), TreeMenuIcon.FlipHorizontal),
-                        TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(false, true), TreeMenuIcon.FlipVertical)));
+                        TreeMenuItem.Item("Flip Horizontal", () => actions.DuplicateChainFlip!(ChainFlip.Horizontal), TreeMenuIcon.FlipHorizontal),
+                        TreeMenuItem.Item("Flip Vertical", () => actions.DuplicateChainFlip!(ChainFlip.Vertical), TreeMenuIcon.FlipVertical),
+                        TreeMenuItem.Item("Flip Diagonal", () => actions.DuplicateChainFlip!(ChainFlip.Diagonal), TreeMenuIcon.FlipDiagonal)));
                 items.Add(TreeMenuItem.Separator());
                 if (!isNativeTsx)
                     items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustOffsets));

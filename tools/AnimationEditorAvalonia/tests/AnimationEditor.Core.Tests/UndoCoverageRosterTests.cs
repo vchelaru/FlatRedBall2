@@ -110,6 +110,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameFlip)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainHorizontally)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainVertically)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.FlipChainDiagonally)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.InvertFrameOrder)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetAllFrameLengths)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateChain)]               = Category.MutatingUndoable,
@@ -360,6 +361,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.FlipChainHorizontally(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.FlipChainVertically),
             ctx => Sync(() => ctx.AppCommands.FlipChainVertically(Zebra(ctx))));
+        yield return Row(nameof(IAppCommands.FlipChainDiagonally),
+            ctx => Sync(() => ctx.AppCommands.FlipChainDiagonally(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.InvertFrameOrder),
             ctx => Sync(() => ctx.AppCommands.InvertFrameOrder(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.SetAllFrameLengths),

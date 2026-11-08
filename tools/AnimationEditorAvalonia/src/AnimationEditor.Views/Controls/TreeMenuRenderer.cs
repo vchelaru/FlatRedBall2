@@ -59,6 +59,7 @@ public static class TreeMenuRenderer
         TreeMenuIcon.Sort           => "IconSortAZ",
         TreeMenuIcon.FlipHorizontal => "IconFlipH",
         TreeMenuIcon.FlipVertical   => "IconFlipV",
+        TreeMenuIcon.FlipDiagonal   => "IconFlipD",
         TreeMenuIcon.Reverse        => "IconReverse",
         TreeMenuIcon.FrameTime      => "IconTimer",
         TreeMenuIcon.Offsets        => "IconMove",

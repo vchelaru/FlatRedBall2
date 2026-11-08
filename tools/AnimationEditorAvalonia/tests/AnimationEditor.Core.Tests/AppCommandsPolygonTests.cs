@@ -206,7 +206,7 @@ public class AppCommandsPolygonTests
         var polygon = AddPolygon(ctx, frame);
         var actions = new TreeMenuActions(
             Copy: () => { }, Cut: () => { }, Paste: () => { }, Duplicate: () => { }, Delete: () => { },
-            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: (_, _) => { });
+            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: _ => { });
 
         var frameItems = TreeMenuPlanBuilder.Build(
             frame, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, actions);

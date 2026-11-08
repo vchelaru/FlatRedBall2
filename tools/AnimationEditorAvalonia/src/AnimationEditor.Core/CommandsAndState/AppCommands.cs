@@ -1683,6 +1683,14 @@ namespace AnimationEditor.Core.CommandsAndState
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
         }
 
+        public void FlipChainDiagonally(AnimationChainSave chain)
+        {
+            if (IsChainLocked(chain) || IsAchxOnlyEditBlocked()) return;
+            _undoManager.Execute(new FlipCommand(
+                chain.Frames.ToArray(), FlipAxis.Diagonal, this, _events,
+                () => { RefreshTreeNode(chain); RefreshWireframe(); }));
+        }
+
         public void InvertFrameOrder(AnimationChainSave chain)
         {
             if (IsChainLocked(chain)) return;
@@ -1705,11 +1713,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public AnimationChainSave? DuplicateChain(
             AnimationChainSave source,
-            bool   flipH    = false,
-            bool   flipV    = false,
+            ChainFlip flip  = ChainFlip.None,
             string? newName = null)
         {
-            var copies = DuplicateChains(new[] { source }, flipH, flipV);
+            var copies = DuplicateChains(new[] { source }, flip);
             if (copies.Count == 0) return null;
 
             var copy = copies[0];
@@ -1717,26 +1724,18 @@ namespace AnimationEditor.Core.CommandsAndState
             return copy;
         }
 
-        // Clones a chain and, when requested, mirrors every frame and shape horizontally
-        // and/or vertically. Shared by DuplicateChain (single) and DuplicateChains (batch)
-        // so right-click Duplicate's Original/Flip Horizontal/Flip Vertical submenu items
-        // behave identically whether one or many chains are selected.
-        private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, bool flipH, bool flipV)
+        // Clones a chain and, when requested, flips every frame and shape along the given axes
+        // through FlipCommand.FlipFrame, the same code an in-place flip runs. Shared by
+        // DuplicateChain (single) and DuplicateChains (batch) so right-click Duplicate's
+        // Original/Flip submenu items behave identically whether one or many chains are selected.
+        private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, ChainFlip flip)
         {
             var copy = AnimationCloneHelper.CloneChain(source);
-            for (int i = 0; i < copy.Frames.Count; i++)
+            foreach (var frame in copy.Frames)
             {
-                var frame = source.Frames[i];
-                var fCopy = copy.Frames[i];
-                fCopy.FlipHorizontal = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal;
-                fCopy.FlipVertical   = flipV ? !frame.FlipVertical   : frame.FlipVertical;
-                // Mirror the sprite offset about the entity origin so an off-center frame stays
-                // aligned with its (also-mirrored) shapes after the flip.
-                fCopy.RelativeX = flipH ? -frame.RelativeX : frame.RelativeX;
-                fCopy.RelativeY = flipV ? -frame.RelativeY : frame.RelativeY;
-                if (fCopy.ShapesSave is not null)
-                    foreach (var shape in fCopy.ShapesSave.Shapes)
-                        ShapeFlip.Mirror(shape, flipH, flipV);
+                if (flip.HasFlag(ChainFlip.Horizontal)) FlipCommand.FlipFrame(frame, FlipAxis.Horizontal);
+                if (flip.HasFlag(ChainFlip.Vertical))   FlipCommand.FlipFrame(frame, FlipAxis.Vertical);
+                if (flip.HasFlag(ChainFlip.Diagonal))   FlipCommand.FlipFrame(frame, FlipAxis.Diagonal);
             }
             return copy;
         }
@@ -1794,12 +1793,12 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc cref="IAppCommands.DuplicateChains"/>
         public IReadOnlyList<AnimationChainSave> DuplicateChains(
-            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false)
+            IReadOnlyList<AnimationChainSave> sources, ChainFlip flip = ChainFlip.None)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null || sources.Count == 0) return Array.Empty<AnimationChainSave>();
             if (IsAchxOnlyEditBlocked())
-                flipH = flipV = false;
+                flip = ChainFlip.None;
 
             var ordered = sources
                 .OrderBy(c => acls.AnimationChains.IndexOf(c))
@@ -1808,8 +1807,8 @@ namespace AnimationEditor.Core.CommandsAndState
             var items = new List<(AnimationChainSave Source, AnimationChainSave Copy)>();
             foreach (var source in ordered)
             {
-                var copy = CloneChainWithFlip(source, flipH, flipV);
-                var invertedName = InvertDirectionTokens(source.Name, flipH, flipV);
+                var copy = CloneChainWithFlip(source, flip);
+                var invertedName = InvertDirectionTokens(source.Name, flip.HasFlag(ChainFlip.Horizontal), flip.HasFlag(ChainFlip.Vertical));
                 // Duplicates increment the trailing number (Walk -> Walk2, Walk2 -> Walk3, Id0 -> Id1)
                 // so repeated duplicates never stack a suffix. Only an unnumbered name skips 1.
                 bool numbered = invertedName.Length > 0 && char.IsDigit(invertedName[^1]);
