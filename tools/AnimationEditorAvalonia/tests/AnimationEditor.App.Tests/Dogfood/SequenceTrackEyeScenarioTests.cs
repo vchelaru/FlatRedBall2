@@ -180,6 +180,92 @@ public class SequenceTrackEyeScenarioTests
         ShownTracks(editor).ShouldBe(new[] { 2 });
     }
 
+    private static void SelectHeaders(AnimationEditorHarness editor, params int[] lanes)
+    {
+        editor.ClickAt(OnName(editor, lanes[0]));
+        foreach (int lane in lanes.Skip(1)) editor.ClickAt(OnName(editor, lane), RawInputModifiers.Control);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickingTheEyeOfASelectedHeader_HidesEverySelectedTrack_InOneUndoEntry()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        SelectHeaders(editor, 0, 1, 2);
+
+        editor.ClickAt(OnEye(editor, 1));
+
+        ShownTracks(editor).ShouldBeEmpty();
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks" });
+        Timeline(editor).SelectedTracks.ShouldBe(new[] { 0, 1, 2 });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
+        editor.UndoLabels.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task ClickingTheEyeOfAHeaderOutsideTheSelection_HidesOnlyThatTrack()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        SelectHeaders(editor, 0, 1);
+
+        editor.ClickAt(OnEye(editor, 2));
+
+        ShownTracks(editor).ShouldBe(new[] { 0, 1 });
+        editor.UndoLabels.ShouldBe(new[] { "Hide Track 'Sun'" });
+    }
+
+    [AvaloniaFact]
+    public async Task ASelectionOfMixedVisibility_HidesAll_WhileAnyIsVisible_ThenShowsAll()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor, "Moon"));
+        SelectHeaders(editor, 0, 1, 2);
+
+        editor.ClickAt(OnEye(editor, 0));
+        ShownTracks(editor).ShouldBeEmpty();
+        editor.ClickAt(OnEye(editor, 2));
+
+        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks", "Show 3 tracks" });
+    }
+
+    [AvaloniaFact]
+    public async Task HeaderMenuOnASelection_CountsTheTracks_AndHidesOrShowsThemAllTogether()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+        SelectHeaders(editor, 0, 1, 2);
+
+        editor.RightClickAt(OnName(editor, 1));
+        Menu(timeline).ShouldContain("Hide 3 Tracks");
+        editor.PickMenuItem(timeline.Menu, "Hide 3 Tracks");
+
+        ShownTracks(editor).ShouldBeEmpty();
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 tracks" });
+        editor.RightClickAt(OnName(editor, 1));
+        Menu(timeline).ShouldContain("Show 3 Tracks");
+        editor.PickMenuItem(timeline.Menu, "Show 3 Tracks");
+        ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
+    }
+
+    [AvaloniaFact]
+    public async Task HeaderMenuOnAHeaderOutsideTheSelection_StaysSingular_AndActsOnThatTrack()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+        SelectHeaders(editor, 0, 1);
+
+        editor.RightClickAt(OnName(editor, 2));
+        Menu(timeline).ShouldContain("Hide Track");
+        editor.PickMenuItem(timeline.Menu, "Hide Track");
+
+        ShownTracks(editor).ShouldBe(new[] { 0, 1 });
+    }
+
     [AvaloniaFact]
     public async Task AllTracksHidden_PreviewsEmpty_WithoutErrors_AndTheSequenceKeepsItsLength()
     {
