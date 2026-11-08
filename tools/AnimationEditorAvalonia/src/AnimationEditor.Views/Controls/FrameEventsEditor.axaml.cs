@@ -83,6 +83,7 @@ public partial class FrameEventsEditor : UserControl
     {
         var name = new TextBox { PlaceholderText = "Name", FontSize = 11, MinWidth = 60 };
         var data = new TextBox { PlaceholderText = "Data (optional)", FontSize = 11, MinWidth = 60, Margin = new(4, 0, 0, 0) };
+        EditorTextPaste.SetAllowEditorJson(data, true); // free text, and may legitimately hold JSON
         var remove = new Button
         {
             Content = "×", FontSize = 12, Width = 22, Height = 22, Padding = new(0),
