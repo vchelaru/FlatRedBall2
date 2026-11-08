@@ -46,7 +46,7 @@ public class SequenceTimelineDuplicateScenarioTests
         Chains(boss, 0).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0), ("Run", 2.0), ("Walk", 0.7) });
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5), ("Run", 1.2) });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 3), new TimelineChainId(1, 2) });
-        editor.UndoLabels.ShouldBe(new[] { "Duplicate 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Duplicate 2 Chains" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         Chains(boss, 0).Length.ShouldBe(3);
         Chains(boss, 1).Length.ShouldBe(2);
@@ -66,7 +66,7 @@ public class SequenceTimelineDuplicateScenarioTests
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
         Chains(boss, 3).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5) });
         timeline.SelectedTracks.ShouldBe(new[] { 2, 3 });
-        editor.UndoLabels.ShouldBe(new[] { "Duplicate 2 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Duplicate 2 Tracks" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(3);
     }

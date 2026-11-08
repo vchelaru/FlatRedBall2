@@ -93,7 +93,7 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         Chains(boss, 2).ShouldBe(new[] { ("Walk", 2.0), ("Walk", 3.0) });
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(2, 0), new TimelineChainId(2, 1) });
-        editor.UndoLabels.ShouldBe(new[] { "Paste 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Paste 2 Chains" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         Chains(boss, 2).ShouldBeEmpty();
     }
@@ -133,7 +133,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5), ("Walk", 1.5), ("Run", 2.5), ("Walk", 3.5) });
         Chains(boss, 2).ShouldBeEmpty();
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 3), new TimelineChainId(1, 2), new TimelineChainId(1, 3) });
-        editor.UndoLabels.ShouldBe(new[] { "Paste 3 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Paste 3 Chains" });
     }
 
     [AvaloniaFact]
@@ -181,7 +181,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         saved.Sources.ShouldBe(new[] { "../hero.achx" });
         saved.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Lane" });
         saved.Sequences[0].Tracks[0].Chains.Select(c => (c.Source, c.Start)).ShouldBe(new[] { ("../hero.achx", 0.0), ("../hero.achx", 1.0) });
-        editor.UndoLabels.ShouldBe(new[] { "Paste 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Paste 2 Chains" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(other).Sources.ShouldBeEmpty();
     }
@@ -204,7 +204,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Body 2", "Head 2", "Tail" });
         Chains(boss, 2).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.0), ("Run", 2.0) });
         timeline.SelectedTracks.ShouldBe(new[] { 2, 3 });
-        editor.UndoLabels.ShouldBe(new[] { "Paste 2 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Paste 2 Tracks" });
     }
 
     [AvaloniaFact]
@@ -220,7 +220,7 @@ public class SequenceTimelineCopyPasteScenarioTests
         JsonNode.Parse((await ClipboardAsync(editor))!)!["chains"]!.AsArray().Count.ShouldBe(2);
         Chains(boss, 0).ShouldBe(new[] { ("Walk", 1.0), ("Run", 2.0) });
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5) });
-        editor.UndoLabels.ShouldBe(new[] { "Remove 2 chains" });
+        editor.UndoLabels.ShouldBe(new[] { "Remove 2 Chains" });
     }
 
     [AvaloniaFact]

@@ -40,7 +40,7 @@ public class SequenceDocumentMultiDeleteTests
         document.DeleteChains(undo, 0, new[] { new TimelineChainId(0, 3), new TimelineChainId(0, 0), new TimelineChainId(1, 1) });
 
         document.Save.Sequences[0].Tracks.Select(t => string.Concat(t.Chains.Select(c => c.Chain))).ShouldBe(new[] { "BC", "E" });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Remove 3 chains" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Remove 3 Chains" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Select(t => string.Concat(t.Chains.Select(c => c.Chain))).ShouldBe(new[] { "ABCD", "EF" });
         undo.Redo();
@@ -69,7 +69,7 @@ public class SequenceDocumentMultiDeleteTests
         document.DeleteTracks(undo, 0, new[] { 2, 0 });
 
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Head" });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Delete 2 tracks" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Delete 2 Tracks" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Tail" });
     }

@@ -73,7 +73,7 @@ public class SequenceDocumentTimelinePasteTests
         Chains(document, 1).ShouldBe(new[] { ("Idle", 0.0), ("Walk", 10.0), ("Run", 12.0) });
         result.Chains.ShouldBe(new[] { new TimelineChainId(1, 1), new TimelineChainId(1, 2) });
         result.Errors.ShouldBeEmpty();
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 chains" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 Chains" });
         undo.Undo();
         Chains(document, 1).ShouldBe(new[] { ("Idle", 0.0) });
         undo.Redo();
@@ -160,7 +160,7 @@ public class SequenceDocumentTimelinePasteTests
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.5, 2f, "hero.achx"), ("Run", 2.0, 1f, "hero.achx") });
         result.Tracks.ShouldBe(new[] { 2, 3 });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 tracks" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 Tracks" });
         undo.Undo();
         Names(document).ShouldBe(new[] { "Body", "Head", "Tail" });
     }

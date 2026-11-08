@@ -76,7 +76,7 @@ public class SequenceDocumentBulkEditTests
         document.SetTracksFlip(undo, 0, AllTracks, true);
 
         Saved(document).Tracks.Select(t => (t.Visible, t.FlipHorizontal)).ShouldBe(new[] { (true, true), (true, true), (true, true) });
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Show 3 tracks", "Turn Flip On for 3 tracks" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Show 3 Tracks", "Turn Flip On for 3 tracks" });
         undo.Undo();
         Saved(document).Tracks.Select(t => t.FlipHorizontal).ShouldBe(new[] { false, false, true });
         undo.Undo();
@@ -97,7 +97,7 @@ public class SequenceDocumentBulkEditTests
         document.SetChainsStart(undo, 0, AllChains, plusOne).ShouldBeNull();
         Saved(document).Tracks.Select(t => t.Chains[0].Start).ShouldBe(new[] { 5d, 5d, 5d });
 
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Start of 3 chains to 4", "Set Start of 3 chains" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Start of 3 Chains to 4", "Set Start of 3 chains" });
         undo.Undo();
         undo.Undo();
         Saved(document).Tracks.Select(t => t.Chains[0].Start).ShouldBe(new[] { 0.5d, 1d, 2d });
@@ -112,7 +112,7 @@ public class SequenceDocumentBulkEditTests
 
         document.SetChainsLoops(undo, 0, AllChains, 3m).ShouldBeNull();
         Saved(document).Tracks.Select(t => t.Chains[0].Loops).ShouldBe(new[] { 3f, 3f, 3f });
-        undo.UndoHistory.Single().Description.ShouldBe("Set Cycles of 3 chains to 3");
+        undo.UndoHistory.Single().Description.ShouldBe("Set Cycles of 3 Chains to 3");
         undo.SealCoalescing();
 
         NumericEdit.TryParse("- 3", out var minusThree).ShouldBeTrue();

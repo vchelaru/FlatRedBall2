@@ -1037,23 +1037,19 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         string description;
         if (kind == DragKind.Edge)
         {
-            description = $"Set Cycles of '{dragged.Chain}' to {dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
+            description = $"Set Cycles of '{dragged.Chain}' to{dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
         }
         else if (toNewTrack)
         {
             // Released on the new-track row: the chains are already at their new times; now they leave for new tracks.
             var created = TimelineNewTrackMove.Apply(sequence, items.Select(item => item.Reference).ToList());
             SelectDragged(sequence, items, dragged);
-            description = movedCount > 1
-                ? $"Move {Plural.Format(movedCount, "chain")} to {(created.Count == 1 ? $"new track '{sequence.Tracks[created[0]].Name}'" : Plural.Format(created.Count, "new track"))}"
-                : $"Move '{dragged.Chain}' to new track '{sequence.Tracks[created[0]].Name}'";
+            description = SequenceLabel.MoveChainsToNewTracks(movedCount, dragged.Chain, created.Select(index => sequence.Tracks[index].Name).ToList());
         }
         else
         {
             var track = sequence.Tracks.First(t => t.Chains.Contains(dragged));
-            description = movedCount > 1 ? $"Move {Plural.Format(movedCount, "chain")}"
-                : sequence.Tracks.IndexOf(track) == originTrack ? $"Move '{dragged.Chain}'"
-                : $"Move '{dragged.Chain}' to '{track.Name}'";
+            description = SequenceLabel.MoveChains(movedCount, dragged.Chain, sequence.Tracks.IndexOf(track) == originTrack ? null : track.Name);
         }
         _document.CommitGesture(_undo, description, before);
     }
