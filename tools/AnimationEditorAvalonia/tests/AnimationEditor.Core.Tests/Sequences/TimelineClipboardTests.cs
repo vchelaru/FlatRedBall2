@@ -152,7 +152,8 @@ public class TimelineClipboardTests
         var tracks = json["sourceTracks"]!.AsArray();
         tracks.Select(t => (t!["name"]!.GetValue<string>(), t["lane"]!.GetValue<int>())).ShouldBe(new[] { ("Ship", 0), ("Booster", 2) });
         var ship = tracks[0]!;
-        (ship["x"]!.GetValue<float>(), ship["y"]!.GetValue<float>()).ShouldBe((3f, -2f));
+        ship.AsObject().ContainsKey("x").ShouldBeFalse("a copied track carries no offset");
+        ship.AsObject().ContainsKey("y").ShouldBeFalse("a copied track carries no offset");
         ship.AsObject().ContainsKey("z").ShouldBeFalse("a copied track carries no Z");
         ship["flipHorizontal"]!.GetValue<bool>().ShouldBeTrue();
         ship["visible"]!.GetValue<bool>().ShouldBeFalse();
