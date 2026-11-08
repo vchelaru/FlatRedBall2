@@ -316,9 +316,12 @@ public class SequenceTrackDragScenarioTests
     public async Task ArrowKeys_OnATrackSelectedOnTheTimeline_NudgeAllSelectedTracks()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        var (path, _) = await OpenAsync(editor);
+        var (path, preview) = await OpenAsync(editor);
         editor.ClickAt(OnHeader(editor, 0));
         editor.ClickAt(OnHeader(editor, 1), RawInputModifiers.Control);
+        // Left and Right on the timeline step the playhead now, so the nudge is taken from the preview's focus.
+        preview.Focus();
+        editor.Layout();
 
         editor.Press(Key.Right);
 
