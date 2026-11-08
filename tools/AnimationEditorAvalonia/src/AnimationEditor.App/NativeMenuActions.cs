@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Avalonia.Input;
 
 namespace AnimationEditor.App;
 
@@ -25,6 +26,13 @@ internal sealed record NativeMenuActions(
     Action ReloadFromDisk,
     Action ToggleHotReload,
     Action ResizeTexture,
+    Action NavBack,
+    Action NavForward,
+    Func<bool> CanGoBack,
+    Func<bool> CanGoForward,
+    Action<Action> SubscribeNavigationChanged,
+    KeyGesture NavBackGesture,
+    KeyGesture NavForwardGesture,
     Action ShowHistory,
     Action ViewLog,
     Action About);
