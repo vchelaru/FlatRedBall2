@@ -857,14 +857,13 @@
                             <DataTemplate x:DataType="appModels:SequenceListItem">
                                 <!-- Double-click swaps the name for the same inline box the ANIMATIONS tree uses. -->
                                 <!-- The summary is the ANIMATIONS rows' meta text (11 px AccentCool, right-aligned, not trimmed); the name ellipsizes instead. -->
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Panel>
-                                        <TextBlock Text="{Binding Name}"
-                                                   IsVisible="{Binding !IsEditing}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <viewsControls:InlineRenameBox IsVisible="{Binding IsEditing}" />
-                                    </Panel>
-                                    <TextBlock Grid.Column="1"
+                                <!-- While editing, the box spans the row (the summary hides), so a double-click anywhere on the row keeps the box focused. -->
+                                <Grid ColumnDefinitions="*,Auto" Background="Transparent">
+                                    <TextBlock Text="{Binding Name}"
+                                               IsVisible="{Binding !IsEditing}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <viewsControls:InlineRenameBox Grid.ColumnSpan="2" IsVisible="{Binding IsEditing}" />
+                                    <TextBlock Grid.Column="1" IsVisible="{Binding !IsEditing}"
                                                Text="{Binding Summary}"
                                                Margin="8,0,0,0"
                                                Foreground="{DynamicResource AccentCool}"
