@@ -138,7 +138,7 @@ public class SequenceDocumentTimelineTests
 
         (first, second).ShouldBe(("Track 2", "Track 3"));
         var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
-        tracks.Select(t => (t.Name, t.Z, t.Chains.Count)).ShouldBe(new[] { ("Track", 0, 0), ("Track 2", 1, 0), ("Track 3", 2, 0) });
+        tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Track", 0), ("Track 2", 0), ("Track 3", 0) });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Track 'Track 2'", "Add Track 'Track 3'" });
         SequenceTimeline.Length(document.Save.Sequences[0], _ => 1).ShouldBe(0);
         undo.Undo();

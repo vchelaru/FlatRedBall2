@@ -392,7 +392,7 @@ public sealed class SequenceDocument
     /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
     /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
     /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made at the end
-    /// with the copied track's offset, flip, z and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
     /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
     /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
     /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
@@ -405,7 +405,7 @@ public sealed class SequenceDocument
         bool legacy = content.SourceTracks.Count == 0;
         // An envelope with no track information is one track, the first chain's; every chain is on it.
         var sourceTracks = legacy
-            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, 0, 0, 0, false, true) }
+            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, 0, 0, false, true) }
             : content.SourceTracks;
         int ChainTrack(int chain) => legacy ? 0 : content.ChainTracks[chain];
 
@@ -450,7 +450,6 @@ public sealed class SequenceDocument
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
                     X = source.X,
                     Y = source.Y,
-                    Z = legacy ? destination.Count : source.Z,
                     FlipHorizontal = source.FlipHorizontal,
                     Visible = source.Visible,
                 });
@@ -684,7 +683,7 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name, Z = tracks.Count, Chains = { reference } });
+            tracks.Add(new SequenceTrackSave { Name = name, Chains = { reference } });
         });
     }
 
@@ -698,7 +697,7 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name, Z = tracks.Count });
+            tracks.Add(new SequenceTrackSave { Name = name });
         });
         return name;
     }
@@ -800,22 +799,22 @@ public sealed class SequenceDocument
 
     /// <summary>
     /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
-    /// (0 above the first lane, the track count below the last) as one undo entry, renumbering Z as
-    /// <see cref="TrackReorder"/> describes. Returns the track's new index, or null when the drop changes nothing.
+    /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the bottom
+    /// lane is in front), so nothing but the list order changes. Returns the track's new index, or null when the drop
+    /// changes nothing.
     /// </summary>
     public int? MoveTrack(IUndoManager undo, int sequence, int from, int slot)
     {
         var tracks = Save.Sequences[sequence].Tracks;
-        if (TrackReorder.Plan(tracks.Select(t => t.Z).ToList(), from, slot) is not { } plan) return null;
+        if (TrackReorder.TargetLane(from, slot) is not { } to) return null;
         Edit(undo, $"Move Track '{tracks[from].Name}'", save =>
         {
             var target = save.Sequences[sequence].Tracks;
-            var moved = plan.Order.Select(old => target[old]).ToList();
-            for (int lane = 0; lane < moved.Count; lane++) moved[lane].Z = plan.Z[lane];
-            target.Clear();
-            target.AddRange(moved);
-        }, trackBefore: from, trackAfter: plan.To);
-        return plan.To;
+            var moved = target[from];
+            target.RemoveAt(from);
+            target.Insert(to, moved);
+        }, trackBefore: from, trackAfter: to);
+        return to;
     }
 
     /// <summary>
@@ -828,10 +827,6 @@ public sealed class SequenceDocument
         _trackToSelect = null;
         return track;
     }
-
-    public void SetTrackZ(IUndoManager undo, int sequence, int track, int z) =>
-        Edit(undo, $"Set Z of '{Save.Sequences[sequence].Tracks[track].Name}' to {z}",
-            save => save.Sequences[sequence].Tracks[track].Z = z);
 
     /// <summary>Moves a chain to <paramref name="start"/> seconds. Returns why it was refused (negative or not a number), or null.</summary>
     public string? SetChainStart(IUndoManager undo, int sequence, int track, int chain, double start)

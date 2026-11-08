@@ -36,7 +36,7 @@ public class SequenceTrackVisibleTests
         var track = JsonNode.Parse(SaveWith(visible: false).ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject();
 
         track["visible"]!.GetValue<bool>().ShouldBeFalse();
-        track.Select(p => p.Key).ShouldBe(new[] { "name", "x", "y", "z", "visible", "chains" });
+        track.Select(p => p.Key).ShouldBe(new[] { "name", "x", "y", "visible", "chains" });
     }
 
     [Fact]
@@ -70,7 +70,6 @@ public class SequenceTrackVisibleTests
                       "name": "Body",
                       "x": 0,
                       "y": 0,
-                      "z": 0,
                       "chains": []
                     }
                   ]

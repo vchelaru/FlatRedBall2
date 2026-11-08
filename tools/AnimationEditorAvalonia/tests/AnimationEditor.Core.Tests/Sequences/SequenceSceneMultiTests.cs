@@ -11,14 +11,14 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceSceneMultiTests
 {
     // hero.achj: Walk, two 0.25 s frames (0.5 s). fx.achj: Spark, two 0.5 s frames (1 s).
-    // Sequence 0 "Attack": Walk on a track at Z 0, x 10. Sequence 1 "Aura": Spark on a track at Z 5, x -10.
+    // Sequence 0 "Attack": Walk on a track at x 10. Sequence 1 "Aura": Spark on a track at x -10.
     private static SequenceDocument Load(TestHelpers.TempDir dir)
     {
         WriteSource(Path.Combine(dir.Path, "hero.achj"), "Walk", 0.25f, 0.25f);
         WriteSource(Path.Combine(dir.Path, "fx.achj"), "Spark", 0.5f, 0.5f);
         var save = new SequenceListSave { Sources = { "hero.achj", "fx.achj" } };
-        save.Sequences.Add(Sequence("Attack", loop: true, Track("Body", z: 0, x: 10, "hero.achj", "Walk")));
-        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", z: 5, x: -10, "fx.achj", "Spark")));
+        save.Sequences.Add(Sequence("Attack", loop: true, Track("Body", x: 10, "hero.achj", "Walk")));
+        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", x: -10, "fx.achj", "Spark")));
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
         return SequenceDocument.Load(path);
@@ -41,9 +41,9 @@ public class SequenceSceneMultiTests
         return sequence;
     }
 
-    private static SequenceTrackSave Track(string name, int z, float x, string source, string chain)
+    private static SequenceTrackSave Track(string name, float x, string source, string chain)
     {
-        var track = new SequenceTrackSave { Name = name, Z = z, X = x };
+        var track = new SequenceTrackSave { Name = name, X = x };
         track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = 0, Loops = 1 });
         return track;
     }
@@ -61,12 +61,12 @@ public class SequenceSceneMultiTests
     }
 
     [Fact]
-    public void Sequences_DrawInTheGivenOrder_FirstAtTheBack_RegardlessOfTrackZ()
+    public void Sequences_DrawInTheGivenOrder_FirstAtTheBack()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
 
-        // Aura's track has the higher Z, but Z only orders sprites inside one sequence.
+        // Selection order alone decides it, not the sequences' positions in the file.
         var auraFirst = SequenceScene.At(document, new[] { new SequenceTime(1, 0), new SequenceTime(0, 0) });
         var attackFirst = SequenceScene.At(document, new[] { new SequenceTime(0, 0), new SequenceTime(1, 0) });
 

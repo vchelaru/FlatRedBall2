@@ -56,14 +56,14 @@ public static class SequenceScene
 {
     /// <summary>
     /// The sprites of several sequences playing side by side, each sampled at its own time (see <see cref="At(SequenceDocument, int, double)"/>).
-    /// Sequences are drawn in the order given, first at the back; within one, by track Z. All share the entity origin.
+    /// Sequences are drawn in the order given, first at the back; within one, in track order. All share the entity origin.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, IEnumerable<SequenceTime> sequences) =>
         sequences.SelectMany(s => At(document, s.Sequence, s.Time)).ToList();
 
     /// <summary>
     /// The sprite of every track with a chain playing at <paramref name="time"/> in sequence
-    /// <paramref name="sequenceIndex"/>, back to front: by Z, equal Z in track order. A track with no chain playing, or
+    /// <paramref name="sequenceIndex"/>, back to front in track order, so the last track (the bottom lane) is in front. A track with no chain playing, or
     /// whose chain is missing or empty, is left out (its sprite is hidden). A track is hidden before its first chain and
     /// after its last one on purpose: this is how a sprite appears or disappears partway through a sequence. A track whose
     /// <see cref="SequenceTrackSave.Visible"/> is false is left out too, shapes included; the sequence's length and
@@ -73,7 +73,7 @@ public static class SequenceScene
     {
         if (sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count) return [];
         var tracks = document.Save.Sequences[sequenceIndex].Tracks;
-        var sprites = new List<(int Z, SequenceSprite Sprite)>();
+        var sprites = new List<SequenceSprite>();
         for (int t = 0; t < tracks.Count; t++)
         {
             var track = tracks[t];
@@ -85,9 +85,8 @@ public static class SequenceScene
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add((track.Z, new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal, sequenceIndex)));
+            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal, sequenceIndex));
         }
-        // OrderBy is stable, so equal Z keeps track order.
-        return sprites.OrderBy(s => s.Z).Select(s => s.Sprite).ToList();
+        return sprites;
     }
 }

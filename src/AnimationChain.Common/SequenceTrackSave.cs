@@ -3,8 +3,9 @@ using System.Text.Json.Nodes;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// One sprite's lane in a <see cref="SequenceSave"/>. Its offset, flip and draw order hold for the whole sequence.
-/// Outside every chain on the track, the sprite is hidden.
+/// One sprite's lane in a <see cref="SequenceSave"/>. Its offset and flip hold for the whole sequence. Outside every
+/// chain on the track, the sprite is hidden. A track has no depth value: the tracks of a sequence draw in list order, the
+/// first at the back and the last in front (the editor shows them as lanes, the top lane at the back).
 /// </summary>
 public class SequenceTrackSave
 {
@@ -26,13 +27,6 @@ public class SequenceTrackSave
     /// without hidden tracks stays unchanged.
     /// </summary>
     public bool Visible { get; set; } = true;
-
-    /// <summary>
-    /// Draw order: higher draws on top. Equal values draw in track order, a later track on top. The editor lists tracks
-    /// in file order, top lane first, so the bottom lane is in front; dragging a lane header rewrites the list order and
-    /// moves this value only as far as keeping that true takes.
-    /// </summary>
-    public int Z { get; set; }
 
     /// <summary>
     /// Chain references in any order. Playback orders them by <see cref="SequenceChainReferenceSave.Start"/>, and list

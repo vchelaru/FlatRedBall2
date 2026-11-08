@@ -288,12 +288,10 @@ public class SequencePreviewLiveScenarioTests
         steps.Check("track Y");
         editor.Click(inspector.TrackFlipBox);
         steps.Check("track flip");
-        TypeInto(editor, inspector.TrackZField, "9");
-        steps.Check("track Z");
         Undo(editor);
-        steps.Check("undo Z");
+        steps.Check("undo flip");
         Redo(editor);
-        steps.Check("redo Z");
+        steps.Check("redo flip");
 
         editor.ClickAt(At(editor, 0, 0.1));
         TypeInto(editor, inspector.ChainStartField, "0.3");

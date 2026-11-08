@@ -12,7 +12,7 @@ namespace AnimationEditorCommon.Tests;
 /// </summary>
 public class SequenceListSaveMalformedTests
 {
-    private enum Kind { String, Number, WholeNumber, Bool, Array }
+    private enum Kind { String, Number, Bool, Array }
 
     // Every typed field at every level: where it lives, its name, the path the message must carry, and what it holds.
     private static readonly (string Level, string Property, string Path, Kind Kind)[] Fields =
@@ -25,7 +25,6 @@ public class SequenceListSaveMalformedTests
         ("track", "name", "sequences[0].tracks[0].name", Kind.String),
         ("track", "x", "sequences[0].tracks[0].x", Kind.Number),
         ("track", "y", "sequences[0].tracks[0].y", Kind.Number),
-        ("track", "z", "sequences[0].tracks[0].z", Kind.WholeNumber),
         ("track", "flipHorizontal", "sequences[0].tracks[0].flipHorizontal", Kind.Bool),
         ("track", "chains", "sequences[0].tracks[0].chains", Kind.Array),
         ("chain", "source", "sequences[0].tracks[0].chains[0].source", Kind.String),
@@ -45,7 +44,6 @@ public class SequenceListSaveMalformedTests
     {
         [Kind.String] = new[] { "string", "numberText" },
         [Kind.Number] = new[] { "number", "fraction" },
-        [Kind.WholeNumber] = new[] { "number" },
         [Kind.Bool] = new[] { "bool" },
         [Kind.Array] = new[] { "array" },
     };
@@ -151,16 +149,16 @@ public class SequenceListSaveMalformedTests
     [Fact]
     public void FromJsonString_FieldsOfTheRightKind_StillLoad()
     {
-        var loaded = SequenceListSave.FromJsonString(With("track", "z", "7"));
+        var loaded = SequenceListSave.FromJsonString(With("track", "x", "7"));
 
-        loaded.Sequences[0].Tracks[0].Z.ShouldBe(7);
+        loaded.Sequences[0].Tracks[0].X.ShouldBe(7);
     }
 
     // A complete, valid document with one property of one object replaced by raw JSON.
     private static string With(string level, string property, string raw)
     {
         var chain = Parse("""{ "source": "a.achx", "chain": "Walk", "start": 0, "loops": 1 }""");
-        var track = Parse("""{ "name": "T", "x": 0, "y": 0, "z": 0, "flipHorizontal": false }""");
+        var track = Parse("""{ "name": "T", "x": 0, "y": 0, "flipHorizontal": false }""");
         track["chains"] = new JsonArray((JsonNode)chain);
         var sequence = Parse("""{ "name": "S", "loop": false }""");
         sequence["tracks"] = new JsonArray((JsonNode)track);
