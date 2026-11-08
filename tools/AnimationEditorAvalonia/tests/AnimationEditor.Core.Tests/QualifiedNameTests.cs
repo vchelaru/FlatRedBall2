@@ -11,7 +11,7 @@ public class QualifiedNameTests
 {
     private static TreeMenuActions Actions(Action<string>? copyText) => new(
         Copy: () => { }, Cut: () => { }, Paste: () => { }, Duplicate: () => { }, Delete: () => { },
-        Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: (_, _) => { },
+        Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: _ => { },
         CopyText: copyText);
 
     [Fact]

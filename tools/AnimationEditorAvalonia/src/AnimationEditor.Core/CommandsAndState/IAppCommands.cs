@@ -336,20 +336,21 @@ namespace AnimationEditor.Core.CommandsAndState
             IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical, bool? flipDiagonal = null);
         void FlipChainHorizontally(AnimationChainSave chain);
         void FlipChainVertically(AnimationChainSave chain);
+        void FlipChainDiagonally(AnimationChainSave chain);
         void InvertFrameOrder(AnimationChainSave chain);
         void SetAllFrameLengths(AnimationChainSave chain, float frameLength);
-        AnimationChainSave? DuplicateChain(AnimationChainSave source, bool flipH = false, bool flipV = false, string? newName = null);
+        AnimationChainSave? DuplicateChain(AnimationChainSave source, ChainFlip flip = ChainFlip.None, string? newName = null);
 
         /// <summary>
         /// Deep-copies every chain in <paramref name="sources"/> and inserts the copies as one
-        /// contiguous block after the last source, in a single undo step. When <paramref name="flipH"/>
-        /// or <paramref name="flipV"/> is set, every copied frame and shape is mirrored along that axis.
+        /// contiguous block after the last source, in a single undo step. Every axis in
+        /// <paramref name="flip"/> is applied to each copied frame and shape.
         /// Backs both <see cref="DuplicateSelection"/> (no flip) and the tree context menu's
-        /// Duplicate → Flip Horizontal/Vertical submenu items (which apply to the whole selection,
+        /// Duplicate → Flip Horizontal/Vertical/Diagonal submenu items (which apply to the whole selection,
         /// not just the right-clicked chain).
         /// </summary>
         IReadOnlyList<AnimationChainSave> DuplicateChains(
-            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false);
+            IReadOnlyList<AnimationChainSave> sources, ChainFlip flip = ChainFlip.None);
 
         /// <summary>
         /// Deep-copies <paramref name="source"/> and inserts the copy immediately after it

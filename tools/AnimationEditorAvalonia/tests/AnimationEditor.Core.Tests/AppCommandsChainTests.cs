@@ -299,6 +299,107 @@ public class AppCommandsChainTests
         Assert.All(chain.Frames, f => Assert.True(f.FlipVertical));
     }
 
+    // ── FlipChainDiagonally ──────────────────────────────────────────────────
+
+    [Fact]
+    public void FlipChainDiagonally_TogglesFlipDiagonalOnAllFrames_AsOneUndoStep()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        foreach (var f in chain.Frames) f.FlipDiagonal = false;
+
+        ctx.AppCommands.FlipChainDiagonally(chain);
+
+        Assert.All(chain.Frames, f => Assert.True(f.FlipDiagonal));
+        ctx.UndoManager.Undo();
+        Assert.All(chain.Frames, f => Assert.False(f.FlipDiagonal));
+        Assert.False(ctx.UndoManager.CanUndo);
+        ctx.UndoManager.Redo();
+        Assert.All(chain.Frames, f => Assert.True(f.FlipDiagonal));
+    }
+
+    [Fact]
+    public void FlipChainDiagonally_TransposesFrameOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        chain.Frames[0].RelativeX = 3;
+        chain.Frames[0].RelativeY = 7;
+
+        ctx.AppCommands.FlipChainDiagonally(chain);
+
+        Assert.Equal(7, chain.Frames[0].RelativeX);
+        Assert.Equal(3, chain.Frames[0].RelativeY);
+    }
+
+    [Fact]
+    public void FlipChainDiagonally_OnLockedChain_DoesNothing()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        chain.IsLocked = true;
+
+        ctx.AppCommands.FlipChainDiagonally(chain);
+
+        Assert.All(chain.Frames, f => Assert.False(f.FlipDiagonal));
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    // ── DuplicateChain(s) with a ChainFlip set ───────────────────────────────
+
+    [Fact]
+    public void DuplicateChain_WithDiagonal_CopyIsTransposed_SourceUntouched()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        source.Frames[0].RelativeX = 3;
+        source.Frames[0].RelativeY = 7;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, ChainFlip.Diagonal);
+
+        Assert.All(copy!.Frames, f => Assert.True(f.FlipDiagonal));
+        Assert.Equal(7, copy.Frames[0].RelativeX);
+        Assert.Equal(3, copy.Frames[0].RelativeY);
+        Assert.All(source.Frames, f => Assert.False(f.FlipDiagonal));
+        Assert.Equal(3, source.Frames[0].RelativeX);
+    }
+
+    [Fact]
+    public void DuplicateChain_WithDiagonalAndHorizontal_MatchesFlippingHThenDInPlace()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        source.Frames[0].RelativeX = 3;
+        source.Frames[0].RelativeY = 7;
+        var expected = TestHelpers.MakeChain(ctx.Acls, "Expected", 1);
+        expected.Frames[0].RelativeX = 3;
+        expected.Frames[0].RelativeY = 7;
+        ctx.AppCommands.FlipChainHorizontally(expected);
+        ctx.AppCommands.FlipChainDiagonally(expected);
+
+        var copy = ctx.AppCommands.DuplicateChain(source, ChainFlip.Horizontal | ChainFlip.Diagonal)!;
+
+        Assert.True(copy.Frames[0].FlipHorizontal);
+        Assert.True(copy.Frames[0].FlipDiagonal);
+        Assert.False(copy.Frames[0].FlipVertical);
+        Assert.Equal(expected.Frames[0].RelativeX, copy.Frames[0].RelativeX);
+        Assert.Equal(expected.Frames[0].RelativeY, copy.Frames[0].RelativeY);
+    }
+
+    [Fact]
+    public void DuplicateChains_WithDiagonal_IsOneUndoStep()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var run = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+
+        var copies = ctx.AppCommands.DuplicateChains(new[] { walk, run }, ChainFlip.Diagonal);
+
+        Assert.All(copies, c => Assert.True(c.Frames[0].FlipDiagonal));
+        ctx.UndoManager.Undo();
+        Assert.Equal(2, ctx.Acls.AnimationChains.Count);
+    }
+
     // ── InvertFrameOrder ─────────────────────────────────────────────────────
 
     [Fact]
@@ -394,7 +495,7 @@ public class AppCommandsChainTests
         source.Loop = false;
         source.IsLocked = true;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.False(copy!.Loop);
         Assert.True(copy.IsLocked);
@@ -408,7 +509,7 @@ public class AppCommandsChainTests
         source.PingPong = true;
         source.Reverse = true;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: false);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.None);
 
         Assert.True(copy!.PingPong);
         Assert.True(copy.Reverse);
@@ -453,7 +554,7 @@ public class AppCommandsChainTests
         source.Frames[0].FlipHorizontal = false;
         source.Frames[1].FlipHorizontal = true;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.True(copy!.Frames[0].FlipHorizontal);   // false → toggled → true
         Assert.False(copy.Frames[1].FlipHorizontal);   // true  → toggled → false
@@ -467,7 +568,7 @@ public class AppCommandsChainTests
         var source = TestHelpers.MakeChain(acls, "JumpUp", 2);
         foreach (var f in source.Frames) f.FlipVertical = false;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         Assert.All(copy!.Frames, f => Assert.True(f.FlipVertical));
     }
@@ -496,7 +597,7 @@ public class AppCommandsChainTests
         source.Frames[0].ShapesSave!.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
         source.Frames[0].ShapesSave!.Add(new CircleSave { Name = "Hurt", X = -6, Y = 3 });
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         var rect = copy!.Frames[0].ShapesSave!.AARectSaves.First();
         Assert.Equal(-10, rect.X);   // horizontal flip negates X
@@ -516,7 +617,7 @@ public class AppCommandsChainTests
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
         source.Frames[0].ShapesSave!.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         var rect = copy!.Frames[0].ShapesSave!.AARectSaves.First();
         Assert.Equal(10, rect.X);    // horizontal offset untouched
@@ -532,7 +633,7 @@ public class AppCommandsChainTests
         source.Frames[0].RelativeX = 20;
         source.Frames[0].RelativeY = 7;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         Assert.Equal(20, copy!.Frames[0].RelativeX);  // horizontal offset untouched
         Assert.Equal(-7, copy.Frames[0].RelativeY);   // vertical flip mirrors sprite offset
@@ -548,7 +649,7 @@ public class AppCommandsChainTests
         source.Frames[0].RelativeX = 20;
         source.Frames[0].RelativeY = 7;
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         // Sprite offset mirrors about the entity origin, same pivot as the shapes,
         // so an off-center frame stays aligned with its collision after the flip.
@@ -579,7 +680,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "WalkRight");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("WalkLeft", copy!.Name);
     }
@@ -591,7 +692,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "WalkLeft");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("WalkRight", copy!.Name);
     }
@@ -603,7 +704,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "JumpUp");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         Assert.Equal("JumpDown", copy!.Name);
     }
@@ -615,7 +716,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "JumpDown");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         Assert.Equal("JumpUp", copy!.Name);
     }
@@ -627,7 +728,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "AttackUpRight");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, ChainFlip.Horizontal | ChainFlip.Vertical);
 
         Assert.Equal("AttackDownLeft", copy!.Name);
     }
@@ -639,7 +740,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Idle");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("Idle2", copy!.Name);
     }
@@ -653,7 +754,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Rightful");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("Rightful2", copy!.Name);
     }
@@ -666,7 +767,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Upgrade");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Vertical);
 
         Assert.Equal("Upgrade2", copy!.Name);
     }
@@ -679,7 +780,7 @@ public class AppCommandsChainTests
         var source = TestHelpers.MakeChain(acls, "WalkRight");
         TestHelpers.MakeChain(acls, "WalkLeft");   // pre-existing chain the flip would collide with
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("WalkLeft2", copy!.Name);
     }
@@ -692,7 +793,7 @@ public class AppCommandsChainTests
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "walkright");
 
-        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+        var copy = ctx.AppCommands.DuplicateChain(source, flip: ChainFlip.Horizontal);
 
         Assert.Equal("walkright2", copy!.Name);
     }
@@ -705,7 +806,7 @@ public class AppCommandsChainTests
         var walkRight = TestHelpers.MakeChain(acls, "WalkRight");
         var runRight  = TestHelpers.MakeChain(acls, "RunRight");
 
-        var copies = ctx.AppCommands.DuplicateChains(new[] { walkRight, runRight }, flipH: true);
+        var copies = ctx.AppCommands.DuplicateChains(new[] { walkRight, runRight }, flip: ChainFlip.Horizontal);
 
         Assert.Equal(new[] { "WalkLeft", "RunLeft" }, copies.Select(c => c.Name));
     }
@@ -773,7 +874,7 @@ public class AppCommandsChainTests
         walk.Frames[0].FlipHorizontal = false;
         run.Frames[0].FlipHorizontal  = false;
 
-        var copies = ctx.AppCommands.DuplicateChains(new[] { walk, run }, flipH: true);
+        var copies = ctx.AppCommands.DuplicateChains(new[] { walk, run }, flip: ChainFlip.Horizontal);
 
         Assert.Equal(2, copies.Count);
         Assert.All(copies, c => Assert.True(c.Frames[0].FlipHorizontal));
