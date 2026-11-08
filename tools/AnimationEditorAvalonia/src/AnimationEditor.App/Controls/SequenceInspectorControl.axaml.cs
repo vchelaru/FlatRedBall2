@@ -26,6 +26,7 @@ public partial class SequenceInspectorControl : UserControl
     private TimelineChainId? _chain;
     private int? _track;
     private string? _multiSummary;
+    private bool _canRenameSequence = true;
     private bool _refreshing;
 
     public SequenceInspectorControl()
@@ -92,9 +93,10 @@ public partial class SequenceInspectorControl : UserControl
     /// of any of those: several items share no editable field. A null document clears the inspector.
     /// </summary>
     public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track,
-        string? multiSummary = null)
+        string? multiSummary = null, bool canRenameSequence = true)
     {
         _multiSummary = multiSummary;
+        _canRenameSequence = canRenameSequence;
         _document = document;
         _sequence = sequence;
         _undo = undo;
@@ -140,6 +142,7 @@ public partial class SequenceInspectorControl : UserControl
     {
         var document = _document!;
         Put(SequenceNameBox, sequence.Name, force);
+        SequenceNameBox.IsEnabled = _canRenameSequence;
         SequenceLoopBox.IsChecked = sequence.Loop;
         SequenceLengthText.Text = Seconds(SequenceTimeline.Length(sequence, reference => document.CycleLength(reference) ?? 0));
         SequenceTracksText.Text = sequence.Tracks.Count.ToString(CultureInfo.InvariantCulture);
