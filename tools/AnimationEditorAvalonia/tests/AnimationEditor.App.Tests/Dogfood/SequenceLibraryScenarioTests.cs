@@ -42,7 +42,7 @@ public class SequenceLibraryScenarioTests
         editor.Control<SequenceLibraryControl>("SequenceLibrary");
 
     // OS drag-drop can't be driven headlessly, so this raises the drag-over and drop a real drag would end with.
-    private static async Task Drop(AnimationEditorHarness editor, Interactive target, params string[] paths)
+    internal static async Task Drop(AnimationEditorHarness editor, Interactive target, params string[] paths)
     {
         DataTransfer data = new DataTransfer();
         foreach (string path in paths)

@@ -83,6 +83,24 @@ public class WindowLeakTests
         await _editor.OpenPngTabAsync(png);
     }
 
+    // The sequence tab's file watchers and their flush timer run only while that tab is in front.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task OpenSequenceTabInFront()
+    {
+        _editor = new AnimationEditorHarness();
+        string seqj = _editor.WriteSeqj("boss.seqj", "Idle");
+        await _editor.OpenAsync(seqj);
+        await _editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+    }
+
+    [AvaloniaFact]
+    public async Task ClosedWindowWithTheSequenceTabInFront_IsCollected()
+    {
+        await OpenSequenceTabInFront();
+        await Task.Delay(300);
+        AssertCollected(CloseEditor());
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CloseEditor()
     {

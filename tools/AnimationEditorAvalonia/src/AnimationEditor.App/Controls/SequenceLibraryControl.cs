@@ -240,7 +240,8 @@ public sealed class SequenceLibraryControl : UserControl
     /// </summary>
     public void Show(SequenceDocument? document)
     {
-        string key = document is null ? "" : string.Join("\n", document.Save.Sources);
+        // The version covers a source file read again (its chains changed under the same names).
+        string key = document is null ? "" : document.SourcesVersion + "\n" + string.Join("\n", document.Save.Sources);
         if (document is not null) CollapsedSources.Prune(document.Save.Sources);
         if (ReferenceEquals(document, _document) && key == _shownKey)
         {
