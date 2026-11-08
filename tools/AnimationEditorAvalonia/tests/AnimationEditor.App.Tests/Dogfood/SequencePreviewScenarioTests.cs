@@ -34,9 +34,9 @@ public class SequencePreviewScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, int z, params (string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, float Loops)[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, Z = z };
+        var track = new SequenceTrackSave { Name = name };
         foreach (var (source, chain, start, loops) in chains)
             track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
         return track;
@@ -62,20 +62,20 @@ public class SequencePreviewScenarioTests
         SequencePreview(editor).Composite!.Select(sprite => $"{sprite.Chain.Name}:{sprite.FrameIndex}").ToList();
 
     [AvaloniaFact]
-    public async Task Scrubbing_ShowsBothTracksComposited_EachFromItsOwnTexture_InZOrder()
+    public async Task Scrubbing_ShowsBothTracksComposited_EachFromItsOwnTexture_InLaneOrder()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, loop: false,
-            Track("Fx", 2, ("fx.achx", "Spark", 0, 1)),
-            Track("Body", 1, ("hero.achx", "Walk", 0, 1)));
+            Track("Fx", ("fx.achx", "Spark", 0, 1)),
+            Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(boss);
 
         editor.ClickAt(RulerAt(editor, 0.15));
 
         Timeline(editor).Playhead.ShouldBe(0.15, 0.01);
-        Shown(editor).ShouldBe(new[] { "Walk:1", "Spark:1" });
+        Shown(editor).ShouldBe(new[] { "Spark:1", "Walk:1" });
         SequencePreview(editor).Composite!.Select(sprite => Path.GetFileName(sprite.TexturePath))
-            .ShouldBe(new[] { "hero.png", "fx.png" });
+            .ShouldBe(new[] { "fx.png", "hero.png" });
         editor.Control<TextBlock>("SequenceTimeText").Text.ShouldBe("0.15 s / 0.50 s");
     }
 
@@ -83,7 +83,7 @@ public class SequencePreviewScenarioTests
     public async Task DraggingOnTheRuler_MovesThePlayheadAndThePreview()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(boss);
 
         editor.Drag(RulerAt(editor, 0.05), RulerAt(editor, 0.35));
@@ -98,8 +98,8 @@ public class SequencePreviewScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, loop: false,
-            Track("Body", 0, ("hero.achx", "Walk", 0, 1)),
-            Track("Fx", 1, ("fx.achx", "Spark", 0.3, 1)));
+            Track("Body", ("hero.achx", "Walk", 0, 1)),
+            Track("Fx", ("fx.achx", "Spark", 0.3, 1)));
         await editor.OpenAsync(boss);
 
         editor.ClickAt(RulerAt(editor, 0.1));
@@ -113,7 +113,7 @@ public class SequencePreviewScenarioTests
     {
         // Hidden before the chain on purpose: this is how a sprite appears partway through a sequence.
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0.4, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Walk", 0.4, 1)));
         await editor.OpenAsync(boss);
 
         Timeline(editor).Playhead.ShouldBe(0, 1e-6);
@@ -125,7 +125,7 @@ public class SequencePreviewScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk asks for 1 s (two cycles) but Run starts at 0.6 s on the same track.
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0, 2), ("hero.achx", "Run", 0.6, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Walk", 0, 2), ("hero.achx", "Run", 0.6, 1)));
         await editor.OpenAsync(boss);
 
         editor.ClickAt(RulerAt(editor, 0.55));
@@ -138,7 +138,7 @@ public class SequencePreviewScenarioTests
     public async Task Play_WithoutLoop_StopsAtTheEnd()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Run", 0, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Run", 0, 1)));
         await editor.OpenAsync(boss);
 
         editor.Click(editor.Control<Button>("SequencePlayButton"));
@@ -153,7 +153,7 @@ public class SequencePreviewScenarioTests
     public async Task Play_WithLoop_WrapsBackToTheStartAndKeepsPlaying()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: true, Track("Body", 0, ("hero.achx", "Run", 0, 1)));
+        string boss = WriteFixture(editor, loop: true, Track("Body", ("hero.achx", "Run", 0, 1)));
         await editor.OpenAsync(boss);
 
         editor.Click(editor.Control<Button>("SequencePlayButton"));
@@ -167,7 +167,7 @@ public class SequencePreviewScenarioTests
     public async Task Stop_PausesAndRewindsToZero()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: true, Track("Body", 0, ("hero.achx", "Walk", 0, 1)));
+        string boss = WriteFixture(editor, loop: true, Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(boss);
         editor.ClickAt(RulerAt(editor, 0.3));
 
@@ -182,7 +182,7 @@ public class SequencePreviewScenarioTests
     public async Task Space_PlaysAndPausesTheSequence_AndStillPlaysThePreviewOnAnAchxTab()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: true, Track("Body", 0, ("hero.achx", "Walk", 0, 1)));
+        string boss = WriteFixture(editor, loop: true, Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, "hero.achx"));
         editor.ClickRow(editor.ChainNamed("Walk"));
         editor.Preview.IsPlaying.ShouldBeTrue();
@@ -209,7 +209,7 @@ public class SequencePreviewScenarioTests
     public async Task LoopToggle_SetsTheSequencesLoopFlagAsOneUndoStep()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(boss);
         var toggle = editor.Control<ToggleButton>("SequenceLoopToggle");
         toggle.IsChecked.ShouldBe(false);
@@ -228,7 +228,7 @@ public class SequencePreviewScenarioTests
     public async Task TimelineZoomControl_ZoomsTheTimeline()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, loop: false, Track("Body", 0, ("hero.achx", "Walk", 0, 1)));
+        string boss = WriteFixture(editor, loop: false, Track("Body", ("hero.achx", "Walk", 0, 1)));
         await editor.OpenAsync(boss);
         var zoom = editor.Control<ZoomControl>("SequenceTimelineZoom");
         zoom.Text.ShouldBe("100%");
@@ -250,7 +250,7 @@ public class SequencePreviewScenarioTests
         guard.Frames[0].ShapesSave!.Add(hitbox);
         editor.WriteAchx("hero.achx", guard);
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
-        var track = Track("Body", 0, ("hero.achx", "Guard", 0, 1));
+        var track = Track("Body", ("hero.achx", "Guard", 0, 1));
         track.X = 20;
         track.FlipHorizontal = true;
         var save = new SequenceListSave { Sources = { "hero.achx" } };

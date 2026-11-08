@@ -141,7 +141,6 @@ public class SequenceListSave
             ["name"] = track.Name,
             ["x"] = track.X,
             ["y"] = track.Y,
-            ["z"] = track.Z,
         };
         // Written only when set, so the common unflipped track stays short.
         if (track.FlipHorizontal) result["flipHorizontal"] = true;
@@ -197,10 +196,11 @@ public class SequenceListSave
             Name = node.String("name"),
             X = node.Float("x"),
             Y = node.Float("y"),
-            Z = node.Int("z"),
             FlipHorizontal = node.Bool("flipHorizontal"),
             Visible = node.Bool("visible", fallback: true),
         };
+        // "z" is listed so it is dropped, not kept as an unknown property: files written before tracks lost their Z still
+        // hold one, and saving them must not write it back. Draw order is the track order.
         CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "chains");
         foreach (var chain in node.Objects("chains"))
         {

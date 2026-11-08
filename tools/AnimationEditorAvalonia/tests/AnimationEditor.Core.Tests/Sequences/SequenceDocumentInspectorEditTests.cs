@@ -28,7 +28,7 @@ public class SequenceDocumentInspectorEditTests
         SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0];
 
     [Fact]
-    public void TrackEdits_OffsetFlipAndZ_EachIsOneUndoStepAndSaves()
+    public void TrackEdits_OffsetAndFlip_EachIsOneUndoStepAndSaves()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
@@ -36,18 +36,17 @@ public class SequenceDocumentInspectorEditTests
 
         document.SetTrackOffset(undo, 0, 0, 4.5f, -2f);
         document.SetTrackFlip(undo, 0, 0, true);
-        document.SetTrackZ(undo, 0, 0, 3);
 
         var saved = SavedTrack(document);
-        (saved.X, saved.Y, saved.FlipHorizontal, saved.Z).ShouldBe((4.5f, -2f, true, 3));
+        (saved.X, saved.Y, saved.FlipHorizontal).ShouldBe((4.5f, -2f, true));
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[]
         {
-            "Set Offset of 'Body' to (4.5, -2)", "Turn Flip On for 'Body'", "Set Z of 'Body' to 3",
+            "Set Offset of 'Body' to (4.5, -2)", "Turn Flip On for 'Body'",
         });
         undo.Undo();
-        SavedTrack(document).Z.ShouldBe(0);
-        undo.Undo();
         SavedTrack(document).FlipHorizontal.ShouldBeFalse();
+        undo.Undo();
+        SavedTrack(document).X.ShouldBe(0f);
     }
 
     [Fact]
@@ -59,7 +58,6 @@ public class SequenceDocumentInspectorEditTests
 
         document.SetTrackOffset(undo, 0, 0, 0, 0);
         document.SetTrackFlip(undo, 0, 0, false);
-        document.SetTrackZ(undo, 0, 0, 0);
 
         undo.UndoHistory.ShouldBeEmpty();
     }

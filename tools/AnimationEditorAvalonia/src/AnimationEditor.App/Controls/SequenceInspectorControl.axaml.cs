@@ -43,11 +43,6 @@ public partial class SequenceInspectorControl : UserControl
             document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
         TrackFlipBox.IsCheckedChanged += (_, _) => Commit(document =>
             document.SetTrackFlip(_undo!, _sequence, _track!.Value, TrackFlipBox.IsChecked == true));
-        TrackZField.ValueChanged += (_, _) =>
-        {
-            if (TrackZField.Value is { } z)
-                Commit(document => document.SetTrackZ(_undo!, _sequence, _track!.Value, (int)z));
-        };
 
         ChainStartField.ValueChanged += (_, _) =>
         {
@@ -155,7 +150,6 @@ public partial class SequenceInspectorControl : UserControl
         Put(TrackYField, (decimal)track.Y, force);
         TrackVisibleBox.IsChecked = track.Visible;
         TrackFlipBox.IsChecked = track.FlipHorizontal;
-        Put(TrackZField, track.Z, force);
     }
 
     private void ShowChain(SequenceChainReferenceSave reference, bool force)

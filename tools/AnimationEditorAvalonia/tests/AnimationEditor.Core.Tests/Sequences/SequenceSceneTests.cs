@@ -39,41 +39,30 @@ public class SequenceSceneTests
         list.SaveJson(path);
     }
 
-    private static SequenceTrackSave Track(string name, int z, params (string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, float Loops)[] chains)
     {
-        var track = new SequenceTrackSave { Name = name, Z = z };
+        var track = new SequenceTrackSave { Name = name };
         foreach (var (source, chain, start, loops) in chains)
             track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
         return track;
     }
 
     [Fact]
-    public void At_TwoTracksFromTwoSources_DrawsBothInZOrderWithTheirOwnTextures()
+    public void At_TwoTracksFromTwoSources_DrawsBothInLaneOrderWithTheirOwnTextures()
     {
         using var dir = new TestHelpers.TempDir();
-        // The first track draws on top: its Z is higher.
+        // The first lane is at the back, the last one in front.
         var document = Load(dir,
-            Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1)),
-            Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
+            Track("Fx", ("fx/fx.achj", "Spark", 0, 1)),
+            Track("Body", ("body/body.achj", "Walk", 0, 1)));
 
         var sprites = SequenceScene.At(document, 0, 0.3);
 
-        sprites.Select(s => s.Chain.Name).ShouldBe(new[] { "Walk", "Spark" });
-        sprites.Select(s => s.Track).ShouldBe(new[] { 1, 0 });
-        sprites[0].FrameIndex.ShouldBe(1);
-        sprites[0].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "body", "body.png")).FullPath);
-        sprites[1].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "fx", "spark.png")).FullPath);
-    }
-
-    [Fact]
-    public void At_EqualZ_DrawsInTrackOrder()
-    {
-        using var dir = new TestHelpers.TempDir();
-        var document = Load(dir,
-            Track("Body", 0, ("body/body.achj", "Walk", 0, 1)),
-            Track("Fx", 0, ("fx/fx.achj", "Spark", 0, 1)));
-
-        SequenceScene.At(document, 0, 0.1).Select(s => s.Track).ShouldBe(new[] { 0, 1 });
+        sprites.Select(s => s.Chain.Name).ShouldBe(new[] { "Spark", "Walk" });
+        sprites.Select(s => s.Track).ShouldBe(new[] { 0, 1 });
+        sprites[1].FrameIndex.ShouldBe(1);
+        sprites[1].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "body", "body.png")).FullPath);
+        sprites[0].TexturePath.ShouldBe(new Paths.FilePath(Path.Combine(dir.Path, "fx", "spark.png")).FullPath);
     }
 
     [Fact]
@@ -82,7 +71,7 @@ public class SequenceSceneTests
         // Hidden before the chain on purpose: this is how a sprite appears partway through a sequence.
         // If it showed before its chain, it would always be visible.
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0.4, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0.4, 1)));
 
         SequenceScene.At(document, 0, 0).ShouldBeEmpty();
         SequenceScene.At(document, 0, 0.39).ShouldBeEmpty();
@@ -95,7 +84,7 @@ public class SequenceSceneTests
         // Hidden after the chain on purpose: this is how a sprite disappears partway through a sequence.
         using var dir = new TestHelpers.TempDir();
         // Walk is 0.5 s, so this chain plays from 1 s to 1.5 s.
-        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 1, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 1, 1)));
 
         SequenceScene.At(document, 0, 1.2).Single().FrameIndex.ShouldBe(0);
         SequenceScene.At(document, 0, 1.5).ShouldBeEmpty();
@@ -107,7 +96,7 @@ public class SequenceSceneTests
     {
         using var dir = new TestHelpers.TempDir();
         // Walk asks for 2 s (four cycles) but Spark starts at 0.6 s on the same track.
-        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0, 4), ("fx/fx.achj", "Spark", 0.6, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 4), ("fx/fx.achj", "Spark", 0.6, 1)));
 
         SequenceScene.At(document, 0, 0.55).Single().Chain.Name.ShouldBe("Walk");
         SequenceScene.At(document, 0, 0.65).Single().Chain.Name.ShouldBe("Spark");
@@ -117,7 +106,7 @@ public class SequenceSceneTests
     public void At_ALoopingChain_RepeatsAcrossTheBlockLength()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0, 3)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 3)));
 
         // 0.6 s is 0.1 s into the second 0.5 s cycle.
         var sprite = SequenceScene.At(document, 0, 0.6).Single();
@@ -135,7 +124,7 @@ public class SequenceSceneTests
         WriteSource(Path.Combine(dir.Path, "body", "body.achj"), "Walk", "body.png", loop: false, 0.25f, 0.25f);
         var save = new SequenceListSave { Sources = { "body/body.achj" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        sequence.Tracks.Add(Track("Body", 0, ("body/body.achj", "Walk", 0, 3)));
+        sequence.Tracks.Add(Track("Body", ("body/body.achj", "Walk", 0, 3)));
         save.Sequences.Add(sequence);
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
@@ -154,7 +143,7 @@ public class SequenceSceneTests
     public void Sample_AFlippedTrack_MirrorsTheFrameOffsetAndFlipAcrossTheTrack()
     {
         using var dir = new TestHelpers.TempDir();
-        var track = Track("Body", 0, ("body/body.achj", "Walk", 0, 1));
+        var track = Track("Body", ("body/body.achj", "Walk", 0, 1));
         track.X = 10;
         track.Y = 4;
         track.FlipHorizontal = true;
@@ -173,7 +162,7 @@ public class SequenceSceneTests
     public void FlipMatrix_AnUnflippedTrack_IsNull()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", 0, ("body/body.achj", "Walk", 0, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1)));
 
         SequenceScene.At(document, 0, 0).Single().FlipMatrix.ShouldBeNull();
     }
@@ -182,9 +171,9 @@ public class SequenceSceneTests
     public void At_AHiddenTrack_IsLeftOut_AndTheOtherTrackStays()
     {
         using var dir = new TestHelpers.TempDir();
-        var fx = Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1));
+        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, 1));
         fx.Visible = false;
-        var document = Load(dir, fx, Track("Body", 1, ("body/body.achj", "Walk", 0, 1)));
+        var document = Load(dir, fx, Track("Body", ("body/body.achj", "Walk", 0, 1)));
 
         SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
     }
@@ -193,8 +182,8 @@ public class SequenceSceneTests
     public void At_EveryTrackHidden_IsEmpty()
     {
         using var dir = new TestHelpers.TempDir();
-        var fx = Track("Fx", 5, ("fx/fx.achj", "Spark", 0, 1));
-        var body = Track("Body", 1, ("body/body.achj", "Walk", 0, 1));
+        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, 1));
+        var body = Track("Body", ("body/body.achj", "Walk", 0, 1));
         fx.Visible = false;
         body.Visible = false;
         var document = Load(dir, fx, body);

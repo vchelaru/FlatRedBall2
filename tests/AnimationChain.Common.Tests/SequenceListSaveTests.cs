@@ -20,7 +20,7 @@ public class SequenceListSaveTests
             {
                 new SequenceTrackSave
                 {
-                    Name = "Wing R", X = 75, Y = 95.5f, Z = 3, FlipHorizontal = true,
+                    Name = "Wing R", X = 75, Y = 95.5f, FlipHorizontal = true,
                     Chains = { new SequenceChainReferenceSave { Source = "Boss.achj", Chain = "WingFlap", Start = 0.25, Loops = 11.5f } },
                 },
             },
@@ -33,7 +33,7 @@ public class SequenceListSaveTests
         sequence.Name.ShouldBe("Attack");
         sequence.Loop.ShouldBeTrue();
         var track = sequence.Tracks.ShouldHaveSingleItem();
-        (track.Name, track.X, track.Y, track.Z, track.FlipHorizontal).ShouldBe(("Wing R", 75f, 95.5f, 3, true));
+        (track.Name, track.X, track.Y, track.FlipHorizontal).ShouldBe(("Wing R", 75f, 95.5f, true));
         var reference = track.Chains.ShouldHaveSingleItem();
         (reference.Source, reference.Chain, reference.Start, reference.Loops).ShouldBe(("Boss.achj", "WingFlap", 0.25, 11.5f));
     }
@@ -57,7 +57,6 @@ public class SequenceListSaveTests
                       "name": "Body",
                       "x": 0,
                       "y": 0,
-                      "z": 0,
                       "chains": [
                         {
                           "source": "Gone.achj",
@@ -161,7 +160,7 @@ public class SequenceListSaveTests
               {{UnknownProps}},
               "tracks": [
                 {
-                  "name": "Body", "x": 1, "y": 2, "z": 3,
+                  "name": "Body", "x": 1, "y": 2,
                   {{UnknownProps}},
                   "chains": [
                     { "source": "A.achj", "chain": "Walk", "start": 0.5, "loops": 2, {{UnknownProps}} }
@@ -205,7 +204,7 @@ public class SequenceListSaveTests
 
         root.Select(p => p.Key).Take(3).ShouldBe(new[] { "version", "sources", "sequences" });
         sequence.Select(p => p.Key).Take(3).ShouldBe(new[] { "name", "loop", "tracks" });
-        track.Select(p => p.Key).Take(5).ShouldBe(new[] { "name", "x", "y", "z", "chains" });
+        track.Select(p => p.Key).Take(4).ShouldBe(new[] { "name", "x", "y", "chains" });
         chain.Select(p => p.Key).Take(4).ShouldBe(new[] { "source", "chain", "start", "loops" });
     }
 

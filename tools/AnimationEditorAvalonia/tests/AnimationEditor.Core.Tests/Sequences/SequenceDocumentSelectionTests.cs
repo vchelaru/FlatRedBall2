@@ -139,7 +139,7 @@ public class SequenceDocumentSelectionTests
     public static TheoryData<string> EditsOfSequenceB() => new()
     {
         "SetLoop", "PlaceChainOnTrack", "PlaceChainOnNewTrack", "DeleteChain", "DeleteTrack", "RenameTrack",
-        "SetTrackOffset", "SetTrackFlip", "SetTrackZ", "SetChainStart", "SetChainLoops", "MoveGesture", "EdgeGesture",
+        "SetTrackOffset", "SetTrackFlip", "SetTrackVisible", "SetChainStart", "SetChainLoops", "MoveGesture", "EdgeGesture",
     };
 
     [Theory]
@@ -159,7 +159,7 @@ public class SequenceDocumentSelectionTests
             case "RenameTrack": document.RenameTrack(undo, 1, 0, "Torso"); break;
             case "SetTrackOffset": document.SetTrackOffset(undo, 1, 0, 4, 5); break;
             case "SetTrackFlip": document.SetTrackFlip(undo, 1, 0, true); break;
-            case "SetTrackZ": document.SetTrackZ(undo, 1, 0, 3); break;
+            case "SetTrackVisible": document.SetTrackVisible(undo, 1, 0, false); break;
             case "SetChainStart": document.SetChainStart(undo, 1, 0, 0, 1.5); break;
             case "SetChainLoops": document.SetChainLoops(undo, 1, 0, 0, 3); break;
             case "MoveGesture":

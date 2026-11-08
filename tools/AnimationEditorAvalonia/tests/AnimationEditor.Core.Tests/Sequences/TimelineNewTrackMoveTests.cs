@@ -16,7 +16,7 @@ public class TimelineNewTrackMoveTests
         var sequence = new SequenceSave();
         foreach (var (name, chains) in tracks)
         {
-            var track = new SequenceTrackSave { Name = name, Z = sequence.Tracks.Count };
+            var track = new SequenceTrackSave { Name = name };
             track.Chains.AddRange(chains);
             sequence.Tracks.Add(track);
         }
@@ -36,7 +36,6 @@ public class TimelineNewTrackMoveTests
         sequence.Tracks[0].Chains.Select(c => c.Chain).ShouldBe(new[] { "Run" });
         sequence.Tracks[1].Chains.ShouldBe(new[] { walk });
         sequence.Tracks[1].Chains[0].Start.ShouldBe(1.5);
-        sequence.Tracks[1].Z.ShouldBe(1);
     }
 
     [Fact]
@@ -66,7 +65,6 @@ public class TimelineNewTrackMoveTests
         sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Walk", "Jump" });
         sequence.Tracks[2].Chains.ShouldBe(new[] { a, b });
         sequence.Tracks[3].Chains.ShouldBe(new[] { c });
-        sequence.Tracks.Select(t => t.Z).ShouldBe(new[] { 0, 1, 2, 3 });
     }
 
     [Fact]

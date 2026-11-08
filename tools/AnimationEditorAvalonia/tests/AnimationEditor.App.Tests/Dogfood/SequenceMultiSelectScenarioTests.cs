@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// </summary>
 public class SequenceMultiSelectScenarioTests
 {
-    // Attack (row 0): Walk on hero.png, 0.5 s, no loop. Aura (row 1): Spark on fx.png, 0.2 s, no loop, Z 3.
+    // Attack (row 0): Walk on hero.png, 0.5 s, no loop. Aura (row 1): Spark on fx.png, 0.2 s, no loop.
     // Idle (row 2): Run on hero.png, 0.2 s, loops.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
@@ -30,9 +30,9 @@ public class SequenceMultiSelectScenarioTests
         editor.WriteAchx("fx.achx", AnimationEditorHarness.Chain("Spark", "fx.png", (0, 0, 16, 16), (16, 0, 16, 16)));
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx", "fx.achx" } };
-        save.Sequences.Add(Sequence("Attack", loop: false, Track("Body", 0, "hero.achx", "Walk")));
-        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", 3, "fx.achx", "Spark")));
-        save.Sequences.Add(Sequence("Idle", loop: true, Track("Body", 0, "hero.achx", "Run")));
+        save.Sequences.Add(Sequence("Attack", loop: false, Track("Body", "hero.achx", "Walk")));
+        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", "fx.achx", "Spark")));
+        save.Sequences.Add(Sequence("Idle", loop: true, Track("Body", "hero.achx", "Run")));
         save.Save(path);
         return path;
     }
@@ -44,9 +44,9 @@ public class SequenceMultiSelectScenarioTests
         return sequence;
     }
 
-    private static SequenceTrackSave Track(string name, int z, string source, string chain)
+    private static SequenceTrackSave Track(string name, string source, string chain)
     {
-        var track = new SequenceTrackSave { Name = name, Z = z };
+        var track = new SequenceTrackSave { Name = name };
         track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = 0, Loops = 1 });
         return track;
     }
@@ -98,12 +98,12 @@ public class SequenceMultiSelectScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task Sequences_DrawInSelectionOrder_NotByTrackZOrListPosition()
+    public async Task Sequences_DrawInSelectionOrder_NotByListPosition()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteFixture(editor));
 
-        // Aura's track has Z 3 and Idle sits below it in the list, but the first one selected draws at the back.
+        // Idle sits below Aura in the list, but the first one selected draws at the back.
         ClickRow(editor, 2);
         ClickRow(editor, 1, RawInputModifiers.Control);
         ClickRow(editor, 0, RawInputModifiers.Control);

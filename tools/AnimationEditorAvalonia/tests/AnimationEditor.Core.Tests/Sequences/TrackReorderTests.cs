@@ -65,84 +65,14 @@ public class TrackReorderTests
     [InlineData(1, 2)]
     [InlineData(2, 2)]
     [InlineData(2, 3)]
-    public void Plan_DroppingOnTheGapsNextToItself_ChangesNothing(int from, int slot) =>
-        TrackReorder.Plan(new[] { 0, 1, 2 }, from, slot).ShouldBeNull();
+    public void TargetLane_DroppingOnTheGapsNextToItself_ChangesNothing(int from, int slot) =>
+        TrackReorder.TargetLane(from, slot).ShouldBeNull();
 
-    [Fact]
-    public void Plan_SingleTrack_ChangesNothing()
-    {
-        TrackReorder.Plan(new[] { 4 }, 0, 0).ShouldBeNull();
-        TrackReorder.Plan(new[] { 4 }, 0, 1).ShouldBeNull();
-    }
-
-    [Fact]
-    public void Plan_FirstTrackToTheEnd_RaisesItsZToTheLastNeighbours()
-    {
-        var plan = TrackReorder.Plan(new[] { 0, 1, 2 }, from: 0, slot: 3)!;
-
-        plan.Order.ShouldBe(new[] { 1, 2, 0 });
-        plan.Z.ShouldBe(new[] { 1, 2, 2 });
-        plan.To.ShouldBe(2);
-    }
-
-    [Fact]
-    public void Plan_LastTrackToTheStart_LowersItsZToTheFirstNeighbours()
-    {
-        var plan = TrackReorder.Plan(new[] { 0, 1, 2 }, from: 2, slot: 0)!;
-
-        plan.Order.ShouldBe(new[] { 2, 0, 1 });
-        plan.Z.ShouldBe(new[] { 0, 0, 1 });
-        plan.To.ShouldBe(0);
-    }
-
-    [Fact]
-    public void Plan_MoveDownOne_KeepsEveryZWhenTheyAlreadyFit()
-    {
-        // The moved track's Z 5 sits between its new neighbours' 5 and 9.
-        var plan = TrackReorder.Plan(new[] { 2, 5, 5, 9 }, from: 1, slot: 3)!;
-
-        plan.Order.ShouldBe(new[] { 0, 2, 1, 3 });
-        plan.Z.ShouldBe(new[] { 2, 5, 5, 9 });
-        plan.To.ShouldBe(2);
-    }
-
-    [Fact]
-    public void Plan_AllEqualZs_ReordersWithoutChangingAnyZ()
-    {
-        var plan = TrackReorder.Plan(new[] { 0, 0, 0, 0 }, from: 3, slot: 1)!;
-
-        plan.Order.ShouldBe(new[] { 0, 3, 1, 2 });
-        plan.Z.ShouldBe(new[] { 0, 0, 0, 0 });
-        plan.To.ShouldBe(1);
-    }
-
-    [Fact]
-    public void Plan_MovedZOutsideItsNewNeighboursRange_TakesTheNearestNeighbourZ()
-    {
-        // Z 4 moves below two Z 10s, so it can only stay in front of them by becoming 10.
-        var plan = TrackReorder.Plan(new[] { 0, 4, 10, 10 }, from: 1, slot: 3)!;
-
-        plan.Order.ShouldBe(new[] { 0, 2, 1, 3 });
-        plan.Z.ShouldBe(new[] { 0, 10, 10, 10 });
-    }
-
-    [Fact]
-    public void Plan_ZsThatDidNotAscendBefore_RenumberEveryTrackToItsLane()
-    {
-        // The middle lane's Z 0 sits below its upper neighbour's 5: lane order was not draw order to begin with.
-        var plan = TrackReorder.Plan(new[] { 5, 0, 9 }, from: 2, slot: 0)!;
-
-        plan.Order.ShouldBe(new[] { 2, 0, 1 });
-        plan.Z.ShouldBe(new[] { 0, 1, 2 });
-        plan.To.ShouldBe(0);
-    }
-
-    [Fact]
-    public void Plan_NegativeZs_StillAscendAfterTheMove()
-    {
-        var plan = TrackReorder.Plan(new[] { -3, -1, 7 }, from: 0, slot: 3)!;
-
-        plan.Order.ShouldBe(new[] { 1, 2, 0 });
-        plan.Z.ShouldBe(new[] { -1, 7, 7 });
-    }
+    [Theory]
+    [InlineData(0, 3, 2)]
+    [InlineData(2, 0, 0)]
+    [InlineData(1, 3, 2)]
+    [InlineData(3, 1, 1)]
+    public void TargetLane_DroppingOnAFartherGap_IsTheLaneItEndsUpIn(int from, int slot, int expected) =>
+        TrackReorder.TargetLane(from, slot).ShouldBe(expected);
 }
