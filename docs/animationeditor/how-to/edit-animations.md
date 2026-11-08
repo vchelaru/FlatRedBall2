@@ -40,13 +40,13 @@ To duplicate an animation, right-click the animation and select **Duplicate ▸ 
 
 <figure><img src="../../.gitbook/assets/edit-animations-duplicate.gif" alt="Duplicating an animation from the right-click menu"><figcaption></figcaption></figure>
 
-The **Duplicate** menu can also flip the copy with **Flip Horizontal** or **Flip Vertical**. When the name contains a direction, the copy's name is changed to match its new direction. For example, duplicating WalkRight with **Flip Horizontal** creates WalkLeft, and duplicating JumpUp with **Flip Vertical** creates JumpDown.
+The **Duplicate** menu can also flip the copy with **Flip Horizontal**, **Flip Vertical**, or **Flip Diagonal**. When the name contains a direction, the copy's name is changed to match its new direction. For example, duplicating WalkRight with **Flip Horizontal** creates WalkLeft, and duplicating JumpUp with **Flip Vertical** creates JumpDown.
 
 Alternatively, press **Ctrl+D** (**⌘D** on macOS) to duplicate the selected animation, or copy and paste it with **Ctrl+C** and **Ctrl+V** (**⌘C** and **⌘V** on macOS).
 
 ## Flip an Animation
 
-To flip an animation, right-click the animation and select **Flip Horizontally** or **Flip Vertically**.
+To flip an animation, right-click the animation and select **Flip Horizontally**, **Flip Vertically**, or **Flip Diagonally**.
 
 <figure><img src="../../.gitbook/assets/edit-animations-flip.png" alt="Right-click menu with Flip Horizontally and Flip Vertically highlighted"><figcaption></figcaption></figure>
 

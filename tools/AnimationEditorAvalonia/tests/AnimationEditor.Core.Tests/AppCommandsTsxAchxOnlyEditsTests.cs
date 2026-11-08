@@ -66,11 +66,13 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
         _ctx.AppCommands.SetChainsPingPong(new[] { chain }, true);
         _ctx.AppCommands.SetChainsReverse(new[] { chain }, true);
         _ctx.AppCommands.FlipChainHorizontally(chain);
+        _ctx.AppCommands.FlipChainDiagonally(chain);
 
         Assert.True(chain.Loop);
         Assert.False(chain.PingPong);
         Assert.False(chain.Reverse);
         Assert.All(chain.Frames, f => Assert.False(f.FlipHorizontal));
+        Assert.All(chain.Frames, f => Assert.False(f.FlipDiagonal));
         Assert.False(_ctx.UndoManager.CanUndo);
     }
 
@@ -90,9 +92,10 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
     {
         var chain = OpenTsx();
 
-        var copy = _ctx.AppCommands.DuplicateChains([chain], flipH: true).Single();
+        var copy = _ctx.AppCommands.DuplicateChains([chain], ChainFlip.Horizontal | ChainFlip.Diagonal).Single();
 
         Assert.All(copy.Frames, f => Assert.False(f.FlipHorizontal));
+        Assert.All(copy.Frames, f => Assert.False(f.FlipDiagonal));
     }
 
     [Fact]
@@ -101,13 +104,13 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
         var chain = OpenTsx();
         var actions = new TreeMenuActions(
             Copy: () => { }, Cut: () => { }, Paste: () => { }, Duplicate: () => { }, Delete: () => { },
-            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: (_, _) => { });
+            Rename: () => { }, AddAnimation: () => { }, DuplicateChainFlip: _ => { });
 
         var frameItems = TreeMenuPlanBuilder.Build(chain.Frames[0], _ctx.AppCommands, _ctx.SelectedState, _ctx.ObjectFinder, _ctx.ProjectManager, actions);
         var chainItems = TreeMenuPlanBuilder.Build(chain, _ctx.AppCommands, _ctx.SelectedState, _ctx.ObjectFinder, _ctx.ProjectManager, actions);
 
         Assert.DoesNotContain(frameItems, i => i.Header is "Add AxisAlignedRectangle" or "Add Circle");
-        Assert.DoesNotContain(chainItems, i => i.Header is "Flip Horizontally" or "Flip Vertically");
+        Assert.DoesNotContain(chainItems, i => i.Header is "Flip Horizontally" or "Flip Vertically" or "Flip Diagonally");
         Assert.DoesNotContain(chainItems, i => i.HostSlot == TreeMenuHostSlot.AdjustOffsets);
         var duplicate = chainItems.Single(i => i.Header == "Duplicate");
         Assert.Null(duplicate.Children);
