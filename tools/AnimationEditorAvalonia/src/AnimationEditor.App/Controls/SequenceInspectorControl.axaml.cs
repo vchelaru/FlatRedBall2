@@ -46,16 +46,13 @@ public partial class SequenceInspectorControl : UserControl
         SequenceLoopBox.IsCheckedChanged += (_, _) => Commit(document =>
             document.SetLoop(_undo!, _sequence, SequenceLoopBox.IsChecked == true));
 
-        TrackXField.ValueChanged += (_, _) => CommitOffset(TrackXField);
-        TrackYField.ValueChanged += (_, _) => CommitOffset(TrackYField);
         TrackVisibleBox.IsCheckedChanged += (_, _) => CommitVisible();
         TrackFlipBox.IsCheckedChanged += (_, _) => CommitFlip();
 
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
         ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
         // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
-        SealOnCommit(TrackXField, TrackYField, ChainStartField, ChainLoopsField);
-        ApplyRelativeEditsWith(() => CommitOffset(null), TrackXField, TrackYField);
+        SealOnCommit(ChainStartField, ChainLoopsField);
         ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
         ApplyRelativeEditsWith(CommitChainLoops, ChainLoopsField);
         GoToDefinitionButton.Click += (_, _) =>
@@ -200,8 +197,6 @@ public partial class SequenceInspectorControl : UserControl
             TrackNameBox.Text = null;
             TrackNameBox.Tag = null;
             TrackNameBox.PlaceholderText = "(multiple — same sequence)";
-            PutOrMixed(TrackXField, state.X, force);
-            PutOrMixed(TrackYField, state.Y, force);
             TrackVisibleBox.IsChecked = state.Visible;
             TrackFlipBox.IsChecked = state.Flip;
             return;
@@ -209,8 +204,6 @@ public partial class SequenceInspectorControl : UserControl
         TrackNameBox.IsEnabled = true;
         TrackNameBox.PlaceholderText = null;
         Put(TrackNameBox, track.Name, force);
-        PutOrMixed(TrackXField, track.X, force);
-        PutOrMixed(TrackYField, track.Y, force);
         TrackVisibleBox.IsChecked = track.Visible;
         TrackFlipBox.IsChecked = track.FlipHorizontal;
     }
@@ -356,23 +349,6 @@ public partial class SequenceInspectorControl : UserControl
         if (edit(document) is { } error)
             ErrorRaised?.Invoke(error);
         Refresh(force: true);
-    }
-
-    private void CommitOffset(Control? changed)
-    {
-        if (_refreshing) return;
-        if (BulkTracks() is { } tracks)
-        {
-            // Only the component being edited applies (the other keeps each track's own value, mixed or not), so the
-            // undo label names what the user changed. A relative edit names its own field.
-            NumericEdit? bulkX = EditOf(TrackXField, ReferenceEquals(changed, TrackXField) ? TrackXField.Value : null);
-            NumericEdit? bulkY = EditOf(TrackYField, ReferenceEquals(changed, TrackYField) ? TrackYField.Value : null);
-            if (bulkX is null && bulkY is null) return;
-            Commit(document => document.SetTracksOffset(_undo!, _sequence, tracks, bulkX, bulkY));
-            return;
-        }
-        if (_track is not { } track || TrackXField.Value is not { } x || TrackYField.Value is not { } y) return;
-        Commit(document => document.SetTrackOffset(_undo!, _sequence, track, (float)x, (float)y));
     }
 
     private void CommitVisible()

@@ -15,22 +15,28 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// </summary>
 public class SequenceTrackReorderScenarioTests
 {
-    // Four tracks, back to front, with offsets 10, 20, 30, 40 so the preview's draw order can be read off their X.
-    // Walk has frame events, so lane 1 ("Second") is taller than the others.
+    // Four tracks, back to front, each on its own chain whose frames are offset 10, 20, 30, 40, so the preview's draw order
+    // can be read off the frame offsets. The second chain has frame events, so lane 1 ("Second") is taller than the others.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
         editor.WritePng("sheet.png", 64, 64);
-        var walk = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16));
-        walk.Frames[0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Start" });
-        editor.WriteAchx("hero.achx", walk, AnimationEditorHarness.Chain("Run", "sheet.png", (0, 32, 16, 16), (16, 32, 16, 16)));
+        var chains = new List<AnimationChainSave>();
+        for (int i = 0; i < 4; i++)
+        {
+            var chain = AnimationEditorHarness.Chain("C" + (i + 1), "sheet.png", (0, 16 * i, 16, 16), (16, 16 * i, 16, 16));
+            foreach (var frame in chain.Frames) frame.RelativeX = 10 * (i + 1);
+            if (i == 1) chain.Frames[0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Start" });
+            chains.Add(chain);
+        }
+        editor.WriteAchx("hero.achx", chains.ToArray());
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
         string[] names = { "Top", "Second", "Third", "Bottom" };
         for (int i = 0; i < names.Length; i++)
         {
-            var track = new SequenceTrackSave { Name = names[i], X = 10 * (i + 1) };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = i == 1 ? "Walk" : "Run" });
+            var track = new SequenceTrackSave { Name = names[i] };
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "C" + (i + 1) });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);
@@ -44,9 +50,9 @@ public class SequenceTrackReorderScenarioTests
     private static List<string> SavedNames(string path) =>
         SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(track => track.Name).ToList();
 
-    // The preview's sprites back to front, as the X offset of each one's track.
+    // The preview's sprites back to front, as the frame offset of each one's chain.
     private static List<float> DrawnBackToFront(AnimationEditorHarness editor) =>
-        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.X).ToList();
+        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.Frame.RelativeX).ToList();
 
     private static Point Header(AnimationEditorHarness editor, int lane) =>
         editor.PointIn(Timeline(editor), 20, Timeline(editor).Viewport.LaneTop(lane) + 10);

@@ -18,15 +18,13 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// </summary>
 public class SequenceInspectorBulkEditScenarioTests
 {
-    // Body X 1, hidden=false; Head X 3, flipped. Both Y 2. Chains from the shared fixture (every block is 1 cycle):
+    // Body shown and flipped; Head hidden and not flipped. Chains from the shared fixture (every block is 1 cycle):
     // Body: Walk@0, Walk@1, Run@2. Head: Run@0.5, Walk@1.5.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
         string path = SequenceTimelineMultiSelectScenarioTests.WriteFixture(editor);
         var save = SequenceListSave.FromFile(path);
         var tracks = save.Sequences[0].Tracks;
-        (tracks[0].X, tracks[0].Y) = (1, 2);
-        (tracks[1].X, tracks[1].Y) = (3, 2);
         tracks[0].Visible = true;
         tracks[1].Visible = false;
         tracks[0].FlipHorizontal = true;
@@ -58,71 +56,16 @@ public class SequenceInspectorBulkEditScenarioTests
     private static SequenceSave Saved(string path) => SequenceListSave.FromFile(path).Sequences[0];
 
     [AvaloniaFact]
-    public async Task TwoTracks_DifferentX_ShowMixed_TypingFiveSetsBoth_AndOneUndoRestoresBoth()
+    public async Task TwoTracks_ShowThePanel_WithTheNameDisabled_AndNoOffsetFields()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string path = await SelectBothTracksAsync(editor);
+        await SelectBothTracksAsync(editor);
         var inspector = Inspector(editor);
 
         inspector.TrackPanel.IsVisible.ShouldBeTrue();
-        inspector.TrackXField.Value.ShouldBeNull();
-        inspector.TrackXField.PlaceholderText.ShouldBe("(mixed)");
-        inspector.TrackYField.Value.ShouldBe(2m, "the tracks agree on Y");
-        inspector.TrackYField.PlaceholderText.ShouldNotBe("(mixed)");
         inspector.TrackNameBox.IsEnabled.ShouldBeFalse("a name is for one track");
-
-        editor.TypeAndEnter(BoxOf(inspector.TrackXField), "5");
-
-        Saved(path).Tracks.Select(t => (t.X, t.Y)).Take(2).ShouldBe(new[] { (5f, 2f), (5f, 2f) });
-        editor.UndoLabels.ShouldBe(new[] { "Set Offset X of 2 tracks to 5" });
-        inspector.TrackXField.Value.ShouldBe(5m);
+        inspector.GetVisualDescendants().OfType<NumericUpDown>().Where(f => f.IsEffectivelyVisible).ShouldBeEmpty();
         SequenceTimelineMultiSelectScenarioTests.Timeline(editor).SelectedTracks.ShouldBe(new[] { 0, 1 });
-
-        editor.Press(Key.Z, RawInputModifiers.Control);
-        Saved(path).Tracks.Select(t => t.X).Take(2).ShouldBe(new[] { 1f, 3f });
-        inspector.TrackXField.Value.ShouldBeNull();
-        inspector.TrackXField.PlaceholderText.ShouldBe("(mixed)");
-        editor.UndoLabels.ShouldBeEmpty("one undo undid the edit of both tracks");
-    }
-
-    [AvaloniaFact]
-    public async Task TwoTracks_RelativeEditOverMixedX_ShiftsEachByItsOwnValue()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string path = await SelectBothTracksAsync(editor);
-
-        editor.TypeAndEnter(BoxOf(Inspector(editor).TrackXField), "+ 4");
-
-        Saved(path).Tracks.Select(t => t.X).Take(2).ShouldBe(new[] { 5f, 7f });
-        Inspector(editor).TrackXField.Value.ShouldBeNull("the offsets are still different");
-        editor.UndoLabels.ShouldBe(new[] { "Set Offset X of 2 tracks" });
-    }
-
-    [AvaloniaFact]
-    public async Task TwoTracks_LeavingAMixedFieldUntouched_ChangesNothing()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string path = await SelectBothTracksAsync(editor);
-        var inspector = Inspector(editor);
-
-        BoxOf(inspector.TrackXField).Focus();
-        editor.Layout();
-        editor.Press(Key.Tab);
-
-        Saved(path).Tracks.Select(t => t.X).Take(2).ShouldBe(new[] { 1f, 3f });
-        editor.UndoLabels.ShouldBeEmpty();
-    }
-
-    [AvaloniaFact]
-    public async Task TwoTracks_TypingY_KeepsTheMixedXAndEachTracksOwnX()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string path = await SelectBothTracksAsync(editor);
-
-        editor.TypeAndEnter(BoxOf(Inspector(editor).TrackYField), "9");
-
-        Saved(path).Tracks.Select(t => (t.X, t.Y)).Take(2).ShouldBe(new[] { (1f, 9f), (3f, 9f) });
-        Inspector(editor).TrackXField.PlaceholderText.ShouldBe("(mixed)");
     }
 
     [AvaloniaFact]
