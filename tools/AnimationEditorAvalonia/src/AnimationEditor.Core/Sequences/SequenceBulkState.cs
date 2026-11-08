@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using AnimationEditor.Core.ViewModels;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Sequences;
@@ -18,27 +19,14 @@ public static class SequenceBulkState
     {
         var selected = tracks.Select(index => sequence.Tracks[index]).ToList();
         return new TrackBulkState(
-            Shared(selected.Select(t => t.Visible)), Shared(selected.Select(t => t.FlipHorizontal)));
+            MixedState.Common(selected.Select(t => t.Visible)), MixedState.Common(selected.Select(t => t.FlipHorizontal)));
     }
 
     public static ChainBulkState ForChains(SequenceSave sequence, IReadOnlyList<TimelineChainId> chains)
     {
         var selected = chains.Select(id => sequence.Tracks[id.Track].Chains[id.Chain]).ToList();
         return new ChainBulkState(
-            Shared(selected.Select(c => c.Source)), Shared(selected.Select(c => c.Chain)),
-            Shared(selected.Select(c => c.Start)), Shared(selected.Select(c => c.Loops)));
-    }
-
-    // The value every item has, or null when they differ (or there are none).
-    private static T? Shared<T>(IEnumerable<T> values) where T : struct
-    {
-        var list = values.Distinct().Take(2).ToList();
-        return list.Count == 1 ? list[0] : null;
-    }
-
-    private static string? Shared(IEnumerable<string> values)
-    {
-        var list = values.Distinct().Take(2).ToList();
-        return list.Count == 1 ? list[0] : null;
+            MixedState.Common(selected.Select(c => c.Source)), MixedState.Common(selected.Select(c => c.Chain)),
+            MixedState.Common(selected.Select(c => c.Start)), MixedState.Common(selected.Select(c => c.Loops)));
     }
 }

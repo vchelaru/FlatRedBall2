@@ -18,7 +18,7 @@ public class AppCommandsSetChainsPlaybackModeTests
 
         Assert.True(a.PingPong);
         Assert.True(b.PingPong);
-        Assert.Equal("Enable ping-pong on 2 animations", ctx.UndoManager.UndoHistory.Last().Description);
+        Assert.Equal("Set Ping-Pong on 2 Animations", ctx.UndoManager.UndoHistory.Last().Description);
 
         ctx.UndoManager.Undo();
 
