@@ -113,4 +113,61 @@ public class ChainFlipNamingTests
         var source = TestHelpers.MakeChain(ctx.Acls, "WalkRight");
         Assert.Equal("WalkDown", ctx.AppCommands.DuplicateChain(source, D)!.Name);
     }
+
+    private static void FlipDiagonallyOnEveryFrame(AnimationChainSave chain)
+    {
+        foreach (var frame in chain.Frames) frame.FlipDiagonal = true;
+    }
+
+    // The source is already diagonal-flipped, so a toggle changes the display differently from the
+    // unflipped source above: H and V still mirror, and a diagonal toggle undoes or redoes the transpose.
+    [Theory]
+    [InlineData(H,         "WalkRight", "WalkLeft")]
+    [InlineData(H,         "IdleDown",  "IdleDown2")]
+    [InlineData(V,         "IdleDown",  "IdleUp")]
+    [InlineData(V,         "WalkRight", "WalkRight2")]
+    [InlineData(D,         "WalkRight", "WalkDown")]
+    [InlineData(D,         "Run_Left",  "Run_Up")]
+    [InlineData(D,         "IdleDown",  "IdleRight")]
+    [InlineData(H | V,     "WalkRight", "WalkLeft")]
+    [InlineData(H | V,     "IdleUp",    "IdleDown")]
+    [InlineData(H | D,     "WalkRight", "WalkDown")]
+    [InlineData(H | D,     "IdleDown",  "IdleLeft")]
+    [InlineData(H | D,     "IdleUp",    "IdleRight")]
+    [InlineData(V | D,     "WalkRight", "WalkUp")]
+    [InlineData(V | D,     "IdleDown",  "IdleRight")]
+    [InlineData(H | V | D, "WalkRight", "WalkUp")]
+    [InlineData(H | V | D, "IdleUp",    "IdleRight")]
+    public void Duplicate_FromADiagonallyFlippedSource_RenamesByTheChangeTheToggleMakesToTheDisplay(
+        ChainFlip flip, string source, string expected)
+    {
+        Assert.Equal(expected, DuplicatedName(source, flip, FlipDiagonallyOnEveryFrame));
+    }
+
+    [Theory]
+    [InlineData(D,     "WalkRight", "WalkUp")]
+    [InlineData(D,     "IdleUp",    "IdleRight")]
+    [InlineData(H | D, "WalkRight", "WalkUp")]
+    [InlineData(H | D, "IdleUp",    "IdleLeft")]
+    public void Duplicate_FromAHorizontallyAndDiagonallyFlippedSource_RenamesByTheChangeTheToggleMakesToTheDisplay(
+        ChainFlip flip, string source, string expected)
+    {
+        Assert.Equal(expected, DuplicatedName(source, flip, chain =>
+        {
+            foreach (var frame in chain.Frames) { frame.FlipHorizontal = true; frame.FlipDiagonal = true; }
+        }));
+    }
+
+    [Fact]
+    public void Duplicate_VerticalAndDiagonal_WhenFramesDisagree_FallsBackToTheVerticalRename()
+    {
+        Assert.Equal("IdleDown", DuplicatedName("IdleUp", V | D,
+            chain => chain.Frames[0].FlipHorizontal = true));
+    }
+
+    [Fact]
+    public void Duplicate_ADirectionWordFollowedByADigit_IsStillRenamed()
+    {
+        Assert.Equal("WalkLeft1", DuplicatedName("WalkRight1", H));
+    }
 }

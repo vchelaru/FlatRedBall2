@@ -30,4 +30,14 @@ public class TreeMenuRendererTests
         foreach (var icon in Enum.GetValues<TreeMenuIcon>())
             Assert.True(AssetLoader.Exists(new Uri(TreeMenuRenderer.IconAssetPath(icon))), icon.ToString());
     }
+
+    [AvaloniaFact]
+    public void IconAssetPath_EachFlipIcon_UsesItsOwnAxisIcon()
+    {
+        const string folder = "avares://AnimationEditor.Views/Assets/icons/svg/";
+
+        Assert.Equal(folder + "IconFlipH.svg", TreeMenuRenderer.IconAssetPath(TreeMenuIcon.FlipHorizontal));
+        Assert.Equal(folder + "IconFlipV.svg", TreeMenuRenderer.IconAssetPath(TreeMenuIcon.FlipVertical));
+        Assert.Equal(folder + "IconFlipD.svg", TreeMenuRenderer.IconAssetPath(TreeMenuIcon.FlipDiagonal));
+    }
 }

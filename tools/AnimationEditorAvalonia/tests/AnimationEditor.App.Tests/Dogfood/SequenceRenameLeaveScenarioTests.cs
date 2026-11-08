@@ -291,6 +291,104 @@ public class SequenceRenameLeaveScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "Strike", "Rest" });
     }
 
+    // The macOS system menu bar raises no pointer press in the window, so the commit that a click on the in-window
+    // menu gets from the press handler has to come from the Undo, Redo and Back actions themselves.
+    [AvaloniaFact]
+    public async Task NativeMenuUndoAndRedo_WhileRenaming_CommitFirst()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        BeginSequenceRename(editor, 0, "Strike");
+        editor.Press(Key.Enter);
+        BeginSequenceRename(editor, 1, "Rest");
+        var bar = NativeMenuTestSupport.Build(editor);
+
+        NativeMenuTestSupport.Activate(bar, "Edit", "Undo");
+
+        editor.SequenceNames.ShouldBe(new[] { "Strike", "Idle" });
+        NativeMenuTestSupport.Activate(bar, "Edit", "Redo");
+        editor.SequenceNames.ShouldBe(new[] { "Strike", "Rest" });
+    }
+
+    [AvaloniaFact]
+    public async Task NativeMenuRedo_WhileRenaming_CommitsFirst_SoTheNewRenameReplacesTheRedo()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        BeginSequenceRename(editor, 0, "Strike");
+        editor.Press(Key.Enter);
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
+        BeginSequenceRename(editor, 1, "Rest");
+
+        NativeMenuTestSupport.Activate(NativeMenuTestSupport.Build(editor), "Edit", "Redo");
+
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Rest" });
+        editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Rest'" });
+    }
+
+    [AvaloniaFact]
+    public async Task NativeMenuBack_WhileRenaming_CommitsTheRename()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        editor.Click((Control)List(editor).ContainerFromIndex(1)!);
+        BeginSequenceRename(editor, 1, "Rest");
+
+        NativeMenuTestSupport.Activate(NativeMenuTestSupport.Build(editor), "View", "Back");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        SavedNames(boss).ShouldBe(new[] { "Attack", "Rest" });
+    }
+
+    [AvaloniaFact]
+    public async Task LeavingByOpeningAFile_PutsTheRenameInTheLeftTabsHistory()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        string other = editor.WriteSeqj("other.seqj", "One", "Two");
+        await editor.OpenAsync(boss);
+
+        BeginSequenceRename(editor, 1, "Rest");
+        await editor.OpenAsync(other);
+        editor.ClickTab("boss.seqj");
+
+        editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Idle' to 'Rest'" });
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickingAnotherTrackHeader_WhileRenamingATrack_CommitsTheFirst_AndOpensTheSecond()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        BeginTrackRename(editor, 0, "Torso");
+
+        editor.DoubleClickAt(OnHeader(editor, 1));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        Timeline(editor).RenamingTrack.ShouldBe(1);
+        editor.UndoLabels.ShouldBe(new[] { "Rename Track 'Body' to 'Torso'" });
+    }
+
+    [AvaloniaFact]
+    public async Task ARefusedName_OnLeavingByCtrlS_ShowsTheBanner_AndClosesTheRenameBox()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+
+        BeginSequenceRename(editor, 1, "Attack");
+        editor.Press(Key.S, RawInputModifiers.Control);
+
+        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        List(editor).ContainerFromIndex(1)!.GetVisualDescendants().OfType<InlineRenameBox>().Single().IsEditing.ShouldBeFalse();
+        SavedNames(boss).ShouldBe(new[] { "Attack", "Idle" });
+    }
+
     [AvaloniaFact]
     public async Task CtrlS_WhileRenamingASequence_CommitsTheRename()
     {
