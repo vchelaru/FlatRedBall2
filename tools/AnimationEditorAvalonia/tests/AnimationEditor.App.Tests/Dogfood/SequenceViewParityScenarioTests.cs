@@ -196,7 +196,7 @@ public class SequenceViewParityScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ArrowKeys_StillNudgeSelectedTracks_NotThePlayhead()
+    public async Task Right_WithATrackSelected_StillStepsThePlayhead_AndEditsNothing()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await OpenFixtureAsync(editor);
@@ -205,8 +205,8 @@ public class SequenceViewParityScenarioTests
 
         editor.Press(Key.Right);
 
-        Timeline(editor).Playhead.ShouldBe(0);
-        editor.UndoLabels.Count.ShouldBe(1);
+        Timeline(editor).Playhead.ShouldBe(0.1, 1e-6);
+        editor.UndoLabels.ShouldBeEmpty();
     }
 
     [AvaloniaFact]

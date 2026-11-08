@@ -7569,14 +7569,13 @@ public partial class MainWindow : Window
                 Scope = HotkeyScope.Document,
                 Action = () => ActivePane.TogglePlayback(),
             },
-            // The .achx player has no keyboard stepping, so these are the sequence tab's own. Left/Right yield to the arrow-key
-            // nudge of selected tracks (the same keys, same panes); Home/End have no such conflict. All four need the
-            // timeline or the preview to hold the focus, so the list, the tree and every text box keep their own keys.
+            // The .achx player has no keyboard stepping, so these are the sequence tab's own. All four need the sequence
+            // timeline to hold the focus, so the list, the tree, the preview and every text box keep their own keys.
             new()
             {
                 Id = "playhead-step-back", Description = "Step Playhead to Previous Frame", Category = "Playback",
                 Gestures = new[] { new HotkeyGesture("Left", Forbidden: Command | Shift | Alt) },
-                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply || _sequencePane.ArrowKeysNudge,
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
                 Scope = HotkeyScope.Document,
                 Action = () => _sequencePane.StepPlayhead(-1),
             },
@@ -7584,7 +7583,7 @@ public partial class MainWindow : Window
             {
                 Id = "playhead-step-forward", Description = "Step Playhead to Next Frame", Category = "Playback",
                 Gestures = new[] { new HotkeyGesture("Right", Forbidden: Command | Shift | Alt) },
-                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply || _sequencePane.ArrowKeysNudge,
+                ShouldSkip = () => IsTextInputFocused() || !_sequencePane.PlayheadKeysApply,
                 Scope = HotkeyScope.Document,
                 Action = () => _sequencePane.StepPlayhead(+1),
             },

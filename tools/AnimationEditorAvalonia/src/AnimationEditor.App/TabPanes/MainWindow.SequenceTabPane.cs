@@ -105,15 +105,11 @@ public partial class MainWindow
         // The Speed field's value, kept across loads: each load starts a fresh SequencePlayback that takes it.
         private double SpeedValue => (double)(_window.SequenceSpeedInput.Value ?? 1.0m);
 
-        /// <summary>Whether the playhead keys act: a sequence is shown and the timeline or the preview holds the focus.</summary>
+        /// <summary>Whether the playhead keys act: a sequence is shown and the timeline holds the focus.</summary>
         public bool PlayheadKeysApply =>
             _document is not null && _window.SequenceEditorPane.IsVisible
             && _window.FocusManager?.GetFocusedElement() is Visual focused
-            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused)
-                || focused == _window.SequencePreview || _window.SequencePreview.IsVisualAncestorOf(focused));
-
-        /// <summary>Whether Left and Right nudge the selected tracks (<see cref="Controls.TrackNudgeKeys"/>) instead of stepping the playhead.</summary>
-        public bool ArrowKeysNudge => _window.SequenceTimeline.SelectedTracks.Count > 0;
+            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused));
 
         /// <summary>
         /// Moves the primary sequence's playhead to the next (<paramref name="direction"/> 1) or previous (-1) frame boundary
