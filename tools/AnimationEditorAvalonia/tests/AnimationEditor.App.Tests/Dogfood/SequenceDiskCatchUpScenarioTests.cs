@@ -154,21 +154,16 @@ public class SequenceDiskCatchUpScenarioTests
         string seqj = editor.WriteSeqj("boss.seqj", "Attack");
         await editor.OpenAsync(seqj);
         editor.ClickMenu("MenuEnableHotReload");
-        // Only a failed save leaves an edit in memory that the file lacks.
-        File.SetAttributes(seqj, FileAttributes.ReadOnly);
-        try
-        {
-            editor.Click(editor.Control<Button>("AddSequenceButton"));
-            editor.SequenceNames.ShouldBe(new[] { "Attack", "Sequence" });
+        // An edit made while the file could not be read (saving paused) is the one kind that never reaches the file.
+        File.WriteAllText(seqj, "{ nope");
+        editor.ClickMenu("MenuReloadFromDisk");
+        editor.Click(editor.Control<Button>("AddSequenceButton"));
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Sequence" });
 
-            editor.ClickMenu("MenuReloadFromDisk");
+        Rewrite(seqj, "Attack", "Idle");
+        editor.ClickMenu("MenuReloadFromDisk");
 
-            editor.SequenceNames.ShouldBe(new[] { "Attack" });
-        }
-        finally
-        {
-            File.SetAttributes(seqj, FileAttributes.Normal);
-        }
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
     }
 
     [AvaloniaFact]
