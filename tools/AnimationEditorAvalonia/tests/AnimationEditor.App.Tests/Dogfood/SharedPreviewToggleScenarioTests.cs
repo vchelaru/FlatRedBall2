@@ -1,7 +1,7 @@
 using System.Text.Json;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
-using AnimationEditor.Views.Controls;
+using AnimationEditor.App.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Shouldly;
