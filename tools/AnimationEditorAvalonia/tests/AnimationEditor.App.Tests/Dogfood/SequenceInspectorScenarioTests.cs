@@ -29,7 +29,7 @@ public class SequenceInspectorScenarioTests
             AnimationEditorHarness.Chain("Run", "sheet.png", (0, 32, 16, 16), (16, 32, 16, 16)));
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
-        var sequence = new SequenceSave { Name = "Attack" };
+        var sequence = new SequenceSave { Name = "Attack", Loop = false };
         sequence.Tracks.AddRange(tracks);
         save.Sequences.Add(sequence);
         save.Save(path);

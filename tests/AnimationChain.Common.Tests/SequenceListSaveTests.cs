@@ -97,7 +97,44 @@ public class SequenceListSaveTests
         loaded.Sources.ShouldBeEmpty();
     }
 
-    private const string LegacyJson = """{ "sources": [ "A.achj" ], "sequences": [ { "name": "Idle", "tracks": [] } ] }""";
+    [Fact]
+    public void NewSequence_LoopsByDefault_LikeAChain()
+    {
+        new SequenceSave().Loop.ShouldBeTrue();
+        new AnimationChainSave().Loop.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void FromJsonString_MissingLoopKey_Loops()
+    {
+        var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "Idle", "tracks": [] } ] }""");
+
+        loaded.Sequences.Single().Loop.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void FromJsonString_ExplicitLoopFalse_StaysFalse()
+    {
+        var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "Idle", "loop": false, "tracks": [] } ] }""");
+
+        loaded.Sequences.Single().Loop.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ToJsonString_AlwaysWritesTheLoopKey(bool loop)
+    {
+        var save = new SequenceListSave();
+        save.Sequences.Add(new SequenceSave { Name = "Idle", Loop = loop });
+
+        var written = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["loop"]!;
+
+        written.GetValue<bool>().ShouldBe(loop);
+        SequenceListSave.FromJsonString(save.ToJsonString()).Sequences.Single().Loop.ShouldBe(loop);
+    }
+
+    private const string LegacyJson ="""{ "sources": [ "A.achj" ], "sequences": [ { "name": "Idle", "tracks": [] } ] }""";
 
     [Fact]
     public void ToJsonString_NewFile_WritesVersionOneFirst()

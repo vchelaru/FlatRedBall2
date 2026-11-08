@@ -146,7 +146,8 @@ public class SequencePreviewScenarioTests
 
         (await editor.WaitUntilAsync(() => !IsPlaying(editor), TimeSpan.FromSeconds(3))).ShouldBeTrue();
         Timeline(editor).Playhead.ShouldBe(0.2, 1e-6);
-        SequencePreview(editor).Composite.ShouldBeEmpty();
+        // The sequence stops at its end and holds its final pose (Run's last frame), not a blank preview.
+        SequencePreview(editor).Composite!.Select(sprite => sprite.FrameIndex).ShouldBe(new[] { 1 });
     }
 
     [AvaloniaFact]
