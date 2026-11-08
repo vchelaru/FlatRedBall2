@@ -7,6 +7,20 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class TimelineEmptyClickTests
 {
     [Fact]
+    public void IsEmptyLaneSpace_IsALaneOrTheBlankAreaUnderTheLastLane_ButNotTheRulerOrTheNewTrackRow()
+    {
+        var viewport = new TimelineViewport();
+        const int tracks = 2;
+        double belowLanes = viewport.LaneTop(tracks) + 5;
+
+        TimelineEmptyClick.IsEmptyLaneSpace(viewport.RowAt(viewport.LaneTop(1) + 5, tracks)).ShouldBeTrue();
+        TimelineEmptyClick.IsEmptyLaneSpace(viewport.RowAt(belowLanes, tracks)).ShouldBeTrue();
+        TimelineEmptyClick.IsEmptyLaneSpace(viewport.RowAt(belowLanes, 0)).ShouldBeTrue();
+        TimelineEmptyClick.IsEmptyLaneSpace(viewport.RowAt(2, tracks)).ShouldBeFalse();
+        TimelineEmptyClick.IsEmptyLaneSpace(viewport.RowAt(viewport.LaneTop(TimelineViewport.NewTrackLane) + 5, tracks)).ShouldBeFalse();
+    }
+
+    [Fact]
     public void PlayheadTime_PlainClickOnEmptyLane_IsTheTimeUnderThePress()
     {
         var viewport = new TimelineViewport();
