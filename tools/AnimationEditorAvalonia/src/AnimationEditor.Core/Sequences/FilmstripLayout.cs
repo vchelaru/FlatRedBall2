@@ -11,8 +11,8 @@ namespace AnimationEditor.Core.Sequences;
 /// <param name="SpriteHeight">The sprite's height in pixels as displayed; 0 when unknown.</param>
 public readonly record struct FilmstripFrame(double Duration, double SpriteWidth, double SpriteHeight);
 
-/// <summary>One showing of a frame within the block: <see cref="Cycle"/> is the loop cycle it starts in. Times are seconds from the block's start. <see cref="IsReturn"/> marks the way back of a ping-pong.</summary>
-public readonly record struct FilmstripVisit(int Frame, double Start, double End, int Cycle, bool IsReturn = false);
+/// <summary>One showing of a frame within the block: <see cref="Cycle"/> is the loop cycle it starts in. Times are seconds from the block's start. <see cref="IsReturn"/> marks the way back of a ping-pong. <see cref="IsHold"/> marks the last showing of a non-looping chain, stretched to fill the rest of the block.</summary>
+public readonly record struct FilmstripVisit(int Frame, double Start, double End, int Cycle, bool IsReturn = false, bool IsHold = false);
 
 /// <summary>
 /// One cell of a block's filmstrip. <see cref="Frame"/> is the frame it draws (the longest of its visits). X and Width are
@@ -29,7 +29,8 @@ public sealed record FilmstripCell(
 /// scale in time (width = duration x pixels per second) and tile once per loop cycle, in the order playback shows the
 /// frames (<see cref="PlaybackTimeline"/>: Reverse plays last to first, PingPong plays forward then back). A ping-pong's
 /// end frames show twice as long, back to back across the turnaround and across the loop point, so each is one
-/// double-length cell. The last cycle is clipped at the played end, which is where a cut chain stops.
+/// double-length cell. The last cycle is clipped at the played end, which is where a cut chain stops. A chain that does
+/// not loop draws its one cycle, then its final showing stretched to the played end (the hold), not further cycles.
 /// </summary>
 public static class FilmstripLayout
 {
@@ -78,9 +79,10 @@ public static class FilmstripLayout
     /// at the cell height and is centered on the image (a clipped last cell keeps the window of its full width). A wider
     /// cell left-aligns the sprite. Frames under <see cref="SliverPixels"/> group until the group reaches that width (a
     /// leftover joins the group before it), and the group draws its longest frame. A frame with no sprite size draws square.
+    /// With <paramref name="loop"/> false the chain plays one cycle and its last showing is stretched to <paramref name="played"/>.
     /// </summary>
     public static IReadOnlyList<FilmstripCell> Cells(
-        IReadOnlyList<FilmstripFrame> frames, bool pingPong, bool reverse, double played, double pixelsPerSecond, double cellHeight)
+        IReadOnlyList<FilmstripFrame> frames, bool pingPong, bool reverse, double played, double pixelsPerSecond, double cellHeight, bool loop = true)
     {
         int count = frames.Count;
         if (count == 0 || played <= 0 || pixelsPerSecond <= 0 || cellHeight <= 0) return Array.Empty<FilmstripCell>();
@@ -90,7 +92,7 @@ public static class FilmstripLayout
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
-        int cycles = (int)Math.Ceiling(played / cycle - 1e-9);
+        int cycles = loop ? (int)Math.Ceiling(played / cycle - 1e-9) : 1;
 
         var units = new List<Unit>();
         for (int k = 0; k < cycles && units.Count < MaxUnits; k++)
@@ -116,6 +118,17 @@ public static class FilmstripLayout
                 }
                 start = end;
             }
+        }
+
+        // A chain that does not loop holds its final showing: that cell stretches to the end of the block.
+        if (!loop && played > cycle + 1e-9 && units.Count > 0)
+        {
+            var last = units[^1];
+            var visits = last.Visits;
+            var held = visits[^1];
+            visits[^1] = held with { End = played, IsHold = true };
+            last.End = played;
+            last.NaturalEnd = played;
         }
 
         // Frames under the sliver width accumulate until they reach it; a leftover at the end joins the last group.

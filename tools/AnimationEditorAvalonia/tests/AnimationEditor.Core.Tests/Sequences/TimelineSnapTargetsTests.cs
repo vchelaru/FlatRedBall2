@@ -114,6 +114,24 @@ public class TimelineSnapTargetsTests
     }
 
     [Fact]
+    public void ResizeEdge_OfAChainThatDoesNotRepeat_OffersFrameBoundariesOnlyInItsFirstCycle()
+    {
+        var walk = Ref("Walk", 0);
+        var blocks = Blocks(Track(walk));
+        var frames = new[] { 0.1, 0.2, 0.3, 0.4 };
+        var others = TimelineSnapTargets.Others(blocks, walk, 9);
+
+        // 0.6 s would be frame boundary 0.1 of the second cycle; a held tail has no second cycle to snap to.
+        var held = TimelineSnapTargets.ResizeEdge(blocks[0], 0.6 + 3 / 1500.0, others, frames, 1500, false, repeats: false);
+        var repeating = TimelineSnapTargets.ResizeEdge(blocks[0], 0.6 + 3 / 1500.0, others, frames, 1500, false, repeats: true);
+        var firstCycle = TimelineSnapTargets.ResizeEdge(blocks[0], 0.3 + 3 / 1500.0, others, frames, 1500, false, repeats: false);
+
+        held.Snap.Target.ShouldBeNull();
+        repeating.Snap.Target!.Value.Kind.ShouldBe(SnapKind.FrameBoundary);
+        firstCycle.Snap.Target!.Value.Kind.ShouldBe(SnapKind.FrameBoundary);
+    }
+
+    [Fact]
     public void ResizeEdge_Bypass_UsesTheRawEdge()
     {
         var walk = Ref("Walk", 0);

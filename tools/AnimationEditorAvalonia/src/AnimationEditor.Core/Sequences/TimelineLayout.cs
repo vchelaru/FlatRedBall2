@@ -7,7 +7,8 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// One chain reference as the timeline draws it. <see cref="Played"/> is what plays after the cut rule;
-/// <see cref="Full"/> is what its loop count asks for, so the part past <see cref="Played"/> is the hatched cut tail.
+/// <see cref="Full"/> is the length its cycle count asks for (repeats or hold), so the part past <see cref="Played"/> is
+/// the hatched cut tail.
 /// </summary>
 public sealed record TimelineBlock(
     int Track, int Chain, SequenceChainReferenceSave Reference, double Played, double Full, double CycleLength, bool IsMissing)
@@ -18,7 +19,7 @@ public sealed record TimelineBlock(
     // Float loop counts can land a chain a rounding error past the next start; that is not a cut anyone can see.
     public bool IsCut => Full > Played + 1e-4;
 
-    /// <summary>Whether dragging the right edge changes the loop count. A missing or empty chain has no cycle to count.</summary>
+    /// <summary>Whether dragging the right edge changes the length in cycles. A missing or empty chain has no cycle to count.</summary>
     public bool CanResize => !IsMissing && CycleLength > 0;
 }
 

@@ -3,9 +3,11 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <summary>
 /// The timing rules of a <see cref="SequenceSave"/>, shared by the editor and any runtime player so both agree.
 /// <list type="bullet">
-/// <item>A chain reference plays for <see cref="SequenceChainReferenceSave.Loops"/> cycles, or until the next chain on
+/// <item>A chain reference lasts <see cref="SequenceChainReferenceSave.Loops"/> cycles, or until the next chain on
 /// its track starts, whichever is first. The cut part never plays and is not resumed. The cut is not stored: move the
 /// next chain away and the earlier one plays in full again.</item>
+/// <item>What fills that length follows the chain's own Loop flag: a looping chain repeats, a non-looping one plays one
+/// cycle and holds its last frame (the final frame of <see cref="PlaybackTimeline"/>'s cycle) to the end.</item>
 /// <item>The next chain is the one with the next later start. On a tie, list order decides: of two chains starting
 /// together, the earlier one in <see cref="SequenceTrackSave.Chains"/> plays for zero seconds.</item>
 /// <item>A missing chain (cycle length 0) never plays, but it still cuts the chain before it.</item>
@@ -61,8 +63,8 @@ public static class SequenceTimeline
     /// <param name="track">The track to sample.</param>
     /// <param name="time">Seconds from the sequence start.</param>
     /// <param name="cycleLength">A reference's cycle length in seconds; 0 for a missing chain.</param>
-    /// <param name="localTime">Seconds since the returned reference's start; 0 when none plays. The caller wraps it
-    /// into a cycle, since the loop count overrides the chain's own Loop flag.</param>
+    /// <param name="localTime">Seconds since the returned reference's start; 0 when none plays. The caller maps it onto the
+    /// chain: wrapped when the chain loops, held at the end of the cycle when it does not.</param>
     public static SequenceChainReferenceSave? ActiveAt(SequenceTrackSave track, double time,
         Func<SequenceChainReferenceSave, double> cycleLength, out double localTime)
     {

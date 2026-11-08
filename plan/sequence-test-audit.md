@@ -118,7 +118,7 @@ Failed!  - Failed:     1 |
 | M51 | Clock: Advance does nothing when paused | UNPINNED -> pinned | TimelineAuditTests.Advance_WhilePaused_DoesNotMoveThePlayhead |
 | M52 | Scene: Z order | caught | At_TwoTracksFromTwoSources_DrawsBothInZOrderWithTheirOwnTextures |
 | M53 | Scene: flip mirrors offset | caught | Sample_AFlippedTrack_MirrorsTheFrameOffsetAndFlipAcrossTheTrack |
-| M54 | Scene: loop count wraps into a cycle | UNPINNED -> pinned | SequencePingPongAndLoopTests.At_ReferenceLoops_OverrideAChainWhoseOwnLoopFlagIsOff (the old test's chain had Loop on, so it never exercised the override) |
+| M54 | Scene: loop count wraps into a cycle | UNPINNED -> pinned | SequencePingPongAndLoopTests.At_ReferenceLoops_OverrideAChainWhoseOwnLoopFlagIsOff (the old test's chain had Loop on, so it never exercised the override). Superseded (#1624): loops no longer override Loop; the test is now `At_ReferenceLoops_OnAChainWhoseOwnLoopFlagIsOff_HoldTheLastFrameInsteadOfRepeating` |
 | M55 | Scene: texture resolved through the source | caught | At_TwoTracksFromTwoSources_DrawsBothInZOrderWithTheirOwnTextures |
 | M56 | CollapsedSourceSet case-insensitive | caught | IsCollapsed_IgnoresCase_LikeTheDocumentsSourceLookup |
 | M57 | CollapsedSourceSet.Load does not raise Changed | caught | Load_ReplacesTheKeys_WithoutRaisingChanged |

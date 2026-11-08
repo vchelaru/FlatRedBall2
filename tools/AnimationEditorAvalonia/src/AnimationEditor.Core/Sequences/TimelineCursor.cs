@@ -5,7 +5,7 @@ public enum TimelineCursor
 {
     Default,
 
-    /// <summary>West-east double arrow: a chain's right edge can be dragged to change its loop count.</summary>
+    /// <summary>West-east double arrow: a chain's right edge can be dragged to change its length in cycles.</summary>
     ResizeHorizontal,
 
     /// <summary>North-south double arrow: a track header is being dragged to another lane.</summary>

@@ -18,8 +18,8 @@ public static class FilmstripReadout
 
     /// <summary>
     /// The card for <paramref name="visit"/> inside <paramref name="cell"/> of a chain with <paramref name="frameCount"/>
-    /// frames whose block starts at <paramref name="blockStart"/> seconds. A merged sliver group lists its frames, and a
-    /// doubled ping-pong end cell says which half the showing is.
+    /// frames whose block starts at <paramref name="blockStart"/> seconds. A merged sliver group lists its frames, a
+    /// doubled ping-pong end cell says which half the showing is, and the held tail of a non-looping chain says "held".
     /// </summary>
     public static FilmstripCard At(string chain, int frameCount, double blockStart, FilmstripCell cell, FilmstripVisit visit)
     {
@@ -39,6 +39,7 @@ public static class FilmstripReadout
         {
             lines.Add(visit.IsReturn ? "return" : "forward");
         }
+        if (visit.IsHold) lines.Add("held");
         return new FilmstripCard(chain, visit.Frame, lines);
     }
 

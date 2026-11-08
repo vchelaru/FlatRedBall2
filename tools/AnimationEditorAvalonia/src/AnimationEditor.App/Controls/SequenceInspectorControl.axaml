@@ -121,9 +121,11 @@
                             <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
                         </Grid>
                         <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="Loops" Classes="label" />
+                            <TextBlock Text="Cycles" Classes="label"
+                                       ToolTip.Tip="The block's length in playback cycles (a ping-pong cycle is there and back). A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                             <viewsControls:FlankerNumericField x:Name="ChainLoopsField" Grid.Column="1"
-                                                               Increment="1" FormatString="0.###" />
+                                                               Increment="1" FormatString="0.###"
+                                                               ToolTip.Tip="The block's length in playback cycles (a ping-pong cycle is there and back). A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                         </Grid>
                         <Grid ColumnDefinitions="78,*">
                             <TextBlock Text="Length" Classes="label" />
