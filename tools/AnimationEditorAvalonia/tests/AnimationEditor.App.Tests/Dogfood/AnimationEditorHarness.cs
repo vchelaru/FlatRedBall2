@@ -760,6 +760,8 @@ internal sealed class AnimationEditorHarness : IDisposable
     {
         Window.MouseMove(from, modifiers);
         Window.MouseDown(from, MouseButton.Left, modifiers);
+        // Work a press posts (a rename committing on the focus loss) runs before the first move, as it does on the desktop.
+        Dispatcher.UIThread.RunJobs();
         for (int step = 1; step <= 4; step++)
         {
             double t = step / 4.0;
@@ -774,6 +776,7 @@ internal sealed class AnimationEditorHarness : IDisposable
     {
         Window.MouseMove(from, modifiers);
         Window.MouseDown(from, MouseButton.Left, modifiers);
+        Dispatcher.UIThread.RunJobs();
         for (int step = 1; step <= 4; step++)
         {
             double t = step / 4.0;
