@@ -2699,7 +2699,7 @@ public partial class MainWindow : Window
     ];
 
     // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
-    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory, MenuReloadFromDisk];
+    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuSaveAs, MenuUndo, MenuRedo, MenuShowHistory, MenuReloadFromDisk];
 
     // Copy, Cut, Paste and Duplicate are enabled by the active pane (ITabPane.CanCopyPaste), not by scope: a sequence tab
     // takes them only while its list or its timeline is the focused surface.
@@ -3025,8 +3025,7 @@ public partial class MainWindow : Window
 
     private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = ActivePane.SaveAsync(_tabManager.ActiveTab);
 
-    private void OnSaveAsClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.SaveCurrentAnimationChainListAsync();
+    private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = ActivePane.SaveAsAsync(_tabManager.ActiveTab);
 
     /// <summary>"Associate Tiled Tileset…" menu command (issue #1133) -- picks a .tsx via the
     /// same open-file dialog seam as everything else, then hands off to
@@ -7567,9 +7566,10 @@ public partial class MainWindow : Window
             },
             new()
             {
-                // Achx scope like the Save As menu item: it saves the animation chain list, so other tab kinds refuse it.
+                // Document scope like Save and the Save As menu item: each tab kind that accepts it saves its own document under a new name.
                 Id = "save-as", Description = "Save As…", Category = "File",
                 Gestures = new[] { new HotkeyGesture("S", Command | Shift) },
+                Scope = HotkeyScope.Document,
                 Action = () => OnSaveAsClick(null, null!),
             },
             // Ctrl+Plus/Minus zooms whichever panel (wireframe, preview, or the PNG diff pane)

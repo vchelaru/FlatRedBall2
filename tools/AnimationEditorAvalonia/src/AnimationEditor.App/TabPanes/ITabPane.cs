@@ -54,6 +54,12 @@ internal interface ITabPane
     /// </summary>
     Task SaveAsync(TabEntry? tab);
 
+    /// <summary>
+    /// File &gt; Save As for <paramref name="tab"/>, the active tab (null when none is open): asks for a new file, writes the
+    /// document there and makes the tab follow it. Only called while <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    Task SaveAsAsync(TabEntry? tab);
+
     /// <summary>Cleans up after the user discards <paramref name="tab"/>, just before it leaves the strip.</summary>
     void Closing(TabEntry tab);
 

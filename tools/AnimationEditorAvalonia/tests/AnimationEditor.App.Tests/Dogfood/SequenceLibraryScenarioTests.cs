@@ -201,7 +201,7 @@ public class SequenceLibraryScenarioTests
 
         header.ContextMenu!.IsOpen.ShouldBeTrue();
         header.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header)
-            .ShouldBe(new[] { "Go to Definition", "Remove Source" });
+            .ShouldBe(new[] { "Go to Definition", "Replace Source…", "Remove Source" });
         editor.PickMenuItem(header.ContextMenu, "Go to Definition");
         await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
 

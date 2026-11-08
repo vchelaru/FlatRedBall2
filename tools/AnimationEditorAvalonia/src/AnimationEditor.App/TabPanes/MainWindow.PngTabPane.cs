@@ -94,6 +94,8 @@ public partial class MainWindow
         // Never reached: Save is document-scoped, which this pane refuses.
         public Task SaveAsync(TabEntry? tab) => Task.CompletedTask;
 
+        public Task SaveAsAsync(TabEntry? tab) => Task.CompletedTask;
+
         public void Closing(TabEntry tab) { }
 
         public TabStatus Status(TabEntry? tab) => new(string.Empty, null, tab?.DisplayName ?? string.Empty, string.Empty);

@@ -148,7 +148,7 @@ public static class SequenceClipboard
     internal static string AbsolutePath(string folder, string source) =>
         new FilePath(IsAbsolute(source) ? source : System.IO.Path.Combine(folder, source)).FullPath;
 
-    private static bool IsAbsolute(string path) =>
+    internal static bool IsAbsolute(string path) =>
         path.StartsWith('/') || path.StartsWith(@"\\")
         || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] is '/' or '\\');
 

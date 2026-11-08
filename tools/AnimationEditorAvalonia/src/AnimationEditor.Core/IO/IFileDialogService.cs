@@ -25,6 +25,12 @@ public interface IFileDialogService
     Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription);
 
     /// <summary>
+    /// Show an open-file dialog for one file, offering <paramref name="filters"/> as its file-type dropdown. Returns the
+    /// chosen path, or <c>null</c> if cancelled (the default, so a test double that never picks a file need not implement it).
+    /// </summary>
+    Task<string?> PickOpenFileAsync(string title, IReadOnlyList<OpenFileFilter> filters) => Task.FromResult<string?>(null);
+
+    /// <summary>
     /// Show an open-file dialog that allows several files, offering <paramref name="filters"/> as its file-type dropdown.
     /// Returns the chosen paths, or an empty list if cancelled. The default is a dialog that is always cancelled, so
     /// a test double that never picks several files need not implement it.

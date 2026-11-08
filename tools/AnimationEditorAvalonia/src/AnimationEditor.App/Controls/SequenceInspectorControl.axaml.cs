@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -61,6 +62,38 @@ public partial class SequenceInspectorControl : UserControl
             if (CurrentChain is { } reference)
                 GoToDefinitionRequested?.Invoke(reference);
         };
+        ChainNameBox.SelectionChanged += (_, _) => RelinkToSelectedChain();
+    }
+
+    // The dropdown's entries as chain names, parallel to its items; null for the "(missing)" entry that stands for the
+    // current name when the source lacks it, which is not a choice.
+    private List<string?> _chainChoices = new();
+
+    private void RelinkToSelectedChain()
+    {
+        if (_refreshing || _chain is not { } chain) return;
+        int index = ChainNameBox.SelectedIndex;
+        if (index < 0 || index >= _chainChoices.Count || _chainChoices[index] is not { } name) return;
+        Commit(document => document.RelinkChains(_undo!, _sequence, new[] { chain }, name));
+    }
+
+    private void ShowChainChoices(SequenceChainReferenceSave reference)
+    {
+        var available = _document!.SourceChains(reference.Source)?.AnimationChains.Select(c => c.Name).ToList() ?? new List<string>();
+        int current = available.IndexOf(reference.Chain);
+        var choices = available.Cast<string?>().ToList();
+        var shown = new List<string>(available);
+        if (current < 0)
+        {
+            // The name the source no longer has stays visible and selected, so the problem is readable, and is replaced by picking another.
+            choices.Insert(0, null);
+            shown.Insert(0, reference.Chain.Length == 0 ? "(missing)" : $"{reference.Chain} (missing)");
+            current = 0;
+        }
+        if (!shown.SequenceEqual(ChainNameBox.Items.OfType<string>()))
+            ChainNameBox.ItemsSource = shown;
+        _chainChoices = choices;
+        ChainNameBox.SelectedIndex = current;
     }
 
     /// <summary>Raised with the reason when an edit is refused.</summary>
@@ -159,8 +192,7 @@ public partial class SequenceInspectorControl : UserControl
         var document = _document!;
         ChainSourceText.Text = reference.Source;
         ToolTip.SetTip(ChainSourceText, reference.Source);
-        ChainNameText.Text = reference.Chain;
-        ToolTip.SetTip(ChainNameText, reference.Chain);
+        ShowChainChoices(reference);
         Put(ChainStartField, (decimal)reference.Start, force);
         Put(ChainLoopsField, (decimal)reference.Loops, force);
         ChainLengthText.Text = document.CycleLength(reference) is { } cycle
