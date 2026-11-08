@@ -177,7 +177,8 @@ public class SequenceLibraryScenarioTests
         editor.RightClick(run);
 
         run.ContextMenu!.IsOpen.ShouldBeTrue();
-        run.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header).ShouldBe(new[] { "Go to Definition" });
+        run.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header)
+            .ShouldBe(new[] { "Add to Timeline", "Add to Selected Track", "Go to Definition", "Open Source" });
         editor.PickMenuItem(run.ContextMenu, "Go to Definition");
         await editor.WaitUntilAsync(() => editor.Services.SelectedState.SelectedChain?.Name == "Run", TimeSpan.FromSeconds(5));
 
