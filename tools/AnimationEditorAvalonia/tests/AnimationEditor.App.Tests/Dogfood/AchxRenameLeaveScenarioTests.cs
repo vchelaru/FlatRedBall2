@@ -456,6 +456,135 @@ public class AchxRenameLeaveScenarioTests
         SavedChainNames(other).ShouldBe(new[] { "Walk", "Run" });
     }
 
+    // Every shape kind in Walk's first frame, for the inspector boxes the first fixture cannot reach.
+    private static string WriteShapesFixture(AnimationEditorHarness editor, string name = "hero.achx")
+    {
+        editor.WritePng("sheet.png", 64, 64);
+        editor.WritePng("sheet2.png", 64, 64);
+        AnimationChainSave walk = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16));
+        walk.Frames[0].ShapesSave = new ShapesSave();
+        walk.Frames[0].ShapesSave!.Add(new CircleSave { Name = "Orb", Radius = 4 });
+        PolygonSave polygon = new PolygonSave { Name = "Poly" };
+        polygon.Points.Add(new Vector2Save { X = 0, Y = 0 });
+        polygon.Points.Add(new Vector2Save { X = 8, Y = 0 });
+        polygon.Points.Add(new Vector2Save { X = 8, Y = 8 });
+        walk.Frames[0].ShapesSave!.Add(polygon);
+        return editor.WriteAchx(name, walk, AnimationEditorHarness.Chain("Run", "sheet.png", (32, 0, 16, 16)));
+    }
+
+    private static void TypeIntoInspectorBox(AnimationEditorHarness editor, object rowData, string boxName, string newText)
+    {
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.Expand(walk.Frames[0]);
+        editor.ClickRow(rowData);
+        TextBox box = editor.Control<TextBox>(boxName);
+        box.Focus();
+        editor.Layout();
+        box.SelectAll();
+        editor.Type(newText);
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchingTabs_WhileTypingTheInspectorCircleName_CommitsTheName()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteShapesFixture(editor);
+        string other = WriteShapesFixture(editor, "other.achx");
+        await editor.OpenAsync(hero);
+        await editor.OpenAsync(other);
+        editor.ClickTab("hero.achx");
+
+        TypeIntoInspectorBox(editor, editor.ChainNamed("Walk").Frames[0].ShapesSave!.CircleSaves.Single(), "PropCircleName", "Ring");
+        editor.ClickTab("other.achx");
+
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains[0].Frames[0].ShapesSave!.CircleSaves.Single().Name.ShouldBe("Ring");
+        AnimationEditorHarness.ReadSaved(other).AnimationChains[0].Frames[0].ShapesSave!.CircleSaves.Single().Name.ShouldBe("Orb");
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchingTabs_WhileTypingTheInspectorPolygonName_CommitsTheName()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteShapesFixture(editor);
+        string other = WriteShapesFixture(editor, "other.achx");
+        await editor.OpenAsync(hero);
+        await editor.OpenAsync(other);
+        editor.ClickTab("hero.achx");
+
+        TypeIntoInspectorBox(editor, editor.ChainNamed("Walk").Frames[0].ShapesSave!.PolygonSaves.Single(), "PropPolygonName", "Hull");
+        editor.ClickTab("other.achx");
+
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.Single().Name.ShouldBe("Hull");
+        AnimationEditorHarness.ReadSaved(other).AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.Single().Name.ShouldBe("Poly");
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchingTabs_WhileTypingTheInspectorTextureName_CommitsTheName()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteShapesFixture(editor);
+        string other = WriteShapesFixture(editor, "other.achx");
+        await editor.OpenAsync(hero);
+        await editor.OpenAsync(other);
+        editor.ClickTab("hero.achx");
+
+        TypeIntoInspectorBox(editor, editor.ChainNamed("Walk").Frames[0], "PropTextureName", "sheet2.png");
+        editor.ClickTab("other.achx");
+
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains[0].Frames[0].TextureName.ShouldBe("sheet2.png");
+        AnimationEditorHarness.ReadSaved(other).AnimationChains[0].Frames[0].TextureName.ShouldBe("sheet.png");
+    }
+
+    [AvaloniaFact]
+    public async Task PressingInsideTheOpenRenameBox_KeepsTheRenameOpen()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenAsync(hero);
+        BeginChainRename(editor, "Run", "Sprint");
+        AnimationChainSave run = editor.ChainNamed("Run");
+
+        editor.Click(editor.InlineRenameBox(run));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        editor.NodeFor(run).IsEditing.ShouldBeTrue();
+        SavedChainNames(hero).ShouldBe(new[] { "Walk", "Run" });
+        editor.Press(Key.Enter);
+        SavedChainNames(hero).ShouldBe(new[] { "Walk", "Sprint" });
+    }
+
+    [AvaloniaFact]
+    public async Task PressingAnInspectorBox_WhileRenamingInTheTree_CommitsTheRename_AndTheBoxKeepsTheFocus()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenAsync(hero);
+        BeginChainRename(editor, "Run", "Sprint");
+        TextBox box = editor.Control<TextBox>("PropChainName");
+
+        editor.Click(box);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        SavedChainNames(hero).ShouldBe(new[] { "Walk", "Sprint" });
+        editor.Window.FocusManager!.GetFocusedElement().ShouldBeSameAs(box);
+    }
+
+    [AvaloniaFact]
+    public async Task LeavingByOpeningAFile_PutsTheRenameInTheLeftTabsHistory()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        string other = WriteFixture(editor, "other.achx");
+        await editor.OpenAsync(hero);
+
+        BeginChainRename(editor, "Run", "Sprint");
+        await editor.OpenAsync(other);
+        editor.ClickTab("hero.achx");
+
+        editor.UndoLabels.ShouldHaveSingleItem().ShouldContain("Sprint");
+    }
+
     [AvaloniaFact]
     public async Task EditUndoFromTheMenu_WhileTypingTheInspectorChainName_CommitsFirst()
     {
