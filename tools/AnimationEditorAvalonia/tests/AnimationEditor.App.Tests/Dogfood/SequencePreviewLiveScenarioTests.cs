@@ -235,13 +235,13 @@ public class SequencePreviewLiveScenarioTests
         await editor.OpenAsync(boss);
         ShownChains(editor).ShouldBeEmpty();
 
-        editor.Drag(editor.CenterOf(Chip(editor, "Walk")), At(editor, 0, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Walk")), At(editor, TimelineViewport.NewTrackLane, 0));
 
         ShownChains(editor).ShouldBe(new[] { "Walk:0" });
         Shown(editor).ShouldBe(Expected(editor, boss));
         editor.Click(editor.Control<Button>("AddSequenceButton"));
         ShownChains(editor).ShouldBeEmpty();
-        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 0, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, TimelineViewport.NewTrackLane, 0));
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
     }
 

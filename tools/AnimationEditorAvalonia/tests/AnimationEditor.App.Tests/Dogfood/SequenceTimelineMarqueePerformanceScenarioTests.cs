@@ -60,16 +60,17 @@ public class SequenceTimelineMarqueePerformanceScenarioTests
         int contentRenders = timeline.RenderCount;
         int layerRenders = timeline.SelectionLayerRenderCount;
         double X(double time) => timeline.Viewport.XAt(time);
-        // Below the last lane, past the last chain's end: empty space, so the press starts a rubber band.
-        double bottom = Math.Min(timeline.Viewport.LaneTop(7) + 20, timeline.Bounds.Height - 4);
-        var from = editor.PointIn(timeline, X(17.45), bottom);
+        // The band starts on the new-track row (no chains there) and is dragged down over every lane.
+        double newTrackRow = timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + 20;
+        double lastLane = Math.Min(timeline.Viewport.LaneTop(6) + 40, timeline.Bounds.Height - 2);
+        var from = editor.PointIn(timeline, X(0) + 2, newTrackRow);
 
         editor.Window.MouseMove(from);
         editor.Window.MouseDown(from, MouseButton.Left);
         for (int step = 1; step <= 60; step++)
         {
             double f = step / 60.0;
-            editor.Window.MouseMove(editor.PointIn(timeline, X(17.45) + (X(0) - X(17.45)) * f, bottom - (bottom - 30) * f), RawInputModifiers.LeftMouseButton);
+            editor.Window.MouseMove(editor.PointIn(timeline, X(0) + (X(17.4) - X(0)) * f, newTrackRow + (lastLane - newTrackRow) * f), RawInputModifiers.LeftMouseButton);
             editor.Layout();
         }
         editor.Window.MouseUp(from, MouseButton.Left);
