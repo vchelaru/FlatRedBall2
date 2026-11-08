@@ -57,6 +57,22 @@ public class SequenceSourceReloadTests
     }
 
     [Fact]
+    public void SourcesVersion_ChangesWhenASourceIsRead_AndStaysWhenNothingChanged()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteSource(dir.Path, "Walk");
+        var document = OpenDocument(dir.Path);
+        int opened = document.SourcesVersion;
+
+        document.ReloadChangedSources();
+        document.SourcesVersion.ShouldBe(opened);
+
+        WriteSource(dir.Path, "Run");
+        document.ReloadChangedSources();
+        document.SourcesVersion.ShouldBeGreaterThan(opened);
+    }
+
+    [Fact]
     public void ReloadChangedSources_NothingChanged_DoesNothing()
     {
         using var dir = new TestHelpers.TempDir();

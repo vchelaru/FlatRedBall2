@@ -29,10 +29,13 @@ namespace AnimationEditor.Core.HotReload
         private string? _achxPath;
         private readonly HashSet<string> _watchedPngPaths =
             new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _watchedSourcePaths =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public event Action<string>? AchxChangedOnDisk;
         public event Action<string>? PngChangedOnDisk;
         public event Action<string>? AchxDeletedOnDisk;
+        public event Action<string>? SourceChangedOnDisk;
 
         public bool IsEnabled { get; set; } = true;
 
@@ -64,21 +67,7 @@ namespace AnimationEditor.Core.HotReload
                 foreach (var p in pngPaths)
                     _watchedPngPaths.Add(Canonicalize(p));
 
-                var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                var achxDir = Path.GetDirectoryName(_achxPath);
-                if (!string.IsNullOrEmpty(achxDir) && Directory.Exists(achxDir))
-                    dirs.Add(achxDir);
-
-                foreach (var png in _watchedPngPaths)
-                {
-                    var dir = Path.GetDirectoryName(png);
-                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                        dirs.Add(dir);
-                }
-
-                foreach (var dir in dirs)
-                    AddWatcher(dir);
+                SyncWatchersLocked();
 
                 _seenHashes.Clear();
                 RememberContent(_achxPath);
@@ -101,31 +90,48 @@ namespace AnimationEditor.Core.HotReload
                 foreach (var p in added)   { _watchedPngPaths.Add(p); RememberContent(p); }
                 foreach (var p in removed) { _watchedPngPaths.Remove(p); _seenHashes.Remove(p); }
 
-                // Add watchers for newly-referenced directories
-                foreach (var png in added)
-                {
-                    var dir = Path.GetDirectoryName(png);
-                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir) &&
-                        !_watchers.ContainsKey(dir))
-                        AddWatcher(dir);
-                }
+                SyncWatchersLocked();
+            }
+        }
 
-                // Remove watchers for directories no longer needed
-                var achxDir = _achxPath != null ? Path.GetDirectoryName(_achxPath) : null;
-                var stillNeeded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                if (!string.IsNullOrEmpty(achxDir)) stillNeeded.Add(achxDir);
-                foreach (var p in _watchedPngPaths)
-                {
-                    var dir = Path.GetDirectoryName(p);
-                    if (!string.IsNullOrEmpty(dir)) stillNeeded.Add(dir);
-                }
+        public void UpdateSourceList(IEnumerable<string> sourcePaths)
+        {
+            lock (_lock)
+            {
+                var newSet = new HashSet<string>(
+                    sourcePaths.Select(Canonicalize),
+                    StringComparer.OrdinalIgnoreCase);
+                var (added, removed) = ReferencedFileDiff.Diff(_watchedSourcePaths, newSet);
 
-                var toRemove = _watchers.Keys.Where(d => !stillNeeded.Contains(d)).ToList();
-                foreach (var d in toRemove)
-                {
-                    _watchers[d].Dispose();
-                    _watchers.Remove(d);
-                }
+                foreach (var p in added)   { _watchedSourcePaths.Add(p); RememberContent(p); }
+                foreach (var p in removed) { _watchedSourcePaths.Remove(p); _seenHashes.Remove(p); }
+
+                SyncWatchersLocked();
+            }
+        }
+
+        // Caller holds _lock. Watches exactly the folders of the main file, the PNGs and the sources:
+        // adds the missing ones and drops the ones nothing needs any more.
+        private void SyncWatchersLocked()
+        {
+            var needed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            void Need(string? file)
+            {
+                var dir = string.IsNullOrEmpty(file) ? null : Path.GetDirectoryName(file);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) needed.Add(dir);
+            }
+
+            Need(_achxPath);
+            foreach (var p in _watchedPngPaths) Need(p);
+            foreach (var p in _watchedSourcePaths) Need(p);
+
+            foreach (var dir in needed)
+                AddWatcher(dir);
+
+            foreach (var d in _watchers.Keys.Where(d => !needed.Contains(d)).ToList())
+            {
+                _watchers[d].Dispose();
+                _watchers.Remove(d);
             }
         }
 
@@ -139,6 +145,7 @@ namespace AnimationEditor.Core.HotReload
                 _watchers.Clear();
                 _achxPath = null;
                 _watchedPngPaths.Clear();
+                _watchedSourcePaths.Clear();
             }
         }
 
@@ -283,11 +290,13 @@ namespace AnimationEditor.Core.HotReload
 
             string? achxPath;
             HashSet<string> pngPaths;
+            HashSet<string> sourcePaths;
 
             lock (_lock)
             {
                 achxPath = _achxPath;
                 pngPaths = new HashSet<string>(_watchedPngPaths, StringComparer.OrdinalIgnoreCase);
+                sourcePaths = new HashSet<string>(_watchedSourcePaths, StringComparer.OrdinalIgnoreCase);
             }
 
             long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -302,9 +311,10 @@ namespace AnimationEditor.Core.HotReload
                 var normalizedPath = path.Replace('\\', '/');
                 bool isAchx = achxPath != null &&
                     string.Equals(normalizedPath, achxPath, StringComparison.OrdinalIgnoreCase);
-                bool isPng = pngPaths.Contains(normalizedPath);
+                bool isSource = !isAchx && sourcePaths.Contains(normalizedPath);
+                bool isPng = !isAchx && !isSource && pngPaths.Contains(normalizedPath);
 
-                if (!isAchx && !isPng) continue;
+                if (!isAchx && !isSource && !isPng) continue;
                 if (!ContentChangedSinceSeen(normalizedPath, type)) continue;
 
                 if (isAchx)
@@ -313,6 +323,11 @@ namespace AnimationEditor.Core.HotReload
                         AchxDeletedOnDisk?.Invoke(normalizedPath);
                     else
                         AchxChangedOnDisk?.Invoke(normalizedPath);
+                }
+                else if (isSource)
+                {
+                    // Deleted too: the consumer re-reads the file and finds it gone.
+                    SourceChangedOnDisk?.Invoke(normalizedPath);
                 }
                 else if (isPng)
                 {
