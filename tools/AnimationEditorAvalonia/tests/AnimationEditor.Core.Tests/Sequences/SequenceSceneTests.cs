@@ -140,12 +140,10 @@ public class SequenceSceneTests
     }
 
     [Fact]
-    public void Sample_AFlippedTrack_MirrorsTheFrameOffsetAndFlipAcrossTheTrack()
+    public void Sample_AFlippedTrack_MirrorsTheFrameOffsetAndFlipAcrossTheEntityOrigin()
     {
         using var dir = new TestHelpers.TempDir();
         var track = Track("Body", ("body/body.achj", "Walk", 0, 1));
-        track.X = 10;
-        track.Y = 4;
         track.FlipHorizontal = true;
         var document = Load(dir, track);
         var sprite = SequenceScene.At(document, 0, 0).Single();
@@ -154,7 +152,7 @@ public class SequenceSceneTests
 
         var sample = sprite.Sample();
 
-        (sample.OffsetX, sample.OffsetY).ShouldBe((7f, 6f));
+        (sample.OffsetX, sample.OffsetY).ShouldBe((-3f, 2f));
         sprite.FlipMatrix.ShouldBe((-1f, 0f, 0f, 1f));
     }
 

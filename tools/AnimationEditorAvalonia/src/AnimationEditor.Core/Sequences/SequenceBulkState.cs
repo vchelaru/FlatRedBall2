@@ -5,7 +5,7 @@ using FlatRedBall2.AnimationEditorCommon;
 namespace AnimationEditor.Core.Sequences;
 
 /// <summary>What several selected tracks share; a null member means they disagree ("(mixed)" in the Inspector).</summary>
-public sealed record TrackBulkState(float? X, float? Y, bool? Visible, bool? Flip);
+public sealed record TrackBulkState(bool? Visible, bool? Flip);
 
 /// <summary>What several selected chains share; a null member means they disagree.</summary>
 public sealed record ChainBulkState(
@@ -18,7 +18,6 @@ public static class SequenceBulkState
     {
         var selected = tracks.Select(index => sequence.Tracks[index]).ToList();
         return new TrackBulkState(
-            Shared(selected.Select(t => t.X)), Shared(selected.Select(t => t.Y)),
             Shared(selected.Select(t => t.Visible)), Shared(selected.Select(t => t.FlipHorizontal)));
     }
 

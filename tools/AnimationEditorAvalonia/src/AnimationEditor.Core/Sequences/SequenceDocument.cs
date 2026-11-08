@@ -433,7 +433,7 @@ public sealed class SequenceDocument
     /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
     /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
     /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made at the end
-    /// with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// with the copied track's flip and visibility); with one, the first copied chain's track (the topmost lane copied
     /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
     /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
     /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
@@ -446,7 +446,7 @@ public sealed class SequenceDocument
         bool legacy = content.SourceTracks.Count == 0;
         // An envelope with no track information is one track, the first chain's; every chain is on it.
         var sourceTracks = legacy
-            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, 0, 0, false, true) }
+            ? new[] { new CopiedTrack(string.IsNullOrWhiteSpace(content.TrackName) ? DefaultTrackName : content.TrackName, 0, false, true) }
             : content.SourceTracks;
         int ChainTrack(int chain) => legacy ? 0 : content.ChainTracks[chain];
 
@@ -489,8 +489,6 @@ public sealed class SequenceDocument
                 destination.Add(new SequenceTrackSave
                 {
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
-                    X = source.X,
-                    Y = source.Y,
                     FlipHorizontal = source.FlipHorizontal,
                     Visible = source.Visible,
                 });
@@ -852,43 +850,6 @@ public sealed class SequenceDocument
     }
 
     /// <summary>
-    /// Sets a track's offset from the entity origin. Like the .achx inspector's number fields, repeated calls merge into
-    /// one undo entry until <see cref="IUndoManager.SealCoalescing"/>, so typing or stepping a field is one step.
-    /// </summary>
-    public void SetTrackOffset(IUndoManager undo, int sequence, int track, float x, float y) =>
-        Edit(undo, $"Set Offset of '{Save.Sequences[sequence].Tracks[track].Name}' to ({Format(x)}, {Format(y)})", save =>
-        {
-            var target = save.Sequences[sequence].Tracks[track];
-            target.X = x;
-            target.Y = y;
-        }, coalesceGroup: $"offset:{sequence}:{track}");
-
-    /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
-    public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
-        ? $"Move Track '{Save.Sequences[sequence].Tracks[tracks[0]].Name}'"
-        : $"Move {Plural.Format(tracks.Count, "track")}";
-
-    /// <summary>
-    /// Moves tracks by (<paramref name="dx"/>, <paramref name="dy"/>) as an arrow key does, keeping each offset as it
-    /// is plus the step (no rounding). Consecutive nudges of the same tracks are one undo entry until
-    /// <see cref="IUndoManager.SealCoalescing"/> (the key coming up, focus leaving) or another edit ends the run.
-    /// </summary>
-    public void NudgeTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, float dx, float dy)
-    {
-        var moved = tracks.Distinct().OrderBy(track => track).ToList();
-        if (moved.Count == 0) return;
-        Edit(undo, DescribeMove(sequence, moved), save =>
-        {
-            foreach (int track in moved)
-            {
-                var target = save.Sequences[sequence].Tracks[track];
-                target.X += dx;
-                target.Y += dy;
-            }
-        }, coalesceGroup: $"nudge:{sequence}:{string.Join(',', moved)}");
-    }
-
-    /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
     /// (no undo entry) when the track already is that way.
     /// </summary>
@@ -908,31 +869,6 @@ public sealed class SequenceDocument
             save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
 
     // ── Plural edits: the Inspector's fields applied to a multi-selection as ONE snapshot, so one undo entry ──
-
-    /// <summary>
-    /// <see cref="SetTrackOffset"/> for several tracks. A null component is left alone on every track; an absolute edit
-    /// sets that component on all of them, a relative one (<c>+ 4</c>) applies to each track's own value, as in the .achx
-    /// Inspector. Merges with the previous call for the same tracks until <see cref="IUndoManager.SealCoalescing"/>.
-    /// </summary>
-    public void SetTracksOffset(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, NumericEdit? x, NumericEdit? y)
-    {
-        var set = tracks.Distinct().OrderBy(track => track).ToList();
-        if (set.Count == 0 || (x is null && y is null)) return;
-        string what = x is not null && y is not null ? "Offset" : x is not null ? "Offset X" : "Offset Y";
-        string to = "";
-        if (x is { IsRelative: false } ax && y is { IsRelative: false } ay) to = $" to ({Format((float)ax.Apply(0m))}, {Format((float)ay.Apply(0m))})";
-        else if (x is { IsRelative: false } onlyX && y is null) to = $" to {Format((float)onlyX.Apply(0m))}";
-        else if (y is { IsRelative: false } onlyY && x is null) to = $" to {Format((float)onlyY.Apply(0m))}";
-        Edit(undo, $"Set {what} of {TracksNamed(sequence, set)}{to}", save =>
-        {
-            foreach (int index in set)
-            {
-                var target = save.Sequences[sequence].Tracks[index];
-                if (x is { } dx) target.X = dx.Apply(target.X);
-                if (y is { } dy) target.Y = dy.Apply(target.Y);
-            }
-        }, coalesceGroup: $"offset:{sequence}:{string.Join(",", set)}");
-    }
 
     /// <summary><see cref="SetTrackVisible"/> for several tracks, as one undo entry.</summary>
     public void SetTracksVisible(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool visible)

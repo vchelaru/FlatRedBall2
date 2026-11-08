@@ -77,7 +77,7 @@ public class SequenceLaneOrderTests
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, ThreeTracks);
         var tracks = document.Save.Sequences[0].Tracks;
-        tracks[0].X = 4; tracks[0].Y = -2; tracks[0].FlipHorizontal = true; tracks[0].Visible = false;
+        tracks[0].FlipHorizontal = true; tracks[0].Visible = false;
         var undo = new UndoManager();
 
         // Drag A from the top lane to below the last one.
@@ -86,7 +86,7 @@ public class SequenceLaneOrderTests
         Lanes(document).ShouldBe(new[] { "B", "C", "A" });
         DrawOrder(document).ShouldBe(new[] { "C", "B" }, "A is hidden, so it is not drawn");
         var moved = document.Save.Sequences[0].Tracks[2];
-        (moved.X, moved.Y, moved.FlipHorizontal, moved.Visible).ShouldBe((4f, -2f, true, false));
+        (moved.FlipHorizontal, moved.Visible).ShouldBe((true, false));
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Move Track 'A'" });
         File.ReadAllText(Path.Combine(dir.Path, "boss.seqj")).ShouldNotContain("\"z\"");
 

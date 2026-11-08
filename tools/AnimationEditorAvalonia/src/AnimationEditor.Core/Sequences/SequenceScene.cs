@@ -8,29 +8,26 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// One track's sprite at an instant of a sequence: the frame its active chain shows, the texture that frame resolves
-/// to through its own source, and the track's offset and flip.
+/// to through its own source, and the track's flip. A track has no offset: the sprite sits at its frame's.
 /// </summary>
 /// <param name="Track">The track's index in the sequence.</param>
 /// <param name="Chain">The active chain, from the reference's source.</param>
 /// <param name="FrameIndex">The frame shown.</param>
 /// <param name="ElapsedInFrame">Forward seconds into that frame, for keyframe sampling.</param>
 /// <param name="TexturePath">The frame's texture, resolved against its source's folder; null when it has none.</param>
-/// <param name="X">The track's offset from the entity origin.</param>
-/// <param name="Y">The track's offset from the entity origin, Y+ up.</param>
 /// <param name="FlipHorizontal">Whether the track mirrors its sprite.</param>
 /// <param name="Sequence">The sequence's index in the file.</param>
 public sealed record SequenceSprite(
     int Track, AnimationChainSave Chain, int FrameIndex, double ElapsedInFrame, string? TexturePath,
-    float X, float Y, bool FlipHorizontal, int Sequence = 0)
+    bool FlipHorizontal, int Sequence = 0)
 {
     public AnimationFrameSave Frame => Chain.Frames[FrameIndex];
 
-    /// <summary>The frame's sampled offset, mirrored by the track flip and moved by the track offset, and its color.</summary>
+    /// <summary>The frame's sampled offset, with X mirrored by the track flip, and its color.</summary>
     public KeyframeSample Sample()
     {
         var sample = KeyframeSampler.Sample(Chain, FrameIndex, ElapsedInFrame);
-        float sign = FlipHorizontal ? -1 : 1;
-        return sample with { OffsetX = X + sign * sample.OffsetX, OffsetY = Y + sample.OffsetY };
+        return FlipHorizontal ? sample with { OffsetX = -sample.OffsetX } : sample;
     }
 
     /// <summary>
@@ -85,7 +82,7 @@ public static class SequenceScene
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal, sequenceIndex));
+            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, track.FlipHorizontal, sequenceIndex));
         }
         return sprites;
     }

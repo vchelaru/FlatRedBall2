@@ -11,25 +11,25 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceSceneMultiTests
 {
     // hero.achj: Walk, two 0.25 s frames (0.5 s). fx.achj: Spark, two 0.5 s frames (1 s).
-    // Sequence 0 "Attack": Walk on a track at x 10. Sequence 1 "Aura": Spark on a track at x -10.
+    // Sequence 0 "Attack": Walk (frames offset x 10). Sequence 1 "Aura": Spark (frames offset x -10). A track has no offset of its own.
     private static SequenceDocument Load(TestHelpers.TempDir dir)
     {
-        WriteSource(Path.Combine(dir.Path, "hero.achj"), "Walk", 0.25f, 0.25f);
-        WriteSource(Path.Combine(dir.Path, "fx.achj"), "Spark", 0.5f, 0.5f);
+        WriteSource(Path.Combine(dir.Path, "hero.achj"), "Walk", 10, 0.25f, 0.25f);
+        WriteSource(Path.Combine(dir.Path, "fx.achj"), "Spark", -10, 0.5f, 0.5f);
         var save = new SequenceListSave { Sources = { "hero.achj", "fx.achj" } };
-        save.Sequences.Add(Sequence("Attack", loop: true, Track("Body", x: 10, "hero.achj", "Walk")));
-        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", x: -10, "fx.achj", "Spark")));
+        save.Sequences.Add(Sequence("Attack", loop: true, Track("Body", "hero.achj", "Walk")));
+        save.Sequences.Add(Sequence("Aura", loop: false, Track("Glow", "fx.achj", "Spark")));
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
         return SequenceDocument.Load(path);
     }
 
-    private static void WriteSource(string path, string chain, params float[] lengths)
+    private static void WriteSource(string path, string chain, float offsetX, params float[] lengths)
     {
         var list = new AnimationChainListSave();
         var save = new AnimationChainSave { Name = chain, Loop = true };
         foreach (float length in lengths)
-            save.Frames.Add(new AnimationFrameSave { TextureName = "t.png", FrameLength = length, RightCoordinate = 1, BottomCoordinate = 1 });
+            save.Frames.Add(new AnimationFrameSave { TextureName = "t.png", FrameLength = length, RelativeX = offsetX, RightCoordinate = 1, BottomCoordinate = 1 });
         list.AnimationChains.Add(save);
         list.SaveJson(path);
     }
@@ -41,9 +41,9 @@ public class SequenceSceneMultiTests
         return sequence;
     }
 
-    private static SequenceTrackSave Track(string name, float x, string source, string chain)
+    private static SequenceTrackSave Track(string name, string source, string chain)
     {
-        var track = new SequenceTrackSave { Name = name, X = x };
+        var track = new SequenceTrackSave { Name = name };
         track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = 0, Loops = 1 });
         return track;
     }

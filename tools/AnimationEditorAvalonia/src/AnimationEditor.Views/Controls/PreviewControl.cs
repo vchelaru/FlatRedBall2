@@ -662,16 +662,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (!_showShapes) return Array.Empty<PreviewShapeInfo>();
         return sprites
             .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Chain)
-                .Select(shape => PlaceOnTrack(shape, sprite.X, sprite.Y, sprite.FlipHorizontal)))
+                .Select(shape => MirrorOnTrack(shape, sprite.FlipHorizontal)))
             .ToArray();
     }
 
-    /// <summary>Moves a frame's shape by its track's offset, mirroring it across the track's X when the track flips.</summary>
-    internal static PreviewShapeInfo PlaceOnTrack(PreviewShapeInfo shape, float x, float y, bool flipHorizontal)
+    /// <summary>Mirrors a frame's shape across the entity origin's X when its track flips; a track has no offset, so nothing else moves it.</summary>
+    internal static PreviewShapeInfo MirrorOnTrack(PreviewShapeInfo shape, bool flipHorizontal)
     {
-        if (!flipHorizontal) return shape with { X = x + shape.X, Y = y + shape.Y };
+        if (!flipHorizontal) return shape;
         float[]? points = shape.Points?.Select((value, i) => i % 2 == 0 ? -value : value).ToArray();
-        return shape with { X = x - shape.X, Y = y + shape.Y, Points = points };
+        return shape with { X = -shape.X, Points = points };
     }
 
     /// <summary>
@@ -1839,7 +1839,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 ? GetResizeCursor(_shapeResizeHandle)
                 : StandardCursorType.SizeAll;
 
-        if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null || IsDraggingTrack)
+        if (_draggingFrame is not null || _draggingChainFrames is not null || _draggingVertexPolygon is not null)
             return StandardCursorType.SizeAll;
 
         if (_selectedState!.SelectedPolygon is { } hoverPolygon && !IsPolygonVertexLocked(hoverPolygon))
@@ -1865,8 +1865,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
             cursorType = StandardCursorType.SizeAll;
         if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
-            cursorType = StandardCursorType.SizeAll;
-        if (cursorType is null && TrackSpriteAt((float)pos.X, (float)pos.Y) is not null)
             cursorType = StandardCursorType.SizeAll;
         return cursorType;
     }
@@ -2931,7 +2929,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _draggedGuideIdx = -1;
             GuidesChanged?.Invoke();
         }
-        else if (!CancelTrackDrag()) return false;
+        else return false;
 
         var pointer = _dragPointer;
         _dragPointer = null;
@@ -3057,7 +3055,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         }
 
         // A sequence tab's composite: a press grabs a track's sprite, or does nothing on empty space.
-        if (TryBeginTrackPress(e, pos)) return;
+        if (TrySelectTrackAt(pos)) return;
 
         // No guide hit — try to drag a shape (or just select one).
 
@@ -3173,8 +3171,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             return;
         }
 
-        if (MoveTrackDrag(e, pos)) return;
-
         if (_shapeResizeHandle != HandleKind.None)
         {
             ApplyShapeResize(pos);
@@ -3268,8 +3264,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         }
 
         base.OnPointerReleased(e);
-
-        if (EndTrackDrag(e)) return;
 
         if (_shapeResizeHandle != HandleKind.None)
         {

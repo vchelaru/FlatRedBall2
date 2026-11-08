@@ -735,7 +735,11 @@ public partial class MainWindow
             preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
-            WireTrackPlacement();
+            // A click on a sprite selects its track (the timeline and Inspector follow); nothing drags, a track has no offset.
+            preview.TrackClicked += track =>
+            {
+                if (_document is not null && SequenceIndex >= 0) w.SequenceTimeline.SelectTracks(new[] { track });
+            };
             w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
             w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
