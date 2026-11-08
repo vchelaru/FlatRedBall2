@@ -335,9 +335,7 @@ public partial class MainWindow
         // open (the toast says why), since closing would lose the edits.
         private async Task<bool> ConfirmCloseAsync(SequenceDocument document)
         {
-            var choice = await _window.ShowSaveDiscardCancelDialogAsync(
-                $"\"{document.Path.NoPath}\" has unsaved changes. Save before closing?",
-                "Unsaved Changes");
+            var choice = await _window.AskSaveBeforeClosingAsync(document.Path.NoPath);
             if (choice == SaveDiscardCancelChoice.Cancel) return false;
             if (choice == SaveDiscardCancelChoice.Discard) return true;
             document.SaveToDisk();
@@ -424,7 +422,9 @@ public partial class MainWindow
             var (label, brush) = _document.SaveError is null
                 ? ("Auto Save On", _autoSaveBrush)
                 : ("Auto Save Failed", _failedBrush);
-            return new TabStatus(label, brush, _document.Path.NoPath, Plural.Format(_document.Save.Sequences.Count, "sequence"));
+            // Several chains or tracks selected: the selection count replaces the file total, as in the .achx tab (#623).
+            string counts = _window.SequenceTimeline.SelectionSummary ?? Plural.Format(_document.Save.Sequences.Count, "sequence");
+            return new TabStatus(label, brush, _document.Path.NoPath, counts);
         }
 
         public string? TitlePath(TabEntry? tab) => tab?.Path.FullPath;
@@ -1076,7 +1076,9 @@ public partial class MainWindow
         {
             var w = _window;
             w.SequenceInspector.Show(_document, SequenceIndex, w._undoManager, w.SequenceTimeline.Selection, w.SequenceTimeline.SelectedTrack,
-                w.SequenceTimeline.SelectionSummary, CanRenameSequence);
+                w.SequenceTimeline.SelectedChains, w.SequenceTimeline.SelectedTracks, CanRenameSequence);
+            // The status bar counts a multi-selection ("3 chains selected"), as the .achx tab's does.
+            if (w._visiblePane == this) w.UpdateStatusBar();
         }
 
         /// <summary>Rename is for a single selected sequence: with several, no rename starts from the menu, the inline box or the Inspector.</summary>

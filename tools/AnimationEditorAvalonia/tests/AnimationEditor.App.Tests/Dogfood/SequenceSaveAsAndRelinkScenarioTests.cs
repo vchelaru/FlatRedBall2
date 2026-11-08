@@ -377,6 +377,30 @@ public class SequenceSaveAsAndRelinkScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task InspectorChainDropdown_WithSeveralChainsOfOneSource_RelinksThemAllInOneUndoStep()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteBoss(editor);
+        SequenceListSave edit = SequenceListSave.FromFile(boss);
+        var second = new SequenceTrackSave { Name = "Tail" };
+        second.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk", Loops = 1 });
+        edit.Sequences[0].Tracks.Add(second);
+        edit.Save(boss);
+        await editor.OpenAsync(boss);
+        editor.ClickAt(OnChain(editor, 0, 0.1));
+        editor.ClickAt(OnChain(editor, 1, 0.1), RawInputModifiers.Control);
+        ComboBox chain = SequenceInspectorScenarioTests.ChainCombo(Inspector(editor));
+        chain.SelectedItem.ShouldBe("Walk");
+
+        editor.PickComboItem(chain, "Run");
+
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(track => track.Chains[0].Chain).ShouldBe(new[] { "Run", "Run" });
+        editor.UndoLabels.ShouldBe(new[] { "Relink 2 Chains to 'Run'" });
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(track => track.Chains[0].Chain).ShouldBe(new[] { "Walk", "Walk" });
+    }
+
+    [AvaloniaFact]
     public async Task InspectorChainDropdown_OnAFoundChain_ListsTheSourcesChains_WithNoMissingEntry()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

@@ -1,5 +1,6 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -14,7 +15,10 @@ namespace AnimationEditor.App.Controls;
 
 /// <summary>
 /// The Inspector tab's content on a <c>.seqj</c> tab: the sequence when nothing is selected on the timeline, a track
-/// when its header is, a chain when one is. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
+/// when its header is, a chain when one is. With several tracks or several chains selected the same section edits all of
+/// them, as the .achx Inspector does for several frames: a field they disagree on is blank with a "(mixed)" placeholder,
+/// an edit sets it on every one (or, written "+ 4", shifts each by its own value) as one undo entry, and the name and
+/// Go to Definition are for one item. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
 /// entry; a refused value (an empty or taken name, cycles of 0) goes out through <see cref="ErrorRaised"/> and the field
 /// goes back to the document's value. The host calls <see cref="Show"/> whenever the selection or the document changes
 /// (including each step of a drag), which rewrites every field except the one being typed in.
@@ -26,9 +30,13 @@ public partial class SequenceInspectorControl : UserControl
     private int _sequence = -1;
     private TimelineChainId? _chain;
     private int? _track;
-    private string? _multiSummary;
+    private IReadOnlyList<TimelineChainId> _chains = Array.Empty<TimelineChainId>();
+    private IReadOnlyList<int> _tracks = Array.Empty<int>();
     private bool _canRenameSequence = true;
     private bool _refreshing;
+
+    // The relative edit ("+ 4") being applied to a mixed field, which EditOf hands to that field's commit.
+    private (Control Field, NumericEdit Edit)? _relativeEdit;
 
     public SequenceInspectorControl()
     {
@@ -38,25 +46,18 @@ public partial class SequenceInspectorControl : UserControl
         SequenceLoopBox.IsCheckedChanged += (_, _) => Commit(document =>
             document.SetLoop(_undo!, _sequence, SequenceLoopBox.IsChecked == true));
 
-        TrackXField.ValueChanged += (_, _) => CommitOffset();
-        TrackYField.ValueChanged += (_, _) => CommitOffset();
-        TrackVisibleBox.IsCheckedChanged += (_, _) => Commit(document =>
-            document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
-        TrackFlipBox.IsCheckedChanged += (_, _) => Commit(document =>
-            document.SetTrackFlip(_undo!, _sequence, _track!.Value, TrackFlipBox.IsChecked == true));
+        TrackXField.ValueChanged += (_, _) => CommitOffset(TrackXField);
+        TrackYField.ValueChanged += (_, _) => CommitOffset(TrackYField);
+        TrackVisibleBox.IsCheckedChanged += (_, _) => CommitVisible();
+        TrackFlipBox.IsCheckedChanged += (_, _) => CommitFlip();
 
-        ChainStartField.ValueChanged += (_, _) =>
-        {
-            if (ChainStartField.Value is { } start && _chain is { } chain)
-                Commit(document => document.SetChainStart(_undo!, _sequence, chain.Track, chain.Chain, (double)start));
-        };
-        ChainLoopsField.ValueChanged += (_, _) =>
-        {
-            if (ChainLoopsField.Value is { } loops && _chain is { } chain)
-                Commit(document => document.SetChainLoops(_undo!, _sequence, chain.Track, chain.Chain, (float)loops));
-        };
+        ChainStartField.ValueChanged += (_, _) => CommitChainStart();
+        ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
         // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
         SealOnCommit(TrackXField, TrackYField, ChainStartField, ChainLoopsField);
+        ApplyRelativeEditsWith(() => CommitOffset(null), TrackXField, TrackYField);
+        ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
+        ApplyRelativeEditsWith(CommitChainLoops, ChainLoopsField);
         GoToDefinitionButton.Click += (_, _) =>
         {
             if (CurrentChain is { } reference)
@@ -71,23 +72,35 @@ public partial class SequenceInspectorControl : UserControl
 
     private void RelinkToSelectedChain()
     {
-        if (_refreshing || _chain is not { } chain) return;
+        if (_refreshing) return;
         int index = ChainNameBox.SelectedIndex;
         if (index < 0 || index >= _chainChoices.Count || _chainChoices[index] is not { } name) return;
-        Commit(document => document.RelinkChains(_undo!, _sequence, new[] { chain }, name));
+        if (BulkChains() is { } chains)
+            Commit(document => document.RelinkChains(_undo!, _sequence, chains, name));
+        else if (_chain is { } chain)
+            Commit(document => document.RelinkChains(_undo!, _sequence, new[] { chain }, name));
     }
 
-    private void ShowChainChoices(SequenceChainReferenceSave reference)
+    // The Chain dropdown: the chains of the source (of every selected chain, when they share one), with the current name
+    // selected. A name the source lacks, or several chains with different names, shows as a first entry that is no choice.
+    private void ShowChainChoices(string? source, string? chain, string mixedLabel)
     {
-        var available = _document!.SourceChains(reference.Source)?.AnimationChains.Select(c => c.Name).ToList() ?? new List<string>();
-        int current = available.IndexOf(reference.Chain);
+        var available = source is null ? new List<string>()
+            : _document!.SourceChains(source)?.AnimationChains.Select(c => c.Name).ToList() ?? new List<string>();
+        int current = chain is null ? -1 : available.IndexOf(chain);
         var choices = available.Cast<string?>().ToList();
         var shown = new List<string>(available);
-        if (current < 0)
+        if (source is null)
         {
-            // The name the source no longer has stays visible and selected, so the problem is readable, and is replaced by picking another.
+            // Chains of different sources have no chain list in common, so there is nothing to pick.
+            choices = new List<string?> { null };
+            shown = new List<string> { chain ?? mixedLabel };
+            current = 0;
+        }
+        else if (current < 0)
+        {
             choices.Insert(0, null);
-            shown.Insert(0, reference.Chain.Length == 0 ? "(missing)" : $"{reference.Chain} (missing)");
+            shown.Insert(0, chain is null ? mixedLabel : chain.Length == 0 ? "(missing)" : $"{chain} (missing)");
             current = 0;
         }
         if (!shown.SequenceEqual(ChainNameBox.Items.OfType<string>()))
@@ -119,13 +132,15 @@ public partial class SequenceInspectorControl : UserControl
 
     /// <summary>
     /// Shows what is selected in sequence <paramref name="sequence"/> of <paramref name="document"/>: a chain, a track,
-    /// or (both null) the sequence itself. A non-null <paramref name="multiSummary"/> ("3 chains selected") is shown instead
-    /// of any of those: several items share no editable field. A null document clears the inspector.
+    /// or (both null) the sequence itself. <paramref name="chain"/> and <paramref name="track"/> are the primary one;
+    /// <paramref name="chains"/> or <paramref name="tracks"/> hold every selected one, and with several the fields edit
+    /// them all. A null document clears the inspector.
     /// </summary>
     public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track,
-        string? multiSummary = null, bool canRenameSequence = true)
+        IReadOnlyList<TimelineChainId>? chains = null, IReadOnlyList<int>? tracks = null, bool canRenameSequence = true)
     {
-        _multiSummary = multiSummary;
+        _chains = chains ?? Array.Empty<TimelineChainId>();
+        _tracks = tracks ?? Array.Empty<int>();
         _canRenameSequence = canRenameSequence;
         _document = document;
         _sequence = sequence;
@@ -147,13 +162,10 @@ public partial class SequenceInspectorControl : UserControl
             var sequence = CurrentSequence;
             var track = CurrentTrack;
             var reference = CurrentChain;
-            bool multi = sequence is not null && _multiSummary is not null;
             NothingLabel.IsVisible = sequence is null;
-            MultiPanel.IsVisible = multi;
-            MultiCountText.Text = multi ? _multiSummary : null;
-            ChainPanel.IsVisible = !multi && sequence is not null && reference is not null;
-            TrackPanel.IsVisible = !multi && sequence is not null && reference is null && track is not null;
-            SequencePanel.IsVisible = !multi && sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
+            ChainPanel.IsVisible = sequence is not null && reference is not null;
+            TrackPanel.IsVisible = sequence is not null && reference is null && track is not null;
+            SequencePanel.IsVisible = sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
 
             if (SequencePanel.IsVisible)
                 ShowSequence(sequence!, force);
@@ -180,9 +192,25 @@ public partial class SequenceInspectorControl : UserControl
 
     private void ShowTrack(SequenceTrackSave track, bool force)
     {
+        if (BulkTracks() is { } tracks)
+        {
+            // A name is one track's: the box is disabled, and says why, as for several shapes of one frame in .achx.
+            var state = SequenceBulkState.ForTracks(CurrentSequence!, tracks);
+            TrackNameBox.IsEnabled = false;
+            TrackNameBox.Text = null;
+            TrackNameBox.Tag = null;
+            TrackNameBox.PlaceholderText = "(multiple — same sequence)";
+            PutOrMixed(TrackXField, state.X, force);
+            PutOrMixed(TrackYField, state.Y, force);
+            TrackVisibleBox.IsChecked = state.Visible;
+            TrackFlipBox.IsChecked = state.Flip;
+            return;
+        }
+        TrackNameBox.IsEnabled = true;
+        TrackNameBox.PlaceholderText = null;
         Put(TrackNameBox, track.Name, force);
-        Put(TrackXField, (decimal)track.X, force);
-        Put(TrackYField, (decimal)track.Y, force);
+        PutOrMixed(TrackXField, track.X, force);
+        PutOrMixed(TrackYField, track.Y, force);
         TrackVisibleBox.IsChecked = track.Visible;
         TrackFlipBox.IsChecked = track.FlipHorizontal;
     }
@@ -190,11 +218,28 @@ public partial class SequenceInspectorControl : UserControl
     private void ShowChain(SequenceChainReferenceSave reference, bool force)
     {
         var document = _document!;
+        if (BulkChains() is { } chains)
+        {
+            // Source and Chain show what the chains share, else how many there are; Length, the missing-source warning
+            // and Go to Definition belong to one chain.
+            var state = SequenceBulkState.ForChains(CurrentSequence!, chains);
+            ChainSourceText.Text = state.Source ?? MixedPlaceholder;
+            ShowChainChoices(state.Source, state.Chain, Plural.Format(chains.Count, "chain"));
+            ToolTip.SetTip(ChainSourceText, ChainSourceText.Text);
+            PutOrMixed(ChainStartField, state.Start is { } start ? (decimal)start : null, force);
+            PutOrMixed(ChainLoopsField, state.Loops is { } loops ? (decimal)loops : null, force);
+            ChainLengthRow.IsVisible = false;
+            ChainMissingText.IsVisible = false;
+            GoToDefinitionButton.IsVisible = false;
+            return;
+        }
+        ChainLengthRow.IsVisible = true;
+        GoToDefinitionButton.IsVisible = true;
         ChainSourceText.Text = reference.Source;
         ToolTip.SetTip(ChainSourceText, reference.Source);
-        ShowChainChoices(reference);
-        Put(ChainStartField, (decimal)reference.Start, force);
-        Put(ChainLoopsField, (decimal)reference.Loops, force);
+        ShowChainChoices(reference.Source, reference.Chain, string.Empty);
+        PutOrMixed(ChainStartField, (decimal)reference.Start, force);
+        PutOrMixed(ChainLoopsField, (decimal)reference.Loops, force);
         ChainLengthText.Text = document.CycleLength(reference) is { } cycle
             ? $"{Seconds(cycle * reference.Loops)} ({Seconds(cycle)} × {reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)})"
             : "Unknown";
@@ -216,21 +261,69 @@ public partial class SequenceInspectorControl : UserControl
         }
     }
 
-    private static void Put(FlankerNumericField field, decimal value, bool force)
+    // A null value is a mixed selection: the field is blank with the "(mixed)" placeholder, as in the .achx Inspector.
+    private static void PutOrMixed(FlankerNumericField field, decimal? value, bool force)
     {
         var box = field.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
         string shown = field.Value?.ToString(field.FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
         bool typing = field.IsKeyboardFocusWithin && box is not null && box.Text != shown;
-        if (force || !typing) field.Value = value;
+        if (!force && typing) return;
+        field.Value = value;
+        field.PlaceholderText = value is null ? MixedPlaceholder : string.Empty;
     }
 
-    private static void Put(NumericUpDown field, decimal value, bool force)
+    private static void PutOrMixed(NumericUpDown field, decimal? value, bool force)
     {
         var box = field.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
         string shown = field.Value?.ToString(field.FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
         bool typing = field.IsKeyboardFocusWithin && box is not null && box.Text != shown;
-        if (force || !typing) field.Value = value;
+        if (!force && typing) return;
+        field.Value = value;
+        field.PlaceholderText = value is null ? MixedPlaceholder : string.Empty;
     }
+
+    private static void PutOrMixed(NumericUpDown field, float? value, bool force) =>
+        PutOrMixed(field, value is { } v ? (decimal)v : null, force);
+
+    private const string MixedPlaceholder = "(mixed)";
+
+    // The selected tracks / chains when several are, else null (one item, or the selection holds nothing that exists any more).
+    private IReadOnlyList<int>? BulkTracks()
+    {
+        if (_tracks.Count < 2 || CurrentSequence is not { } sequence) return null;
+        var present = _tracks.Where(index => index >= 0 && index < sequence.Tracks.Count).ToList();
+        return present.Count > 1 ? present : null;
+    }
+
+    private IReadOnlyList<TimelineChainId>? BulkChains()
+    {
+        if (_chains.Count < 2 || CurrentSequence is not { } sequence) return null;
+        var present = _chains.Where(id => id.Track >= 0 && id.Track < sequence.Tracks.Count
+            && id.Chain >= 0 && id.Chain < sequence.Tracks[id.Track].Chains.Count).ToList();
+        return present.Count > 1 ? present : null;
+    }
+
+    // As MainWindow.ApplyRelativeEditsWith: "+ 4" typed over a mixed field edits each selected item's own value.
+    private void ApplyRelativeEditsWith(Action apply, params Control[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.AddHandler(NumericExpressionInput.RelativeEditCommittedEvent, (_, e) =>
+            {
+                e.Handled = true;
+                _relativeEdit = (field, e.Edit);
+                try { apply(); }
+                finally { _relativeEdit = null; }
+                _undo?.SealCoalescing();
+            });
+        }
+    }
+
+    /// <summary>The edit a field asks for: the relative edit being applied to it, else its value, else null ("(mixed)" and untouched).</summary>
+    private NumericEdit? EditOf(Control field, decimal? value) =>
+        _relativeEdit is { } r && ReferenceEquals(r.Field, field) ? r.Edit
+        : value is { } v ? v
+        : null;
 
     // As MainWindow.SealOnCommit does for the .achx Inspector. Enter is handled by the field, so listen after it.
     private void SealOnCommit(params InputElement[] fields)
@@ -265,17 +358,79 @@ public partial class SequenceInspectorControl : UserControl
         Refresh(force: true);
     }
 
-    private void CommitOffset()
+    private void CommitOffset(Control? changed)
     {
-        if (_refreshing || _track is not { } track || TrackXField.Value is not { } x || TrackYField.Value is not { } y) return;
+        if (_refreshing) return;
+        if (BulkTracks() is { } tracks)
+        {
+            // Only the component being edited applies (the other keeps each track's own value, mixed or not), so the
+            // undo label names what the user changed. A relative edit names its own field.
+            NumericEdit? bulkX = EditOf(TrackXField, ReferenceEquals(changed, TrackXField) ? TrackXField.Value : null);
+            NumericEdit? bulkY = EditOf(TrackYField, ReferenceEquals(changed, TrackYField) ? TrackYField.Value : null);
+            if (bulkX is null && bulkY is null) return;
+            Commit(document => document.SetTracksOffset(_undo!, _sequence, tracks, bulkX, bulkY));
+            return;
+        }
+        if (_track is not { } track || TrackXField.Value is not { } x || TrackYField.Value is not { } y) return;
         Commit(document => document.SetTrackOffset(_undo!, _sequence, track, (float)x, (float)y));
+    }
+
+    private void CommitVisible()
+    {
+        if (_refreshing) return;
+        if (BulkTracks() is { } tracks)
+        {
+            // Indeterminate means the selection disagrees and the user did not touch it.
+            if (TrackVisibleBox.IsChecked is { } visible)
+                Commit(document => document.SetTracksVisible(_undo!, _sequence, tracks, visible));
+            return;
+        }
+        Commit(document => document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
+    }
+
+    private void CommitFlip()
+    {
+        if (_refreshing) return;
+        if (BulkTracks() is { } tracks)
+        {
+            if (TrackFlipBox.IsChecked is { } flip)
+                Commit(document => document.SetTracksFlip(_undo!, _sequence, tracks, flip));
+            return;
+        }
+        Commit(document => document.SetTrackFlip(_undo!, _sequence, _track!.Value, TrackFlipBox.IsChecked == true));
+    }
+
+    private void CommitChainStart()
+    {
+        if (_refreshing) return;
+        if (BulkChains() is { } chains)
+        {
+            if (EditOf(ChainStartField, ChainStartField.Value) is { } edit)
+                Commit(document => document.SetChainsStart(_undo!, _sequence, chains, edit));
+            return;
+        }
+        if (ChainStartField.Value is { } start && _chain is { } chain)
+            Commit(document => document.SetChainStart(_undo!, _sequence, chain.Track, chain.Chain, (double)start));
+    }
+
+    private void CommitChainLoops()
+    {
+        if (_refreshing) return;
+        if (BulkChains() is { } chains)
+        {
+            if (EditOf(ChainLoopsField, ChainLoopsField.Value) is { } edit)
+                Commit(document => document.SetChainsLoops(_undo!, _sequence, chains, edit));
+            return;
+        }
+        if (ChainLoopsField.Value is { } loops && _chain is { } chain)
+            Commit(document => document.SetChainLoops(_undo!, _sequence, chain.Track, chain.Chain, (float)loops));
     }
 
     private string? CommitSequenceName(SequenceDocument document, string text) => CurrentSequence is null
         ? null
         : document.RenameSequence(_undo!, _sequence, text);
 
-    private string? CommitTrackName(SequenceDocument document, string text) => _track is { } track
+    private string? CommitTrackName(SequenceDocument document, string text) => _track is { } track && BulkTracks() is null
         ? document.RenameTrack(_undo!, _sequence, track, text)
         : null;
 

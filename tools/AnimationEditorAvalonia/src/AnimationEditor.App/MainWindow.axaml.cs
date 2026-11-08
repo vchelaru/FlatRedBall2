@@ -872,14 +872,15 @@ public partial class MainWindow : Window
     private bool _confirmingClose;
 
     /// <summary>
-    /// Closing the window with a .seqj whose last save failed would drop its edits, so it asks first (the window-level
-    /// counterpart of <see cref="ITabPane.PrepareCloseAsync"/>).
+    /// Closing the window with a tab whose last save failed would drop its edits, so it asks first, once per such tab
+    /// (the window-level counterpart of <see cref="ITabPane.PrepareCloseAsync"/>).
     /// </summary>
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         CommitPendingRename();
-        if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown || !_sequencePane.HasUnsavedEdits) return;
+        if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown
+            || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
 
         e.Cancel = true;
         if (_confirmingClose) return;
@@ -891,7 +892,7 @@ public partial class MainWindow : Window
         _confirmingClose = true;
         try
         {
-            if (!await _sequencePane.ConfirmWindowCloseAsync()) return;
+            if (!await _sequencePane.ConfirmWindowCloseAsync() || !await _achxPane.ConfirmWindowCloseAsync()) return;
             _closeConfirmed = true;
         }
         finally
@@ -7315,6 +7316,13 @@ public partial class MainWindow : Window
     /// by ~20 tests across unrelated fixtures, and this prompt is UI-layer-only.
     /// </summary>
     internal Func<string, string, Task<SaveDiscardCancelChoice>> ShowSaveDiscardCancelDialogAsync { get; set; } = null!;
+
+    /// <summary>
+    /// The prompt for a tab that holds edits its file lacks (an Untitled tab with content, or any file whose last save
+    /// failed), so every tab kind words and titles it the same.
+    /// </summary>
+    internal Task<SaveDiscardCancelChoice> AskSaveBeforeClosingAsync(string tabName) =>
+        ShowSaveDiscardCancelDialogAsync($"\"{tabName}\" has unsaved changes. Save before closing?", "Unsaved Changes");
 
     private Task<SaveDiscardCancelChoice> ShowSaveDiscardCancelDialogAsyncCore(string message, string title) =>
         EditorDialogs.ConfirmSaveDiscardCancelAsync(_dialogHost, message, title);

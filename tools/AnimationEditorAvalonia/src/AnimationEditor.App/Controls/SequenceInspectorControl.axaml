@@ -4,7 +4,8 @@
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.App.Controls.SequenceInspectorControl">
     <!-- The Inspector tab's content while a .seqj tab is active: one section per kind of timeline selection
-         (nothing = the sequence, a track header, a chain). Only one section shows at a time. -->
+         (nothing = the sequence, a track header, a chain). Only one section shows at a time. With several tracks or
+         several chains selected the same section edits them all: a field they disagree on is blank and says "(mixed)". -->
     <UserControl.Styles>
         <Style Selector="TextBlock.label">
             <Setter Property="FontSize" Value="11" />
@@ -106,16 +107,6 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Several chains or tracks selected: only the count; no field is common to all of them. -->
-                <Border x:Name="MultiPanel" IsVisible="False" Padding="12,8,12,10"
-                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
-                    <StackPanel Spacing="8">
-                        <TextBlock x:Name="MultiCountText" Classes="heading" AutomationProperties.AutomationId="seq-multi-count" />
-                        <TextBlock Classes="note"
-                                   Text="Drag to move them together, Delete to remove them, Ctrl+C to copy them, Ctrl+D to duplicate them. Click one to edit it." />
-                    </StackPanel>
-                </Border>
-
                 <!-- Chain -->
                 <Border x:Name="ChainPanel" IsVisible="False" Padding="12,8,12,10"
                         BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
@@ -144,7 +135,7 @@
                                                                Minimum="0.001" Increment="1" FormatString="0.###"
                                                                ToolTip.Tip="The block's length in playback cycles (a ping-pong cycle is there and back). A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                         </Grid>
-                        <Grid ColumnDefinitions="78,*">
+                        <Grid x:Name="ChainLengthRow" ColumnDefinitions="78,*">
                             <TextBlock Text="Length" Classes="label" />
                             <TextBlock x:Name="ChainLengthText" Grid.Column="1" Classes="value" />
                         </Grid>
