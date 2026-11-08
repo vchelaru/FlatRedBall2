@@ -159,4 +159,22 @@ public class SequenceTimelineTests
         SequenceTimeline.LoopsForEdge(start: 0, edgeTime: 2.04, cycleLength: 1).ShouldBe(2.04f, 1e-5f);
         SequenceTimeline.LoopsForEdge(start: 1, edgeTime: 1.4, cycleLength: 4).ShouldBe(0.1f, 1e-5f);
     }
+
+    [Fact]
+    public void PoseTime_ANonLoopingSequenceAtOrPastItsLength_IsTheLastInstantBeforeTheEnd()
+    {
+        double last = 2 - SequenceTimeline.HoldEpsilon;
+
+        SequenceTimeline.PoseTime(2, length: 2, loop: false).ShouldBe(last);
+        SequenceTimeline.PoseTime(9, length: 2, loop: false).ShouldBe(last);
+        last.ShouldBeLessThan(2);
+    }
+
+    [Fact]
+    public void PoseTime_BeforeTheEnd_ALoopingSequence_AndAnEmptyOne_AreUnchanged()
+    {
+        SequenceTimeline.PoseTime(1.5, length: 2, loop: false).ShouldBe(1.5);
+        SequenceTimeline.PoseTime(2, length: 2, loop: true).ShouldBe(2);
+        SequenceTimeline.PoseTime(5, length: 0, loop: false).ShouldBe(5);
+    }
 }

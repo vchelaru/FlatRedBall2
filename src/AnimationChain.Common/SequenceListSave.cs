@@ -179,7 +179,7 @@ public class SequenceListSave
         var sequence = new SequenceSave
         {
             Name = node.String("name"),
-            Loop = node.Bool("loop"),
+            Loop = node.Bool("loop", fallback: true),
         };
         CaptureUnknown(node.Node, sequence.UnknownProperties, "name", "loop", "tracks");
         foreach (var track in node.Objects("tracks"))
