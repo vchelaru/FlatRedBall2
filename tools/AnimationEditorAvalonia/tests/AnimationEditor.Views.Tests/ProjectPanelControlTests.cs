@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using SkiaSharp;
@@ -900,6 +901,34 @@ public class ProjectPanelControlTests
         NewAnimationFileMenuItem(control).RaiseEvent(
             new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
         Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaTheory]
+    [InlineData("{ \"kind\": \"frb2-animation-editor-sequence\", \"version\": 1 }", "NewAnimation")]
+    [InlineData("hello", "hello")]
+    public async Task PastingIntoTheNewFileNameBox_RefusesTheEditorsCopyJson_ButTakesOrdinaryText(string clipboard, string expected)
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achj"), root, "Sprites/hero.achj") });
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]);
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            var textBox = control.ProjectTree.GetVisualDescendants().OfType<TextBox>()
+                .First(t => ReferenceEquals(t.DataContext, pending));
+            await window.Clipboard!.SetTextAsync(clipboard);
+            textBox.Focus();
+            textBox.SelectAll();
+
+            textBox.Paste();
+            await Task.Delay(100);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(expected, pending.EditText);
+        }
+        finally { window.Close(); }
     }
 
     // Drives the real TextBox in the pending row rather than calling a commit method directly, so
