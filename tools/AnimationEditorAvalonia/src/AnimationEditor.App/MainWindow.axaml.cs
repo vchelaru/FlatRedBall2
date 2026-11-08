@@ -298,6 +298,10 @@ public partial class MainWindow : Window
         ApplyPersistedPreviewPaneHeight();
         ShowBoundingBoxCheck.IsChecked = _appSettings.ShowBoundingBox;
         PreviewCtrl.ShowBoundingBox = _appSettings.ShowBoundingBox;
+        ShowShapesCheck.IsChecked = _appSettings.ShowShapes;
+        PreviewCtrl.ShowShapes = _appSettings.ShowShapes;
+        ShowOriginCheck.IsChecked = _appSettings.ShowOrigin;
+        PreviewCtrl.ShowOrigin = _appSettings.ShowOrigin;
         ApplyPersistedSequenceView();
         ProjectPanel.ShowAllFolders = _appSettings.ShowAllProjectFolders;
         ProjectPanel.ShowAllFoldersChanged += show => _appSettings.ShowAllProjectFolders = show;
@@ -3414,12 +3418,23 @@ public partial class MainWindow : Window
         OnionSkinToggle.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOnionSkin = OnionSkinToggle.IsChecked == true;
 
+        // Shapes, Origin and Bounding Box are one setting each for both tab kinds: the sequence preview's toggle follows.
         ShowShapesCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowShapes = ShowShapesCheck.IsChecked == true;
+        {
+            var show = ShowShapesCheck.IsChecked == true;
+            PreviewCtrl.ShowShapes = show;
+            _appSettings.ShowShapes = show;
+            SequenceShowShapes.IsChecked = show;
+        };
         PreviewCtrl.ShowShapesChanged += () => ShowShapesCheck.IsChecked = PreviewCtrl.ShowShapes;
 
         ShowOriginCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
+        {
+            var show = ShowOriginCheck.IsChecked == true;
+            PreviewCtrl.ShowOrigin = show;
+            _appSettings.ShowOrigin = show;
+            SequenceShowOrigin.IsChecked = show;
+        };
 
         ShowBoundingBoxCheck.IsCheckedChanged += (_, _) =>
         {
@@ -7209,14 +7224,14 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Applies what a <c>.seqj</c> tab's preview remembers across launches: the Shapes and Origin toggles, the Bounding Box
-    /// toggle (the same <see cref="AppSettingsModel.ShowBoundingBox"/> the achx toggle uses, so a user sees one setting), and
+    /// Applies what a <c>.seqj</c> tab's preview remembers across launches: the Shapes, Origin and Bounding Box toggles
+    /// (the same <see cref="AppSettingsModel"/> settings the achx toggles use, so a user sees one setting each), and
     /// the preview row height and library column width (siblings of <see cref="AppSettingsModel.PreviewPaneHeight"/>).
     /// </summary>
     private void ApplyPersistedSequenceView()
     {
-        SequenceShowShapes.IsChecked = _appSettings.SequenceShowShapes;
-        SequenceShowOrigin.IsChecked = _appSettings.SequenceShowOrigin;
+        SequenceShowShapes.IsChecked = _appSettings.ShowShapes;
+        SequenceShowOrigin.IsChecked = _appSettings.ShowOrigin;
         SequenceShowBoundingBox.IsChecked = _appSettings.ShowBoundingBox;
         SequenceEditorPane.RowDefinitions[2].Height = new GridLength(PersistedDimensionValidator.Resolve(
             _appSettings.SequencePreviewPaneHeight, MinPreviewPaneHeight, MaxPreviewPaneHeight, DefaultPreviewPaneHeight), GridUnitType.Pixel);
@@ -7444,9 +7459,10 @@ public partial class MainWindow : Window
     /// <summary>
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
     /// "Could not open x", "Nothing to paste", "Start must be 0 or more"). Shows the top-centre banner for about 8 s,
-    /// dismissable, with a Retry button when <paramref name="retry"/> is given. The status bar message is separate.
+    /// dismissable, with a Retry button when <paramref name="retry"/> is given; <paramref name="sticky"/> keeps it up until
+    /// dismissed. The status bar message is separate.
     /// </summary>
-    public void ShowProblem(string message, Action? retry = null) => Notifications.ShowProblem(message, retry);
+    public void ShowProblem(string message, Action? retry = null, bool sticky = false) => Notifications.ShowProblem(message, retry, sticky);
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 

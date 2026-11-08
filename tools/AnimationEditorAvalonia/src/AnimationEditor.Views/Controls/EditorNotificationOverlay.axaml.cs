@@ -102,9 +102,10 @@ public partial class EditorNotificationOverlay : UserControl
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
     /// "Could not open x", "Nothing to paste"). Shows the prominent top-centre banner for about 8 s; hovering it keeps
     /// it up and the dismiss button closes it. <paramref name="retry"/>, when given, adds a Retry button that closes
-    /// the banner and runs it.
+    /// the banner and runs it. <paramref name="sticky"/> keeps the banner up until the user dismisses it, for a problem
+    /// that stays true after the 8 s (editing a file written by a newer version may lose data).
     /// </summary>
-    public void ShowProblem(string message, Action? retry = null)
+    public void ShowProblem(string message, Action? retry = null, bool sticky = false)
     {
         _bannerRetryAction = retry;
         ErrorBannerRetryBtn.IsVisible = retry is not null;
@@ -112,6 +113,7 @@ public partial class EditorNotificationOverlay : UserControl
         ErrorBanner.IsVisible = true;
 
         _errorBannerTimer?.Stop();
+        if (sticky) return;
         _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
         _errorBannerTimer.Tick += (_, _) => HideErrorBannerIfNotHovered();
         _errorBannerTimer.Start();

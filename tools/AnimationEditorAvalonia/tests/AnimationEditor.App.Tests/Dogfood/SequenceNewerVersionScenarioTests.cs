@@ -25,7 +25,7 @@ public class SequenceNewerVersionScenarioTests
     private const string Notice = "Newer file format (v2). Unknown data is kept when you save.";
 
     private static void DismissNotice(AnimationEditorHarness editor) =>
-        editor.Click(editor.Notifications.ToastDismissBtn);
+        editor.Click(editor.Notifications.ErrorBannerDismissBtn);
 
     [AvaloniaFact]
     public async Task OpeningANewerSeqj_ShowsTheNotice_AndSavingKeepsTheVersionAndUnknownFields()
@@ -36,8 +36,8 @@ public class SequenceNewerVersionScenarioTests
 
         await editor.OpenAsync(boss);
 
-        editor.InfoText.ShouldBe(Notice);
-        editor.ProblemText.ShouldBeNull();
+        editor.ProblemText.ShouldBe(Notice);
+        editor.InfoText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "Idle" });
 
         editor.Click(editor.Control<Button>("AddSequenceButton"));
@@ -49,22 +49,27 @@ public class SequenceNewerVersionScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TheNotice_IsAnInfoToast_ThatAutoHides_AndDoesNotReturnOnTabSwitchOrEdit()
+    public async Task TheNotice_IsAProblemBanner_ThatStaysUntilDismissed_AndDoesNotReturnOnTabSwitchOrEdit()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
         File.WriteAllText(boss, NewerJson);
         string other = editor.WriteSeqj("other.seqj", "Walk");
         await editor.OpenAsync(boss);
-        // The notice is an info toast: it hides itself after about 6 seconds.
-        editor.InfoText.ShouldBe(Notice);
-        (await editor.WaitUntilAsync(() => editor.InfoText == null, TimeSpan.FromSeconds(9))).ShouldBeTrue();
+        // A problem banner normally hides itself after about 8 seconds; this one stays because editing the file may lose data.
+        editor.ProblemText.ShouldBe(Notice);
+        (await editor.WaitUntilAsync(() => editor.ProblemText == null, TimeSpan.FromSeconds(10))).ShouldBeFalse();
+        editor.ProblemText.ShouldBe(Notice);
+
+        DismissNotice(editor);
+        editor.ProblemText.ShouldBeNull();
         await editor.OpenAsync(other);
         editor.ClickTab("boss.seqj");
         editor.ClickTab("other.seqj");
         editor.ClickTab("boss.seqj");
         editor.Click(editor.Control<Button>("AddSequenceButton"));
 
+        editor.ProblemText.ShouldBeNull();
         editor.InfoText.ShouldBeNull();
     }
 
@@ -102,14 +107,14 @@ public class SequenceNewerVersionScenarioTests
         try
         {
             using AnimationEditorHarness editor = new AnimationEditorHarness(settingsRoot);
-            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.InfoText != null, TimeSpan.FromSeconds(5));
+            editor.WaitUntil(() => editor.TabLabels.Count == 2 && editor.ProblemText != null, TimeSpan.FromSeconds(5));
             editor.Layout();
 
-            editor.InfoText.ShouldBe(Notice);
+            editor.ProblemText.ShouldBe(Notice);
             DismissNotice(editor);
             editor.ClickTab("other.seqj");
             editor.ClickTab("boss.seqj");
-            editor.InfoText.ShouldBeNull();
+            editor.ProblemText.ShouldBeNull();
         }
         finally
         {
