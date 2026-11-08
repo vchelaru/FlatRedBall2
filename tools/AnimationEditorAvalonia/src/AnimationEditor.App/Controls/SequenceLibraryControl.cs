@@ -707,10 +707,30 @@ public sealed class LibraryChipView : Border
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property != IsPointerOverProperty && change.Property != IsFocusedProperty) return;
-        // A focused chip (reached with Tab, Enter adds it) is outlined like a hovered one.
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver || IsFocused ? "Accent" : "LineBrush");
-        if (change.Property == IsPointerOverProperty) _library.RefreshPlayback();
+        if (change.Property != IsPointerOverProperty) return;
+        ShowOutline();
+        _library.RefreshPlayback();
+    }
+
+    // A chip reached with the keyboard (Tab, then Enter adds it) is outlined like a hovered one. A click or a closing menu
+    // that hands the focus back does not count: the outline then still means "the pointer is over it" (#1655).
+    private bool _keyboardFocused;
+
+    private void ShowOutline() =>
+        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver || _keyboardFocused ? "Accent" : "LineBrush");
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        _keyboardFocused = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
+        ShowOutline();
+    }
+
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        _keyboardFocused = false;
+        ShowOutline();
     }
 
     /// <summary>Starts or stops the chip. <paramref name="now"/> is the library clock's time, so a started chip begins on its first frame.</summary>
