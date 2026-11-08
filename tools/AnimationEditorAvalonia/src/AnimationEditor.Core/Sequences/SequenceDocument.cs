@@ -636,6 +636,27 @@ public sealed class SequenceDocument
             stateBefore: before, stateAfter: after);
     }
 
+    /// <summary>
+    /// Moves the given sequences as one block to the gap <paramref name="slot"/> (0 above the first row, the sequence
+    /// count below the last), keeping their relative order, as one undo entry. The selection and its primary stay (the
+    /// document's selected index follows the primary by name); undo puts back the order and the selection. Returns
+    /// false, with no undo entry, when the drop changes nothing. See <see cref="SequenceReorder"/>.
+    /// </summary>
+    public bool MoveSequences(IUndoManager undo, IReadOnlyList<int> indices, int slot)
+    {
+        if (SequenceReorder.Plan(Save.Sequences.Count, indices, slot) is not { } plan) return false;
+        var moved = InDocumentOrder(indices);
+        string description = moved.Count == 1 ? $"Move Sequence '{Save.Sequences[moved[0]].Name}'" : $"Move {moved.Count} Sequences";
+        var after = SelectionOf(indices);
+        Edit(undo, description, save =>
+        {
+            var reordered = plan.Order.Select(old => save.Sequences[old]).ToList();
+            save.Sequences.Clear();
+            save.Sequences.AddRange(reordered);
+        }, stateBefore: Selection.State, stateAfter: after);
+        return true;
+    }
+
     /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
     public void SetLoop(IUndoManager undo, int index, bool loop)
     {
