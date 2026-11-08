@@ -11,10 +11,12 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows.Input;
 
 namespace AnimationEditor.App;
@@ -165,6 +167,22 @@ public partial class App : Application
                 });
             SingleInstance.ActivationRequested += () =>
                 Dispatcher.UIThread.Post(() => { if (window.IsVisible) window.BringToForeground(); });
+        }
+
+        // macOS hands a Finder double-click, a drop on the Dock icon and `open -a` the file as an open-document event
+        // (Info.plist CFBundleDocumentTypes decides which files), never as a command-line argument.
+        if (TryGetFeature(typeof(IActivatableLifetime)) is IActivatableLifetime activatable)
+        {
+            activatable.Activated += (_, e) =>
+            {
+                if (e is not FileActivatedEventArgs opened) return;
+                string[] paths = opened.Files.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray();
+                Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    foreach (string path in paths) await window.OpenFileAsTab(path);
+                    if (window.IsVisible) window.BringToForeground();
+                });
+            };
         }
 
         // Post the Dock icon update to the next UI tick. Avalonia's macOS backend

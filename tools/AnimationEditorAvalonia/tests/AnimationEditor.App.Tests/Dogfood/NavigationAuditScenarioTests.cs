@@ -1,3 +1,4 @@
+using AnimationEditor.App.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -46,6 +47,60 @@ public class NavigationAuditScenarioTests
         await SettleAsync(editor);
         SelectedChain().ShouldBe("Walk");
         BackEnabled(editor).ShouldBeFalse();
+    }
+
+    // Option+Left/Right move the caret by a word in a Mac text box; Back is for everywhere else. On Windows and Linux
+    // Alt+Arrow means nothing to a text box, so Back stays available there.
+    [AvaloniaTheory]
+    [InlineData(true, "Run")]
+    [InlineData(false, "Walk")]
+    public async Task AltLeft_InATextBox_IsBackOnlyOffTheMac(bool mac, string chainAfterAltLeft)
+    {
+        using var editor = new AnimationEditorHarness(commandModifier: mac ? CommandModifier.Meta : CommandModifier.Control);
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 16, 16, 16)));
+        await editor.OpenAsync(path);
+        editor.ClickRow(editor.ChainNamed("Run"));
+        BackEnabled(editor).ShouldBeTrue();
+        TextBox box = editor.Control<TextBox>("PropChainName");
+        box.Focus();
+        editor.Layout();
+
+        Back(editor);
+        await SettleAsync(editor);
+
+        editor.Services.SelectedState.SelectedChain?.Name.ShouldBe(chainAfterAltLeft);
+    }
+
+    // The Mac menu cannot show Option+Left/Right (AppKit would hand it to Back even inside a text box), so Back and
+    // Forward are Cmd+[ and Cmd+] there, as in Finder and browsers, and work from a text box too.
+    [AvaloniaFact]
+    public async Task OnTheMac_BackAndForwardAreCmdBrackets_EvenInATextBox_AndTheBarShowsThem()
+    {
+        using var editor = new AnimationEditorHarness(commandModifier: CommandModifier.Meta);
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (0, 16, 16, 16)));
+        await editor.OpenAsync(path);
+        editor.ClickRow(editor.ChainNamed("Run"));
+        editor.Control<TextBox>("PropChainName").Focus();
+        editor.Layout();
+        string? Selected() => editor.Services.SelectedState.SelectedChain?.Name;
+
+        editor.Press(Key.OemOpenBrackets, RawInputModifiers.Meta);
+        await SettleAsync(editor);
+        Selected().ShouldBe("Walk");
+
+        editor.Press(Key.OemCloseBrackets, RawInputModifiers.Meta);
+        await SettleAsync(editor);
+        Selected().ShouldBe("Run");
+
+        NativeMenu bar = NativeMenuTestSupport.Build(editor);
+        NativeMenuTestSupport.Find(bar, "View", "Back").Gesture.ShouldBe(new KeyGesture(Key.OemOpenBrackets, KeyModifiers.Meta));
+        NativeMenuTestSupport.Find(bar, "View", "Forward").Gesture.ShouldBe(new KeyGesture(Key.OemCloseBrackets, KeyModifiers.Meta));
     }
 
     [AvaloniaFact]

@@ -2651,9 +2651,10 @@ public partial class MainWindow : Window
         SequenceTimeline.DiagnosticsExtraLines = _diagnosticsHub.Lines;
         MenuSettings.Click += OnSettingsClick;
         MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
-        MenuCopy.Click          += (_, _) => ActivePane.CopySelection();
-        MenuCut.Click           += (_, _) => ActivePane.CutSelection();
-        MenuPaste.Click         += (_, _) => ActivePane.PasteSelection();
+        // A Mac runs Cmd+C/X/V through these items, so with a text box focused they edit its text, not the selection.
+        MenuCopy.Click          += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Copy(); else ActivePane.CopySelection(); };
+        MenuCut.Click           += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Cut(); else ActivePane.CutSelection(); };
+        MenuPaste.Click         += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Paste(); else ActivePane.PasteSelection(); };
         MenuDuplicate.Click     += (_, _) => ActivePane.DuplicateSelection();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
@@ -7656,16 +7657,22 @@ public partial class MainWindow : Window
             new()
             {
                 Id = "nav-back", Description = "Back", Category = "View",
-                Gestures = new[] { new HotkeyGesture("Left", Alt) },
+                // Option+Left/Right is word navigation in a Mac text box, and AppKit hands a menu's key equivalent
+                // to the menu even there, so on a Mac Back is Cmd+[ (Finder's and browsers' Back) instead.
+                Gestures = IsMacOS
+                    ? new[] { new HotkeyGesture(Key.OemOpenBrackets.ToString(), Command, Forbidden: Shift | Alt) }
+                    : new[] { new HotkeyGesture("Left", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
             },
             new()
             {
                 Id = "nav-forward", Description = "Forward", Category = "View",
-                Gestures = new[] { new HotkeyGesture("Right", Alt) },
+                Gestures = IsMacOS
+                    ? new[] { new HotkeyGesture(Key.OemCloseBrackets.ToString(), Command, Forbidden: Shift | Alt) }
+                    : new[] { new HotkeyGesture("Right", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
             },
             new()
             {
