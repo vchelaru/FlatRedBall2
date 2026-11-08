@@ -209,7 +209,7 @@ public class SequenceTimelineMultiMoveScenarioTests
 
         editor.RightClickAt(At(editor, 1, 1.75));
         timeline.SelectedChains.Count.ShouldBe(2);
-        editor.PickMenuItem(timeline.Menu, "Remove Selected Chains");
+        editor.PickMenuItem(timeline.Menu, "Remove 2 Chains");
 
         Chains(boss, 0).Length.ShouldBe(2);
         Chains(boss, 1).ShouldBe(new[] { ("Run", 0.5) });

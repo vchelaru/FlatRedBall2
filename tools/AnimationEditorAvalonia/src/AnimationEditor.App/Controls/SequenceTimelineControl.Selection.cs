@@ -99,6 +99,9 @@ public sealed partial class SequenceTimelineControl
     public void SelectTracks(IEnumerable<int> tracks) =>
         NotifySelection(_model.SelectTracks(tracks.Where(track => track >= 0 && track < TrackCount)));
 
+    /// <summary>Selects every chain, or every track while headers are selected: what Ctrl+A does with the timeline focused.</summary>
+    public void SelectAllItems() => NotifySelection(_model.SelectAll(_blocks, TrackCount));
+
     /// <summary>Deselects the chain or track, so the inspector shows the sequence.</summary>
     public void ClearSelection() => SetSelection(null, null);
 

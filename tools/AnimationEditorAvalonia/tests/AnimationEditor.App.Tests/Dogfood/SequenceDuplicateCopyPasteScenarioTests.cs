@@ -291,7 +291,9 @@ public class SequenceDuplicateCopyPasteScenarioTests
         await SetClipboardAsync(editor, "sentinel");
 
         await CtrlAsync(editor, Key.C);
-        (await ClipboardAsync(editor)).ShouldBe("sentinel");
+        // Nothing is selected on the timeline: Copy says so and empties the clipboard rather than leave an older copy to paste.
+        (await ClipboardAsync(editor)).ShouldBeNullOrEmpty();
+        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
         await SetClipboardAsync(editor, envelope);
         await CtrlAsync(editor, Key.V);
 
@@ -330,16 +332,19 @@ public class SequenceDuplicateCopyPasteScenarioTests
         var copy = editor.Control<MenuItem>("MenuCopy");
         var paste = editor.Control<MenuItem>("MenuPaste");
 
+        (copy.IsEnabled, paste.IsEnabled).ShouldBe((false, false), "neither pane was touched yet");
+
         ClickRow(editor, 0);
         (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));
 
-        // The timeline copies chains and tracks, so it enables them too; anything else does not.
+        // The timeline copies chains and tracks, so it enables them too.
         ClickTimeline(editor);
         (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));
+        // A button takes the focus but not the ownership: the timeline is still the last pane touched.
         editor.Control<Button>("AddSequenceButton").Focus();
         editor.Layout();
-        (copy.IsEnabled, paste.IsEnabled).ShouldBe((false, false));
-        editor.Control<MenuItem>("MenuCut").IsEnabled.ShouldBeFalse();
+        (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));
+        editor.Control<MenuItem>("MenuCut").IsEnabled.ShouldBeTrue();
 
         ClickRow(editor, 1);
         (copy.IsEnabled, paste.IsEnabled).ShouldBe((true, true));

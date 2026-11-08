@@ -97,6 +97,18 @@ internal interface ITabPane
     void DuplicateSelection();
 
     /// <summary>
+    /// The F2 hotkey: renames in place what is selected in this kind's document. Only called while <see cref="Accepts"/>
+    /// takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void RenameSelection();
+
+    /// <summary>
+    /// The Alt+Up (<paramref name="delta"/> -1) and Alt+Down (+1) hotkeys: moves what is selected in this kind's document one
+    /// place. Only called while <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
+    /// </summary>
+    void MoveSelection(int delta);
+
+    /// <summary>
     /// File &gt; Reload from Disk: reads this kind's document from its file again, discarding what the file lacks. Only
     /// called while <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.
     /// </summary>

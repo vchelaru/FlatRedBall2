@@ -9,6 +9,10 @@ namespace AnimationEditor.Core.Tests;
 public class SequenceListMenuLayoutTests
 {
     [Theory]
+    [InlineData(Cmd.Copy, 1, "Copy")]
+    [InlineData(Cmd.Copy, 3, "Copy 3 Sequences")]
+    [InlineData(Cmd.Cut, 2, "Cut 2 Sequences")]
+    [InlineData(Cmd.Paste, 3, "Paste")]
     [InlineData(Cmd.Rename, 1, "Rename…")]
     [InlineData(Cmd.Rename, 3, "Rename…")]
     [InlineData(Cmd.DuplicateSequence, 1, "Duplicate Sequence")]

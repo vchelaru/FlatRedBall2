@@ -65,6 +65,8 @@ public static class TreeMenuRenderer
         TreeMenuIcon.Offsets        => "IconMove",
         TreeMenuIcon.RevealFile     => "IconFolderOpen",
         TreeMenuIcon.MatchSize      => "IconBoundingBox",
+        TreeMenuIcon.Sequence       => "IconSequence",
+        TreeMenuIcon.Plus           => "IconPlus",
         _ => throw new ArgumentOutOfRangeException(nameof(icon), icon, null),
     };
 
