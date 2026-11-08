@@ -297,7 +297,7 @@ public partial class MainWindow
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
-                // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
+                // later tab switches reuse it, so the notice shows once per open. It is a toast that hides on its own.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
                     _window.ShowInfo(notice);
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.

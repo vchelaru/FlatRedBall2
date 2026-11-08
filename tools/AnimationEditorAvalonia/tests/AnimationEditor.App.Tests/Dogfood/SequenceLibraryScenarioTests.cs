@@ -201,8 +201,8 @@ public class SequenceLibraryScenarioTests
 
         header.ContextMenu!.IsOpen.ShouldBeTrue();
         header.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header)
-            .ShouldBe(new[] { "Go to Definition", "Replace Source…", "Remove Source" });
-        editor.PickMenuItem(header.ContextMenu, "Go to Definition");
+            .ShouldBe(new[] { "Open Source", "Replace Source…", "Remove Source" });
+        editor.PickMenuItem(header.ContextMenu, "Open Source");
         await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
 
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
@@ -238,7 +238,7 @@ public class SequenceLibraryScenarioTests
         editor.RightClickAt(OnHeaderTitle(editor, header));
 
         header.ContextMenu!.IsOpen.ShouldBeTrue();
-        Item(header.ContextMenu, "Go to Definition").IsEnabled.ShouldBeFalse();
+        Item(header.ContextMenu, "Open Source").IsEnabled.ShouldBeFalse();
         Item(header.ContextMenu, "Remove Source").IsEnabled.ShouldBeTrue();
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
     }

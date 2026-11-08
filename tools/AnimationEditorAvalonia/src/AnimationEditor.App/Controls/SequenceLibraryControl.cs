@@ -1,6 +1,8 @@
 using AnimationEditor.App.Services;
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -89,9 +91,10 @@ public sealed class SequenceLibraryControl : UserControl
         ToolTip.SetTip(AddSourceButton, "Add .achx or .achj files to the library");
         Avalonia.Automation.AutomationProperties.SetName(AddSourceButton, "Add Source");
         AddSourceButton.Click += (_, _) => AddSourceRequested?.Invoke();
-        Grid.SetColumn(AddSourceButton, 1);
-        Grid.SetColumn(_autoplayToggle, 2);
-        _headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
+        SetAddSourceCompact(true);
+        Grid.SetColumn(AddSourceButton, 2);
+        Grid.SetColumn(_autoplayToggle, 3);
+        _headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto") };
         _headerRow.Children.Add(title);
         _headerRow.Children.Add(AddSourceButton);
         _headerRow.Children.Add(_autoplayToggle);
@@ -363,6 +366,7 @@ public sealed class SequenceLibraryControl : UserControl
             BindResource(hint, TextBlock.ForegroundProperty, "InkMid");
             empty.Children.Add(none);
             MoveAddSourceButton(empty);
+            SetAddSourceCompact(false);
             AddSourceButton.HorizontalAlignment = HorizontalAlignment.Left;
             AddSourceButton.Margin = new Thickness(0);
             empty.Children.Add(hint);
@@ -371,12 +375,24 @@ public sealed class SequenceLibraryControl : UserControl
         }
 
         MoveAddSourceButton(_headerRow);
+        SetAddSourceCompact(true);
         AddSourceButton.HorizontalAlignment = HorizontalAlignment.Stretch;
         AddSourceButton.Margin = new Thickness(0, 0, 6, 0);
 
         foreach (var source in Sources)
             _groups.Children.Add(BuildGroup(source));
         RefreshPlayback();
+    }
+
+    // In the header the button is a small "+" so the LIBRARY title and the All toggle both fit (the .achx panel header also
+    // keeps its title clear of its icon buttons); in the empty state it has room for its full label.
+    private void SetAddSourceCompact(bool compact)
+    {
+        AddSourceButton.Content = compact ? "+" : "+ Add Source…";
+        AddSourceButton.FontSize = compact ? 14 : 11;
+        AddSourceButton.Width = compact ? 24 : double.NaN;
+        AddSourceButton.Padding = compact ? new Thickness(0) : new Thickness(8, 0);
+        AddSourceButton.HorizontalContentAlignment = HorizontalAlignment.Center;
     }
 
     // The one button sits in the header, or in the empty state while there is nothing else to click.
@@ -409,7 +425,7 @@ public sealed class SequenceLibraryControl : UserControl
             VerticalAlignment = VerticalAlignment.Center, Tag = source.Source,
         };
         BindResource(remove, Button.ForegroundProperty, "InkMid");
-        ToolTip.SetTip(remove, "Remove from library");
+        ToolTip.SetTip(remove, "Remove Source");
         Avalonia.Automation.AutomationProperties.SetName(remove, $"Remove {source.Source}");
         remove.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
 
@@ -421,18 +437,16 @@ public sealed class SequenceLibraryControl : UserControl
             VerticalAlignment = VerticalAlignment.Center,
         };
         BindResource(open, Button.ForegroundProperty, "InkMid");
-        ToolTip.SetTip(open, "Open in tab");
+        ToolTip.SetTip(open, "Open Source");
         Avalonia.Automation.AutomationProperties.SetName(open, $"Open {source.Source} in tab");
         open.Click += (_, _) => OpenSource();
 
         // A transparent background makes the whole row hit-testable, so a click anywhere on it toggles and a right-click opens the menu.
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto"), Background = Brushes.Transparent };
-        var definition = new MenuItem { Header = "Go to Definition", IsEnabled = !source.IsMissing };
-        definition.Click += (_, _) => OpenSource();
-        var replaceItem = new MenuItem { Header = "Replace Source…" };
-        replaceItem.Click += (_, _) => ReplaceSourceRequested?.Invoke(source.Source);
-        var removeItem = new MenuItem { Header = "Remove Source" };
-        removeItem.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
+        var definition = TreeMenuRenderer.CreateMenuItem("Open Source", OpenSource, TreeMenuIcon.RevealFile);
+        definition.IsEnabled = !source.IsMissing;
+        var replaceItem = TreeMenuRenderer.CreateMenuItem("Replace Source…", () => ReplaceSourceRequested?.Invoke(source.Source), TreeMenuIcon.Replace);
+        var removeItem = TreeMenuRenderer.CreateMenuItem("Remove Source", () => RemoveSourceRequested?.Invoke(source.Source), TreeMenuIcon.Delete);
         header.ContextMenu = new ContextMenu { Items = { definition, replaceItem, removeItem } };
         _headers[source.Source] = header;
         Control toggle;
@@ -593,16 +607,14 @@ public sealed class LibraryChipView : Border
         Cursor = GrabCursor;
         // Focusable so Enter can add the chain from the keyboard; a click does not take the focus (the press is handled).
         Focusable = true;
-        var addToTimeline = new MenuItem { Header = "Add to Timeline" };
-        addToTimeline.Click += (_, _) => _library.RaiseAddChip(Chip, ChipAddMode.NewTrack);
-        var addToTrack = new MenuItem { Header = "Add to Selected Track", IsEnabled = false };
-        addToTrack.Click += (_, _) => _library.RaiseAddChip(Chip, ChipAddMode.SelectedTrack);
-        var definition = new MenuItem { Header = "Go to Definition" };
-        definition.Click += (_, _) => _library.RaiseGoToDefinition(
-            new SequenceChainReferenceSave { Source = chip.Source, Chain = chip.Chain.Name });
+        var addToTimeline = TreeMenuRenderer.CreateMenuItem("Add to Timeline", () => _library.RaiseAddChip(Chip, ChipAddMode.NewTrack), TreeMenuIcon.Plus);
+        var addToTrack = TreeMenuRenderer.CreateMenuItem("Add to Selected Track", () => _library.RaiseAddChip(Chip, ChipAddMode.SelectedTrack), TreeMenuIcon.Plus);
+        addToTrack.IsEnabled = false;
+        var definition = TreeMenuRenderer.CreateMenuItem("Go to Definition", () => _library.RaiseGoToDefinition(
+            new SequenceChainReferenceSave { Source = chip.Source, Chain = chip.Chain.Name }), TreeMenuIcon.Animation);
         // The source alone, as the group header's open button sends it: the file opens in its own tab with nothing selected.
-        var openSource = new MenuItem { Header = "Open Source" };
-        openSource.Click += (_, _) => _library.RaiseGoToDefinition(new SequenceChainReferenceSave { Source = chip.Source });
+        var openSource = TreeMenuRenderer.CreateMenuItem("Open Source",
+            () => _library.RaiseGoToDefinition(new SequenceChainReferenceSave { Source = chip.Source }), TreeMenuIcon.RevealFile);
         var menu = new ContextMenu { Items = { addToTimeline, addToTrack, new Separator(), definition, openSource } };
         // Whether a track is selected is only known when the menu opens.
         menu.Opening += (_, _) => addToTrack.IsEnabled = _library.CanAddToSelectedTrack?.Invoke() == true;
