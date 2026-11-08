@@ -513,13 +513,48 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_document is null || _undo is null) return false;
         var plan = PlanDrop(chip, point);
         if (plan.Kind == TimelineDropKind.None) return false;
-        _document.PlaceChain(_undo, _sequenceIndex, plan.Kind == TimelineDropKind.Track ? plan.Row : null,
-            chip.Source, chip.Chain.Name, plan.Start);
-        var sequence = Sequence!;
-        int track = plan.Kind == TimelineDropKind.Track ? plan.Row : sequence.Tracks.Count - 1;
-        SetSelection(new TimelineChainId(track, sequence.Tracks[track].Chains.Count - 1), null);
-        Rebuild();
+        PlaceAndSelect(chip, plan.Kind == TimelineDropKind.Track ? plan.Row : null, plan.Start);
         return true;
+    }
+
+    // The drop and "add without dragging" end the same way: one PlaceChain (so one undo entry, named alike) and the new chain selected.
+    private void PlaceAndSelect(LibraryChip chip, int? track, double start)
+    {
+        _document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start);
+        var sequence = Sequence!;
+        int placed = track ?? sequence.Tracks.Count - 1;
+        SetSelection(new TimelineChainId(placed, sequence.Tracks[placed].Chains.Count - 1), null);
+        Rebuild();
+    }
+
+    /// <summary>True when the selection names exactly one track, so <see cref="ChipAddMode.SelectedTrack"/> has somewhere to add.</summary>
+    public bool CanAddToSelectedTrack =>
+        Sequence is not null && ChipAddPlan.For(ChipAddMode.SelectedTrack, SelectedChains, SelectedTracks, _playhead).CanAdd;
+
+    /// <summary>
+    /// Adds <paramref name="chip"/>'s chain at the playhead without a drag: on a new track at the end of the list, or on the
+    /// one selected track (see <see cref="ChipAddPlan"/>). The new chain is selected and scrolled into view, as a drop's is.
+    /// Returns null when added, else why nothing was (no sequence in the file, or no single selected track).
+    /// </summary>
+    public string? AddChip(LibraryChip chip, ChipAddMode mode)
+    {
+        if (_document is null || _undo is null || Sequence is null) return "Add a sequence first: the file has none to put the chain on.";
+        var plan = ChipAddPlan.For(mode, SelectedChains, SelectedTracks, _playhead);
+        if (!plan.CanAdd) return plan.Refusal;
+        PlaceAndSelect(chip, plan.Track, plan.Start);
+        RevealPlaced(plan.Start);
+        return null;
+    }
+
+    // A chain added at the playhead can land off screen (a lane below the visible ones, a playhead scrolled away).
+    private void RevealPlaced(double start)
+    {
+        int track = Selection?.Track ?? -1;
+        if (track < 0) return;
+        double top = Viewport.LaneTop(track), bottom = top + Viewport.LaneHeightOf(track);
+        if (bottom > Bounds.Height) ScrollToY(Viewport.ScrollY + bottom - Bounds.Height);
+        else if (top < TimelineViewport.RulerHeight) ScrollToY(Viewport.ScrollY - (TimelineViewport.RulerHeight - top));
+        if (start < Viewport.ScrollSeconds || Viewport.XAt(start) > Bounds.Width) ScrollToSeconds(Math.Max(0, start - 0.1));
     }
 
     /// <summary>

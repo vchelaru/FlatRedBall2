@@ -46,6 +46,7 @@ public partial class SearchToggleBox : UserControl
     public SearchToggleBox()
     {
         InitializeComponent();
+        EditorTextPaste.SetAllowEditorJson(SearchBox, true); // a filter is not a name; it takes any text
 
         SearchToggleBtn.Click += (_, _) => Toggle();
 

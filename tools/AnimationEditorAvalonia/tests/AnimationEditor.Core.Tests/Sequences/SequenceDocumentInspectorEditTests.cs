@@ -191,4 +191,67 @@ public class SequenceDocumentInspectorEditTests
         SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
         undo.UndoHistory.ShouldBeEmpty();
     }
+
+    // A numeric field commits as it is typed in, like the .achx inspector's: every step lands in the document at once and
+    // the entries merge until the user seals them (Enter, leaving the field).
+    [Fact]
+    public void TrackOffset_StepsOfOneEdit_MergeIntoOneUndoStep_UntilSealed()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+
+        document.SetTrackOffset(undo, 0, 0, 1f, 0f);
+        document.SetTrackOffset(undo, 0, 0, 12f, 0f);
+        document.SetTrackOffset(undo, 0, 0, 12.5f, 0f);
+
+        SavedTrack(document).X.ShouldBe(12.5f);
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Offset of 'Body' to (12.5, 0)" });
+        undo.SealCoalescing();
+        document.SetTrackOffset(undo, 0, 0, 12.5f, -3f);
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[]
+        {
+            "Set Offset of 'Body' to (12.5, 0)", "Set Offset of 'Body' to (12.5, -3)",
+        });
+
+        undo.Undo();
+        SavedTrack(document).Y.ShouldBe(0f);
+        undo.Undo();
+        SavedTrack(document).X.ShouldBe(0f);
+        undo.Redo();
+        SavedTrack(document).X.ShouldBe(12.5f);
+    }
+
+    [Fact]
+    public void ChainStartAndCycles_StepsOfOneEdit_MergeIntoOneUndoStepEach()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+
+        document.SetChainStart(undo, 0, 0, 0, 1);
+        document.SetChainStart(undo, 0, 0, 0, 1.5);
+        document.SetChainLoops(undo, 0, 0, 0, 2);
+        document.SetChainLoops(undo, 0, 0, 0, 2.5f);
+
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Cycles of 'Walk' to 2.5" });
+        undo.Undo();
+        SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
+        undo.Undo();
+        SavedTrack(document).Chains.Single().Start.ShouldBe(0.5);
+    }
+
+    [Fact]
+    public void OffsetsOfTwoTracks_NeverMerge()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddTrack(undo, 0);
+
+        document.SetTrackOffset(undo, 0, 0, 1f, 0f);
+        document.SetTrackOffset(undo, 0, 1, 2f, 0f);
+
+        undo.UndoHistory.Count(c => c.Description.StartsWith("Set Offset")).ShouldBe(2);
+    }
 }

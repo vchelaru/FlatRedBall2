@@ -79,6 +79,22 @@ public sealed class SequenceDocument
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
 
+    /// <summary>
+    /// Raised with the reason each time a write of the file fails (or is paused because the file on disk could not be
+    /// read), the way <c>IAppCommands.SaveFailed</c> is for an <c>.achx</c>. The window turns it into a toast.
+    /// </summary>
+    public event Action<string>? SaveFailed;
+
+    /// <summary>True while the last write failed, so this document holds edits the file lacks.</summary>
+    public bool HasUnsavedEdits => SaveError is not null;
+
+    /// <summary>
+    /// Says which sequences were renamed because the file gave two the same name (sequences are keyed by name, so the
+    /// later one would be unreachable). The numbering is in memory only: the file is not rewritten until the next edit
+    /// saves it. Null when the file had no duplicates.
+    /// </summary>
+    public string? DuplicateNamesNotice { get; private set; }
+
     /// <summary>Raised after any edit, undo, redo, source reload or reload from disk.</summary>
     public event Action? Changed;
 
@@ -145,6 +161,7 @@ public sealed class SequenceDocument
             StaleOnDiskReason = ex.Message;
             return new SequenceReloadResult(false, ex.Message);
         }
+        DuplicateNamesNotice = NumberDuplicateNames(loaded);
         // The "saving is paused" failure is over once the file reads again; a real write failure is not.
         if (StaleOnDiskReason is not null) SaveError = null;
         StaleOnDiskReason = null;
@@ -186,7 +203,31 @@ public sealed class SequenceDocument
     {
         // Hashed before the read: a write in between makes the next catch-up read once more, never miss.
         byte[]? hash = HotReload.HotReloadWatcher.TryHash(path);
-        return new SequenceDocument(path, SequenceListSave.FromFile(path), hash);
+        var save = SequenceListSave.FromFile(path);
+        var notice = NumberDuplicateNames(save);
+        return new SequenceDocument(path, save, hash) { DuplicateNamesNotice = notice };
+    }
+
+    /// <summary>
+    /// Gives each sequence whose name an earlier one already has (ignoring case, like <see cref="NameGenerator"/>) the next
+    /// free numbered name, so every sequence can be reached by name. Returns what was renamed as a sentence, or null.
+    /// </summary>
+    private static string? NumberDuplicateNames(SequenceListSave save)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var renames = new List<string>();
+        foreach (var sequence in save.Sequences)
+        {
+            if (seen.Add(sequence.Name)) continue;
+            string original = sequence.Name;
+            // Counted against every name in the file, so the number never lands on a sequence further down.
+            sequence.Name = NameGenerator.Unique(save.Sequences.Select(other => other.Name).Concat(seen), original);
+            seen.Add(sequence.Name);
+            renames.Add($"'{original}' as '{sequence.Name}'");
+        }
+        return renames.Count == 0
+            ? null
+            : $"This file has sequences with the same name, which can't be told apart. Shown as {string.Join(", ", renames)}; the file keeps its names until you edit it.";
     }
 
     /// <summary>
@@ -810,14 +851,42 @@ public sealed class SequenceDocument
         return null;
     }
 
-    /// <summary>Sets a track's offset from the entity origin.</summary>
+    /// <summary>
+    /// Sets a track's offset from the entity origin. Like the .achx inspector's number fields, repeated calls merge into
+    /// one undo entry until <see cref="IUndoManager.SealCoalescing"/>, so typing or stepping a field is one step.
+    /// </summary>
     public void SetTrackOffset(IUndoManager undo, int sequence, int track, float x, float y) =>
         Edit(undo, $"Set Offset of '{Save.Sequences[sequence].Tracks[track].Name}' to ({Format(x)}, {Format(y)})", save =>
         {
             var target = save.Sequences[sequence].Tracks[track];
             target.X = x;
             target.Y = y;
-        });
+        }, coalesceGroup: $"offset:{sequence}:{track}");
+
+    /// <summary>The undo label of a drag or nudge of these tracks: "Move Track 'Body'", or "Move 3 tracks".</summary>
+    public string DescribeMove(int sequence, IReadOnlyList<int> tracks) => tracks.Count == 1
+        ? $"Move Track '{Save.Sequences[sequence].Tracks[tracks[0]].Name}'"
+        : $"Move {Plural.Format(tracks.Count, "track")}";
+
+    /// <summary>
+    /// Moves tracks by (<paramref name="dx"/>, <paramref name="dy"/>) as an arrow key does, keeping each offset as it
+    /// is plus the step (no rounding). Consecutive nudges of the same tracks are one undo entry until
+    /// <see cref="IUndoManager.SealCoalescing"/> (the key coming up, focus leaving) or another edit ends the run.
+    /// </summary>
+    public void NudgeTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, float dx, float dy)
+    {
+        var moved = tracks.Distinct().OrderBy(track => track).ToList();
+        if (moved.Count == 0) return;
+        Edit(undo, DescribeMove(sequence, moved), save =>
+        {
+            foreach (int track in moved)
+            {
+                var target = save.Sequences[sequence].Tracks[track];
+                target.X += dx;
+                target.Y += dy;
+            }
+        }, coalesceGroup: $"nudge:{sequence}:{string.Join(',', moved)}");
+    }
 
     /// <summary>
     /// Hides or shows a track: its <see cref="SequenceTrackSave.Visible"/> flag, which is saved in the file. A no-op
@@ -875,7 +944,8 @@ public sealed class SequenceDocument
         if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Start of '{name}' to {Format(start)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Start = start,
+            coalesceGroup: $"start:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -888,7 +958,8 @@ public sealed class SequenceDocument
         if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
         Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops);
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops,
+            coalesceGroup: $"cycles:{sequence}:{track}:{chain}");
         return null;
     }
 
@@ -919,6 +990,7 @@ public sealed class SequenceDocument
         {
             // The file holds something this document could not read; writing now would destroy it.
             SaveError = $"{Path.NoPath} changed on disk and couldn't be reloaded ({stale}). Saving is paused until it reloads.";
+            SaveFailed?.Invoke(SaveError);
             return;
         }
         try
@@ -933,13 +1005,14 @@ public sealed class SequenceDocument
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             SaveError = ex.Message;
+            SaveFailed?.Invoke(ex.Message);
         }
     }
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
         int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
-        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null)
+        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null, string? coalesceGroup = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -950,7 +1023,7 @@ public sealed class SequenceDocument
         if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
         undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
-            stateBefore, stateAfter));
+            stateBefore, stateAfter, coalesceGroup));
     }
 
     /// <summary>
@@ -1028,9 +1101,24 @@ public sealed class SequenceDocument
     // leaves the selection alone the first time the edit runs (redo still applies selectAfter).
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
-        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null) : IUndoableCommand
+        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
+        string? coalesceGroup = null) : IUndoableCommand
     {
         public string Description => description;
+
+        // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
+        public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
+
+        // The merged entry undoes to where the first one started and redoes to where this one ended.
+        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
+            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
+            : this;
+
+        private string Before => before;
+        private int? SelectBefore => selectBefore;
+        private int? TrackBefore => trackBefore;
+        private SequenceSelectionState? StateBefore => stateBefore;
 
         public bool Do()
         {

@@ -54,6 +54,8 @@ public partial class SequenceInspectorControl : UserControl
             if (ChainLoopsField.Value is { } loops && _chain is { } chain)
                 Commit(document => document.SetChainLoops(_undo!, _sequence, chain.Track, chain.Chain, (float)loops));
         };
+        // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
+        SealOnCommit(TrackXField, TrackYField, ChainStartField, ChainLoopsField);
         GoToDefinitionButton.Click += (_, _) =>
         {
             if (CurrentChain is { } reference)
@@ -188,6 +190,27 @@ public partial class SequenceInspectorControl : UserControl
         string shown = field.Value?.ToString(field.FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
         bool typing = field.IsKeyboardFocusWithin && box is not null && box.Text != shown;
         if (force || !typing) field.Value = value;
+    }
+
+    private static void Put(NumericUpDown field, decimal value, bool force)
+    {
+        var box = field.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+        string shown = field.Value?.ToString(field.FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
+        bool typing = field.IsKeyboardFocusWithin && box is not null && box.Text != shown;
+        if (force || !typing) field.Value = value;
+    }
+
+    // As MainWindow.SealOnCommit does for the .achx Inspector. Enter is handled by the field, so listen after it.
+    private void SealOnCommit(params InputElement[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.LostFocus += (_, _) => _undo?.SealCoalescing();
+            field.AddHandler(KeyDownEvent, (_, e) =>
+            {
+                if (e.Key == Key.Enter) _undo?.SealCoalescing();
+            }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
+        }
     }
 
     /// <summary>
