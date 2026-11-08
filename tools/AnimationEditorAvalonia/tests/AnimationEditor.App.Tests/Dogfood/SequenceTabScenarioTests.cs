@@ -144,10 +144,10 @@ public class SequenceTabScenarioTests
         {
             "MenuSaveAs", "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
             "MenuCopy", "MenuCut", "MenuPaste", "MenuDuplicate",
-            "MenuReloadFromDisk", "MenuResizeTexture", "MenuAssociateTiledTileset",
+            "MenuResizeTexture", "MenuAssociateTiledTileset",
             "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut",
         };
-        string[] documentItems = { "MenuSave", "MenuUndo", "MenuRedo", "MenuShowHistory" };
+        string[] documentItems = { "MenuSave", "MenuUndo", "MenuRedo", "MenuShowHistory", "MenuReloadFromDisk" };
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         string hero = editor.WriteAchx("hero.achx",

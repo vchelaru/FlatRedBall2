@@ -173,6 +173,12 @@ public partial class MainWindow
 
         public void DuplicateSelection() => _window.HandleDuplicate();
 
+        public void ReloadFromDisk()
+        {
+            if (!string.IsNullOrEmpty(_window._projectManager.FileName))
+                _window._appCommands.ReloadAchxFromDisk(_window._projectManager.FileName);
+        }
+
         public bool CanCopyPaste => true;
 
         public void TogglePlayback() => _window.PreviewCtrl.TogglePlayPause();
