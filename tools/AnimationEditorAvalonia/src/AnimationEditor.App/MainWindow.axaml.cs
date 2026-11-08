@@ -2591,11 +2591,7 @@ public partial class MainWindow : Window
         MenuDuplicate.Click     += (_, _) => ActivePane.DuplicateSelection();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
-        MenuReloadFromDisk.Click += (_, _) =>
-        {
-            if (!string.IsNullOrEmpty(_projectManager.FileName))
-                _appCommands.ReloadAchxFromDisk(_projectManager.FileName);
-        };
+        MenuReloadFromDisk.Click += (_, _) => ActivePane.ReloadFromDisk();
         MenuEnableHotReload.Click += (_, _) =>
         {
             _appCommands.HotReloadWatcher.IsEnabled = MenuEnableHotReload.IsChecked == true;
@@ -2652,7 +2648,7 @@ public partial class MainWindow : Window
     ];
 
     // Menu items that act on whichever document the active tab edits (see HotkeyScope.Document).
-    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory];
+    private MenuItem[] DocumentScopedMenuItems => [MenuSave, MenuUndo, MenuRedo, MenuShowHistory, MenuReloadFromDisk];
 
     // Copy, Cut, Paste and Duplicate are enabled by the active pane (ITabPane.CanCopyPaste), not by scope: a sequence tab
     // takes them only while its list or its timeline is the focused surface.

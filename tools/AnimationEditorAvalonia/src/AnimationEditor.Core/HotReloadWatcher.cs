@@ -221,7 +221,7 @@ namespace AnimationEditor.Core.HotReload
             }
         }
 
-        private static byte[]? TryHash(string path)
+        internal static byte[]? TryHash(string path)
         {
             try
             {

@@ -101,8 +101,11 @@ public partial class MainWindow
         /// <summary>The sequence file itself was rewritten (git pull, another editor, an agent): read it again, keeping what still applies.</summary>
         private void OnFileChangedOnDisk(string path)
         {
-            if (!IsShown(path)) return;
-            var document = _document!;
+            if (IsShown(path)) ReloadShownFromDisk(_document!);
+        }
+
+        private void ReloadShownFromDisk(SequenceDocument document)
+        {
             var timeline = _window.SequenceTimeline;
             string? sequenceName = CurrentSequence?.Name;
             var chains = timeline.SelectedChains.ToList();
@@ -135,8 +138,10 @@ public partial class MainWindow
 
         private void OnFileDeletedOnDisk(string path)
         {
-            if (IsShown(path)) _window.ShowToast($"'{new FilePath(path).NoPath}' was deleted from disk.");
+            if (IsShown(path)) ShowDeletedToast(new FilePath(path));
         }
+
+        private void ShowDeletedToast(FilePath path) => _window.ShowToast($"'{path.NoPath}' was deleted from disk.");
 
         /// <summary>A listed source file changed or vanished: re-read it, so chains, frames, timings and the missing flag follow.</summary>
         private void OnSourceChangedOnDisk()
@@ -228,7 +233,9 @@ public partial class MainWindow
         {
             if (_documents.TryGetValue(tab.Path, out var known))
             {
-                // A source edited in its own tab (or on disk) while this tab was away: read it again before showing.
+                // The file or a source changed while this tab was away (a git pull, a source edited in its own tab): no
+                // watcher ran for it, so read what differs again before showing, or the next save would overwrite it.
+                CatchUpWithDisk(tab, known);
                 known.ReloadChangedSources();
             }
             if (!_documents.TryGetValue(tab.Path, out var document))
@@ -266,6 +273,26 @@ public partial class MainWindow
             RestoreZoom();
             StartWatching(document);
             return Task.FromResult(true);
+        }
+
+        // Same reactions as the live path, for a tab that was not in front when its file changed. Runs before the
+        // document is shown, so nothing observes the intermediate state and the Refresh that follows picks it up.
+        private void CatchUpWithDisk(TabEntry tab, SequenceDocument document)
+        {
+            var result = document.ReloadIfChangedOnDisk();
+            if (result.Deleted)
+                ShowDeletedToast(document.Path);
+            else if (result.Error is { } error)
+                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+            else if (document.StaleOnDiskReason is { } stale)
+                // Still the same unreadable file: saving stays paused, so say so again.
+                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {stale}");
+            else if (result.Changed)
+            {
+                // The history describes the old file; undoing into it would write that back over the new one.
+                tab.UndoSnapshot = null;
+                _window.ShowToast($"Reloaded {document.Path.NoPath}");
+            }
         }
 
         public Task<TabEntry?> PrepareCloseAsync(TabEntry tab) => Task.FromResult<TabEntry?>(tab);
@@ -407,6 +434,16 @@ public partial class MainWindow
                 DuplicateSelected();
             else if (surface == ClipboardSurface.Timeline)
                 _window.SequenceTimeline.DuplicateSelected();
+        }
+
+        /// <summary>File &gt; Reload from Disk. Unlike the watcher it reads the file whatever it holds; an identical file changes nothing.</summary>
+        public void ReloadFromDisk()
+        {
+            if (_document is not { } document) return;
+            if (!File.Exists(document.Path.FullPath))
+                ShowDeletedToast(document.Path);
+            else
+                ReloadShownFromDisk(document);
         }
 
         public bool CanCopyPaste => Surface != ClipboardSurface.None;
