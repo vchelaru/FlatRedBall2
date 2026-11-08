@@ -2288,7 +2288,7 @@
                                 </ToggleButton>
                                 <!-- The achx transport's Speed field, unchanged: it scales every selected sequence's clock. -->
                                 <viewsControls:FlankerNumericField x:Name="SequenceSpeedInput"
-                                                                    Width="92" Margin="4,0,0,0" VerticalAlignment="Center"
+                                                                    Width="92" Margin="6,0,0,0" VerticalAlignment="Center"
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"
                                                                     Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.##" />
                                 <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
