@@ -2857,6 +2857,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     private IPointer? _dragPointer;
     private TopLevel? _escapeKeyHost;
 
+    // The playback timer is rooted by the dispatcher, so it must not keep ticking once the control leaves
+    // the tree: it would keep the closed window and everything it references alive and burn a tick every 16 ms.
+    private bool _timerRanBeforeDetach;
+
     /// <summary>
     /// Escape cancels whichever drag is in progress (shape move or resize, polygon vertex, frame or
     /// whole-animation offset, guide): everything goes back to its start-of-drag value, no undo entry
@@ -2938,6 +2942,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        if (_timerRanBeforeDetach)
+        {
+            _timerRanBeforeDetach = false;
+            StartAutoTimer();
+        }
         _escapeKeyHost = TopLevel.GetTopLevel(this);
         _escapeKeyHost?.AddHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
@@ -2946,6 +2955,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IWheelInpu
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        _timerRanBeforeDetach = _timer.IsEnabled;
+        _timer.Stop();
         _escapeKeyHost?.RemoveHandler(KeyDownEvent, OnTopLevelKeyDownForDragCancel);
         _escapeKeyHost = null;
     }
