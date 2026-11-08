@@ -743,7 +743,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 };
 
             var path = await FileDialogService.PickSaveFileAsync(
-                "Save Animation Chain", defaultExtension, fileTypeChoices);
+                "Save Animation Chain", defaultExtension, fileTypeChoices, SaveDialogStart.For(_pm.FileName));
 
             if (string.IsNullOrEmpty(path)) return;
 

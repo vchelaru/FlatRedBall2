@@ -388,6 +388,62 @@ public partial class MainWindow
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// File &gt; Save As: writes the document to the chosen <c>.seqj</c> and moves the tab there, as an <c>.achx</c> Save
+        /// As does. The document, its undo history and its view state carry over; the old file is not touched again.
+        /// </summary>
+        public async Task SaveAsAsync(TabEntry? tab)
+        {
+            if (tab is null || _document is not { } document || !_documents.TryGetValue(tab.Path, out var known) || known != document) return;
+            string? picked = await _window._appCommands.FileDialogService.PickSaveFileAsync("Save Sequence", "seqj",
+                new[] { new FileTypeChoice("seqj", "Sequence") }, SaveDialogStart.For(tab.Path.FullPath));
+            if (string.IsNullOrEmpty(picked) || document != _document) return;
+
+            var oldPath = tab.Path;
+            var newPath = new FilePath(picked);
+            if (newPath != oldPath && _window._tabManager.Tabs.Any(other => other.Path == newPath))
+            {
+                _window.ShowErrorBanner($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
+                return;
+            }
+
+            // The library and settings are keyed by source as written, which a Save As may rewrite; carry them by position.
+            var oldSources = document.Save.Sources.ToList();
+            var collapsedIndices = Enumerable.Range(0, oldSources.Count).Where(i => _window.SequenceLibrary.IsCollapsed(oldSources[i])).ToList();
+            if (document.SaveAs(newPath.FullPath) is { } error)
+            {
+                _window.ShowErrorBanner(error);
+                return;
+            }
+            if (newPath == oldPath) return;
+
+            _documents.Remove(oldPath);
+            _documents[newPath] = document;
+            _window._tabManager.Rename(oldPath, newPath);
+            _window.RebuildTabStrip();
+            CarryViewState(oldPath, newPath, collapsedIndices.Select(i => document.Save.Sources[i]).ToList());
+            // The watcher followed the old file; it now watches the new one, its sources and their textures.
+            StartWatching(document);
+            _window.RecordRecentFile(newPath.FullPath);
+            _window.UpdateTitle();
+            _window.UpdateStatusBar();
+        }
+
+        // What the settings remember per file follows the document to its new name, so the tab looks as it did a moment ago.
+        private void CarryViewState(FilePath oldPath, FilePath newPath, List<string> collapsedSources)
+        {
+            var settings = _window._appSettings;
+            if (settings.TimelineZooms.TryGetValue(oldPath.Standardized, out int zoom))
+                settings.TimelineZooms[newPath.Standardized] = zoom;
+            // The document's Changed already stored the selected sequence under the new name.
+            if (collapsedSources.Count > 0) settings.CollapsedLibrarySources[newPath.Standardized] = collapsedSources;
+            else settings.CollapsedLibrarySources.Remove(newPath.Standardized);
+            _window.SaveSettingsFile();
+            var library = _window.SequenceLibrary;
+            library.CollapsedSources.Load(collapsedSources);
+            library.Show(_document);
+        }
+
         public void Closing(TabEntry tab)
         {
             CommitPendingRename();
@@ -733,6 +789,7 @@ public partial class MainWindow
             w.SequenceLibrary.AddChipRequested += AddChip;
             w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+            w.SequenceLibrary.ReplaceSourceRequested += source => _ = ReplaceSourceAsync(source);
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceLibrary.GroupsPanel.TranslatePoint(point, w.DragOverlayCanvas));
@@ -1266,6 +1323,27 @@ public partial class MainWindow
         {
             if (_document?.RemoveSource(_window._undoManager, source) is { } error)
                 _window.ShowProblem(error);
+        }
+
+        // Swaps a source for another file, keeping every chain that used it: the repair for a source that was renamed or moved.
+        // A cancelled dialog changes nothing; a refusal (the file is already a source, not an .achx/.achj) is said.
+        private async Task ReplaceSourceAsync(string source)
+        {
+            if (_document is not { } document) return;
+            string? picked = await _window._appCommands.FileDialogService.PickOpenFileAsync("Replace Source", OpenFileFilters.SequenceSources);
+            if (string.IsNullOrEmpty(picked) || document != _document) return;
+
+            var library = _window.SequenceLibrary;
+            int index = document.Save.Sources.FindIndex(listed => string.Equals(listed, source, StringComparison.OrdinalIgnoreCase));
+            bool collapsed = library.IsCollapsed(source);
+            if (document.ReplaceSource(_window._undoManager, source, picked) is { } error)
+            {
+                _window.ShowErrorBanner(error);
+                return;
+            }
+            // The collapsed state is keyed by the source as written, which the replace changed; the new source starts as the old one was.
+            if (collapsed && index >= 0 && index < document.Save.Sources.Count && !library.IsCollapsed(document.Save.Sources[index]))
+                library.ToggleSource(document.Save.Sources[index]);
         }
 
         // Dropping a source's group on a gap: one undo entry, and an edit rather than a place to come back to, so no Back entry.
