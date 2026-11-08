@@ -41,7 +41,8 @@ public sealed class SequenceClock
     /// tick, capped at <see cref="MaxTickSeconds"/>. A window drag or GC pause that freezes the timer for seconds then
     /// moves the playhead by at most the cap.
     /// </summary>
-    public void AdvanceTick(double elapsedSeconds, double length, bool loop) => Advance(Math.Min(elapsedSeconds, MaxTickSeconds), length, loop);
+    public void AdvanceTick(double elapsedSeconds, double length, bool loop, double speed = 1) =>
+        Advance(Math.Min(elapsedSeconds, MaxTickSeconds) * speed, length, loop);
 
     /// <summary>
     /// Advances by <paramref name="seconds"/> while playing. Past the end it wraps when <paramref name="loop"/>, and

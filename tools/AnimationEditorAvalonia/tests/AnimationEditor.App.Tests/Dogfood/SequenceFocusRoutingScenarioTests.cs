@@ -174,7 +174,7 @@ public class SequenceFocusRoutingScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
         await editor.OpenAsync(path);
-        editor.ClickAt(editor.PointIn(Timeline(editor), 20, Timeline(editor).Viewport.LaneTop(3) + 10));
+        editor.ClickAt(editor.PointIn(Timeline(editor), 20, Timeline(editor).Viewport.LaneTop(TimelineViewport.NewTrackLane) + 10));
         Timeline(editor).IsRenamingTrack.ShouldBeTrue();
 
         await PressAsync(editor, key);
@@ -308,7 +308,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.C, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to copy");
         (await ClipboardAsync(editor)).ShouldBeNullOrEmpty();
         await PressAsync(editor, Key.V, RawInputModifiers.Control);
         editor.SequenceNames.Count.ShouldBe(3);
@@ -322,7 +322,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.C, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to copy");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to copy");
     }
 
     [AvaloniaFact]
@@ -335,7 +335,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.D, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -347,7 +347,7 @@ public class SequenceFocusRoutingScenarioTests
 
         await PressAsync(editor, Key.D, RawInputModifiers.Control);
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to duplicate");
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -584,7 +584,7 @@ public class SequenceFocusRoutingScenarioTests
 
         shortcuts.ShouldContainKey("Rename");
         shortcuts["Rename"].ShouldBe("F2");
-        shortcuts.Keys.ShouldNotContain("Save As…", "Save As is disabled on a sequence tab");
+        shortcuts.ShouldContainKey("Save As…");   // a sequence tab saves under a new name too
         shortcuts.Count(pair => pair.Value.StartsWith("Alt+") && (pair.Value.EndsWith("Up") || pair.Value.EndsWith("Down"))).ShouldBe(2);
         var working = editor.Window.Hotkeys.Where(h => h.Scope is HotkeyScope.Document or HotkeyScope.App).Select(h => h.Description).ToHashSet();
         shortcuts.Keys.ToHashSet().ShouldBe(working, ignoreOrder: true, "the panel lists exactly the hotkeys a sequence tab accepts");
@@ -597,7 +597,7 @@ public class SequenceFocusRoutingScenarioTests
         editor.WritePng("sheet.png", 16, 16);
         await editor.OpenAsync(editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16))));
         await editor.OpenAsync(WriteThreeSequences(editor));
-        Shortcuts(editor).Keys.ShouldNotContain("Save As…");
+        Shortcuts(editor).Keys.ShouldContain("Save As…");
 
         editor.ClickTab("hero.achx");
 

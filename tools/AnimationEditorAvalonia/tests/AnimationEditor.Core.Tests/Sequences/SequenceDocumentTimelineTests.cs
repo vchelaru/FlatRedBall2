@@ -53,9 +53,9 @@ public class SequenceDocumentTimelineTests
         document.PlaceChain(undo, 0, track: null, "hero.achj", "Walk", start: 0.5);
 
         var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
-        tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Walk" });
-        tracks[0].Chains.Single().Start.ShouldBe(1.5);
-        tracks[1].Chains.Single().Start.ShouldBe(0.5);
+        tracks.Select(t => t.Name).ShouldBe(new[] { "Walk", "Body" }, "a new track lands on top, in front");
+        tracks[1].Chains.Single().Start.ShouldBe(1.5);
+        tracks[0].Chains.Single().Start.ShouldBe(0.5);
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add 'Walk' to 'Body'", "Add Track 'Walk'" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Count.ShouldBe(1);
@@ -115,19 +115,19 @@ public class SequenceDocumentTimelineTests
         document.CommitGesture(undo, "Move 'Walk' to new track 'Walk'", before);
 
         var saved = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
-        saved.Select(t => t.Name).ShouldBe(new[] { "Body", "Walk" });
-        saved[0].Chains.ShouldBeEmpty();
-        saved[1].Chains.Single().Start.ShouldBe(2.5);
+        saved.Select(t => t.Name).ShouldBe(new[] { "Walk", "Body" });
+        saved[1].Chains.ShouldBeEmpty();
+        saved[0].Chains.Single().Start.ShouldBe(2.5);
         undo.UndoHistory.Count.ShouldBe(2);
         undo.Undo();
         document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body" });
         document.Save.Sequences[0].Tracks[0].Chains.Single().Start.ShouldBe(1);
         undo.Redo();
-        document.Save.Sequences[0].Tracks[1].Chains.Single().Start.ShouldBe(2.5);
+        document.Save.Sequences[0].Tracks[0].Chains.Single().Start.ShouldBe(2.5);
     }
 
     [Fact]
-    public void AddTrack_AddsAnEmptyUniquelyNamedTrack_OneUndoStep_SavesAndHasNoLength()
+    public void AddTrack_AddsAnEmptyUniquelyNamedTrackInFront_OneUndoStep_SavesAndHasNoLength()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir, "Track");
@@ -138,13 +138,45 @@ public class SequenceDocumentTimelineTests
 
         (first, second).ShouldBe(("Track 2", "Track 3"));
         var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
-        tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Track", 0), ("Track 2", 0), ("Track 3", 0) });
+        tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Track 3", 0), ("Track 2", 0), ("Track", 0) });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Track 'Track 2'", "Add Track 'Track 3'" });
         SequenceTimeline.Length(document.Save.Sequences[0], _ => 1).ShouldBe(0);
         undo.Undo();
-        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2" });
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track 2", "Track" });
         undo.Redo();
-        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2", "Track 3" });
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track 3", "Track 2", "Track" });
+    }
+
+    [Fact]
+    public void AddTrack_SelectsTheNewTopTrack_OnDoAndRedo()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Body");
+        var undo = new UndoManager();
+
+        document.AddTrack(undo, 0);
+        document.TakeTrackSelection().ShouldBe(0);
+
+        undo.Undo();
+        document.TakeTrackSelection().ShouldBeNull();
+        undo.Redo();
+        document.TakeTrackSelection().ShouldBe(0);
+    }
+
+    [Fact]
+    public void AddTrack_TheNewTrackCoversTheOldOnes_InTheScene()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, "Body");
+        var undo = new UndoManager();
+        document.PlaceChain(undo, 0, track: 0, "hero.achj", "Walk", start: 0);
+
+        document.PlaceChain(undo, 0, track: null, "hero.achj", "Walk", start: 0);
+
+        var tracks = document.Save.Sequences[0].Tracks;
+        var drawn = SequenceScene.At(document, 0, 0);
+        tracks[drawn.Last().Track].Name.ShouldBe("Walk", "the new track is drawn last, so it is in front");
+        tracks[drawn.First().Track].Name.ShouldBe("Body");
     }
 
     [Fact]

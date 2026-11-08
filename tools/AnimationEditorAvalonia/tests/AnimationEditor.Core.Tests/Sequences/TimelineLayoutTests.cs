@@ -115,7 +115,7 @@ public class TimelineLayoutTests
 
         hit!.Value.Block.Reference.Chain.ShouldBe("Run");
         // The same y with every lane 48 px would land on the first lane's event row, not on Run's body.
-        viewport.LaneTop(1).ShouldBe(TimelineViewport.RulerHeight + 60);
+        viewport.LaneTop(1).ShouldBe(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight + 60);
     }
 
     [Fact]

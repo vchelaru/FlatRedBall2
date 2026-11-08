@@ -10,7 +10,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// Adding a library chip's chain to the timeline without dragging it: double-click, Enter and the chip's menu. The rule:
-/// the chain starts at the playhead, on a new track at the end of the list (like a drop on the dashed row) unless the
+/// the chain starts at the playhead, on a new track in front, the top of the list (like a drop on the dashed row) unless the
 /// menu's "Add to Selected Track" names the one selected track. The undo entry is the drop's.
 /// </summary>
 public class SequenceAddChipScenarioTests
@@ -64,12 +64,31 @@ public class SequenceAddChipScenarioTests
         editor.DoubleClickAt(editor.CenterOf(Chip(editor, "Run")));
 
         var tracks = SavedTracks(boss);
-        tracks.Select(track => track.Name).ShouldBe(new[] { "Body", "Run" });
-        tracks[1].Chains.Select(chain => (chain.Chain, chain.Start)).ShouldBe(new[] { ("Run", playhead) });
+        tracks.Select(track => track.Name).ShouldBe(new[] { "Run", "Body" });
+        tracks[0].Chains.Select(chain => (chain.Chain, chain.Start)).ShouldBe(new[] { ("Run", playhead) });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Run'" });
-        Timeline(editor).Selection.ShouldBe(new TimelineChainId(1, 0));
+        Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 0));
         editor.Press(Key.Z, RawInputModifiers.Control);
         SavedTracks(boss).Count.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickingAChip_MakesTheTopLane_AndItDrawsInFrontOfTheExistingOne()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        ScrubTo(editor, 0.3);
+
+        editor.DoubleClickAt(editor.CenterOf(Chip(editor, "Run")));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        var timeline = Timeline(editor);
+        // The new lane is the first one, right under the dashed row; the old lane moved down a lane.
+        timeline.Viewport.LaneTop(0).ShouldBe(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight);
+        timeline.Blocks.Select(block => (block.Track, block.Reference.Chain)).ShouldBe(new[] { (1, "Walk"), (0, "Run") }, ignoreOrder: true);
+        // The preview lists sprites back to front: the last one is in front.
+        editor.Control<PreviewControl>("SequencePreview").Composite!.Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Walk", "Run" });
     }
 
     [AvaloniaFact]
@@ -82,7 +101,7 @@ public class SequenceAddChipScenarioTests
 
         editor.DoubleClickAt(editor.CenterOf(Chip(editor, "Run")));
 
-        SavedTracks(boss).Select(track => (track.Name, track.Chains.Count)).ShouldBe(new[] { ("Body", 1), ("Run", 1) });
+        SavedTracks(boss).Select(track => (track.Name, track.Chains.Count)).ShouldBe(new[] { ("Run", 1), ("Body", 1) });
     }
 
     [AvaloniaFact]
@@ -99,9 +118,9 @@ public class SequenceAddChipScenarioTests
 
         editor.Press(Key.Enter);
 
-        SavedTracks(boss).Select(track => track.Name).ShouldBe(new[] { "Body", "Walk" });
+        SavedTracks(boss).Select(track => track.Name).ShouldBe(new[] { "Walk", "Body" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Walk'" });
-        Timeline(editor).Selection.ShouldBe(new TimelineChainId(1, 0));
+        Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 0));
     }
 
     [AvaloniaFact]
@@ -120,9 +139,9 @@ public class SequenceAddChipScenarioTests
         run.ContextMenu.Items.OfType<MenuItem>().Single(item => (string?)item.Header == "Add to Selected Track").IsEnabled.ShouldBeFalse();
         editor.PickMenuItem(run.ContextMenu, "Add to Timeline");
 
-        SavedTracks(boss).Select(track => track.Name).ShouldBe(new[] { "Body", "Run" });
+        SavedTracks(boss).Select(track => track.Name).ShouldBe(new[] { "Run", "Body" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Run'" });
-        Timeline(editor).Selection.ShouldBe(new TimelineChainId(1, 0));
+        Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 0));
     }
 
     [AvaloniaFact]
@@ -172,7 +191,7 @@ public class SequenceAddChipScenarioTests
 
         editor.DoubleClickAt(editor.CenterOf(Chip(editor, "Run")));
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("sequence");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("sequence");
         editor.UndoLabels.ShouldBeEmpty();
     }
 }

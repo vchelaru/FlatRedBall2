@@ -24,18 +24,18 @@ public class TimelineNewTrackMoveTests
     }
 
     [Fact]
-    public void Apply_OneChain_LeavesItsTrackEmptyAndMakesATrackNamedAfterTheChain()
+    public void Apply_OneChain_LeavesItsTrackEmptyAndMakesAFrontTrackNamedAfterTheChain()
     {
         var walk = Ref("Walk", 1.5);
         var sequence = Sequence(("Body", new[] { walk, Ref("Run", 3) }));
 
         var created = TimelineNewTrackMove.Apply(sequence, new[] { walk });
 
-        created.ShouldBe(new[] { 1 });
-        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Walk" });
-        sequence.Tracks[0].Chains.Select(c => c.Chain).ShouldBe(new[] { "Run" });
-        sequence.Tracks[1].Chains.ShouldBe(new[] { walk });
-        sequence.Tracks[1].Chains[0].Start.ShouldBe(1.5);
+        created.ShouldBe(new[] { 0 });
+        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Walk", "Body" });
+        sequence.Tracks[1].Chains.Select(c => c.Chain).ShouldBe(new[] { "Run" });
+        sequence.Tracks[0].Chains.ShouldBe(new[] { walk });
+        sequence.Tracks[0].Chains[0].Start.ShouldBe(1.5);
     }
 
     [Fact]
@@ -46,8 +46,8 @@ public class TimelineNewTrackMoveTests
 
         TimelineNewTrackMove.Apply(sequence, new[] { walk });
 
-        sequence.Tracks[0].Name.ShouldBe("Body");
-        sequence.Tracks[0].Chains.ShouldBeEmpty();
+        sequence.Tracks[1].Name.ShouldBe("Body");
+        sequence.Tracks[1].Chains.ShouldBeEmpty();
     }
 
     [Fact]
@@ -61,10 +61,10 @@ public class TimelineNewTrackMoveTests
         // Handed over in reverse; the result follows the lanes, not the order given.
         var created = TimelineNewTrackMove.Apply(sequence, new[] { c, b, a });
 
-        created.ShouldBe(new[] { 2, 3 });
-        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Head", "Walk", "Jump" });
-        sequence.Tracks[2].Chains.ShouldBe(new[] { a, b });
-        sequence.Tracks[3].Chains.ShouldBe(new[] { c });
+        created.ShouldBe(new[] { 0, 1 });
+        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Walk", "Jump", "Body", "Head" });
+        sequence.Tracks[0].Chains.ShouldBe(new[] { a, b });
+        sequence.Tracks[1].Chains.ShouldBe(new[] { c });
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class TimelineNewTrackMoveTests
 
         TimelineNewTrackMove.Apply(sequence, new[] { walk });
 
-        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Walk", "Walk 2" });
+        sequence.Tracks.Select(t => t.Name).ShouldBe(new[] { "Walk 2", "Walk" });
     }
 
     [Fact]
@@ -86,19 +86,19 @@ public class TimelineNewTrackMoveTests
 
         TimelineNewTrackMove.Apply(sequence, new[] { missing });
 
-        sequence.Tracks[1].Name.ShouldBe("Track");
+        sequence.Tracks[0].Name.ShouldBe("Track");
     }
 
     [Fact]
-    public void ForMove_OverTheNewTrackRow_TargetsANewTrackAtTheGivenStart()
+    public void ForMove_OverTheNewTrackRowAtTheTop_TargetsANewTrackAtTheGivenStart()
     {
         var viewport = new TimelineViewport();
-        double y = viewport.LaneTop(2) + TimelineViewport.LaneHeight / 2;
+        double y = TimelineViewport.RulerHeight + TimelineViewport.LaneHeight / 2;
 
         var plan = TimelineDropPlan.ForMove(viewport, trackCount: 2, y, start: 0.85, length: 0.5);
 
         plan.Kind.ShouldBe(TimelineDropKind.NewTrack);
-        plan.Row.ShouldBe(2);
+        plan.Row.ShouldBe(-1);
         plan.Start.ShouldBe(0.85);
         plan.Length.ShouldBe(0.5);
         plan.Left.ShouldBe(viewport.XAt(0.85), 1e-9);
@@ -106,7 +106,7 @@ public class TimelineNewTrackMoveTests
     }
 
     [Fact]
-    public void ForMove_OverALaneOrBelowTheNewTrackRow_IsNone()
+    public void ForMove_OverALaneOrBelowTheLastLane_IsNone()
     {
         var viewport = new TimelineViewport();
 
@@ -115,24 +115,32 @@ public class TimelineNewTrackMoveTests
     }
 
     [Fact]
-    public void ForMove_WithTallEventLanes_FindsTheNewTrackRowBelowTheRealHeights()
+    public void ForMove_WithTallEventLanes_TheNewTrackRowStaysAtTheTop_AndALaneStartsBelowIt()
     {
         var viewport = new TimelineViewport();
         viewport.SetLaneHeights(new[] { TimelineViewport.LaneHeight + 12, TimelineViewport.LaneHeight });
 
-        TimelineDropPlan.ForMove(viewport, 2, viewport.LaneTop(2) + 2, 1, 0.5).Kind.ShouldBe(TimelineDropKind.NewTrack);
-        // Where a fixed-height lane 1 would end, inside the tall lane 0's event row.
+        TimelineDropPlan.ForMove(viewport, 2, TimelineViewport.RulerHeight + 2, 1, 0.5).Kind.ShouldBe(TimelineDropKind.NewTrack);
+        // The tall lane 0's event row is part of lane 0, not a new-track target.
         TimelineDropPlan.ForMove(viewport, 2, viewport.LaneTop(0) + TimelineViewport.LaneHeight + 4, 1, 0.5).Kind.ShouldBe(TimelineDropKind.None);
     }
 
     [Fact]
-    public void ForMove_ScrolledDown_StillFindsTheNewTrackRowUnderThePointer()
+    public void ForMove_ScrolledDownPastTheNewTrackRow_NoLongerTargetsIt()
     {
         var viewport = new TimelineViewport();
         viewport.Pan(0, -10000, trackCount: 10, viewHeight: 150);
-        viewport.ScrollY.ShouldBeGreaterThan(0);
-        double y = viewport.LaneTop(10) + 4;
+        viewport.ScrollY.ShouldBeGreaterThan(TimelineViewport.LaneHeight);
 
-        TimelineDropPlan.ForMove(viewport, 10, y, 1, 0.5).Kind.ShouldBe(TimelineDropKind.NewTrack);
+        TimelineDropPlan.ForMove(viewport, 10, TimelineViewport.RulerHeight + 4, 1, 0.5).Kind.ShouldBe(TimelineDropKind.None);
+    }
+
+    [Fact]
+    public void ForMove_ScrolledPartWayUp_StillFindsTheNewTrackRowUnderThePointer()
+    {
+        var viewport = new TimelineViewport();
+        viewport.ScrollVertically(10, trackCount: 10, viewHeight: 150);
+
+        TimelineDropPlan.ForMove(viewport, 10, TimelineViewport.RulerHeight + 4, 1, 0.5).Kind.ShouldBe(TimelineDropKind.NewTrack);
     }
 }

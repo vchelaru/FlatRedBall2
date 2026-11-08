@@ -102,7 +102,7 @@ public class SequenceLibraryScenarioTests
 
         Library(editor).ChipFor("chars/hero.achx", "Walk").ShouldNotBeNull();
         SequenceListSave.FromFile(boss).Sources.ShouldBe(new[] { "chars/hero.achx" });
-        editor.ErrorBannerText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
+        editor.ProblemText.ShouldBe("other.seqj can't be a source. Only .achx and .achj files can.");
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
         editor.UndoLabels.ShouldBe(new[] { "Add Source 'hero.achx'" });
         editor.Press(Key.Z, RawInputModifiers.Control);
@@ -185,7 +185,7 @@ public class SequenceLibraryScenarioTests
         editor.TabLabels.ShouldBe(new[] { "boss.seqj", "hero.achx" });
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
         editor.Services.SelectedState.SelectedChain!.Name.ShouldBe("Run");
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -201,12 +201,12 @@ public class SequenceLibraryScenarioTests
 
         header.ContextMenu!.IsOpen.ShouldBeTrue();
         header.ContextMenu.Items.OfType<MenuItem>().Select(item => (string?)item.Header)
-            .ShouldBe(new[] { "Go to Definition", "Remove Source" });
+            .ShouldBe(new[] { "Go to Definition", "Replace Source…", "Remove Source" });
         editor.PickMenuItem(header.ContextMenu, "Go to Definition");
         await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
 
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]

@@ -49,7 +49,11 @@ public sealed class SequenceDocument
         SyncSources();
     }
 
-    public FilePath Path { get; }
+    /// <summary>The file this document reads and saves. Changes only through <see cref="SaveAs"/>.</summary>
+    public FilePath Path { get; private set; }
+
+    // The folder the relative source paths are relative to.
+    private FilePath Folder => Path.GetDirectoryContainingThis();
 
     /// <summary>The file's data. Replaced by undo and redo, so do not hold on to it or to anything inside it.</summary>
     public SequenceListSave Save { get; private set; }
@@ -432,8 +436,8 @@ public sealed class SequenceDocument
     /// <summary>
     /// Pastes copied chains into <paramref name="sequence"/>, the earliest at <paramref name="time"/> seconds and the rest keeping
     /// their distance from it. Which track each lands on depends on <paramref name="selectedTrack"/>:
-    /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made at the end
-    /// with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
+    /// with none, every chain goes back to the track it came from, found by name (a track the sequence lacks is made on top, in
+    /// front, with the copied track's offset, flip and visibility); with one, the first copied chain's track (the topmost lane copied
     /// from) is that track and each other copied track keeps its lane distance from it, a lane the sequence does not have
     /// yet being made at the end, one per copied track, with that track's settings. An envelope without track information
     /// puts everything on the selected track, else on the track named like the first chain's, else on a new one. The sources
@@ -478,23 +482,38 @@ public sealed class SequenceDocument
         {
             var destination = save.Sequences[sequence].Tracks;
             var target = new int[sourceTracks.Count];
+            // Without a selected track, a missing track is a new track like any other: it goes on top (index 0, in front),
+            // in the copied lane order, which moves every existing track down by the number made. With a selected track the
+            // copied lanes continue below it, so lanes past the last track are made at the end to keep their distances.
+            bool atFront = anchor is null;
+            int madeAtFront = 0;
+            int shift = atFront ? landing.Count(lane => lane is null) : 0;
             for (int i = 0; i < sourceTracks.Count; i++)
             {
                 if (landing[i] is { } index)
                 {
-                    target[i] = index;
+                    target[i] = index + shift;
                     continue;
                 }
                 var source = sourceTracks[i];
-                destination.Add(new SequenceTrackSave
+                var newTrack = new SequenceTrackSave
                 {
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
                     X = source.X,
                     Y = source.Y,
                     FlipHorizontal = source.FlipHorizontal,
                     Visible = source.Visible,
-                });
-                target[i] = destination.Count - 1;
+                };
+                if (atFront)
+                {
+                    destination.Insert(madeAtFront, newTrack);
+                    target[i] = madeAtFront++;
+                }
+                else
+                {
+                    destination.Add(newTrack);
+                    target[i] = destination.Count - 1;
+                }
             }
             var pasted = TimelineClipboard.CloneChains(content.Chains);
             MergeSources(save, pasted, folder, errors);
@@ -750,7 +769,7 @@ public sealed class SequenceDocument
     /// <summary>
     /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on
     /// track <paramref name="track"/> of sequence <paramref name="sequence"/>. A null track adds a new track named
-    /// after the chain.
+    /// after the chain, as the first track (index 0), so it is drawn in front. The caller selects the placed chain.
     /// </summary>
     public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start)
     {
@@ -765,13 +784,13 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name, Chains = { reference } });
+            tracks.Insert(0, new SequenceTrackSave { Name = name, Chains = { reference } });
         });
     }
 
     /// <summary>
-    /// Adds an empty track to the end of sequence <paramref name="sequence"/>, named <c>Track</c> (or <c>Track 2</c>, and
-    /// so on, when that is taken). Returns the name.
+    /// Adds an empty track as the first track of sequence <paramref name="sequence"/> (index 0, so it is drawn in front of
+    /// the rest), named <c>Track</c> (or <c>Track 2</c>, and so on, when that is taken), and selects it. Returns the name.
     /// </summary>
     public string AddTrack(IUndoManager undo, int sequence)
     {
@@ -779,8 +798,8 @@ public sealed class SequenceDocument
         Edit(undo, $"Add Track '{name}'", save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Add(new SequenceTrackSave { Name = name });
-        });
+            tracks.Insert(0, new SequenceTrackSave { Name = name });
+        }, trackAfter: 0);
         return name;
     }
 
@@ -1079,6 +1098,116 @@ public sealed class SequenceDocument
     /// <summary>Puts <see cref="Save"/> back as it was at <paramref name="before"/>, with no undo entry.</summary>
     public void CancelGesture(string before) => Restore(before);
 
+    /// <summary>
+    /// Writes the document to <paramref name="newPath"/> and makes that its file from now on: <see cref="Path"/> changes,
+    /// every later save goes there, and the old file is left exactly as it was. Sources are stored relative to the file, so
+    /// the relative ones are rewritten to keep pointing at the same files; the undo history stays valid (each entry
+    /// remembers the folder it was taken in). Returns why it was refused (not a <c>.seqj</c>; a source that no relative path
+    /// reaches from the new folder, which is another drive; a write that failed), or null. A refusal changes nothing.
+    /// </summary>
+    public string? SaveAs(string newPath)
+    {
+        var target = new FilePath(newPath);
+        if (target.Extension != "seqj")
+            return $"{target.NoPath} is not a .seqj file. Give it a .seqj extension.";
+        if (target == Path)
+        {
+            SaveToDisk();
+            return SaveError;
+        }
+
+        var copy = SequenceListSave.FromJsonString(Save.ToJsonString());
+        var unreachable = SequenceSourcePaths.Rebase(copy, Folder, target.GetDirectoryContainingThis());
+        if (unreachable.Count > 0)
+            return $"Can't save there: {new FilePath(unreachable[0]).NoPath} is on a different drive, so {target.NoPath} could not point to it. " +
+                   "Pick a folder on the same drive as the sources.";
+        try
+        {
+            SaveRunner(target.FullPath, () =>
+            {
+                Directory.CreateDirectory(target.GetDirectoryContainingThis().FullPath);
+                copy.Save(target.FullPath);
+            });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return $"Could not save {target.NoPath}: {ex.Message}";
+        }
+
+        Path = target;
+        Save = copy;
+        _diskHash = HotReload.HotReloadWatcher.TryHash(target.FullPath);
+        SaveError = null;
+        StaleOnDiskReason = null;
+        // The source strings changed, so the loaded sources are looked up under their new spelling.
+        _sources.Clear();
+        _stamps.Clear();
+        SyncSources();
+        Changed?.Invoke();
+        return null;
+    }
+
+    /// <summary>
+    /// Swaps the library source <paramref name="source"/> (as written in the file) for the file at
+    /// <paramref name="newAbsolutePath"/>, in place in <see cref="SequenceListSave.Sources"/>, and points every chain
+    /// reference that used it at the new file, in one undo entry. A chain the new file lacks stays on the timeline, flagged
+    /// missing. Returns why it was refused (not an <c>.achx</c>/<c>.achj</c>; the file is already another source, since
+    /// merging two sources is not offered; the source is not in the library), or null.
+    /// </summary>
+    public string? ReplaceSource(IUndoManager undo, string source, string newAbsolutePath)
+    {
+        int index = Save.Sources.FindIndex(listed => string.Equals(listed, source, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return $"{source} is not in the library.";
+        var file = new FilePath(newAbsolutePath);
+        if (file.Extension is not ("achx" or "achj"))
+            return $"{file.NoPath} can't be a source. Only .achx and .achj files can.";
+        string old = Save.Sources[index];
+        if (file == SourcePath(old)) return null;
+        for (int other = 0; other < Save.Sources.Count; other++)
+            if (other != index && SourcePath(Save.Sources[other]) == file)
+                return $"{file.NoPath} is already in the library, so it can't replace {new FilePath(old).NoPath}. Pick a different file.";
+
+        string written = file.RelativeTo(Folder);
+        var selection = SelectionOf(SelectedIndices);
+        Edit(undo, $"Replace Source '{new FilePath(old).NoPath}' with '{file.NoPath}'", save =>
+        {
+            save.Sources[index] = written;
+            foreach (var reference in save.Sequences.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains))
+                if (string.Equals(reference.Source, old, StringComparison.OrdinalIgnoreCase)) reference.Source = written;
+        }, stateBefore: selection, stateAfter: selection);
+        return null;
+    }
+
+    /// <summary>
+    /// Points the chain references at <paramref name="chains"/> (track and chain index in sequence <paramref name="sequence"/>)
+    /// at the chain called <paramref name="chainName"/> of their own source, in one undo entry. Relinks a reference whose
+    /// chain was renamed or removed in its source. Returns why it was refused (an empty name, a source that is missing, a
+    /// source with no such chain), or null.
+    /// </summary>
+    public string? RelinkChains(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains, string chainName)
+    {
+        if (chainName.Length == 0) return "A chain needs a name.";
+        var tracks = Save.Sequences[sequence].Tracks;
+        var references = chains.Distinct().Select(id => (Id: id, Reference: tracks[id.Track].Chains[id.Chain])).ToList();
+        foreach (var (_, reference) in references)
+        {
+            if (IsSourceMissing(reference.Source)) return $"{reference.Source} is missing or could not be read.";
+            if (SourceChains(reference.Source)!.AnimationChains.All(chain => chain.Name != chainName))
+                return $"{reference.Source} has no chain named \"{chainName}\".";
+        }
+        var changing = references.Where(item => item.Reference.Chain != chainName).ToList();
+        if (changing.Count == 0) return null;
+        string description = changing.Count == 1
+            ? $"Relink Chain '{changing[0].Reference.Chain}' to '{chainName}'"
+            : $"Relink {changing.Count} Chains to '{chainName}'";
+        Edit(undo, description, save =>
+        {
+            foreach (var (id, _) in changing)
+                save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Chain = chainName;
+        });
+        return null;
+    }
+
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
@@ -1136,9 +1265,12 @@ public sealed class SequenceDocument
         return null;
     }
 
-    private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null)
+    // snapshotFolder is the folder the snapshot's relative sources were written for; a Save As since then moved the file.
+    private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null,
+        FilePath? snapshotFolder = null)
     {
         Save = SequenceListSave.FromJsonString(json);
+        if (snapshotFolder is not null) SequenceSourcePaths.Rebase(Save, snapshotFolder, Folder);
         if (selection is not null)
         {
             // A whole selection to put back (a multi-sequence edit, or its undo): the primary says which one is SelectedSequence.
@@ -1198,9 +1330,15 @@ public sealed class SequenceDocument
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
         (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
-        string? coalesceGroup = null) : IUndoableCommand
+        string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null) : IUndoableCommand
     {
         public string Description => description;
+
+        // The snapshots hold sources relative to the file's folder at the time; a Save As to another folder since then is
+        // undone by rewriting them on restore (SequenceSourcePaths.Rebase).
+        private readonly FilePath _beforeFolder = beforeFolder ?? document.Folder;
+        private readonly FilePath _afterFolder = afterFolder ?? document.Folder;
+        private FilePath BeforeFolder => _beforeFolder;
 
         // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
         public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
@@ -1208,7 +1346,7 @@ public sealed class SequenceDocument
         // The merged entry undoes to where the first one started and redoes to where this one ended.
         public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
             ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
-                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup)
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder)
             : this;
 
         private string Before => before;
@@ -1219,20 +1357,20 @@ public sealed class SequenceDocument
         public bool Do()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter);
+            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter, _afterFolder);
             return true;
         }
 
         public void Redo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectAfter, trackAfter, stateAfter);
+            document.Restore(after, selectAfter, trackAfter, stateAfter, _afterFolder);
         }
 
         public void Undo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.To, names.From);
-            document.Restore(before, selectBefore, trackBefore, stateBefore);
+            document.Restore(before, selectBefore, trackBefore, stateBefore, _beforeFolder);
         }
     }
 }

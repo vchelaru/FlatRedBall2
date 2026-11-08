@@ -63,6 +63,50 @@ public partial class SequenceInspectorControl : UserControl
             if (CurrentChain is { } reference)
                 GoToDefinitionRequested?.Invoke(reference);
         };
+        ChainNameBox.SelectionChanged += (_, _) => RelinkToSelectedChain();
+    }
+
+    // The dropdown's entries as chain names, parallel to its items; null for the "(missing)" entry that stands for the
+    // current name when the source lacks it, which is not a choice.
+    private List<string?> _chainChoices = new();
+
+    private void RelinkToSelectedChain()
+    {
+        if (_refreshing) return;
+        int index = ChainNameBox.SelectedIndex;
+        if (index < 0 || index >= _chainChoices.Count || _chainChoices[index] is not { } name) return;
+        if (BulkChains() is { } chains)
+            Commit(document => document.RelinkChains(_undo!, _sequence, chains, name));
+        else if (_chain is { } chain)
+            Commit(document => document.RelinkChains(_undo!, _sequence, new[] { chain }, name));
+    }
+
+    // The Chain dropdown: the chains of the source (of every selected chain, when they share one), with the current name
+    // selected. A name the source lacks, or several chains with different names, shows as a first entry that is no choice.
+    private void ShowChainChoices(string? source, string? chain, string mixedLabel)
+    {
+        var available = source is null ? new List<string>()
+            : _document!.SourceChains(source)?.AnimationChains.Select(c => c.Name).ToList() ?? new List<string>();
+        int current = chain is null ? -1 : available.IndexOf(chain);
+        var choices = available.Cast<string?>().ToList();
+        var shown = new List<string>(available);
+        if (source is null)
+        {
+            // Chains of different sources have no chain list in common, so there is nothing to pick.
+            choices = new List<string?> { null };
+            shown = new List<string> { chain ?? mixedLabel };
+            current = 0;
+        }
+        else if (current < 0)
+        {
+            choices.Insert(0, null);
+            shown.Insert(0, chain is null ? mixedLabel : chain.Length == 0 ? "(missing)" : $"{chain} (missing)");
+            current = 0;
+        }
+        if (!shown.SequenceEqual(ChainNameBox.Items.OfType<string>()))
+            ChainNameBox.ItemsSource = shown;
+        _chainChoices = choices;
+        ChainNameBox.SelectedIndex = current;
     }
 
     /// <summary>Raised with the reason when an edit is refused.</summary>
@@ -180,9 +224,8 @@ public partial class SequenceInspectorControl : UserControl
             // and Go to Definition belong to one chain.
             var state = SequenceBulkState.ForChains(CurrentSequence!, chains);
             ChainSourceText.Text = state.Source ?? MixedPlaceholder;
-            ChainNameText.Text = state.Chain ?? Plural.Format(chains.Count, "chain");
+            ShowChainChoices(state.Source, state.Chain, Plural.Format(chains.Count, "chain"));
             ToolTip.SetTip(ChainSourceText, ChainSourceText.Text);
-            ToolTip.SetTip(ChainNameText, ChainNameText.Text);
             PutOrMixed(ChainStartField, state.Start is { } start ? (decimal)start : null, force);
             PutOrMixed(ChainLoopsField, state.Loops is { } loops ? (decimal)loops : null, force);
             ChainLengthRow.IsVisible = false;
@@ -194,8 +237,7 @@ public partial class SequenceInspectorControl : UserControl
         GoToDefinitionButton.IsVisible = true;
         ChainSourceText.Text = reference.Source;
         ToolTip.SetTip(ChainSourceText, reference.Source);
-        ChainNameText.Text = reference.Chain;
-        ToolTip.SetTip(ChainNameText, reference.Chain);
+        ShowChainChoices(reference.Source, reference.Chain, string.Empty);
         PutOrMixed(ChainStartField, (decimal)reference.Start, force);
         PutOrMixed(ChainLoopsField, (decimal)reference.Loops, force);
         ChainLengthText.Text = document.CycleLength(reference) is { } cycle

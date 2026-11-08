@@ -52,7 +52,7 @@ public class QaScenarioTests
 
         editor.Project.AnimationChains.Single().Frames.Count.ShouldBe(1);
         editor.ThrowIfErrorShown();
-        editor.ToastText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -291,7 +291,7 @@ public class QaScenarioTests
 
         walk.Name.ShouldBe("Walk");
         editor.UndoManager.CanUndo.ShouldBeFalse();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -520,8 +520,8 @@ public class QaScenarioTests
         await editor.OpenAsync(bad);
         editor.Wait(TimeSpan.FromMilliseconds(100));
 
-        editor.ErrorBannerText.ShouldNotBeNull("a file that cannot be read must be reported");
-        editor.ErrorBannerText!.ShouldContain("broken.achx");
+        editor.ProblemText.ShouldNotBeNull("a file that cannot be read must be reported");
+        editor.ProblemText!.ShouldContain("broken.achx");
         editor.ClickTab(editor.Tabs.Tabs.Single(tab => tab.Path.FullPath.EndsWith("hero.achx")).DisplayName);
         editor.Click(editor.RowButton(editor.ChainNamed("Walk"), "Add Frame"));
         editor.ChainNamed("Walk").Frames.Count.ShouldBe(2, "the editor still works afterwards");
@@ -546,8 +546,8 @@ public class QaScenarioTests
         // A pixel-coordinate file cannot be written without the texture's size, so the editor
         // refuses the save and says so, rather than writing a file with made-up coordinates.
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
-        editor.ToastText.ShouldNotBeNull();
-        editor.ToastText!.ShouldContain("gone.png");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("gone.png");
         AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Count.ShouldBe(1, "the file on disk is left as it was");
     }
 

@@ -247,7 +247,7 @@ public class SequenceTrackEyeScenarioTests
         for (int lane = 0; lane < 3; lane++) editor.ClickAt(OnEye(editor, lane));
 
         ShownTracks(editor).ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.Control<TextBlock>("SequenceTimeText").Text.ShouldBe(length);
     }
 

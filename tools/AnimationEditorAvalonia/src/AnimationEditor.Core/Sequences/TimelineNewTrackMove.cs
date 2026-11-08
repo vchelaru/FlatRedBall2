@@ -13,10 +13,11 @@ public static class TimelineNewTrackMove
     private const string DefaultTrackName = "Track";
 
     /// <summary>
-    /// Takes <paramref name="chains"/> out of the tracks they are in and appends one new track per source track, in lane
-    /// order, each holding that track's chains in their old order. A new track is named after its first chain (numbered
-    /// when taken; "Track" for a chain with no name), exactly as a chip dropped on the row names it. A source track
-    /// left empty stays. Returns the new tracks' indices.
+    /// Takes <paramref name="chains"/> out of the tracks they are in and puts one new track per source track in front of
+    /// all the others (at the top of the list, the way the new-track row sits), in lane order, each holding that track's
+    /// chains in their old order. A new track is named after its first chain (numbered when taken; "Track" for a chain
+    /// with no name), exactly as a chip dropped on the row names it. A source track left empty stays. Returns the new
+    /// tracks' indices (0, 1, ...).
     /// </summary>
     public static IReadOnlyList<int> Apply(SequenceSave sequence, IReadOnlyList<SequenceChainReferenceSave> chains)
     {
@@ -38,8 +39,8 @@ public static class TimelineNewTrackMove
                 Name = NameGenerator.Unique(sequence.Tracks.Select(t => t.Name), baseName),
             };
             track.Chains.AddRange(group);
-            created.Add(sequence.Tracks.Count);
-            sequence.Tracks.Add(track);
+            created.Add(created.Count);
+            sequence.Tracks.Insert(created.Count - 1, track);
         }
         return created;
     }

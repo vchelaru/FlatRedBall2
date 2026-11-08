@@ -50,7 +50,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowErrorBanner($"Could not create {new FilePath(path).NoPath}: {ex.Message}");
+            ShowProblem($"Could not create {new FilePath(path).NoPath}: {ex.Message}");
             return;
         }
         await LoadAnimationFileAsync(path);
@@ -78,7 +78,7 @@ public partial class MainWindow
         private SequencePlayback _playback = new();
         private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(16) };
         // Real time between ticks, since a DispatcherTimer fires later than its interval (see #526).
-        private readonly TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
+        private TickClock _tick = new(Stopwatch.GetTimestamp, Stopwatch.Frequency);
 
         // Watches the shown document's file, its sources and their textures, and only while its tab is in front: a hidden
         // tab catches up in LoadAsync, so a source edited in its own tab never races this. A second instance of the achx
@@ -96,6 +96,42 @@ public partial class MainWindow
             _watcher.AchxDeletedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnFileDeletedOnDisk(path));
             _watcher.SourceChangedOnDisk += _ => Dispatcher.UIThread.InvokeAsync(OnSourceChangedOnDisk);
             _watcher.PngChangedOnDisk += path => Dispatcher.UIThread.InvokeAsync(() => OnTextureChangedOnDisk(path));
+        }
+
+        internal void SetPlaybackClock(TickClock clock) => _tick = clock;
+
+        internal void TickPlayback() => OnTick();
+
+        // The Speed field's value, kept across loads: each load starts a fresh SequencePlayback that takes it.
+        private double SpeedValue => (double)(_window.SequenceSpeedInput.Value ?? 1.0m);
+
+        /// <summary>Whether the playhead keys act: a sequence is shown and the timeline holds the focus.</summary>
+        public bool PlayheadKeysApply =>
+            _document is not null && _window.SequenceEditorPane.IsVisible
+            && _window.FocusManager?.GetFocusedElement() is Visual focused
+            && (focused == _window.SequenceTimeline || _window.SequenceTimeline.IsVisualAncestorOf(focused));
+
+        /// <summary>
+        /// Moves the primary sequence's playhead to the next (<paramref name="direction"/> 1) or previous (-1) frame boundary
+        /// (<see cref="PlayheadSteps"/>), the way a scrub does: a playing sequence keeps playing.
+        /// </summary>
+        public void StepPlayhead(int direction)
+        {
+            if (_document is not { } document || CurrentSequence is not { } sequence) return;
+            var blocks = TimelineLayout.Blocks(sequence, document.CycleLength);
+            var steps = PlayheadSteps.Boundaries(sequence, blocks, document.FindChain, _window.SequenceTimeline.SequenceLength);
+            double now = _window.SequenceTimeline.Playhead;
+            SeekPrimary(direction > 0 ? PlayheadSteps.Next(steps, now) : PlayheadSteps.Previous(steps, now));
+        }
+
+        /// <summary>Moves the primary sequence's playhead to its start, or to its end (the sequence length).</summary>
+        public void JumpPlayhead(bool toEnd) => SeekPrimary(toEnd ? _window.SequenceTimeline.SequenceLength : 0);
+
+        private void SeekPrimary(double time)
+        {
+            if (_document?.Selection.Primary is not { } primary) return;
+            _playback.Seek(primary, time, _window.SequenceTimeline.SequenceLength);
+            ShowPlayhead();
         }
 
         private bool IsShown(string path) =>
@@ -117,7 +153,7 @@ public partial class MainWindow
             if (result.Error is { } error)
             {
                 // Mid-write or damaged: the open document stays, and the next change event tries again.
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
                 return;
             }
             if (!result.Changed) return;
@@ -127,7 +163,7 @@ public partial class MainWindow
             if (sequenceName is not null && CurrentSequence?.Name == sequenceName
                 && timeline.SelectedChains.Count == 0 && timeline.SelectedTracks.Count == 0)
                 RestoreTimelineSelection(CurrentSequence, chains, tracks);
-            _window.ShowToast($"Reloaded {document.Path.NoPath}");
+            _window.ShowInfo($"Reloaded {document.Path.NoPath}");
         }
 
         private void RestoreTimelineSelection(SequenceSave sequence, List<TimelineChainId> chains, List<int> tracks)
@@ -141,10 +177,10 @@ public partial class MainWindow
 
         private void OnFileDeletedOnDisk(string path)
         {
-            if (IsShown(path)) ShowDeletedToast(new FilePath(path));
+            if (IsShown(path)) ShowDeletedInfo(new FilePath(path));
         }
 
-        private void ShowDeletedToast(FilePath path) => _window.ShowToast($"'{path.NoPath}' was deleted from disk.");
+        private void ShowDeletedInfo(FilePath path) => _window.ShowInfo($"'{path.NoPath}' was deleted from disk.");
 
         /// <summary>A listed source file changed or vanished: re-read it, so chains, frames, timings and the missing flag follow.</summary>
         private void OnSourceChangedOnDisk()
@@ -249,24 +285,24 @@ public partial class MainWindow
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                 {
-                    _window.ShowErrorBanner($"Could not open {tab.DisplayName}: {ex.Message}");
+                    _window.ShowProblem($"Could not open {tab.DisplayName}: {ex.Message}");
                     return Task.FromResult(false);
                 }
                 _documents[tab.Path] = document;
                 // Our own saves go through the watcher's guard so their change events do not reload the document.
                 document.SaveRunner = _watcher.RunOwnSave;
                 // The same toast an achx shows (MainWindow wires AppCommands.SaveFailed), so a failed write is never silent.
-                document.SaveFailed += message => _window.ShowToast($"Auto save failed — {message}");
+                document.SaveFailed += message => _window.ShowProblem($"Auto save failed — {message}");
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
                 // The one place a document is created (open, restore and back/forward all come through here), and
                 // later tab switches reuse it, so the notice shows once per open. It stays until dismissed.
                 if (NewerVersionNotice.MessageFor(document.Save) is { } notice)
-                    _window.Notifications.ShowWarningBanner(notice);
+                    _window.ShowInfo(notice);
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
                 if (document.DuplicateNamesNotice is { } duplicates)
-                    _window.Notifications.ShowWarningBanner(duplicates);
+                    _window.ShowInfo(duplicates);
             }
 
             // Showing another file starts with no pane owning the edit hotkeys, as a fresh tab does.
@@ -275,13 +311,14 @@ public partial class MainWindow
             _document = document;
             _document.Changed += Refresh;
             _document.SequenceRenamed += OnSequenceRenamed;
-            _playback = new SequencePlayback();
+            _playback = new SequencePlayback { Speed = SpeedValue };
             // The undo stack is shared by every tab; this tab's own history lives in its snapshot.
             _window._undoManager.Clear();
             if (tab.UndoSnapshot != null)
                 _window._undoManager.RestoreSnapshot(tab.UndoSnapshot);
             Refresh();
             RestoreZoom();
+            RestorePreviewView();
             RestoreGuides();
             StartWatching(document);
             return Task.FromResult(true);
@@ -293,17 +330,17 @@ public partial class MainWindow
         {
             var result = document.ReloadIfChangedOnDisk();
             if (result.Deleted)
-                ShowDeletedToast(document.Path);
+                ShowDeletedInfo(document.Path);
             else if (result.Error is { } error)
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {error}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
             else if (document.StaleOnDiskReason is { } stale)
                 // Still the same unreadable file: saving stays paused, so say so again.
-                _window.ShowErrorBanner($"Could not reload {document.Path.NoPath}: {stale}");
+                _window.ShowProblem($"Could not reload {document.Path.NoPath}: {stale}");
             else if (result.Changed)
             {
                 // The history describes the old file; undoing into it would write that back over the new one.
                 tab.UndoSnapshot = null;
-                _window.ShowToast($"Reloaded {document.Path.NoPath}");
+                _window.ShowInfo($"Reloaded {document.Path.NoPath}");
             }
         }
 
@@ -349,6 +386,62 @@ public partial class MainWindow
             _document?.SaveToDisk();
             _window.UpdateStatusBar();
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// File &gt; Save As: writes the document to the chosen <c>.seqj</c> and moves the tab there, as an <c>.achx</c> Save
+        /// As does. The document, its undo history and its view state carry over; the old file is not touched again.
+        /// </summary>
+        public async Task SaveAsAsync(TabEntry? tab)
+        {
+            if (tab is null || _document is not { } document || !_documents.TryGetValue(tab.Path, out var known) || known != document) return;
+            string? picked = await _window._appCommands.FileDialogService.PickSaveFileAsync("Save Sequence", "seqj",
+                new[] { new FileTypeChoice("seqj", "Sequence") }, SaveDialogStart.For(tab.Path.FullPath));
+            if (string.IsNullOrEmpty(picked) || document != _document) return;
+
+            var oldPath = tab.Path;
+            var newPath = new FilePath(picked);
+            if (newPath != oldPath && _window._tabManager.Tabs.Any(other => other.Path == newPath))
+            {
+                _window.ShowErrorBanner($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
+                return;
+            }
+
+            // The library and settings are keyed by source as written, which a Save As may rewrite; carry them by position.
+            var oldSources = document.Save.Sources.ToList();
+            var collapsedIndices = Enumerable.Range(0, oldSources.Count).Where(i => _window.SequenceLibrary.IsCollapsed(oldSources[i])).ToList();
+            if (document.SaveAs(newPath.FullPath) is { } error)
+            {
+                _window.ShowErrorBanner(error);
+                return;
+            }
+            if (newPath == oldPath) return;
+
+            _documents.Remove(oldPath);
+            _documents[newPath] = document;
+            _window._tabManager.Rename(oldPath, newPath);
+            _window.RebuildTabStrip();
+            CarryViewState(oldPath, newPath, collapsedIndices.Select(i => document.Save.Sources[i]).ToList());
+            // The watcher followed the old file; it now watches the new one, its sources and their textures.
+            StartWatching(document);
+            _window.RecordRecentFile(newPath.FullPath);
+            _window.UpdateTitle();
+            _window.UpdateStatusBar();
+        }
+
+        // What the settings remember per file follows the document to its new name, so the tab looks as it did a moment ago.
+        private void CarryViewState(FilePath oldPath, FilePath newPath, List<string> collapsedSources)
+        {
+            var settings = _window._appSettings;
+            if (settings.TimelineZooms.TryGetValue(oldPath.Standardized, out int zoom))
+                settings.TimelineZooms[newPath.Standardized] = zoom;
+            // The document's Changed already stored the selected sequence under the new name.
+            if (collapsedSources.Count > 0) settings.CollapsedLibrarySources[newPath.Standardized] = collapsedSources;
+            else settings.CollapsedLibrarySources.Remove(newPath.Standardized);
+            _window.SaveSettingsFile();
+            var library = _window.SequenceLibrary;
+            library.CollapsedSources.Load(collapsedSources);
+            library.Show(_document);
         }
 
         public void Closing(TabEntry tab)
@@ -415,7 +508,7 @@ public partial class MainWindow
         {
             if (SequenceEditRule.NothingToDo(verb, surface, SelectedCount(surface)) is not { } message) return false;
             if (clearClipboard && surface != EditSurface.None) _window.CopyTextToClipboard(string.Empty);
-            _window.ShowToast(message);
+            _window.ShowProblem(message);
             return true;
         }
 
@@ -504,7 +597,7 @@ public partial class MainWindow
             var timeline = _window.SequenceTimeline;
             if (SequenceEditRule.RenameRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
             {
-                _window.ShowToast(message);
+                _window.ShowProblem(message);
                 return;
             }
             if (surface == EditSurface.List)
@@ -528,7 +621,7 @@ public partial class MainWindow
             var timeline = _window.SequenceTimeline;
             if (SequenceEditRule.MoveRefusal(surface, document.SelectedIndices.Count, timeline.SelectedTracks.Count, timeline.SelectedChains.Count) is { } message)
             {
-                _window.ShowToast(message);
+                _window.ShowProblem(message);
                 return;
             }
             if (surface == EditSurface.List)
@@ -547,7 +640,7 @@ public partial class MainWindow
         {
             if (_document is not { } document) return;
             if (!File.Exists(document.Path.FullPath))
-                ShowDeletedToast(document.Path);
+                ShowDeletedInfo(document.Path);
             else
                 ReloadShownFromDisk(document);
         }
@@ -567,17 +660,14 @@ public partial class MainWindow
                     var result = document.PasteSequences(_window._undoManager, route.Sequences!);
                     // The pasted sequences start from their beginning.
                     StopPlayback();
-                    if (result.Errors.Count > 0) _window.ShowErrorBanner(string.Join(" ", result.Errors));
+                    if (result.Errors.Count > 0) _window.ShowProblem(string.Join(" ", result.Errors));
                     FocusSelectedRow();
                     break;
                 case PasteRouteKind.Timeline:
                     PasteIntoTimeline(document, route.Timeline!);
                     break;
                 default:
-                    if (route.IsDamaged)
-                        _window.ShowErrorBanner(route.Message!);
-                    else
-                        _window.ShowToast(route.Message!);
+                    _window.ShowProblem(route.Message!);
                     break;
             }
         }
@@ -587,13 +677,13 @@ public partial class MainWindow
             string noun = content.Kind == TimelineClipboardKind.Chains ? "chains" : "tracks";
             if (document.Save.Sequences.Count == 0)
             {
-                _window.ShowToast($"Can't paste the copied {noun}: the file has no sequence to paste into. Add a sequence first.");
+                _window.ShowProblem($"Can't paste the copied {noun}: the file has no sequence to paste into. Add a sequence first.");
                 return;
             }
             // The pasted items become the timeline's selection, so it takes the keyboard: with the list focused, Delete would remove the sequence instead.
             _window.SequenceTimeline.Focus();
             if (!_window.SequenceTimeline.Paste(content))
-                _window.ShowToast($"Nothing to paste: the copied {noun} are empty.");
+                _window.ShowProblem($"Nothing to paste: the copied {noun} are empty.");
         }
 
         // Rebuilding the list drops its focus once the old rows are gone; lay it out now and take it back so the keys keep working.
@@ -664,12 +754,12 @@ public partial class MainWindow
             };
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
             w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
-            w.SequenceTimeline.ErrorRaised += w.ShowErrorBanner;
+            w.SequenceTimeline.ErrorRaised += message => w.ShowProblem(message);
             w.SequenceTimeline.RenameTrackRequested += index => _ = RenameTrackAsync(index);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
-            w.SequenceInspector.ErrorRaised += w.ShowErrorBanner;
+            w.SequenceInspector.ErrorRaised += message => w.ShowProblem(message);
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
@@ -699,6 +789,7 @@ public partial class MainWindow
             w.SequenceLibrary.AddChipRequested += AddChip;
             w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
+            w.SequenceLibrary.ReplaceSourceRequested += source => _ = ReplaceSourceAsync(source);
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceLibrary.GroupsPanel.TranslatePoint(point, w.DragOverlayCanvas));
@@ -717,6 +808,10 @@ public partial class MainWindow
             w.SequencePlayButton.Click += (_, _) => TogglePlayback();
             w.SequenceStopButton.Click += (_, _) => StopPlayback();
             w.SequenceLoopToggle.Click += (_, _) => SetLoop(w.SequenceLoopToggle.IsChecked == true);
+            // The achx Speed field's twin: a session-wide value, applied to every selected sequence's clock.
+            w.SequenceSpeedInput.Value = 1.0m;
+            w.SequenceSpeedInput.ValueChanged += (_, _) => _playback.Speed = SpeedValue;
+            w.SequenceTimelineFit.Click += (_, _) => w.SequenceTimeline.FitToSequence();
             // The timeline shows the primary sequence, so a scrub moves its playhead alone; the others keep theirs.
             w.SequenceTimeline.Scrubbed += time =>
             {
@@ -734,9 +829,27 @@ public partial class MainWindow
             preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
             preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
             WireTrackPlacement();
-            w.SequenceShowShapes.IsCheckedChanged += (_, _) => preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
-            w.SequenceShowOrigin.IsCheckedChanged += (_, _) => preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
-            w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) => preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+            // Shapes and Origin are remembered for all files, in the settings the window writes on close (as the achx
+            // Bounding Box toggle is). Bounding Box is that same achx setting, so flipping it here flips the achx toggle.
+            w.SequenceShowShapes.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowShapes = w.SequenceShowShapes.IsChecked == true;
+                w._appSettings.SequenceShowShapes = preview.ShowShapes;
+            };
+            w.SequenceShowOrigin.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowOrigin = w.SequenceShowOrigin.IsChecked == true;
+                w._appSettings.SequenceShowOrigin = preview.ShowOrigin;
+            };
+            w.SequenceShowBoundingBox.IsCheckedChanged += (_, _) =>
+            {
+                preview.ShowBoundingBox = w.SequenceShowBoundingBox.IsChecked == true;
+                w._appSettings.ShowBoundingBox = preview.ShowBoundingBox;
+                w.ShowBoundingBoxCheck.IsChecked = preview.ShowBoundingBox;
+            };
+            // Zoom and pan are per file, like the timeline's zoom: settled values only, not every tick of an ease.
+            preview.ZoomChanged += _ => RememberPreviewView();
+            preview.PanChanged += (_, _) => RememberPreviewView();
 
             // Guides work as on the achx preview: the toggle shows once a guide exists, and placing one while hidden reveals them.
             w.SequenceShowUserGuides.IsCheckedChanged += (_, _) =>
@@ -948,7 +1061,7 @@ public partial class MainWindow
             int index = _items.IndexOf(item);
             if (document is null || document != _document || index < 0) return;
             if (document.RenameSequence(_window._undoManager, index, text, keepSelection: true) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         /// <summary>True while a sequence row or a track header is being renamed in place.</summary>
@@ -1054,7 +1167,7 @@ public partial class MainWindow
             var (path, error) = document.LocateDefinition(reference);
             if (path is null)
             {
-                _window.ShowErrorBanner(error!);
+                _window.ShowProblem(error!);
                 return;
             }
             await _window.OpenAndSelectChainAsync(path, reference.Chain);
@@ -1178,7 +1291,7 @@ public partial class MainWindow
             string? name = await _window._appCommands.PromptStringAsync("Rename Track", "Track name:", oldName);
             if (name is null || document != _document) return;
             if (document.RenameTrack(_window._undoManager, sequence, track, name) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         private void AddSources(IReadOnlyList<string> paths)
@@ -1186,7 +1299,7 @@ public partial class MainWindow
             if (_document is null) return;
             var errors = _document.AddSources(_window._undoManager, paths);
             if (errors.Count > 0)
-                _window.ShowErrorBanner(string.Join(" ", errors));
+                _window.ShowProblem(string.Join(" ", errors));
         }
 
         // Same refusals and one undo entry as a drop; a cancelled dialog changes nothing.
@@ -1203,13 +1316,34 @@ public partial class MainWindow
         {
             if (_document is null) return;
             if (_window.SequenceTimeline.AddChip(chip, mode) is { } refusal)
-                _window.ShowToast(refusal);
+                _window.ShowProblem(refusal);
         }
 
         private void RemoveSource(string source)
         {
             if (_document?.RemoveSource(_window._undoManager, source) is { } error)
+                _window.ShowProblem(error);
+        }
+
+        // Swaps a source for another file, keeping every chain that used it: the repair for a source that was renamed or moved.
+        // A cancelled dialog changes nothing; a refusal (the file is already a source, not an .achx/.achj) is said.
+        private async Task ReplaceSourceAsync(string source)
+        {
+            if (_document is not { } document) return;
+            string? picked = await _window._appCommands.FileDialogService.PickOpenFileAsync("Replace Source", OpenFileFilters.SequenceSources);
+            if (string.IsNullOrEmpty(picked) || document != _document) return;
+
+            var library = _window.SequenceLibrary;
+            int index = document.Save.Sources.FindIndex(listed => string.Equals(listed, source, StringComparison.OrdinalIgnoreCase));
+            bool collapsed = library.IsCollapsed(source);
+            if (document.ReplaceSource(_window._undoManager, source, picked) is { } error)
+            {
                 _window.ShowErrorBanner(error);
+                return;
+            }
+            // The collapsed state is keyed by the source as written, which the replace changed; the new source starts as the old one was.
+            if (collapsed && index >= 0 && index < document.Save.Sources.Count && !library.IsCollapsed(document.Save.Sources[index]))
+                library.ToggleSource(document.Save.Sources[index]);
         }
 
         // Dropping a source's group on a gap: one undo entry, and an edit rather than a place to come back to, so no Back entry.
@@ -1273,7 +1407,7 @@ public partial class MainWindow
             string? name = await _window._appCommands.PromptStringAsync("Rename Sequence", "Sequence name:", oldName);
             if (name is null || document != _document) return;
             if (document.RenameSequence(_window._undoManager, index, name) is { } error)
-                _window.ShowErrorBanner(error);
+                _window.ShowProblem(error);
         }
 
         private void DeleteSelected()
@@ -1345,6 +1479,38 @@ public partial class MainWindow
             finally
             {
                 _restoringZoom = false;
+            }
+        }
+
+        private bool _restoringPreviewView;
+
+        // The sequence preview's zoom and pan persist per .seqj file, as the achx preview's do in its companion file: view
+        // state, so no undo entry and the file is not touched. The settings are written only when the stored view changed.
+        private void RememberPreviewView()
+        {
+            var preview = _window.SequencePreview;
+            if (_restoringPreviewView || _document is null || preview.IsZoomAnimating) return;
+            if (SequencePreviewViewMemory.Remember(_window._appSettings.SequencePreviewViews, _document.Path.Standardized,
+                    preview.Zoom * 100.0, preview.PanOffset.X, preview.PanOffset.Y))
+                _window.SaveSettingsFile();
+        }
+
+        // Applies the file's remembered view without easing. Every load comes through here and the one preview is shared by
+        // all .seqj tabs, so each load sets its own zoom and pan (the default view when it has none).
+        private void RestorePreviewView()
+        {
+            if (_document is null) return;
+            var preview = _window.SequencePreview;
+            var view = SequencePreviewViewMemory.ViewToRestore(_window._appSettings.SequencePreviewViews, _document.Path.Standardized);
+            _restoringPreviewView = true;
+            try
+            {
+                preview.SetZoomPercent(view.ZoomPercent);
+                preview.SetPan(view.PanX, view.PanY);
+            }
+            finally
+            {
+                _restoringPreviewView = false;
             }
         }
 

@@ -173,7 +173,7 @@ public class SequenceClipboardMenuScenarioTests
         editor.PickMenuItem(List(editor).ContextMenu!, "Paste");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("Nothing to paste");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to paste");
     }
 
     // ── Timeline ────────────────────────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ public class SequenceClipboardMenuScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task BlankLaneMenu_AddTrack_AddsAndNamesAtTheEnd_AsOneUndoStep()
+    public async Task BlankLaneMenu_AddTrack_AddsAndNamesInFront_AsOneUndoStep()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
@@ -335,9 +335,9 @@ public class SequenceClipboardMenuScenarioTests
 
         editor.PickMenuItem(Timeline(editor).Menu, "Add Track");
 
-        SavedTrackNames(path).ShouldBe(new[] { "Body", "Head", "Tail", "Track" });
+        SavedTrackNames(path).ShouldBe(new[] { "Track", "Body", "Head", "Tail" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'" });
-        Timeline(editor).RenamingTrack.ShouldBe(3);
+        Timeline(editor).RenamingTrack.ShouldBe(0);
     }
 
     [AvaloniaFact]

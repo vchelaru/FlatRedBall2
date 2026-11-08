@@ -276,6 +276,12 @@ public sealed class SequenceLibraryControl : UserControl
     public event Action<string>? RemoveSourceRequested;
 
     /// <summary>
+    /// Raised by a source's "Replace Source…" menu item, and by the Replace… button a missing source's header shows, with the
+    /// source as written in the file. The host asks for the new file and edits the document; this control never does.
+    /// </summary>
+    public event Action<string>? ReplaceSourceRequested;
+
+    /// <summary>
     /// Raised by a "Go to Definition" menu item. A chip sends its source and chain; a source's header sends the source
     /// alone (empty <see cref="SequenceChainReferenceSave.Chain"/>), so the host opens the file without selecting a chain.
     /// </summary>
@@ -423,9 +429,11 @@ public sealed class SequenceLibraryControl : UserControl
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto"), Background = Brushes.Transparent };
         var definition = new MenuItem { Header = "Go to Definition", IsEnabled = !source.IsMissing };
         definition.Click += (_, _) => OpenSource();
+        var replaceItem = new MenuItem { Header = "Replace Source…" };
+        replaceItem.Click += (_, _) => ReplaceSourceRequested?.Invoke(source.Source);
         var removeItem = new MenuItem { Header = "Remove Source" };
         removeItem.Click += (_, _) => RemoveSourceRequested?.Invoke(source.Source);
-        header.ContextMenu = new ContextMenu { Items = { definition, removeItem } };
+        header.ContextMenu = new ContextMenu { Items = { definition, replaceItem, removeItem } };
         _headers[source.Source] = header;
         Control toggle;
         Path? chevron = null;
@@ -459,6 +467,22 @@ public sealed class SequenceLibraryControl : UserControl
         {
             Grid.SetColumn(open, 3);
             header.Children.Add(open);
+        }
+        else
+        {
+            // The usual repair for a source that was moved or renamed, so it is on the header and not only in the menu. The
+            // same "…" button the .achx Inspector's texture field uses to browse for another file.
+            var replace = new Button
+            {
+                Content = "…", FontSize = 11, Padding = new Thickness(5, 1), Background = Brushes.Transparent,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            BindResource(replace, Button.ForegroundProperty, "InkMid");
+            ToolTip.SetTip(replace, "Replace Source…");
+            Avalonia.Automation.AutomationProperties.SetName(replace, $"Replace {source.Source}");
+            replace.Click += (_, _) => ReplaceSourceRequested?.Invoke(source.Source);
+            Grid.SetColumn(replace, 3);
+            header.Children.Add(replace);
         }
         Grid.SetColumn(remove, 4);
         header.Children.Add(remove);

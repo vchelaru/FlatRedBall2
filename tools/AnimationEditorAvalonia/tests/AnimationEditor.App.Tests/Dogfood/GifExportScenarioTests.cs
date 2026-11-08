@@ -21,7 +21,7 @@ public class GifExportScenarioTests
 
         editor.ClickMenu("MenuExportGif");
 
-        (await editor.WaitUntilAsync(() => editor.ToastText is not null || editor.ErrorBannerText is not null, TimeSpan.FromSeconds(10)))
+        (await editor.WaitUntilAsync(() => editor.InfoText is not null || editor.ProblemText is not null, TimeSpan.FromSeconds(10)))
             .ShouldBeTrue("the export should finish with a toast or an error");
         editor.ThrowIfErrorShown();
     }
@@ -41,7 +41,7 @@ public class GifExportScenarioTests
         using SKCodec codec = OpenGif(gif);
         (codec.Info.Width, codec.Info.Height).ShouldBe((16, 16));
         codec.FrameInfo.Select(frame => frame.Duration).ShouldBe(new[] { 100, 100 });
-        editor.ToastText!.ShouldContain("walk.gif");
+        editor.InfoText!.ShouldContain("walk.gif");
     }
 
     [AvaloniaFact]
@@ -143,8 +143,8 @@ public class GifExportScenarioTests
         editor.ClickMenu("MenuExportGif");
         editor.Wait(TimeSpan.FromMilliseconds(100));
 
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain("Select an animation");
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain("Select an animation");
         editor.Dialogs.Shown.ShouldBeEmpty();
     }
 }

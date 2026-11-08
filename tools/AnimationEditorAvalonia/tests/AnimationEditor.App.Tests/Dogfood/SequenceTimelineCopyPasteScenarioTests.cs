@@ -179,8 +179,8 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         var saved = SequenceListSave.FromFile(other);
         saved.Sources.ShouldBe(new[] { "../hero.achx" });
-        saved.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Lane", "Body" });
-        saved.Sequences[0].Tracks[1].Chains.Select(c => (c.Source, c.Start)).ShouldBe(new[] { ("../hero.achx", 0.0), ("../hero.achx", 1.0) });
+        saved.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Lane" });
+        saved.Sequences[0].Tracks[0].Chains.Select(c => (c.Source, c.Start)).ShouldBe(new[] { ("../hero.achx", 0.0), ("../hero.achx", 1.0) });
         editor.UndoLabels.ShouldBe(new[] { "Paste 2 chains" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(other).Sources.ShouldBeEmpty();
@@ -224,7 +224,7 @@ public class SequenceTimelineCopyPasteScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TextThatIsNotAnEnvelope_PastesNothing_AndShowsNoBanner_ADamagedOneShowsTheError()
+    public async Task TextThatIsNotAnEnvelope_PastesNothing_AndSaysSo_ADamagedOneShowsTheError()
     {
         var (editor, boss) = await OpenAsync();
         using var _ = editor;
@@ -233,12 +233,12 @@ public class SequenceTimelineCopyPasteScenarioTests
         await SetClipboardAsync(editor, "just some text");
         await CtrlAsync(editor, Key.V);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Nothing to paste");
 
         await SetClipboardAsync(editor, "{ \"kind\": \"frb2-animation-editor-chains\", \"version\": 1 }");
         await CtrlAsync(editor, Key.V);
         editor.UndoLabels.ShouldBeEmpty();
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("damaged");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("damaged");
     }
 
     [AvaloniaFact]
@@ -256,7 +256,7 @@ public class SequenceTimelineCopyPasteScenarioTests
 
         editor.SequenceNames.Count.ShouldBe(1);
         editor.UndoLabels.ShouldBe(new[] { "Paste 'Walk' on 'Body'" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         Chains(boss, 0).Length.ShouldBe(4);
         Timeline(editor).IsFocused.ShouldBeTrue();
         editor.Click((Control)list.ContainerFromIndex(0)!);

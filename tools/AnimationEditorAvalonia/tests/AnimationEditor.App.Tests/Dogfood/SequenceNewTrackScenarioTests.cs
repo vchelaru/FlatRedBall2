@@ -30,11 +30,11 @@ public class SequenceNewTrackScenarioTests
     private static SequenceTimelineControl Timeline(AnimationEditorHarness editor) =>
         editor.Control<SequenceTimelineControl>("SequenceTimeline");
 
-    /// <summary>A window point inside the "+ new track" cell of the header column.</summary>
-    private static Point NewTrackCell(AnimationEditorHarness editor, int trackCount)
+    /// <summary>A window point inside the "+ new track" cell of the header column, the top row under the ruler.</summary>
+    private static Point NewTrackCell(AnimationEditorHarness editor)
     {
         var timeline = Timeline(editor);
-        return editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(trackCount) + TimelineViewport.LaneHeight / 2);
+        return editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + TimelineViewport.LaneHeight / 2);
     }
 
     [AvaloniaFact]
@@ -45,11 +45,11 @@ public class SequenceNewTrackScenarioTests
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
-        editor.ClickAt(NewTrackCell(editor, 1));
+        editor.ClickAt(NewTrackCell(editor));
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Track", 0), ("Track 2", 0) });
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => (t.Name, t.Chains.Count)).ShouldBe(new[] { ("Track 2", 0), ("Track", 0) });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track 2'" });
-        timeline.SelectedTrack.ShouldBe(1);
+        timeline.SelectedTrack.ShouldBe(0);
         editor.Control<SequenceInspectorControl>("SequenceInspector").TrackNameBox.Text.ShouldBe("Track 2");
 
         // The new track's name is open for editing; Escape keeps the default and gives the keys back to the timeline.
@@ -57,7 +57,7 @@ public class SequenceNewTrackScenarioTests
         editor.Press(Key.Z, RawInputModifiers.Control);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks.Count.ShouldBe(1);
         editor.Press(Key.Y, RawInputModifiers.Control);
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track", "Track 2" });
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Track 2", "Track" });
         timeline.Blocks.ShouldBeEmpty();
     }
 
@@ -75,7 +75,7 @@ public class SequenceNewTrackScenarioTests
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
-        editor.ClickAt(NewTrackCell(editor, 1));
+        editor.ClickAt(NewTrackCell(editor));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
 
         timeline.IsRenamingTrack.ShouldBeTrue();
@@ -86,10 +86,10 @@ public class SequenceNewTrackScenarioTests
         editor.Press(Key.Enter);
 
         timeline.IsRenamingTrack.ShouldBeFalse();
-        SavedTracks(boss).ShouldBe(new[] { "Body", "Legs" });
+        SavedTracks(boss).ShouldBe(new[] { "Legs", "Body" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'", "Rename Track 'Track' to 'Legs'" });
         editor.Press(Key.Z, RawInputModifiers.Control);
-        SavedTracks(boss).ShouldBe(new[] { "Body", "Track" });
+        SavedTracks(boss).ShouldBe(new[] { "Track", "Body" });
         editor.Press(Key.Z, RawInputModifiers.Control);
         SavedTracks(boss).ShouldBe(new[] { "Body" });
     }
@@ -102,26 +102,26 @@ public class SequenceNewTrackScenarioTests
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
-        editor.ClickAt(NewTrackCell(editor, 1));
+        editor.ClickAt(NewTrackCell(editor));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
         editor.Type("Nope");
         editor.Press(Key.Escape);
         timeline.IsRenamingTrack.ShouldBeFalse();
-        SavedTracks(boss).ShouldBe(new[] { "Body", "Track" });
+        SavedTracks(boss).ShouldBe(new[] { "Track", "Body" });
 
-        editor.ClickAt(NewTrackCell(editor, 2));
+        editor.ClickAt(NewTrackCell(editor));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
         editor.Type("Body");
         editor.Press(Key.Enter);
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
-        SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2" });
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
+        SavedTracks(boss).ShouldBe(new[] { "Track 2", "Track", "Body" });
 
-        editor.ClickAt(NewTrackCell(editor, 3));
+        editor.ClickAt(NewTrackCell(editor));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
         TrackBox(editor)!.Text = "  ";
         editor.Press(Key.Enter);
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("needs a name");
-        SavedTracks(boss).ShouldBe(new[] { "Body", "Track", "Track 2", "Track 3" });
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("needs a name");
+        SavedTracks(boss).ShouldBe(new[] { "Track 3", "Track 2", "Track", "Body" });
         editor.UndoLabels.ShouldBe(new[] { "Add Track 'Track'", "Add Track 'Track 2'", "Add Track 'Track 3'" });
     }
 
@@ -132,7 +132,7 @@ public class SequenceNewTrackScenarioTests
         await editor.OpenAsync(WriteFixture(editor, "Body"));
         var timeline = Timeline(editor);
 
-        editor.Hover(NewTrackCell(editor, 1));
+        editor.Hover(NewTrackCell(editor));
         timeline.IsNewTrackHot.ShouldBeTrue();
         timeline.ShownCursor.ShouldBe(TimelineCursor.Default);
 
@@ -147,8 +147,41 @@ public class SequenceNewTrackScenarioTests
         await editor.OpenAsync(WriteFixture(editor, "Body"));
         var timeline = Timeline(editor);
 
-        editor.ClickAt(editor.PointIn(timeline, 400, timeline.Viewport.LaneTop(1) + 20));
+        editor.ClickAt(editor.PointIn(timeline, 400, timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + 20));
 
         editor.UndoLabels.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task TheDashedRow_SitsRightUnderTheRuler_AboveTheFirstLane()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor, "Body", "Arms"));
+        var timeline = Timeline(editor);
+
+        timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane).ShouldBe(TimelineViewport.RulerHeight);
+        timeline.Viewport.LaneTop(0).ShouldBe(TimelineViewport.RulerHeight + TimelineViewport.LaneHeight);
+        timeline.Viewport.RowAt(TimelineViewport.RulerHeight + 4, 2).Kind.ShouldBe(TimelineRowKind.NewTrack);
+        timeline.Viewport.RowAt(timeline.Viewport.LaneTop(1) + TimelineViewport.LaneHeight + 4, 2).Kind.ShouldBe(TimelineRowKind.None);
+        // The header cell reads "+ new track" there: hovering it lights it, hovering the first lane's header does not.
+        editor.Hover(NewTrackCell(editor));
+        timeline.IsNewTrackHot.ShouldBeTrue();
+        editor.Hover(editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(1) + 20));
+        timeline.IsNewTrackHot.ShouldBeFalse();
+    }
+
+    [AvaloniaFact]
+    public async Task AnEmptySequence_ShowsTheDashedRowUnderTheRuler_AndAClickThereMakesTheFirstTrack()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        timeline.Viewport.RowAt(TimelineViewport.RulerHeight + 4, 0).Kind.ShouldBe(TimelineRowKind.NewTrack);
+
+        editor.ClickAt(NewTrackCell(editor));
+
+        SavedTracks(boss).ShouldBe(new[] { "Track" });
+        timeline.SelectedTrack.ShouldBe(0);
     }
 }

@@ -300,7 +300,7 @@ public class SequenceListReorderScenarioTests
         editor.SequenceNames.ShouldBe(new[] { "D", "A", "Bee", "C", "E" });
         SavedNames(boss).ShouldBe(new[] { "D", "A", "Bee", "C", "E" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'B' to 'Bee'", "Move Sequence 'D'" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         Selected(editor).ShouldBe(new[] { "D" });
         List(editor).GetVisualDescendants().OfType<InlineRenameBox>().ShouldAllBe(inline => !inline.IsEditing);
     }
@@ -376,8 +376,8 @@ public class SequenceListReorderScenarioTests
         editor.Drag(editor.CenterOf(Row(editor, 0)), BelowRow(editor, 4));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(1500));
 
-        editor.ToastText.ShouldBeNull();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "B", "C", "D", "E", "A" });
         SavedNames(boss).ShouldBe(new[] { "B", "C", "D", "E", "A" });
         editor.UndoLabels.ShouldBe(new[] { "Move Sequence 'A'" });

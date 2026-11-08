@@ -235,13 +235,13 @@ public class SequencePreviewLiveScenarioTests
         await editor.OpenAsync(boss);
         ShownChains(editor).ShouldBeEmpty();
 
-        editor.Drag(editor.CenterOf(Chip(editor, "Walk")), At(editor, 0, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Walk")), At(editor, TimelineViewport.NewTrackLane, 0));
 
         ShownChains(editor).ShouldBe(new[] { "Walk:0" });
         Shown(editor).ShouldBe(Expected(editor, boss));
         editor.Click(editor.Control<Button>("AddSequenceButton"));
         ShownChains(editor).ShouldBeEmpty();
-        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 0, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, TimelineViewport.NewTrackLane, 0));
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
     }
 
@@ -256,7 +256,7 @@ public class SequencePreviewLiveScenarioTests
         var inspector = Inspector(editor);
         steps.Check("open");
 
-        editor.ClickAt(editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(1) + TimelineViewport.LaneHeight / 2));
+        editor.ClickAt(editor.PointIn(timeline, 30, timeline.Viewport.LaneTop(TimelineViewport.NewTrackLane) + TimelineViewport.LaneHeight / 2));
         editor.Press(Key.Escape);
         steps.Check("+ new track");
         Undo(editor);
@@ -264,9 +264,9 @@ public class SequencePreviewLiveScenarioTests
         Redo(editor);
         steps.Check("redo + new track");
 
-        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 1, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 0, 0));
         steps.Check("chip onto a lane");
-        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 2, 0));
+        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, TimelineViewport.NewTrackLane, 0));
         steps.Check("chip onto the new-track row");
         Undo(editor);
         steps.Check("undo chip drop");
@@ -279,12 +279,12 @@ public class SequencePreviewLiveScenarioTests
         steps.Check("undo move");
         Redo(editor);
         steps.Check("redo move");
-        editor.Drag(At(editor, 0, 0.5), At(editor, 0, 0.2));
+        editor.Drag(At(editor, 2, 0.5), At(editor, 2, 0.2));
         steps.Check("resize a chain");
         Undo(editor);
         steps.Check("undo resize");
 
-        editor.ClickAt(Header(editor, 0));
+        editor.ClickAt(Header(editor, 2));
         TypeInto(editor, inspector.TrackXField, "12");
         steps.Check("track X");
         TypeInto(editor, inspector.TrackYField, "-3");
@@ -296,7 +296,7 @@ public class SequencePreviewLiveScenarioTests
         Redo(editor);
         steps.Check("redo flip");
 
-        editor.ClickAt(At(editor, 0, 0.1));
+        editor.ClickAt(At(editor, 2, 0.1));
         TypeInto(editor, inspector.ChainStartField, "0.3");
         steps.Check("chain start");
         TypeInto(editor, inspector.ChainStartField, "0");
@@ -305,13 +305,13 @@ public class SequencePreviewLiveScenarioTests
         Undo(editor);
         steps.Check("undo loops");
 
-        editor.ClickAt(At(editor, 0, 0.6));
+        editor.ClickAt(At(editor, 2, 0.6));
         editor.Press(Key.Delete);
         steps.Check("Delete key on a chain");
         Undo(editor);
         steps.Check("undo delete chain");
 
-        editor.Drag(Header(editor, 0), Header(editor, 1));
+        editor.Drag(Header(editor, 2), Header(editor, 0));
         steps.Check("reorder tracks");
         Undo(editor);
         steps.Check("undo reorder");
@@ -484,7 +484,7 @@ public class SequencePreviewLiveScenarioTests
         await editor.OpenAsync(boss);
 
         ShownChains(editor).ShouldBe(new[] { "Run:0" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
