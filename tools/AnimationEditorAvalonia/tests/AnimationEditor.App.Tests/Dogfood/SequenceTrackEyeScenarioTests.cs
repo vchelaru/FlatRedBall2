@@ -234,7 +234,7 @@ public class SequenceTrackEyeScenarioTests
 
         editor.Click(inspector.TrackVisibleBox);
         ShownTracks(editor).ShouldBe(new[] { 0, 1, 2 });
-        editor.UndoLabels.ShouldBe(new[] { "Hide 3 Tracks", "Show 3 tracks" });
+        editor.UndoLabels.ShouldBe(new[] { "Hide 3 Tracks", "Show 3 Tracks" });
     }
 
     [AvaloniaFact]

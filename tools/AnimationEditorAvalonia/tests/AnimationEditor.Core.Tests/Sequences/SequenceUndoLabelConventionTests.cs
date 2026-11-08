@@ -1,5 +1,6 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System.Collections.Generic;
@@ -53,64 +54,67 @@ public class SequenceUndoLabelConventionTests
         return content!;
     }
 
-    /// <summary>One label per edit, each from a fresh undo manager, for single and multi-item forms of every command.</summary>
+    /// <summary>The label of each edit, every one run on a fresh document, for single and multi-item forms of every command.</summary>
     private static List<string> ProducedLabels(string folder)
     {
         var labels = new List<string>();
-        var document = Open(folder);
-        var undo = new UndoManager();
-        void Run(System.Action edit)
+
+
+        void Run(System.Action<SequenceDocument, UndoManager> edit)
         {
-            int before = undo.UndoHistory.Count;
-            edit();
-            labels.AddRange(undo.UndoHistory.Skip(before).Select(c => c.Description));
+            var document = Open(folder);
+            var undo = new UndoManager();
+            edit(document, undo);
+            labels.AddRange(undo.UndoHistory.Select(c => c.Description));
         }
 
         var chains3 = new[] { new TimelineChainId(0, 0), new TimelineChainId(0, 1), new TimelineChainId(1, 0) };
         var chains2 = new[] { new TimelineChainId(0, 0), new TimelineChainId(0, 1) };
-        var copied = Read(document.CopyChains(0, chains3));
+        var documentForClipboard = Open(folder);
+        var copied = Read(documentForClipboard.CopyChains(0, chains3));
+        var copiedOne = Read(documentForClipboard.CopyChains(0, new[] { chains3[0] }));
 
-        Run(() => document.DeleteChains(undo, 0, new[] { new TimelineChainId(0, 0) }));
-        Run(() => document.DeleteChains(undo, 0, new[] { new TimelineChainId(2, 0), new TimelineChainId(1, 0) }));
-        Run(() => document.DeleteTracks(undo, 0, new[] { 2 }));
-        Run(() => document.AddTrack(undo, 0));
-        Run(() => document.DeleteTracks(undo, 0, new[] { 0, 1 }));
-        Run(() => document.PasteChains(undo, 0, copied, selectedTrack: null, time: 5));
-        Run(() => document.PasteChains(undo, 0, Read(document.CopyChains(0, new[] { chains3[0] })), selectedTrack: 0, time: 5));
-        Run(() => document.PasteTracks(undo, 0, copied, afterTrack: null));
-        Run(() => document.DuplicateChains(undo, 0, chains2));
-        Run(() => document.DuplicateChains(undo, 0, new[] { chains2[0] }));
-        Run(() => document.DuplicateTracks(undo, 0, new[] { 0, 1 }));
-        Run(() => document.DuplicateTracks(undo, 0, new[] { 0 }));
-        Run(() => document.SetTracksVisible(undo, 0, new[] { 0, 1, 2 }, false));
-        Run(() => document.SetTracksVisible(undo, 0, new[] { 0 }, true));
-        Run(() => document.SetTrackVisible(undo, 0, 1, false));
-        Run(() => document.ShowAllTracks(undo, 0));
-        Run(() => document.SetTracksFlip(undo, 0, new[] { 0, 1 }, true));
-        Run(() => document.SetTracksFlip(undo, 0, new[] { 0 }, false));
-        Run(() => document.SetTrackFlip(undo, 0, 1, true));
-        Run(() => document.MoveTrack(undo, 0, 0, 2));
+        Run((document, undo) => document.DeleteChains(undo, 0, new[] { new TimelineChainId(0, 0) }));
+        Run((document, undo) => document.DeleteChains(undo, 0, new[] { new TimelineChainId(2, 0), new TimelineChainId(1, 0) }));
+        Run((document, undo) => document.DeleteTracks(undo, 0, new[] { 2 }));
+        Run((document, undo) => document.AddTrack(undo, 0));
+        Run((document, undo) => document.DeleteTracks(undo, 0, new[] { 0, 1 }));
+        Run((document, undo) => document.PasteChains(undo, 0, copied, selectedTrack: null, time: 5));
+        Run((document, undo) => document.PasteChains(undo, 0, copiedOne, selectedTrack: 0, time: 5));
+        Run((document, undo) => document.PasteTracks(undo, 0, copied, afterTrack: null));
+        Run((document, undo) => document.DuplicateChains(undo, 0, chains2));
+        Run((document, undo) => document.DuplicateChains(undo, 0, new[] { chains2[0] }));
+        Run((document, undo) => document.DuplicateTracks(undo, 0, new[] { 0, 1 }));
+        Run((document, undo) => document.DuplicateTracks(undo, 0, new[] { 0 }));
+        Run((document, undo) => document.SetTracksVisible(undo, 0, new[] { 0, 1, 2 }, false));
+        Run((document, undo) => document.SetTracksVisible(undo, 0, new[] { 0 }, true));
+        Run((document, undo) => document.SetTrackVisible(undo, 0, 1, false));
+        Run((document, undo) => document.ShowAllTracks(undo, 0));
+        Run((document, undo) => document.SetTracksFlip(undo, 0, new[] { 0, 1 }, true));
+        Run((document, undo) => document.SetTracksFlip(undo, 0, new[] { 0 }, false));
+        Run((document, undo) => document.SetTrackFlip(undo, 0, 1, true));
+        Run((document, undo) => document.MoveTrack(undo, 0, 0, 2));
         NumericEdit.TryParse("3", out var three).ShouldBeTrue();
         NumericEdit.TryParse("+ 1", out var plusOne).ShouldBeTrue();
-        Run(() => document.SetChainsStart(undo, 0, chains3, three));
-        Run(() => document.SetChainsStart(undo, 0, chains3, plusOne));
-        Run(() => document.SetChainsLoops(undo, 0, chains2, three));
-        Run(() => document.SetChainStart(undo, 0, 0, 0, 2));
-        Run(() => document.SetChainLoops(undo, 0, 0, 0, 2));
-        Run(() => document.PlaceChain(undo, 0, track: 0, "hero.achx", "Jump", 0));
-        Run(() => document.PlaceChain(undo, 0, track: null, "hero.achx", "Jump", 0));
-        Run(() => document.RenameTrack(undo, 0, 0, "Torso"));
-        Run(() => document.RelinkChains(undo, 0, new[] { new TimelineChainId(0, 0) }, "Run"));
-        Run(() => document.RelinkChains(undo, 0, new[] { new TimelineChainId(0, 1), new TimelineChainId(1, 0) }, "Jump"));
-        Run(() => document.AddSequence(undo));
-        Run(() => document.RenameSequence(undo, 0, "Stand"));
-        Run(() => document.SetLoop(undo, 0, true));
-        Run(() => document.DuplicateSequences(undo, new[] { 0 }));
-        Run(() => document.DuplicateSequences(undo, new[] { 0, 1 }));
-        Run(() => document.MoveSequences(undo, new[] { 0 }, 3));
-        Run(() => document.MoveSequences(undo, new[] { 0, 1 }, 4));
-        Run(() => document.DeleteSequences(undo, new[] { 0 }));
-        Run(() => document.DeleteSequences(undo, new[] { 0, 1 }));
+        Run((document, undo) => document.SetChainsStart(undo, 0, chains3, three));
+        Run((document, undo) => document.SetChainsStart(undo, 0, chains3, plusOne));
+        Run((document, undo) => document.SetChainsLoops(undo, 0, chains2, three));
+        Run((document, undo) => document.SetChainStart(undo, 0, 0, 0, 2));
+        Run((document, undo) => document.SetChainLoops(undo, 0, 0, 0, 2));
+        Run((document, undo) => document.PlaceChain(undo, 0, track: 0, "hero.achx", "Jump", 0));
+        Run((document, undo) => document.PlaceChain(undo, 0, track: null, "hero.achx", "Jump", 0));
+        Run((document, undo) => document.RenameTrack(undo, 0, 0, "Torso"));
+        Run((document, undo) => document.RelinkChains(undo, 0, new[] { new TimelineChainId(0, 0) }, "Run"));
+        Run((document, undo) => document.RelinkChains(undo, 0, new[] { new TimelineChainId(0, 1), new TimelineChainId(1, 0) }, "Jump"));
+        Run((document, undo) => document.AddSequence(undo));
+        Run((document, undo) => document.RenameSequence(undo, 0, "Stand"));
+        Run((document, undo) => document.SetLoop(undo, 0, true));
+        Run((document, undo) => document.DuplicateSequences(undo, new[] { 0 }));
+        Run((document, undo) => document.DuplicateSequences(undo, new[] { 0, 1 }));
+        Run((document, undo) => document.MoveSequences(undo, new[] { 0 }, 3));
+        Run((document, undo) => document.MoveSequences(undo, new[] { 0, 1 }, 4));
+        Run((document, undo) => document.DeleteSequences(undo, new[] { 0 }));
+        Run((document, undo) => document.DeleteSequences(undo, new[] { 0, 1 }));
 
         // The timeline's drag gestures build their label from these.
         labels.Add(SequenceLabel.MoveChains(1, "Walk", null));
