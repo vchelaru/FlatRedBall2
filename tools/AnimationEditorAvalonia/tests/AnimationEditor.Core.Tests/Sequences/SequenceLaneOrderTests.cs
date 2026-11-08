@@ -95,28 +95,28 @@ public class SequenceLaneOrderTests
     }
 
     [Fact]
-    public void PasteTracks_LandAtThePastePosition_AndDrawByLane()
+    public void PasteTracks_LandInFrontOfTheSelectedTrack_AndDrawByLane()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, ThreeTracks);
         TimelineClipboard.TryRead(document.CopyTracks(0, new[] { 2 }), out var content, out _).ShouldBeTrue();
 
-        document.PasteTracks(new UndoManager(), 0, content!, afterTrack: 0);
+        document.PasteTracks(new UndoManager(), 0, content!, selectedTrack: 0);
 
-        Lanes(document).ShouldBe(new[] { "A", "C 2", "B", "C" });
-        DrawOrder(document).ShouldBe(new[] { "C", "B", "C 2", "A" });
+        Lanes(document).ShouldBe(new[] { "C 2", "A", "B", "C" });
+        DrawOrder(document).ShouldBe(new[] { "C", "B", "A", "C 2" });
     }
 
     [Fact]
-    public void DuplicateTracks_LandRightBelowTheOriginal_AndDrawByLane()
+    public void DuplicateTracks_LandRightInFrontOfTheOriginal_AndDrawByLane()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, ThreeTracks);
 
         document.DuplicateTracks(new UndoManager(), 0, new[] { 0 });
 
-        Lanes(document).ShouldBe(new[] { "A", "A 2", "B", "C" });
-        DrawOrder(document).ShouldBe(new[] { "C", "B", "A 2", "A" });
+        Lanes(document).ShouldBe(new[] { "A 2", "A", "B", "C" });
+        DrawOrder(document).ShouldBe(new[] { "C", "B", "A", "A 2" });
     }
 
     [Fact]
