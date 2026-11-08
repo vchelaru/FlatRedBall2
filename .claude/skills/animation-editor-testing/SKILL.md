@@ -8,11 +8,10 @@ description: "AE tests — Core first, [AvaloniaFact] only for real UI, Windows 
 Headless-test discipline for the Avalonia AnimationEditor. Tool layout lives in the **`animation-editor`** skill.
 
 ```
-scripts/test-ae.py                                     # build, then every AE test (~1 min)
-scripts/test-ae.py --filter "FullyQualifiedName~Grid"  # same, filtered
+python scripts/run_tests.py GridSnapperTests,GridRenderTests   # only the classes you changed
 ```
 
-`test-ae.py` builds once, runs every test project in parallel with App.Tests split into shards, prints only failures, and exits nonzero on any. It works from any worktree and can run in several worktrees at once: build outputs, temp folders and settings roots are all per worktree or per test.
+`run_tests.py` finds each class's test project, builds only that project and runs it once (App.Tests is one process). Agents never run a whole project or `scripts/test-ae.py --all`, the CI-parity runner for the user; CI runs the full suites. It works from any worktree and can run in several worktrees at once: build outputs, temp folders and settings roots are all per worktree or per test.
 
 ## Pick the right layer (do not duplicate)
 
@@ -27,7 +26,7 @@ Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior un
 
 ## Windows Sandbox tests run only when asked
 
-`dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Sandbox.Tests` builds a Velopack `Setup.exe` (or uses `AE_SANDBOX_SETUP_EXE`) and runs each scenario in a fresh Windows Sandbox. The project is left out of the `.slnx`, `test-ae.py`, and CI on purpose, because a scenario takes minutes; keep it out. Tests skip on machines without Sandbox (Windows Home, or the optional feature off), and fail fast if a sandbox is already open, since Windows allows one at a time.
+`python scripts/run_tests.py AnimationEditor.Sandbox.Tests:InstallerSandboxTests` builds a Velopack `Setup.exe` (or uses `AE_SANDBOX_SETUP_EXE`) and runs each scenario in a fresh Windows Sandbox. The project is left out of the `.slnx`, `test-ae.py`, and CI on purpose, because a scenario takes minutes; keep it out. Tests skip on machines without Sandbox (Windows Home, or the optional feature off), and fail fast if a sandbox is already open, since Windows allows one at a time.
 
 A scenario is a PowerShell script in `Scenarios/` plus one `[Fact]` calling `WindowsSandbox.RunAsync`. Each boot costs about a minute, so one script bundles every check that can share a boot: it records each check instead of throwing, writes `results.json` last, then shuts the sandbox down. `install-uninstall-achx.ps1` is the pattern. When a scenario hits behavior nobody has confirmed (for example, whether a silent Setup launches the app), it logs an `OBSERVED` line in `scenario.log` rather than quietly working around it, so the run settles the question. A scenario can't change the user's own default-app choice, because Windows hash-protects it.
 

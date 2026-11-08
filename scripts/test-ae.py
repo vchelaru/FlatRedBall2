@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Builds the AnimationEditor once and runs every AE test project, in parallel.
+"""CI-parity run: builds the whole AnimationEditor and runs every AE test project, in parallel.
 
-Usage:
-  scripts/test-ae.py                       # all Core, Views, App and DocScreenshots tests
-  scripts/test-ae.py --filter "FullyQualifiedName~Dogfood"
-  scripts/test-ae.py --no-build ...        # skip the build (you just built)
+For the user debugging a CI failure. AI agents run only the tests for their change with
+`python scripts/run_tests.py <Class>`; CI runs the full suites.
+
+Usage (--all is required, so a bare invocation refuses):
+  scripts/test-ae.py --all                 # all Core, Views, App and DocScreenshots tests
+  scripts/test-ae.py --all --filter "FullyQualifiedName~Dogfood"
+  scripts/test-ae.py --all --no-build ...  # skip the build (you just built)
 
 Works from any worktree: paths resolve from this file, not the current directory. App.Tests is
 split into shards run as separate processes, because Avalonia headless runs every [AvaloniaFact]
@@ -14,6 +17,8 @@ passed.
 """
 import argparse, os, re, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
+
+from run_tests import failure_details
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AE = os.path.join(ROOT, "tools", "AnimationEditorAvalonia")
@@ -64,18 +69,18 @@ def run(label, project, test_filter, log_dir):
     return label, ok, passed, failed, time.time() - start, log, text
 
 
-def failure_details(text):
-    # Each failure block starts at "  Failed <name> [..]" and runs to the next failure, xUnit
-    # progress line or run summary. Assertion bodies ("Expected: ...") are not indented.
-    blocks = re.findall(r"^  Failed .*?(?=^  Failed |^\[xUnit|^(?:Passed|Failed)!|\Z)", text, re.M | re.S)
-    return ["\n".join(b.rstrip().splitlines()[:40]) for b in blocks]
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--filter", help="dotnet test --filter expression, applied to every project")
     parser.add_argument("--no-build", action="store_true", help="skip building the solution first")
+    parser.add_argument("--all", action="store_true", help="run the whole AE suite (CI-parity debugging by the user, not agents)")
     args = parser.parse_args()
+
+    if not args.all:
+        parser.print_usage()
+        print("REFUSED: this runs every AE test project. Run only the tests for your change: "
+              "python scripts/run_tests.py <Class>[,<Class>]. Whole-suite mode needs --all (for the user, not agents).")
+        return 2
 
     if not args.no_build:
         print("Building AnimationEditorAvalonia.slnx ...", flush=True)
