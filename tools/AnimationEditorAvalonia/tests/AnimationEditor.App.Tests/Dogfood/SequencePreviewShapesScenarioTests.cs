@@ -265,12 +265,11 @@ public class SequencePreviewShapesScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TheShapesToggle_HidesAndShowsThem_WithoutTouchingTheAchxPreviewsToggle()
+    public async Task TheShapesToggle_HidesAndShowsThem_AndTheAchxPreviewsToggleFollows()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await OpenAsync(editor, Sequence("Attack", Plain("Guard")));
         ToggleButton toggle = editor.Control<ToggleButton>("SequenceShowShapes");
-        bool achxToggle = editor.Control<ToggleButton>("ShowShapesCheck").IsChecked == true;
 
         toggle.IsChecked.ShouldBe(true);
         Current(editor).ShouldNotBeEmpty();
@@ -278,7 +277,7 @@ public class SequencePreviewShapesScenarioTests
         Current(editor).ShouldBeEmpty();
         // The sprite is unaffected.
         Preview(editor).Composite!.Count.ShouldBe(1);
-        editor.Control<ToggleButton>("ShowShapesCheck").IsChecked.ShouldBe(achxToggle);
+        editor.Control<ToggleButton>("ShowShapesCheck").IsChecked.ShouldBe(false);
 
         toggle.IsChecked = true;
         ShouldBeShapes(Current(editor), Rect(5, 2, 4, 3));
