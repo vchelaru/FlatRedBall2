@@ -849,7 +849,7 @@
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.Styles>
                             <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="10,5" />
+                                <Setter Property="Padding" Value="10,0" />
                                 <Setter Property="FontSize" Value="12" />
                             </Style>
                         </ListBox.Styles>
