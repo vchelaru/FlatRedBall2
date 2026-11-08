@@ -10,6 +10,19 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// <summary>SCRATCH probe (not committed): times the Animations tab click on a real folder.</summary>
 public class ProjectTabStallProbe
 {
+    // Settings: the real folder, plus the user's real collapsed-folder list (read only) when AE_PERF_REALCOLLAPSE=1.
+    private static string BuildSettings(string folder)
+    {
+        var node = new System.Text.Json.Nodes.JsonObject { ["LastProjectFolderPath"] = folder };
+        if (Environment.GetEnvironmentVariable("AE_PERF_REALCOLLAPSE") == "1")
+        {
+            string real = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AnimationEditor", "AESettings.json");
+            var parsed = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(real))!;
+            node["CollapsedAnimationFolders"] = parsed["CollapsedAnimationFolders"]!.DeepClone();
+        }
+        return node.ToJsonString();
+    }
+
     [AvaloniaFact]
     public async Task Probe()
     {
@@ -27,7 +40,7 @@ public class ProjectTabStallProbe
             string settingsRoot = Path.Combine(Path.GetTempPath(), "AEPerf", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(settingsRoot, "AnimationEditor"));
             File.WriteAllText(Path.Combine(settingsRoot, "AnimationEditor", "AESettings.json"),
-                "{ \"LastProjectFolderPath\": " + System.Text.Json.JsonSerializer.Serialize(folder) + " }");
+                BuildSettings(folder));
 
             using var meter = new UiStallMeter();
             var sw = Stopwatch.StartNew();

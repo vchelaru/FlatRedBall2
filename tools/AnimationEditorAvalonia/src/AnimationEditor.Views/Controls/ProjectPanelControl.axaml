@@ -7,6 +7,24 @@
     <UserControl.Resources>
         <x:Double x:Key="ProjectTreeThumbSize">28</x:Double>
     </UserControl.Resources>
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="controls:AchxTreeNodeVm">
+            <controls:FolderExpanderIcon IsOpen="{Binding IsFolderOpen}"
+                                          Toggled="OnFolderExpanderToggled" />
+        </DataTemplate>
+        <DataTemplate DataType="controls:ProjectRowSvgIcon">
+            <svg:Svg Width="16" Height="16"
+                     Path="{Binding Path}"
+                     CurrentColor="{DynamicResource IconInkMuted}" />
+        </DataTemplate>
+        <!-- .tsx row: the same Tiled logo used elsewhere in the app (status bar's tileset-sync
+             indicator) rather than the chain icon, since a tileset has no animation frames. -->
+        <DataTemplate DataType="controls:ProjectRowTsxIcon">
+            <Image Width="16" Height="16"
+                   Source="avares://AnimationEditor.Views/Assets/icons/png/tiled-icon-128.png"
+                   Stretch="Uniform" />
+        </DataTemplate>
+    </UserControl.DataTemplates>
     <!--
         Open Project Folder (#770): recursively-discovered .achx/.achj/.tsx tree for a picked
         folder (.tsx surfaced later; OpenProjectWorkflowAsync already opens one as a native
@@ -82,24 +100,12 @@
                 <TreeDataTemplate DataType="controls:AchxTreeNodeVm"
                                   ItemsSource="{Binding Children}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
-                        <controls:FolderExpanderIcon IsVisible="{Binding IsFolder}"
-                                                      IsOpen="{Binding IsFolderOpen}"
-                                                      Toggled="OnFolderExpanderToggled" />
-                        <svg:Svg IsVisible="{Binding ShowFallbackIcon}"
-                                 Width="16" Height="16"
-                                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
-                                 CurrentColor="{DynamicResource IconInkMuted}" />
-                        <!-- .tsx row: the same Tiled logo used elsewhere in the app
-                             (status bar's tileset-sync indicator) rather than the chain icon,
-                             since a tileset has no animation frames to preview. -->
-                        <svg:Svg IsVisible="{Binding ShowSequenceIcon}"
-                                 Width="16" Height="16"
-                                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconSequence.svg"
-                                 CurrentColor="{DynamicResource IconInkMuted}" />
-                        <Image IsVisible="{Binding ShowTsxIcon}"
-                               Width="16" Height="16"
-                               Source="avares://AnimationEditor.Views/Assets/icons/png/tiled-icon-128.png"
-                               Stretch="Uniform" />
+                        <!-- Icons are realized per row only when it needs one: each Svg control parses
+                             its SVG on creation, and four per row (two of them the hidden folder
+                             glyphs on every file row) froze the tab switch for over a second on a
+                             130-file project. -->
+                        <ContentControl Content="{Binding FolderToggleContent}" />
+                        <ContentControl Content="{Binding FileIconContent}" />
                         <Image IsVisible="{Binding HasThumbnail}"
                                Width="{StaticResource ProjectTreeThumbSize}"
                                Height="{StaticResource ProjectTreeThumbSize}"
