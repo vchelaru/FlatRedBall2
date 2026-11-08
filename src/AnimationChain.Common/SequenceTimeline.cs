@@ -8,6 +8,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// next chain away and the earlier one plays in full again.</item>
 /// <item>What fills that length follows the chain's own Loop flag: a looping chain repeats, a non-looping one plays one
 /// cycle and holds its last frame (the final frame of <see cref="PlaybackTimeline"/>'s cycle) to the end.</item>
+/// <item>Frame events fire when playback enters their frame, in every cycle of a reference's block, not only the first
+/// (a walk repeated 3 times fires its footstep 3 times). A block of a chain that does not loop has one cycle; its hold
+/// raises nothing. Never from the part of a block the next chain cuts off, and never from a hidden track (turning it on
+/// does not replay frames already passed). A ping-pong's turnaround and loop point raise nothing: only a changed frame
+/// does. A large time step raises every skipped frame's events in order. A sequence with Loop off raises none during its
+/// hold.</item>
 /// <item>The next chain is the one with the next later start. On a tie, list order decides: of two chains starting
 /// together, the earlier one in <see cref="SequenceTrackSave.Chains"/> plays for zero seconds.</item>
 /// <item>A missing chain (cycle length 0) never plays, but it still cuts the chain before it.</item>

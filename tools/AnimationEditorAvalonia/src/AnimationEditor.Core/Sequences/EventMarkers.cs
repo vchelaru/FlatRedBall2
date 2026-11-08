@@ -39,7 +39,8 @@ public static class EventMarkers
 
     /// <summary>
     /// Every event that fires while <paramref name="frames"/> play for <paramref name="played"/> seconds, in time order.
-    /// With <paramref name="loop"/> false only the first cycle fires; the rest of <paramref name="played"/> is the hold.
+    /// A looping chain fires in every cycle of <paramref name="played"/>. With <paramref name="loop"/> false the chain has
+    /// one cycle, so the rest of <paramref name="played"/> is the hold, which enters no frame and fires nothing.
     /// </summary>
     public static IReadOnlyList<EventOccurrence> Occurrences(IReadOnlyList<EventFrame> frames, bool pingPong, bool reverse, double played, bool loop = true)
     {
