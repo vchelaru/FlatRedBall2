@@ -44,6 +44,24 @@ public class AchxFailedSaveScenarioTests
         return path;
     }
 
+    /// <summary>
+    /// Opens hero.achx and boss.achx (both written first: on Linux an unwritable file means an unwritable folder), fails a
+    /// save on hero, and leaves boss in front. The caller makes hero writable again.
+    /// </summary>
+    private static async Task<(string Hero, string Boss)> OpenTwoTabsAndFailTheFirstSave(AnimationEditorHarness editor)
+    {
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string boss = editor.WriteAchx("boss.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        await editor.OpenAsync(boss);
+        editor.ClickTab("hero.achx");
+        UnusualProjectScenarioTests.MakeUnwritable(hero);
+        EditFirstFrame(editor, "8");
+        editor.ClickTab("boss.achx");
+        return (hero, boss);
+    }
+
     private static int SavedX(string path) =>
         (int)AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Single().LeftCoordinate;
 
@@ -189,11 +207,9 @@ public class AchxFailedSaveScenarioTests
     public async Task ABackgroundTabWithAFailedSave_StillAsksWhenClosedFromTheStrip_AndSaveRetriesIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string hero = await OpenAndFailASave(editor, "hero.achx");
+        (string hero, _) = await OpenTwoTabsAndFailTheFirstSave(editor);
         try
         {
-            string boss = editor.WriteAchx("boss.achx", AnimationEditorHarness.Chain("Roar", "sheet.png", (0, 0, 16, 16)));
-            await editor.OpenAsync(boss);
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On", "the other tab saved fine");
             editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Save);
             UnusualProjectScenarioTests.MakeWritable(hero);
@@ -214,12 +230,9 @@ public class AchxFailedSaveScenarioTests
     public async Task SwitchingBackToATabWithAFailedSave_ShowsItAsFailedStill()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string hero = await OpenAndFailASave(editor, "hero.achx");
+        (string hero, _) = await OpenTwoTabsAndFailTheFirstSave(editor);
         try
         {
-            string boss = editor.WriteAchx("boss.achx", AnimationEditorHarness.Chain("Roar", "sheet.png", (0, 0, 16, 16)));
-            await editor.OpenAsync(boss);
-
             editor.ClickTab("hero.achx");
 
             editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
@@ -379,12 +392,10 @@ public class AchxFailedSaveScenarioTests
     public async Task ClosingTheWindowWithSeveralFailedTabs_AsksOncePerTab()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string hero = await OpenAndFailASave(editor, "hero.achx");
-        string boss = editor.WriteAchx("boss.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        (string hero, string boss) = await OpenTwoTabsAndFailTheFirstSave(editor);
         UnusualProjectScenarioTests.MakeUnwritable(boss);
         try
         {
-            await editor.OpenAsync(boss);
             EditFirstFrame(editor, "8");
             editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
             editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
