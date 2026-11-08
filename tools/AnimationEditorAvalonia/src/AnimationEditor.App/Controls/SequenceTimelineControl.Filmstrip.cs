@@ -63,14 +63,14 @@ public sealed partial class SequenceTimelineControl
         _hoverPoint = point;
         _hoverSource = source;
         HoverCard = card;
-        InvalidateVisual();
+        InvalidatePopups();
     }
 
     private void ClearHover()
     {
         if (HoverCard is null) return;
         HoverCard = null;
-        InvalidateVisual();
+        InvalidatePopups();
     }
 
     private const double CardThumb = 64;
