@@ -77,6 +77,8 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 **Number fields never pad trailing zeros.** Every `FlankerNumericField`/`NumericUpDown` `FormatString` uses optional decimals (`0.###`, not `0.000` or `0.0#`), so 0.1 shows as `0.1`; `NumberFieldFormatTests` enforces this for `MainWindow`. Position-like values (offsets, pixel rects, color channels) use a plain `NumericUpDown` with short `X`/`Y` labels, and stepped scalars (length, speed, grid size, a chain's start and cycles) use `FlankerNumericField`; the sequence Inspector's TRANSFORM section holds the same flip button as the `.achx` frame TRANSFORM section, and `SequenceInspectorParityScenarioTests` compares the two live.
 
+**Numeric fields show no up/down chevron spinner anywhere** (the `NumericUpDown` default in `ThemeStyles.axaml`; arrow keys and the wheel still step). Never set `ShowButtonSpinner` per control: opt in with `Classes="spinner"` and add the name to `NumericSpinnerRuleScenarioTests`, which fails on any other field showing one. The `[-][+]` flanker buttons (zoom, Speed, Grid, Length, Start, Cycles) are a separate widget and stay.
+
 ## Pop-ups are INFO or PROBLEM, nothing else
 
 Call `MainWindow.ShowInfo(message)` for a confirmation or FYI that needs nothing from the user (top-right toast, about 6 s), and `ShowProblem(message, retry?)` when work is not saved or an action the user asked for failed or was refused (top-centre banner, about 8 s, dismissable, optional Retry; `sticky: true` keeps it until dismissed, used for the newer-format `.seqj` notice); `NotificationEntryPointGuardTests` fails on any other entry point. The status bar message (`ShowStatusMessage`) is a separate ambient label, so a failure never goes there.

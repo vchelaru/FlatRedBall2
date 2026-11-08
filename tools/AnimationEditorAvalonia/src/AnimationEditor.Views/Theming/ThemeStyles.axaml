@@ -44,11 +44,14 @@
     <Style Selector="Button.flanker:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource BgActive}"/>
     </Style>
-    <!-- NumericUpDown: compact, no spinners by default. Set ShowButtonSpinner="True" individually where needed. -->
+    <!-- NumericUpDown: compact, and no chevron spinner anywhere (the app-wide rule; arrow keys and the wheel still step). A field that really needs one opts in with Classes="spinner" and joins the allowlist in NumericSpinnerRuleScenarioTests, never a per-control ShowButtonSpinner. -->
     <Style Selector="NumericUpDown">
         <Setter Property="ShowButtonSpinner" Value="False"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="FontSize" Value="11"/>
+    </Style>
+    <Style Selector="NumericUpDown.spinner">
+        <Setter Property="ShowButtonSpinner" Value="True"/>
     </Style>
     <!-- Strip the Fluent TextBox inner border inside ButtonSpinner so only the outer border is visible. -->
     <Style Selector="ButtonSpinner TextBox">
