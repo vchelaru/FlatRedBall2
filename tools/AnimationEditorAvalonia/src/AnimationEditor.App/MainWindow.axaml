@@ -838,7 +838,7 @@
                                    Foreground="{DynamicResource InkMid}"
                                    VerticalAlignment="Center" />
                     </Border>
-                    <ListBox x:Name="SequenceList" Grid.Row="1"
+                    <ListBox x:Name="SequenceList" Grid.Row="1" SelectionMode="Multiple"
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.Styles>

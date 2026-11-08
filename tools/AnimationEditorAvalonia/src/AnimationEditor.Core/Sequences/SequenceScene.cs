@@ -18,9 +18,10 @@ namespace AnimationEditor.Core.Sequences;
 /// <param name="X">The track's offset from the entity origin.</param>
 /// <param name="Y">The track's offset from the entity origin, Y+ up.</param>
 /// <param name="FlipHorizontal">Whether the track mirrors its sprite.</param>
+/// <param name="Sequence">The sequence's index in the file.</param>
 public sealed record SequenceSprite(
     int Track, AnimationChainSave Chain, int FrameIndex, double ElapsedInFrame, string? TexturePath,
-    float X, float Y, bool FlipHorizontal)
+    float X, float Y, bool FlipHorizontal, int Sequence = 0)
 {
     public AnimationFrameSave Frame => Chain.Frames[FrameIndex];
 
@@ -47,9 +48,19 @@ public sealed record SequenceSprite(
     }
 }
 
+/// <summary>One selected sequence and the time its own playhead is at.</summary>
+public readonly record struct SequenceTime(int Sequence, double Time);
+
 /// <summary>What the sequence preview draws at an instant.</summary>
 public static class SequenceScene
 {
+    /// <summary>
+    /// The sprites of several sequences playing side by side, each sampled at its own time (see <see cref="At(SequenceDocument, int, double)"/>).
+    /// Sequences are drawn in the order given, first at the back; within one, by track Z. All share the entity origin.
+    /// </summary>
+    public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, IEnumerable<SequenceTime> sequences) =>
+        sequences.SelectMany(s => At(document, s.Sequence, s.Time)).ToList();
+
     /// <summary>
     /// The sprite of every track with a chain playing at <paramref name="time"/> in sequence
     /// <paramref name="sequenceIndex"/>, back to front: by Z, equal Z in track order. A track with no chain playing, or
@@ -74,7 +85,7 @@ public static class SequenceScene
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = document.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add((track.Z, new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal)));
+            sprites.Add((track.Z, new SequenceSprite(t, chain, frame, elapsed, texture, track.X, track.Y, track.FlipHorizontal, sequenceIndex)));
         }
         // OrderBy is stable, so equal Z keeps track order.
         return sprites.OrderBy(s => s.Z).Select(s => s.Sprite).ToList();

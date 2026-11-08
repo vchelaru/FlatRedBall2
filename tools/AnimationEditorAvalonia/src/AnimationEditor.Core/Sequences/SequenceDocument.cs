@@ -56,11 +56,35 @@ public sealed class SequenceDocument
     /// </summary>
     public int SelectedSequence { get; set; }
 
+    /// <summary>Seconds until sequence <paramref name="index"/> ends (<see cref="SequenceTimeline.Length"/>); 0 for an index outside the file.</summary>
+    public double SequenceLength(int index) =>
+        index >= 0 && index < Save.Sequences.Count
+            ? SequenceTimeline.Length(Save.Sequences[index], reference => CycleLength(reference) ?? 0)
+            : 0;
+
+    /// <summary>
+    /// Every sequence the list has selected, primary included. View state like <see cref="SelectedSequence"/>, which is
+    /// the primary's index: neither is saved, and both outlive tab switches with the document.
+    /// </summary>
+    public SequenceSelection Selection { get; } = new();
+
     /// <summary>Why the last save failed, or null when it succeeded.</summary>
     public string? SaveError { get; private set; }
 
     /// <summary>Raised after any edit, undo, redo or source reload.</summary>
     public event Action? Changed;
+
+    /// <summary>
+    /// Raised, before <see cref="Changed"/>, when a sequence takes a new name (by rename, undo or redo) with the old name
+    /// and the new one, so views keyed by sequence name can follow it.
+    /// </summary>
+    public event Action<string, string>? SequenceRenamed;
+
+    private void NotifyRenamed(string from, string to)
+    {
+        Selection.Rename(from, to);
+        SequenceRenamed?.Invoke(from, to);
+    }
 
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
     /// <exception cref="System.Text.Json.JsonException">The file is not a valid <c>.seqj</c>.</exception>
@@ -427,7 +451,7 @@ public sealed class SequenceDocument
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
         Edit(undo, $"Rename Sequence '{oldName}' to '{name}'", save => save.Sequences[index].Name = name,
-            selectBefore: index, selectAfter: index, selectOnDo: !keepSelection);
+            selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
         return null;
     }
 
@@ -695,7 +719,7 @@ public sealed class SequenceDocument
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
-        int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true)
+        int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -705,7 +729,7 @@ public sealed class SequenceDocument
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
         if (selectBefore is null && selectAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo));
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed));
     }
 
     /// <summary>
@@ -770,18 +794,28 @@ public sealed class SequenceDocument
     // trackBefore and trackAfter are the same for the selected track; null when the edit names none. selectOnDo false
     // leaves the selection alone the first time the edit runs (redo still applies selectAfter).
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
-        int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true) : IUndoableCommand
+        int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
+        (string From, string To)? renamed = null) : IUndoableCommand
     {
         public string Description => description;
 
         public bool Do()
         {
+            if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
             document.Restore(after, selectOnDo ? selectAfter : null, trackAfter);
             return true;
         }
 
-        public void Redo() => document.Restore(after, selectAfter, trackAfter);
+        public void Redo()
+        {
+            if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
+            document.Restore(after, selectAfter, trackAfter);
+        }
 
-        public void Undo() => document.Restore(before, selectBefore, trackBefore);
+        public void Undo()
+        {
+            if (renamed is { } names) document.NotifyRenamed(names.To, names.From);
+            document.Restore(before, selectBefore, trackBefore);
+        }
     }
 }
