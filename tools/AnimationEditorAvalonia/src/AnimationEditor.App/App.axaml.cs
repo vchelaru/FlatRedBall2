@@ -44,9 +44,13 @@ public partial class App : Application
         // Catch UI-thread crashes (e.g. the SKImage.FromBitmap crash in #479, which came
         // through the dispatcher). The background-thread handlers are installed in Program.Main.
         Services.CrashLogging.InstallDispatcherHandler();
+        Services.WindowLog.Install();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktop.ShutdownRequested += (_, _) => Services.AppLifecycle.ShutdownSignal("Lifetime shutdown requested");
+            desktop.Exit += (_, e) => Services.AppLifecycle.ShutdownSignal($"Lifetime exit, code {e.ApplicationExitCode}");
+
             // Program.Main only reaches here as a non-owner when its pipe hand-off to the
             // primary instance failed (#1049) — show a recovery dialog instead of the normal
             // MainWindow/DI graph, which would be overkill for a two-button prompt.
@@ -68,6 +72,7 @@ public partial class App : Application
     {
         var action = RecoveryActionForReachedPrimary
             ?? SingleInstanceRecoveryDecision.Decide(reachedPrimary: false, PrimaryInstanceHangChecker.Check());
+        AppLog.Info($"Recovery dialog for a secondary launch: action {action}.");
 
         switch (action)
         {
@@ -101,6 +106,7 @@ public partial class App : Application
         desktop.MainWindow = window;
         window.Closed += (_, _) =>
         {
+            AppLog.Info($"Recovery dialog closed (restart requested: {window.RestartRequested}).");
             if (window.RestartRequested && onRestartConfirmed != null)
                 onRestartConfirmed();
             else
@@ -115,6 +121,7 @@ public partial class App : Application
     /// </summary>
     private void RestartAndTakeOver(IClassicDesktopStyleApplicationLifetime desktop)
     {
+        AppLog.Info("Restarting: killing the other instance and taking over.");
         PrimaryInstanceHangChecker.KillOtherInstance();
 
         SingleInstance?.Dispose();
@@ -123,10 +130,13 @@ public partial class App : Application
         if (!SingleInstance.IsOwner)
         {
             // Race: something else still holds the mutex — give up cleanly rather than looping.
+            AppLog.Warn("Restart gave up: the single-instance mutex is still held after killing the other instance.");
             desktop.Shutdown(0);
             return;
         }
 
+        AppLog.Info("Restart took over: single-instance mutex acquired.");
+        AppLifecycle.OwnerStarted();
         SingleInstance.StartListening();
         StartAsOwner(desktop);
     }
@@ -138,6 +148,9 @@ public partial class App : Application
         window.Icon = LoadAppIcon();
         desktop.MainWindow = window;
         RegisterNativeMenu(window);
+        window.Closing += (_, e) => AppLog.Info($"MainWindow closing (reason {e.CloseReason}, programmatic {e.IsProgrammatic}).");
+        window.Closed += (_, _) => AppLifecycle.ShutdownSignal(
+            $"MainWindow closed ({desktop.Windows.Count} other window(s) still open)");
 
         // Wire single-instance IPC: file paths received from a second process open as tabs
         // and bring the window forward (#1009) -- otherwise it opens behind whatever else
