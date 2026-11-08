@@ -262,9 +262,9 @@ public partial class ProjectPanelControl : UserControl
     {
         foreach (var node in nodes)
         {
-            // A .tsx or .seqj has no animation frames to preview -- it always shows its own icon,
+            // A .tsx has no animation frames to preview -- it always shows its own icon,
             // so there's nothing for ProjectTreeThumbnailService to generate.
-            if (node.IsFile && node.Entry!.HasAnimationFrames) results.Add(node);
+            if (node.IsFile && node.Entry!.HasPreviewThumbnail) results.Add(node);
             else if (!node.IsFile) CollectFileNodes(node.Children, results);
         }
     }
@@ -294,13 +294,29 @@ public partial class ProjectPanelControl : UserControl
     /// </summary>
     public async Task InvalidateThumbnail(AchxFileEntry entry)
     {
-        if (_thumbnailService is null || !entry.HasAnimationFrames) return;
+        if (_thumbnailService is null || !entry.HasPreviewThumbnail) return;
 
         var node = FindNode(TreeRoots, entry);
         if (node is null) return;
 
         _thumbnailService.InvalidateEntry(entry);
         await LoadOneThumbnailAsync(node, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Re-generates every <c>.seqj</c> row's thumbnail, for when something a sequence draws from changed: an <c>.achx</c>/
+    /// <c>.achj</c> source, a texture, or another <c>.seqj</c>. A row keeps its old picture until the new one arrives, and
+    /// a row whose inputs did not change is served from the disk cache. Callers fire-and-forget this; it returns a task
+    /// only so tests can await it.
+    /// </summary>
+    public Task InvalidateSequenceThumbnails()
+    {
+        if (_thumbnailService is null) return Task.CompletedTask;
+        var nodes = new List<AchxTreeNodeVm>();
+        CollectFileNodes(TreeRoots, nodes);
+        var sequences = nodes.Where(node => node.Entry!.IsSequence).ToList();
+        foreach (var node in sequences) _thumbnailService.InvalidateEntry(node.Entry!);
+        return Task.WhenAll(sequences.Select(node => LoadOneThumbnailAsync(node, CancellationToken.None)));
     }
 
     private void OnSearchQueryChanged(object? sender, string query)
@@ -733,7 +749,7 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
     public object? FileIconContent =>
         Entry is null ? null
         : IsTsx ? ProjectRowTsxIcon.Instance
-        : IsSequence ? ProjectRowSvgIcon.Sequence
+        : IsSequence ? (_thumbnail is null ? ProjectRowSvgIcon.Sequence : null)
         : ShowFallbackIcon ? ProjectRowSvgIcon.Chain
         : null;
 
@@ -743,7 +759,7 @@ public sealed class AchxTreeNodeVm : ICollapsibleFolderNode
     /// chain icon/thumbnail, since a tileset has no animation frames to preview.</summary>
     public bool IsTsx => Entry?.IsTsx == true;
 
-    /// <summary>True for a <c>.seqj</c> row, shown with the sequence icon and never a thumbnail.</summary>
+    /// <summary>True for a <c>.seqj</c> row: the sequence icon until its composite thumbnail arrives, like an <c>.achx</c> row's chain icon.</summary>
     public bool IsSequence => Entry?.IsSequence == true;
 
     public bool ShowFallbackIcon => Entry?.HasAnimationFrames == true && _thumbnail is null;

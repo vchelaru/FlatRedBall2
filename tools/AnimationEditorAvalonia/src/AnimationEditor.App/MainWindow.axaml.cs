@@ -376,6 +376,9 @@ public partial class MainWindow : Window
                 _ = LoadAnimationFileAsync(diskFile.FullPath);
         };
         ProjectPanel.DragPathFor = entry => (entry.File as DiskEditorFile)?.FullPath;
+        // A texture changed on disk (whichever watcher saw it): the .seqj rows that draw it re-render.
+        _thumbnailService.PathInvalidated += _ =>
+            Dispatcher.UIThread.InvokeAsync(() => ProjectPanel.InvalidateSequenceThumbnails());
         _pngFolderWatcher.Changed += changed =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -2993,8 +2996,15 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(savedPath)) return Task.CompletedTask;
 
         var entry = FindProjectPanelEntry(ProjectPanel.TreeRoots, savedPath);
-        return entry is not null ? ProjectPanel.InvalidateThumbnail(entry) : Task.CompletedTask;
+        var own = entry is not null ? ProjectPanel.InvalidateThumbnail(entry) : Task.CompletedTask;
+        // A .seqj row draws from its sources, so a saved animation file (or sequence) refreshes those rows too.
+        return SequenceRowsDependOn(savedPath) ? Task.WhenAll(own, ProjectPanel.InvalidateSequenceThumbnails()) : own;
     }
+
+    /// <summary>Whether a change to <paramref name="path"/> can change what a <c>.seqj</c> row shows: an animation file it
+    /// may reference, or a <c>.seqj</c>. Textures arrive through <see cref="ThumbnailService.PathInvalidated"/>.</summary>
+    private static bool SequenceRowsDependOn(string path) =>
+        AchxFolderScanner.IsAchxPath(path) || AchxFolderScanner.IsSequencePath(path);
 
     /// <summary>
     /// Reacts to the Project-tree folder watcher for <c>.achx</c> files that were never opened as
@@ -3039,6 +3049,8 @@ public partial class MainWindow : Window
             var entry = FindProjectPanelEntry(ProjectPanel.TreeRoots, path);
             if (entry is not null)
                 await ProjectPanel.InvalidateThumbnail(entry);
+            if (SequenceRowsDependOn(path))
+                await ProjectPanel.InvalidateSequenceThumbnails();
         }
     }
 

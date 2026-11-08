@@ -106,4 +106,8 @@ public sealed record AchxFileEntry(IEditorFile File, IEditorFolder ParentFolder,
 
     /// <summary>True for an <c>.achx</c>/<c>.achj</c>, the only kind with frames to draw a thumbnail from.</summary>
     public bool HasAnimationFrames => AchxFolderScanner.IsAchxPath(FileName);
+
+    /// <summary>True when the Project tree draws a preview thumbnail for this row: an <c>.achx</c>/<c>.achj</c> (its first frame)
+    /// or a <c>.seqj</c> (its first sequence, composited).</summary>
+    public bool HasPreviewThumbnail => HasAnimationFrames || IsSequence;
 }

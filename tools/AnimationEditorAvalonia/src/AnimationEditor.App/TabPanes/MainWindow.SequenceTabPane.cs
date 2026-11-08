@@ -1,4 +1,5 @@
 using AnimationEditor.App.Models;
+using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.Hotkeys;
@@ -23,6 +24,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -783,7 +785,13 @@ public partial class MainWindow
             };
             w.SequenceTimeline.Thumbnails = w._thumbnailService;
             // A texture replaced on disk: the preview redraws its sprites from the re-decoded sheet.
-            w._thumbnailService.PathInvalidated += _ => { if (_document is not null) ShowPlayhead(); };
+            w._thumbnailService.PathInvalidated += _ =>
+            {
+                if (_document is null) return;
+                ShowPlayhead();
+                // The rows that drew from that texture redraw: their key includes the file's stamp.
+                LoadThumbnails();
+            };
             w.SequenceLibrary.FilesDropped += AddSources;
             w.SequenceLibrary.AddSourceRequested += () => _ = AddSourcesFromPickerAsync();
             w.SequenceLibrary.AddChipRequested += AddChip;
@@ -1542,6 +1550,42 @@ public partial class MainWindow
             FocusSelectedRow();
         }
 
+        // The row thumbnails are the Open Project Folder .seqj rows' picture (SequenceThumbnailScene), drawn off the UI thread.
+        private readonly SequenceListThumbnailService _thumbnails = new();
+        private CancellationTokenSource? _thumbnailLoad;
+
+        // 28 px at the ANIMATIONS chain rows' 2x render size.
+        private const int ThumbnailPixels = 56;
+
+        /// <summary>Completes once every row's thumbnail from the latest load has arrived (or been replaced by a newer load). Test seam.</summary>
+        internal Task ThumbnailLoadTask { get; private set; } = Task.CompletedTask;
+
+        /// <summary>Loads every row's thumbnail in the background; a newer load replaces one still running.</summary>
+        private void LoadThumbnails()
+        {
+            _thumbnailLoad?.Cancel();
+            _thumbnailLoad?.Dispose();
+            if (_document is not { } document) { ThumbnailLoadTask = Task.CompletedTask; return; }
+            var cts = new CancellationTokenSource();
+            _thumbnailLoad = cts;
+            var items = _items;
+            ThumbnailLoadTask = Task.WhenAll(items.Select((item, index) => LoadThumbnailAsync(document, items, item, index, cts.Token)));
+        }
+
+        private async Task LoadThumbnailAsync(SequenceDocument document, List<SequenceListItem> items, SequenceListItem item, int index, CancellationToken token)
+        {
+            Avalonia.Media.Imaging.Bitmap? thumbnail;
+            try
+            {
+                thumbnail = await _thumbnails.GetAsync(document, index, ThumbnailPixels, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            if (!token.IsCancellationRequested && ReferenceEquals(_items, items)) item.Thumbnail = thumbnail;
+        }
+
         /// <summary>Rebuilds the list from the document, keeping the selection by position.</summary>
         private void Refresh()
         {
@@ -1549,7 +1593,10 @@ public partial class MainWindow
             // Its rows are about to be replaced; a drag still holding the old ones would drop on the wrong sequences.
             _listDrag?.CancelDrag();
             var current = _document;
-            _items = current.Save.Sequences.Select((sequence, index) => new SequenceListItem(sequence.Name, current.SequenceSummary(index))).ToList();
+            // A rebuilt row starts with the previous picture of the same name until its new one arrives, so an edit does not blink every row.
+            var previous = _items.GroupBy(item => item.Name).ToDictionary(group => group.Key, group => group.First().Thumbnail);
+            _items = current.Save.Sequences.Select((sequence, index) =>
+                new SequenceListItem(sequence.Name, current.SequenceSummary(index)) { Thumbnail = previous.GetValueOrDefault(sequence.Name) }).ToList();
             // The document says which sequence an edit, undo or redo left selected.
             int selected = Math.Min(_document.SelectedSequence, _items.Count - 1);
             _document.SelectedSequence = selected;
@@ -1570,6 +1617,7 @@ public partial class MainWindow
             {
                 _refreshing = false;
             }
+            LoadThumbnails();
             RememberSelection();
             _playback.Select(_document.Selection.Names, LengthOf);
             if (!_playback.IsPlaying) _timer.Stop();
@@ -1581,6 +1629,8 @@ public partial class MainWindow
             // Rebuilding the timeline raises ContentChanged, which refreshes the inspector, Loop toggle, playhead and preview.
             _window.SequenceTimeline.Show(_document, selected, _window._undoManager);
             _window.UpdateStatusBar();
+            // The file was just saved by the edit, so its Project tree row (and any other row drawing from it) re-renders.
+            _ = _window.InvalidateProjectPanelThumbnailIfTrackedAsync(_document.Path.FullPath);
         }
     }
 }
