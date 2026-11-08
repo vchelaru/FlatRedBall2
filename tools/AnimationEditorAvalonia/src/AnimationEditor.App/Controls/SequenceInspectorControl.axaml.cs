@@ -14,7 +14,7 @@ namespace AnimationEditor.App.Controls;
 /// <summary>
 /// The Inspector tab's content on a <c>.seqj</c> tab: the sequence when nothing is selected on the timeline, a track
 /// when its header is, a chain when one is. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
-/// entry; a refused value (an empty or taken name, loops of 0) goes out through <see cref="ErrorRaised"/> and the field
+/// entry; a refused value (an empty or taken name, cycles of 0) goes out through <see cref="ErrorRaised"/> and the field
 /// goes back to the document's value. The host calls <see cref="Show"/> whenever the selection or the document changes
 /// (including each step of a drag), which rewrites every field except the one being typed in.
 /// </summary>
