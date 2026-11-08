@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 using static AnimationEditor.App.Tests.Dogfood.SequenceTimelineMultiSelectScenarioTests;
 
 namespace AnimationEditor.App.Tests.Dogfood;
