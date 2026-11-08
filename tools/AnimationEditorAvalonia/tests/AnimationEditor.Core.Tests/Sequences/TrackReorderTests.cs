@@ -17,14 +17,15 @@ public class TrackReorderTests
     [Fact]
     public void SlotAt_VariableLaneHeights_SplitsEachLaneAtItsOwnMiddle()
     {
-        // Lane 0 is 60 tall (event row), lanes 1 and 2 are 48. Under the 22 px ruler they span 22-82, 82-130, 130-178.
+        // Lane 0 is 60 tall (event row), lanes 1 and 2 are 48. Under the 22 px ruler and the 48 px new-track row they span
+        // 70-130, 130-178, 178-226.
         var viewport = Viewport(60, 48, 48);
 
-        TrackReorder.SlotAt(viewport, 3, 40).ShouldBe(0);   // upper half of lane 0 (middle is 52)
-        TrackReorder.SlotAt(viewport, 3, 60).ShouldBe(1);   // lower half of lane 0, inside its event row
-        TrackReorder.SlotAt(viewport, 3, 100).ShouldBe(1);  // upper half of lane 1 (middle is 106)
-        TrackReorder.SlotAt(viewport, 3, 110).ShouldBe(2);
-        TrackReorder.SlotAt(viewport, 3, 170).ShouldBe(3);  // lower half of the last lane
+        TrackReorder.SlotAt(viewport, 3, 88).ShouldBe(0);   // upper half of lane 0 (middle is 100)
+        TrackReorder.SlotAt(viewport, 3, 108).ShouldBe(1);  // lower half of lane 0, inside its event row
+        TrackReorder.SlotAt(viewport, 3, 148).ShouldBe(1);  // upper half of lane 1 (middle is 154)
+        TrackReorder.SlotAt(viewport, 3, 158).ShouldBe(2);
+        TrackReorder.SlotAt(viewport, 3, 218).ShouldBe(3);  // lower half of the last lane
     }
 
     [Fact]
@@ -40,9 +41,9 @@ public class TrackReorderTests
     public void SlotAt_ScrolledLanes_UsesTheScrolledPositions()
     {
         var viewport = Viewport(48, 48, 48, 48);
-        viewport.ScrollVertically(48, 4, 100);
+        viewport.ScrollVertically(96, 4, 100);
 
-        // Lane 1 now starts right under the ruler (y 22), so y 30 is its upper half.
+        // The new-track row and lane 0 are scrolled away: lane 1 now starts right under the ruler (y 22), so y 30 is its upper half.
         TrackReorder.SlotAt(viewport, 4, 30).ShouldBe(1);
     }
 
@@ -54,8 +55,8 @@ public class TrackReorderTests
     {
         var viewport = Viewport(60, 48);
 
-        TrackReorder.SlotY(viewport, 1).ShouldBe(82);
-        TrackReorder.SlotY(viewport, 2).ShouldBe(130);
+        TrackReorder.SlotY(viewport, 1).ShouldBe(130);
+        TrackReorder.SlotY(viewport, 2).ShouldBe(178);
     }
 
     [Theory]

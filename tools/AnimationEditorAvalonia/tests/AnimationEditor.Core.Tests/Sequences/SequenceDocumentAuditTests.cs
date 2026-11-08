@@ -116,7 +116,7 @@ public class SequenceDocumentAuditTests
         for (int i = 0; i < 3; i++)
             document.PlaceChain(undo, 0, track: null, "hero.achj", "Walk", start: 0);
 
-        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Arms", "Walk", "Walk 2", "Walk 3" });
+        document.Save.Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Walk 3", "Walk 2", "Walk", "Body", "Arms" });
     }
 
     [Fact]

@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.Sequences;
 /// <summary>Where a library chip is added when it is not dragged.</summary>
 public enum ChipAddMode
 {
-    /// <summary>On a new track at the end of the list, like a drop on the dashed new-track row.</summary>
+    /// <summary>On a new track in front (the top of the list), like a drop on the dashed new-track row.</summary>
     NewTrack,
 
     /// <summary>On the one track the timeline selection points at.</summary>

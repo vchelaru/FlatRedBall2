@@ -230,7 +230,7 @@ public class SequenceAudit2Tests
 
         document.PasteChains(new UndoManager(), 0, content, selectedTrack: null, time: 0);
 
-        Names(document).ShouldBe(new[] { "Head", "Track" });
+        Names(document).ShouldBe(new[] { "Track", "Head" });
     }
 
     [Fact]
