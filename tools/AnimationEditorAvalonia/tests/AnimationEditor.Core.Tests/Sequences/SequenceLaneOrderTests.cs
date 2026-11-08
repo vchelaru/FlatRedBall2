@@ -120,17 +120,17 @@ public class SequenceLaneOrderTests
     }
 
     [Fact]
-    public void PasteChains_ThatMakeANewTrack_PutItInTheLastLane_AtTheBack()
+    public void PasteChains_ThatMakeANewTrack_PutItInTheFirstLane_InFront()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir, ThreeTracks);
         TimelineClipboard.TryRead(document.CopyChains(0, new[] { new TimelineChainId(1, 0) }), out var content, out _).ShouldBeTrue();
         document.Save.Sequences[0].Tracks.RemoveAt(1);
 
-        // B no longer exists, so the paste makes it at the end of the lanes.
+        // B no longer exists, so the paste makes it on top of the lanes.
         document.PasteChains(new UndoManager(), 0, content!, selectedTrack: null, time: 0);
 
-        Lanes(document).ShouldBe(new[] { "A", "C", "B" });
-        DrawOrder(document).ShouldBe(new[] { "B", "C", "A" });
+        Lanes(document).ShouldBe(new[] { "B", "A", "C" });
+        DrawOrder(document).ShouldBe(new[] { "C", "A", "B" });
     }
 }

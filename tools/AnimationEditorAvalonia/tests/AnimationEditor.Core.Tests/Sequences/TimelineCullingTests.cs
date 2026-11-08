@@ -56,7 +56,8 @@ public class TimelineCullingTests
     {
         var viewport = new TimelineViewport();
         viewport.SetLaneHeights(new[] { 48.0, 48.0, 48.0, 48.0 });
-        viewport.ScrollVertically(2 * 48, trackCount: 4, viewHeight: TimelineViewport.RulerHeight + 96);
+        // Scrolled past the new-track row and lane 0: lane 1 is above the view, lane 2 is the first one in it.
+        viewport.ScrollVertically(3 * 48, trackCount: 4, viewHeight: TimelineViewport.RulerHeight + 96);
 
         TimelineCulling.IsBlockVisible(viewport, Block(1, 2, 1, 1), ViewWidth, TimelineViewport.RulerHeight + 96).ShouldBeFalse();
         TimelineCulling.IsBlockVisible(viewport, Block(2, 2, 1, 1), ViewWidth, TimelineViewport.RulerHeight + 96).ShouldBeTrue();

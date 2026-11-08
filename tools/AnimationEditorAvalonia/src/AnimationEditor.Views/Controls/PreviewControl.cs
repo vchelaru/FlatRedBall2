@@ -302,7 +302,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
     /// <summary>
     /// Sprites to draw back to front in place of the achx selection: a sequence tab's composited preview. Each draws
-    /// from its own texture at its track's offset and flip, with its chain's shapes. Null (the default) shows the
+    /// from its own texture at its frame offsets, mirrored by its track's flip, with its chain's shapes. Null (the default) shows the
     /// selection. A control used this way should be given an <see cref="ISelectedState"/> of its own that nothing
     /// selects in, so its shape and sprite gestures have nothing to edit.
     /// </summary>

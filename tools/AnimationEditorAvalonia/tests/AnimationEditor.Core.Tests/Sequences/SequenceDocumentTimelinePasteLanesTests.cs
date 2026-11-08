@@ -141,10 +141,10 @@ public class SequenceDocumentTimelinePasteLanesTests
 
         destination.PasteChains(undo, 0, content, selectedTrack: null, time: 3);
 
-        Names(destination).ShouldBe(new[] { "Other", "Ship", "Booster" });
-        Chains(destination, 1).ShouldBe(new[] { ("Walk", 3.0) });
-        Chains(destination, 2).ShouldBe(new[] { ("Glow", 4.0) });
-        var made = destination.Save.Sequences[0].Tracks[2];
+        Names(destination).ShouldBe(new[] { "Booster", "Other", "Ship" }, "a track the paste makes lands on top, in front");
+        Chains(destination, 2).ShouldBe(new[] { ("Walk", 3.0) });
+        Chains(destination, 0).ShouldBe(new[] { ("Glow", 4.0) });
+        var made = destination.Save.Sequences[0].Tracks[0];
         (made.FlipHorizontal, made.Visible).ShouldBe((true, false));
         destination.Save.Sources.ShouldBe(new[] { "../a/hero.achx" });
         undo.UndoHistory.Count.ShouldBe(1);
@@ -169,6 +169,6 @@ public class SequenceDocumentTimelinePasteLanesTests
         Chains(document, 0).ShouldBe(new[] { ("Walk", 0.0), ("Run", 1.0) });
 
         document.PasteChains(new UndoManager(), 0, Read(legacy.Replace("\"Head\"", "\"Gone\"")), selectedTrack: null, time: 0);
-        Names(document).ShouldBe(new[] { "Body", "Head", "Gone" });
+        Names(document).ShouldBe(new[] { "Gone", "Body", "Head" });
     }
 }

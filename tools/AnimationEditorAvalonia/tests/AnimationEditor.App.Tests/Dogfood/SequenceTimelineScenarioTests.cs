@@ -80,8 +80,8 @@ public class SequenceTimelineScenarioTests
         string boss = WriteFixture(editor);
         await editor.OpenAsync(boss);
 
-        // With no tracks, row 0 is the new-track row.
-        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, 0, 0.5));
+        // The new-track row sits right under the ruler, with or without tracks.
+        editor.Drag(editor.CenterOf(Chip(editor, "Run")), At(editor, TimelineViewport.NewTrackLane, 0.5));
 
         var tracks = SequenceListSave.FromFile(boss).Sequences[0].Tracks;
         tracks.Select(t => t.Name).ShouldBe(new[] { "Run" });
@@ -134,7 +134,7 @@ public class SequenceTimelineScenarioTests
         string boss = WriteFixture(editor, Track("Body"));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
-        var target = At(editor, 1, 0.87);
+        var target = At(editor, TimelineViewport.NewTrackLane, 0.87);
 
         editor.DragHold(editor.CenterOf(Chip(editor, "Run")), target);
 
@@ -147,7 +147,7 @@ public class SequenceTimelineScenarioTests
         preview.Length.ShouldBe(0.2, 1e-6);
         editor.DragRelease(target);
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].Chains.Single().Start.ShouldBe(preview.Start, 1e-9);
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Chains.Single().Start.ShouldBe(preview.Start, 1e-9);
         timeline.IsDropTargetNewTrack.ShouldBeFalse();
     }
 

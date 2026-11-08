@@ -174,7 +174,7 @@ public class SequenceFocusRoutingScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
         await editor.OpenAsync(path);
-        editor.ClickAt(editor.PointIn(Timeline(editor), 20, Timeline(editor).Viewport.LaneTop(3) + 10));
+        editor.ClickAt(editor.PointIn(Timeline(editor), 20, Timeline(editor).Viewport.LaneTop(TimelineViewport.NewTrackLane) + 10));
         Timeline(editor).IsRenamingTrack.ShouldBeTrue();
 
         await PressAsync(editor, key);

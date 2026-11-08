@@ -48,6 +48,7 @@ namespace AnimationEditor.Core.Models
         {
             tab.CachedEditorModel = null;
             tab.CachedDiskWriteTimeUtc = null;
+            tab.SaveFailed = false;
         }
 
         /// <summary>Refreshes only the on-disk timestamp after a save.</summary>

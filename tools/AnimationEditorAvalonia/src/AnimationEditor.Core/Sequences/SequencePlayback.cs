@@ -16,6 +16,18 @@ public sealed class SequencePlayback
     /// <summary>True while any selected sequence is still advancing.</summary>
     public bool IsPlaying => _clocks.Values.Any(clock => clock.IsPlaying);
 
+    /// <summary>The slowest and fastest <see cref="Speed"/>, the range the <c>.achx</c> transport's Speed field allows.</summary>
+    public const double MinSpeed = 0.1, MaxSpeed = 10;
+
+    private double _speed = 1;
+
+    /// <summary>Playback speed of every selected sequence (1 = runtime speed), held within <see cref="MinSpeed"/>..<see cref="MaxSpeed"/>.</summary>
+    public double Speed
+    {
+        get => _speed;
+        set => _speed = double.IsNaN(value) ? 1 : Math.Clamp(value, MinSpeed, MaxSpeed);
+    }
+
     /// <summary>The playhead of sequence <paramref name="name"/>; 0 when it is not selected.</summary>
     public double TimeOf(string name) => _clocks.TryGetValue(name, out var clock) ? clock.Time : 0;
 
@@ -80,9 +92,12 @@ public sealed class SequencePlayback
         foreach (var (name, clock) in _clocks) clock.Seek(clock.Time, length(name));
     }
 
-    /// <summary>Advances every playing sequence by the real time since the last tick, each by its own length and loop flag.</summary>
+    /// <summary>
+    /// Advances every playing sequence by the real time since the last tick, scaled by <see cref="Speed"/>, each by its own
+    /// length and loop flag. A stalled tick is capped before it is scaled.
+    /// </summary>
     public void AdvanceTick(double elapsedSeconds, Func<string, double> length, Func<string, bool> loop)
     {
-        foreach (var (name, clock) in _clocks) clock.AdvanceTick(elapsedSeconds, length(name), loop(name));
+        foreach (var (name, clock) in _clocks) clock.AdvanceTick(elapsedSeconds, length(name), loop(name), Speed);
     }
 }
