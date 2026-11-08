@@ -24,10 +24,16 @@ public class WindowCloseRobustnessTests
     public void Close_WithAnUndeletableRecoveryFile_DoesNotThrow()
     {
         string folder = NewFolder();
-        string recovery = Path.Combine(folder, "recovery.achx");
+        string recoveryFolder = Path.Combine(folder, "recovery");
+        Directory.CreateDirectory(recoveryFolder);
+        string recovery = Path.Combine(recoveryFolder, "recovery.achx");
         File.WriteAllText(recovery, "x");
-        File.SetAttributes(recovery, FileAttributes.ReadOnly);
         MainWindow window = App.CreateDetachedWindow(folder, recovery);
+        // Windows refuses to delete a read-only file; Unix refuses to delete from a read-only folder.
+        if (OperatingSystem.IsWindows())
+            File.SetAttributes(recovery, FileAttributes.ReadOnly);
+        else
+            File.SetUnixFileMode(recoveryFolder, UnixFileMode.UserRead | UnixFileMode.UserExecute);
         try
         {
             window.Show();
@@ -37,7 +43,10 @@ public class WindowCloseRobustnessTests
         }
         finally
         {
-            File.SetAttributes(recovery, FileAttributes.Normal);
+            if (OperatingSystem.IsWindows())
+                File.SetAttributes(recovery, FileAttributes.Normal);
+            else
+                File.SetUnixFileMode(recoveryFolder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
     }
 
