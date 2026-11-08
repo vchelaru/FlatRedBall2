@@ -12,7 +12,7 @@ on:
 # A newer push to the same PR cancels the superseded run. Only pull_request runs share a group;
 # every other event (push to main, workflow_dispatch) gets a run-unique group, because a shared
 # group would let a newer main push cancel the pending run of an older one, and main must always
-# get a full run per commit.
+# get a full run for every commit.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
