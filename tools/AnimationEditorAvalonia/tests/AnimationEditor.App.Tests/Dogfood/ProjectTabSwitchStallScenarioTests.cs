@@ -1,4 +1,5 @@
 using System.Reflection;
+using FlatRedBall2.AnimationEditorCommon;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -36,6 +37,15 @@ public class ProjectTabSwitchStallScenarioTests
                 editor.WriteAchx($"Group{folder}/anim{file}.achx",
                     AnimationEditorHarness.Chain("Walk", "../sheet.png", (0, 0, 16, 16)));
             }
+
+            // A .seqj per folder: its row loads its thumbnail in the background like the .achx rows, adding no per-row UI work.
+            var save = new SequenceListSave { Sources = { "anim0.achx" } };
+            var sequence = new SequenceSave { Name = "Attack" };
+            var track = new SequenceTrackSave { Name = "Body" };
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "anim0.achx", Chain = "Walk", Start = 0, Loops = 1 });
+            sequence.Tracks.Add(track);
+            save.Sequences.Add(sequence);
+            save.Save(Path.Combine(editor.ProjectFolder, $"Group{folder}/boss{folder}.seqj"));
         }
 
         // The startup path: the folder loads while another sidebar tab is in front, so the tree is
@@ -48,6 +58,8 @@ public class ProjectTabSwitchStallScenarioTests
         await panel.ThumbnailLoadTask;
         editor.Layout();
         panel.TreeRoots.Count.ShouldBe(FolderCount);
+        panel.TreeRoots.SelectMany(folder => folder.Children).Where(row => row.IsSequence).ToList()
+            .ShouldAllBe(row => row.Thumbnail != null);
 
         using UiStallMeter meter = new UiStallMeter();
         meter.Mark("click");

@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Sequences;
 using Avalonia.Media.Imaging;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
@@ -96,6 +97,9 @@ public sealed class ProjectTreeThumbnailService
     private async Task<Bitmap?> LoadOrGenerateAsync(
         AchxFileEntry entry, int maxWidth, int maxHeight, CancellationToken cancellationToken)
     {
+        if (entry.IsSequence)
+            return await LoadOrGenerateSequenceAsync(entry, maxWidth, maxHeight, cancellationToken);
+
         string? cacheFilePath = null;
         if (_diskCacheDirectory is not null)
         {
@@ -115,6 +119,112 @@ public sealed class ProjectTreeThumbnailService
             TrySaveToDisk(cacheFilePath, bitmap);
 
         return bitmap;
+    }
+
+    /// <summary>
+    /// A <c>.seqj</c> row: the composite of its first sequence at the first instant where something shows
+    /// (<see cref="SequenceThumbnailScene"/>), drawn by <see cref="SequenceThumbnailRenderer"/>. Null when the file is
+    /// unreadable, has no sequence, or nothing in the first sequence resolves to a chain with frames. The disk cache key
+    /// covers the <c>.seqj</c>'s content, every source it references and every texture those sources use, so a change to any
+    /// of them misses the cache; a missing file is part of the key too, so adding it later misses as well.
+    /// </summary>
+    private async Task<Bitmap?> LoadOrGenerateSequenceAsync(
+        AchxFileEntry entry, int maxWidth, int maxHeight, CancellationToken cancellationToken)
+    {
+        SequenceListSave save;
+        string seqjText;
+        try
+        {
+            await using var stream = await entry.File.OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            seqjText = await reader.ReadToEndAsync(cancellationToken);
+            save = SequenceListSave.FromJsonString(seqjText);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null; // Unreadable or malformed .seqj: the row simply has no thumbnail.
+        }
+        if (save.Sequences.Count == 0) return null;
+        var sequence = save.Sequences[0];
+
+        var lookup = new EditorFileSequenceLookup();
+        var seqjStamp = await entry.File.GetBasicPropertiesAsync();
+        var inputs = new List<string>
+        {
+            $"seqj:{SequenceThumbnailCacheKey.Fingerprint([seqjText])}",
+            SequenceThumbnailCacheKey.FileInput("seqj", entry.RelativePath, seqjStamp.Size, seqjStamp.Modified),
+            $"size:{maxWidth}x{maxHeight}",
+        };
+        var references = sequence.Tracks.SelectMany(track => track.Chains).ToList();
+        foreach (var source in references.Select(reference => reference.Source).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var file = await entry.ParentFolder.ResolveRelativeFileAsync(source);
+            if (file is null)
+            {
+                inputs.Add($"src:{source.ToLowerInvariant()}|missing");
+                continue;
+            }
+            var stamp = await file.GetBasicPropertiesAsync();
+            inputs.Add(SequenceThumbnailCacheKey.FileInput("src", source, stamp.Size, stamp.Modified));
+            try
+            {
+                string text;
+                await using (var stream = await file.OpenReadAsync())
+                using (var reader = new StreamReader(stream))
+                    text = await reader.ReadToEndAsync(cancellationToken);
+                lookup.Add(source, AnimationChainListSave.FromString(text));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A source that will not parse is a missing source: what else resolves is still drawn.
+            }
+        }
+
+        foreach (var chainSource in references.GroupBy(reference => reference.Source))
+        {
+            foreach (var chain in chainSource.Select(lookup.FindChain).OfType<AnimationChainSave>().Distinct())
+            {
+                foreach (var name in chain.Frames.Select(frame => frame.TextureName).Where(name => !string.IsNullOrEmpty(name)).Distinct())
+                {
+                    var path = RelativeFilePaths.ResolveFrom(chainSource.Key, name!);
+                    var texture = await entry.ParentFolder.ResolveRelativeFileAsync(path);
+                    var stamp = texture is null ? default : await texture.GetBasicPropertiesAsync();
+                    inputs.Add(texture is null
+                        ? $"png:{path.ToLowerInvariant()}|missing"
+                        : SequenceThumbnailCacheKey.FileInput("png", path, stamp.Size, stamp.Modified));
+                }
+            }
+        }
+
+        var layers = SequenceThumbnailScene.LayersFor(sequence, lookup);
+        if (layers.Count == 0) return null;
+
+        string? cacheFilePath = null;
+        if (_diskCacheDirectory is not null)
+        {
+            cacheFilePath = Path.Combine(_diskCacheDirectory, SequenceThumbnailCacheKey.BuildFileName(entry.RelativePath, inputs));
+            if (TryLoadFromDisk(cacheFilePath) is { } cached) return cached;
+        }
+
+        using var composite = await SequenceThumbnailRenderer.RenderAsync(
+            layers, lookup.IsPixelFrame, async path => await DecodeOrNullAsync(entry.ParentFolder, path), maxWidth, maxHeight);
+        if (composite is null) return null;
+
+        var bitmap = ThumbnailService.ToAvaloniaBitmap(composite);
+        if (cacheFilePath is not null) TrySaveToDisk(cacheFilePath, bitmap);
+        return bitmap;
+    }
+
+    private static async Task<SKBitmap?> DecodeOrNullAsync(IEditorFolder folder, string path)
+    {
+        try
+        {
+            return await folder.ResolveRelativeFileAsync(path) is { } file ? await DecodeAsync(file) : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
     }
 
     private static async Task<Bitmap?> GenerateAsync(

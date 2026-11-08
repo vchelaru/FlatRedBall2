@@ -743,7 +743,7 @@ public class ProjectPanelControlTests
     }
 
     [AvaloniaFact]
-    public async Task SetEntries_SeqjFile_ShowsSequenceIconAndSkipsThumbnailLoad()
+    public async Task SetEntries_SeqjFileWithNothingToShow_KeepsTheSequenceIcon()
     {
         var root = new FakeFolder("Content");
         var seqjFile = new FakeFile("Boss.seqj", Encoding.UTF8.GetBytes("{}"));
@@ -759,7 +759,7 @@ public class ProjectPanelControlTests
         Assert.True(node.ShowSequenceIcon);
         Assert.False(node.ShowFallbackIcon);
         Assert.False(node.ShowTsxIcon);
-        Assert.Equal(0, seqjFile.OpenReadCount);
+        Assert.Null(node.Thumbnail); // a thumbnail is attempted (the file is read), but an empty file has nothing to draw
     }
 
     // Issue #1018: right-click a folder row -> "New Animation File", named inline in the tree.
