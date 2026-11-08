@@ -241,60 +241,107 @@ public sealed class SequenceDocument
     }
 
     /// <summary>
-    /// Inserts a deep copy of the sequence at <paramref name="index"/> right after it, with the next free name, and selects
-    /// it, as one undo entry. Returns the new name.
+    /// The indices of the sequences the list has selected, in selection order, primary included; just
+    /// <see cref="SelectedSequence"/> when the selection holds nothing, and empty when nothing is selected. Delete,
+    /// duplicate, copy and paste act on these.
     /// </summary>
-    public string DuplicateSequence(IUndoManager undo, int index)
+    public IReadOnlyList<int> SelectedIndices
     {
-        string original = Save.Sequences[index].Name;
-        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name), original);
-        Edit(undo, $"Duplicate Sequence '{original}'", save =>
+        get
         {
-            var copy = SequenceClipboard.Clone(save.Sequences[index]);
-            copy.Name = name;
-            save.Sequences.Insert(index + 1, copy);
-        }, selectBefore: index, selectAfter: index + 1);
-        return name;
+            var indices = Selection.Names.Select(name => Save.Sequences.FindIndex(s => s.Name == name)).Where(index => index >= 0).ToList();
+            if (indices.Count > 0) return indices;
+            return SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count ? new[] { SelectedSequence } : Array.Empty<int>();
+        }
+    }
+
+    // The valid, distinct indices in document order: the order a block of sequences is copied, pasted and inserted in.
+    private List<int> InDocumentOrder(IEnumerable<int> indices) =>
+        indices.Where(index => index >= 0 && index < Save.Sequences.Count).Distinct().OrderBy(index => index).ToList();
+
+    // The selection an edit starts from: the given sequences in the order given, the primary kept when among them.
+    private SequenceSelectionState SelectionOf(IEnumerable<int> indices)
+    {
+        var names = indices.Where(index => index >= 0 && index < Save.Sequences.Count).Distinct().Select(index => Save.Sequences[index].Name).ToList();
+        return new SequenceSelectionState(names, Selection.Primary is { } primary && names.Contains(primary) ? primary : names.FirstOrDefault());
     }
 
     /// <summary>
-    /// The indices of the sequences the list has selected, in selection order, primary included; just
-    /// <see cref="SelectedSequence"/> when the selection holds nothing, and empty when nothing is selected.
+    /// Inserts a deep copy of each given sequence, as one block in document order right after the last of them, each with
+    /// the next free name, and selects the copies (the first is the primary), as one undo entry. Undo selects the
+    /// originals again. Returns the new names.
     /// </summary>
-    public IReadOnlyList<int> SelectedIndices => throw new NotImplementedException();
-
-    public void DeleteSequences(IUndoManager undo, IReadOnlyList<int> indices) => throw new NotImplementedException();
-
-    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices) => throw new NotImplementedException();
-
-    public string CopySequences(IReadOnlyList<int> indices) => throw new NotImplementedException();
-
-    public SequencePasteResult PasteSequences(IUndoManager undo, SequenceClipboardContent content) => throw new NotImplementedException();
-
-    /// <summary>The clipboard text for the sequence at <paramref name="index"/> (see <see cref="SequenceClipboard"/>).</summary>
-    public string CopySequence(int index) =>
-        SequenceClipboard.Write(Save.Sequences[index], Path.GetDirectoryContainingThis().FullPath);
+    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices)
+    {
+        var ordered = InDocumentOrder(indices);
+        if (ordered.Count == 0) return Array.Empty<string>();
+        var used = Save.Sequences.Select(s => s.Name).ToList();
+        var names = new List<string>();
+        foreach (int index in ordered)
+        {
+            string name = NameGenerator.ForCopy(used, Save.Sequences[index].Name);
+            names.Add(name);
+            used.Add(name);
+        }
+        int insertAt = ordered[^1] + 1;
+        string description = ordered.Count == 1
+            ? $"Duplicate Sequence '{Save.Sequences[ordered[0]].Name}'"
+            : $"Duplicate {ordered.Count} Sequences";
+        var before = SelectionOf(indices);
+        Edit(undo, description, save =>
+        {
+            var copies = ordered.Select((index, i) =>
+            {
+                var copy = SequenceClipboard.Clone(save.Sequences[index]);
+                copy.Name = names[i];
+                return copy;
+            }).ToList();
+            save.Sequences.InsertRange(insertAt, copies);
+        }, stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
+        return names;
+    }
 
     /// <summary>
-    /// Pastes a copied sequence after the selected one (at the end when none is selected) with a free name, and selects it.
-    /// The sources it uses join this file's source list when not already there, all as one undo entry.
+    /// The clipboard text for the given sequences, in document order whatever order they are given in (see
+    /// <see cref="SequenceClipboard"/>).
     /// </summary>
-    public SequencePasteResult PasteSequence(IUndoManager undo, SequenceClipboardContent content)
+    public string CopySequences(IReadOnlyList<int> indices)
     {
-        int selected = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count ? SelectedSequence : Save.Sequences.Count - 1;
-        int insertAt = selected + 1;
-        string name = NameGenerator.ForCopy(Save.Sequences.Select(s => s.Name),
-            string.IsNullOrWhiteSpace(content.Sequences[0].Name) ? DefaultSequenceName : content.Sequences[0].Name.Trim());
+        var ordered = InDocumentOrder(indices);
+        if (ordered.Count == 0) throw new ArgumentException("There is no sequence to copy.", nameof(indices));
+        return SequenceClipboard.Write(ordered.Select(index => Save.Sequences[index]).ToList(), Path.GetDirectoryContainingThis().FullPath);
+    }
+
+    /// <summary>
+    /// Pastes copied sequences as one block, in the order copied, after the last selected sequence (at the end when none is
+    /// selected), each with a free name, and selects the pasted set (the first is the primary). The sources they use join this
+    /// file's source list when not already there, all as one undo entry.
+    /// </summary>
+    public SequencePasteResult PasteSequences(IUndoManager undo, SequenceClipboardContent content)
+    {
+        if (content.Sequences.Count == 0) return new SequencePasteResult(Array.Empty<string>(), Array.Empty<string>());
+        var selected = SelectedIndices;
+        int insertAt = (selected.Count > 0 ? selected.Max() : Save.Sequences.Count - 1) + 1;
+        var used = Save.Sequences.Select(s => s.Name).ToList();
+        var names = new List<string>();
+        foreach (var sequence in content.Sequences)
+        {
+            string name = NameGenerator.ForCopy(used, string.IsNullOrWhiteSpace(sequence.Name) ? DefaultSequenceName : sequence.Name.Trim());
+            names.Add(name);
+            used.Add(name);
+        }
+        string description = names.Count == 1 ? $"Paste Sequence '{names[0]}'" : $"Paste {names.Count} Sequences";
         var errors = new List<string>();
         var folder = Path.GetDirectoryContainingThis();
-        Edit(undo, $"Paste Sequence '{name}'", save =>
+        var before = SelectionOf(selected);
+        Edit(undo, description, save =>
         {
-            var pasted = SequenceClipboard.Clone(content.Sequences[0]);
-            pasted.Name = name;
-            MergeSources(save, pasted.Tracks.SelectMany(track => track.Chains), folder, errors);
-            save.Sequences.Insert(insertAt, pasted);
-        }, selectBefore: SelectedSequence, selectAfter: insertAt);
-        return new SequencePasteResult(new[] { name }, errors);
+            var pasted = content.Sequences.Select(SequenceClipboard.Clone).ToList();
+            for (int i = 0; i < pasted.Count; i++) pasted[i].Name = names[i];
+            MergeSources(save, pasted.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains), folder, errors);
+            save.Sequences.InsertRange(insertAt, pasted);
+        }, stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
+        return new SequencePasteResult(names, errors);
     }
 
     /// <summary>The clipboard text for the given chains of <paramref name="sequence"/>, in document order (see <see cref="TimelineClipboard"/>).</summary>
@@ -539,12 +586,25 @@ public sealed class SequenceDocument
         return null;
     }
 
-    public void DeleteSequence(IUndoManager undo, int index)
+    /// <summary>
+    /// Deletes the given sequences as one undo entry. The survivor that takes the first deleted one's place is selected
+    /// (the last one when they were at the end; nothing when none is left); undo puts every sequence back at its position
+    /// with the selection it had.
+    /// </summary>
+    public void DeleteSequences(IUndoManager undo, IReadOnlyList<int> indices)
     {
-        string name = Save.Sequences[index].Name;
-        // The neighbour that takes its place, or the last one when the deleted sequence was last.
-        Edit(undo, $"Delete Sequence '{name}'", save => save.Sequences.RemoveAt(index),
-            selectBefore: index, selectAfter: Math.Min(index, Save.Sequences.Count - 2));
+        var doomed = InDocumentOrder(indices);
+        if (doomed.Count == 0) return;
+        var survivors = Save.Sequences.Where((_, index) => !doomed.Contains(index)).Select(s => s.Name).ToList();
+        int next = Math.Min(doomed[0], survivors.Count - 1);
+        var after = next < 0
+            ? new SequenceSelectionState(Array.Empty<string>(), null)
+            : new SequenceSelectionState(new[] { survivors[next] }, survivors[next]);
+        string description = doomed.Count == 1 ? $"Delete Sequence '{Save.Sequences[doomed[0]].Name}'" : $"Delete {doomed.Count} Sequences";
+        var before = SelectionOf(indices);
+        // Highest index first, so earlier removals do not move the ones still to go.
+        Edit(undo, description, save => doomed.AsEnumerable().Reverse().ToList().ForEach(save.Sequences.RemoveAt),
+            stateBefore: before, stateAfter: after);
     }
 
     /// <summary>Sets whether sequence <paramref name="index"/> restarts at 0 once it ends.</summary>
@@ -809,7 +869,8 @@ public sealed class SequenceDocument
 
     /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
     private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
-        int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null)
+        int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
+        SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null)
     {
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
@@ -817,9 +878,10 @@ public sealed class SequenceDocument
         string after = copy.ToJsonString();
         if (after == before) return;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
-        if (selectBefore is null && selectAfter is null && ChangedSequence(before, after) is { } changed)
+        if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed));
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
+            stateBefore, stateAfter));
     }
 
     /// <summary>
@@ -836,10 +898,21 @@ public sealed class SequenceDocument
         return null;
     }
 
-    private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null)
+    private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null)
     {
         Save = SequenceListSave.FromJsonString(json);
-        if (selectedSequence is { } selected) SelectedSequence = selected;
+        if (selection is not null)
+        {
+            // A whole selection to put back (a multi-sequence edit, or its undo): the primary says which one is SelectedSequence.
+            Selection.Restore(selection);
+            SelectedSequence = Selection.Primary is { } primary ? Save.Sequences.FindIndex(s => s.Name == primary) : -1;
+        }
+        else if (selectedSequence is { } selected)
+        {
+            SelectedSequence = selected;
+        }
+        // Names that are gone drop out of the selection and the primary is always in it, whatever the edit was.
+        Selection.Reconcile(Save.Sequences.Select(s => s.Name).ToList(), Math.Min(SelectedSequence, Save.Sequences.Count - 1));
         _trackToSelect = selectedTrack;
         SyncSources();
         SaveToDisk();
@@ -886,27 +959,27 @@ public sealed class SequenceDocument
     // leaves the selection alone the first time the edit runs (redo still applies selectAfter).
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
-        (string From, string To)? renamed = null) : IUndoableCommand
+        (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null) : IUndoableCommand
     {
         public string Description => description;
 
         public bool Do()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter);
+            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter);
             return true;
         }
 
         public void Redo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectAfter, trackAfter);
+            document.Restore(after, selectAfter, trackAfter, stateAfter);
         }
 
         public void Undo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.To, names.From);
-            document.Restore(before, selectBefore, trackBefore);
+            document.Restore(before, selectBefore, trackBefore, stateBefore);
         }
     }
 }

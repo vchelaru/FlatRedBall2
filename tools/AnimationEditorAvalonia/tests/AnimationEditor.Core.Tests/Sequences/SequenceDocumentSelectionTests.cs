@@ -101,7 +101,7 @@ public class SequenceDocumentSelectionTests
         var (document, undo) = Open(dir, "A", "B", "C");
         document.SelectedSequence = deleted;
 
-        document.DeleteSequence(undo, deleted);
+        document.DeleteSequences(undo, new[] { deleted });
         document.SelectedSequence.ShouldBe(selectedAfter);
         undo.Undo();
         document.SelectedSequence.ShouldBe(deleted);
@@ -116,7 +116,7 @@ public class SequenceDocumentSelectionTests
         using var dir = new TestHelpers.TempDir();
         var (document, undo) = Open(dir, "Only");
 
-        document.DeleteSequence(undo, 0);
+        document.DeleteSequences(undo, new[] { 0 });
         document.SelectedSequence.ShouldBe(-1);
         undo.Undo();
         document.SelectedSequence.ShouldBe(0);

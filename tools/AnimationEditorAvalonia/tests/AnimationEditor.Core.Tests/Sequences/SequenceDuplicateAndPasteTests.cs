@@ -55,7 +55,7 @@ public class SequenceDuplicateAndPasteTests
         var document = SequenceDocument.Load(path);
         var undo = new UndoManager();
 
-        string name = document.DuplicateSequence(undo, 0);
+        string name = document.DuplicateSequences(undo, new[] { 0 }).Single();
 
         name.ShouldBe("Idle 2");
         Names(document).ShouldBe(new[] { "Idle", "Idle 2", "Attack" });
@@ -77,7 +77,7 @@ public class SequenceDuplicateAndPasteTests
         var document = SequenceDocument.Load(path);
         var undo = new UndoManager();
 
-        document.DuplicateSequence(undo, 0);
+        document.DuplicateSequences(undo, new[] { 0 });
 
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate Sequence 'Idle'" });
         undo.Undo();
@@ -96,7 +96,7 @@ public class SequenceDuplicateAndPasteTests
         string path = WriteSeqj(dir.Path, "boss.seqj", SaveWith(new string[0], Sequence("Idle"), Sequence("Idle 2")));
         var document = SequenceDocument.Load(path);
 
-        document.DuplicateSequence(new UndoManager(), 1).ShouldBe("Idle 3");
+        document.DuplicateSequences(new UndoManager(), new[] { 1 }).ShouldBe(new[] { "Idle 3" });
 
         Names(document).ShouldBe(new[] { "Idle", "Idle 2", "Idle 3" });
     }
@@ -108,10 +108,10 @@ public class SequenceDuplicateAndPasteTests
         string path = WriteSeqj(dir.Path, "boss.seqj", SaveWith(new[] { "hero.achx" }, Sequence("Idle", "hero.achx"), Sequence("Attack", "hero.achx")));
         var document = SequenceDocument.Load(path);
         var undo = new UndoManager();
-        SequenceClipboard.TryRead(document.CopySequence(1), out var content, out _).ShouldBeTrue();
+        SequenceClipboard.TryRead(document.CopySequences(new[] { 1 }), out var content, out _).ShouldBeTrue();
         document.SelectedSequence = 0;
 
-        var result = document.PasteSequence(undo, content!);
+        var result = document.PasteSequences(undo, content!);
 
         result.Names.ShouldBe(new[] { "Attack 2" });
         result.Errors.ShouldBeEmpty();
@@ -130,10 +130,10 @@ public class SequenceDuplicateAndPasteTests
         using var dir = new TestHelpers.TempDir();
         string path = WriteSeqj(dir.Path, "boss.seqj", SaveWith(new string[0], Sequence("Idle"), Sequence("Attack")));
         var document = SequenceDocument.Load(path);
-        SequenceClipboard.TryRead(document.CopySequence(0), out var content, out _).ShouldBeTrue();
+        SequenceClipboard.TryRead(document.CopySequences(new[] { 0 }), out var content, out _).ShouldBeTrue();
         document.SelectedSequence = -1;
 
-        document.PasteSequence(new UndoManager(), content!);
+        document.PasteSequences(new UndoManager(), content!);
 
         Names(document).ShouldBe(new[] { "Idle", "Attack", "Idle 2" });
         document.SelectedSequence.ShouldBe(2);
@@ -149,10 +149,10 @@ public class SequenceDuplicateAndPasteTests
         var a = SequenceDocument.Load(aPath);
         var b = SequenceDocument.Load(bPath);
         var undo = new UndoManager();
-        SequenceClipboard.TryRead(a.CopySequence(0), out var content, out _).ShouldBeTrue();
+        SequenceClipboard.TryRead(a.CopySequences(new[] { 0 }), out var content, out _).ShouldBeTrue();
 
-        var result = b.PasteSequence(undo, content!);
-        b.PasteSequence(undo, content!);
+        var result = b.PasteSequences(undo, content!);
+        b.PasteSequences(undo, content!);
 
         result.Errors.ShouldBeEmpty();
         b.Save.Sources.ShouldBe(new[] { "../../a/hero.achx", "../../shared/fx.achj" });
@@ -173,9 +173,9 @@ public class SequenceDuplicateAndPasteTests
         string aPath = WriteSeqj(Path.Combine(dir.Path, "a"), "boss.seqj", SaveWith(new[] { "hero.achx" }, Sequence("Idle", "hero.achx")));
         string bPath = WriteSeqj(Path.Combine(dir.Path, "b"), "other.seqj", SaveWith(new[] { "../A/HERO.achx" }, Sequence("Run")));
         var b = SequenceDocument.Load(bPath);
-        SequenceClipboard.TryRead(SequenceDocument.Load(aPath).CopySequence(0), out var content, out _).ShouldBeTrue();
+        SequenceClipboard.TryRead(SequenceDocument.Load(aPath).CopySequences(new[] { 0 }), out var content, out _).ShouldBeTrue();
 
-        b.PasteSequence(new UndoManager(), content!);
+        b.PasteSequences(new UndoManager(), content!);
 
         b.Save.Sources.ShouldBe(new[] { "../A/HERO.achx" });
         b.Save.Sequences[1].Tracks[0].Chains[0].Source.ShouldBe("../A/HERO.achx");
@@ -188,9 +188,9 @@ public class SequenceDuplicateAndPasteTests
         string aPath = WriteSeqj(Path.Combine(dir.Path, "a"), "boss.seqj", SaveWith(new[] { "gone.achx" }, Sequence("Idle", "gone.achx")));
         string bPath = WriteSeqj(Path.Combine(dir.Path, "b"), "other.seqj", SaveWith(new string[0]));
         var b = SequenceDocument.Load(bPath);
-        SequenceClipboard.TryRead(SequenceDocument.Load(aPath).CopySequence(0), out var content, out _).ShouldBeTrue();
+        SequenceClipboard.TryRead(SequenceDocument.Load(aPath).CopySequences(new[] { 0 }), out var content, out _).ShouldBeTrue();
 
-        var result = b.PasteSequence(new UndoManager(), content!);
+        var result = b.PasteSequences(new UndoManager(), content!);
 
         result.Errors.ShouldBeEmpty();
         b.Save.Sources.ShouldBe(new[] { "../a/gone.achx" });
@@ -211,7 +211,7 @@ public class SequenceDuplicateAndPasteTests
         pasted.Tracks[0].Chains.Add(new SequenceChainReferenceSave { Source = folderA + "/ok.achx", Chain = "Y" });
         var content = new SequenceClipboardContent(new[] { pasted }, new[] { bPath.Replace('\\', '/'), folderA + "/boss.seqj", folderA + "/ok.achx" });
 
-        var result = b.PasteSequence(new UndoManager(), content);
+        var result = b.PasteSequences(new UndoManager(), content);
 
         Names(b).ShouldBe(new[] { "Run", "Idle" });
         b.Save.Sources.ShouldBe(new[] { "../a/ok.achx" });
