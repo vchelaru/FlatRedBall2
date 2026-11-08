@@ -1031,7 +1031,7 @@
                                                         HorizontalAlignment="Left"
                                                         AutomationProperties.AutomationId="prop-chain-tsx-owner-sync" />
                                                 <TextBlock x:Name="PropChainTsxOwnerError"
-                                                           Foreground="{DynamicResource Danger}"
+                                                           Foreground="{DynamicResource Accent}"
                                                            FontSize="11"
                                                            TextWrapping="Wrap"
                                                            IsVisible="False" />

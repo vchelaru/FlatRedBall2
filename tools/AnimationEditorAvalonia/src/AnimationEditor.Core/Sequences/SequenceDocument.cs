@@ -922,6 +922,102 @@ public sealed class SequenceDocument
         Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for '{Save.Sequences[sequence].Tracks[track].Name}'",
             save => save.Sequences[sequence].Tracks[track].FlipHorizontal = flip);
 
+    // ── Plural edits: the Inspector's fields applied to a multi-selection as ONE snapshot, so one undo entry ──
+
+    /// <summary>
+    /// <see cref="SetTrackOffset"/> for several tracks. A null component is left alone on every track; an absolute edit
+    /// sets that component on all of them, a relative one (<c>+ 4</c>) applies to each track's own value, as in the .achx
+    /// Inspector. Merges with the previous call for the same tracks until <see cref="IUndoManager.SealCoalescing"/>.
+    /// </summary>
+    public void SetTracksOffset(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, NumericEdit? x, NumericEdit? y)
+    {
+        var set = tracks.Distinct().OrderBy(track => track).ToList();
+        if (set.Count == 0 || (x is null && y is null)) return;
+        string what = x is not null && y is not null ? "Offset" : x is not null ? "Offset X" : "Offset Y";
+        string to = "";
+        if (x is { IsRelative: false } ax && y is { IsRelative: false } ay) to = $" to ({Format((float)ax.Apply(0m))}, {Format((float)ay.Apply(0m))})";
+        else if (x is { IsRelative: false } onlyX && y is null) to = $" to {Format((float)onlyX.Apply(0m))}";
+        else if (y is { IsRelative: false } onlyY && x is null) to = $" to {Format((float)onlyY.Apply(0m))}";
+        Edit(undo, $"Set {what} of {TracksNamed(sequence, set)}{to}", save =>
+        {
+            foreach (int index in set)
+            {
+                var target = save.Sequences[sequence].Tracks[index];
+                if (x is { } dx) target.X = dx.Apply(target.X);
+                if (y is { } dy) target.Y = dy.Apply(target.Y);
+            }
+        }, coalesceGroup: $"offset:{sequence}:{string.Join(",", set)}");
+    }
+
+    /// <summary><see cref="SetTrackVisible"/> for several tracks, as one undo entry.</summary>
+    public void SetTracksVisible(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool visible)
+    {
+        var set = tracks.Distinct().OrderBy(track => track).ToList();
+        if (set.Count == 0) return;
+        Edit(undo, $"{(visible ? "Show" : "Hide")} {TracksNamed(sequence, set)}", save =>
+        {
+            foreach (int index in set) save.Sequences[sequence].Tracks[index].Visible = visible;
+        });
+    }
+
+    /// <summary><see cref="SetTrackFlip"/> for several tracks, as one undo entry.</summary>
+    public void SetTracksFlip(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool flip)
+    {
+        var set = tracks.Distinct().OrderBy(track => track).ToList();
+        if (set.Count == 0) return;
+        Edit(undo, $"Turn Flip {(flip ? "On" : "Off")} for {TracksNamed(sequence, set)}", save =>
+        {
+            foreach (int index in set) save.Sequences[sequence].Tracks[index].FlipHorizontal = flip;
+        });
+    }
+
+    /// <summary>
+    /// <see cref="SetChainStart"/> for several chains: an absolute edit moves every chain to that start, a relative one
+    /// shifts each from its own. Returns why it was refused (any chain would end up negative or not a number), or null;
+    /// a refused edit changes none.
+    /// </summary>
+    public string? SetChainsStart(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains, NumericEdit start)
+    {
+        var set = chains.Distinct().ToList();
+        if (set.Count == 0) return null;
+        var targets = set.Select(id => (id, value: (double)start.Apply((decimal)Save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Start))).ToList();
+        if (targets.Any(t => !double.IsFinite(t.value) || t.value < 0)) return "Start must be 0 or more.";
+        Edit(undo, $"Set Start of {ChainsNamed(sequence, set)}{ToText(start)}", save =>
+        {
+            foreach (var (id, value) in targets) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Start = value;
+        }, coalesceGroup: $"start:{sequence}:{ChainSetKey(set)}");
+        return null;
+    }
+
+    /// <summary><see cref="SetChainLoops"/> for several chains; refused (none changed) when any would end up zero, negative or not a number.</summary>
+    public string? SetChainsLoops(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains, NumericEdit loops)
+    {
+        var set = chains.Distinct().ToList();
+        if (set.Count == 0) return null;
+        var targets = set.Select(id => (id, value: loops.Apply(Save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Loops))).ToList();
+        if (targets.Any(t => !float.IsFinite(t.value) || t.value <= 0)) return "Cycles must be above 0.";
+        Edit(undo, $"Set Cycles of {ChainsNamed(sequence, set)}{ToText(loops)}", save =>
+        {
+            foreach (var (id, value) in targets) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Loops = value;
+        }, coalesceGroup: $"cycles:{sequence}:{ChainSetKey(set)}");
+        return null;
+    }
+
+    // An absolute edit says what it set; a relative one ("+ 4") has no single value to name.
+    private static string ToText(NumericEdit edit) => edit.IsRelative ? "" : $" to {Format((double)edit.Apply(0m))}";
+
+    private static string ChainSetKey(IEnumerable<TimelineChainId> set) =>
+        string.Join(",", set.OrderBy(id => id.Track).ThenBy(id => id.Chain).Select(id => $"{id.Track}.{id.Chain}"));
+
+    // One track by name ('Body'), several by count (3 tracks), as the other plural labels do.
+    private string TracksNamed(int sequence, IReadOnlyList<int> set) => set.Count == 1
+        ? $"'{Save.Sequences[sequence].Tracks[set[0]].Name}'"
+        : Plural.Format(set.Count, "track");
+
+    private string ChainsNamed(int sequence, IReadOnlyList<TimelineChainId> set) => set.Count == 1
+        ? $"'{Save.Sequences[sequence].Tracks[set[0].Track].Chains[set[0].Chain].Chain}'"
+        : Plural.Format(set.Count, "chain");
+
     /// <summary>
     /// Moves track <paramref name="from"/> of sequence <paramref name="sequence"/> to the gap <paramref name="slot"/>
     /// (0 above the first lane, the track count below the last) as one undo entry. Lane order is draw order (the top

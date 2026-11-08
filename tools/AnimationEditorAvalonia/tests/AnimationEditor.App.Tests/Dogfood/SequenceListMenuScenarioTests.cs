@@ -8,8 +8,8 @@ using Shouldly;
 namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
-/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Copy Qualified Name,
-/// Rename, Duplicate Sequence, Delete and Add Sequence; blank space offers only Add Sequence. (The popup is not part of the headless back-buffer, so the
+/// The SEQUENCES list's right-click menu follows what was hit: a sequence row offers Copy, Cut, Paste, Duplicate Sequence, Rename,
+/// Copy Qualified Name, Delete and Add Sequence; blank space offers Add Sequence and Paste. (The popup is not part of the headless back-buffer, so the
 /// menus are checked by their items rather than by screenshot.)
 /// </summary>
 public class SequenceListMenuScenarioTests
@@ -29,7 +29,7 @@ public class SequenceListMenuScenarioTests
         SequenceListSave.FromFile(path).Sequences.Select(sequence => sequence.Name).ToList();
 
     [AvaloniaFact]
-    public async Task RightClickingBlankSpace_OffersOnlyAddSequence()
+    public async Task RightClickingBlankSpace_OffersAddSequenceAndPaste()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "Idle", "Attack"));
@@ -37,11 +37,11 @@ public class SequenceListMenuScenarioTests
         RightClickBlankSpace(editor);
 
         List(editor).ContextMenu!.IsOpen.ShouldBeTrue();
-        Headers(List(editor)).ShouldBe(new[] { "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste" });
     }
 
     [AvaloniaFact]
-    public async Task RightClickingARow_SelectsIt_AndOffersCopyQualifiedName_RenameDelete_ThenAddSequence()
+    public async Task RightClickingARow_SelectsIt_AndOffersCopyCutPasteDuplicate_RenameCopyName_Delete_ThenAddSequence()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "Idle", "Attack"));
@@ -50,7 +50,7 @@ public class SequenceListMenuScenarioTests
         editor.RightClick(List(editor).ContainerFromIndex(1)!);
 
         List(editor).SelectedIndex.ShouldBe(1);
-        Headers(List(editor)).ShouldBe(new[] { "Copy Qualified Name", "-", "Rename…", "Duplicate Sequence", "Delete", "-", "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Copy", "Cut", "Paste", "Duplicate Sequence", "-", "Rename…", "Copy Qualified Name", "-", "Delete", "-", "Add Sequence" });
     }
 
     [AvaloniaFact]
@@ -74,13 +74,13 @@ public class SequenceListMenuScenarioTests
         await editor.OpenAsync(editor.WriteSeqj("boss.seqj", "Idle"));
 
         RightClickBlankSpace(editor);
-        Headers(List(editor)).Count.ShouldBe(1);
+        Headers(List(editor)).Count.ShouldBe(3);
         List(editor).ContextMenu!.Close();
         editor.RightClick(List(editor).ContainerFromIndex(0)!);
-        Headers(List(editor)).Count.ShouldBe(7);
+        Headers(List(editor)).Count.ShouldBe(11);
         List(editor).ContextMenu!.Close();
         RightClickBlankSpace(editor);
-        Headers(List(editor)).ShouldBe(new[] { "Add Sequence" });
+        Headers(List(editor)).ShouldBe(new[] { "Add Sequence", "-", "Paste" });
     }
 
     [AvaloniaFact]
