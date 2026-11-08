@@ -1,6 +1,7 @@
 using AnimationEditor.App.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
@@ -18,11 +19,17 @@ public class DetachedWindowNativeMenuTests
     public void DetachedWindow_HasANativeMenu_ThatMirrorsItsInWindowMenu()
     {
         MainWindow window = App.CreateDetachedWindow(NewSettingsRoot());
+        try
+        {
+            NativeMenu? native = NativeMenu.GetMenu(window);
 
-        NativeMenu? native = NativeMenu.GetMenu(window);
-
-        native.ShouldNotBeNull();
-        NativeMenuParity.Differences(window.FindControl<Menu>("MainMenu")!, native, CommandModifier.Meta).ShouldBeEmpty();
+            native.ShouldNotBeNull();
+            NativeMenuParity.Differences(window.FindControl<Menu>("MainMenu")!, native, CommandModifier.Meta).ShouldBeEmpty();
+        }
+        finally
+        {
+            Dispose(window);
+        }
     }
 
     [AvaloniaFact]
@@ -30,12 +37,26 @@ public class DetachedWindowNativeMenuTests
     {
         MainWindow first = App.CreateDetachedWindow(NewSettingsRoot());
         MainWindow second = App.CreateDetachedWindow(NewSettingsRoot());
+        try
+        {
+            NativeMenu? firstMenu = NativeMenu.GetMenu(first);
+            NativeMenu? secondMenu = NativeMenu.GetMenu(second);
 
-        NativeMenu? firstMenu = NativeMenu.GetMenu(first);
-        NativeMenu? secondMenu = NativeMenu.GetMenu(second);
+            firstMenu.ShouldNotBeNull();
+            secondMenu.ShouldNotBeNull();
+            secondMenu.ShouldNotBeSameAs(firstMenu);
+        }
+        finally
+        {
+            Dispose(first);
+            Dispose(second);
+        }
+    }
 
-        firstMenu.ShouldNotBeNull();
-        secondMenu.ShouldNotBeNull();
-        secondMenu.ShouldNotBeSameAs(firstMenu);
+    // Close, as the harness does, so the window's watchers and posted work do not outlive the test.
+    private static void Dispose(MainWindow window)
+    {
+        window.Close();
+        Dispatcher.UIThread.RunJobs();
     }
 }
