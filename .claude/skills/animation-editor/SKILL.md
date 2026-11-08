@@ -195,6 +195,10 @@ Dragging a list row reorders the file's sequences: `SequenceListDragController` 
 
 The library adds without dragging too: a chip double-click or Enter (chips are focusable) puts its chain on a new top (front) track at the playhead, and its menu's "Add to Selected Track" needs the selection to name exactly one track (`ChipAddPlan`, Core; both end in `PlaceChain`, so the undo label is the drop's), while the "+ Add Source…" button (header, or the empty state) goes through `IFileDialogService.PickOpenFilesAsync` into `AddSources`.
 
+## Sequence rename boxes are plain text boxes for undo, and survive a live reload
+
+While an `InlineRenameBox` (sequence row or track header) has focus and the user has typed in it (`HasTypedText`), the window-level Undo/Redo hotkeys skip (`IsInlineRenameBoxFocused`), so Ctrl+Z/Y/Shift+Z act on the typed text and never the document (an untouched box, like the one Add Sequence opens, has nothing to undo, so Ctrl+Z still takes the add back); the Edit menu's Undo still commits the rename first. The ANIMATIONS tree's rename box is a different control and still commits first. A live reload (`ReloadShownFromDisk`) reopens an open rename on the same sequence or track by name with the typed text (`TakePendingRename`/`ResumePendingRename`), and closes it when that name is gone.
+
 ## Text boxes refuse the editor's own copy JSON
 
 Copy puts editor JSON on the system clipboard, so a Ctrl+V or context-menu Paste in a name box would insert it. Every `TextBox` refuses it by default (`EditorTextPaste`, `AnimationEditor.Views/Controls`, a class handler installed by a module initializer; it reads the clipboard and re-issues the paste only for ordinary text), using `EditorClipboard.IsEditorEnvelope` (Core), which shares `PasteRoute` and `ClipboardPayload` detection. A box that must take any text (search, event data) opts in with `EditorTextPaste.SetAllowEditorJson`; `NameBoxPasteScenarioTests` sweeps every box and lists the opt-outs.

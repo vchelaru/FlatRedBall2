@@ -312,7 +312,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             ? document.Save.Sequences[_sequenceIndex]
             : null;
 
-    internal int TrackCount => Sequence?.Tracks.Count ?? 0;
+    /// <summary>How many tracks (lanes) the shown sequence has.</summary>
+    public int TrackCount => Sequence?.Tracks.Count ?? 0;
 
     /// <summary>Shows sequence <paramref name="sequenceIndex"/> of <paramref name="document"/>, or nothing when null.</summary>
     public void Show(SequenceDocument? document, int sequenceIndex, IUndoManager? undo)
@@ -399,7 +400,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <see cref="SequenceDocument.RenameTrack"/> (one undo entry; a refused name goes out on <see cref="ErrorRaised"/>
     /// and the old name stays), Escape cancels.
     /// </summary>
-    public void BeginRenameTrack(int track)
+    public void BeginRenameTrack(int track, string? resumeText = null)
     {
         if (Sequence is not { } sequence || track < 0 || track >= sequence.Tracks.Count) return;
         EndTrackRename();
@@ -419,8 +420,15 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         LogicalChildren.Add(_renameBox);
         InvalidateMeasure();
         InvalidateArrange();
-        _renameBox.Begin(sequence.Tracks[track].Name);
+        // resumeText is name text typed before the box was rebuilt (a live reload); it replaces the file's name, caret at the end.
+        _renameBox.Begin(resumeText ?? sequence.Tracks[track].Name, selectAll: resumeText is null);
     }
+
+    /// <summary>The text typed so far into the open track rename, or null when none is open.</summary>
+    public string? RenameText => IsRenamingTrack ? _renameBox!.Text ?? string.Empty : null;
+
+    /// <summary>Closes an open track rename without applying it (the track it named is gone).</summary>
+    public void CancelRename() => EndTrackRename();
 
     /// <summary>The track whose name is being edited in place, or null.</summary>
     public int? RenamingTrack => IsRenamingTrack ? _renameTrack : null;
