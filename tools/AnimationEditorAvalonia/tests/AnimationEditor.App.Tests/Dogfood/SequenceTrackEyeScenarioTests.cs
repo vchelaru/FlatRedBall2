@@ -19,7 +19,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 /// </summary>
 public class SequenceTrackEyeScenarioTests
 {
-    // Action has Moon (z 0) and BlackMoon (z 1), both playing Walk from 0. Sun plays Flash, which has a frame event, so its
+    // Action has the tracks Moon, BlackMoon and Sun in lane order (Moon on top), Moon and BlackMoon both playing Walk from 0. Sun plays Flash, which has a frame event, so its
     // lane is taller than the others.
     private static void WriteSeqj(string folder, string path, params string[] hidden)
     {
