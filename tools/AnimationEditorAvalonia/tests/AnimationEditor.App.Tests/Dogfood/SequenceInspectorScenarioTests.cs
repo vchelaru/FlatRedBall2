@@ -312,16 +312,16 @@ public class SequenceInspectorScenarioTests
         inspector.ChainLoopsField.Value.ShouldBe(0.001m);
         TypeInto(editor, inspector.ChainStartField, "-2");
         inspector.ChainStartField.Value.ShouldBe(0m);
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.Press(Key.Z, RawInputModifiers.Control);
         editor.Press(Key.Z, RawInputModifiers.Control);
 
         editor.ClickAt(OnHeader(editor, 1));
         editor.TypeAndEnter(inspector.TrackNameBox, "Body");
-        editor.ErrorBannerText.ShouldBe("A track named \"Body\" already exists.");
+        editor.ProblemText.ShouldBe("A track named \"Body\" already exists.");
         inspector.TrackNameBox.Text.ShouldBe("Arms");
         editor.TypeAndEnter(inspector.TrackNameBox, "   ");
-        editor.ErrorBannerText.ShouldBe("A track needs a name.");
+        editor.ProblemText.ShouldBe("A track needs a name.");
         inspector.TrackNameBox.Text.ShouldBe("Arms");
 
         editor.ClickAt(editor.PointIn(Timeline(editor), 400, Timeline(editor).Viewport.LaneTop(4)));
@@ -330,7 +330,7 @@ public class SequenceInspectorScenarioTests
         inspector.SequenceNameBox.SelectAll();
         editor.Press(Key.Back);
         editor.Press(Key.Enter);
-        editor.ErrorBannerText.ShouldBe("A sequence needs a name.");
+        editor.ProblemText.ShouldBe("A sequence needs a name.");
         inspector.SequenceNameBox.Text.ShouldBe("Attack");
 
         editor.UndoLabels.ShouldBeEmpty();
@@ -403,7 +403,7 @@ public class SequenceInspectorScenarioTests
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
         editor.Services.SelectedState.SelectedChain!.Name.ShouldBe("Run");
         editor.Control<Grid>("AchxEditorPane").IsVisible.ShouldBeTrue();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         File.Exists(hero).ShouldBeTrue();
     }
 
@@ -448,11 +448,11 @@ public class SequenceInspectorScenarioTests
         editor.ClickAt(OnChain(editor, 0, 0.1));
         inspector.ChainMissingText.IsVisible.ShouldBeTrue();
         editor.Click(inspector.GoToDefinitionButton);
-        editor.ErrorBannerText.ShouldBe("hero.achx has no chain named \"Gone\".");
+        editor.ProblemText.ShouldBe("hero.achx has no chain named \"Gone\".");
 
         editor.ClickAt(OnChain(editor, 1, 0.1));
         editor.Click(inspector.GoToDefinitionButton);
-        editor.ErrorBannerText.ShouldBe("nowhere.achx is missing or could not be read.");
+        editor.ProblemText.ShouldBe("nowhere.achx is missing or could not be read.");
 
         editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
     }

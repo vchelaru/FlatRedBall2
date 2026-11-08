@@ -78,7 +78,7 @@ public class AchxRenameLeaveScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
         SavedChainNames(hero).ShouldBe(new[] { "Walk", "Sprint" });
         SavedChainNames(other).ShouldBe(new[] { "Walk", "Run" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.ClickTab("hero.achx");
         editor.UndoLabels.ShouldHaveSingleItem().ShouldContain("Sprint");
     }
@@ -231,7 +231,7 @@ public class AchxRenameLeaveScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
 
         SavedChainNames(hero).ShouldBe(new[] { "Walk", "Sprint" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -302,7 +302,7 @@ public class AchxRenameLeaveScenarioTests
         editor.Press(Key.Back);
         editor.ClickTab("other.achx");
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("empty");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("empty");
         SavedChainNames(hero).ShouldBe(new[] { "Walk", "Run" });
         editor.ClickTab("hero.achx");
         editor.UndoLabels.ShouldBeEmpty();

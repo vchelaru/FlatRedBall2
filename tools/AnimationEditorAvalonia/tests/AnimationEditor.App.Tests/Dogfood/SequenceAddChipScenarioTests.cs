@@ -191,7 +191,7 @@ public class SequenceAddChipScenarioTests
 
         editor.DoubleClickAt(editor.CenterOf(Chip(editor, "Run")));
 
-        editor.ToastText.ShouldNotBeNull().ShouldContain("sequence");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("sequence");
         editor.UndoLabels.ShouldBeEmpty();
     }
 }

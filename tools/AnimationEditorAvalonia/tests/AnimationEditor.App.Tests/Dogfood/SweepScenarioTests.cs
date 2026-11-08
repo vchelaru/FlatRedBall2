@@ -186,8 +186,8 @@ public class SweepScenarioTests
         File.ReadAllText(json).ShouldContain("\"frames\"");
         File.ReadAllText(json).ShouldContain("Walk");
         File.Exists(Path.Combine(exportDir, "sheet.png")).ShouldBeTrue("the texture travels with the JSON");
-        editor.ToastText.ShouldNotBeNull();
-        editor.ToastText!.ShouldContain("hero.json");
+        editor.InfoText.ShouldNotBeNull();
+        editor.InfoText!.ShouldContain("hero.json");
     }
 
     [AvaloniaFact]
@@ -209,8 +209,8 @@ public class SweepScenarioTests
         File.ReadAllText(tres).ShouldContain("\"name\": &\"Walk\"");
         File.ReadAllText(tres).ShouldContain("region = Rect2(16, 0, 16, 16)");
         File.Exists(Path.Combine(exportDir, "sheet.png")).ShouldBeTrue("the texture travels with the .tres");
-        editor.ToastText.ShouldNotBeNull();
-        editor.ToastText!.ShouldContain("hero.tres");
+        editor.InfoText.ShouldNotBeNull();
+        editor.InfoText!.ShouldContain("hero.tres");
     }
 
     [AvaloniaFact]

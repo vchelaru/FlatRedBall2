@@ -157,7 +157,7 @@ public class PolygonScenarioTests
 
         PolygonVertices.Get(first, 2).ShouldBe((20f, 14f));
         PolygonVertices.Get(second, 3).ShouldBe((8f, 8f));
-        editor.ToastText.ShouldBe("Moved vertex on 1 of 2 polygons, 1 skipped: different vertex count");
+        editor.InfoText.ShouldBe("Moved vertex on 1 of 2 polygons, 1 skipped: different vertex count");
     }
 
     [AvaloniaFact]

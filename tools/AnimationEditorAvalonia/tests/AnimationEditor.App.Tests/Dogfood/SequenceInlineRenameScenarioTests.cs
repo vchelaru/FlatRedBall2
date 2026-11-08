@@ -72,7 +72,7 @@ public class SequenceInlineRenameScenarioTests
         TrackBox(editor).ShouldBeNull();
         SavedTracks(boss).ShouldBe(new[] { "Body", "Legs" });
         editor.UndoLabels.ShouldBe(new[] { "Rename Track 'Arms' to 'Legs'" });
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.Press(Key.Z, RawInputModifiers.Control);
         SavedTracks(boss).ShouldBe(new[] { "Body", "Arms" });
     }
@@ -87,7 +87,7 @@ public class SequenceInlineRenameScenarioTests
 
         editor.TypeAndEnter(TrackBox(editor)!, "Body");
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         SavedTracks(boss).ShouldBe(new[] { "Body", "Arms" });
         editor.UndoLabels.ShouldBeEmpty();
         TrackBox(editor).ShouldBeNull();
@@ -157,7 +157,7 @@ public class SequenceInlineRenameScenarioTests
         editor.DoubleClickAt(editor.CenterOf((Control)List(editor).ContainerFromIndex(1)!));
         editor.TypeAndEnter(ListBoxEditor(editor, 1), "Attack");
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("already exists");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("already exists");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle" });
         editor.UndoLabels.ShouldBeEmpty();
         ListBoxEditor(editor, 1).IsVisible.ShouldBeFalse();

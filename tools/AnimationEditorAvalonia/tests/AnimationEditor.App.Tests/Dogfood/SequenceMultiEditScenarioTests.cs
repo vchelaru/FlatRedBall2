@@ -243,7 +243,7 @@ public class SequenceMultiEditScenarioTests
         ClickRow(editor, 3);
         await CtrlAsync(editor, Key.V);
 
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.SequenceNames.ShouldBe(new[] { "Idle", "Attack", "Run", "Jump", "Idle 2", "Attack 2" });
         SavedNames(boss).ShouldBe(new[] { "Idle", "Attack", "Run", "Jump", "Idle 2", "Attack 2" });
         editor.UndoLabels.ShouldBe(new[] { "Paste 2 Sequences" });

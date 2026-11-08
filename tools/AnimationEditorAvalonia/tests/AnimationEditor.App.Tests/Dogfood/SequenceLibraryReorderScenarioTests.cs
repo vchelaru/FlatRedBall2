@@ -356,7 +356,7 @@ public class SequenceLibraryReorderScenarioTests
         VisualOrder(editor).ShouldBe(new[] { "c.achx", "a.achx", "b.achx", "d.achx" });
         timeline.Blocks.Count.ShouldBe(blocks);
         SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Chains.Single().Source.ShouldBe("c.achx");
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
     }
 
     [AvaloniaFact]
@@ -368,8 +368,8 @@ public class SequenceLibraryReorderScenarioTests
         editor.Drag(GrabPoint(editor, "a.achx"), BelowGroup(editor, "d.achx"));
         await editor.WaitAsync(TimeSpan.FromMilliseconds(1500));
 
-        editor.ToastText.ShouldBeNull();
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         VisualOrder(editor).ShouldBe(new[] { "b.achx", "c.achx", "d.achx", "a.achx" });
         SavedSources(boss).ShouldBe(new[] { "b.achx", "c.achx", "d.achx", "a.achx" });
         editor.UndoLabels.ShouldBe(new[] { "Move Source 'a.achx'" });

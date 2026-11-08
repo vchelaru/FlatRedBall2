@@ -201,7 +201,7 @@ public class SequenceLibraryAutoplayScenarioTests
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
         // No chain is targeted: the file opens as a plain open does, with its first chain selected, not "Run".
         editor.Services.SelectedState.SelectedChain!.Name.ShouldBe("Walk");
-        editor.ErrorBannerText.ShouldBeNull();
+        editor.ProblemText.ShouldBeNull();
         editor.ClickTab("boss.seqj");
         editor.UndoLabels.ShouldBeEmpty();
     }

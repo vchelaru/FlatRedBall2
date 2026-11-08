@@ -29,9 +29,9 @@ public class SequenceMalformedOpenScenarioTests
 
     private static void ShouldShowTheBannerFor(AnimationEditorHarness editor, string file)
     {
-        editor.ErrorBannerText.ShouldNotBeNull();
-        editor.ErrorBannerText!.ShouldContain($"Could not open {file}");
-        editor.ErrorBannerText.ShouldContain(Problem);
+        editor.ProblemText.ShouldNotBeNull();
+        editor.ProblemText!.ShouldContain($"Could not open {file}");
+        editor.ProblemText.ShouldContain(Problem);
     }
 
     private static bool SequencePaneShown(AnimationEditorHarness editor) =>
@@ -138,7 +138,7 @@ public class SequenceMalformedOpenScenarioTests
             folder => (new[] { Path.Combine(folder, "broken.seqj"), Path.Combine(folder, "good.seqj") }, Path.Combine(folder, "broken.seqj")),
             editor =>
             {
-                editor.WaitUntil(() => editor.ErrorBannerText != null, TimeSpan.FromSeconds(5));
+                editor.WaitUntil(() => editor.ProblemText != null, TimeSpan.FromSeconds(5));
                 editor.Layout();
 
                 ShouldShowTheBannerFor(editor, "broken.seqj");
@@ -155,7 +155,7 @@ public class SequenceMalformedOpenScenarioTests
             folder => (new[] { Path.Combine(folder, "broken.seqj") }, Path.Combine(folder, "broken.seqj")),
             editor =>
             {
-                editor.WaitUntil(() => editor.ErrorBannerText != null, TimeSpan.FromSeconds(5));
+                editor.WaitUntil(() => editor.ProblemText != null, TimeSpan.FromSeconds(5));
                 editor.Layout();
 
                 ShouldShowTheBannerFor(editor, "broken.seqj");
@@ -172,7 +172,7 @@ public class SequenceMalformedOpenScenarioTests
             {
                 editor.WaitUntil(() => editor.TabLabels.Count == 2, TimeSpan.FromSeconds(5));
                 editor.Layout();
-                editor.ErrorBannerText.ShouldBeNull();
+                editor.ProblemText.ShouldBeNull();
 
                 editor.ClickTab("broken.seqj");
                 editor.Layout();

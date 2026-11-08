@@ -512,7 +512,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// selected polygon with the same vertex count, in that polygon's local space: a move adds the
         /// same delta to the same vertex index, an insert lands at that polygon's own edge midpoint
         /// plus the same offset. Different vertex counts are skipped and reported through
-        /// <see cref="Notified"/>. The whole batch is one undo entry.
+        /// <see cref="InfoRaised"/>. The whole batch is one undo entry.
         /// </remarks>
         void CommitPolygonPoints(PolygonSave polygon, IReadOnlyList<Vector2Save> pointsBefore, PolygonVertexEdit edit);
 
@@ -527,8 +527,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>The top-to-bottom counterpart of <see cref="FlipPolygonHorizontally"/>.</summary>
         void FlipPolygonVertically(PolygonSave polygon);
 
-        /// <summary>A one-line message for the user about an edit that only partly applied.</summary>
-        event Action<string>? Notified;
+        /// <summary>A one-line FYI for the user (INFO, nothing to act on) about an edit that only partly applied.</summary>
+        event Action<string>? InfoRaised;
 
         /// <summary>
         /// Sets Name/X/Y/ScaleX/ScaleY on every rectangle in <paramref name="rects"/> as a single
