@@ -127,7 +127,7 @@ public class SequenceDocumentSelectionTests
     {
         var save = new SequenceListSave { Sources = { "hero.achj" } };
         save.Sequences.Add(new SequenceSave { Name = "A" });
-        var sequence = new SequenceSave { Name = "B" };
+        var sequence = new SequenceSave { Name = "B", Loop = false };
         sequence.Tracks.Add(new SequenceTrackSave { Name = "Body", Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk" } } });
         save.Sequences.Add(sequence);
         save.Sequences.Add(new SequenceSave { Name = "C" });
