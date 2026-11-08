@@ -691,7 +691,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             : null;
         if (hit is not { } found)
         {
-            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers), row.Kind == TimelineRowKind.Track);
+            BeginMarquee(point, e, IsToggleModifier(e.KeyModifiers), TimelineEmptyClick.IsEmptyLaneSpace(row));
             return;
         }
 
