@@ -992,12 +992,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void UpdateNameHover(Point? point)
     {
         int? track = null;
-        if (point is { } p && _drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && !IsRenamingTrack
-            && p.X < TimelineViewport.HeaderWidth && Sequence is { } sequence
+        if (point is { } p && _drag == DragKind.None && !_scrubbing && !_panning && !_columnResizing && _chipGhost is null && !IsRenamingTrack
+            && p.X < Viewport.ColumnWidth && Sequence is { } sequence
             && Viewport.RowAt(p.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row
             && !TimelineLayout.IsOverEye(p.X, p.Y - Viewport.LaneTop(row.Track))
             && TimelineTooltips.IsTruncated(Text(sequence.Tracks[row.Track].Name, 12, Brush("Ink"), FontWeight.SemiBold).Width,
-                TimelineTooltips.NameRoom(TimelineViewport.HeaderWidth)))
+                TimelineTooltips.NameRoom(Viewport.ColumnWidth)))
             track = row.Track;
         if (track == _nameTipTrack)
         {

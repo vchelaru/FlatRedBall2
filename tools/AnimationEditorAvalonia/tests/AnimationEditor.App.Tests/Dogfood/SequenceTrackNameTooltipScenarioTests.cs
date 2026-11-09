@@ -12,6 +12,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 public class SequenceTrackNameTooltipScenarioTests
 {
     private const string LongName = "Boss attack with a very long descriptive track name";
+    private const string MediumName = "Medium length track name";
 
     private static string WriteFixture(AnimationEditorHarness editor)
     {
@@ -22,7 +23,7 @@ public class SequenceTrackNameTooltipScenarioTests
         chains.Save(Path.Combine(editor.ProjectFolder, "hero.achx"));
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var action = new SequenceSave { Name = "Action" };
-        foreach (string name in new[] { LongName, "Sun" })
+        foreach (string name in new[] { LongName, "Sun", MediumName })
         {
             var track = new SequenceTrackSave { Name = name };
             track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
@@ -82,5 +83,24 @@ public class SequenceTrackNameTooltipScenarioTests
         await PastTheDelay(editor);
 
         Timeline(editor).NameTooltip.ShouldBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task WideningTheColumn_StopsTheTooltip_BecauseTheNameNowFits()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+
+        editor.Hover(OnName(editor, 2));
+        await PastTheDelay(editor);
+        timeline.NameTooltip.ShouldBe(MediumName);
+
+        timeline.Viewport.SetColumnWidth(TimelineViewport.MaxColumnWidth);
+        editor.Hover(new Point(500, 5));
+        editor.Hover(OnName(editor, 2));
+        await PastTheDelay(editor);
+
+        timeline.NameTooltip.ShouldBeNull();
     }
 }
