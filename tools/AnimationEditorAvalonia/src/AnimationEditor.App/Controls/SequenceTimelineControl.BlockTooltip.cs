@@ -19,6 +19,9 @@ public sealed partial class SequenceTimelineControl
     /// </summary>
     public string? BlockTooltip { get; private set; }
 
+    /// <summary>The pointer position the tooltip hangs from; it follows every move over the block.</summary>
+    public Point BlockTooltipAnchor => _tipPoint;
+
     // The tooltip belongs to one block: moving onto another restarts the delay, and any drag, scroll or press ends it.
     private void UpdateBlockTooltip(Point point)
     {
@@ -30,7 +33,16 @@ public sealed partial class SequenceTimelineControl
             ClearBlockTooltip();
             return;
         }
-        if (ReferenceEquals(block.Reference, _tipReference)) return;
+        if (ReferenceEquals(block.Reference, _tipReference))
+        {
+            // The pill follows the pointer, before and after it shows.
+            if (_tipPoint != point)
+            {
+                _tipPoint = point;
+                if (BlockTooltip is not null) InvalidatePopups();
+            }
+            return;
+        }
         ClearBlockTooltip();
         _tipReference = block.Reference;
         _tipPoint = point;

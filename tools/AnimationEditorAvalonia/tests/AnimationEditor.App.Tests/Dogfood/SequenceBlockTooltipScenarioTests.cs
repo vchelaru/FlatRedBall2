@@ -93,4 +93,22 @@ public class SequenceBlockTooltipScenarioTests
         timeline.HoverCard.ShouldNotBeNull();
         timeline.HoverCardBlockLines.ShouldBe(new[] { "Cycles 2", "Length 1 s" });
     }
+
+    [AvaloniaFact]
+    public async Task AfterItShows_AOnePixelMove_MovesTheTooltipByExactlyOnePixel()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+        var start = OnBlock(editor, 0);
+        editor.Hover(start);
+        await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2));
+        var shownAt = timeline.BlockTooltipAnchor;
+
+        editor.Hover(start + new Vector(1, 0));
+
+        timeline.BlockTooltip.ShouldNotBeNull();
+        (timeline.BlockTooltipAnchor.X - shownAt.X).ShouldBe(1);
+        timeline.BlockTooltipAnchor.Y.ShouldBe(shownAt.Y);
+    }
 }
