@@ -68,6 +68,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private int? _hoverEyeTrack;
     private Point _eyePoint;
+    private int? _nameTipTrack;
+    private bool _nameTipShown;
+    private Point _nameTipPoint;
+    private DispatcherTimer? _nameTipTimer;
 
     // A track-header drag: which lane, the gap the pointer points at, and the pointer to release on Escape.
     private int _dragTrack;
@@ -186,6 +190,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>The tooltip for the eye under the pointer ("Visible" or "Hidden"), or null when the pointer is not over one. <see cref="EyeTooltipNote"/> goes under it.</summary>
     public string? EyeTooltip =>
         _hoverEyeTrack is { } track ? (IsTrackHidden(track) ? "Hidden" : "Visible") : null;
+
+    /// <summary>The full name of the track whose cut-off name the pointer has rested on for <see cref="TimelineTooltips.ShowDelay"/>, or null. Names that fit the column never show one.</summary>
+    public string? NameTooltip =>
+        _nameTipShown && _nameTipTrack is { } track && Sequence is { } sequence && track < sequence.Tracks.Count ? sequence.Tracks[track].Name : null;
 
     /// <summary>The second line of the eye's tooltip: the eye is saved state, not just a preview setting.</summary>
     public const string EyeTooltipNote = "Saved in the file; runtimes may skip hidden tracks";
@@ -761,6 +769,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerMoved(e);
         UpdateEyeHover(e.GetPosition(this));
+        UpdateNameHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
         if (_panning)
@@ -924,6 +933,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         base.OnPointerExited(e);
         ClearHover();
         UpdateEyeHover(null);
+        UpdateNameHover(null);
         UpdateNewTrackHot(new Point(-1, -1));
         if (_drag != DragKind.None || _scrubbing || _panning) return;
         _lastPoint = new Point(-1, -1);
@@ -960,6 +970,45 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (point is { } at) _eyePoint = at;
         InvalidatePopups();
         InvalidateVisual();
+    }
+
+    // A track name cut short by the column gets a tooltip with the full name once the pointer rests on it.
+    private void UpdateNameHover(Point? point)
+    {
+        int? track = null;
+        if (point is { } p && _drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && !IsRenamingTrack
+            && p.X < TimelineViewport.HeaderWidth && Sequence is { } sequence
+            && Viewport.RowAt(p.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row
+            && !TimelineLayout.IsOverEye(p.X, p.Y - Viewport.LaneTop(row.Track))
+            && TimelineTooltips.IsTruncated(Text(sequence.Tracks[row.Track].Name, 12, Brush("Ink"), FontWeight.SemiBold).Width,
+                TimelineTooltips.NameRoom(TimelineViewport.HeaderWidth)))
+            track = row.Track;
+        if (track == _nameTipTrack)
+        {
+            if (_nameTipShown && point is { } at) { _nameTipPoint = at; InvalidatePopups(); }
+            return;
+        }
+        _nameTipTimer?.Stop();
+        bool wasShown = _nameTipShown;
+        _nameTipShown = false;
+        _nameTipTrack = track;
+        if (point is { } now) _nameTipPoint = now;
+        if (track is not null)
+        {
+            _nameTipTimer ??= new DispatcherTimer { Interval = TimelineTooltips.ShowDelay };
+            _nameTipTimer.Tick -= OnNameTipTick;
+            _nameTipTimer.Tick += OnNameTipTick;
+            _nameTipTimer.Start();
+        }
+        if (wasShown) InvalidatePopups();
+    }
+
+    private void OnNameTipTick(object? sender, EventArgs e)
+    {
+        _nameTipTimer?.Stop();
+        if (_nameTipTrack is null) return;
+        _nameTipShown = true;
+        InvalidatePopups();
     }
 
     // The "+ new track" cell lights up under the pointer, except while a chain or the ruler is being dragged.
@@ -1331,7 +1380,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.FillRectangle(new SolidColorBrush(AccentColor(), 0.45), grabbed);
                     context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
                 }
-                var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, header - TimelineLayout.HeaderNameLeft - 8);
+                var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, TimelineTooltips.NameRoom(header));
                 using (PushOpacityUnlessOpaque(context, hidden ? HiddenOpacity + 0.2 : 1))
                     context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
@@ -1393,6 +1442,20 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
         context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
         context.DrawText(note, new Point(pill.X + pad.Left, pill.Y + pad.Top + text.Height));
+    }
+
+    // Drawn like the eye tooltip, so a headless test can read it (NameTooltip).
+    private void DrawNameTooltip(DrawingContext context, Size size)
+    {
+        if (NameTooltip is not { } tip) return;
+        var text = Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground"));
+        var pad = EyeTooltipPadding;
+        var pill = new Rect(_nameTipPoint.X + 12, _nameTipPoint.Y + 16, text.Width + pad.Left + pad.Right, text.Height + pad.Top + pad.Bottom);
+        pill = pill.WithX(Math.Clamp(pill.X, 0, Math.Max(0, size.Width - pill.Width)))
+                   .WithY(Math.Clamp(pill.Y, 0, Math.Max(0, size.Height - pill.Height)));
+        double radius = this.TryFindResource("OverlayCornerRadius", ActualThemeVariant, out var found) && found is CornerRadius corner ? corner.TopLeft : 8;
+        context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
+        context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
     }
 
     /// <summary>The eye tooltip's font size and padding: a standard ToolTip's.</summary>
