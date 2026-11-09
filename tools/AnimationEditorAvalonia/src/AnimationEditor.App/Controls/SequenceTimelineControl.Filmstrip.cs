@@ -68,6 +68,7 @@ public sealed partial class SequenceTimelineControl
 
     private void ClearHover()
     {
+        ClearBlockTooltip();
         if (HoverCard is null) return;
         HoverCard = null;
         InvalidatePopups();

@@ -23,6 +23,7 @@ public sealed partial class SequenceTimelineControl
     {
         DrawHover(context, size);
         DrawEyeTooltip(context, size);
+        DrawBlockTooltip(context, size);
     }
 
     // Popups change on their own (the card follows the pointer), so only their layer repaints, not the lanes under it.
