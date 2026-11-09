@@ -50,7 +50,7 @@ public class SequenceBlockTooltipScenarioTests
         editor.Hover(OnBlock(editor, 0));
         timeline.BlockTooltip.ShouldBeNull();
 
-        (await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, HoverDelays.QuickTooltip + TimeSpan.FromSeconds(2))).ShouldBeTrue();
+        (await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2))).ShouldBeTrue();
         timeline.BlockTooltip.ShouldBe("Walk ×2 (1.00 s)");
     }
 
@@ -62,7 +62,7 @@ public class SequenceBlockTooltipScenarioTests
         var timeline = Timeline(editor);
 
         editor.Hover(OnBlock(editor, 1));
-        await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, HoverDelays.QuickTooltip + TimeSpan.FromSeconds(2));
+        await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2));
 
         timeline.BlockTooltip.ShouldBe("Walk ×1 (0.50 s)");
     }
@@ -74,7 +74,7 @@ public class SequenceBlockTooltipScenarioTests
         await editor.OpenAsync(WriteFixture(editor));
         var timeline = Timeline(editor);
         editor.Hover(OnBlock(editor, 0));
-        await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, HoverDelays.QuickTooltip + TimeSpan.FromSeconds(2));
+        await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2));
 
         editor.Hover(editor.PointIn(timeline, timeline.Viewport.XAt(5), timeline.Viewport.LaneTop(0) + TimelineLayout.BodyTop + 4));
 

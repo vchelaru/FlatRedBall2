@@ -15,7 +15,7 @@ public sealed partial class SequenceTimelineControl
 
     /// <summary>
     /// The full text of the block under the pointer (<c>Walk ×2 (1.20 s)</c>), once the pointer has rested on it for
-    /// <see cref="HoverDelays.QuickTooltip"/>, or null. Drawn, not a ToolTip, like the eye tooltip, so a test can read it.
+    /// <see cref="TimelineTooltips.ShowDelay"/>, or null. Drawn, not a ToolTip, like the eye tooltip, so a test can read it.
     /// </summary>
     public string? BlockTooltip { get; private set; }
 
@@ -23,7 +23,7 @@ public sealed partial class SequenceTimelineControl
     private void UpdateBlockTooltip(Point point)
     {
         TimelineBlock? block = null;
-        if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= TimelineViewport.HeaderWidth && Sequence is { } sequence)
+        if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= Viewport.ColumnWidth && Sequence is { } sequence)
             block = TimelineLayout.HitTest(Viewport, _blocks, sequence.Tracks.Count, point.X, point.Y)?.Block;
         if (block is null)
         {
@@ -38,7 +38,7 @@ public sealed partial class SequenceTimelineControl
         string text = block.IsMissing
             ? $"⚠ {block.Reference.Chain} (missing)"
             : BlockLabel.Tooltip(block.Reference.Chain, block.Reference.Loops, block.Played);
-        _tipTimer = new DispatcherTimer { Interval = HoverDelays.QuickTooltip };
+        _tipTimer = new DispatcherTimer { Interval = TimelineTooltips.ShowDelay };
         _tipTimer.Tick += (_, _) =>
         {
             _tipTimer?.Stop();
