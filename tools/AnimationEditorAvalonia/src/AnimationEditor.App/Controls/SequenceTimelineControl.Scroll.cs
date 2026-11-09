@@ -11,7 +11,7 @@ public sealed partial class SequenceTimelineControl
 
     /// <summary>The horizontal scrollbar's range, in seconds.</summary>
     public TimelineScrollRange HorizontalScroll =>
-        TimelineScrollBars.Horizontal(Viewport.ScrollSeconds, Viewport.PixelsPerSecond, Bounds.Width, SequenceLength);
+        TimelineScrollBars.Horizontal(Viewport.ScrollSeconds, Viewport.PixelsPerSecond, Bounds.Width, SequenceLength, Viewport.ColumnWidth);
 
     /// <summary>The vertical scrollbar's range, in pixels.</summary>
     public TimelineScrollRange VerticalScroll =>
