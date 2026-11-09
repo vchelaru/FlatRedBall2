@@ -30,7 +30,12 @@ public readonly record struct TimelineRow(TimelineRowKind Kind, int Track = -1);
 /// </summary>
 public sealed class TimelineViewport
 {
+    /// <summary>The track-name column's default width. The live width is <see cref="ColumnWidth"/>.</summary>
     public const double HeaderWidth = 120;
+    /// <summary>The narrowest the track-name column can be dragged: the eye icon plus a few characters.</summary>
+    public const double MinColumnWidth = 80;
+    /// <summary>The widest the track-name column can be dragged.</summary>
+    public const double MaxColumnWidth = 400;
     public const double RulerHeight = 22;
     /// <summary>The base lane height: a label strip and a filmstrip row, then the cut-tail strip. A track with events is taller (<see cref="TimelineLayout.EventRowHeight"/>); see <see cref="SetLaneHeights"/>.</summary>
     public const double LaneHeight = 48;
@@ -61,9 +66,33 @@ public sealed class TimelineViewport
     /// <summary>How far the lanes are scrolled up, in pixels. Never negative.</summary>
     public double ScrollY { get; private set; }
 
-    public double XAt(double time) => HeaderWidth + (time - ScrollSeconds) * PixelsPerSecond;
+    /// <summary>
+    /// The width of the track-name column (eye and name), which is also the x where time 0 of the lanes' view starts.
+    /// Always within <see cref="MinColumnWidth"/>..<see cref="MaxColumnWidth"/>; change it with <see cref="SetColumnWidth"/>.
+    /// </summary>
+    public double ColumnWidth { get; private set; } = HeaderWidth;
 
-    public double TimeAt(double x) => ScrollSeconds + (x - HeaderWidth) / PixelsPerSecond;
+    /// <summary>
+    /// Clamps a requested column width to the allowed range; NaN and infinities give the default.
+    /// </summary>
+    public static double ClampColumnWidth(double width) =>
+        double.IsNaN(width) || double.IsInfinity(width) ? HeaderWidth : Math.Clamp(width, MinColumnWidth, MaxColumnWidth);
+
+    /// <summary>
+    /// Sets the column width (clamped), keeping the time at the lanes' left edge where it is, so the lanes' contents
+    /// shift with the divider instead of the view sliding underneath it.
+    /// </summary>
+    public void SetColumnWidth(double width)
+    {
+        double clamped = ClampColumnWidth(width);
+        if (clamped == ColumnWidth) return;
+        ColumnWidth = clamped;
+        Changed?.Invoke();
+    }
+
+    public double XAt(double time) => ColumnWidth + (time - ScrollSeconds) * PixelsPerSecond;
+
+    public double TimeAt(double x) => ScrollSeconds + (x - ColumnWidth) / PixelsPerSecond;
 
     /// <summary>
     /// The lane index of the new-track row, which sits right under the ruler, above lane 0: the top lane is in front, so a
@@ -144,7 +173,7 @@ public sealed class TimelineViewport
     {
         double anchor = TimeAt(x);
         PixelsPerSecond = Math.Clamp(pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond);
-        ScrollSeconds = Math.Max(0, anchor - (x - HeaderWidth) / PixelsPerSecond);
+        ScrollSeconds = Math.Max(0, anchor - (x - ColumnWidth) / PixelsPerSecond);
         Changed?.Invoke();
     }
 
@@ -160,10 +189,10 @@ public sealed class TimelineViewport
     /// pixels wide: the width left after the track headers and the end margin the scrollbar reserves, held within the zoom
     /// limits. An empty sequence keeps the default zoom.
     /// </summary>
-    public static double PixelsPerSecondToFit(double length, double viewWidth)
+    public static double PixelsPerSecondToFit(double length, double viewWidth, double columnWidth = HeaderWidth)
     {
         if (length <= 0) return DefaultPixelsPerSecond;
-        double room = viewWidth - HeaderWidth - TimelineScrollBars.EndMarginPixels;
+        double room = viewWidth - columnWidth -TimelineScrollBars.EndMarginPixels;
         return Math.Clamp(room / length, MinPixelsPerSecond, MaxPixelsPerSecond);
     }
 

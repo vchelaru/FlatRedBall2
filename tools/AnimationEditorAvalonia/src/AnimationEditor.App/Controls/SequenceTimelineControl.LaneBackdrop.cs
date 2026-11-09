@@ -27,7 +27,7 @@ public sealed partial class SequenceTimelineControl
             Stats.GridLines++;
             grid.Add(Snap(Viewport.XAt(t)));
         }
-        context.Custom(new LaneBackdropOp(lanes, grid.ToArray(), TimelineViewport.HeaderWidth, TimelineViewport.RulerHeight,
+        context.Custom(new LaneBackdropOp(lanes, grid.ToArray(), Viewport.ColumnWidth, TimelineViewport.RulerHeight,
             size.Width, size.Height, stripe, line));
         return true;
     }

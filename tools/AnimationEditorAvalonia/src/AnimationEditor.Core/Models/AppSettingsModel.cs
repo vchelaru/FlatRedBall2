@@ -141,6 +141,12 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public double? SequencePreviewPaneHeight { get; set; }
 
+        /// <summary>
+        /// The <c>.seqj</c> timeline's track-name column width in pixels, as last dragged by its right edge (#1765). One
+        /// setting for all files. <c>null</c> falls back to the default; see <c>TimelineViewport.ClampColumnWidth</c>.
+        /// </summary>
+        public double? SequenceTrackColumnWidth { get; set; }
+
         /// <summary>The <c>.seqj</c> tab's library column width in pixels, as last dragged via its splitter. <c>null</c> falls back to the default.</summary>
         public double? SequenceLibraryWidth { get; set; }
 

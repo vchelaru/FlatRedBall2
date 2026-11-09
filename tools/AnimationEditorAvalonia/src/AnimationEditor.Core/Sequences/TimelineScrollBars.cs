@@ -29,9 +29,10 @@ public static class TimelineScrollBars
     /// current zoom; the view is the lanes' width. An offset beyond the extent (the wheel can scroll past the end) is
     /// kept on the track.
     /// </summary>
-    public static TimelineScrollRange Horizontal(double scrollSeconds, double pixelsPerSecond, double controlWidth, double sequenceLength)
+    public static TimelineScrollRange Horizontal(double scrollSeconds, double pixelsPerSecond, double controlWidth, double sequenceLength,
+        double columnWidth = TimelineViewport.HeaderWidth)
     {
-        double view = Math.Max(0, controlWidth - TimelineViewport.HeaderWidth) / pixelsPerSecond;
+        double view = Math.Max(0, controlWidth - columnWidth) / pixelsPerSecond;
         double content = Math.Max(0, sequenceLength) + EndMarginPixels / pixelsPerSecond;
         double value = Math.Max(0, scrollSeconds);
         return new TimelineScrollRange(Math.Max(Math.Max(0, content - view), value), value, view);

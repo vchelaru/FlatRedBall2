@@ -18,6 +18,6 @@ public static class TimelineCulling
         if (top + viewport.LaneHeightOf(block.Track) <= TimelineViewport.RulerHeight || top >= viewHeight) return false;
         double left = viewport.XAt(block.Start);
         double right = left + Math.Max(1, Math.Max(block.Played, block.Full) * viewport.PixelsPerSecond);
-        return right + OutlineSlack > TimelineViewport.HeaderWidth && left - OutlineSlack < viewWidth;
+        return right + OutlineSlack > viewport.ColumnWidth && left - OutlineSlack < viewWidth;
     }
 }
