@@ -1,5 +1,4 @@
 using AnimationEditor.App.Controls;
-using AnimationEditor.Core;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Headless.XUnit;
@@ -103,12 +102,12 @@ public class SequenceBlockTooltipScenarioTests
         var start = OnBlock(editor, 0);
         editor.Hover(start);
         await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2));
-        var shownAt = timeline.BlockTooltipAnchor;
+        var shownAt = timeline.BlockTooltipRect!.Value;
 
         editor.Hover(start + new Vector(1, 0));
 
         timeline.BlockTooltip.ShouldNotBeNull();
-        (timeline.BlockTooltipAnchor.X - shownAt.X).ShouldBe(1);
-        timeline.BlockTooltipAnchor.Y.ShouldBe(shownAt.Y);
+        (timeline.BlockTooltipRect!.Value.X - shownAt.X).ShouldBe(1);
+        timeline.BlockTooltipRect!.Value.Y.ShouldBe(shownAt.Y);
     }
 }

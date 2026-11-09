@@ -1,4 +1,3 @@
-using AnimationEditor.Core;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Threading;
@@ -11,16 +10,13 @@ public sealed partial class SequenceTimelineControl
     private DispatcherTimer? _tipTimer;
     private SequenceChainReferenceSave? _tipReference;
     private Point _tipPoint;
-    private double _tipTop;
 
     /// <summary>
-    /// The full text of the block under the pointer (<c>Walk ×2 (1.20 s)</c>), once the pointer has rested on it for
+    /// The full text of the block under the pointer (<c>Walk ×2 (1.2 s)</c>), once the pointer has rested on it for
     /// <see cref="TimelineTooltips.ShowDelay"/>, or null. Drawn, not a ToolTip, like the eye tooltip, so a test can read it.
     /// </summary>
     public string? BlockTooltip { get; private set; }
 
-    /// <summary>The pointer position the tooltip hangs from; it follows every move over the block.</summary>
-    public Point BlockTooltipAnchor => _tipPoint;
 
     // The tooltip belongs to one block: moving onto another restarts the delay, and any drag, scroll or press ends it.
     private void UpdateBlockTooltip(Point point)
@@ -46,7 +42,6 @@ public sealed partial class SequenceTimelineControl
         ClearBlockTooltip();
         _tipReference = block.Reference;
         _tipPoint = point;
-        _tipTop = Viewport.LaneTop(block.Track) + TimelineLayout.BodyTop;
         string text = block.IsMissing
             ? $"⚠ {block.Reference.Chain} (missing)"
             : BlockLabel.Tooltip(block.Reference.Chain, block.Reference.Loops, block.Played);

@@ -23,6 +23,7 @@ public sealed partial class SequenceTimelineControl
     {
         DrawHover(context, size);
         DrawEyeTooltip(context, size);
+        DrawNameTooltip(context, size);
         DrawBlockTooltip(context, size);
     }
 
