@@ -32,6 +32,13 @@ public static class SequenceTimeline
     /// <summary>The smallest loop count <see cref="LoopsForEdge"/> returns, so a chain never shrinks to nothing.</summary>
     public const float MinimumLoops = 0.05f;
 
+    /// <summary>
+    /// Slack in seconds when comparing a time to a block's start or end. Cycle lengths sum float frame lengths, so a block
+    /// whose end is 2.4 on paper ends a hair after it; without the slack a playhead on that end still shows the block.
+    /// A start is inclusive and an end exclusive, within this slack.
+    /// </summary>
+    public const double BoundaryTolerance = 1e-6;
+
     /// <summary>Authored length in seconds: <paramref name="loops"/> cycles of <paramref name="cycleLength"/>. Never negative.</summary>
     public static double FullLength(float loops, double cycleLength) => Math.Max(0, loops) * cycleLength;
 
@@ -83,13 +90,13 @@ public static class SequenceTimeline
         for (int i = ordered.Count - 1; i >= 0; i--)
         {
             var reference = ordered[i];
-            if (reference.Start > time) continue;
+            if (reference.Start > time + BoundaryTolerance) continue;
 
             double? next = i + 1 < ordered.Count ? ordered[i + 1].Start : null;
             double played = PlayedLength(reference.Start, FullLength(reference.Loops, cycleLength(reference)), next);
-            if (time >= reference.Start + played) return null;
+            if (time + BoundaryTolerance >= reference.Start + played) return null;
 
-            localTime = time - reference.Start;
+            localTime = Math.Max(0, time - reference.Start);
             return reference;
         }
         return null;
