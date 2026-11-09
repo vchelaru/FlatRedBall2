@@ -1001,7 +1001,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             track = row.Track;
         if (track == _nameTipTrack)
         {
-            if (_nameTipShown && point is { } at) { _nameTipPoint = at; InvalidatePopups(); }
+            if (point is { } at) { _nameTipPoint = at; if (_nameTipShown) InvalidatePopups(); }
             return;
         }
         _nameTipTimer?.Stop();
@@ -1452,10 +1452,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var text = Text(tip, EyeTooltipFontSize, ink);
         var note = Text(EyeTooltipNote, EyeTooltipFontSize, ink);
         var pad = EyeTooltipPadding;
-        var pill = new Rect(_eyePoint.X + 12, _eyePoint.Y + 16, Math.Max(text.Width, note.Width) + pad.Left + pad.Right,
-            text.Height + note.Height + pad.Top + pad.Bottom);
-        pill = pill.WithX(Math.Clamp(pill.X, 0, Math.Max(0, size.Width - pill.Width)))
-                   .WithY(Math.Clamp(pill.Y, 0, Math.Max(0, size.Height - pill.Height)));
+        var pill = PillAt(_eyePoint, Math.Max(text.Width, note.Width) + pad.Left + pad.Right, text.Height + note.Height + pad.Top + pad.Bottom, size);
         double radius = this.TryFindResource("OverlayCornerRadius", ActualThemeVariant, out var found) && found is CornerRadius corner ? corner.TopLeft : 8;
         context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
         context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
@@ -1468,13 +1465,27 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (NameTooltip is not { } tip) return;
         var text = Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground"));
         var pad = EyeTooltipPadding;
-        var pill = new Rect(_nameTipPoint.X + 12, _nameTipPoint.Y + 16, text.Width + pad.Left + pad.Right, text.Height + pad.Top + pad.Bottom);
-        pill = pill.WithX(Math.Clamp(pill.X, 0, Math.Max(0, size.Width - pill.Width)))
-                   .WithY(Math.Clamp(pill.Y, 0, Math.Max(0, size.Height - pill.Height)));
+        var pill = PillAt(_nameTipPoint, text.Width + pad.Left + pad.Right, text.Height + pad.Top + pad.Bottom, size);
         double radius = this.TryFindResource("OverlayCornerRadius", ActualThemeVariant, out var found) && found is CornerRadius corner ? corner.TopLeft : 8;
         context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
         context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
     }
+
+    // The one position rule for the drawn tooltips, so the pill never sits somewhere a later pointer move would jump it from.
+    private static Rect PillAt(Point anchor, double width, double height, Size surface)
+    {
+        var (x, y) = TimelineTooltips.PillOrigin(anchor.X, anchor.Y, width, height, surface.Width, surface.Height);
+        return new Rect(x, y, width, height);
+    }
+
+    /// <summary>Where the pointer was when the name tooltip was last placed: the pointer's latest position over the name, also before the tooltip shows.</summary>
+    public Point NameTooltipAnchor => _nameTipPoint;
+
+    /// <summary>The name tooltip's pill in this control's coordinates, or null when none shows.</summary>
+    public Rect? NameTooltipRect => NameTooltip is { } tip
+        ? PillAt(_nameTipPoint, Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground")).Width + EyeTooltipPadding.Left + EyeTooltipPadding.Right,
+            Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground")).Height + EyeTooltipPadding.Top + EyeTooltipPadding.Bottom, Bounds.Size)
+        : null;
 
     /// <summary>The eye tooltip's font size and padding: a standard ToolTip's.</summary>
     public const double EyeTooltipFontSize = 12;

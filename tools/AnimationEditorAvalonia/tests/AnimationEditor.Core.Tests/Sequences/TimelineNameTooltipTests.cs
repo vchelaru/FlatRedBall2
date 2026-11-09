@@ -40,4 +40,13 @@ public class TimelineNameTooltipTests
         TimelineTooltips.ShowDelay.ShouldBeGreaterThan(TimeSpan.FromMilliseconds(100));
         TimelineTooltips.ShowDelay.ShouldBeLessThan(TimeSpan.FromMilliseconds(400));
     }
+
+    [Fact]
+    public void PillOrigin_FollowsTheAnchorOneToOne_UntilItHitsTheSurfaceEdge()
+    {
+        var a = TimelineTooltips.PillOrigin(50, 40, 100, 20, 600, 200);
+        var b = TimelineTooltips.PillOrigin(51, 40, 100, 20, 600, 200);
+        (b.X - a.X, b.Y - a.Y).ShouldBe((1.0, 0.0));
+        TimelineTooltips.PillOrigin(590, 190, 100, 20, 600, 200).ShouldBe((500.0, 180.0));
+    }
 }

@@ -16,4 +16,8 @@ public static class TimelineTooltips
 
     /// <summary>True when text <paramref name="textWidth"/> wide does not fit in <paramref name="availableWidth"/>, so it is drawn with an ellipsis.</summary>
     public static bool IsTruncated(double textWidth, double availableWidth) => textWidth > availableWidth + 0.5;
+
+    /// <summary>Where a tooltip pill's top-left goes for a pointer at (<paramref name="anchorX"/>, <paramref name="anchorY"/>): below and right of it, kept inside the surface. The one position rule for every timeline tooltip.</summary>
+    public static (double X, double Y) PillOrigin(double anchorX, double anchorY, double width, double height, double surfaceWidth, double surfaceHeight) =>
+        (Math.Clamp(anchorX + 12, 0, Math.Max(0, surfaceWidth - width)), Math.Clamp(anchorY + 16, 0, Math.Max(0, surfaceHeight - height)));
 }

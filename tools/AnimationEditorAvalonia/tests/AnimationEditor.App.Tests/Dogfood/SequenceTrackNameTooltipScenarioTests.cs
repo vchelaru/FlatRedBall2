@@ -103,4 +103,26 @@ public class SequenceTrackNameTooltipScenarioTests
 
         timeline.NameTooltip.ShouldBeNull();
     }
+
+    [AvaloniaFact]
+    public async Task TheTooltip_AppearsAtThePointersCurrentSpot_SoTheNextMoveDoesNotSnapIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+
+        var enter = OnName(editor, 0);
+        editor.Hover(enter);
+        var entered = timeline.NameTooltipAnchor;
+        var settled = enter + new Point(7, 1);
+        editor.Hover(settled);
+        await PastTheDelay(editor);
+
+        timeline.NameTooltip.ShouldBe(LongName);
+        timeline.NameTooltipAnchor.ShouldBe(entered + new Point(7, 1));
+        var before = timeline.NameTooltipRect!.Value;
+
+        editor.Hover(settled + new Point(1, 0));
+        timeline.NameTooltipRect!.Value.ShouldBe(before.Translate(new Vector(1, 0)));
+    }
 }
