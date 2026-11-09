@@ -47,7 +47,8 @@ public class SequenceChainBoundaryTests
     [Theory]
     [InlineData(8, 0.15f, 2, 2.4)]
     [InlineData(3, 0.1f, 1, 0.3)]
-    [InlineData(3, 0.1f, 3, 0.9)]
+    [InlineData(3, 0.1f, 1000, 300.0)]
+    [InlineData(3, 0.1f, 10000, 3000.0)]
     [InlineData(7, 0.7f, 2, 9.8)]
     [InlineData(5, 0.15f, 4, 3.0)]
     public void At_TheExactEndOfALoopingBlock_ShowsTheChainStartingThere_NotTheBlocksFirstFrame(int frames, float length, float loops, double end)
