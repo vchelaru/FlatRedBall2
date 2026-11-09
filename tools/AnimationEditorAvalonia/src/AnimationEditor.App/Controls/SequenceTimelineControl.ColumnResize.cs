@@ -11,9 +11,9 @@ namespace AnimationEditor.App.Controls;
 // (lanes, ruler, playhead, hit-testing, drops, scrollbar alignment) already reads from.
 public sealed partial class SequenceTimelineControl
 {
-    // Pixels either side of the column edge that grab it. Left of the edge is the header, right of it the lanes.
+    // Pixels left of the column edge (inside the header) that grab it. The lanes start at the edge, so none of them is
+    // taken: a chain at time 0, the ruler start and the marquee all begin at x = ColumnWidth.
     private const double EdgeGrabLeft = 4;
-    private const double EdgeGrabRight = 2;
     private const double EdgeHotWidth = 3;
 
     private bool _columnResizing;
@@ -38,7 +38,7 @@ public sealed partial class SequenceTimelineControl
     }
 
     private bool IsOverColumnEdge(Point point) =>
-        point.X >= Viewport.ColumnWidth - EdgeGrabLeft && point.X <= Viewport.ColumnWidth + EdgeGrabRight
+        point.X >= Viewport.ColumnWidth - EdgeGrabLeft && point.X < Viewport.ColumnWidth
         && point.Y >= 0 && point.Y <= Bounds.Height;
 
     // Handles a left press on the edge. A double-click fits the longest track name.

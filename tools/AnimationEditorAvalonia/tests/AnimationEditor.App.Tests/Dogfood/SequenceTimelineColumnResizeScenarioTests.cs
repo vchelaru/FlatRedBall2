@@ -45,7 +45,7 @@ public class SequenceTimelineColumnResizeScenarioTests
         double y = timeline.Viewport.LaneTop(0) + 10;
         double xBefore = timeline.Viewport.XAt(1);
 
-        editor.Drag(editor.PointIn(timeline, TimelineViewport.HeaderWidth, y), editor.PointIn(timeline, TimelineViewport.HeaderWidth + 100, y));
+        editor.Drag(editor.PointIn(timeline, TimelineViewport.HeaderWidth - 1, y), editor.PointIn(timeline, TimelineViewport.HeaderWidth + 99, y));
 
         timeline.Viewport.ColumnWidth.ShouldBe(TimelineViewport.HeaderWidth + 100, 1e-6);
         timeline.Viewport.XAt(1).ShouldBe(xBefore + 100, 1e-6);
@@ -62,7 +62,7 @@ public class SequenceTimelineColumnResizeScenarioTests
         var timeline = Timeline(editor);
         double y = timeline.Viewport.LaneTop(0) + 10;
 
-        editor.Drag(editor.PointIn(timeline, TimelineViewport.HeaderWidth, y), editor.PointIn(timeline, 5, y));
+        editor.Drag(editor.PointIn(timeline, TimelineViewport.HeaderWidth - 1, y), editor.PointIn(timeline, 5, y));
         timeline.Viewport.ColumnWidth.ShouldBe(TimelineViewport.MinColumnWidth);
     }
 
@@ -73,7 +73,7 @@ public class SequenceTimelineColumnResizeScenarioTests
         await editor.OpenAsync(WriteFixture(editor));
         var timeline = Timeline(editor);
         double y = timeline.Viewport.LaneTop(0) + 10;
-        Point edge = editor.PointIn(timeline, TimelineViewport.HeaderWidth, y);
+        Point edge = editor.PointIn(timeline, TimelineViewport.HeaderWidth - 1, y);
 
         editor.DoubleClickAt(edge);
 

@@ -1364,7 +1364,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
         if (_columnEdgeHot)
-            context.FillRectangle(new SolidColorBrush(AccentColor(), 0.8), new Rect(header - EdgeHotWidth + 1, 0, EdgeHotWidth, size.Height));
+            context.FillRectangle(new SolidColorBrush(AccentColor(), 0.8), new Rect(header - EdgeHotWidth, 0, EdgeHotWidth, size.Height));
     }
 
     // A small drawn eye (an almond outline and a pupil); struck through when the track is hidden in the preview.
