@@ -187,7 +187,8 @@ public static class TimelineLayout
         for (int i = 0; i < lane.Count; i++)
         {
             var block = lane[i];
-            if (!block.IsCut || !block.CanResize) continue;
+            // The event row under the bands is read-only.
+            if (!block.IsCut || !block.CanResize || inLane >= EventRowTop) continue;
             double distance = Math.Abs(x - viewport.XAt(block.FullEnd));
             if (distance > EdgeGrabPixels || distance >= cutDistance) continue;
             cutEdge = new TimelineHit(block, TimelineHitPart.Edge);
