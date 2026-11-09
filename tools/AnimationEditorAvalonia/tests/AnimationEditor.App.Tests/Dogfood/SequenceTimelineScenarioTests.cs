@@ -185,6 +185,21 @@ public class SequenceTimelineScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DraggingTheEndOfAChainPastTheNextOne_GrabsItsEdge_AndSnapsBackToTheNextStartExactly()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        // Walk asks for 4 cycles (0..2 s); Run (1.25..1.75 s) sits wholly inside it, so Walk's end lies past Run's.
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 4), ("Run", 1.25, 1)));
+        await editor.OpenAsync(boss);
+
+        editor.Drag(At(editor, 0, 2.0, dx: -1), At(editor, 0, 1.25, dx: 2));
+
+        var chains = SavedTrack(boss, 0).Chains;
+        chains.Single(c => c.Chain == "Walk").Loops.ShouldBe(2.5f);
+        chains.Single(c => c.Chain == "Run").Start.ShouldBe(1.25);
+    }
+
+    [AvaloniaFact]
     public async Task DraggingTheRightEdge_SnapsToCyclesAndTheNextChain_AndCanOverlapIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
