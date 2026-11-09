@@ -154,18 +154,51 @@ public static class TimelineLayout
             }
         }
 
-        foreach (var block in lane)
+        // Walk the lane latest-first, as the chains draw. A cut chain's far end can lie inside or past the chain that cuts it,
+        // so its edge competes with whatever body or edge the plain walk lands on instead of being hidden by it.
+        TimelineHit? plain = null;
+        double plainDistance = double.PositiveInfinity;
+        int plainOrder = -1;
+        for (int i = 0; i < lane.Count; i++)
         {
+            var block = lane[i];
             double left = viewport.XAt(block.Start);
             double right = viewport.XAt(block.PlayedEnd);
             // A narrow chain keeps most of its width for moving.
             double grab = Math.Min(EdgeGrabPixels, (right - left) / 3);
             bool resizable = block.CanResize && !block.IsCut;
             if (resizable && x >= right - grab && x <= right + EdgeGrabPixels)
-                return new TimelineHit(block, TimelineHitPart.Edge);
+            {
+                plain = new TimelineHit(block, TimelineHitPart.Edge);
+                plainDistance = Math.Abs(x - right);
+                plainOrder = i;
+                break;
+            }
             if (x >= left && x <= right)
-                return new TimelineHit(block, TimelineHitPart.Body);
+            {
+                plain = new TimelineHit(block, TimelineHitPart.Body);
+                break;
+            }
         }
-        return null;
+
+        TimelineHit? cutEdge = null;
+        double cutDistance = double.PositiveInfinity;
+        int cutOrder = -1;
+        for (int i = 0; i < lane.Count; i++)
+        {
+            var block = lane[i];
+            if (!block.IsCut || !block.CanResize) continue;
+            double distance = Math.Abs(x - viewport.XAt(block.FullEnd));
+            if (distance > EdgeGrabPixels || distance >= cutDistance) continue;
+            cutEdge = new TimelineHit(block, TimelineHitPart.Edge);
+            cutDistance = distance;
+            cutOrder = i;
+        }
+
+        if (cutEdge is null) return plain;
+        // Both ends in reach: the nearer wins, and a tie goes to the later chain (the lane is latest-first).
+        if (plain is { Part: TimelineHitPart.Edge } && (plainDistance < cutDistance - 1e-6 || (Math.Abs(plainDistance - cutDistance) <= 1e-6 && plainOrder < cutOrder)))
+            return plain;
+        return cutEdge;
     }
 }
