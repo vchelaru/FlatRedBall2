@@ -1417,7 +1417,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     // The block's full text, drawn above it (the filmstrip card goes below the pointer), in the eye tooltip's look.
     private void DrawBlockTooltip(DrawingContext context, Size size)
     {
-        if (BlockTooltip is not { } tip) return;
+        // The filmstrip card carries the block text itself, so only one popup shows for a block.
+        if (BlockTooltip is not { } tip || HoverCard is not null) return;
         var text = Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground"));
         var pad = EyeTooltipPadding;
         double height = text.Height + pad.Top + pad.Bottom;

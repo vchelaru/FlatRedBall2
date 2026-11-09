@@ -33,12 +33,17 @@ public sealed partial class SequenceTimelineControl
 
     private Point _hoverPoint;
     private (string Source, AnimationChainSave Chain)? _hoverSource;
+    private string? _hoverBlockText;
+
+    /// <summary>The block's full text (<c>Walk ×2 (1.00 s)</c>) shown as the last line of a filmstrip <see cref="HoverCard"/>, or null when the card is for an event flag.</summary>
+    public string? HoverCardBlockText => HoverCard is null ? null : _hoverBlockText;
 
     // The card follows the pointer. It is off during any drag (a chain, the ruler, a library chip) and after a scroll or zoom.
     private void UpdateHover(Point point)
     {
         FilmstripCard? card = null;
         (string, AnimationChainSave)? source = null;
+        _hoverBlockText = null;
         if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= Viewport.ColumnWidth
             && _document is { } document && Sequence is { } sequence
             && Viewport.RowAt(point.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row)
@@ -52,6 +57,7 @@ public sealed partial class SequenceTimelineControl
                 var visit = FilmstripLayout.VisitAt(cell, Viewport.TimeAt(point.X) - hit.Block.Start);
                 source = (hit.Block.Reference.Source, chain);
                 card = FilmstripReadout.At(hit.Block.Reference.Chain, chain.Frames.Count, hit.Block.Start, cell, visit);
+                _hoverBlockText = BlockLabel.Tooltip(hit.Block.Reference.Chain, hit.Block.Reference.Loops, hit.Block.Played);
             }
             else if (EventCardAt(point, inLane) is { } eventCard)
             {
@@ -82,6 +88,7 @@ public sealed partial class SequenceTimelineControl
         if (HoverCard is not { } card || _document is not { } document) return;
         var texts = new List<FormattedText> { Text(card.Title, 11, Brush("Ink"), FontWeight.SemiBold) };
         texts.AddRange(card.Lines.Select(line => Text(line, 11, Brush("InkMid"))));
+        if (_hoverBlockText is { } blockText) texts.Add(Text(blockText, 11, Brush("InkMid")));
         double textWidth = texts.Max(t => t.Width);
         double textHeight = texts.Sum(t => t.Height);
         double width = 8 + CardThumb + 8 + textWidth + 8;

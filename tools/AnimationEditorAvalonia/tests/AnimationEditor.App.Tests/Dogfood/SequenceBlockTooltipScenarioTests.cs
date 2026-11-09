@@ -80,4 +80,17 @@ public class SequenceBlockTooltipScenarioTests
 
         timeline.BlockTooltip.ShouldBeNull();
     }
+
+    [AvaloniaFact]
+    public async Task OverTheFilmstrip_TheFrameCardCarriesTheBlockText_AndNoSecondPopupDraws()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(WriteFixture(editor));
+        var timeline = Timeline(editor);
+
+        editor.Hover(editor.PointIn(timeline, timeline.Viewport.XAt(0.2), timeline.Viewport.LaneTop(0) + TimelineLayout.FilmTop + 10));
+
+        timeline.HoverCard.ShouldNotBeNull();
+        timeline.HoverCardBlockText.ShouldBe("Walk ×2 (1.00 s)");
+    }
 }
