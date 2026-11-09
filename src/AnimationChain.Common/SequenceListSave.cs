@@ -131,8 +131,8 @@ public class SequenceListSave
             {
                 ["source"] = reference.Source,
                 ["chain"] = reference.Chain,
-                ["start"] = reference.Start,
-                ["loops"] = reference.Loops,
+                ["start"] = Clean(reference.Start),
+                ["loops"] = Clean(reference.Loops),
             }, reference.UnknownProperties));
         }
 
@@ -144,6 +144,9 @@ public class SequenceListSave
         result["chains"] = chains;
         return AppendUnknown(result, track.UnknownProperties);
     }
+
+    // 1e-6 s is far below a frame; rounding drops double/float arithmetic noise like 3.8000000000000003.
+    private static double Clean(double value) => Math.Round(value, 6);
 
     // Copies, because a JsonNode has one parent and the stored node must stay usable for the next save. A key the known
     // fields already wrote wins, so a hand-added unknown entry cannot clobber a real value.
