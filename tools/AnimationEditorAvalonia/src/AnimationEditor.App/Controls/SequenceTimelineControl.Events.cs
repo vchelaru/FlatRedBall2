@@ -65,7 +65,7 @@ public sealed partial class SequenceTimelineControl
         double pps = Viewport.PixelsPerSecond;
         double left = Viewport.XAt(block.Start);
         double right = left + block.Played * pps;
-        if (right < TimelineViewport.HeaderWidth || left > size) return;
+        if (right < Viewport.ColumnWidth || left > size) return;
 
         // A name may run past its block's end, up to where the next chain on the track starts.
         double trackRoomRight = size;
@@ -87,7 +87,7 @@ public sealed partial class SequenceTimelineControl
         {
             var marker = markers[i];
             double x = left + marker.X;
-            if (x + EventMarkers.MarkerPixels < TimelineViewport.HeaderWidth) continue;
+            if (x + EventMarkers.MarkerPixels < Viewport.ColumnWidth) continue;
             if (x > size) break;
             Stats.MarkersIssued++;
             double poleX = Snap(x);

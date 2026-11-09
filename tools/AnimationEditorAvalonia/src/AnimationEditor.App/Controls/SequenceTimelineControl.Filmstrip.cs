@@ -39,7 +39,7 @@ public sealed partial class SequenceTimelineControl
     {
         FilmstripCard? card = null;
         (string, AnimationChainSave)? source = null;
-        if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= TimelineViewport.HeaderWidth
+        if (_drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && point.X >= Viewport.ColumnWidth
             && _document is { } document && Sequence is { } sequence
             && Viewport.RowAt(point.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row)
         {
@@ -127,13 +127,13 @@ public sealed partial class SequenceTimelineControl
             if (paint is not null)
             {
                 drawn = _filmstrip.Draw(context, document, block.Reference.Source, chain, cells, film,
-                    TimelineViewport.HeaderWidth, Bounds.Width, scaling, boundary, Brush("Ink"), paint);
+                    Viewport.ColumnWidth, Bounds.Width, scaling, boundary, Brush("Ink"), paint);
             }
             else
             {
                 using (context.PushClip(film))
                     _filmstrip.Draw(context, document, block.Reference.Source, chain, cells, film,
-                        TimelineViewport.HeaderWidth, Bounds.Width, scaling, boundary, Brush("Ink"));
+                        Viewport.ColumnWidth, Bounds.Width, scaling, boundary, Brush("Ink"));
             }
         }
         if (!drawn && paint is not null) _filmstrip.DrawBlockOnly(context, film, paint);

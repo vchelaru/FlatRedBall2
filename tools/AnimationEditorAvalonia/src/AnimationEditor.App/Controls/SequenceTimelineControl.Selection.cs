@@ -138,7 +138,7 @@ public sealed partial class SequenceTimelineControl
         // Pressing empty space clears the selection, as it always did; Ctrl keeps it for the band to add to.
         if (!additive) SetSelection(null, null);
         _selectionLayer.InvalidateVisual();
-        if (point.X < TimelineViewport.HeaderWidth) return;
+        if (point.X < Viewport.ColumnWidth) return;
         _marqueeBase = additive ? _model.Chains.ToList() : Array.Empty<TimelineChainId>();
         _marquee.Begin(_marqueeBase);
         _marqueeThrottle.Reset();
@@ -188,7 +188,7 @@ public sealed partial class SequenceTimelineControl
         SelectionLayerRenderCount++;
         if (Sequence is null) return;
         var size = Bounds.Size;
-        double header = TimelineViewport.HeaderWidth;
+        double header = Viewport.ColumnWidth;
         double ruler = TimelineViewport.RulerHeight;
         var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
         using (context.PushClip(lanes))
