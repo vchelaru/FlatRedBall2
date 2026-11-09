@@ -284,7 +284,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         _zoomAnimator.Cancel();
         ClearHover();
-        Viewport.SetPixelsPerSecond(TimelineViewport.PixelsPerSecondToFit(SequenceLength, Bounds.Width));
+        Viewport.SetPixelsPerSecond(TimelineViewport.PixelsPerSecondToFit(SequenceLength, Bounds.Width, Viewport.ColumnWidth));
         Viewport.SetScrollSeconds(0);
         ZoomChanged?.Invoke(Zoom * 100f);
         InvalidateVisual();
@@ -300,7 +300,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _zoomAnimator.Cancel();
         ClearHover();
         Viewport.SetPixelsPerSecond(TimelineViewport.DefaultPixelsPerSecond * percent / 100.0);
-        double view = Math.Max(0, Bounds.Width - TimelineViewport.HeaderWidth) / Viewport.PixelsPerSecond;
+        double view = Math.Max(0, Bounds.Width - Viewport.ColumnWidth) / Viewport.PixelsPerSecond;
         double furthest = Math.Max(0, SequenceLength + TimelineScrollBars.EndMarginPixels / Viewport.PixelsPerSecond - view);
         if (Viewport.ScrollSeconds > furthest) Viewport.SetScrollSeconds(furthest);
         ZoomChanged?.Invoke(Zoom * 100f);
@@ -480,7 +480,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         _selectionLayer.Measure(availableSize);
         _popupSurface.Measure(availableSize);
-        _renameBox?.Measure(new Size(TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
+        _renameBox?.Measure(new Size(Viewport.ColumnWidth - 4, RenameBoxHeight));
         return default;
     }
 
@@ -491,7 +491,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_renameBox is { } box && VisualChildren.Contains(box))
         {
             box.Arrange(new Rect(2, Viewport.LaneTop(_renameTrack) + TimelineLayout.HeaderCenterY - RenameBoxHeight / 2,
-                TimelineViewport.HeaderWidth - 4, RenameBoxHeight));
+                Viewport.ColumnWidth - 4, RenameBoxHeight));
         }
         return finalSize;
     }
@@ -643,7 +643,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (!properties.IsLeftButtonPressed) return;
         e.Handled = true;
 
-        if (row.Kind == TimelineRowKind.Ruler && point.X >= TimelineViewport.HeaderWidth)
+        if (TryBeginColumnResize(e, point)) return;
+
+        if (row.Kind == TimelineRowKind.Ruler && point.X >= Viewport.ColumnWidth)
         {
             _scrubbing = true;
             e.Pointer.Capture(this);
@@ -651,13 +653,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
-        if (row.Kind == TimelineRowKind.NewTrack && point.X < TimelineViewport.HeaderWidth)
+        if (row.Kind == TimelineRowKind.NewTrack && point.X < Viewport.ColumnWidth)
         {
             AddTrackAndRename();
             return;
         }
 
-        if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
+        if (row.Kind == TimelineRowKind.Track && point.X < Viewport.ColumnWidth)
         {
             // The eye is a button: it neither selects the track nor starts a rename.
             if (TimelineLayout.IsOverEye(point.X, point.Y - Viewport.LaneTop(row.Track)))
@@ -694,7 +696,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
 
-        var hit = point.X >= TimelineViewport.HeaderWidth
+        var hit = point.X >= Viewport.ColumnWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, sequence.Tracks.Count, point.X, point.Y)
             : null;
         if (hit is not { } found)
@@ -763,6 +765,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         UpdateEyeHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
+        UpdateColumnEdgeHot(e.GetPosition(this));
+        if (_columnResizing)
+        {
+            MoveColumnResize(e.GetPosition(this));
+            return;
+        }
         if (_panning)
         {
             var at = e.GetPosition(this);
@@ -852,6 +860,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerReleased(e);
         _lastPoint = e.GetPosition(this);
+        if (_columnResizing)
+        {
+            EndColumnResize(e.Pointer);
+            return;
+        }
         if (_panning)
         {
             if (e.InitialPressMouseButton == MouseButton.Middle) EndPan(e.Pointer);
@@ -879,6 +892,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        EndColumnResize(null);
         _scrubbing = false;
         if (_panning)
         {
@@ -925,6 +939,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         ClearHover();
         UpdateEyeHover(null);
         UpdateNewTrackHot(new Point(-1, -1));
+        if (!_columnResizing) UpdateColumnEdgeHot(new Point(-1, -1));
         if (_drag != DragKind.None || _scrubbing || _panning) return;
         _lastPoint = new Point(-1, -1);
         ShowCursor(_lastPoint);
@@ -938,20 +953,21 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void ShowCursor(Point point)
     {
         _lastPoint = point;
-        TimelineHit? hover = point.X >= TimelineViewport.HeaderWidth
+        TimelineHit? hover = point.X >= Viewport.ColumnWidth
             ? TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y)
             : null;
         _shownCursor = _panning ? TimelineCursor.Pan
+            : _columnResizing || (_drag == DragKind.None && !_scrubbing && IsOverColumnEdge(point)) ? TimelineCursor.ResizeHorizontal
             : _drag == DragKind.Track ? TimelineCursor.Reorder
             : TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
-        if (_drag != DragKind.None || _panning) DragCursors.Apply(this, _shownCursor);
+        if (_drag != DragKind.None || _panning || _columnResizing) DragCursors.Apply(this, _shownCursor);
     }
 
     private void UpdateEyeHover(Point? point)
     {
         int? track = null;
-        if (point is { } p && _drag == DragKind.None && !_scrubbing && _chipGhost is null && p.X < TimelineViewport.HeaderWidth
+        if (point is { } p && _drag == DragKind.None && !_scrubbing && _chipGhost is null && p.X < Viewport.ColumnWidth
             && Sequence is { } sequence && Viewport.RowAt(p.Y, sequence.Tracks.Count) is { Kind: TimelineRowKind.Track } row
             && TimelineLayout.IsOverEye(p.X, p.Y - Viewport.LaneTop(row.Track)))
             track = row.Track;
@@ -966,7 +982,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void UpdateNewTrackHot(Point point)
     {
         bool hot = _drag == DragKind.None && !_scrubbing && !_panning && Sequence is { } sequence && point.X >= 0
-            && point.X < TimelineViewport.HeaderWidth && Viewport.RowAt(point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
+            && point.X < Viewport.ColumnWidth && Viewport.RowAt(point.Y, sequence.Tracks.Count).Kind == TimelineRowKind.NewTrack;
         if (hot == IsNewTrackHot) return;
         IsNewTrackHot = hot;
         InvalidateVisual();
@@ -1105,7 +1121,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var point = e.GetPosition(this);
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
         {
-            _zoomPivotX = Math.Max(point.X, TimelineViewport.HeaderWidth);
+            _zoomPivotX = Math.Max(point.X, Viewport.ColumnWidth);
             _zoomAnimator.Wheel((float)_zoomPivotX, 0, e.Delta.Y);
         }
         else if (e.Delta.X != 0 || e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -1146,7 +1162,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var target = TimelineMenuTarget.Blank;
         TimelineBlock? hitBlock = null;
         int track = row.Track;
-        if (row.Kind == TimelineRowKind.Track && point.X < TimelineViewport.HeaderWidth)
+        if (row.Kind == TimelineRowKind.Track && point.X < Viewport.ColumnWidth)
         {
             target = TimelineMenuTarget.TrackHeader;
             if (!_model.ContainsTrack(track)) SetSelection(null, track);
@@ -1207,7 +1223,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     public override void Render(DrawingContext context)
     {
         RenderCount++;
-        Diagnostics.Frame(context, DrawTimeline, TimelineViewport.HeaderWidth + 6, TimelineViewport.RulerHeight + 6);
+        Diagnostics.Frame(context, DrawTimeline, Viewport.ColumnWidth + 6, TimelineViewport.RulerHeight + 6);
     }
 
     private void DrawTimeline(DrawingContext context)
@@ -1217,7 +1233,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (ProbeMode == TimelineProbeMode.BackgroundOnly) return;
         if (Sequence is not { } sequence) return;
 
-        double header = TimelineViewport.HeaderWidth;
+        double header = Viewport.ColumnWidth;
         double ruler = TimelineViewport.RulerHeight;
         var line = new Pen(Brush("LineBrush"), 1);
         var lanes = new Rect(header, ruler, Math.Max(0, size.Width - header), Math.Max(0, size.Height - ruler));
@@ -1273,10 +1289,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         if (SnapGuide is not { } target || Sequence is null) return;
         double x = Snap(Viewport.XAt(target.Time));
-        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        if (x < Viewport.ColumnWidth || x > size.Width) return;
         double bottom = Math.Min(size.Height, Viewport.LaneTop(TrackCount));
         var brush = Brush("Accent");
-        using (context.PushClip(new Rect(TimelineViewport.HeaderWidth, TimelineViewport.RulerHeight, Math.Max(0, size.Width - TimelineViewport.HeaderWidth), Math.Max(0, size.Height - TimelineViewport.RulerHeight))))
+        using (context.PushClip(new Rect(Viewport.ColumnWidth, TimelineViewport.RulerHeight, Math.Max(0, size.Width - Viewport.ColumnWidth), Math.Max(0, size.Height - TimelineViewport.RulerHeight))))
         {
             context.DrawLine(new Pen(brush, 1), new Point(x, TimelineViewport.RulerHeight), new Point(x, bottom));
             if (target.Kind == SnapKind.ChainEdge && target.Track >= 0 && target.Track < TrackCount)
@@ -1290,7 +1306,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void DrawPlayhead(DrawingContext context, Size size)
     {
         double x = Snap(Viewport.XAt(_playhead));
-        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        if (x < Viewport.ColumnWidth || x > size.Width) return;
         var brush = Brush("Accent");
         context.DrawLine(new Pen(brush, 2), new Point(x, 0), new Point(x, size.Height));
         var head = new StreamGeometry();
@@ -1307,7 +1323,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void DrawHeaders(DrawingContext context, SequenceSave sequence, Size size, TimelineDropPlan drop)
     {
         _headerSelectionShown = _model.Tracks.Count > 0;
-        double header = TimelineViewport.HeaderWidth;
+        double header = Viewport.ColumnWidth;
         double ruler = TimelineViewport.RulerHeight;
         var area = new Rect(0, ruler, header, Math.Max(0, size.Height - ruler));
         using (context.PushClip(area))
@@ -1347,6 +1363,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             context.DrawText(newTrack, new Point(8, newTop + (TimelineViewport.LaneHeight - newTrack.Height) / 2));
         }
         context.DrawLine(new Pen(Brush("LineStrong"), 1), new Point(header - 0.5, 0), new Point(header - 0.5, size.Height));
+        if (_columnEdgeHot)
+            context.FillRectangle(new SolidColorBrush(AccentColor(), 0.8), new Rect(header - EdgeHotWidth, 0, EdgeHotWidth, size.Height));
     }
 
     // A small drawn eye (an almond outline and a pupil); struck through when the track is hidden in the preview.
@@ -1409,7 +1427,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         using (context.PushClip(new Rect(0, ruler, size.Width, Math.Max(0, size.Height - ruler))))
         {
             context.FillRectangle(new SolidColorBrush(AccentColor(), 0.12),
-                new Rect(TimelineViewport.HeaderWidth, Viewport.LaneTop(dragged), Math.Max(0, size.Width - TimelineViewport.HeaderWidth), Viewport.LaneHeightOf(dragged)));
+                new Rect(Viewport.ColumnWidth, Viewport.LaneTop(dragged), Math.Max(0, size.Width - Viewport.ColumnWidth), Viewport.LaneHeightOf(dragged)));
             if (TrackDropLineY is not { } y) return;
             var brush = Brush("Accent");
             context.DrawLine(new Pen(brush, 3), new Point(0, y), new Point(size.Width, y));
@@ -1419,7 +1437,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
     private void DrawRuler(DrawingContext context, Size size, double step, double firstTick)
     {
-        double header = TimelineViewport.HeaderWidth;
+        double header = Viewport.ColumnWidth;
         double ruler = TimelineViewport.RulerHeight;
         context.FillRectangle(Brush("BgRail"), new Rect(0, 0, size.Width, ruler));
         // Which end of the lane stack draws in front; the header column is otherwise empty up here.
@@ -1449,7 +1467,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var body = new Rect(left, top + TimelineLayout.BodyTop, Math.Max(1, block.Played * pps),
             TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
         Stats.BlocksIssued++;
-        if (body.Right > TimelineViewport.HeaderWidth && body.Left < Bounds.Width) Stats.BlocksVisible++;
+        if (body.Right > Viewport.ColumnWidth && body.Left < Bounds.Width) Stats.BlocksVisible++;
 
         if (block.IsCut)
         {
@@ -1563,7 +1581,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         if (drop.Kind == TimelineDropKind.None) return;
         double x = Snap(drop.Left);
-        if (x < TimelineViewport.HeaderWidth || x > size.Width) return;
+        if (x < Viewport.ColumnWidth || x > size.Width) return;
         var brush = Brush("AccentCool");
         context.DrawLine(new Pen(brush, 1, new DashStyle(new double[] { 2, 2 }, 0)), new Point(x, TimelineViewport.RulerHeight), new Point(x, size.Height));
 
