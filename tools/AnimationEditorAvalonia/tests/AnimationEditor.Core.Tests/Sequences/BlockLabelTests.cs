@@ -11,20 +11,20 @@ public class BlockLabelTests
     private static double Chars(string text) => text.Length;
 
     [Theory]
-    [InlineData("Walk", 2, 1.2, "Walk ×2 (1.20 s)")]
-    [InlineData("Walk", 1, 0.5, "Walk (0.50 s)")]
+    [InlineData("Walk", 2, 1.2, "Walk ×2 (1.2 s)")]
+    [InlineData("Walk", 1, 0.5, "Walk (0.5 s)")]
     [InlineData("Walk", 2.5, 1.0 / 3, "Walk ×2.5 (0.33 s)")]
-    [InlineData("Walk", 3, 0.30000000000000004, "Walk ×3 (0.30 s)")]
+    [InlineData("Walk", 3, 0.30000000000000004, "Walk ×3 (0.3 s)")]
     public void Full_ShowsNameLoopsAndSeconds_HidingASingleLoop(string name, double loops, double seconds, string expected) =>
         BlockLabel.Full(name, loops, seconds).ShouldBe(expected);
 
     [Fact]
     public void Tooltip_AlwaysShowsTheLoopCount() =>
-        BlockLabel.Tooltip("Walk", 1, 0.5).ShouldBe("Walk ×1 (0.50 s)");
+        BlockLabel.Tooltip("Walk", 1, 0.5).ShouldBe("Walk ×1 (0.5 s)");
 
     [Fact]
     public void Fit_WideBlock_ShowsEverything() =>
-        BlockLabel.Fit("Walk", 2, 1.2, 100, Chars).ShouldBe("Walk ×2 (1.20 s)");
+        BlockLabel.Fit("Walk", 2, 1.2, 100, Chars).ShouldBe("Walk ×2 (1.2 s)");
 
     [Fact]
     public void Fit_DropsTheLengthFirst() =>
@@ -40,9 +40,13 @@ public class BlockLabelTests
 
     [Fact]
     public void Fit_SingleLoop_SkipsTheLoopStep() =>
-        BlockLabel.Fit("Walk", 1, 0.5, 12, Chars).ShouldBe("Walk");
+        BlockLabel.Fit("Walk", 1, 0.5, 11, Chars).ShouldBe("Walk");
 
     [Fact]
     public void Fit_ExactWidth_Fits() =>
-        BlockLabel.Fit("Walk", 2, 1.2, 16, Chars).ShouldBe("Walk ×2 (1.20 s)");
+        BlockLabel.Fit("Walk", 2, 1.2, 15, Chars).ShouldBe("Walk ×2 (1.2 s)");
+
+    [Fact]
+    public void CardLines_AreWordedLikeTheInspectorsCyclesAndLength() =>
+        BlockLabel.CardLines(2, 1).ShouldBe(new[] { "Cycles 2", "Length 1 s" });
 }

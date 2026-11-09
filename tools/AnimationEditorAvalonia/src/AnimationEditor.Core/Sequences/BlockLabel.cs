@@ -12,8 +12,12 @@ public static class BlockLabel
     /// <summary>Whether <paramref name="loops"/> is a single play, which the block label leaves unmarked.</summary>
     public static bool IsSingleLoop(double loops) => Math.Abs(loops - 1) <= 1e-6;
 
-    /// <summary>The block's length as shown, rounded for display only: <c>1.20 s</c>.</summary>
-    public static string Seconds(double seconds) => seconds.ToString("0.00", CultureInfo.InvariantCulture) + " s";
+    /// <summary>The block's length as shown, rounded for display only, formatted like the Inspector's Length: <c>1.2 s</c>.</summary>
+    public static string Seconds(double seconds) => seconds.ToString("0.##", CultureInfo.InvariantCulture) + " s";
+
+    /// <summary>The last lines of a filmstrip hover card, worded like the Inspector's Cycles and Length fields.</summary>
+    public static string[] CardLines(double loops, double seconds) =>
+        new[] { "Cycles " + loops.ToString("0.##", CultureInfo.InvariantCulture), "Length " + Seconds(seconds) };
 
     private static string Loops(double loops) => "×" + loops.ToString("0.##", CultureInfo.InvariantCulture);
 

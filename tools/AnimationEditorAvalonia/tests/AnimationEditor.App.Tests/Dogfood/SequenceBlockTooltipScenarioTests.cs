@@ -8,7 +8,7 @@ using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
-/// <summary>Resting the pointer on a timeline block shows its full text (<c>Walk ×2 (1.00 s)</c>) after a short delay, at any zoom.</summary>
+/// <summary>Resting the pointer on a timeline block shows its full text (<c>Walk ×2 (1 s)</c>) after a short delay, at any zoom.</summary>
 public class SequenceBlockTooltipScenarioTests
 {
     // Walk is five 0.1 s frames (0.5 s a cycle). Body plays it twice from 0, Once plays it once from 0.
@@ -51,7 +51,7 @@ public class SequenceBlockTooltipScenarioTests
         timeline.BlockTooltip.ShouldBeNull();
 
         (await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2))).ShouldBeTrue();
-        timeline.BlockTooltip.ShouldBe("Walk ×2 (1.00 s)");
+        timeline.BlockTooltip.ShouldBe("Walk ×2 (1 s)");
     }
 
     [AvaloniaFact]
@@ -64,7 +64,7 @@ public class SequenceBlockTooltipScenarioTests
         editor.Hover(OnBlock(editor, 1));
         await editor.WaitUntilAsync(() => timeline.BlockTooltip is not null, TimelineTooltips.ShowDelay + TimeSpan.FromSeconds(2));
 
-        timeline.BlockTooltip.ShouldBe("Walk ×1 (0.50 s)");
+        timeline.BlockTooltip.ShouldBe("Walk ×1 (0.5 s)");
     }
 
     [AvaloniaFact]
@@ -91,6 +91,6 @@ public class SequenceBlockTooltipScenarioTests
         editor.Hover(editor.PointIn(timeline, timeline.Viewport.XAt(0.2), timeline.Viewport.LaneTop(0) + TimelineLayout.FilmTop + 10));
 
         timeline.HoverCard.ShouldNotBeNull();
-        timeline.HoverCardBlockText.ShouldBe("Walk ×2 (1.00 s)");
+        timeline.HoverCardBlockLines.ShouldBe(new[] { "Cycles 2", "Length 1 s" });
     }
 }
