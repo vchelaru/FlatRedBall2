@@ -48,7 +48,7 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
     public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength,
         IReadOnlyList<SnapTarget>? targets = null, bool bypass = false)
     {
-        if (x < TimelineViewport.HeaderWidth || x > viewWidth) return None;
+        if (x < viewport.ColumnWidth || x > viewWidth) return None;
         var row = viewport.RowAt(y, trackCount);
         if (row.Kind is not (TimelineRowKind.Track or TimelineRowKind.NewTrack)) return None;
 

@@ -421,7 +421,8 @@ public partial class MainWindow : Window
                 () => _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value,
                 () => _appSettings.SequencePreviewPaneHeight = SequenceEditorPane.RowDefinitions[2].Height.Value,
                 () => _appSettings.SequenceLibraryWidth = SequenceTopGrid.ColumnDefinitions[0].Width.Value,
-                () => _appSettings.SidebarWidth = MainContentGrid.ColumnDefinitions[0].Width.Value,
+                () => _appSettings.SequenceTrackColumnWidth = SequenceTimeline.Viewport.ColumnWidth,
+                () => _appSettings.SidebarWidth =MainContentGrid.ColumnDefinitions[0].Width.Value,
                 () => _appSettings.WindowMaximized = WindowState == WindowState.Maximized,
                 SaveTabsToSettings,
                 // A normal close is not a crash -- clear any stray recovery file so the next
@@ -7259,6 +7260,8 @@ public partial class MainWindow : Window
             _appSettings.SequencePreviewPaneHeight, MinPreviewPaneHeight, MaxPreviewPaneHeight, DefaultPreviewPaneHeight), GridUnitType.Pixel);
         SequenceTopGrid.ColumnDefinitions[0].Width = new GridLength(PersistedDimensionValidator.Resolve(
             _appSettings.SequenceLibraryWidth, MinSequenceLibraryWidth, MaxSequenceLibraryWidth, DefaultSequenceLibraryWidth), GridUnitType.Pixel);
+        SequenceTimeline.SetColumnWidth(PersistedDimensionValidator.Resolve(
+            _appSettings.SequenceTrackColumnWidth, Core.Sequences.TimelineViewport.MinColumnWidth, Core.Sequences.TimelineViewport.MaxColumnWidth, Core.Sequences.TimelineViewport.HeaderWidth));
     }
 
     private const double MinSequenceLibraryWidth = 100;

@@ -18,7 +18,7 @@ public static class TimelineScrollBinder
 
     public static void Attach(SequenceTimelineControl timeline, ScrollBar horizontal, ScrollBar vertical)
     {
-        horizontal.Margin = new Thickness(TimelineViewport.HeaderWidth, 0, 0, 0);
+        horizontal.Margin = new Thickness(timeline.Viewport.ColumnWidth, 0, 0, 0);
         vertical.Margin = new Thickness(0, TimelineViewport.RulerHeight, 0, 0);
         bool suppress = false;
 
@@ -41,6 +41,7 @@ public static class TimelineScrollBinder
         {
             if (suppress) return;
             suppress = true;
+            horizontal.Margin = new Thickness(timeline.Viewport.ColumnWidth, 0, 0, 0);
             var across = timeline.HorizontalScroll;
             Apply(horizontal, across, ArrowStepPixels / timeline.Viewport.PixelsPerSecond);
             horizontal.Visibility = ScrollBarVisibility.Visible;
