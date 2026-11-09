@@ -60,7 +60,7 @@ public class TimelinePopupLayerTests
             grid.Children.Add(playhead);
             grid.Children.Add(popups);
         }
-        var window = new Window { Width = 600, Height = 200, Content = grid };
+        var window = new Window { Width = 600, Height = 260, Content = grid };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         timeline.Show(SequenceDocument.Load(path), 0, new UndoManager());
