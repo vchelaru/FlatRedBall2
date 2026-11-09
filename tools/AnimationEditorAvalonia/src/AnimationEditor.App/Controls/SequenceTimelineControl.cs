@@ -773,6 +773,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         UpdateEyeHover(e.GetPosition(this));
         UpdateNameHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
+        UpdateBlockTooltip(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
         UpdateColumnEdgeHot(e.GetPosition(this));
         if (_columnResizing)
@@ -1471,6 +1472,24 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
     }
 
+    // A block's full text. The filmstrip card carries it itself, so only one popup shows for a block.
+    private void DrawBlockTooltip(DrawingContext context, Size size)
+    {
+        if (BlockTooltip is not { } tip || HoverCard is not null) return;
+        var text = Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground"));
+        var pad = EyeTooltipPadding;
+        var pill = PillAt(_tipPoint, text.Width + pad.Left + pad.Right, text.Height + pad.Top + pad.Bottom, size);
+        double radius = this.TryFindResource("OverlayCornerRadius", ActualThemeVariant, out var found) && found is CornerRadius corner ? corner.TopLeft : 8;
+        context.DrawRectangle(Brush("ToolTipBackground"), new Pen(Brush("ToolTipBorderBrush"), 1), pill, radius, radius);
+        context.DrawText(text, new Point(pill.X + pad.Left, pill.Y + pad.Top));
+    }
+
+    /// <summary>The block tooltip's pill in this control's coordinates, or null when none shows.</summary>
+    public Rect? BlockTooltipRect => BlockTooltip is { } tip && HoverCard is null
+        ? PillAt(_tipPoint, Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground")).Width + EyeTooltipPadding.Left + EyeTooltipPadding.Right,
+            Text(tip, EyeTooltipFontSize, Brush("ToolTipForeground")).Height + EyeTooltipPadding.Top + EyeTooltipPadding.Bottom, Bounds.Size)
+        : null;
+
     // The one position rule for the drawn tooltips, so the pill never sits somewhere a later pointer move would jump it from.
     private static Rect PillAt(Point anchor, double width, double height, Size surface)
     {
@@ -1594,12 +1613,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
 
         if (!TimelineLayout.ShowsLabel(body.Width)) return;
-        string label = block.IsMissing ? $"⚠ {block.Reference.Chain} (missing)" : block.Reference.Chain;
-        if (!block.IsMissing && Math.Abs(block.Reference.Loops - 1) > 1e-6)
-            label += $"  ×{block.Reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
+        double labelWidth = Math.Max(1, body.Width - 12);
+        string label = block.IsMissing
+            ? $"⚠ {block.Reference.Chain} (missing)"
+            : BlockLabel.Fit(block.Reference.Chain, block.Reference.Loops, block.Played, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
-            var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, Math.Max(1, body.Width - 12));
+            var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, labelWidth);
             // A missing chain has no filmstrip, so its label centers in the whole block.
             double strip = block.IsMissing ? body.Height : TimelineLayout.LabelHeight;
             context.DrawText(text, new Point(body.X + 6, body.Y + (strip - text.Height) / 2));

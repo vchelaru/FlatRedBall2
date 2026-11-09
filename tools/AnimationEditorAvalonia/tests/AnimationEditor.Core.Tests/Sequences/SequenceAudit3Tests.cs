@@ -121,7 +121,7 @@ public class SequenceAudit3Tests
         var held = new FilmstripVisit(0, 0.1, 1.2, 0, IsReturn: true, IsHold: true);
 
         FilmstripReadout.At("Chomp", 3, 0, Cell(0, false, forward, held), held).Lines
-            .ShouldBe(new[] { "1 / 3", "1.10 s", "at 0.10 s", "return", "held" });
+            .ShouldBe(new[] { "1 / 3", "Frame 1.10 s", "Start 0.10 s", "return", "held" });
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class SequenceAudit3Tests
     {
         var held = new FilmstripVisit(0, 0.5, 1.2, 0, IsReturn: true, IsHold: true);
 
-        FilmstripReadout.At("Chomp", 3, 0, Cell(0, false, held), held).Lines.ShouldBe(new[] { "1 / 3", "0.70 s", "at 0.50 s", "held" });
+        FilmstripReadout.At("Chomp", 3, 0, Cell(0, false, held), held).Lines.ShouldBe(new[] { "1 / 3", "Frame 0.70 s", "Start 0.50 s", "held" });
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class SequenceAudit3Tests
         var held = new FilmstripVisit(2, 0.11, 0.9, 0, IsHold: true);
 
         FilmstripReadout.At("Once", 3, 0, Cell(2, true, first, held), held).Lines
-            .ShouldBe(new[] { "3 / 3", "0.79 s", "at 0.11 s", "merged: 2, 3", "held" });
+            .ShouldBe(new[] { "3 / 3", "Frame 0.79 s", "Start 0.11 s", "merged: 2, 3", "held" });
     }
 
     // ---- events

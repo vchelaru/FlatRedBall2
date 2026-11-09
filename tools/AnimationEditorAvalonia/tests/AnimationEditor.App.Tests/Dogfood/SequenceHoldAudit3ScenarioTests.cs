@@ -110,9 +110,9 @@ public class SequenceHoldAudit3ScenarioTests
 
         editor.Hover(Film(editor, 0, 1.0));
         timeline.HoverCard!.Title.ShouldBe("Once");
-        timeline.HoverCard.Lines.ShouldBe(new[] { "5 / 5", "1.10 s", "at 0.40 s", "held" });
+        timeline.HoverCard.Lines.ShouldBe(new[] { "5 / 5", "Frame 1.10 s", "Start 0.40 s", "held" });
         editor.Hover(Film(editor, 0, 0.25));
-        timeline.HoverCard!.Lines.ShouldBe(new[] { "3 / 5", "0.10 s", "at 0.20 s" });
+        timeline.HoverCard!.Lines.ShouldBe(new[] { "3 / 5", "Frame 0.10 s", "Start 0.20 s" });
     }
 
     // ---- the inspector says what the field is

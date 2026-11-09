@@ -238,7 +238,7 @@ public partial class SequenceInspectorControl : UserControl
         ChainMissingText.IsVisible = problem is not null;
     }
 
-    private static string Seconds(double seconds) => seconds.ToString("0.##", CultureInfo.InvariantCulture) + " s";
+    private static string Seconds(double seconds) => BlockLabel.Seconds(seconds);
 
     // A focused field is left alone only while it holds text the user typed and has not committed.
     private static void Put(TextBox box, string text, bool force)

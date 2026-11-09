@@ -19,7 +19,7 @@ public class FilmstripReadoutTests
 
         card.Title.ShouldBe("Walk");
         card.Frame.ShouldBe(2);
-        card.Lines.ShouldBe(new[] { "3 / 8", "0.12 s", "at 1.90 s" });
+        card.Lines.ShouldBe(new[] { "3 / 8", "Frame 0.12 s", "Start 1.90 s" });
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class FilmstripReadoutTests
     {
         var visit = new FilmstripVisit(2, 0.2, 0.9, 0, IsHold: true);
 
-        FilmstripReadout.At("Once", 3, 0, Cell(2, visit), visit).Lines.ShouldBe(new[] { "3 / 3", "0.70 s", "at 0.20 s", "held" });
+        FilmstripReadout.At("Once", 3, 0, Cell(2, visit), visit).Lines.ShouldBe(new[] { "3 / 3", "Frame 0.70 s", "Start 0.20 s", "held" });
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class FilmstripReadoutTests
     {
         var visit = new FilmstripVisit(1, 0.1, 0.2, 0, IsReturn: true);
 
-        FilmstripReadout.At("Chomp", 4, 0, Cell(1, visit), visit).Lines.ShouldBe(new[] { "2 / 4", "0.10 s", "at 0.10 s" });
+        FilmstripReadout.At("Chomp", 4, 0, Cell(1, visit), visit).Lines.ShouldBe(new[] { "2 / 4", "Frame 0.10 s", "Start 0.10 s" });
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class FilmstripReadoutTests
 
         var card = FilmstripReadout.At("Stress", 6, 0, cell, visits[1]);
 
-        card.Lines.ShouldBe(new[] { "2 / 6", "0.01 s", "at 0.01 s", "merged: 1, 2, 3" });
+        card.Lines.ShouldBe(new[] { "2 / 6", "Frame 0.01 s", "Start 0.01 s", "merged: 1, 2, 3" });
     }
 
     [Fact]

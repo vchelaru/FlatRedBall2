@@ -55,13 +55,13 @@ public class SequenceFilmstripHoverScenarioTests
         // Block starts at 0.5 s; 0.75 s is frame 3 of the first cycle, 1.15 s is frame 2 of the second.
         editor.Hover(Film(editor, 0, 0.75));
         timeline.HoverCard!.Title.ShouldBe("Walk");
-        timeline.HoverCard.Lines.ShouldBe(new[] { "3 / 5", "0.10 s", "at 0.70 s" });
+        timeline.HoverCard.Lines.ShouldBe(new[] { "3 / 5", "Frame 0.10 s", "Start 0.70 s" });
         editor.Hover(Film(editor, 0, 1.15));
-        timeline.HoverCard!.Lines.ShouldBe(new[] { "2 / 5", "0.10 s", "at 1.10 s" });
+        timeline.HoverCard!.Lines.ShouldBe(new[] { "2 / 5", "Frame 0.10 s", "Start 1.10 s" });
 
         timeline.SetZoomPercent(400);
         editor.Hover(Film(editor, 0, 1.15));
-        timeline.HoverCard!.Lines.ShouldBe(new[] { "2 / 5", "0.10 s", "at 1.10 s" });
+        timeline.HoverCard!.Lines.ShouldBe(new[] { "2 / 5", "Frame 0.10 s", "Start 1.10 s" });
         timeline.SetZoomPercent(50);
         editor.Hover(Film(editor, 0, 1.15));
         timeline.HoverCard!.Lines[0].ShouldBe("2 / 5");
