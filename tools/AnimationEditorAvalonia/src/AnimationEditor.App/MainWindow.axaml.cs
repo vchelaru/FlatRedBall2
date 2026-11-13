@@ -8582,6 +8582,21 @@ public partial class MainWindow : Window
             // caret ourselves rather than re-dispatching the key, since re-raising it on the
             // TextBox would route back through this same Tunnel handler.
             e.Handled = true;
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                // Shift extends the selection from its fixed end; the caret is the moving end.
+                var length = (tb.Text ?? string.Empty).Length;
+                var caret = Math.Clamp(tb.CaretIndex, 0, length);
+                var anchor = tb.SelectionStart == tb.SelectionEnd
+                    ? caret
+                    : (tb.SelectionStart == caret ? tb.SelectionEnd : tb.SelectionStart);
+                var moved = Math.Clamp(caret + (e.Key == Key.Left ? -1 : 1), 0, length);
+                // Setting CaretIndex collapses the selection, so it goes first.
+                tb.CaretIndex = moved;
+                tb.SelectionStart = anchor;
+                tb.SelectionEnd = moved;
+                return;
+            }
             var min = Math.Min(tb.SelectionStart, tb.SelectionEnd);
             var max = Math.Max(tb.SelectionStart, tb.SelectionEnd);
             var hasSelection = min != max;
