@@ -115,6 +115,29 @@ public class SequenceRenameBoxKeysScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ShiftArrows_InSequenceAndTrackRenameBoxes_ExtendTheSelection()
+    {
+        using var editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        await editor.OpenAsync(path);
+
+        var box = OpenSequenceBox(editor, 1, "Zebra");
+        box.SelectionStart = box.SelectionEnd = box.CaretIndex = 3;
+        editor.Press(Key.Left, RawInputModifiers.Shift);
+        editor.Press(Key.Left, RawInputModifiers.Shift);
+        box.SelectedText.ShouldBe("eb", $"s={box.SelectionStart} e={box.SelectionEnd} c={box.CaretIndex}");
+        box.IsEditing.ShouldBeTrue();
+        editor.Press(Key.Escape);
+
+        editor.ClickAt(editor.CenterOf((Control)List(editor).ContainerFromIndex(0)!));
+        box = OpenTrackBox(editor, 0, "Torso");
+        box.SelectionStart = box.SelectionEnd = box.CaretIndex = 2;
+        editor.Press(Key.Right, RawInputModifiers.Shift);
+        box.SelectedText.ShouldBe("r", $"s={box.SelectionStart} e={box.SelectionEnd} c={box.CaretIndex}");
+        box.IsEditing.ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
     public async Task CtrlA_InARenameBox_SelectsItsText_AndEscapeAndEnterStillMean_Cancel_AndCommit()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

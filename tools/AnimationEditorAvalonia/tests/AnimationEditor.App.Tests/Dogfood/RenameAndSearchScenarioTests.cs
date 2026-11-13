@@ -33,6 +33,29 @@ public class RenameAndSearchScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ShiftArrowsInTheTreeRenameBox_ExtendTheTextSelection()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk);
+        editor.Press(Key.F2);
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        TextBox box = (TextBox)editor.Window.FocusManager!.GetFocusedElement()!;
+
+        box.SelectionStart = box.SelectionEnd = box.CaretIndex = 4;
+        editor.Press(Key.Left, RawInputModifiers.Shift);
+        editor.Press(Key.Left, RawInputModifiers.Shift);
+        box.SelectedText.ShouldBe("lk", $"{box.GetType().Name} text={box.Text} s={box.SelectionStart} e={box.SelectionEnd} c={box.CaretIndex}");
+
+        editor.Press(Key.Right, RawInputModifiers.Shift);
+        box.SelectedText.ShouldBe("k");
+        editor.NodeFor(walk).IsEditing.ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
     public async Task DoubleClickingAChainRow_FitsTheChainToTheWireframe_WithoutRenaming()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
