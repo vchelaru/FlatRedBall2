@@ -194,6 +194,31 @@ public class KeyframeLaneUiTests
     }
 
     [AvaloniaFact]
+    public void EveryKeyframeSitsOnItsCellsRealLeftEdge_ForEightFramesOf0Point15()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var chain = MakeChain("Fade", 8, 0.15f);
+        for (int i = 0; i < 8; i++) chain.Frames[i].RelativeX = i * 3;
+        var window = ShowWindow(ctx, chain);
+        try
+        {
+            var strip = Find<ItemsControl>(window, "TimelineStrip");
+            var lane = Find<KeyframeLaneControl>(window, "FirstLane");
+            Assert.NotNull(lane.Lane);
+            Assert.Equal(8, lane.Lane!.KeyframeXs.Count);
+            var stripOrigin = Origin(strip, window);
+            var report = new System.Text.StringBuilder();
+            for (int i = 0; i < 8; i++)
+            {
+                double cellX = Origin(strip.ContainerFromIndex(i)!, window).X - stripOrigin.X;
+                report.Append($"[{i}: cell {cellX:0.###} lane {lane.Lane.KeyframeXs[i]:0.###}] ");
+                Assert.True(Math.Abs(cellX - lane.Lane.KeyframeXs[i]) < 0.01, report.ToString());
+            }
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void WhenBothShow_EachLabelSitsOnItsOwnLane()
     {
         var ctx = TestHelpers.BuildServices();
