@@ -2002,7 +2002,9 @@
                             <ScrollViewer x:Name="TimelineScroll"
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl x:Name="TimelineStrip">
+                                <!-- No layout rounding: it rounds each cell's width up to whole pixels, so the cells
+                                     drift right of the keyframe lanes, which sum the unrounded widths (#1777). -->
+                                <ItemsControl x:Name="TimelineStrip" UseLayoutRounding="False">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <StackPanel Orientation="Horizontal" />
