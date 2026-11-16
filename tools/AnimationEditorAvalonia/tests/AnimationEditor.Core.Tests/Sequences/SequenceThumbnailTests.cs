@@ -64,6 +64,51 @@ public class SequenceThumbnailTests
         SequenceThumbnailScene.LayersFor(document.Save.Sequences[0], document).Count.ShouldBe(1);
     }
 
+    // Boss: only a reference to Fx (Spark) at the given start. Fx: one Spark track.
+    private static SequenceDocument LoadReferenceOnly(TestHelpers.TempDir dir, double start)
+    {
+        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, 1)));
+        document.Save.Sequences[0].Name = "Fx";
+        var boss = new SequenceSave { Name = "Boss" };
+        boss.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Fx", Start = start } });
+        document.Save.Sequences.Add(boss);
+        return document;
+    }
+
+    [Fact]
+    public void LayersFor_AReferenceTrack_ShowsTheReferencedSequence()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = LoadReferenceOnly(dir, 0);
+        var boss = document.Save.Sequences[1];
+
+        SequenceThumbnailScene.LayersFor(boss, document).ShouldBeEmpty();
+        SequenceThumbnailScene.LayersFor(boss, document, document.Save.Sequences)
+            .Select(l => Path.GetFileName(l.TexturePath)).ShouldBe(new[] { "spark.png" });
+    }
+
+    [Fact]
+    public void ChooseTime_AReferenceStartingLater_IsItsStart()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = LoadReferenceOnly(dir, 0.4);
+        var boss = document.Save.Sequences[1];
+
+        SequenceThumbnailScene.ChooseTime(boss, document, document.Save.Sequences).ShouldBe(0.4);
+        SequenceThumbnailScene.LayersFor(boss, document, document.Save.Sequences).Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ChainReferencesOf_IncludesTheChainsOfReferencedSequences()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = LoadReferenceOnly(dir, 0);
+        var boss = document.Save.Sequences[1];
+
+        SequenceThumbnailScene.ChainReferencesOf(boss, document.Save.Sequences)
+            .Select(r => r.Source + ":" + r.Chain).ShouldBe(new[] { "fx/fx.achj:Spark" });
+    }
+
     [Fact]
     public void ChooseTime_AHiddenOrUnresolvedTrackDoesNotCount()
     {

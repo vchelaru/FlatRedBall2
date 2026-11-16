@@ -155,7 +155,7 @@ public sealed class ProjectTreeThumbnailService
             SequenceThumbnailCacheKey.FileInput("seqj", entry.RelativePath, seqjStamp.Size, seqjStamp.Modified),
             $"size:{maxWidth}x{maxHeight}",
         };
-        var references = sequence.Tracks.SelectMany(track => track.Chains).ToList();
+        var references = SequenceThumbnailScene.ChainReferencesOf(sequence, save.Sequences);
         foreach (var source in references.Select(reference => reference.Source).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var file = await entry.ParentFolder.ResolveRelativeFileAsync(source);
@@ -196,7 +196,7 @@ public sealed class ProjectTreeThumbnailService
             }
         }
 
-        var layers = SequenceThumbnailScene.LayersFor(sequence, lookup);
+        var layers = SequenceThumbnailScene.LayersFor(sequence, lookup, save.Sequences);
         if (layers.Count == 0) return null;
 
         string? cacheFilePath = null;
