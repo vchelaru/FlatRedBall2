@@ -1,5 +1,6 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Sequences;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
 using System;
@@ -38,6 +39,7 @@ internal sealed class FilmstripAtlas
 
     private readonly List<Page> _pages = new();
     private readonly Dictionary<Key, (AtlasEntry? Entry, bool Fallback)> _entries = new();
+    private readonly Dictionary<(ScenePose Pose, int Height), AtlasEntry?> _composites = new();
     private SKImage[] _snapshot = Array.Empty<SKImage>();
     private bool _snapshotStale = true;
     private bool _full;
@@ -59,6 +61,7 @@ internal sealed class FilmstripAtlas
         foreach (var page in _pages) page.Bitmap.Dispose();
         _pages.Clear();
         _entries.Clear();
+        _composites.Clear();
         _snapshot = Array.Empty<SKImage>();
         _snapshotStale = true;
         _full = false;
@@ -81,6 +84,32 @@ internal sealed class FilmstripAtlas
         var entry = Build(sheet, plain, flipH, flipV, flipD, color, deviceHeight, out fallback);
         _entries[key] = (entry, fallback);
         if (_entries.Count > MaxEntries) _full = true;   // edits mint new keys; start over at the next frame
+        return entry;
+    }
+
+    /// <summary>Whether the composite of <paramref name="pose"/> at <paramref name="deviceHeight"/> is already cut (or known to have nothing to draw); <paramref name="entry"/> is null for the latter.</summary>
+    public bool TryGetComposite(ScenePose pose, int deviceHeight, out AtlasEntry? entry) => _composites.TryGetValue((pose, deviceHeight), out entry);
+
+    /// <summary>Stores the composite thumbnail of <paramref name="pose"/> (a null bitmap records that there is nothing to draw), returning where it sits; null when the atlas can't hold it.</summary>
+    public AtlasEntry? AddComposite(ScenePose pose, int deviceHeight, SKBitmap? bitmap)
+    {
+        AtlasEntry? entry = null;
+        if (bitmap is not null && bitmap.Width + 2 * Gutter <= PageSize && bitmap.Height + 2 * Gutter <= PageSize)
+        {
+            var (page, x, y) = Allocate(bitmap.Width, bitmap.Height);
+            if (page is not null)
+            {
+                using var source = SKImage.FromBitmap(bitmap);
+                using var canvas = new SKCanvas(page.Bitmap);
+                using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
+                canvas.DrawImage(source, x, y, SamplingNearest, paint);
+                page.Dirty = true;
+                _snapshotStale = true;
+                entry = new AtlasEntry(_pages.IndexOf(page), x, y, bitmap.Width, bitmap.Height);
+            }
+        }
+        _composites[(pose, deviceHeight)] = entry;
+        if (_composites.Count > MaxEntries) _full = true;
         return entry;
     }
 

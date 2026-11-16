@@ -49,6 +49,9 @@ public sealed partial class SequenceTimelineControl
 
     internal int FilmstripAtlasPages => _filmstrip.Atlas.PageCount;
 
+    /// <summary>What the reference clips' composite cells have cost since the counters were last reset.</summary>
+    internal ReferenceFilmstripStats ReferenceStats => _filmstrip.ReferenceStats;
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
