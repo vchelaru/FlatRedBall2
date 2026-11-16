@@ -81,16 +81,18 @@ public sealed partial class SequenceTimelineControl
     // ── Adding ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Adds a track that plays sequence <paramref name="name"/> at the playhead, in front, with one cycle, and selects it. One
-    /// undo entry. Returns why it was refused (it would play itself through a cycle), or null.
+    /// Adds a track that plays sequence <paramref name="name"/> at the playhead with one cycle, in gap <paramref name="slot"/>
+    /// (0, the default, is in front), and selects it. One undo entry. Returns why it was refused (it would play itself through a
+    /// cycle), or null.
     /// </summary>
-    public string? AddSequenceReference(string name)
+    public string? AddSequenceReference(string name, int slot = 0)
     {
         if (_document is null || _undo is null || Sequence is null) return "Open a sequence first.";
-        if (_document.AddSequenceReference(_undo, _sequenceIndex, name, _playhead) is { } error) return error;
-        SetSelection(null, 0);
+        if (_document.AddSequenceReference(_undo, _sequenceIndex, name, _playhead, slot) is { } error) return error;
+        int added = Math.Clamp(slot, 0, Sequence.Tracks.Count - 1);
+        SetSelection(null, added);
         Rebuild();
-        if (Viewport.ScrollY > 0) ScrollToY(0);
+        if (slot == 0 && Viewport.ScrollY > 0) ScrollToY(0);
         return null;
     }
 
@@ -122,13 +124,24 @@ public sealed partial class SequenceTimelineControl
     /// <summary>True while a sequence dragged from the list is over a place it could be dropped.</summary>
     public bool IsSequenceDropTarget => _sequenceGhost is not null;
 
-    /// <summary>Drops sequence <paramref name="name"/> at <paramref name="point"/>: a new reference at the playhead. False (nothing added) where <see cref="CanDropSequence"/> says no.</summary>
+    /// <summary>The gap between lanes a sequence dragged from the list would be inserted into, or null when it makes the front track on the new-track row or is not over a drop.</summary>
+    public int? SequenceDropSlot =>
+        _sequenceGhost is { } ghost && TimelineDropPlan.ForSequence(Viewport, TrackCount, ghost.Point.Y) is { Kind: TimelineDropKind.Gap } plan ? plan.Row : null;
+
+    /// <summary>The y of the insertion line for <see cref="SequenceDropSlot"/>, in this control's coordinates.</summary>
+    public double? SequenceDropLineY => SequenceDropSlot is { } slot ? TrackReorder.SlotY(Viewport, slot) : null;
+
+    /// <summary>
+    /// Drops sequence <paramref name="name"/> at <paramref name="point"/>: a new reference at the playhead, in front on the new-track
+    /// row or in the gap between lanes nearest the point. False (nothing added) where <see cref="CanDropSequence"/> says no.
+    /// </summary>
     public bool DropSequence(string name, Point point)
     {
         _sequenceGhost = null;
         InvalidateVisual();
         if (!CanDropSequence(name, point)) return false;
-        if (AddSequenceReference(name) is { } error) ErrorRaised?.Invoke(error);
+        var plan = TimelineDropPlan.ForSequence(Viewport, TrackCount, point.Y);
+        if (AddSequenceReference(name, plan.Kind == TimelineDropKind.Gap ? plan.Row : 0) is { } error) ErrorRaised?.Invoke(error);
         return true;
     }
 
@@ -393,6 +406,7 @@ public sealed partial class SequenceTimelineControl
         if (_sequenceGhost is not { } ghost) return;
         var color = RefColor();
         context.FillRectangle(new SolidColorBrush(color, 0.08), lanes);
+        if (SequenceDropSlot is not null) return; // a gap shows the reorder's insertion line instead (DrawSequenceGap)
         double length = GhostLength(ghost.Name);
         double top = Viewport.LaneTop(TimelineViewport.NewTrackLane);
         var rect = new Rect(Viewport.XAt(_playhead), top + TimelineLayout.BodyTop, Math.Max(1, length * Viewport.PixelsPerSecond), TimelineViewport.LaneHeight - 2 * TimelineLayout.BodyTop);
