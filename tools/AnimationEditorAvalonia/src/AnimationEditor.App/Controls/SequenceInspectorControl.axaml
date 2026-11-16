@@ -89,7 +89,7 @@
                                 <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
                             </Grid>
                             <Grid ColumnDefinitions="78,*">
-                                <TextBlock Text="Cycles" Classes="label"
+                                <TextBlock Text="Clip cycles" Classes="label"
                                            ToolTip.Tip="The clip's length in cycles of the played sequence. A sequence with Loop on repeats across it; one with Loop off plays once, then holds its final pose. The clip never lengthens this sequence." />
                                 <viewsControls:FlankerNumericField x:Name="ReferenceLoopsField" Grid.Column="1"
                                                                    Minimum="0.001" Increment="1" FormatString="0.###" />

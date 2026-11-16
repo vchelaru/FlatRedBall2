@@ -297,22 +297,22 @@ public class SequenceClipboardMenuScenarioTests
 
         editor.RightClickAt(At(editor, 2, 5.0));
 
-        Headers(Timeline(editor).Menu).ShouldBe(new[] { "Add Track", "-", "Paste" });
+        Headers(Timeline(editor).Menu).ShouldBe(new[] { "Add Track", "Add Sequence Reference", "-", "Paste" });
     }
 
     [AvaloniaFact]
-    public async Task TheNewTrackRow_AndTheSpaceBelowIt_OfferAddTrackAndPaste()
+    public async Task TheNewTrackRow_AndTheSpaceBelowIt_OfferAddTrackReferenceAndPaste()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         await editor.OpenAsync(WriteThreeSequences(editor));
         var timeline = Timeline(editor);
 
         editor.RightClickAt(editor.PointIn(timeline, 20, timeline.Viewport.LaneTop(3) + 10));
-        Headers(timeline.Menu).ShouldBe(new[] { "Add Track", "-", "Paste" });
+        Headers(timeline.Menu).ShouldBe(new[] { "Add Track", "Add Sequence Reference", "-", "Paste" });
         timeline.Menu.Close();
 
         editor.RightClickAt(editor.PointIn(timeline, 400, timeline.Viewport.LaneTop(3) + 10));
-        Headers(timeline.Menu).ShouldBe(new[] { "Add Track", "-", "Paste" });
+        Headers(timeline.Menu).ShouldBe(new[] { "Add Track", "Add Sequence Reference", "-", "Paste" });
     }
 
     [AvaloniaFact]

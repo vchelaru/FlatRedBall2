@@ -20,7 +20,7 @@ public class NumericSpinnerRuleScenarioTests
     // scalars that have always had them. Anything else with visible buttons is a new field that needs a decision.
     private static readonly HashSet<string> FlankerWithButtons = new()
     {
-        "SpeedInput", "SequenceSpeedInput", "GridSizeInput", "PropFrameLen", "ChainStartField", "ChainLoopsField",
+        "SpeedInput", "SequenceSpeedInput", "GridSizeInput", "PropFrameLen", "ChainStartField", "ChainLoopsField", "ReferenceStartField", "ReferenceLoopsField",
     };
 
     // NumericUpDown fields allowed to show the chevron spinner. Empty on purpose.
