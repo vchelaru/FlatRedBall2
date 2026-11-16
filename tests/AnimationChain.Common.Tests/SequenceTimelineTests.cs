@@ -68,7 +68,7 @@ public class SequenceTimelineTests
         var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { Ref("Walk", start: 1, loops: 2.5f) } } } };
 
         // A ping-pong chain of 0.4 s forward has a 0.8 s cycle.
-        SequenceTimeline.Length(sequence, _ => 0.8).ShouldBe(3, 1e-6);
+        SequenceTimeline.Length([sequence], sequence, _ => 0.8).ShouldBe(3, 1e-6);
     }
 
     [Theory]
@@ -134,8 +134,8 @@ public class SequenceTimelineTests
         double Cycle(SequenceChainReferenceSave r) => r == long_ ? 1 : 0;
 
         // Long asks for 10 s but is cut at 1 s by the missing chain, which itself plays 0 s.
-        SequenceTimeline.Length(sequence, Cycle).ShouldBe(1, 1e-9);
-        SequenceTimeline.Length(new SequenceSave(), _ => 1).ShouldBe(0);
+        SequenceTimeline.Length([sequence], sequence, Cycle).ShouldBe(1, 1e-9);
+        SequenceTimeline.Length([], new SequenceSave(), _ => 1).ShouldBe(0);
     }
 
     [Fact]

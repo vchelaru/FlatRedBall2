@@ -16,7 +16,7 @@ namespace AnimationEditor.App.Controls;
 
 /// <summary>
 /// Reference tracks on the timeline: a track that plays another sequence of the file. Its lane draws one purple clip (a link
-/// icon and the sequence's name) that drags and resizes like a chain block but never lengthens the sequence; the header has a
+/// icon and the sequence's name) that drags and resizes like a chain block and lengthens the sequence like one; the header has a
 /// chevron that expands the lane to list the inherited tracks, read-only, as dashed bars. A sequence dragged from the list
 /// drops onto the track area as a new reference at the playhead. The rules live in <see cref="SequenceReferences"/> and
 /// <see cref="TimelineReferences"/>.
@@ -445,7 +445,7 @@ public sealed partial class SequenceTimelineControl
     private double GhostLength(string name)
     {
         if (_document is not { } document || SequenceReferences.Find(document.Save.Sequences, name) is not { } target) return TimelineLayout.MissingLength;
-        double length = SequenceTimeline.Length(target, reference => document.CycleLength(reference) ?? 0);
+        double length = SequenceTimeline.Length(document.Save.Sequences, target, reference => document.CycleLength(reference) ?? 0);
         return length > 0 ? length : TimelineLayout.MissingLength;
     }
 }

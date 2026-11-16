@@ -72,7 +72,7 @@ public static class TimelineReferences
     public static IReadOnlyList<TimelineReference> For(SequenceSave sequence, IReadOnlyList<SequenceSave> file,
         Func<SequenceChainReferenceSave, double?> cycleLength)
     {
-        double LengthOf(SequenceSave s) => SequenceTimeline.Length(s, reference => cycleLength(reference) ?? 0);
+        double LengthOf(SequenceSave s) => SequenceTimeline.Length(file, s, reference => cycleLength(reference) ?? 0);
         var result = new List<TimelineReference>();
         for (int t = 0; t < sequence.Tracks.Count; t++)
         {

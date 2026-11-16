@@ -3,8 +3,8 @@ using System.Text.Json.Nodes;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// A named timeline in a <c>.seqj</c>, played by name. It has no stored length: it ends when its last chain stops
-/// playing (<see cref="SequenceTimeline.Length"/>).
+/// A named timeline in a <c>.seqj</c>, played by name. It has no stored length: it ends when its last clip (chain or
+/// reference) stops playing (<see cref="SequenceTimeline.Length"/>).
 /// </summary>
 public class SequenceSave
 {

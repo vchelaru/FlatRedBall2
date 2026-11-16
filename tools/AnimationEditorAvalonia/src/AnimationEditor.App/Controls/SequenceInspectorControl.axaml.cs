@@ -193,7 +193,7 @@ public partial class SequenceInspectorControl : UserControl
         Put(SequenceNameBox, sequence.Name, force);
         SequenceNameBox.IsEnabled = _canRenameSequence;
         SequenceLoopBox.IsChecked = sequence.Loop;
-        SequenceLengthText.Text = Seconds(SequenceTimeline.Length(sequence, reference => document.CycleLength(reference) ?? 0));
+        SequenceLengthText.Text = Seconds(SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0));
         SequenceTracksText.Text = sequence.Tracks.Count.ToString(CultureInfo.InvariantCulture);
     }
 

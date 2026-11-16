@@ -156,16 +156,31 @@ public class SequenceReferenceDocumentTests
     }
 
     [Fact]
-    public void SequenceLength_ReferenceTrack_DoesNotChangeTheHoldingSequence()
+    public void SequenceLength_ReferenceTrack_ExtendsTheHoldingSequenceToTheClipEnd()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
-        double before = document.SequenceLength(0);
 
         document.AddSequenceReference(new UndoManager(), 0, "Earth", 0);
         document.SetReferenceLoops(new UndoManager(), 0, 0, 9);
 
-        document.SequenceLength(0).ShouldBe(before, 1e-9);
+        document.SequenceLength(0).ShouldBe(9, 1e-6);   // 9 cycles of Earth's 1 s, past Body's 0.5 s
+    }
+
+    [Fact]
+    public void At_SequenceOfOnlyReferences_PlaysTheInnermostChain()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        string name = document.AddSequence(undo);                         // holds nothing but a reference to Earth
+        int middle = document.Save.Sequences.FindIndex(s => s.Name == name);
+        document.Save.Sequences[middle].Tracks.Clear();
+        document.AddSequenceReference(undo, middle, "Earth", 0);
+        document.AddSequenceReference(undo, 0, name, 0);
+
+        document.SequenceLength(middle).ShouldBe(1, 1e-6);
+        SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldContain("Spark");
     }
 
     [Fact]

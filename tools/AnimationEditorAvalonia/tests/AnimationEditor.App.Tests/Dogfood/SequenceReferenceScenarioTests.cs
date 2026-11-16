@@ -248,7 +248,7 @@ public class SequenceReferenceScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DraggingAReferenceClip_MovesItsStart_AndItsRightEdgeChangesTheCycles_NeitherLengthensTheSequence()
+    public async Task DraggingAReferenceClip_MovesItsStart_AndItsRightEdgeChangesTheCycles_AndLengthensToTheClipEnd()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor);
@@ -256,7 +256,6 @@ public class SequenceReferenceScenarioTests
         var timeline = Timeline(editor);
         timeline.AddSequenceReference("Earth");
         editor.Layout();
-        double lengthBefore = timeline.SequenceLength;
 
         // Earth is 1 s: the clip spans 0..1 s. Drag its body 0.5 s later.
         editor.Drag(OnLanes(editor, 0, 0.4), OnLanes(editor, 0, 0.9), RawInputModifiers.Alt);
@@ -269,7 +268,7 @@ public class SequenceReferenceScenarioTests
         editor.Drag(editor.PointIn(timeline, edge - 1, y), editor.PointIn(timeline, timeline.Viewport.XAt(reference.End + 2), y), RawInputModifiers.Alt);
 
         Saved(boss, "Idle").Tracks[0].Reference!.Loops.ShouldBe(3f, 0.05f);
-        timeline.SequenceLength.ShouldBe(lengthBefore, 1e-6);
+        timeline.SequenceLength.ShouldBe(3.5, 0.05);   // the clip end, past Body's 2 s
         editor.UndoLabels.Count.ShouldBe(3);
     }
 }

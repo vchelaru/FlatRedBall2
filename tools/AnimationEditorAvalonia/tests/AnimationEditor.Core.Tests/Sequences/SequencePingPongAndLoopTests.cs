@@ -63,7 +63,7 @@ public class SequencePingPongAndLoopTests
         var document = Load(dir, Track("Bounce", start: 1, loops: 2.5f));
         var sequence = document.Save.Sequences[0];
 
-        SequenceTimeline.Length(sequence, r => document.CycleLength(r) ?? 0).ShouldBe(1 + 2.5 * 0.6, 1e-6);
+        SequenceTimeline.Length(document.Save.Sequences, sequence, r => document.CycleLength(r) ?? 0).ShouldBe(1 + 2.5 * 0.6, 1e-6);
         var block = TimelineLayout.Blocks(sequence, document.CycleLength).Single();
         block.Full.ShouldBe(2.5 * 0.6, 1e-6);
         block.CycleLength.ShouldBe(0.6, 1e-6);
