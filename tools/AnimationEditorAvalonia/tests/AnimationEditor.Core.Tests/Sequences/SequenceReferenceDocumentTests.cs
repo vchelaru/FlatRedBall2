@@ -561,4 +561,89 @@ public class SequenceReferenceDocumentTests
         result.Errors.ShouldNotBeEmpty("the paste did not happen, so it must say why");
         result.Names.ShouldAllBe(name => document.Save.Sequences.Any(s => s.Name == name), "it must not report sequences it did not paste");
     }
+
+    private static string ReferenceOf(SequenceDocument document, string sequence) =>
+        document.Save.Sequences.Single(s => s.Name == sequence).Tracks.Single(t => t.Reference is not null).Reference!.Sequence;
+
+    [Fact]
+    public void DuplicateSequences_HolderAndTarget_CopyPlaysTheCopiedTarget()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+
+        var names = document.DuplicateSequences(undo, new[] { 0, 1 });
+
+        ReferenceOf(document, names[0]).ShouldBe(names[1]);
+        ReferenceOf(document, "Idle").ShouldBe("Earth");
+    }
+
+    [Fact]
+    public void DuplicateSequences_ThreeLevels_RemapsEveryLevel()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.AddSequenceReference(undo, 1, "Action", 0);
+
+        var names = document.DuplicateSequences(undo, new[] { 0, 1, 2 });
+
+        ReferenceOf(document, names[0]).ShouldBe(names[1]);
+        ReferenceOf(document, names[1]).ShouldBe(names[2]);
+    }
+
+    [Fact]
+    public void PasteSequences_HolderAndTargetIntoTheSameFile_RenamedForTheCollision_CopyPlaysThePastedTarget()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        SequenceClipboard.TryRead(document.CopySequences(new[] { 0, 1 }), out var content, out _).ShouldBeTrue();
+
+        var names = document.PasteSequences(undo, content!).Names;
+
+        names.ShouldNotContain("Earth");
+        ReferenceOf(document, names[0]).ShouldBe(names[1]);
+        ReferenceOf(document, "Idle").ShouldBe("Earth");
+    }
+
+    [Fact]
+    public void PasteSequences_HolderAndTargetIntoAnotherFile_CopyPlaysThePastedTarget()
+    {
+        using var dirA = new TestHelpers.TempDir();
+        using var dirB = new TestHelpers.TempDir();
+        var from = Load(dirA);
+        var into = Load(dirB);
+        var undo = new UndoManager();
+        from.AddSequenceReference(undo, 2, "Earth", 0);
+        SequenceClipboard.TryRead(from.CopySequences(new[] { 1, 2 }), out var content, out _).ShouldBeTrue();
+
+        var names = into.PasteSequences(undo, content!).Names;
+
+        // The other file has its own "Earth", so the pasted one is renamed and the pasted Action follows it.
+        names[0].ShouldNotBe("Earth");
+        ReferenceOf(into, names[1]).ShouldBe(names[0]);
+    }
+
+    [Fact]
+    public void PasteSequences_CycleCheckRunsOnTheRemappedReferences()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        // The file's Earth plays "Boss"; the clipboard's Boss plays the clipboard's Earth, not the file's.
+        document.Save.Sequences[1].Tracks.Add(RefTrack("Back", "Boss"));
+        var boss = new SequenceSave { Name = "Boss", Loop = true, Tracks = { RefTrack("Earth", "Earth") } };
+        var earth = new SequenceSave { Name = "Earth", Loop = true };
+        SequenceClipboard.TryRead(SequenceClipboard.Write(new[] { boss, earth }, dir.Path), out var content, out _).ShouldBeTrue();
+
+        var result = document.PasteSequences(undo, content!);
+
+        result.Errors.ShouldBeEmpty();
+        ReferenceOf(document, result.Names[0]).ShouldBe(result.Names[1]);
+        SequenceReferences.FindCycle(document.Save.Sequences).ShouldBeNull();
+    }
 }

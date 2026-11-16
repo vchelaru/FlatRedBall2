@@ -348,8 +348,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     /// <summary>
     /// Inserts a deep copy of each given sequence, as one block in document order right after the last of them, each with
-    /// the next free name, and selects the copies (the first is the primary), as one undo entry. Undo selects the
-    /// originals again. Returns the new names.
+    /// the next free name, and selects the copies (the first is the primary), as one undo entry. A copy plays the copy of a
+    /// sequence duplicated with it. Undo selects the originals again. Returns the new names.
     /// </summary>
     public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices)
     {
@@ -366,16 +366,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
         int insertAt = ordered[^1] + 1;
         string description = SequenceLabel.OneOrMany("Duplicate", "Sequence", ordered.Select(index => Save.Sequences[index].Name).ToList());
         var before = SelectionOf(indices);
-        Edit(undo, description, save =>
-        {
-            var copies = ordered.Select((index, i) =>
-            {
-                var copy = SequenceClipboard.Clone(save.Sequences[index]);
-                copy.Name = names[i];
-                return copy;
-            }).ToList();
-            save.Sequences.InsertRange(insertAt, copies);
-        }, stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
+        Edit(undo, description, save => save.Sequences.InsertRange(insertAt, Renamed(ordered.Select(index => save.Sequences[index]).ToList(), names)),
+            stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
         return names;
     }
 
@@ -392,8 +384,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     /// <summary>
     /// Pastes copied sequences as one block, in the order copied, after the last selected sequence (at the end when none is
-    /// selected), each with a free name, and selects the pasted set (the first is the primary). The sources they use join this
-    /// file's source list when not already there, all as one undo entry.
+    /// selected), each with a free name, and selects the pasted set (the first is the primary). A pasted sequence plays the
+    /// pasted copy of a sequence copied with it. The sources they use join this file's source list when not already there,
+    /// all as one undo entry.
     /// </summary>
     public SequencePasteResult PasteSequences(IUndoManager undo, SequenceClipboardContent content)
     {
@@ -424,10 +417,22 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return new SequencePasteResult(names, errors);
     }
 
+    /// <summary>
+    /// Deep copies of <paramref name="sequences"/> named <paramref name="names"/>. A reference to a sequence copied in the
+    /// same operation plays its copy, at every level; a reference to any other sequence keeps its target.
+    /// </summary>
     private static List<SequenceSave> Renamed(IReadOnlyList<SequenceSave> sequences, IReadOnlyList<string> names)
     {
         var copies = sequences.Select(SequenceClipboard.Clone).ToList();
-        for (int i = 0; i < copies.Count; i++) copies[i].Name = names[i];
+        var newName = new Dictionary<string, string>();
+        for (int i = 0; i < copies.Count; i++)
+        {
+            newName.TryAdd(copies[i].Name, names[i]);
+            copies[i].Name = names[i];
+        }
+        foreach (var reference in copies.SelectMany(copy => copy.Tracks).Select(track => track.Reference))
+            if (reference is not null && newName.TryGetValue(reference.Sequence, out var renamed))
+                reference.Sequence = renamed;
         return copies;
     }
 
