@@ -106,18 +106,33 @@ public static class SequenceTimeline
     }
 
     /// <summary>
-    /// Seconds until the sequence ends: the end of the last chain to finish playing, across all tracks. 0 when it has no
-    /// chains.
+    /// Seconds until the sequence ends: the latest end of any clip on any track. A chain ends where it stops playing; a
+    /// reference clip ends <see cref="SequenceReferenceSave.Loops"/> cycles of its target's own length after its start,
+    /// measured the same way, through every level. A reference that does not <see cref="SequenceReferences.Plays"/> (a
+    /// missing target or a cycle) adds nothing. 0 when nothing plays.
     /// </summary>
+    /// <param name="sequences">Every sequence of the file, to resolve references by name.</param>
     /// <param name="sequence">The sequence to measure.</param>
-    /// <param name="cycleLength">A reference's cycle length in seconds; 0 for a missing chain.</param>
-    public static double Length(SequenceSave sequence, Func<SequenceChainReferenceSave, double> cycleLength)
+    /// <param name="cycleLength">A chain reference's cycle length in seconds; 0 for a missing chain.</param>
+    public static double Length(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence, Func<SequenceChainReferenceSave, double> cycleLength) =>
+        LengthWithin(sequences, sequence, cycleLength, new List<SequenceSave> { sequence });
+
+    private static double LengthWithin(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence,
+        Func<SequenceChainReferenceSave, double> cycleLength, List<SequenceSave> stack)
     {
         double end = 0;
         foreach (var track in sequence.Tracks)
         {
             foreach (var reference in track.Chains)
                 end = Math.Max(end, reference.Start + PlayedLength(track, reference, cycleLength(reference)));
+
+            // The stack check is a backstop for duplicate names, which Plays (by name) cannot tell apart.
+            if (track.Reference is not { } clip || !SequenceReferences.Plays(sequences, sequence.Name, clip.Sequence)
+                || SequenceReferences.Find(sequences, clip.Sequence) is not { } target || stack.Contains(target)) continue;
+            stack.Add(target);
+            double targetLength = LengthWithin(sequences, target, cycleLength, stack);
+            stack.RemoveAt(stack.Count - 1);
+            end = Math.Max(end, clip.Start + FullLength(clip.Loops, targetLength));
         }
         return end;
     }
@@ -150,8 +165,8 @@ public static class SequenceTimeline
     /// <paramref name="parentTime"/>, or null when the clip is not playing: before its start, after
     /// <see cref="SequenceReferenceSave.Loops"/> cycles of <paramref name="targetLength"/>, or when the target has no length.
     /// The target restarts with the holder (its clock is the holder's minus the clip start). A looping target wraps at its
-    /// length; one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. A
-    /// reference never lengthens the holder (<see cref="Length"/> ignores it), so a holder that loops restarts the target.
+    /// length; one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. The
+    /// holder lasts at least to the clip's end (<see cref="Length"/>), so a looping holder restarts the target only after it.
     /// </summary>
     public static double? ReferenceTime(SequenceReferenceSave reference, SequenceSave target, double targetLength, double parentTime)
     {

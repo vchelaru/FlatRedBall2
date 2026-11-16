@@ -70,8 +70,8 @@ public static class SequenceScene
         return sprites;
     }
 
-    private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup) =>
-        SequenceTimeline.Length(sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0);
+    private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave> file) =>
+        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0);
 
     private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack)
@@ -79,7 +79,7 @@ public static class SequenceScene
         var tracks = sequence.Tracks;
         double CycleLength(SequenceChainReferenceSave reference) =>
             lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0;
-        time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(sequence, CycleLength), sequence.Loop);
+        time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength), sequence.Loop);
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
             var track = tracks[t];
@@ -90,7 +90,7 @@ public static class SequenceScene
                 // A cycle read from disk plays nothing; the stack check is the backstop for duplicate names.
                 if (file is null || !SequenceReferences.Plays(file, sequence.Name, playing.Sequence)
                     || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
-                if (SequenceTimeline.ReferenceTime(playing, target, LengthOf(target, lookup), time) is not { } inner) continue;
+                if (SequenceTimeline.ReferenceTime(playing, target, LengthOf(target, lookup, file), time) is not { } inner) continue;
                 stack.Add(target);
                 Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack);
                 stack.RemoveAt(stack.Count - 1);

@@ -254,17 +254,49 @@ public class SequenceReferenceTests
     }
 
     [Fact]
-    public void Length_ReferenceTrack_DoesNotExtendTheParent()
+    public void Length_ReferenceTrack_ExtendsTheParentToTheClipEnd()
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth", start: 0, loops: 10)),
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth", start: 0.5, loops: 10)),
             Sequence("Earth", true, ChainTrack("Body")),
         };
 
-        double length = SequenceTimeline.Length(sequences[0], _ => 1.0);
+        double length = SequenceTimeline.Length(sequences, sequences[0], _ => 1.0);
 
-        length.ShouldBe(1.0);
+        length.ShouldBe(10.5, 1e-9);
+    }
+
+    [Fact]
+    public void Length_BrokenReference_AddsNothing()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Gone", "Missing", loops: 5), RefTrack("Loop", "Back", loops: 5)),
+            Sequence("Back", true, ChainTrack("Body", loops: 3), RefTrack("Idle", "Idle")),
+        };
+
+        SequenceTimeline.Length(sequences, sequences[0], _ => 1.0).ShouldBe(1.0, 1e-9);
+        // Back's reference to Idle closes the cycle too, so Back is its own chain only.
+        SequenceTimeline.Length(sequences, sequences[1], _ => 1.0).ShouldBe(3.0, 1e-9);
+    }
+
+    [Fact]
+    public void Length_SequenceOfOnlyReferences_PlaysThroughEveryLevel()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", start: 1)),
+            Sequence("B", true, RefTrack("c", "C", start: 0.5, loops: 2)),
+            Sequence("C", true, ChainTrack("Leaf", loops: 2)),
+        };
+        double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
+        var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single(t => t.Name == "b/c/Leaf");
+
+        // C is 2 s; B's clip of C runs 0.5 + 2 x 2; A's clip of B starts at 1.
+        Length(sequences[1]).ShouldBe(4.5, 1e-9);
+        Length(sequences[0]).ShouldBe(5.5, 1e-9);
+        SequenceReferences.InlinedTime(leaf, 4.0, Length)!.Value.ShouldBe(0.5, 1e-9);
     }
 
     [Fact]

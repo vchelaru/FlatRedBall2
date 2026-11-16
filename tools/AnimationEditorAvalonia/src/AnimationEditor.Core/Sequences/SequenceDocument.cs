@@ -68,7 +68,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>Seconds until sequence <paramref name="index"/> ends (<see cref="SequenceTimeline.Length"/>); 0 for an index outside the file.</summary>
     public double SequenceLength(int index) =>
         index >= 0 && index < Save.Sequences.Count
-            ? SequenceTimeline.Length(Save.Sequences[index], reference => CycleLength(reference) ?? 0)
+            ? SequenceTimeline.Length(Save.Sequences, Save.Sequences[index], reference => CycleLength(reference) ?? 0)
             : 0;
 
     /// <summary>The grey text after sequence <paramref name="index"/>'s name in the list: its track count and length (<see cref="SequenceListSummary"/>).</summary>

@@ -266,7 +266,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Seconds until the shown sequence ends (<see cref="SequenceTimeline.Length"/>); 0 when nothing is shown.</summary>
     public double SequenceLength =>
         Sequence is { } sequence && _document is { } document
-            ? SequenceTimeline.Length(sequence, reference => document.CycleLength(reference) ?? 0)
+            ? SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0)
             : 0;
 
     // IZoomTarget: 100% is the default pixels per second.

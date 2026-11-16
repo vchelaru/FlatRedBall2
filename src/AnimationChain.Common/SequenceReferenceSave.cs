@@ -5,7 +5,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <summary>
 /// A track that plays another sequence of the same <c>.seqj</c> instead of chains: the target's tracks are inlined under
 /// this track's name. It is a clip like a chain placement, with a <see cref="Start"/> and a length in <see cref="Loops"/>
-/// cycles of the target, but it never extends the sequence that holds it (see <see cref="SequenceTimeline.Length"/>).
+/// cycles of the target, and like a chain it extends the sequence that holds it to its end (see <see cref="SequenceTimeline.Length"/>).
 /// The target restarts whenever the holding sequence starts, so switching sequences restarts it. A reference whose target
 /// plays the holder back (a cycle) is kept but plays nothing (see <see cref="SequenceReferences.Plays"/>).
 /// </summary>

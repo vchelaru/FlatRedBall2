@@ -32,7 +32,7 @@ public class PlayheadStepsTests
         var sequence = new SequenceSave();
         sequence.Tracks.AddRange(tracks);
         var blocks = TimelineLayout.Blocks(sequence, Cycle);
-        double length = SequenceTimeline.Length(sequence, reference => Cycle(reference) ?? 0);
+        double length = SequenceTimeline.Length([sequence], sequence, reference => Cycle(reference) ?? 0);
         return PlayheadSteps.Boundaries(sequence, blocks, Find, length).Select(time => Math.Round(time, 4)).ToList();
     }
 
