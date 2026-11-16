@@ -537,6 +537,15 @@ public sealed class SequenceDocument : ISequenceChainLookup
     public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack)
     {
         if (content.Tracks.Count == 0) return TimelinePasteResult.Empty;
+        string host = Save.Sequences[sequence].Name;
+        var cycling = content.Tracks.Where(track => track.Reference is { } r && SequenceReferences.WouldCycle(Save.Sequences, host, r.Sequence)).ToList();
+        if (cycling.Count > 0)
+        {
+            return TimelinePasteResult.Empty with
+            {
+                Errors = cycling.Select(track => $"Can't paste track \"{track.Name}\": \"{host}\" would play itself through \"{track.Reference!.Sequence}\".").ToList(),
+            };
+        }
         var tracks = Save.Sequences[sequence].Tracks;
         int insertAt = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected : 0;
         var used = tracks.Select(t => t.Name).ToList();
@@ -670,8 +679,13 @@ public sealed class SequenceDocument : ISequenceChainLookup
         if (name == oldName) return null;
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
-        Edit(undo, SequenceLabel.Renamed("Sequence", oldName, name), save => save.Sequences[index].Name = name,
-            selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
+        Edit(undo, SequenceLabel.Renamed("Sequence", oldName, name), save =>
+        {
+            save.Sequences[index].Name = name;
+            // Tracks that play it follow the rename, so the reference does not go dangling.
+            foreach (var playing in save.Sequences.SelectMany(s => s.Tracks).Select(t => t.Reference).Where(r => r is not null && r.Sequence == oldName))
+                playing!.Sequence = name;
+        }, selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
         return null;
     }
 
@@ -806,6 +820,63 @@ public sealed class SequenceDocument : ISequenceChainLookup
             var tracks = save.Sequences[sequence].Tracks;
             tracks.Insert(0, new SequenceTrackSave { Name = name, Chains = { reference } });
         });
+    }
+
+    /// <summary>
+    /// Whether sequence <paramref name="sequence"/> may play the sequence called <paramref name="target"/>: it exists and
+    /// playing it would not close a cycle (itself, or a sequence that plays this one, directly or not).
+    /// </summary>
+    public bool CanReference(int sequence, string target) =>
+        sequence >= 0 && sequence < Save.Sequences.Count && SequenceReferences.Find(Save.Sequences, target) is not null
+        && !SequenceReferences.WouldCycle(Save.Sequences, Save.Sequences[sequence].Name, target);
+
+    /// <summary>The names of the sequences sequence <paramref name="sequence"/> may play (<see cref="CanReference"/>), in file order. The menu lists exactly these.</summary>
+    public IReadOnlyList<string> ReferenceCandidates(int sequence) =>
+        Save.Sequences.Select(s => s.Name).Where(name => CanReference(sequence, name)).ToList();
+
+    /// <summary>
+    /// Adds a track to sequence <paramref name="sequence"/> that plays the sequence <paramref name="target"/>, as the first track
+    /// (in front), named after the target, with one cycle starting at <paramref name="start"/> seconds. One undo entry; the new track
+    /// is selected. Returns why it was refused (no such sequence, or it would play itself through a cycle), or null.
+    /// </summary>
+    public string? AddSequenceReference(IUndoManager undo, int sequence, string target, double start)
+    {
+        if (SequenceReferences.Find(Save.Sequences, target) is null) return $"There is no sequence named \"{target}\".";
+        if (!CanReference(sequence, target))
+            return $"\"{Save.Sequences[sequence].Name}\" cannot play \"{target}\": that would make the sequences play each other in a loop.";
+        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), target);
+        double at = double.IsFinite(start) ? Math.Max(0, start) : 0;
+        Edit(undo, SequenceLabel.Named("Add", "Reference", target), save =>
+            save.Sequences[sequence].Tracks.Insert(0, new SequenceTrackSave
+            {
+                Name = name,
+                Reference = new SequenceReferenceSave { Sequence = target, Start = at },
+            }), trackAfter: 0);
+        return null;
+    }
+
+    /// <summary>Moves a reference track's clip to <paramref name="start"/> seconds. Returns why it was refused (not a reference, negative or not a number), or null.</summary>
+    public string? SetReferenceStart(IUndoManager undo, int sequence, int track, double start)
+    {
+        if (Save.Sequences[sequence].Tracks[track].Reference is null) return "That track does not play a sequence.";
+        if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
+        string name = Save.Sequences[sequence].Tracks[track].Name;
+        Edit(undo, $"Set Start of '{name}' to {Format(start)}",
+            save => save.Sequences[sequence].Tracks[track].Reference!.Start = start,
+            coalesceGroup: $"refstart:{sequence}:{track}");
+        return null;
+    }
+
+    /// <summary>Sets a reference track's clip length in cycles of the target. Returns why it was refused (not a reference, zero, negative or not a number), or null.</summary>
+    public string? SetReferenceLoops(IUndoManager undo, int sequence, int track, float loops)
+    {
+        if (Save.Sequences[sequence].Tracks[track].Reference is null) return "That track does not play a sequence.";
+        if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
+        string name = Save.Sequences[sequence].Tracks[track].Name;
+        Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
+            save => save.Sequences[sequence].Tracks[track].Reference!.Loops = loops,
+            coalesceGroup: $"refcycles:{sequence}:{track}");
+        return null;
     }
 
     /// <summary>
@@ -1183,6 +1254,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
         mutate(copy);
+        // A file with a cycle does not load, so an edit that would close one (a paste into another file) is dropped.
+        // The edits that can do this check first and say why.
+        if (SequenceReferences.FindCycle(copy.Sequences) is not null) return;
         string after = copy.ToJsonString();
         if (after == before) return;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.

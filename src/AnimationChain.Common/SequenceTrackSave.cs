@@ -22,6 +22,13 @@ public class SequenceTrackSave
     public bool Visible { get; set; } = true;
 
     /// <summary>
+    /// When set, the track plays another sequence of the file instead of chains (a clip with a start and a loop count,
+    /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> is empty. The target's tracks are inlined under this
+    /// track's name; <see cref="Visible"/> false hides all of them.
+    /// </summary>
+    public SequenceReferenceSave? Reference { get; set; }
+
+    /// <summary>
     /// Chain references in any order. Playback orders them by <see cref="SequenceChainReferenceSave.Start"/>, and list
     /// order breaks ties (see <see cref="SequenceTimeline"/>).
     /// </summary>

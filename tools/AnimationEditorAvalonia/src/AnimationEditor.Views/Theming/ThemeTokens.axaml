@@ -23,6 +23,8 @@
             <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
             <SolidColorBrush x:Key="AccentSoft"  Color="#f0c674" />
             <SolidColorBrush x:Key="AccentCool"  Color="#5fb6e8" />
+            <!-- The sequence-reference tracks (a track that plays another sequence). -->
+            <SolidColorBrush x:Key="RefPurple"   Color="#b48cf0" />
             <SolidColorBrush x:Key="Ok"          Color="#6dd28d" />
             <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
                  distinct from passive BgRail chrome, without the loud Accent red. -->
@@ -68,6 +70,8 @@
             <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
             <SolidColorBrush x:Key="AccentSoft"  Color="#b8860b" />
             <SolidColorBrush x:Key="AccentCool"  Color="#2b7fc0" />
+            <!-- The sequence-reference tracks (a track that plays another sequence). -->
+            <SolidColorBrush x:Key="RefPurple"   Color="#7a4fc4" />
             <SolidColorBrush x:Key="Ok"          Color="#2f9e54" />
             <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
                  distinct from passive BgRail chrome, without the loud Accent red. -->

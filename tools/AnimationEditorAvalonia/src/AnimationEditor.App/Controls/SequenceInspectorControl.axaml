@@ -73,6 +73,31 @@
                                       AutomationProperties.AutomationId="seq-track-visible" />
                         </StackPanel>
                     </Border>
+                    <!-- Only for a track that plays another sequence of the file (a reference): its clip, like a chain's block. -->
+                    <Border x:Name="ReferenceSection" IsVisible="False" Padding="12,8,12,10"
+                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="PLAYS SEQUENCE" Classes="heading" />
+                            <Grid ColumnDefinitions="78,*">
+                                <TextBlock Text="Sequence" Classes="label" />
+                                <TextBlock x:Name="ReferenceSequenceText" Grid.Column="1" Classes="value" />
+                            </Grid>
+                            <Grid ColumnDefinitions="78,*,Auto">
+                                <TextBlock Text="Start" Classes="label" />
+                                <viewsControls:FlankerNumericField x:Name="ReferenceStartField" Grid.Column="1"
+                                                                   Minimum="0" Increment="0.05" FormatString="0.###" />
+                                <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </Grid>
+                            <Grid ColumnDefinitions="78,*">
+                                <TextBlock Text="Clip cycles" Classes="label"
+                                           ToolTip.Tip="The clip's length in cycles of the played sequence. A sequence with Loop on repeats across it; one with Loop off plays once, then holds its final pose. The clip never lengthens this sequence." />
+                                <viewsControls:FlankerNumericField x:Name="ReferenceLoopsField" Grid.Column="1"
+                                                                   Minimum="0.001" Increment="1" FormatString="0.###" />
+                            </Grid>
+                            <TextBlock x:Name="ReferenceMissingText" Classes="note" IsVisible="False"
+                                       Foreground="{DynamicResource Accent}" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- Chain -->

@@ -69,8 +69,8 @@ public class TimelineMenuLayoutTests
         });
 
     [Fact]
-    public void BlankSpace_OffersAddTrackAndPaste() =>
-        Groups(Target.Blank).ShouldBe(new[] { new[] { Cmd.AddTrack }, new[] { Cmd.Paste } });
+    public void BlankSpace_OffersAddTrackAndSequenceReference_ThenPaste() =>
+        Groups(Target.Blank).ShouldBe(new[] { new[] { Cmd.AddTrack, Cmd.AddSequenceReference }, new[] { Cmd.Paste } });
 
     [Theory]
     [InlineData(Target.TrackHeader, Cmd.Copy, 1, "Copy")]
@@ -90,6 +90,18 @@ public class TimelineMenuLayoutTests
     [InlineData(Target.Chain, Cmd.GoToDefinition, 2, "Go to Definition")]
     public void Header_CountsTheSelection_AsTheTreeMenuDoes(Target target, Cmd command, int selected, string expected) =>
         TimelineMenuLayout.Header(target, command, selected).ShouldBe(expected);
+
+    [Fact]
+    public void AReferenceTrackHeader_AlsoOffersExpandOrCollapse_AndOtherTracksDoNot()
+    {
+        TimelineMenuLayout.For(Target.TrackHeader, false, null, referenceExpanded: false)[1]
+            .ShouldBe(new[] { Cmd.RenameTrack, Cmd.ToggleVisibility, Cmd.ToggleExpanded });
+        Groups(Target.TrackHeader)[1].ShouldNotContain(Cmd.ToggleExpanded);
+        TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleExpanded, 1, referenceExpanded: false).ShouldBe("Expand");
+        TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleExpanded, 1, referenceExpanded: true).ShouldBe("Collapse");
+        TimelineMenuLayout.Header(Target.Blank, Cmd.AddSequenceReference, 0).ShouldBe("Add Sequence Reference");
+        TimelineMenuLayout.Icon(Cmd.AddSequenceReference).ShouldBe(TreeMenuIcon.Link);
+    }
 
     [Fact]
     public void ToggleVisibility_NamesWhatItWillDo()

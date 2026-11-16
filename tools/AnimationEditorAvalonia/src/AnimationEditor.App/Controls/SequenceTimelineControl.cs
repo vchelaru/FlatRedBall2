@@ -34,7 +34,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     // A hidden track keeps its lane and blocks, drawn faint so they stay readable and editable.
     private const double HiddenOpacity = 0.4;
 
-    private enum DragKind { None, Pending, Move, Edge, TrackPending, Track, MarqueePending, Marquee }
+    private enum DragKind { None, Pending, Move, Edge, TrackPending, Track, MarqueePending, Marquee, RefPending, RefMove, RefEdge }
 
     private readonly ContextMenu _menu = new();
     private SequenceDocument? _document;
@@ -607,10 +607,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             ? TimelineLayout.Blocks(sequence, document.CycleLength)
             : Array.Empty<TimelineBlock>();
         _trackStarts = TimelineLayout.TrackStarts(_blocks, TrackCount);
+        RebuildReferences();
         RetainSelection();
         if (IsRenamingTrack && _renameTrack >= TrackCount)
             EndTrackRename();
-        Viewport.SetLaneHeights(TimelineLayout.LaneHeights(_blocks, TrackCount, HasEvents));
+        Viewport.SetLaneHeights(TimelineLayout.LaneHeights(_blocks, TrackCount, HasEvents, _references, IsExpanded));
         Viewport.ClampVertical(TrackCount, Bounds.Height);
         InvalidateArrange();
         InvalidateVisual();
@@ -675,6 +676,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                 ToggleTrackVisibility(row.Track);
                 return;
             }
+            // The chevron of a reference track is a button too.
+            if (ReferenceOn(row.Track) is { Expandable: true } && IsOverChevron(point.X, point.Y - Viewport.LaneTop(row.Track)))
+            {
+                ToggleReferenceExpanded(row.Track);
+                return;
+            }
             if (IsToggleModifier(e.KeyModifiers))
             {
                 NotifySelection(_model.ToggleTrack(row.Track));
@@ -701,6 +708,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             _dragPointer = e.Pointer;
             e.Pointer.Capture(this);
             ShowCursor(point);
+            return;
+        }
+
+        if (point.X >= Viewport.ColumnWidth
+            && TimelineReferences.HitTest(Viewport, _references, sequence.Tracks.Count, point.X, point.Y) is { } referenceHit)
+        {
+            BeginReferencePress(e, point, referenceHit);
             return;
         }
 
@@ -808,6 +822,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             return;
         }
         ShowCursor(point);
+        if (_drag is DragKind.RefPending or DragKind.RefMove or DragKind.RefEdge)
+        {
+            MoveReferenceDrag(point, e.KeyModifiers);
+            return;
+        }
         if (_drag == DragKind.None || Sequence is not { } sequence || _dragged is null || _dragBlock is null) return;
         if (_drag == DragKind.Pending)
         {
@@ -970,6 +989,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _shownCursor = _panning ? TimelineCursor.Pan
             : _columnResizing || (_drag == DragKind.None && !_scrubbing && IsOverColumnEdge(point)) ? TimelineCursor.ResizeHorizontal
             : _drag == DragKind.Track ? TimelineCursor.Reorder
+            : _drag == DragKind.None && !_scrubbing && hover is null && IsReferenceEdgeAt(point) ? TimelineCursor.ResizeHorizontal
             : TimelineCursors.For(hover, _drag == DragKind.None ? null : _pressedPart);
         Cursor = DragCursors.ForHover(_shownCursor);
         if (_drag != DragKind.None || _panning || _columnResizing) DragCursors.Apply(this, _shownCursor);
@@ -1057,6 +1077,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             e.Handled = true;
             return;
         }
+        if (e.Key == Key.Escape && _drag is DragKind.RefPending or DragKind.RefMove or DragKind.RefEdge && _document is not null && _gestureBefore is not null)
+        {
+            // Puts the reference clip back with no undo entry; the track stays selected.
+            string refBefore = _gestureBefore;
+            ResetDrag();
+            _document.CancelGesture(refBefore);
+            ReleaseCursor();
+            e.Handled = true;
+            return;
+        }
         if (HandleSelectionKey(e)) return;
         if (e.Key != Key.Escape || _drag == DragKind.None || _document is null || _gestureBefore is null) return;
         // Escape puts the dragged chain back with no undo entry.
@@ -1095,6 +1125,11 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             ResetDrag();
             EndMarquee();
+            return;
+        }
+        if (_drag is DragKind.RefPending or DragKind.RefMove or DragKind.RefEdge)
+        {
+            CommitReferenceDrag();
             return;
         }
         var kind = _drag;
@@ -1160,6 +1195,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _collapseOnRelease = null;
         _moveDrop = null;
         _dragItems = Array.Empty<DragItem>();
+        _dragReference = null;
         _marqueeBase = Array.Empty<TimelineChainId>();
     }
 
@@ -1217,6 +1253,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             target = TimelineMenuTarget.TrackHeader;
             if (!_model.ContainsTrack(track)) SetSelection(null, track);
         }
+        else if (row.Kind == TimelineRowKind.Track
+            && TimelineReferences.HitTest(Viewport, _references, TrackCount, point.X, point.Y) is not null)
+        {
+            // A reference clip is its track: the header's menu acts on it.
+            target = TimelineMenuTarget.TrackHeader;
+            if (!_model.ContainsTrack(track)) SetSelection(null, track);
+        }
         else if (row.Kind == TimelineRowKind.Track && TimelineLayout.HitTest(Viewport, _blocks, TrackCount, point.X, point.Y) is { } hit)
         {
             target = TimelineMenuTarget.Chain;
@@ -1233,12 +1276,20 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         var moves = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
             ? TrackReorder.AvailableMoves(TrackCount, _model.Tracks[0])
             : null;
-        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves);
+        // Expand/Collapse is offered when the clicked track is the one selected track and a reference with something to show.
+        bool? referenceExpanded = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
+            && ReferenceOn(track) is { Expandable: true } ? IsReferenceExpanded(track) : null;
+        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves, referenceExpanded);
         for (int i = 0; i < groups.Count; i++)
         {
             if (i > 0) _menu.Items.Add(new Separator());
             foreach (var command in groups[i])
             {
+                if (command == TimelineMenuCommand.AddSequenceReference)
+                {
+                    _menu.Items.Add(BuildReferenceMenu(TimelineMenuLayout.Header(target, command, selected)));
+                    continue;
+                }
                 Action onClick = command switch
                 {
                     TimelineMenuCommand.Copy or TimelineMenuCommand.Cut or TimelineMenuCommand.Paste => () => ClipboardCommandRequested?.Invoke(command),
@@ -1249,11 +1300,12 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     TimelineMenuCommand.ShowAllTracks => () => _document.ShowAllTracks(_undo, _sequenceIndex),
                     TimelineMenuCommand.GoToDefinition => () => GoToDefinitionRequested?.Invoke(hitBlock!.Reference),
                     TimelineMenuCommand.AddTrack => AddTrackAndRename,
+                    TimelineMenuCommand.ToggleExpanded => () => ToggleReferenceExpanded(track),
                     TimelineMenuCommand.MoveToTop or TimelineMenuCommand.MoveUp or TimelineMenuCommand.MoveDown or TimelineMenuCommand.MoveToBottom
                         => () => MoveSelectedTrack(TimelineMenuLayout.MoveOf(command)),
                     _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                 };
-                string header = TimelineMenuLayout.Header(target, command, selected, trackHidden);
+                string header = TimelineMenuLayout.Header(target, command, selected, trackHidden, referenceExpanded == true);
                 _menu.Items.Add(TimelineMenuLayout.Icon(command) is { } icon
                     ? TreeMenuRenderer.CreateMenuItem(header, onClick, icon)
                     : CreatePlainItem(header, onClick));
@@ -1322,8 +1374,10 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     DrawEvents(context, block, size.Width);
                 }
             }
+            DrawReferences(context, size);
             DrawNewTrackRow(context, sequence, lanes, drop);
             DrawChipGhost(context, drop);
+            DrawSequenceGhost(context, lanes);
         }
 
         DrawHeaders(context, sequence, size, drop);
@@ -1397,9 +1451,16 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     context.FillRectangle(new SolidColorBrush(AccentColor(), 0.45), grabbed);
                     context.DrawRectangle(null, new Pen(Brush("Accent"), 2), grabbed);
                 }
-                var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, TimelineTooltips.NameRoom(header));
-                using (PushOpacityUnlessOpaque(context, hidden ? HiddenOpacity + 0.2 : 1))
-                    context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
+                if (ReferenceOn(lane) is { } referenceLane)
+                {
+                    DrawReferenceHeader(context, referenceLane, top, header, hidden, new Point(0, centers.Name));
+                }
+                else
+                {
+                    var text = TrimmedText(sequence.Tracks[lane].Name, 12, Brush("Ink"), FontWeight.SemiBold, TimelineTooltips.NameRoom(header));
+                    using (PushOpacityUnlessOpaque(context, hidden ? HiddenOpacity + 0.2 : 1))
+                        context.DrawText(text, new Point(TimelineLayout.HeaderNameLeft, centers.Name - text.Height / 2));
+                }
                 context.DrawLine(new Pen(Brush("LineBrush"), 1), new Point(0, top + laneHeight - 0.5),
                     new Point(header, top + laneHeight - 0.5));
             }

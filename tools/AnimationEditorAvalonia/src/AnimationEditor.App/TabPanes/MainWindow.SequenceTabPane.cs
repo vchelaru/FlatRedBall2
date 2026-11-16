@@ -796,7 +796,8 @@ public partial class MainWindow
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             _listDrag = new Controls.SequenceListDragController(w.SequenceList, () => _document?.SelectedIndices ?? Array.Empty<int>(),
                 CommitPendingRename, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
-                point => w.SequenceList.TranslatePoint(point, w.DragOverlayCanvas));
+                point => w.SequenceList.TranslatePoint(point, w.DragOverlayCanvas),
+                SequenceDragOverTimeline, DropSequencesOnTimeline, () => w.SequenceTimeline.UpdateSequenceDrag(null, null));
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
             w.SequenceList.AddHandler(InlineRenameBox.CancelledEvent, OnSequenceRenameCancelled);
             // A press that does not move the focus (a library chip, a toolbar button, blank space) would leave a rename open.
@@ -1581,6 +1582,30 @@ public partial class MainWindow
 
         // Dropping the dragged rows on a gap: one undo entry, and a move is an edit rather than a place to come back to,
         // so it records no Back entry.
+        // A sequence row dragged over the timeline: the cursor its drop would get, or null when the pointer is elsewhere. Only one
+        // sequence can be dropped, so a dragged selection of several is refused there.
+        private ChipDragCursor? SequenceDragOverTimeline(IReadOnlyList<int> rows, PointerEventArgs e)
+        {
+            var timeline = _window.SequenceTimeline;
+            var point = e.GetPosition(timeline);
+            if (_document is not { } document || !new Rect(timeline.Bounds.Size).Contains(point))
+            {
+                timeline.UpdateSequenceDrag(null, null);
+                return null;
+            }
+            string? name = rows.Count == 1 && rows[0] < document.Save.Sequences.Count ? document.Save.Sequences[rows[0]].Name : null;
+            timeline.UpdateSequenceDrag(name, point);
+            return name is not null && timeline.CanDropSequence(name, point) ? ChipDragCursor.Copy : ChipDragCursor.NotAllowed;
+        }
+
+        private void DropSequencesOnTimeline(IReadOnlyList<int> rows, PointerEventArgs e)
+        {
+            var timeline = _window.SequenceTimeline;
+            if (_document is not { } document || rows.Count != 1 || rows[0] >= document.Save.Sequences.Count) return;
+            using (_window._navigation.Suppress())
+                timeline.DropSequence(document.Save.Sequences[rows[0]].Name, e.GetPosition(timeline));
+        }
+
         private void MoveSequences(IReadOnlyList<int> indices, int slot)
         {
             if (_document is not { } document) return;

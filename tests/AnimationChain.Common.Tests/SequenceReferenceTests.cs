@@ -1,0 +1,258 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
+using Xunit;
+
+namespace AnimationEditorCommon.Tests;
+
+/// <summary>A track that plays another sequence of the same file: format, cycles, inlining and timing.</summary>
+public class SequenceReferenceTests
+{
+    private static SequenceSave Sequence(string name, bool loop = true, params SequenceTrackSave[] tracks)
+    {
+        var sequence = new SequenceSave { Name = name, Loop = loop };
+        sequence.Tracks.AddRange(tracks);
+        return sequence;
+    }
+
+    private static SequenceTrackSave ChainTrack(string name, double start = 0, float loops = 1, bool visible = true) =>
+        new() { Name = name, Visible = visible, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start, Loops = loops } } };
+
+    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, float loops = 1, bool visible = true) =>
+        new() { Name = name, Visible = visible, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Loops = loops } };
+
+    [Fact]
+    public void RoundTrip_ReferenceTrack_KeepsSequenceStartAndLoops()
+    {
+        var save = new SequenceListSave { Sequences = { Sequence("Idle", true, RefTrack("Earth", "Earth", start: 0.5, loops: 2)), Sequence("Earth") } };
+
+        var loaded = SequenceListSave.FromJsonString(save.ToJsonString());
+
+        var reference = loaded.Sequences[0].Tracks[0].Reference!;
+        reference.Sequence.ShouldBe("Earth");
+        reference.Start.ShouldBe(0.5);
+        reference.Loops.ShouldBe(2f);
+    }
+
+    [Fact]
+    public void ToJsonString_ReferenceTrack_WritesReferenceObjectAndNoChains()
+    {
+        var save = new SequenceListSave { Sequences = { Sequence("Idle", true, RefTrack("Earth", "Earth", 1, 3)), Sequence("Earth") } };
+
+        var track = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject();
+
+        track.Select(p => p.Key).ShouldBe(new[] { "name", "reference" });
+        track["reference"]!.AsObject().Select(p => p.Key).ShouldBe(new[] { "sequence", "start", "loops" });
+    }
+
+    [Fact]
+    public void ToJsonString_ChainTrack_StaysUnchanged()
+    {
+        var save = new SequenceListSave { Sequences = { Sequence("Idle", true, ChainTrack("Body")) } };
+
+        var track = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject();
+
+        track.Select(p => p.Key).ShouldBe(new[] { "name", "chains" });
+    }
+
+    [Fact]
+    public void FromJsonString_FileWithoutReferences_LoadsWithNoReference()
+    {
+        var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "A", "tracks": [ { "name": "T", "chains": [] } ] } ] }""");
+
+        loaded.Sequences[0].Tracks[0].Reference.ShouldBeNull();
+    }
+
+    [Fact]
+    public void RoundTrip_UnknownPropertyOnReference_IsKept()
+    {
+        const string json = """
+            { "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B", "start": 0, "loops": 1, "tint": "red" } } ] }, { "name": "B" } ] }
+            """;
+
+        var again = JsonNode.Parse(SequenceListSave.FromJsonString(json).ToJsonString())!["sequences"]![0]!["tracks"]![0]!["reference"]!;
+
+        again["tint"]!.GetValue<string>().ShouldBe("red");
+    }
+
+    [Fact]
+    public void FromJsonString_ReferenceWithWrongKind_NamesTheProperty()
+    {
+        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(
+            """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": 5 } } ] } ] }"""));
+
+        ex.Message.ShouldContain("sequences[0].tracks[0].reference.sequence");
+    }
+
+    [Fact]
+    public void FromJsonString_SelfReference_IsRejected()
+    {
+        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(
+            """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "A" } } ] } ] }"""));
+
+        ex.Message.ShouldContain("A");
+    }
+
+    [Fact]
+    public void FromJsonString_IndirectCycle_IsRejected()
+    {
+        const string json = """
+            { "sequences": [
+              { "name": "A", "tracks": [ { "name": "x", "reference": { "sequence": "B" } } ] },
+              { "name": "B", "tracks": [ { "name": "y", "reference": { "sequence": "A" } } ] } ] }
+            """;
+
+        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(json));
+
+        ex.Message.ShouldContain("A");
+        ex.Message.ShouldContain("B");
+    }
+
+    [Fact]
+    public void FromJsonString_ReferenceToMissingSequence_LoadsAndKeepsTheName()
+    {
+        var loaded = SequenceListSave.FromJsonString(
+            """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "Gone" } } ] } ] }""");
+
+        loaded.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Gone");
+    }
+
+    [Fact]
+    public void WouldCycle_TargetReachesHost_IsTrue()
+    {
+        var sequences = new List<SequenceSave> { Sequence("A"), Sequence("B", true, RefTrack("r", "A")) };
+
+        SequenceReferences.WouldCycle(sequences, host: "A", target: "B").ShouldBeTrue();
+        SequenceReferences.WouldCycle(sequences, host: "A", target: "A").ShouldBeTrue();
+        SequenceReferences.WouldCycle(sequences, host: "B", target: "A").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inline_ReferenceTrack_PrefixesInheritedTrackNamesWithTheReferenceTrack()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth")),
+            Sequence("Earth", true, ChainTrack("Body")),
+        };
+
+        var names = SequenceReferences.Inline(sequences, sequences[0]).Select(t => t.Name).ToList();
+
+        names.ShouldBe(new[] { "Body", "Earth/Body" });
+    }
+
+    [Fact]
+    public void Inline_NestedReference_PrefixesEachLevel()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B")),
+            Sequence("B", true, RefTrack("c", "C")),
+            Sequence("C", true, ChainTrack("Leaf")),
+        };
+
+        SequenceReferences.Inline(sequences, sequences[0]).Single().Name.ShouldBe("b/c/Leaf");
+    }
+
+    [Fact]
+    public void Inline_HiddenReferenceTrackOrInheritedTrack_IsNotVisible()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("hiddenRef", "B", visible: false), RefTrack("ok", "B")),
+            Sequence("B", true, ChainTrack("Shown"), ChainTrack("Hidden", visible: false)),
+        };
+
+        var tracks = SequenceReferences.Inline(sequences, sequences[0]);
+
+        tracks.Select(t => (t.Name, t.Visible)).ShouldBe(new[]
+        {
+            ("hiddenRef/Shown", false), ("hiddenRef/Hidden", false), ("ok/Shown", true), ("ok/Hidden", false),
+        });
+    }
+
+    [Fact]
+    public void Inline_ReferenceToMissingSequence_YieldsNothing()
+    {
+        var sequences = new List<SequenceSave> { Sequence("A", true, RefTrack("r", "Gone")) };
+
+        SequenceReferences.Inline(sequences, sequences[0]).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inline_CycleBuiltInCode_DoesNotRecurseForever()
+    {
+        var sequences = new List<SequenceSave> { Sequence("A", true, RefTrack("r", "A")) };
+
+        SequenceReferences.Inline(sequences, sequences[0]).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(-0.1, null)]      // before the clip starts
+    [InlineData(1.0, 0.0)]        // the target starts with the parent's clock at the clip start
+    [InlineData(1.5, 0.5)]
+    [InlineData(3.0, 0.0)]        // a looping target wraps at its length (2 s)
+    [InlineData(4.9, 1.9)]
+    [InlineData(5.0, null)]       // 2 loops of 2 s end at 1 + 4
+    public void ReferenceTime_LoopingTarget_WrapsAndEndsAfterLoopsCycles(double parentTime, double? expected)
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Loops = 2 };
+
+        var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
+
+        if (expected is null) time.ShouldBeNull();
+        else time!.Value.ShouldBe(expected.Value, 1e-9);
+    }
+
+    [Fact]
+    public void ReferenceTime_NonLoopingTarget_HoldsItsFinalPoseUntilTheClipEnds()
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Loops = 2 };
+        var target = new SequenceSave { Name = "T", Loop = false };
+
+        var time = SequenceTimeline.ReferenceTime(reference, target, targetLength: 2, parentTime: 3);
+
+        time.ShouldBe(SequenceTimeline.PoseTime(2, 2, false));
+        SequenceTimeline.ReferenceTime(reference, target, 2, 4.0).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ReferenceTime_EmptyTarget_IsNeverActive()
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T" };
+
+        SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T" }, targetLength: 0, parentTime: 0).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Length_ReferenceTrack_DoesNotExtendTheParent()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth", start: 0, loops: 10)),
+            Sequence("Earth", true, ChainTrack("Body")),
+        };
+
+        double length = SequenceTimeline.Length(sequences[0], _ => 1.0);
+
+        length.ShouldBe(1.0);
+    }
+
+    [Fact]
+    public void InlinedTime_NestedHops_MapsTimeThroughEachClip()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", start: 1)),
+            Sequence("B", true, RefTrack("c", "C", start: 0.5), ChainTrack("pad")),
+            Sequence("C", true, ChainTrack("Leaf")),
+        };
+        var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single(t => t.Name == "b/c/Leaf");
+
+        // B is 4 s and C 1 s long; C's clip starts 0.5 s into B, and B's clip starts 1 s into A.
+        double Length(SequenceSave target) => target.Name == "B" ? 4 : 1;
+        SequenceReferences.InlinedTime(leaf, 2.0, Length)!.Value.ShouldBe(0.5, 1e-9);
+        SequenceReferences.InlinedTime(leaf, 1.2, Length).ShouldBeNull();
+    }
+}

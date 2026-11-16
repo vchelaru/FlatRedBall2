@@ -145,6 +145,23 @@ public static class SequenceTimeline
     public static double PoseTime(double time, double length, bool loop) =>
         !loop && length > 0 && time >= length ? length - Math.Min(HoldEpsilon, length) : time;
 
+    /// <summary>
+    /// The time to sample <paramref name="target"/> at when the sequence holding <paramref name="reference"/> is at
+    /// <paramref name="parentTime"/>, or null when the clip is not playing: before its start, after
+    /// <see cref="SequenceReferenceSave.Loops"/> cycles of <paramref name="targetLength"/>, or when the target has no length.
+    /// The target restarts with the holder (its clock is the holder's minus the clip start). A looping target wraps at its
+    /// length; one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. A
+    /// reference never lengthens the holder (<see cref="Length"/> ignores it), so a holder that loops restarts the target.
+    /// </summary>
+    public static double? ReferenceTime(SequenceReferenceSave reference, SequenceSave target, double targetLength, double parentTime)
+    {
+        if (targetLength <= 0) return null;
+        if (reference.Start > parentTime + Slack(parentTime)) return null;
+        double local = Math.Max(0, parentTime - reference.Start);
+        if (parentTime + Slack(parentTime) >= reference.Start + FullLength(reference.Loops, targetLength)) return null;
+        return PoseTime(WrapTime(local, targetLength, target.Loop), targetLength, target.Loop);
+    }
+
     /// <summary>The earliest a chain's right edge can sit: <see cref="MinimumLoops"/> cycles after <paramref name="start"/>.</summary>
     public static double MinimumEdge(double start, double cycleLength) => start + MinimumLoops * cycleLength;
 

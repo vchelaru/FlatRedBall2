@@ -35,6 +35,12 @@ public enum TimelineMenuCommand
     MoveUp,
     MoveDown,
     MoveToBottom,
+
+    /// <summary>Blank space: a submenu listing the sequences this one may play (<see cref="SequenceDocument.ReferenceCandidates"/>).</summary>
+    AddSequenceReference,
+
+    /// <summary>A reference track: shows or hides the tracks it inherits.</summary>
+    ToggleExpanded,
 }
 
 /// <summary>
@@ -59,7 +65,8 @@ public static class TimelineMenuLayout
     /// (<see cref="TrackReorder.AvailableMoves"/>), offered first on a track header as the tree menu offers its reorder items;
     /// one that can't happen is left out, and so is the divider under the group when none can.
     /// </summary>
-    public static IReadOnlyList<IReadOnlyList<TimelineMenuCommand>> For(TimelineMenuTarget target, bool anyTrackHidden, IReadOnlyList<ReorderMove>? moves = null)
+    public static IReadOnlyList<IReadOnlyList<TimelineMenuCommand>> For(TimelineMenuTarget target, bool anyTrackHidden, IReadOnlyList<ReorderMove>? moves = null,
+        bool? referenceExpanded = null)
     {
         var clipboard = new[] { TimelineMenuCommand.Copy, TimelineMenuCommand.Cut, TimelineMenuCommand.Paste, TimelineMenuCommand.Duplicate };
         var moveItems = new List<TimelineMenuCommand>();
@@ -73,9 +80,11 @@ public static class TimelineMenuLayout
         var header = new List<IReadOnlyList<TimelineMenuCommand>>();
         if (moveItems.Count > 0) header.Add(moveItems.ToArray());
         header.Add(clipboard);
-        header.Add(anyTrackHidden
-            ? new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility, TimelineMenuCommand.ShowAllTracks }
-            : new[] { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility });
+        var own = new List<TimelineMenuCommand> { TimelineMenuCommand.RenameTrack, TimelineMenuCommand.ToggleVisibility };
+        if (anyTrackHidden) own.Add(TimelineMenuCommand.ShowAllTracks);
+        // Only a single reference track clicked offers Expand/Collapse (referenceExpanded says which, null for any other track).
+        if (referenceExpanded is not null) own.Add(TimelineMenuCommand.ToggleExpanded);
+        header.Add(own.ToArray());
         header.Add(new[] { TimelineMenuCommand.Delete });
         return target switch
         {
@@ -88,14 +97,14 @@ public static class TimelineMenuLayout
             },
             _ => new IReadOnlyList<TimelineMenuCommand>[]
             {
-                new[] { TimelineMenuCommand.AddTrack },
+                new[] { TimelineMenuCommand.AddTrack, TimelineMenuCommand.AddSequenceReference },
                 new[] { TimelineMenuCommand.Paste },
             },
         };
     }
 
     /// <summary>The item's text with <paramref name="selected"/> tracks or chains selected; <paramref name="trackHidden"/> says whether the clicked track is hidden.</summary>
-    public static string Header(TimelineMenuTarget target, TimelineMenuCommand command, int selected, bool trackHidden = false)
+    public static string Header(TimelineMenuTarget target, TimelineMenuCommand command, int selected, bool trackHidden = false, bool referenceExpanded = false)
     {
         string plural = target == TimelineMenuTarget.Chain ? "Chains" : "Tracks";
         bool several = selected > 1;
@@ -115,6 +124,8 @@ public static class TimelineMenuLayout
                 ? (several ? $"Remove {selected} Chains" : "Remove from Track")
                 : (several ? $"Delete {selected} Tracks" : "Delete Track"),
             TimelineMenuCommand.AddTrack => "Add Track",
+            TimelineMenuCommand.AddSequenceReference => "Add Sequence Reference",
+            TimelineMenuCommand.ToggleExpanded => referenceExpanded ? "Collapse" : "Expand",
             TimelineMenuCommand.MoveToTop => "Move To Top",
             TimelineMenuCommand.MoveUp => "Move Up",
             TimelineMenuCommand.MoveDown => "Move Down",
@@ -133,6 +144,7 @@ public static class TimelineMenuLayout
         TimelineMenuCommand.RenameTrack => TreeMenuIcon.Rename,
         TimelineMenuCommand.Delete => TreeMenuIcon.Delete,
         TimelineMenuCommand.AddTrack => TreeMenuIcon.Plus,
+        TimelineMenuCommand.AddSequenceReference or TimelineMenuCommand.ToggleExpanded => TreeMenuIcon.Link,
         TimelineMenuCommand.ToggleVisibility or TimelineMenuCommand.ShowAllTracks => TreeMenuIcon.Visibility,
         TimelineMenuCommand.GoToDefinition => TreeMenuIcon.Animation,
         TimelineMenuCommand.MoveToTop => TreeMenuIcon.MoveToTop,

@@ -60,6 +60,10 @@ public static class TimelineClipboard
     public const string TracksKind = "frb2-animation-editor-tracks";
     public const int CurrentVersion = 1;
 
+    // The name of the throwaway sequence the tracks are round-tripped through. No real sequence has it, so a copied reference
+    // track that points at a sequence called "x" is not read as a cycle with the holder.
+    private const string HolderName = "\u0001clipboard";
+
     /// <summary>Deep copies of <paramref name="chains"/>, made through the format's own reader and writer so unknown properties survive.</summary>
     public static List<SequenceChainReferenceSave> CloneChains(IEnumerable<SequenceChainReferenceSave> chains)
     {
@@ -169,7 +173,7 @@ public static class TimelineClipboard
         List<SequenceTrackSave> read;
         try
         {
-            var holder = new JsonObject { ["name"] = "x" };
+            var holder = new JsonObject { ["name"] = HolderName };
             holder["tracks"] = chains
                 ? new JsonArray(new JsonObject { ["name"] = "x", ["chains"] = array.DeepClone() })
                 : array.DeepClone();
@@ -268,7 +272,7 @@ public static class TimelineClipboard
 
     private static string ToWrapper(IEnumerable<SequenceTrackSave> tracks)
     {
-        var sequence = new SequenceSave { Name = "x" };
+        var sequence = new SequenceSave { Name = HolderName };
         sequence.Tracks.AddRange(tracks);
         var wrapper = new SequenceListSave();
         wrapper.Sequences.Add(sequence);

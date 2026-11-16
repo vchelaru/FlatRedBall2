@@ -70,6 +70,19 @@ public static class TimelineLayout
     }
 
     /// <summary>
+    /// <see cref="LaneHeights(IReadOnlyList{TimelineBlock}, int, Func{TimelineBlock, bool})"/> with each expanded reference lane
+    /// grown to list its inherited tracks (<see cref="TimelineReferences.ExtraHeight"/>).
+    /// </summary>
+    public static double[] LaneHeights(IReadOnlyList<TimelineBlock> blocks, int trackCount, Func<TimelineBlock, bool> hasEvents,
+        IReadOnlyList<TimelineReference> references, Func<TimelineReference, bool> expanded)
+    {
+        var heights = LaneHeights(blocks, trackCount, hasEvents);
+        foreach (var reference in references)
+            if (reference.Track >= 0 && reference.Track < trackCount) heights[reference.Track] += TimelineReferences.ExtraHeight(reference, expanded(reference));
+        return heights;
+    }
+
+    /// <summary>
     /// The eye toggle and the name in a track header share one line, centered on the lane's base body
     /// (<see cref="TimelineViewport.LaneHeight"/>), not on the whole lane: a lane with an event row is taller, and
     /// centering on it would move the pair down on those lanes only. The name starts at <see cref="HeaderNameLeft"/>, past the eye.

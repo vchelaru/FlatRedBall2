@@ -71,6 +71,7 @@ public static class TreeMenuRenderer
         TreeMenuIcon.Visibility     => "IconOnionSkin",
         // Nearest existing art for "swap".
         TreeMenuIcon.Replace        => "IconReverse",
+        TreeMenuIcon.Link           => "IconLink",
         _ => throw new ArgumentOutOfRangeException(nameof(icon), icon, null),
     };
 

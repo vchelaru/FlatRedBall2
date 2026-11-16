@@ -17,9 +17,11 @@ namespace AnimationEditor.App.Controls;
 /// <summary>
 /// Drag-to-reorder for the sequence list. A press on a row arms it; past <see cref="DragThreshold"/> the drag starts,
 /// the pointer is captured, and an insertion line follows the gap the pointer points at (<see cref="SequenceReorder"/>).
-/// Release drops, Escape or a lost capture cancels. The rows that move are the list's selection: pressing an unselected
-/// row selects it alone first (the list does that on the press), and pressing a selected row of a multi-selection keeps
-/// the selection so the whole block can drag, narrowing it to that row on release when no drag followed. Ctrl, Shift and
+/// Release drops, Escape or a lost capture cancels. Selection waits for the release for every row: a plain press is held
+/// back from the list (so dragging a row never switches the timeline away from the place it is dropped on), and a release
+/// with no drag selects that row alone. The rows that move are the list's selection when the pressed row is in it, so a
+/// multi-selection drags as a block, and otherwise just the pressed row. Over the sequence timeline (see the
+/// <c>overTimeline</c> and <c>dropOnTimeline</c> callbacks) the line gives way to the drop onto the timeline. Ctrl, Shift and
 /// Meta presses, a second press of a double-click, and presses in the rename box never arm it.
 /// </summary>
 internal sealed class SequenceListDragController
@@ -36,6 +38,9 @@ internal sealed class SequenceListDragController
     private readonly Action<double, double, double> _showLine;
     private readonly Action _hideLine;
     private readonly Func<Point, Point?> _toOverlay;
+    private readonly Func<IReadOnlyList<int>, PointerEventArgs, ChipDragCursor?>? _overTimeline;
+    private readonly Action<IReadOnlyList<int>, PointerEventArgs>? _dropOnTimeline;
+    private readonly Action? _timelineDragEnded;
 
     private int _pressRow = -1;
     private Point _pressPoint;
@@ -54,9 +59,17 @@ internal sealed class SequenceListDragController
     /// <param name="showLine">Draws the insertion line at (left, right, y) in the drag overlay's coordinates.</param>
     /// <param name="hideLine">Removes the insertion line.</param>
     /// <param name="toOverlay">Maps a point in the list to the drag overlay's coordinates.</param>
+    /// <param name="overTimeline">While dragging: null when the pointer is not over the timeline, else the cursor the drop there would get (copy, or not allowed).</param>
+    /// <param name="dropOnTimeline">Released over the timeline (<paramref name="overTimeline"/> returned a cursor): adds the dragged sequences there.</param>
+    /// <param name="timelineDragEnded">The drag ended, dropped or cancelled: the timeline stops showing where the sequence would land.</param>
     public SequenceListDragController(ListBox list, Func<IReadOnlyList<int>> movedRows, Action commitPendingRename,
-        Action<IReadOnlyList<int>, int> drop, Action<double, double, double> showLine, Action hideLine, Func<Point, Point?> toOverlay)
+        Action<IReadOnlyList<int>, int> drop, Action<double, double, double> showLine, Action hideLine, Func<Point, Point?> toOverlay,
+        Func<IReadOnlyList<int>, PointerEventArgs, ChipDragCursor?>? overTimeline = null,
+        Action<IReadOnlyList<int>, PointerEventArgs>? dropOnTimeline = null, Action? timelineDragEnded = null)
     {
+        _overTimeline = overTimeline;
+        _dropOnTimeline = dropOnTimeline;
+        _timelineDragEnded = timelineDragEnded;
         _list = list;
         _movedRows = movedRows;
         _commitPendingRename = commitPendingRename;
@@ -96,9 +109,10 @@ internal sealed class SequenceListDragController
         if (row < 0) return;
         _pressRow = row;
         _pressPoint = e.GetPosition(_list);
-        // Pressing a row of a multi-selection must not narrow it before we know whether this is a drag. The second
-        // press of a double-click can still start a drag (click a row, then grab it) but is left to the list.
-        if (e.ClickCount == 1 && _list.SelectedItems!.Count > 1 && _list.SelectedItems.Contains(item.DataContext))
+        // A press must not select before we know whether this is a drag: a row dragged onto the timeline would switch the
+        // timeline away from its drop target, and a row of a multi-selection would narrow it. The release selects when no drag
+        // followed. The second press of a double-click can still start a drag (click a row, then grab it) but is left to the list.
+        if (e.ClickCount == 1)
         {
             _collapseOnRelease = true;
             e.Handled = true;
@@ -120,6 +134,13 @@ internal sealed class SequenceListDragController
             if (Math.Abs(point.X - _pressPoint.X) < DragThreshold && Math.Abs(point.Y - _pressPoint.Y) < DragThreshold) return;
             if (!Begin(e)) return;
         }
+        if (_overTimeline?.Invoke(_moved, e) is { } cursor)
+        {
+            // Over the timeline the drop adds a reference there; reordering is for the list.
+            _hideLine();
+            DragCursors.Apply(_list, cursor);
+            return;
+        }
         UpdateIndicator();
         DragCursors.Apply(_list, TimelineCursor.Reorder);
     }
@@ -128,12 +149,9 @@ internal sealed class SequenceListDragController
     {
         // The rename's own commit may have rebuilt the list (it keeps the order), so the rows are read after it.
         _commitPendingRename();
-        _moved = _movedRows().OrderBy(row => row).ToList();
-        if (!_moved.Contains(_pressRow))
-        {
-            End();
-            return false;
-        }
+        // The pressed row was not selected by the press, so it drags alone unless it is part of the selection.
+        var selected = _movedRows().OrderBy(row => row).ToList();
+        _moved = selected.Contains(_pressRow) ? selected : new List<int> { _pressRow };
         _collapseOnRelease = false;
         _dragging = true;
         _pointer = e.Pointer;
@@ -156,10 +174,12 @@ internal sealed class SequenceListDragController
         if (_pressRow < 0) return;
         if (_dragging)
         {
-            int slot = SlotAt(e.GetPosition(_list).Y);
             var moved = _moved;
+            bool onTimeline = _overTimeline?.Invoke(moved, e) is not null;
+            int slot = SlotAt(e.GetPosition(_list).Y);
             End();
-            _drop(moved, slot);
+            if (onTimeline) _dropOnTimeline?.Invoke(moved, e);
+            else _drop(moved, slot);
             return;
         }
         int row = _pressRow;
@@ -269,6 +289,7 @@ internal sealed class SequenceListDragController
         _dimmed.Clear();
         if (!wasDragging) return;
         _hideLine();
+        _timelineDragEnded?.Invoke();
         DragCursors.Restore(_list, null);
         pointer?.Capture(null);
     }
