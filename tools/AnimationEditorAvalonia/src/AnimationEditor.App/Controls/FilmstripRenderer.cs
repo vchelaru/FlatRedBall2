@@ -18,7 +18,7 @@ namespace AnimationEditor.App.Controls;
 /// come from the shared <see cref="ThumbnailService"/> through each source's own texture path, so a sprite sheet is
 /// decoded once for the library chips and the timeline together.
 /// </summary>
-internal sealed class FilmstripRenderer
+internal sealed partial class FilmstripRenderer
 {
     private const int MaxBitmapSide = 2048;
     private const int MaxCachedLayouts = 256;
@@ -92,6 +92,7 @@ internal sealed class FilmstripRenderer
     public void Invalidate()
     {
         _layouts.Clear();
+        _clips.Clear();
         _numbers.Clear();
     }
 
