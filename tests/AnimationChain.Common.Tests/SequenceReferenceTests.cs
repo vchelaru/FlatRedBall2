@@ -86,27 +86,55 @@ public class SequenceReferenceTests
     }
 
     [Fact]
-    public void FromJsonString_SelfReference_IsRejected()
+    public void FromJsonString_SelfReference_LoadsAndSavesUnchanged_AndPlaysNothing()
     {
-        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(
-            """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "A" } } ] } ] }"""));
+        var save = new SequenceListSave { Sequences = { Sequence("A", true, ChainTrack("Body"), RefTrack("E", "A")) } };
+        string json = save.ToJsonString();
 
-        ex.Message.ShouldContain("A");
+        var loaded = SequenceListSave.FromJsonString(json);
+
+        loaded.ToJsonString().ShouldBe(json);
+        SequenceReferences.Inline(loaded.Sequences, loaded.Sequences[0]).Select(t => t.Name).ShouldBe(new[] { "Body" });
+        SequenceReferences.CycleThrough(loaded.Sequences, "A", "A").ShouldBe(new[] { "A", "A" });
     }
 
     [Fact]
-    public void FromJsonString_IndirectCycle_IsRejected()
+    public void FromJsonString_TwoStepCycle_Loads_TheClosingReferencesPlayNothing_AndOtherSequencesStillPlay()
     {
-        const string json = """
-            { "sequences": [
-              { "name": "A", "tracks": [ { "name": "x", "reference": { "sequence": "B" } } ] },
-              { "name": "B", "tracks": [ { "name": "y", "reference": { "sequence": "A" } } ] } ] }
-            """;
+        var save = new SequenceListSave
+        {
+            Sequences =
+            {
+                Sequence("A", true, ChainTrack("Body"), RefTrack("x", "B")),
+                Sequence("B", true, ChainTrack("Leg"), RefTrack("y", "A")),
+                Sequence("C", true, RefTrack("a", "A")),
+            },
+        };
 
-        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(json));
+        var loaded = SequenceListSave.FromJsonString(save.ToJsonString());
+        var sequences = loaded.Sequences;
 
-        ex.Message.ShouldContain("A");
-        ex.Message.ShouldContain("B");
+        SequenceReferences.Inline(sequences, sequences[0]).Select(t => t.Name).ShouldBe(new[] { "Body" });
+        SequenceReferences.Inline(sequences, sequences[1]).Select(t => t.Name).ShouldBe(new[] { "Leg" });
+        SequenceReferences.Inline(sequences, sequences[2]).Select(t => t.Name).ShouldBe(new[] { "a/Body" });
+        SequenceReferences.CycleThrough(sequences, "A", "B").ShouldBe(new[] { "A", "B", "A" });
+        SequenceReferences.CycleThrough(sequences, "C", "A").ShouldBeNull();
+    }
+
+    [Fact]
+    public void Inline_DeepChainWithoutCycle_ReachesTheLeaf_WithNoFalseCycle()
+    {
+        const int depth = 500;
+        var sequences = new List<SequenceSave>();
+        for (int i = 0; i < depth; i++) sequences.Add(Sequence($"S{i}", true, RefTrack("r", $"S{i + 1}")));
+        sequences.Add(Sequence($"S{depth}", true, ChainTrack("Leaf")));
+
+        var tracks = SequenceReferences.Inline(sequences, sequences[0]);
+
+        tracks.Single().Track.Name.ShouldBe("Leaf");
+        tracks.Single().Hops.Count.ShouldBe(depth);
+        SequenceReferences.CycleThrough(sequences, "S0", "S1").ShouldBeNull();
+        SequenceReferences.FindCycle(sequences).ShouldBeNull();
     }
 
     [Fact]

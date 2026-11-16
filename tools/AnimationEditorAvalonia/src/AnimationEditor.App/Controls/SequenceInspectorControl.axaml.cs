@@ -226,9 +226,13 @@ public partial class SequenceInspectorControl : UserControl
         ReferenceSequenceText.Text = reference.Sequence;
         PutOrMixed(ReferenceStartField, (decimal)reference.Start, force);
         PutOrMixed(ReferenceLoopsField, (decimal)reference.Loops, force);
-        bool missing = SequenceReferences.Find(_document!.Save.Sequences, reference.Sequence) is null;
-        ReferenceMissingText.Text = missing ? $"⚠ There is no sequence named \"{reference.Sequence}\"." : null;
-        ReferenceMissingText.IsVisible = missing;
+        var sequences = _document!.Save.Sequences;
+        bool missing = SequenceReferences.Find(sequences, reference.Sequence) is null;
+        var cycle = !missing && _sequence >= 0 && _sequence < sequences.Count
+            ? SequenceReferences.CycleThrough(sequences, sequences[_sequence].Name, reference.Sequence) : null;
+        ReferenceMissingText.Text = missing ? $"⚠ There is no sequence named \"{reference.Sequence}\"."
+            : cycle is not null ? $"⚠ {SequenceCycleNotice.Describe(cycle)}." : null;
+        ReferenceMissingText.IsVisible = ReferenceMissingText.Text is not null;
         _goToSequence = reference.Sequence;
         GoToSequenceButton.IsEnabled = !missing;
         ToolTip.SetTip(GoToSequenceButton, TimelineMenuLayout.GoToSequenceDisabledReason(_document.Save.Sequences, reference.Sequence)
