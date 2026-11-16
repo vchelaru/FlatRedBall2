@@ -23,9 +23,9 @@ public class DragCursorsTests
     }
 
     [Fact]
-    public void StockCursorId_ReorderIsSizeNS()
+    public void StockCursorId_ReorderIsSizeAll_NotAResizeArrow()
     {
-        DragCursors.StockCursorId(TimelineCursor.Reorder).ShouldBe(32645);
+        DragCursors.StockCursorId(TimelineCursor.Reorder).ShouldBe(32646);
     }
 
     [Fact]
@@ -35,13 +35,15 @@ public class DragCursorsTests
     }
 
     [AvaloniaFact]
-    public void ForHover_GivesEachTimelineCursorItsOwnShape_AndNothingForTheDefault()
+    public void ForHover_ReorderIsTheFourWayMoveCursor_ResizeKeepsItsArrow_AndNothingForTheDefault()
     {
         DragCursors.ForHover(TimelineCursor.Default).ShouldBeNull();
 
-        var shapes = new[] { TimelineCursor.ResizeHorizontal, TimelineCursor.Reorder, TimelineCursor.Pan }
-            .Select(cursor => DragCursors.ForHover(cursor).ShouldNotBeNull()).ToArray();
+        var resize = DragCursors.ForHover(TimelineCursor.ResizeHorizontal).ShouldNotBeNull();
+        var reorder = DragCursors.ForHover(TimelineCursor.Reorder).ShouldNotBeNull();
+        var pan = DragCursors.ForHover(TimelineCursor.Pan).ShouldNotBeNull();
 
-        shapes.Distinct().Count().ShouldBe(3);
+        reorder.ShouldBeSameAs(pan);
+        reorder.ShouldNotBeSameAs(resize);
     }
 }
