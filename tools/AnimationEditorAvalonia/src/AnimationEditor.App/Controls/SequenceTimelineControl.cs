@@ -237,6 +237,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Raised when the user double-clicks a chain or picks Go to Definition on it.</summary>
     public event Action<SequenceChainReferenceSave>? GoToDefinitionRequested;
 
+    /// <summary>Raised with the sequence's name when the user picks Go to Sequence on a reference track.</summary>
+    public event Action<string>? GoToSequenceRequested;
+
     /// <summary>Raised with the reason when an in-place rename is refused (an empty or taken name).</summary>
     public event Action<string>? ErrorRaised;
 
@@ -1279,7 +1282,13 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         // Expand/Collapse is offered when the clicked track is the one selected track and a reference with something to show.
         bool? referenceExpanded = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
             && ReferenceOn(track) is { Expandable: true } ? IsReferenceExpanded(track) : null;
-        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves, referenceExpanded);
+        // Go to Sequence is offered on the single selected reference track, disabled with a reason when its target is missing.
+        string? referenceTarget = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
+            && track >= 0 && track < Sequence.Tracks.Count ? Sequence.Tracks[track].Reference?.Sequence : null;
+        string? goToDisabledReason = referenceTarget is not null && _document is { } doc
+            ? TimelineMenuLayout.GoToSequenceDisabledReason(doc.Save.Sequences, referenceTarget) : null;
+        var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves, referenceExpanded,
+            canGoToSequence: referenceTarget is null ? null : goToDisabledReason is null);
         for (int i = 0; i < groups.Count; i++)
         {
             if (i > 0) _menu.Items.Add(new Separator());
@@ -1299,6 +1308,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     TimelineMenuCommand.ToggleVisibility => () => ToggleTrackVisibility(track),
                     TimelineMenuCommand.ShowAllTracks => () => _document.ShowAllTracks(_undo, _sequenceIndex),
                     TimelineMenuCommand.GoToDefinition => () => GoToDefinitionRequested?.Invoke(hitBlock!.Reference),
+                    TimelineMenuCommand.GoToSequence => () => GoToSequenceRequested?.Invoke(referenceTarget!),
                     TimelineMenuCommand.AddTrack => AddTrackAndRename,
                     TimelineMenuCommand.ToggleExpanded => () => ToggleReferenceExpanded(track),
                     TimelineMenuCommand.MoveToTop or TimelineMenuCommand.MoveUp or TimelineMenuCommand.MoveDown or TimelineMenuCommand.MoveToBottom
@@ -1306,9 +1316,15 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
                     _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
                 };
                 string header = TimelineMenuLayout.Header(target, command, selected, trackHidden, referenceExpanded == true);
-                _menu.Items.Add(TimelineMenuLayout.Icon(command) is { } icon
+                var menuItem = TimelineMenuLayout.Icon(command) is { } icon
                     ? TreeMenuRenderer.CreateMenuItem(header, onClick, icon)
-                    : CreatePlainItem(header, onClick));
+                    : CreatePlainItem(header, onClick);
+                if (command == TimelineMenuCommand.GoToSequence && goToDisabledReason is not null)
+                {
+                    menuItem.IsEnabled = false;
+                    ToolTip.SetTip(menuItem, goToDisabledReason);
+                }
+                _menu.Items.Add(menuItem);
             }
         }
     }
