@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -244,6 +245,7 @@ public sealed partial class SequenceTimelineControl
 
     private void DrawReferences(DrawingContext context, Size size)
     {
+        _filmstrip.BeginReferencePass();
         foreach (var reference in _references)
         {
             using (PushOpacityUnlessOpaque(context, IsTrackHidden(reference.Track) ? HiddenOpacity : 1))
@@ -266,6 +268,8 @@ public sealed partial class SequenceTimelineControl
         context.FillRectangle(new SolidColorBrush(color, 0.22), body, 3);
         if (reference.IsMissing) DrawHatched(context, body, solid, 0.4);
         context.DrawRectangle(null, new Pen(solid, 1.5), body, 3, 3);
+
+        if (!IsExpanded(reference)) DrawClipFilmstrip(context, reference, body, color);
 
         // Whole-cycle marks of the played sequence, so a fractional count reads at a glance.
         if (reference.TargetLength > 0)
@@ -294,6 +298,29 @@ public sealed partial class SequenceTimelineControl
 
         if (IsExpanded(reference)) DrawInheritedRows(context, reference, left, width, top, color);
     }
+
+    // A collapsed clip's content: the target sequence as the preview draws it, cell by cell along the clip, each cycle repeating
+    // the same cells. Cells not yet cut stay empty and are filled by the repaint this schedules.
+    private void DrawClipFilmstrip(DrawingContext context, TimelineReference reference, Rect body, Color color)
+    {
+        if (_document is not { } document || reference.TargetLength <= 0) return;
+        var film = new Rect(body.X, body.Y + TimelineLayout.LabelHeight, body.Width, TimelineLayout.FilmHeight);
+        double scaling = (VisualRoot as TopLevel)?.RenderScaling ?? 1;
+        _filmstrip.Stats = Stats;
+        int pending = _filmstrip.DrawReference(context, document, reference, Viewport.PixelsPerSecond, film,
+            Viewport.ColumnWidth, Bounds.Width, scaling, Color.FromArgb(0x4D, color.R, color.G, color.B));
+        if (pending > 0 && !_referenceRepaintQueued)
+        {
+            _referenceRepaintQueued = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _referenceRepaintQueued = false;
+                InvalidateVisual();
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    private bool _referenceRepaintQueued;
 
     // The inherited tracks as dashed bars: the target's first cycle, repeated for each cycle the clip plays. Read-only, so no handles.
     private void DrawInheritedRows(DrawingContext context, TimelineReference reference, double left, double width, double top, Color color)
