@@ -77,6 +77,86 @@ public class TimelineReferencesTests
         expanded[1].ShouldBe(TimelineViewport.LaneHeight + 2 * TimelineReferences.InheritedRowHeight + 2, 1e-9);
     }
 
+    private static TimelineReference ClipOf(SequenceSave target, float loops = 1)
+    {
+        var holder = new SequenceSave { Name = "Holder", Tracks = { RefTrack("Link", target.Name, loops: loops) } };
+        var file = new List<SequenceSave> { holder, target };
+        return TimelineReferences.For(holder, file, Cycle).Single();
+    }
+
+    private static SequenceSave TargetWithTracks(int count)
+    {
+        var target = new SequenceSave { Name = "Many" };
+        for (int i = 0; i < count; i++) target.Tracks.Add(ChainTrack("T" + i));
+        return target;
+    }
+
+    [Fact]
+    public void Strips_OnePerReferencedTrack_StackedInsideTheFilmAreaWithoutOverlap()
+    {
+        var clip = ClipOf(TargetWithTracks(3));
+
+        clip.Strips.Count.ShouldBe(3);
+        clip.Overflow.ShouldBe(0);
+        clip.Strips.Select(s => s.Row).ShouldBe(new[] { 0, 1, 2 });
+        clip.Strips[0].Top.ShouldBeGreaterThanOrEqualTo(TimelineLayout.FilmTop);
+        for (int i = 1; i < clip.Strips.Count; i++)
+            clip.Strips[i].Top.ShouldBeGreaterThan(clip.Strips[i - 1].Top + clip.Strips[i - 1].Height - 1e-9);
+        (clip.Strips[2].Top + clip.Strips[2].Height).ShouldBeLessThanOrEqualTo(TimelineLayout.BodyBottom);
+    }
+
+    [Fact]
+    public void Strips_MoreTracksThanTheCap_ShowsTheFirstOnesAndCountsTheRest()
+    {
+        var clip = ClipOf(TargetWithTracks(8));
+
+        clip.Strips.Count.ShouldBe(TimelineReferences.MaxClipStrips);
+        clip.Overflow.ShouldBe(8 - TimelineReferences.MaxClipStrips);
+        (clip.Strips[^1].Top + clip.Strips[^1].Height).ShouldBeLessThanOrEqualTo(TimelineLayout.BodyBottom);
+    }
+
+    [Fact]
+    public void Strips_TargetWithNoTracks_HasNoStripsAndNoOverflow()
+    {
+        var clip = ClipOf(new SequenceSave { Name = "Empty" });
+
+        clip.Strips.ShouldBeEmpty();
+        clip.Overflow.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Strips_NestedReferenceInTheTarget_IsOneStripLikeAnyOtherTrack()
+    {
+        var file = File();
+        file.Add(new SequenceSave { Name = "Outer", Tracks = { RefTrack("Inner", "Idle") } });
+
+        var clip = TimelineReferences.For(file[2], file, Cycle).Single();
+
+        clip.Rows.Count.ShouldBe(clip.Strips.Count + clip.Overflow);
+        clip.Rows.Single(r => r.Name == "Earth/Ring").Spans.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Strips_MissingTarget_HasNoStripsAndNoCycles()
+    {
+        var holder = new SequenceSave { Name = "Holder", Tracks = { RefTrack("Link", "Gone") } };
+
+        var clip = TimelineReferences.For(holder, new List<SequenceSave> { holder }, Cycle).Single();
+
+        clip.Strips.ShouldBeEmpty();
+        clip.Cycles.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(1f, 1)]
+    [InlineData(3f, 3)]
+    [InlineData(2.5f, 3)]
+    [InlineData(0.5f, 1)]
+    public void Cycles_IsTheNumberOfTargetCopiesTheClipDrawsIncludingAPartialLastOne(float loops, int expected)
+    {
+        ClipOf(TargetWithTracks(1), loops).Cycles.ShouldBe(expected);
+    }
+
     [Fact]
     public void HitTest_ClipBody_ThenItsRightEdge_AndNotTheInheritedRowsBelow()
     {

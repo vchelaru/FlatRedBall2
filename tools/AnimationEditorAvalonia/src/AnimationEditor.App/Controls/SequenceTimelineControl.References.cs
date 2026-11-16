@@ -267,6 +267,8 @@ public sealed partial class SequenceTimelineControl
         if (reference.IsMissing) DrawHatched(context, body, solid, 0.4);
         context.DrawRectangle(null, new Pen(solid, 1.5), body, 3, 3);
 
+        if (!IsExpanded(reference)) DrawClipStrips(context, reference, body, left, top, color);
+
         // Whole-cycle marks of the played sequence, so a fractional count reads at a glance.
         if (reference.TargetLength > 0)
         {
@@ -293,6 +295,38 @@ public sealed partial class SequenceTimelineControl
         }
 
         if (IsExpanded(reference)) DrawInheritedRows(context, reference, left, width, top, color);
+    }
+
+    // A collapsed clip's content: one thin strip per referenced track (hidden ones fainter, as in the expanded rows), the target's
+    // first cycle repeated for each cycle the clip plays; "+k" in the label row when the cap left tracks out.
+    private void DrawClipStrips(DrawingContext context, TimelineReference reference, Rect body, double left, double top, Color color)
+    {
+        if (reference.Strips.Count == 0) return;
+        double pps = Viewport.PixelsPerSecond;
+        var shown = new SolidColorBrush(color, 0.6);
+        var faint = new SolidColorBrush(color, 0.22);
+        using (context.PushClip(body))
+        {
+            foreach (var strip in reference.Strips)
+            {
+                var row = reference.Rows[strip.Row];
+                var brush = row.Visible ? shown : faint;
+                for (int cycle = 0; cycle < reference.Cycles; cycle++)
+                {
+                    foreach (var span in row.Spans)
+                    {
+                        double x = left + (cycle * reference.TargetLength + span.Start) * pps;
+                        if (x >= body.Right) continue;
+                        context.FillRectangle(brush, new Rect(x, top + strip.Top, Math.Max(1, Math.Min(span.Length * pps, body.Right - x)), strip.Height));
+                    }
+                }
+            }
+        }
+        if (reference.Overflow > 0 && body.Width >= 2 * TimelineLayout.MinLabelPixels)
+        {
+            var more = TrimmedText($"+{reference.Overflow}", 10, Brush("InkMid"), FontWeight.Normal, 30);
+            context.DrawText(more, new Point(body.Right - more.Width - 5, body.Y + (TimelineLayout.LabelHeight - more.Height) / 2 + 1));
+        }
     }
 
     // The inherited tracks as dashed bars: the target's first cycle, repeated for each cycle the clip plays. Read-only, so no handles.

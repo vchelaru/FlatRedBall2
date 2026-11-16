@@ -40,7 +40,19 @@ public sealed record TimelineReference(int Track, SequenceReferenceSave Referenc
 
     /// <summary>Whether there is anything to show when the lane is expanded.</summary>
     public bool Expandable => Rows.Count > 0;
+
+    /// <summary>The strips of the collapsed clip, one per referenced track up to the cap.</summary>
+    public IReadOnlyList<ClipStrip> Strips { get; } = TimelineReferences.ClipStrips(Rows.Count);
+
+    /// <summary>How many referenced tracks have no strip because of the cap.</summary>
+    public int Overflow => Rows.Count - Strips.Count;
+
+    /// <summary>How many copies of the target the clip draws, a partial last one included; 0 when the target is missing or empty.</summary>
+    public int Cycles => TargetLength > 0 ? (int)Math.Ceiling(Length / TargetLength - 1e-9) : 0;
 }
+
+/// <summary>One referenced track's strip in a collapsed clip: its row in <see cref="TimelineReference.Rows"/> and its vertical place as offsets from the lane top.</summary>
+public readonly record struct ClipStrip(int Row, double Top, double Height);
 
 /// <summary>What a pointer lands on in a reference clip.</summary>
 public readonly record struct TimelineReferenceHit(TimelineReference Reference, TimelineHitPart Part);
@@ -53,6 +65,28 @@ public static class TimelineReferences
 
     /// <summary>Padding under the clip band before the inherited rows start.</summary>
     public const double InheritedTop = TimelineLayout.BodyBottom + 4;
+
+    /// <summary>The most strips a collapsed clip draws; a sequence with more tracks shows the first ones and a count of the rest.</summary>
+    public const int MaxClipStrips = 5;
+
+    private const double StripGap = 1;
+    private const double StripMaxHeight = 6;
+    private const double StripInset = 2;
+
+    /// <summary>
+    /// Where a collapsed clip draws one thin strip per referenced track, as offsets from the lane top: stacked in the clip body under
+    /// the name label, at most <see cref="MaxClipStrips"/>. A few tracks get taller strips, so a lone one is not a hairline.
+    /// </summary>
+    public static IReadOnlyList<ClipStrip> ClipStrips(int rowCount)
+    {
+        int shown = Math.Min(rowCount, MaxClipStrips);
+        if (shown <= 0) return Array.Empty<ClipStrip>();
+        double top = TimelineLayout.FilmTop + StripInset, room = TimelineLayout.BodyBottom - StripInset - top;
+        double height = Math.Min(StripMaxHeight, (room - StripGap * (shown - 1)) / shown);
+        var strips = new ClipStrip[shown];
+        for (int i = 0; i < shown; i++) strips[i] = new ClipStrip(i, top + i * (height + StripGap), height);
+        return strips;
+    }
 
     /// <summary>The lane height a reference adds when expanded.</summary>
     public static double ExtraHeight(TimelineReference reference, bool expanded) =>
