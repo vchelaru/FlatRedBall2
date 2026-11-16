@@ -411,15 +411,24 @@ public sealed class SequenceDocument : ISequenceChainLookup
         string description = SequenceLabel.OneOrMany("Paste", "Sequence", names);
         var errors = new List<string>();
         var folder = Path.GetDirectoryContainingThis();
+        if (ClosesCycle(save => save.Sequences.InsertRange(insertAt, Renamed(content.Sequences, names))))
+            return new SequencePasteResult(Array.Empty<string>(),
+                new[] { $"Can't paste {string.Join(", ", names.Select(n => $"\"{n}\""))}: that would make the sequences play each other in a loop." });
         var before = SelectionOf(selected);
         Edit(undo, description, save =>
         {
-            var pasted = content.Sequences.Select(SequenceClipboard.Clone).ToList();
-            for (int i = 0; i < pasted.Count; i++) pasted[i].Name = names[i];
+            var pasted = Renamed(content.Sequences, names);
             MergeSources(save, pasted.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains), folder, errors);
             save.Sequences.InsertRange(insertAt, pasted);
         }, stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
         return new SequencePasteResult(names, errors);
+    }
+
+    private static List<SequenceSave> Renamed(IReadOnlyList<SequenceSave> sequences, IReadOnlyList<string> names)
+    {
+        var copies = sequences.Select(SequenceClipboard.Clone).ToList();
+        for (int i = 0; i < copies.Count; i++) copies[i].Name = names[i];
+        return copies;
     }
 
     /// <summary>The clipboard text for the given chains of <paramref name="sequence"/>, in document order (see <see cref="TimelineClipboard"/>).</summary>
@@ -679,13 +688,17 @@ public sealed class SequenceDocument : ISequenceChainLookup
         if (name == oldName) return null;
         if (Save.Sequences.Where((_, i) => i != index).Any(s => s.Name == name))
             return $"A sequence named \"{name}\" already exists.";
-        Edit(undo, SequenceLabel.Renamed("Sequence", oldName, name), save =>
+        void Rename(SequenceListSave save)
         {
             save.Sequences[index].Name = name;
             // Tracks that play it follow the rename, so the reference does not go dangling.
             foreach (var playing in save.Sequences.SelectMany(s => s.Tracks).Select(t => t.Reference).Where(r => r is not null && r.Sequence == oldName))
                 playing!.Sequence = name;
-        }, selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
+        }
+        // A reference already naming the new name (left dangling by an edit outside the editor) would start playing it.
+        if (ClosesCycle(Rename))
+            return $"Can't rename \"{oldName}\" to \"{name}\": that would make the sequences play each other in a loop.";
+        Edit(undo, SequenceLabel.Renamed("Sequence", oldName, name), Rename, selectBefore: index, selectAfter: index, selectOnDo: !keepSelection, renamed: (oldName, name));
         return null;
     }
 
@@ -1258,7 +1271,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         mutate(copy);
         // An edit that would close a new cycle (a paste into another file) is dropped; the edits that can do this check
         // first and say why. A cycle the file already held (edited outside the editor) does not block other edits.
-        if (SequenceReferences.CyclicReferenceCount(copy.Sequences) > SequenceReferences.CyclicReferenceCount(Save.Sequences)) return;
+        if (AddsCycle(copy)) return;
         string after = copy.ToJsonString();
         if (after == before) return;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
@@ -1267,6 +1280,17 @@ public sealed class SequenceDocument : ISequenceChainLookup
         undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
             stateBefore, stateAfter, coalesceGroup));
     }
+
+    /// <summary>Whether <paramref name="mutate"/>, applied to a copy of the file, would close a cycle the file does not already hold.</summary>
+    private bool ClosesCycle(Action<SequenceListSave> mutate)
+    {
+        var copy = SequenceListSave.FromJsonString(Save.ToJsonString());
+        mutate(copy);
+        return AddsCycle(copy);
+    }
+
+    private bool AddsCycle(SequenceListSave copy) =>
+        SequenceReferences.CyclicReferenceCount(copy.Sequences) > SequenceReferences.CyclicReferenceCount(Save.Sequences);
 
     /// <summary>
     /// The index of the first sequence that differs between two snapshots, or null when none does (a sources-only
