@@ -130,6 +130,37 @@ public class SequenceThumbnailTests
         SequenceThumbnailScene.LayersFor(document.Save.Sequences[0], document).ShouldBeEmpty();
     }
 
+    private static SequenceTrackSave Link(string name, string target, double start = 0) =>
+        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start } };
+
+    [Fact]
+    public void ChooseTime_NestedReferencesStartingLater_IsTheSumOfTheirStarts()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, 1)));
+        document.Save.Sequences[0].Name = "Fx";
+        document.Save.Sequences.Add(new SequenceSave { Name = "Mid", Tracks = { Link("Fx", "Fx", 0.5) } });
+        var boss = new SequenceSave { Name = "Boss", Tracks = { Link("Mid", "Mid", 1) } };
+        document.Save.Sequences.Add(boss);
+
+        SequenceThumbnailScene.ChooseTime(boss, document, document.Save.Sequences).ShouldBe(1.5);
+        SequenceThumbnailScene.LayersFor(boss, document, document.Save.Sequences).Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void LayersFor_BrokenReferences_ShowOnlyTheOwnTracks()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1)));
+        var attack = document.Save.Sequences[0];
+        attack.Tracks.Add(Link("Me", "Attack"));
+        attack.Tracks.Add(Link("Gone", "Missing"));
+
+        SequenceThumbnailScene.LayersFor(attack, document, document.Save.Sequences)
+            .Select(l => Path.GetFileName(l.TexturePath)).ShouldBe(new[] { "body.png" });
+        SequenceThumbnailScene.ChainReferencesOf(attack, document.Save.Sequences).Select(r => r.Chain).ShouldBe(new[] { "Walk" });
+    }
+
     [Fact]
     public void LayersFor_TwoTracks_AreBackToFront_TopLaneLast()
     {

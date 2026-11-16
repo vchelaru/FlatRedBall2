@@ -93,4 +93,98 @@ public class TimelineReferencesTests
         TimelineReferences.HitTest(viewport, references, 2, mid, lane + TimelineReferences.InheritedTop + 4).ShouldBeNull();
         TimelineReferences.HitTest(viewport, references, 2, viewport.XAt(0.2), lane + 20).ShouldBeNull();
     }
+
+    [Fact]
+    public void For_NestedReferenceInTheTarget_IsOnePrefixedRowPerTrack_SpanningItsClip()
+    {
+        var file = new List<SequenceSave>
+        {
+            new() { Name = "Idle", Tracks = { RefTrack("Mid", "Mid") } },
+            new() { Name = "Mid", Tracks = { ChainTrack("Own"), RefTrack("Fx", "Earth", start: 0.5, loops: 2) } },
+            new() { Name = "Earth", Tracks = { ChainTrack("Ring") } },
+        };
+
+        var rows = TimelineReferences.For(file[0], file, Cycle).Single().Rows;
+
+        rows.Select(r => r.Name).ShouldBe(new[] { "Own", "Fx/Ring" });
+        rows[1].Spans.Single().Start.ShouldBe(0.5);
+        rows[1].Spans.Single().Length.ShouldBe(1.5, 1e-9);
+    }
+
+    [Fact]
+    public void For_SelfReference_IsBroken_NamesTheCycle_AndCannotBeResizedOrExpanded()
+    {
+        var file = new List<SequenceSave> { new() { Name = "A", Tracks = { ChainTrack("Body"), RefTrack("Me", "A") } } };
+
+        var reference = TimelineReferences.For(file[0], file, Cycle).Single();
+
+        reference.IsBroken.ShouldBeTrue();
+        reference.IsMissing.ShouldBeFalse();
+        reference.Cycle.ShouldBe(new[] { "A", "A" });
+        reference.CanResize.ShouldBeFalse();
+        reference.Expandable.ShouldBeFalse();
+        reference.Length.ShouldBe(TimelineLayout.MissingLength);
+    }
+
+    [Fact]
+    public void For_EmptyTarget_IsNotBroken_ButHasNoCycleToResize()
+    {
+        var file = new List<SequenceSave>
+        {
+            new() { Name = "Idle", Tracks = { RefTrack("Nothing", "Empty", loops: 3) } },
+            new() { Name = "Empty" },
+        };
+
+        var reference = TimelineReferences.For(file[0], file, Cycle).Single();
+
+        reference.IsBroken.ShouldBeFalse();
+        reference.TargetLength.ShouldBe(0);
+        reference.Length.ShouldBe(TimelineLayout.MissingLength);
+        reference.CanResize.ShouldBeFalse();
+        reference.Expandable.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void For_HiddenTrackInTheTarget_ItsRowIsNotVisible()
+    {
+        var file = File();
+        file[1].Tracks[1].Visible = false;
+
+        var rows = TimelineReferences.For(file[0], file, Cycle).Single().Rows;
+
+        rows.Select(r => r.Visible).ShouldBe(new[] { true, false });
+    }
+
+    [Fact]
+    public void For_FractionalLoops_ClipIsThatPartOfTheTarget()
+    {
+        var file = File();
+        file[0].Tracks[1].Reference!.Loops = 0.5f;
+
+        TimelineReferences.For(file[0], file, Cycle).Single().Length.ShouldBe(0.625, 1e-9);
+    }
+
+    [Fact]
+    public void For_SeveralReferenceTracks_OnePerLaneWithItsIndex()
+    {
+        var file = File();
+        file[0].Tracks.Add(RefTrack("Gone", "Missing"));
+        file[0].Tracks.Insert(0, RefTrack("Again", "Earth"));
+
+        var references = TimelineReferences.For(file[0], file, Cycle);
+
+        references.Select(r => (r.Track, r.IsMissing)).ShouldBe(new[] { (0, false), (2, false), (3, true) });
+    }
+
+    [Fact]
+    public void HitTest_BrokenClip_IsBodyAtItsRightEdge_NeverTheResizeEdge()
+    {
+        var file = new List<SequenceSave> { new() { Name = "Idle", Tracks = { ChainTrack("Body"), RefTrack("Gone", "Missing", start: 1) } } };
+        var references = TimelineReferences.For(file[0], file, Cycle);
+        var viewport = new TimelineViewport();
+        viewport.SetLaneHeights(TimelineLayout.LaneHeights(new List<TimelineBlock>(), 2, _ => false, references, _ => true));
+        double lane = viewport.LaneTop(1);
+
+        TimelineReferences.HitTest(viewport, references, 2, viewport.XAt(references[0].End) - 1, lane + 20)!.Value.Part.ShouldBe(TimelineHitPart.Body);
+    }
 }

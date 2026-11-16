@@ -79,4 +79,64 @@ public class SequenceCycleTests
         document.StaleOnDiskReason.ShouldBeNull();
         SequenceCycleNotice.For(document.Save, "boss.seqj")!.ShouldContain("A > B > A");
     }
+
+    [Fact]
+    public void SelfReferenceFile_Loads_TheNoticeNamesItTwice_AndItsOwnTracksPlay()
+    {
+        using var dir = new TestHelpers.TempDir();
+        string path = Write(dir, cyclic: false);
+        var file = SequenceListSave.FromFile(path);
+        file.Sequences[1].Tracks.Add(RefTrack("me", "B"));
+        file.Save(path);
+
+        var document = SequenceDocument.Load(path);
+
+        SequenceCycleNotice.For(document.Save, "boss.seqj")!.ShouldContain("B > B");
+        SequenceScene.At(document, 1, 0.1).Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Run" });
+        SequenceScene.At(document, 0, 0.1).Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Run", "Walk" }, "A is not on the cycle");
+    }
+
+    [Fact]
+    public void ExternalEditRemovingTheCycle_Reloads_TheNoticeClears_AndTheReferencePlaysAgain()
+    {
+        using var dir = new TestHelpers.TempDir();
+        string path = Write(dir, cyclic: true);
+        var document = SequenceDocument.Load(path);
+
+        Write(dir, cyclic: false);
+        document.ReloadFromDisk().Changed.ShouldBeTrue();
+
+        SequenceCycleNotice.For(document.Save, "boss.seqj").ShouldBeNull();
+        SequenceScene.At(document, 0, 0.1).Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Run", "Walk" });
+    }
+
+    [Fact]
+    public void CyclicFile_DeletingTheClosingReference_FixesIt_AndUndoBringsTheCycleBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = SequenceDocument.Load(Write(dir, cyclic: true));
+        var undo = new UndoManager();
+
+        document.DeleteTrack(undo, 1, 1);
+
+        SequenceCycleNotice.For(document.Save, "boss.seqj").ShouldBeNull();
+        SequenceScene.At(document, 0, 0.1).Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Run", "Walk" });
+        undo.Undo();
+        SequenceCycleNotice.For(document.Save, "boss.seqj")!.ShouldContain("A > B > A");
+    }
+
+    [Fact]
+    public void CyclicFile_ANewSequenceMayStillPlayASequenceOnTheCycle()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = SequenceDocument.Load(Write(dir, cyclic: true));
+        var undo = new UndoManager();
+        string name = document.AddSequence(undo);
+        int added = document.Save.Sequences.FindIndex(s => s.Name == name);
+
+        document.AddSequenceReference(undo, added, "A", 0).ShouldBeNull();
+
+        SequenceScene.At(document, added, 0.1).Select(sprite => sprite.Chain.Name).ShouldBe(new[] { "Walk" });
+        document.SequenceLength(added).ShouldBe(0.5, 1e-6);
+    }
 }
