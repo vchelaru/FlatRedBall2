@@ -154,4 +154,26 @@ public class ReferenceFilmstripTests
         var (shown, shownTarget, shownFile) = Setup(new SequenceSave { Name = "T", Tracks = { ChainTrack("Walk") } });
         ReferenceFilmstrip.PoseAt(shown, shownTarget, 5, new Lookup(), shownFile).ShouldBeNull();
     }
+
+    [Fact]
+    public void Cells_FractionalLoops_AreCutAtTheClipEnd_AndZeroLoopsHasNone()
+    {
+        var half = ReferenceFilmstrip.Cells(targetLength: 1, loops: 0.5f, pixelsPerSecond: 100);
+
+        half.Sum(c => c.Width).ShouldBe(50, 1e-6);
+        half.ShouldAllBe(c => c.Cycle == 0);
+        ReferenceFilmstrip.Cells(1, 0, 100).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void PoseAt_NonLoopingTarget_HoldsItsLastFrameInLaterCycles()
+    {
+        var (reference, target, file) = Setup(new SequenceSave { Name = "T", Loop = false, Tracks = { ChainTrack("Walk") } }, loops: 3);
+
+        var last = ReferenceFilmstrip.PoseAt(reference, target, 0.9, new Lookup(), file)!;
+        var held = ReferenceFilmstrip.PoseAt(reference, target, 2.2, new Lookup(), file)!;
+
+        held.ShouldBe(last);
+        ReferenceFilmstrip.PoseAt(reference, target, 0.1, new Lookup(), file).ShouldNotBe(last);
+    }
 }

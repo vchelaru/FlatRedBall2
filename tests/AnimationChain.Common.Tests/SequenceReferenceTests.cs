@@ -315,4 +315,208 @@ public class SequenceReferenceTests
         SequenceReferences.InlinedTime(leaf, 2.0, Length)!.Value.ShouldBe(0.5, 1e-9);
         SequenceReferences.InlinedTime(leaf, 1.2, Length).ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData(1.9, 0.9)]
+    [InlineData(2.0, null)]       // half a cycle of a 2 s target ends 1 s after the start
+    public void ReferenceTime_FractionalLoops_EndsPartWayThroughTheCycle(double parentTime, double? expected)
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Loops = 0.5f };
+
+        var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
+
+        if (expected is null) time.ShouldBeNull();
+        else time!.Value.ShouldBe(expected.Value, 1e-9);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void ReferenceTime_ZeroOrNegativeLoops_IsNeverActive(float loops)
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Loops = loops };
+        var target = new SequenceSave { Name = "T", Loop = true };
+
+        SequenceTimeline.ReferenceTime(reference, target, 2, 0).ShouldBeNull();
+        SequenceTimeline.ReferenceTime(reference, target, 2, 0.5).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(0.0, 1.0)]        // a clip starting at -1 is already 1 s in when the holder starts
+    [InlineData(0.5, 1.5)]
+    [InlineData(1.0, null)]
+    public void ReferenceTime_NegativeStartFromDisk_PlaysFromPartWayIn(double parentTime, double? expected)
+    {
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = -1, Loops = 1 };
+
+        var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
+
+        if (expected is null) time.ShouldBeNull();
+        else time!.Value.ShouldBe(expected.Value, 1e-9);
+    }
+
+    [Fact]
+    public void Length_NonLoopingTarget_ClipStillLastsAllItsLoops()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", loops: 3)),
+            Sequence("B", false, ChainTrack("Body")),
+        };
+
+        SequenceTimeline.Length(sequences, sequences[0], _ => 1.0).ShouldBe(3.0, 1e-9);
+    }
+
+    [Fact]
+    public void Length_HiddenReferenceTrack_StillCounts()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, ChainTrack("Body"), RefTrack("b", "B", loops: 4, visible: false)),
+            Sequence("B", true, ChainTrack("Body")),
+        };
+
+        SequenceTimeline.Length(sequences, sequences[0], _ => 1.0).ShouldBe(4.0, 1e-9);
+    }
+
+    [Fact]
+    public void Length_FourLevelsOfReferences_AddsEveryStart_AndTimeMapsToTheLeaf()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", start: 1)),
+            Sequence("B", true, RefTrack("c", "C", start: 0.5)),
+            Sequence("C", true, RefTrack("d", "D", start: 0.25, loops: 2)),
+            Sequence("D", true, ChainTrack("Leaf")),
+        };
+        double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
+
+        Length(sequences[2]).ShouldBe(2.25, 1e-9);
+        Length(sequences[1]).ShouldBe(2.75, 1e-9);
+        Length(sequences[0]).ShouldBe(3.75, 1e-9);
+        var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single();
+        leaf.Name.ShouldBe("b/c/d/Leaf");
+        leaf.Hops.Select(h => h.Target.Name).ShouldBe(new[] { "B", "C", "D" });
+        // 3.25 in A is 2.25 in B, 1.75 in C, 1.5 into D's clip: the second cycle of a 1 s D.
+        SequenceReferences.InlinedTime(leaf, 3.25, Length)!.Value.ShouldBe(0.5, 1e-9);
+    }
+
+    [Fact]
+    public void Inline_TargetHoldingACycle_PlaysTheTargetsOwnTracksOnly()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", loops: 1)),
+            Sequence("B", true, ChainTrack("Legs"), RefTrack("c", "C")),
+            Sequence("C", true, ChainTrack("Arm"), RefTrack("b", "B")),
+        };
+
+        SequenceReferences.Plays(sequences, "A", "B").ShouldBeTrue("A is not on the cycle");
+        SequenceReferences.Inline(sequences, sequences[0]).Select(t => t.Name).ShouldBe(new[] { "b/Legs" });
+        SequenceTimeline.Length(sequences, sequences[0], _ => 1.0).ShouldBe(1.0, 1e-9);
+        SequenceReferences.FindCycle(sequences).ShouldBe(new[] { "B", "C", "B" });
+    }
+
+    [Fact]
+    public void Diamond_TwoPathsToOneSequence_IsNoCycle_AndInlinesBothPaths()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B"), RefTrack("c", "C")),
+            Sequence("B", true, RefTrack("d", "D")),
+            Sequence("C", true, RefTrack("d", "D")),
+            Sequence("D", true, ChainTrack("Leaf")),
+        };
+
+        SequenceReferences.FindCycle(sequences).ShouldBeNull();
+        SequenceReferences.CyclicReferenceCount(sequences).ShouldBe(0);
+        SequenceReferences.WouldCycle(sequences, "A", "D").ShouldBeFalse();
+        SequenceReferences.Inline(sequences, sequences[0]).Select(t => t.Name).ShouldBe(new[] { "b/d/Leaf", "c/d/Leaf" });
+    }
+
+    [Fact]
+    public void CyclicReferenceCount_CountsEveryReferenceOnTheCycle()
+    {
+        var self = new List<SequenceSave> { Sequence("A", true, RefTrack("a", "A")) };
+        var twoStep = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B"), RefTrack("gone", "Missing")),
+            Sequence("B", true, RefTrack("a", "A")),
+        };
+
+        SequenceReferences.CyclicReferenceCount(self).ShouldBe(1);
+        SequenceReferences.CyclicReferenceCount(twoStep).ShouldBe(2);
+    }
+
+    [Fact]
+    public void Inline_DuplicateSequenceNames_TheFirstWins()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B")),
+            Sequence("B", true, ChainTrack("First")),
+            Sequence("B", true, ChainTrack("Second")),
+        };
+
+        SequenceReferences.Inline(sequences, sequences[0]).Select(t => t.Name).ShouldBe(new[] { "b/First" });
+    }
+
+    [Fact]
+    public void FromJsonString_ReferenceWithoutStartOrLoops_StartsAtZeroForOneCycle()
+    {
+        var loaded = SequenceListSave.FromJsonString(
+            """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B" } } ] }, { "name": "B" } ] }""");
+
+        var reference = loaded.Sequences[0].Tracks[0].Reference!;
+        reference.Start.ShouldBe(0);
+        reference.Loops.ShouldBe(1f);
+    }
+
+    [Fact]
+    public void RoundTrip_HiddenReferenceTrack_FractionalLoopsAndNegativeStart_AreKept()
+    {
+        var save = new SequenceListSave { Sequences = { Sequence("A", true, RefTrack("E", "B", start: -0.5, loops: 0.25f, visible: false)), Sequence("B") } };
+        string json = save.ToJsonString();
+
+        var loaded = SequenceListSave.FromJsonString(json);
+
+        var track = loaded.Sequences[0].Tracks[0];
+        track.Visible.ShouldBeFalse();
+        track.Reference!.Start.ShouldBe(-0.5);
+        track.Reference.Loops.ShouldBe(0.25f);
+        loaded.ToJsonString().ShouldBe(json);
+    }
+
+    [Fact]
+    public void InlinedTime_OuterClipEnded_IsNullEvenWhenTheInnerWouldStillPlay()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", loops: 0.5f)),
+            Sequence("B", true, ChainTrack("Pad", loops: 2), RefTrack("c", "C", loops: 5)),
+            Sequence("C", true, ChainTrack("Leaf")),
+        };
+        double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
+        var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single(t => t.Name == "b/c/Leaf");
+
+        // B is 5 s (its clip of C), so A's half cycle of B ends at 2.5 while C would play on in B until 5.
+        SequenceReferences.InlinedTime(leaf, 2.25, Length)!.Value.ShouldBe(0.25, 1e-9);
+        SequenceReferences.InlinedTime(leaf, 3.0, Length).ShouldBeNull();
+    }
+
+    [Fact]
+    public void InlinedTime_NonLoopingMiddleSequence_HoldsTheInnerFinalPose()
+    {
+        var sequences = new List<SequenceSave>
+        {
+            Sequence("A", true, RefTrack("b", "B", loops: 2)),
+            Sequence("B", false, RefTrack("c", "C", loops: 2)),
+            Sequence("C", true, ChainTrack("Leaf")),
+        };
+        double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
+        var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single();
+
+        // B (2 s, Loop off) holds its last instant during A's second cycle of it; C is then near the end of its second cycle.
+        SequenceReferences.InlinedTime(leaf, 3.0, Length)!.Value.ShouldBe(1.0, 1e-3);
+    }
 }

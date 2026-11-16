@@ -249,4 +249,281 @@ public class SequenceReferenceDocumentTests
         SequenceScene.At(document, 0, 1.5).Any(s => s.Chain.Name == "Spark").ShouldBeTrue("held after its one cycle");
         SequenceScene.At(document, 0, 2.5).Any(s => s.Chain.Name == "Spark").ShouldBeFalse();
     }
+
+    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, float loops = 1) =>
+        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Loops = loops } };
+
+    private static bool Shows(SequenceDocument document, int sequence, double time, string chain) =>
+        SequenceScene.At(document, sequence, time).Any(s => s.Chain.Name == chain);
+
+    private static TimelineReference Clip(SequenceDocument document, int sequence) =>
+        TimelineReferences.For(document.Save.Sequences[sequence], document.Save.Sequences, document.CycleLength).Single();
+
+    [Fact]
+    public void PasteSequences_HolderIntoTheSameFile_KeepsItsReference()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0.5);
+        SequenceClipboard.TryRead(document.CopySequences(new[] { 0 }), out var content, out _).ShouldBeTrue();
+
+        var names = document.PasteSequences(undo, content!).Names;
+
+        int copy = document.Save.Sequences.FindIndex(s => s.Name == names[0]);
+        document.Save.Sequences[copy].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
+        document.Save.Sequences[copy].Tracks[0].Reference!.Start.ShouldBe(0.5);
+        Shows(document, copy, 0.6, "Spark").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DeleteSequences_Target_LeavesTheReferenceMissing_AndUndoBringsItBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLoops(undo, 0, 0, 3);
+
+        document.DeleteSequences(undo, new[] { 1 });
+
+        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Earth", "a missing target is kept as written");
+        Clip(document, 0).IsMissing.ShouldBeTrue();
+        document.SequenceLength(0).ShouldBe(0.5, 1e-6);
+        Shows(document, 0, 0.1, "Spark").ShouldBeFalse();
+
+        undo.Undo();
+
+        Clip(document, 0).IsBroken.ShouldBeFalse();
+        document.SequenceLength(0).ShouldBe(3, 1e-6);
+        Shows(document, 0, 0.1, "Spark").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DuplicateSequences_Holder_CopyPlaysTheSameTarget_AndEditsStaySeparate()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0.25);
+
+        string copyName = document.DuplicateSequences(undo, new[] { 0 }).Single();
+        int copy = document.Save.Sequences.FindIndex(s => s.Name == copyName);
+        document.SetReferenceStart(undo, copy, 0, 2).ShouldBeNull();
+
+        document.Save.Sequences[copy].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
+        document.Save.Sequences[0].Tracks[0].Reference!.Start.ShouldBe(0.25);
+        Shows(document, copy, 2.1, "Spark").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DuplicateTracks_ReferenceTrack_CopyIsItsOwnReference()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+
+        document.DuplicateTracks(undo, 0, new[] { 0 });
+        document.SetReferenceLoops(undo, 0, 0, 4).ShouldBeNull();
+
+        var tracks = document.Save.Sequences[0].Tracks;
+        tracks.Count(t => t.Reference?.Sequence == "Earth").ShouldBe(2);
+        tracks.Select(t => t.Name).Distinct().Count().ShouldBe(tracks.Count);
+        tracks[1].Reference!.Loops.ShouldBe(1f);
+        document.SequenceLength(0).ShouldBe(4, 1e-6);
+    }
+
+    [Fact]
+    public void UndoAndRedo_AddSequenceReference_RemoveAndRestoreThePlayingClip()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLoops(undo, 0, 0, 2);
+
+        undo.Undo();
+        undo.Undo();
+        Shows(document, 0, 0.1, "Spark").ShouldBeFalse();
+        document.SequenceLength(0).ShouldBe(0.5, 1e-6);
+
+        undo.Redo();
+        undo.Redo();
+        Shows(document, 0, 0.1, "Spark").ShouldBeTrue();
+        document.SequenceLength(0).ShouldBe(2, 1e-6);
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Reference!.Loops.ShouldBe(2f);
+    }
+
+    [Fact]
+    public void SetReferenceLoops_Fractional_CutsTheClipPartWayThroughTheTarget()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0.5);
+
+        document.SetReferenceLoops(undo, 0, 0, 0.5f).ShouldBeNull();
+
+        Clip(document, 0).Length.ShouldBe(0.5, 1e-6);
+        document.SequenceLength(0).ShouldBe(1.0, 1e-6);
+        Shows(document, 0, 0.9, "Spark").ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(-2.0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void AddSequenceReference_NegativeOrNotANumberStart_StartsAtZero(double start)
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+
+        document.AddSequenceReference(new UndoManager(), 0, "Earth", start).ShouldBeNull();
+
+        document.Save.Sequences[0].Tracks[0].Reference!.Start.ShouldBe(0);
+    }
+
+    [Fact]
+    public void AddSequenceReference_SlotPastTheEnd_GoesToTheBottom_AndATakenNameGetsAFreeOne()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.RenameTrack(undo, 0, 0, "Earth");
+
+        document.AddSequenceReference(undo, 0, "Earth", 0, slot: 99).ShouldBeNull();
+
+        var tracks = document.Save.Sequences[0].Tracks;
+        tracks.Count.ShouldBe(2);
+        tracks[1].Reference!.Sequence.ShouldBe("Earth");
+        tracks[1].Name.ShouldNotBe("Earth");
+    }
+
+    [Fact]
+    public void SetTrackVisible_HiddenReferenceTrack_KeepsTheSequenceLength()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLoops(undo, 0, 0, 3);
+
+        document.SetTrackVisible(undo, 0, 0, false);
+
+        document.SequenceLength(0).ShouldBe(3, 1e-6);
+    }
+
+    [Fact]
+    public void At_HiddenTrackInsideTheTarget_HidesOnlyThatSprite_AndKeepsTheClip()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLoops(undo, 0, 0, 2);
+
+        document.SetTrackVisible(undo, 1, 0, false);
+
+        SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
+        document.SequenceLength(0).ShouldBe(2, 1e-6);
+        Clip(document, 0).Rows.Single().Visible.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void At_NonLoopingHolderPastItsLength_HoldsTheReferencedSprite()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLoops(undo, 0, 0, 2);
+        document.SetLoop(undo, 0, false);
+
+        Shows(document, 0, 5, "Spark").ShouldBeTrue("the held final pose is the last instant of the clip");
+        Shows(document, 0, 5, "Walk").ShouldBeFalse("Body's chain ended at 0.5");
+    }
+
+    [Fact]
+    public void MoveTrack_ReferenceTrack_ChangesOnlyTheDrawOrder()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+
+        document.MoveTrack(undo, 0, 0, 2).ShouldBe(1);
+
+        document.Save.Sequences[0].Tracks[1].Reference!.Sequence.ShouldBe("Earth");
+        SequenceScene.At(document, 0, 0.1).Select(s => (s.Chain.Name, s.Track)).ShouldBe(new[] { ("Spark", 1), ("Walk", 0) });
+    }
+
+    [Fact]
+    public void RenameSequence_TargetPlayedBySeveralSequences_UpdatesEvery_AndRedoAgain()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.AddSequenceReference(undo, 2, "Earth", 0);
+
+        document.RenameSequence(undo, 1, "Ground").ShouldBeNull();
+        undo.Undo();
+        undo.Redo();
+
+        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Ground");
+        document.Save.Sequences[2].Tracks[0].Reference!.Sequence.ShouldBe("Ground");
+        Shows(document, 2, 0.1, "Spark").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ReloadFromDisk_ExternalRetarget_PlaysTheNewTarget()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        document.AddSequenceReference(new UndoManager(), 0, "Earth", 0);
+        var onDisk = SequenceListSave.FromFile(document.Path.FullPath);
+        onDisk.Sequences[0].Tracks[0].Reference!.Sequence = "Action";
+        onDisk.Save(document.Path.FullPath);
+
+        document.ReloadFromDisk().Changed.ShouldBeTrue();
+
+        SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk", "Walk" });
+        Clip(document, 0).IsBroken.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReloadFromDisk_TargetRenamedOutsideTheEditor_LeavesTheReferenceMissing()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        document.AddSequenceReference(new UndoManager(), 0, "Earth", 0);
+        var onDisk = SequenceListSave.FromFile(document.Path.FullPath);
+        onDisk.Sequences[1].Name = "Ground";
+        onDisk.Save(document.Path.FullPath);
+
+        var result = document.ReloadFromDisk();
+
+        result.Error.ShouldBeNull();
+        Clip(document, 0).IsMissing.ShouldBeTrue();
+        Shows(document, 0, 0.1, "Spark").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Load_FileWithNestedReferences_SavesBackUnchanged()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 2, "Earth", 0.5);
+        document.AddSequenceReference(undo, 0, "Action", 0.25);
+        string written = File.ReadAllText(document.Path.FullPath);
+
+        var reloaded = SequenceDocument.Load(document.Path.FullPath);
+        reloaded.SetLoop(undo, 1, false);
+        reloaded.SetLoop(undo, 1, true);
+
+        File.ReadAllText(reloaded.Path.FullPath).ShouldBe(written);
+        SequenceScene.At(reloaded, 0, 0.8).Any(s => s.Chain.Name == "Spark").ShouldBeTrue("Idle > Action > Earth");
+    }
 }
