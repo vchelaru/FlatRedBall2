@@ -30,6 +30,7 @@ public partial class SequenceInspectorControl : UserControl
     private int _sequence = -1;
     private TimelineChainId? _chain;
     private int? _track;
+    private string? _goToSequence; // the sequence the shown reference track plays
     private IReadOnlyList<TimelineChainId> _chains = Array.Empty<TimelineChainId>();
     private IReadOnlyList<int> _tracks = Array.Empty<int>();
     private bool _canRenameSequence = true;
@@ -62,7 +63,15 @@ public partial class SequenceInspectorControl : UserControl
                 GoToDefinitionRequested?.Invoke(reference);
         };
         ChainNameBox.SelectionChanged += (_, _) => RelinkToSelectedChain();
+        GoToSequenceButton.Click += (_, _) =>
+        {
+            if (_goToSequence is { } sequenceName)
+                GoToSequenceRequested?.Invoke(sequenceName);
+        };
     }
+
+    /// <summary>Raised with the sequence's name when the user presses Go to Sequence on a reference track.</summary>
+    public event Action<string>? GoToSequenceRequested;
 
     // The dropdown's entries as chain names, parallel to its items; null for the "(missing)" entry that stands for the
     // current name when the source lacks it, which is not a choice.
@@ -220,6 +229,10 @@ public partial class SequenceInspectorControl : UserControl
         bool missing = SequenceReferences.Find(_document!.Save.Sequences, reference.Sequence) is null;
         ReferenceMissingText.Text = missing ? $"⚠ There is no sequence named \"{reference.Sequence}\"." : null;
         ReferenceMissingText.IsVisible = missing;
+        _goToSequence = reference.Sequence;
+        GoToSequenceButton.IsEnabled = !missing;
+        ToolTip.SetTip(GoToSequenceButton, TimelineMenuLayout.GoToSequenceDisabledReason(_document.Save.Sequences, reference.Sequence)
+            ?? "Select this sequence in the list");
     }
 
     private void CommitReference(bool start)
