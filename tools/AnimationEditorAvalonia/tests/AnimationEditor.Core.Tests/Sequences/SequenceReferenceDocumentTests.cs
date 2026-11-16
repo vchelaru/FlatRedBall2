@@ -526,4 +526,39 @@ public class SequenceReferenceDocumentTests
         File.ReadAllText(reloaded.Path.FullPath).ShouldBe(written);
         SequenceScene.At(reloaded, 0, 0.8).Any(s => s.Chain.Name == "Spark").ShouldBeTrue("Idle > Action > Earth");
     }
+
+    [Fact]
+    public void RenameSequence_OntoADanglingReferenceThatWouldCloseACycle_IsRefused()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        // Earth holds a reference to a sequence that does not exist yet (edited on disk, or its target was deleted).
+        document.Save.Sequences[1].Tracks.Add(RefTrack("Back", "Calm"));
+
+        // Renaming Idle to "Calm" would make Idle > Earth > Idle.
+        document.RenameSequence(undo, 0, "Calm").ShouldNotBeNull();
+
+        document.Save.Sequences[0].Name.ShouldBe("Idle");
+        SequenceReferences.FindCycle(document.Save.Sequences).ShouldBeNull();
+    }
+
+    [Fact]
+    public void PasteSequences_ThatWouldCloseACycle_IsRefusedWithAMessage()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.Save.Sequences[1].Tracks.Add(RefTrack("Back", "Boss"));
+        var boss = new SequenceSave { Name = "Boss", Loop = true, Tracks = { RefTrack("Earth", "Earth") } };
+        SequenceClipboard.TryRead(SequenceClipboard.Write(boss, dir.Path), out var content, out _).ShouldBeTrue();
+
+        // A pasted "Boss" that plays Earth, which already plays "Boss", would close Boss > Earth > Boss.
+        var result = document.PasteSequences(undo, content!);
+
+        SequenceReferences.FindCycle(document.Save.Sequences).ShouldBeNull();
+        result.Errors.ShouldNotBeEmpty("the paste did not happen, so it must say why");
+        result.Names.ShouldAllBe(name => document.Save.Sequences.Any(s => s.Name == name), "it must not report sequences it did not paste");
+    }
 }
