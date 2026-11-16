@@ -87,6 +87,25 @@ public class SequenceThumbnailScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ASequenceMadeOnlyOfAReferenceTrack_ShowsTheReferencedPicture_InTheTreeAndTheList()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, "Hero");
+        var save = SequenceListSave.FromFile(boss);
+        var wrap = new SequenceSave { Name = "Wrap" };
+        wrap.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Hero" } });
+        save.Sequences.Insert(0, wrap);
+        save.Save(boss);
+        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await Panel(editor).ThumbnailLoadTask;
+
+        Node(Panel(editor), "boss.seqj").Thumbnail.ShouldNotBeNull("the first sequence only plays a reference");
+
+        await editor.OpenAsync(boss);
+        (await AllLoadedAsync(editor, "Wrap", "Hero")).ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
     public async Task ProjectTree_ASequenceWithNothingToShow_KeepsTheSequenceIcon()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

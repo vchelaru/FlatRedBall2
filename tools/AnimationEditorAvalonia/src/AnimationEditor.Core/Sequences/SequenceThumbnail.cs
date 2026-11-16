@@ -20,29 +20,42 @@ public static class SequenceThumbnailScene
 {
     /// <summary>
     /// The first instant where something is visible: 0 when any track shows a sprite then, otherwise the earliest start of a
-    /// visible track's chain that has frames (a sequence whose tracks all start later). Null when nothing ever shows: no
-    /// track, every track hidden, or no chain that resolves to a chain with frames.
+    /// visible track's chain that has frames, or of a reference clip (a sequence whose tracks all start later). Null when
+    /// nothing ever shows: no track, every track hidden, or no chain that resolves to a chain with frames. Pass
+    /// <paramref name="file"/>, the file's sequences, so reference tracks resolve; without it they show nothing.
     /// </summary>
-    public static double? ChooseTime(SequenceSave sequence, ISequenceChainLookup lookup)
+    public static double? ChooseTime(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave>? file = null)
     {
-        if (SequenceScene.At(sequence, 0, 0, lookup).Count > 0) return 0;
-        var starts = sequence.Tracks
+        if (SequenceScene.At(sequence, 0, 0, lookup, file).Count > 0) return 0;
+        var starts = SequenceReferences.Inline(file ?? [sequence], sequence)
             .Where(track => track.Visible)
-            .SelectMany(track => track.Chains)
-            .Where(reference => reference.Start > 0 && lookup.FindChain(reference) is { Frames.Count: > 0 })
-            .Select(reference => reference.Start)
+            .SelectMany(track =>
+            {
+                double clip = track.Hops.Sum(hop => hop.Reference.Start);
+                return track.Track.Chains
+                    .Where(reference => lookup.FindChain(reference) is { Frames.Count: > 0 })
+                    .SelectMany(reference => new[] { clip, clip + reference.Start });
+            })
+            .Where(start => start > 0)
             .Distinct()
             .OrderBy(start => start);
         foreach (double start in starts)
-            if (SequenceScene.At(sequence, 0, start, lookup).Count > 0) return start;
+            if (SequenceScene.At(sequence, 0, start, lookup, file).Count > 0) return start;
         return null;
     }
 
+    /// <summary>
+    /// Every chain reference the sequence plays, including those of the sequences its reference tracks play. A thumbnail
+    /// depends on the sources and textures of all of them, so the disk cache key is built from this list.
+    /// </summary>
+    public static IReadOnlyList<SequenceChainReferenceSave> ChainReferencesOf(SequenceSave sequence, IReadOnlyList<SequenceSave> file) =>
+        SequenceReferences.Inline(file, sequence).SelectMany(track => track.Track.Chains).ToList();
+
     /// <summary>The sprites at <see cref="ChooseTime"/>, back to front (the top lane last); empty when nothing ever shows.</summary>
-    public static IReadOnlyList<SequenceThumbnailLayer> LayersFor(SequenceSave sequence, ISequenceChainLookup lookup)
+    public static IReadOnlyList<SequenceThumbnailLayer> LayersFor(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave>? file = null)
     {
-        if (ChooseTime(sequence, lookup) is not { } time) return [];
-        return SequenceScene.At(sequence, 0, time, lookup)
+        if (ChooseTime(sequence, lookup, file) is not { } time) return [];
+        return SequenceScene.At(sequence, 0, time, lookup, file)
             .Select(sprite =>
             {
                 var sample = sprite.Sample();

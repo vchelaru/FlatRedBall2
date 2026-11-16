@@ -36,7 +36,7 @@ public sealed class SequenceListThumbnailService
         SequenceDocument document, int sequenceIndex, int maxPixels, CancellationToken cancellationToken = default)
     {
         if (sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count) return null;
-        var layers = SequenceThumbnailScene.LayersFor(document.Save.Sequences[sequenceIndex], document);
+        var layers = SequenceThumbnailScene.LayersFor(document.Save.Sequences[sequenceIndex], document, document.Save.Sequences);
         if (layers.Count == 0) return null;
 
         await _concurrency.WaitAsync(cancellationToken);
