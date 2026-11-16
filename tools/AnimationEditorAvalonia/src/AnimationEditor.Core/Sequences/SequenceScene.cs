@@ -87,7 +87,9 @@ public static class SequenceScene
             int reported = outerTrack ?? t;
             if (track.Reference is { } playing)
             {
-                if (file is null || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
+                // A cycle read from disk plays nothing; the stack check is the backstop for duplicate names.
+                if (file is null || !SequenceReferences.Plays(file, sequence.Name, playing.Sequence)
+                    || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
                 if (SequenceTimeline.ReferenceTime(playing, target, LengthOf(target, lookup), time) is not { } inner) continue;
                 stack.Add(target);
                 Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack);

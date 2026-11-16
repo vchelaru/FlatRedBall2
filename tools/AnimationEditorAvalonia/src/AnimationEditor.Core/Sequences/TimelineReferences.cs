@@ -26,17 +26,23 @@ public sealed record InheritedRow(string Name, bool Visible, IReadOnlyList<Inher
 /// <param name="TargetLength">The referenced sequence's length in seconds; 0 when it is missing or empty.</param>
 /// <param name="IsMissing">Whether no sequence has the referenced name.</param>
 /// <param name="Rows">The inherited tracks.</param>
-public sealed record TimelineReference(int Track, SequenceReferenceSave Reference, double TargetLength, bool IsMissing, IReadOnlyList<InheritedRow> Rows)
+/// <param name="Cycle">The names around the cycle this reference closes (<c>A, B, A</c>), or null. A cyclic reference plays
+/// nothing (<see cref="SequenceReferences.Plays"/>), so it has no target length and no rows.</param>
+public sealed record TimelineReference(int Track, SequenceReferenceSave Reference, double TargetLength, bool IsMissing, IReadOnlyList<InheritedRow> Rows,
+    IReadOnlyList<string>? Cycle = null)
 {
+    /// <summary>Whether the clip plays nothing: its target is missing or plays this sequence back. Drawn hatched with a warning.</summary>
+    public bool IsBroken => IsMissing || Cycle is not null;
+
     public double Start => Reference.Start;
 
-    /// <summary>The clip's length: its cycles of the target, or <see cref="TimelineLayout.MissingLength"/> for a target that is missing or has no length.</summary>
+    /// <summary>The clip's length: its cycles of the target, or <see cref="TimelineLayout.MissingLength"/> for a broken target or one with no length.</summary>
     public double Length => TargetLength > 0 ? SequenceTimeline.FullLength(Reference.Loops, TargetLength) : TimelineLayout.MissingLength;
 
     public double End => Start + Length;
 
-    /// <summary>Whether dragging the right edge changes the cycles. A missing or empty target has no cycle to count.</summary>
-    public bool CanResize => !IsMissing && TargetLength > 0;
+    /// <summary>Whether dragging the right edge changes the cycles. A broken or empty target has no cycle to count.</summary>
+    public bool CanResize => !IsBroken && TargetLength > 0;
 
     /// <summary>Whether there is anything to show when the lane is expanded.</summary>
     public bool Expandable => Rows.Count > 0;
@@ -77,22 +83,24 @@ public static class TimelineReferences
                 result.Add(new TimelineReference(t, reference, 0, true, Array.Empty<InheritedRow>()));
                 continue;
             }
+            if (SequenceReferences.CycleThrough(file, sequence.Name, target.Name) is { } cycle)
+            {
+                result.Add(new TimelineReference(t, reference, 0, false, Array.Empty<InheritedRow>(), cycle));
+                continue;
+            }
             var blocks = TimelineLayout.Blocks(target, cycleLength);
             var rows = new List<InheritedRow>();
-            if (!SequenceReferences.WouldCycle(file, sequence.Name, target.Name))
+            foreach (var inlined in SequenceReferences.Inline(file, target))
             {
-                foreach (var inlined in SequenceReferences.Inline(file, target))
-                {
-                    IReadOnlyList<InheritedSpan> spans = inlined.Hops.Count == 0
-                        ? blocks.Where(block => ReferenceEquals(target.Tracks[block.Track], inlined.Track))
-                            .Select(block => new InheritedSpan(block.Start, block.Played)).ToList()
-                        : new[]
-                        {
-                            new InheritedSpan(inlined.Hops[0].Reference.Start,
-                                SequenceTimeline.FullLength(inlined.Hops[0].Reference.Loops, LengthOf(inlined.Hops[0].Target))),
-                        };
-                    rows.Add(new InheritedRow(inlined.Name, inlined.Visible, spans));
-                }
+                IReadOnlyList<InheritedSpan> spans = inlined.Hops.Count == 0
+                    ? blocks.Where(block => ReferenceEquals(target.Tracks[block.Track], inlined.Track))
+                        .Select(block => new InheritedSpan(block.Start, block.Played)).ToList()
+                    : new[]
+                    {
+                        new InheritedSpan(inlined.Hops[0].Reference.Start,
+                            SequenceTimeline.FullLength(inlined.Hops[0].Reference.Loops, LengthOf(inlined.Hops[0].Target))),
+                    };
+                rows.Add(new InheritedRow(inlined.Name, inlined.Visible, spans));
             }
             result.Add(new TimelineReference(t, reference, LengthOf(target), false, rows));
         }

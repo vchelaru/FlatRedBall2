@@ -69,14 +69,61 @@ public static class SequenceReferences
         return Reaches(target);
     }
 
+    /// <summary>
+    /// The cycle a reference from <paramref name="host"/> to <paramref name="target"/> closes, as the names along it
+    /// (<c>A, B, A</c>; <c>A, A</c> for a sequence playing itself), or null when the target never plays the host.
+    /// </summary>
+    public static IReadOnlyList<string>? CycleThrough(IReadOnlyList<SequenceSave> sequences, string host, string target)
+    {
+        // Breadth-first by name from the target, remembering how each name was reached, so the shortest way back is named.
+        var cameFrom = new Dictionary<string, string?> { [target] = null };
+        var queue = new Queue<string>();
+        queue.Enqueue(target);
+        while (queue.Count > 0)
+        {
+            string name = queue.Dequeue();
+            if (name == host)
+            {
+                var path = new List<string>();
+                for (string? at = name; at is not null; at = cameFrom[at]) path.Add(at);
+                path.Reverse();
+                path.Insert(0, host);
+                return path;
+            }
+            if (Find(sequences, name) is not { } sequence) continue;
+            foreach (var track in sequence.Tracks)
+            {
+                if (track.Reference is { } reference && !cameFrom.ContainsKey(reference.Sequence))
+                {
+                    cameFrom[reference.Sequence] = name;
+                    queue.Enqueue(reference.Sequence);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="host"/>'s reference to <paramref name="target"/> plays: false when no sequence has the
+    /// target's name, or when the target plays the host back (<see cref="CycleThrough"/>), which a file edited outside the
+    /// editor can hold. A reference that does not play adds nothing wherever it is inlined, sampled or drawn.
+    /// </summary>
+    public static bool Plays(IReadOnlyList<SequenceSave> sequences, string host, string target) =>
+        Find(sequences, target) is not null && !WouldCycle(sequences, host, target);
+
+    /// <summary>How many references in the file close a cycle (<see cref="CycleThrough"/>).</summary>
+    public static int CyclicReferenceCount(IReadOnlyList<SequenceSave> sequences) =>
+        sequences.Sum(sequence => sequence.Tracks.Count(track => track.Reference is { } reference
+            && Find(sequences, reference.Sequence) is not null && WouldCycle(sequences, sequence.Name, reference.Sequence)));
+
     /// <summary>The first sequence called <paramref name="name"/>, or null.</summary>
     public static SequenceSave? Find(IReadOnlyList<SequenceSave> sequences, string name) =>
         sequences.FirstOrDefault(sequence => sequence.Name == name);
 
     /// <summary>
     /// Every chain track <paramref name="sequence"/> plays, in track order, with each reference track replaced by the tracks of
-    /// its target (recursively, see <see cref="InlinedTrack.Name"/>). A reference to a missing sequence, or one that would
-    /// loop back into itself, adds nothing.
+    /// its target (recursively, see <see cref="InlinedTrack.Name"/>). A reference that does not <see cref="Plays"/> (a
+    /// missing target, or one that plays its holder back) adds nothing.
     /// </summary>
     public static IReadOnlyList<InlinedTrack> Inline(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence)
     {
@@ -95,7 +142,9 @@ public static class SequenceReferences
                 result.Add(new InlinedTrack(prefix + track.Name, track, visible && track.Visible, hops.ToArray()));
                 continue;
             }
-            if (Find(sequences, reference.Sequence) is not { } target || stack.Contains(target)) continue;
+            // The stack check is a backstop for duplicate names, which Plays (by name) cannot tell apart.
+            if (!Plays(sequences, sequence.Name, reference.Sequence) || Find(sequences, reference.Sequence) is not { } target
+                || stack.Contains(target)) continue;
             hops.Add(new ReferenceHop(reference, target));
             stack.Add(target);
             Collect(sequences, target, prefix + track.Name + "/", visible && track.Visible, hops, stack, result);

@@ -279,7 +279,7 @@ public sealed partial class SequenceTimelineControl
         var solid = new SolidColorBrush(color);
         var body = new Rect(left, top + TimelineLayout.BodyTop, width, TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
         context.FillRectangle(new SolidColorBrush(color, 0.22), body, 3);
-        if (reference.IsMissing) DrawHatched(context, body, solid, 0.4);
+        if (reference.IsBroken) DrawHatched(context, body, solid, 0.4);
         context.DrawRectangle(null, new Pen(solid, 1.5), body, 3, 3);
 
         if (!IsExpanded(reference)) DrawClipFilmstrip(context, reference, body, color);
@@ -298,8 +298,8 @@ public sealed partial class SequenceTimelineControl
         if (width >= TimelineLayout.MinLabelPixels)
         {
             double labelWidth = Math.Max(1, body.Width - 26);
-            string label = reference.IsMissing
-                ? $"⚠ {reference.Reference.Sequence} (missing)"
+            string label = reference.IsBroken
+                ? $"⚠ {reference.Reference.Sequence} ({(reference.IsMissing ? "missing" : "cycle")})"
                 : BlockLabel.Fit(reference.Reference.Sequence, reference.Reference.Loops, reference.Length, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
             using (context.PushClip(body.Deflate(new Thickness(4, 0))))
             {

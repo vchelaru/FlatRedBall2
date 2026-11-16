@@ -1256,9 +1256,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
         mutate(copy);
-        // A file with a cycle does not load, so an edit that would close one (a paste into another file) is dropped.
-        // The edits that can do this check first and say why.
-        if (SequenceReferences.FindCycle(copy.Sequences) is not null) return;
+        // An edit that would close a new cycle (a paste into another file) is dropped; the edits that can do this check
+        // first and say why. A cycle the file already held (edited outside the editor) does not block other edits.
+        if (SequenceReferences.CyclicReferenceCount(copy.Sequences) > SequenceReferences.CyclicReferenceCount(Save.Sequences)) return;
         string after = copy.ToJsonString();
         if (after == before) return;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.

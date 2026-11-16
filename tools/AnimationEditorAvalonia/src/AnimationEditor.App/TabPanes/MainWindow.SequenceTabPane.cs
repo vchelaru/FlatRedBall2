@@ -173,6 +173,13 @@ public partial class MainWindow
                 RestoreTimelineSelection(CurrentSequence, chains, tracks);
             ResumePendingRename(rename);
             _window.ShowInfo($"Reloaded {document.Path.NoPath}");
+            ShowCycleProblem(document);
+        }
+
+        // Sequences that play each other only come from an edit outside the editor; the file loads, and this says which ones.
+        private void ShowCycleProblem(SequenceDocument document)
+        {
+            if (SequenceCycleNotice.For(document.Save, document.Path.NoPath) is { } cycle) _window.ShowProblem(cycle);
         }
 
         /// <summary>An in-place rename that was open when the file was reloaded: what it named (by name, as indexes may shift) and the text typed.</summary>
@@ -363,6 +370,7 @@ public partial class MainWindow
                 // Sequences sharing a name were numbered in memory so each stays reachable; the file is left as it was.
                 if (document.DuplicateNamesNotice is { } duplicates)
                     _window.ShowInfo(duplicates);
+                ShowCycleProblem(document);
             }
 
             // Showing another file starts with no pane owning the edit hotkeys, as a fresh tab does.
@@ -401,6 +409,7 @@ public partial class MainWindow
                 // The history describes the old file; undoing into it would write that back over the new one.
                 tab.UndoSnapshot = null;
                 _window.ShowInfo($"Reloaded {document.Path.NoPath}");
+                ShowCycleProblem(document);
             }
         }
 

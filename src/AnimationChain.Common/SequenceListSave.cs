@@ -26,8 +26,8 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <para>
 /// A track may carry a <c>"reference"</c> object (<see cref="SequenceReferenceSave"/>) in place of chains, playing another
 /// sequence of the file by name. It is an additive key, so the format version stays 1 and older readers keep it as an
-/// unknown property. Reading rejects a file whose references form a cycle with a <see cref="JsonException"/> naming it;
-/// a reference to a missing sequence is kept as written and plays nothing.
+/// unknown property. A reference to a missing sequence, or one whose target plays the holding sequence back (a cycle,
+/// <see cref="SequenceReferences.CycleThrough"/>), is kept as written and plays nothing.
 /// </para>
 /// </remarks>
 public class SequenceListSave
@@ -188,8 +188,6 @@ public class SequenceListSave
         result.Sources.AddRange(root.Strings("sources"));
         foreach (var sequence in root.Objects("sequences"))
             result.Sequences.Add(ReadSequence(sequence));
-        if (SequenceReferences.FindCycle(result.Sequences) is { } cycle)
-            throw new JsonException($"Sequences play each other in a cycle: {string.Join(" > ", cycle)}.");
         return result;
     }
 
