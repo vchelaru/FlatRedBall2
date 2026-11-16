@@ -47,13 +47,15 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
     /// The plan for a chip released at (<paramref name="x"/>, <paramref name="y"/>) in the timeline's own coordinates.
     /// <paramref name="cycleLength"/> is the chip's chain length in seconds, 0 when it is missing. Either end of the ghost
     /// snaps to <paramref name="targets"/> (see <see cref="TimelineSnapTargets.Others"/>) unless <paramref name="bypass"/>.
+    /// A lane <paramref name="acceptsChains"/> rejects (a track that plays a sequence) is no drop.
     /// </summary>
     public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength,
-        IReadOnlyList<SnapTarget>? targets = null, bool bypass = false)
+        IReadOnlyList<SnapTarget>? targets = null, bool bypass = false, Func<int, bool>? acceptsChains = null)
     {
         if (x < viewport.ColumnWidth || x > viewWidth) return None;
         var row = viewport.RowAt(y, trackCount);
         if (row.Kind is not (TimelineRowKind.Track or TimelineRowKind.NewTrack)) return None;
+        if (row.Kind == TimelineRowKind.Track && acceptsChains is not null && !acceptsChains(row.Track)) return None;
 
         double length = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
         var snap = TimelineSnap.Move(viewport.TimeAt(x), length, targets ?? Array.Empty<SnapTarget>(), viewport.PixelsPerSecond, bypass);

@@ -57,6 +57,35 @@ public class SequenceReferenceTests
     }
 
     [Fact]
+    public void FromJsonString_TrackWithReferenceAndChains_IsRefusedNamingTheSequenceAndTrack()
+    {
+        const string json = """
+            { "sequences": [
+              { "name": "Idle", "tracks": [ { "name": "Earth", "reference": { "sequence": "Spin" },
+                "chains": [ { "source": "a.achx", "chain": "Walk" } ] } ] },
+              { "name": "Spin", "tracks": [] } ] }
+            """;
+
+        var ex = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(json));
+
+        ex.Message.ShouldBe("Sequence \"Idle\", track \"Earth\" has both a reference and chains; a track plays one or the other. Remove one.");
+    }
+
+    [Fact]
+    public void FromJsonString_TrackWithReferenceAndEmptyChains_LoadsAsAReference()
+    {
+        var loaded = SequenceListSave.FromJsonString("""
+            { "sequences": [
+              { "name": "Idle", "tracks": [ { "name": "Earth", "reference": { "sequence": "Spin" }, "chains": [] } ] },
+              { "name": "Spin", "tracks": [] } ] }
+            """);
+
+        var track = loaded.Sequences[0].Tracks[0];
+        track.Reference!.Sequence.ShouldBe("Spin");
+        track.Chains.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void FromJsonString_FileWithoutReferences_LoadsWithNoReference()
     {
         var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "A", "tracks": [ { "name": "T", "chains": [] } ] } ] }""");

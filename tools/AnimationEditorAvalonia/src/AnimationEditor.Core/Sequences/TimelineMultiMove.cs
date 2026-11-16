@@ -21,13 +21,21 @@ public static class TimelineMultiMove
     /// <param name="requestedTime">Seconds the primary chain moved (already snapped).</param>
     /// <param name="requestedTracks">Lanes the pointer is from the primary chain's starting lane.</param>
     /// <param name="trackCount">How many lanes the sequence has.</param>
-    public static Result Plan(IReadOnlyList<Origin> origins, double requestedTime, int requestedTracks, int trackCount)
+    /// <param name="acceptsChains">
+    /// Whether a lane can take chains (a track that plays a sequence can't). A lane shift that would put any chain on a
+    /// lane it rejects steps back toward 0 until every chain lands on one that accepts, like the edge clamp.
+    /// </param>
+    public static Result Plan(IReadOnlyList<Origin> origins, double requestedTime, int requestedTracks, int trackCount,
+        Func<int, bool>? acceptsChains = null)
     {
         if (origins.Count == 0) return new Result(0, 0);
         double time = Math.Max(requestedTime, -origins.Min(origin => origin.Start));
         int lowest = origins.Min(origin => origin.Track);
         int highest = origins.Max(origin => origin.Track);
         int tracks = Math.Clamp(requestedTracks, -lowest, Math.Max(-lowest, trackCount - 1 - highest));
+        if (acceptsChains is not null)
+            while (tracks != 0 && origins.Any(origin => !acceptsChains(origin.Track + tracks)))
+                tracks -= Math.Sign(tracks);
         return new Result(time, tracks);
     }
 }

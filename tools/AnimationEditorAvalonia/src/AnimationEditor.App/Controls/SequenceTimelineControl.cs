@@ -532,11 +532,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>True while a dragged chip is over the new-track row.</summary>
     public bool IsDropTargetNewTrack => DropPreview is { Kind: TimelineDropKind.NewTrack };
 
+    // A track that plays a sequence takes no chains: a chip dropped on it or a chain dragged onto it is refused.
+    private bool TakesChains(int track) => Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && sequence.Tracks[track].Reference is null;
+
     private TimelineDropPlan PlanDrop(LibraryChip chip, Point point) =>
         Sequence is null
             ? TimelineDropPlan.None
             : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain),
-                TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass);
+                TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass, TakesChains);
 
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at <paramref name="point"/>: on a lane, at the time under the point; on the
@@ -846,7 +849,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             var row = Viewport.RowAt(point.Y, sequence.Tracks.Count);
             if (row.Kind == TimelineRowKind.Track) _requestedTrackDelta = row.Track - _dragOriginTrack;
             var plan = TimelineMultiMove.Plan(_dragItems.Select(item => new TimelineMultiMove.Origin(item.Track, item.Start)).ToList(),
-                snap.Time - _dragOriginStart, _requestedTrackDelta, sequence.Tracks.Count);
+                snap.Time - _dragOriginStart, _requestedTrackDelta, sequence.Tracks.Count, TakesChains);
             MoveDragItems(sequence, plan);
             // Over the new-track row nothing is created yet (Escape must leave no trace); the release makes the track(s).
             var onNewTrack = TimelineDropPlan.ForMove(Viewport, sequence.Tracks.Count, point.Y, _dragged.Start, _dragBlock.Full, snap.Target);

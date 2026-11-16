@@ -488,6 +488,16 @@ public sealed class SequenceDocument : ISequenceChainLookup
                 landing[i] = byName >= 0 ? byName : null;
             }
         }
+        // A track plays chains or a sequence, never both (the file would not load).
+        var playsSequence = landing.OfType<int>().Distinct().Where(lane => tracks[lane].Reference is not null).ToList();
+        if (playsSequence.Count > 0)
+        {
+            return TimelinePasteResult.Empty with
+            {
+                Errors = playsSequence.Select(lane =>
+                    $"Can't paste chains on track \"{tracks[lane].Name}\": it plays a sequence. Select a track that plays chains.").ToList(),
+            };
+        }
         string firstName = landing[ChainTrack(0)] is { } existing ? tracks[existing].Name : sourceTracks[ChainTrack(0)].Name;
         string description = content.Chains.Count == 1
             ? $"Paste '{content.Chains[0].Chain}' on '{firstName}'"
@@ -1120,9 +1130,17 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// </summary>
     public string BeginGesture() => Save.ToJsonString();
 
-    /// <summary>Records everything since <paramref name="before"/> as one undo entry and saves. Does nothing when nothing changed.</summary>
+    /// <summary>
+    /// Records everything since <paramref name="before"/> as one undo entry and saves. Does nothing when nothing changed. A
+    /// gesture that left chains on a track that plays a sequence is put back to <paramref name="before"/> instead.
+    /// </summary>
     public void CommitGesture(IUndoManager undo, string description, string before)
     {
+        if (HasTrackWithReferenceAndChains(Save))
+        {
+            Restore(before);
+            return;
+        }
         string after = Save.ToJsonString();
         if (after == before) return;
         int? changed = ChangedSequence(before, after);
@@ -1277,6 +1295,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
         // An edit that would close a new cycle (a paste into another file) is dropped; the edits that can do this check
         // first and say why. A cycle the file already held (edited outside the editor) does not block other edits.
         if (AddsCycle(copy)) return;
+        // A track holding both a reference and chains makes a file that does not load, so such an edit is dropped too.
+        if (HasTrackWithReferenceAndChains(copy)) return;
         string after = copy.ToJsonString();
         if (after == before) return;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
@@ -1293,6 +1313,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         mutate(copy);
         return AddsCycle(copy);
     }
+
+    private static bool HasTrackWithReferenceAndChains(SequenceListSave save) =>
+        save.Sequences.Any(sequence => sequence.Tracks.Any(track => track.Reference is not null && track.Chains.Count > 0));
 
     private bool AddsCycle(SequenceListSave copy) =>
         SequenceReferences.CyclicReferenceCount(copy.Sequences) > SequenceReferences.CyclicReferenceCount(Save.Sequences);

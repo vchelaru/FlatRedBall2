@@ -20,6 +20,17 @@ public class TimelineMultiMoveTests
     }
 
     [Fact]
+    public void Plan_ALaneThatTakesNoChains_IsSkipped_AndTheMoveStopsAtTheNearestLaneThatDoes()
+    {
+        // Lane 1 plays a sequence. From lane 0: one down stays put, two down lands on lane 2.
+        bool Accepts(int lane) => lane != 1;
+        var origins = new[] { At(0, 0) };
+
+        TimelineMultiMove.Plan(origins, 0, requestedTracks: 1, trackCount: 3, Accepts).TrackDelta.ShouldBe(0);
+        TimelineMultiMove.Plan(origins, 0, requestedTracks: 2, trackCount: 3, Accepts).TrackDelta.ShouldBe(2);
+    }
+
+    [Fact]
     public void Plan_TheEarliestChainStopsAtZero_AndTheOthersStopWithIt()
     {
         var plan = TimelineMultiMove.Plan(new[] { At(0, 0.25), At(0, 2) }, requestedTime: -1, requestedTracks: 0, trackCount: 1);

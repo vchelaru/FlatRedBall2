@@ -32,6 +32,17 @@ public class TimelineDropPlanTests
     }
 
     [Fact]
+    public void For_OverALaneThatTakesNoChains_IsNoDrop()
+    {
+        var viewport = new TimelineViewport();
+        var (x, y) = Point(viewport, 0.5, row: 1);
+
+        TimelineDropPlan.For(viewport, ViewWidth, 2, x, y, 0.5, acceptsChains: lane => lane != 1).Kind.ShouldBe(TimelineDropKind.None);
+        TimelineDropPlan.For(viewport, ViewWidth, 2, x, Point(viewport, 0.5, row: 0).Y, 0.5, acceptsChains: lane => lane != 1)
+            .Kind.ShouldBe(TimelineDropKind.Track);
+    }
+
+    [Fact]
     public void For_OverATrackLane_TargetsThatTrackAtTheSnappedTime()
     {
         var viewport = new TimelineViewport();

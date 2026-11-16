@@ -23,8 +23,8 @@ public class SequenceTrackSave
 
     /// <summary>
     /// When set, the track plays another sequence of the file instead of chains (a clip with a start and a loop count,
-    /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> is empty. The target's tracks are inlined under this
-    /// track's name; <see cref="Visible"/> false hides all of them.
+    /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> must stay empty: reading a file whose track has
+    /// both throws. The target's tracks are inlined under this track's name; <see cref="Visible"/> false hides all of them.
     /// </summary>
     public SequenceReferenceSave? Reference { get; set; }
 

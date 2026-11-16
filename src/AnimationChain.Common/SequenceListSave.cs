@@ -27,7 +27,8 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// A track may carry a <c>"reference"</c> object (<see cref="SequenceReferenceSave"/>) in place of chains, playing another
 /// sequence of the file by name. It is an additive key, so the format version stays 1 and older readers keep it as an
 /// unknown property. A reference to a missing sequence, or one whose target plays the holding sequence back (a cycle,
-/// <see cref="SequenceReferences.CycleThrough"/>), is kept as written and plays nothing.
+/// <see cref="SequenceReferences.CycleThrough"/>), is kept as written and plays nothing. A track with both a reference and a
+/// non-empty <c>"chains"</c> is rejected with a <see cref="JsonException"/> naming the sequence and track.
 /// </para>
 /// </remarks>
 public class SequenceListSave
@@ -61,7 +62,7 @@ public class SequenceListSave
     public List<SequenceSave> Sequences { get; set; } = new();
 
     /// <summary>Loads a <c>.seqj</c> from disk.</summary>
-    /// <exception cref="JsonException">The file is not valid JSON, or a field has the wrong kind; the message names the property.</exception>
+    /// <exception cref="JsonException">The file is not valid JSON, a field has the wrong kind, or a track has both a reference and chains; the message names the property or track.</exception>
     public static SequenceListSave FromFile(string path)
     {
         using var stream = File.OpenRead(path);
@@ -69,7 +70,7 @@ public class SequenceListSave
     }
 
     /// <summary>Parses <c>.seqj</c> JSON. A leading byte-order mark is allowed.</summary>
-    /// <exception cref="JsonException"><paramref name="json"/> is not valid JSON, or a field has the wrong kind; the message names the property.</exception>
+    /// <exception cref="JsonException"><paramref name="json"/> is not valid JSON, a field has the wrong kind, or a track has both a reference and chains; the message names the property or track.</exception>
     public static SequenceListSave FromJsonString(string json) =>
         // JsonNode.Parse(string) rejects a BOM, unlike the stream overload.
         Read(() => JsonNode.Parse(json.TrimStart('﻿')));
@@ -200,11 +201,11 @@ public class SequenceListSave
         };
         CaptureUnknown(node.Node, sequence.UnknownProperties, "name", "loop", "tracks");
         foreach (var track in node.Objects("tracks"))
-            sequence.Tracks.Add(ReadTrack(track));
+            sequence.Tracks.Add(ReadTrack(track, sequence.Name));
         return sequence;
     }
 
-    private static SequenceTrackSave ReadTrack(SeqjObject node)
+    private static SequenceTrackSave ReadTrack(SeqjObject node, string sequenceName)
     {
         var track = new SequenceTrackSave
         {
@@ -238,6 +239,10 @@ public class SequenceListSave
             CaptureUnknown(chain.Node, reference.UnknownProperties, "source", "chain", "start", "loops");
             track.Chains.Add(reference);
         }
+        // Readers disagree on which one plays, so the file is refused rather than read one way. An empty "chains" is fine.
+        if (track.Reference is not null && track.Chains.Count > 0)
+            throw new JsonException(
+                $"Sequence \"{sequenceName}\", track \"{track.Name}\" has both a reference and chains; a track plays one or the other. Remove one.");
         return track;
     }
 }
