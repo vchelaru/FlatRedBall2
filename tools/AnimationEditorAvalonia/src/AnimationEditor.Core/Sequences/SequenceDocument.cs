@@ -835,23 +835,25 @@ public sealed class SequenceDocument : ISequenceChainLookup
         Save.Sequences.Select(s => s.Name).Where(name => CanReference(sequence, name)).ToList();
 
     /// <summary>
-    /// Adds a track to sequence <paramref name="sequence"/> that plays the sequence <paramref name="target"/>, as the first track
-    /// (in front), named after the target, with one cycle starting at <paramref name="start"/> seconds. One undo entry; the new track
+    /// Adds a track to sequence <paramref name="sequence"/> that plays the sequence <paramref name="target"/>, in the gap
+    /// <paramref name="slot"/> (as <see cref="TrackReorder.SlotAt"/> numbers them; 0 is the front, the default), named after the target,
+    /// with one cycle starting at <paramref name="start"/> seconds. One undo entry; the new track
     /// is selected. Returns why it was refused (no such sequence, or it would play itself through a cycle), or null.
     /// </summary>
-    public string? AddSequenceReference(IUndoManager undo, int sequence, string target, double start)
+    public string? AddSequenceReference(IUndoManager undo, int sequence, string target, double start, int slot = 0)
     {
+        slot = Math.Clamp(slot, 0, Save.Sequences[sequence].Tracks.Count);
         if (SequenceReferences.Find(Save.Sequences, target) is null) return $"There is no sequence named \"{target}\".";
         if (!CanReference(sequence, target))
             return $"\"{Save.Sequences[sequence].Name}\" cannot play \"{target}\": that would make the sequences play each other in a loop.";
         string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), target);
         double at = double.IsFinite(start) ? Math.Max(0, start) : 0;
         Edit(undo, SequenceLabel.Named("Add", "Reference", target), save =>
-            save.Sequences[sequence].Tracks.Insert(0, new SequenceTrackSave
+            save.Sequences[sequence].Tracks.Insert(slot, new SequenceTrackSave
             {
                 Name = name,
                 Reference = new SequenceReferenceSave { Sequence = target, Start = at },
-            }), trackAfter: 0);
+            }), trackAfter: slot);
         return null;
     }
 
