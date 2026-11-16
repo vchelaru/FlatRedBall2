@@ -29,7 +29,7 @@ internal static class DragCursors
     internal static int StockCursorId(TimelineCursor cursor) => cursor switch
     {
         TimelineCursor.ResizeHorizontal => IdcSizeWE,
-        TimelineCursor.Reorder => IdcSizeAll,
+        TimelineCursor.Reorder => IdcArrow,
         TimelineCursor.Pan => IdcSizeAll,
         _ => IdcArrow,
     };
@@ -42,15 +42,13 @@ internal static class DragCursors
         cursor switch
         {
             TimelineCursor.ResizeHorizontal => ResizeCursor,
-            TimelineCursor.Reorder => ReorderCursor,
             TimelineCursor.Pan => PanCursor,
             _ => null,
         };
 
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
-    // Reorder is a move, not a resize, so it shares the four-way move cursor with pan instead of a resize arrow.
+    // Reorder (null) keeps the plain arrow: a move is not a resize, and the ANIMATIONS tree reorder shows the OS drag cursor.
     private static readonly Cursor PanCursor = new(StandardCursorType.SizeAll);
-    private static readonly Cursor ReorderCursor = PanCursor;
 
     /// <summary>Shows <paramref name="cursor"/> during a chip drag. Call on every pointer move: Windows resets the cursor between moves.</summary>
     public static void Apply(Control control, ChipDragCursor cursor)

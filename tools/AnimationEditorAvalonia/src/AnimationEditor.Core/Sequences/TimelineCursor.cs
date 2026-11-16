@@ -8,7 +8,7 @@ public enum TimelineCursor
     /// <summary>West-east double arrow: a chain's right edge can be dragged to change its length in cycles.</summary>
     ResizeHorizontal,
 
-    /// <summary>Move cursor (four-way arrow, never a resize arrow): a track, sequence or group is being dragged to a new position.</summary>
+    /// <summary>Plain arrow, never a resize arrow: a track, sequence or group is being dragged to a new position.</summary>
     Reorder,
 
     /// <summary>Four-way arrow: the timeline is being panned by a middle-button drag.</summary>
