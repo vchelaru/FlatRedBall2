@@ -67,6 +67,58 @@ public class SequenceReferenceDocumentTests
     }
 
     [Fact]
+    public void PlaceChain_OnAReferenceTrack_ChangesNothing_AndTheFileStillReopens()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", start: 0).ShouldBeNull();
+
+        document.PlaceChain(undo, 0, 0, "body.achj", "Walk", 0);
+        document.SaveToDisk();
+
+        document.Save.Sequences[0].Tracks[0].Chains.ShouldBeEmpty();
+        undo.UndoHistory.Count().ShouldBe(1);
+        Should.NotThrow(() => SequenceDocument.Load(document.Path.FullPath));
+    }
+
+    [Fact]
+    public void PasteChains_OntoAReferenceTrack_IsRefusedWithAReason_AndChangesNothing()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", start: 0).ShouldBeNull();
+        TimelineClipboard.TryRead(document.CopyChains(0, new[] { new TimelineChainId(1, 0) }), out var content, out _).ShouldBeTrue();
+
+        var result = document.PasteChains(undo, 0, content!, selectedTrack: 0, time: 0);
+
+        result.Errors.ShouldBe(new[] { "Can't paste chains on track \"Earth\": it plays a sequence. Select a track that plays chains." });
+        result.Chains.ShouldBeEmpty();
+        document.Save.Sequences[0].Tracks[0].Chains.ShouldBeEmpty();
+        undo.UndoHistory.Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public void CommitGesture_LeavingChainsOnAReferenceTrack_PutsTheFileBack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", start: 0).ShouldBeNull();
+        string before = document.BeginGesture();
+        var tracks = document.Save.Sequences[0].Tracks;
+        var chain = tracks[1].Chains[0];
+        tracks[1].Chains.Remove(chain);
+        tracks[0].Chains.Add(chain);
+
+        document.CommitGesture(undo, "Move", before);
+
+        document.Save.ToJsonString().ShouldBe(before);
+        undo.UndoHistory.Count().ShouldBe(1);
+    }
+
+    [Fact]
     public void AddSequenceReference_PutsANewFrontTrackAtTheStart_AsOneUndoStep()
     {
         using var dir = new TestHelpers.TempDir();

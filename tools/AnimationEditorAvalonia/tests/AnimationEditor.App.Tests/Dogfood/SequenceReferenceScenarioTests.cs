@@ -92,6 +92,31 @@ public class SequenceReferenceScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task AReferenceLane_RefusesADraggedChainAndADroppedChip()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        await editor.OpenAsync(boss);
+        editor.Drag(editor.CenterOf(Row(editor, 1)), OnLanes(editor, 0, 1.0));
+        Saved(boss, "Idle").Tracks.Select(t => t.Name).ShouldBe(new[] { "Earth", "Body" });
+
+        editor.Drag(OnLanes(editor, 1, 0.25), OnLanes(editor, 0, 0.25));
+
+        var chip = editor.Control<SequenceLibraryControl>("SequenceLibrary").ChipFor("hero.achx", "Run")!;
+        Point start = editor.CenterOf(chip);
+        editor.Window.MouseMove(start, RawInputModifiers.None);
+        editor.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
+        editor.Window.MouseMove(OnLanes(editor, 0, 1.5), RawInputModifiers.LeftMouseButton);
+        chip.DragCursor.ShouldBe(ChipDragCursor.NotAllowed);
+        editor.Window.MouseUp(OnLanes(editor, 0, 1.5), MouseButton.Left, RawInputModifiers.None);
+
+        var tracks = Saved(boss, "Idle").Tracks;
+        tracks[0].Chains.ShouldBeEmpty();
+        tracks[1].Chains.Count.ShouldBe(1);
+        editor.UndoLabels.ShouldBe(new[] { "Add Reference 'Earth'" });
+    }
+
+    [AvaloniaFact]
     public async Task DraggingASequenceThatWouldCycle_ShowsNoDropTarget_AndAddsNothing()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
