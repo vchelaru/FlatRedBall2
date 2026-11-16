@@ -37,6 +37,12 @@ internal readonly struct SeqjObject(JsonObject node, string path)
     private int Int(string key, int fallback) =>
         Read(key, node => node is JsonValue value && value.TryGetValue<int>(out var number) ? number : (int?)null, "a whole number", fallback);
 
+    /// <summary>The object under <paramref name="key"/>, which must be present and a JSON object.</summary>
+    public SeqjObject Object(string key) =>
+        Node.TryGetPropertyValue(key, out var node) && node is JsonObject child
+            ? new SeqjObject(child, PathOf(key))
+            : throw Wrong(PathOf(key), "an object");
+
     /// <summary>The objects in the array under <paramref name="key"/>; empty when absent. Every element must be an object.</summary>
     public List<SeqjObject> Objects(string key)
     {

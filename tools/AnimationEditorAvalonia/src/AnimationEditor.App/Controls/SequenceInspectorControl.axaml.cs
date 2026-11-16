@@ -51,7 +51,9 @@ public partial class SequenceInspectorControl : UserControl
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
         ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
         // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
-        SealOnCommit(ChainStartField, ChainLoopsField);
+        SealOnCommit(ChainStartField, ChainLoopsField, ReferenceStartField, ReferenceLoopsField);
+        ReferenceStartField.ValueChanged += (_, _) => CommitReference(start: true);
+        ReferenceLoopsField.ValueChanged += (_, _) => CommitReference(start: false);
         ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
         ApplyRelativeEditsWith(CommitChainLoops, ChainLoopsField);
         GoToDefinitionButton.Click += (_, _) =>
@@ -197,12 +199,36 @@ public partial class SequenceInspectorControl : UserControl
             TrackNameBox.Tag = null;
             TrackNameBox.PlaceholderText = "(multiple — same sequence)";
             TrackVisibleBox.IsChecked = state.Visible;
+            ReferenceSection.IsVisible = false;
             return;
         }
         TrackNameBox.IsEnabled = true;
         TrackNameBox.PlaceholderText = null;
         Put(TrackNameBox, track.Name, force);
         TrackVisibleBox.IsChecked = track.Visible;
+        ShowReference(track, force);
+    }
+
+    // A track that plays another sequence shows its clip: which sequence, where it starts and for how many cycles.
+    private void ShowReference(SequenceTrackSave track, bool force)
+    {
+        ReferenceSection.IsVisible = track.Reference is not null;
+        if (track.Reference is not { } reference) return;
+        ReferenceSequenceText.Text = reference.Sequence;
+        PutOrMixed(ReferenceStartField, (decimal)reference.Start, force);
+        PutOrMixed(ReferenceLoopsField, (decimal)reference.Loops, force);
+        bool missing = SequenceReferences.Find(_document!.Save.Sequences, reference.Sequence) is null;
+        ReferenceMissingText.Text = missing ? $"⚠ There is no sequence named \"{reference.Sequence}\"." : null;
+        ReferenceMissingText.IsVisible = missing;
+    }
+
+    private void CommitReference(bool start)
+    {
+        if (_refreshing || _track is not { } track) return;
+        if (start && ReferenceStartField.Value is { } at)
+            Commit(document => document.SetReferenceStart(_undo!, _sequence, track, (double)at));
+        else if (!start && ReferenceLoopsField.Value is { } loops)
+            Commit(document => document.SetReferenceLoops(_undo!, _sequence, track, (float)loops));
     }
 
     private void ShowChain(SequenceChainReferenceSave reference, bool force)

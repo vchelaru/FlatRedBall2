@@ -78,6 +78,7 @@ public enum TreeMenuIcon
     Plus,
     Visibility,
     Replace,
+    Link,
 }
 
 /// <summary>

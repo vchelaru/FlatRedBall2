@@ -52,23 +52,48 @@ public static class SequenceScene
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time) =>
         sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count
             ? []
-            : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document);
+            : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document, document.Save.Sequences);
 
     /// <summary>
     /// <see cref="At(SequenceDocument, int, double)"/> for one sequence and any source of chains: the open document, or a
-    /// <c>.seqj</c> read without opening it (the Open Project Folder thumbnails).
+    /// <c>.seqj</c> read without opening it (the Open Project Folder thumbnails). A track that plays another sequence
+    /// (<see cref="SequenceTrackSave.Reference"/>) shows that sequence's sprites in its own place in the stack, sampled by
+    /// <see cref="SequenceTimeline.ReferenceTime"/> and honouring each hidden track on the way; they report the reference
+    /// track's index as <see cref="SequenceSprite.Track"/>, so a click selects it. Pass <paramref name="file"/>, the file's
+    /// sequences, to resolve references; without it they show nothing.
     /// </summary>
-    public static IReadOnlyList<SequenceSprite> At(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup)
+    public static IReadOnlyList<SequenceSprite> At(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
+        IReadOnlyList<SequenceSave>? file = null)
+    {
+        var sprites = new List<SequenceSprite>();
+        Collect(sequence, sequenceIndex, time, lookup, file, sprites, null, new List<SequenceSave> { sequence });
+        return sprites;
+    }
+
+    private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup) =>
+        SequenceTimeline.Length(sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0);
+
+    private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
+        IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack)
     {
         var tracks = sequence.Tracks;
         double CycleLength(SequenceChainReferenceSave reference) =>
             lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0;
         time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(sequence, CycleLength), sequence.Loop);
-        var sprites = new List<SequenceSprite>();
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
             var track = tracks[t];
             if (!track.Visible) continue;
+            int reported = outerTrack ?? t;
+            if (track.Reference is { } playing)
+            {
+                if (file is null || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
+                if (SequenceTimeline.ReferenceTime(playing, target, LengthOf(target, lookup), time) is not { } inner) continue;
+                stack.Add(target);
+                Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack);
+                stack.RemoveAt(stack.Count - 1);
+                continue;
+            }
             var reference = SequenceTimeline.ActiveAt(track, time, CycleLength, out double local);
             if (reference is null || lookup.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
 
@@ -76,9 +101,8 @@ public static class SequenceScene
             // its last frame until the block ends (ChainClock does both).
             var (frame, elapsed) = ChainClock.Locate(chain, local);
             string? texture = lookup.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add(new SequenceSprite(t, chain, frame, elapsed, texture, sequenceIndex));
+            sprites.Add(new SequenceSprite(reported, chain, frame, elapsed, texture, sequenceIndex));
         }
-        return sprites;
     }
 }
 

@@ -23,6 +23,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// version is written back as read rather than downgraded. <see cref="IsFromNewerVersion"/> tells the UI to warn.
 /// A <c>"version"</c> that is not a whole number of at least 1 is rejected with a <see cref="JsonException"/>.
 /// </para>
+/// <para>
+/// A track may carry a <c>"reference"</c> object (<see cref="SequenceReferenceSave"/>) in place of chains, playing another
+/// sequence of the file by name. It is an additive key, so the format version stays 1 and older readers keep it as an
+/// unknown property. Reading rejects a file whose references form a cycle with a <see cref="JsonException"/> naming it;
+/// a reference to a missing sequence is kept as written and plays nothing.
+/// </para>
 /// </remarks>
 public class SequenceListSave
 {
@@ -141,7 +147,17 @@ public class SequenceListSave
             ["name"] = track.Name,
         };
         if (!track.Visible) result["visible"] = false;
-        result["chains"] = chains;
+        if (track.Reference is { } playing)
+        {
+            result["reference"] = AppendUnknown(new JsonObject
+            {
+                ["sequence"] = playing.Sequence,
+                ["start"] = Clean(playing.Start),
+                ["loops"] = Clean(playing.Loops),
+            }, playing.UnknownProperties);
+        }
+        // A reference track has no chains; the key stays for every other track, as it always was.
+        if (track.Reference is null || track.Chains.Count > 0) result["chains"] = chains;
         return AppendUnknown(result, track.UnknownProperties);
     }
 
@@ -172,6 +188,8 @@ public class SequenceListSave
         result.Sources.AddRange(root.Strings("sources"));
         foreach (var sequence in root.Objects("sequences"))
             result.Sequences.Add(ReadSequence(sequence));
+        if (SequenceReferences.FindCycle(result.Sequences) is { } cycle)
+            throw new JsonException($"Sequences play each other in a cycle: {string.Join(" > ", cycle)}.");
         return result;
     }
 
@@ -198,7 +216,18 @@ public class SequenceListSave
         // "x", "y", "z" and "flipHorizontal" are listed so they are dropped unread, not kept as unknown properties: files
         // written before tracks lost their offset, Z and flip still hold them, and saving must not write them back. Sprites
         // sit at their frames' offsets, draw with their frames' flips and stack in track order.
-        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "chains");
+        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "reference", "chains");
+        if (node.Node.ContainsKey("reference"))
+        {
+            var reference = node.Object("reference");
+            track.Reference = new SequenceReferenceSave
+            {
+                Sequence = reference.String("sequence"),
+                Start = reference.Double("start"),
+                Loops = reference.Float("loops", fallback: 1),
+            };
+            CaptureUnknown(reference.Node, track.Reference.UnknownProperties, "sequence", "start", "loops");
+        }
         foreach (var chain in node.Objects("chains"))
         {
             var reference = new SequenceChainReferenceSave

@@ -206,6 +206,20 @@ public sealed partial class SequenceTimelineControl
                         context.DrawRectangle(null, pen, body, 3, 3);
                 }
             }
+            // A selected reference track outlines its clip, as a selected chain outlines its block.
+            if (_model.Tracks.Count > 0)
+            {
+                var pen = new Pen(Brush("Ink"), 2);
+                foreach (var reference in _references)
+                {
+                    double left = Viewport.XAt(reference.Start);
+                    double width = Math.Max(1, reference.Length * Viewport.PixelsPerSecond);
+                    if (left > size.Width || left + width < header || !_model.ContainsTrack(reference.Track)) continue;
+                    var body = new Rect(left, Viewport.LaneTop(reference.Track) + TimelineLayout.BodyTop, width, TimelineLayout.BodyBottom - TimelineLayout.BodyTop);
+                    using (context.PushOpacity(IsTrackHidden(reference.Track) ? HiddenOpacity : 1))
+                        context.DrawRectangle(null, pen, body, 3, 3);
+                }
+            }
             DrawMarquee(context);
         }
     }
