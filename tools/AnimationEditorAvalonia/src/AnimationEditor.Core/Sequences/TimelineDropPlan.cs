@@ -15,6 +15,9 @@ public enum TimelineDropKind
 
     /// <summary>On the dashed row above the first lane that makes a new track in front.</summary>
     NewTrack,
+
+    /// <summary>In the gap between two lanes (or below the last), where a dragged sequence inserts a new reference track. <see cref="TimelineDropPlan.Row"/> is the gap, as <see cref="TrackReorder.SlotAt"/> numbers it.</summary>
+    Gap,
 }
 
 /// <summary>
@@ -59,6 +62,23 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
             row.Kind == TimelineRowKind.Track ? TimelineDropKind.Track : TimelineDropKind.NewTrack,
             row.Kind == TimelineRowKind.Track ? row.Track : TimelineViewport.NewTrackLane,
             start, length, viewport.XAt(start), length * viewport.PixelsPerSecond, snap.Target);
+    }
+
+    /// <summary>
+    /// The plan for a sequence dragged from the list, released at height <paramref name="y"/>: the new-track row makes the front
+    /// track, anywhere else under the ruler points at the nearest gap between lanes (a lane's upper half the gap above it, its lower half
+    /// the gap below, and below the last lane the bottom), as a track header drag does. The reference always starts at the playhead,
+    /// so only <see cref="Kind"/> and <see cref="Row"/> are set.
+    /// </summary>
+    public static TimelineDropPlan ForSequence(TimelineViewport viewport, int trackCount, double y)
+    {
+        var row = viewport.RowAt(y, trackCount);
+        return row.Kind switch
+        {
+            TimelineRowKind.NewTrack => new TimelineDropPlan(TimelineDropKind.NewTrack, TimelineViewport.NewTrackLane, 0, 0, 0, 0),
+            TimelineRowKind.Track or TimelineRowKind.None => new TimelineDropPlan(TimelineDropKind.Gap, TrackReorder.SlotAt(viewport, trackCount, y), 0, 0, 0, 0),
+            _ => None,
+        };
     }
 
     /// <summary>

@@ -1398,6 +1398,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
 
         DrawHeaders(context, sequence, size, drop);
         DrawTrackDrop(context, size);
+        DrawSequenceGap(context, size);
         DrawRuler(context, size, step, firstTick);
         DrawDropTime(context, size, drop);
         DrawSnapGuide(context, size);
@@ -1599,10 +1600,24 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             context.FillRectangle(new SolidColorBrush(AccentColor(), 0.12),
                 new Rect(Viewport.ColumnWidth, Viewport.LaneTop(dragged), Math.Max(0, size.Width - Viewport.ColumnWidth), Viewport.LaneHeightOf(dragged)));
             if (TrackDropLineY is not { } y) return;
-            var brush = Brush("Accent");
-            context.DrawLine(new Pen(brush, 3), new Point(0, y), new Point(size.Width, y));
-            context.DrawEllipse(brush, null, new Point(4, y), 4, 4);
+            DrawInsertionLine(context, size, y);
         }
+    }
+
+    // While a sequence from the list is over a gap between lanes: the same line a header drag shows.
+    private void DrawSequenceGap(DrawingContext context, Size size)
+    {
+        if (SequenceDropLineY is not { } y) return;
+        double ruler = TimelineViewport.RulerHeight;
+        using (context.PushClip(new Rect(0, ruler, size.Width, Math.Max(0, size.Height - ruler))))
+            DrawInsertionLine(context, size, y);
+    }
+
+    private void DrawInsertionLine(DrawingContext context, Size size, double y)
+    {
+        var brush = Brush("Accent");
+        context.DrawLine(new Pen(brush, 3), new Point(0, y), new Point(size.Width, y));
+        context.DrawEllipse(brush, null, new Point(4, y), 4, 4);
     }
 
     private void DrawRuler(DrawingContext context, Size size, double step, double firstTick)
