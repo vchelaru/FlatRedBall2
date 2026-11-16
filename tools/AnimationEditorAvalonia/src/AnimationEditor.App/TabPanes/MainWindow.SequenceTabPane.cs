@@ -819,6 +819,8 @@ public partial class MainWindow
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceTimeline.GoToSequenceRequested += GoToSequence;
+            w.SequenceInspector.GoToSequenceRequested += GoToSequence;
             w.SequenceInspector.ErrorRaised += message => w.ShowProblem(message);
             w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
@@ -1250,6 +1252,15 @@ public partial class MainWindow
                 return;
             }
             await _window.OpenAndSelectChainAsync(path, reference.Chain);
+        }
+
+        /// <summary>Selects the sequence named <paramref name="name"/> in the list, alone, as a click on its row does. The user action makes it a Back entry.</summary>
+        private void GoToSequence(string name)
+        {
+            int index = IndexOf(name);
+            if (index < 0) return;
+            using var navigation = _window._navigation.BeginUserAction();
+            _window.SequenceList.SelectedIndex = index;
         }
 
         /// <summary>The primary sequence's index: what the timeline, Inspector and every editing command act on. -1 for none.</summary>

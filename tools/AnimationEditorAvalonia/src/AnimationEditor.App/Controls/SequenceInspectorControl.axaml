@@ -96,6 +96,10 @@
                             </Grid>
                             <TextBlock x:Name="ReferenceMissingText" Classes="note" IsVisible="False"
                                        Foreground="{DynamicResource Accent}" />
+                            <Button x:Name="GoToSequenceButton" Content="Go to Sequence"
+                                    HorizontalAlignment="Left"
+                                    ToolTip.Tip="Select this sequence in the list"
+                                    AutomationProperties.AutomationId="seq-go-to-sequence" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
