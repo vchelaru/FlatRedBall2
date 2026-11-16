@@ -46,6 +46,27 @@ public class SequenceReferenceDocumentTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = source, Chain = chain } } };
 
     [Fact]
+    public void ExternalEditGivingAReferenceTrackChains_IsRefused_AndTheReasonNamesTheTrack()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var bad = SequenceListSave.FromFile(document.Path.FullPath);
+        bad.Sequences[0].Tracks.Add(new SequenceTrackSave
+        {
+            Name = "Earth",
+            Reference = new SequenceReferenceSave { Sequence = "Earth" },
+            Chains = { new SequenceChainReferenceSave { Source = "fx.achj", Chain = "Spark" } },
+        });
+        bad.Save(document.Path.FullPath);
+        const string reason = "Sequence \"Idle\", track \"Earth\" has both a reference and chains; a track plays one or the other. Remove one.";
+
+        document.ReloadFromDisk().Error.ShouldBe(reason);
+
+        document.Save.Sequences[0].Tracks.Count.ShouldBe(1);
+        Should.Throw<System.Text.Json.JsonException>(() => SequenceDocument.Load(document.Path.FullPath)).Message.ShouldBe(reason);
+    }
+
+    [Fact]
     public void AddSequenceReference_PutsANewFrontTrackAtTheStart_AsOneUndoStep()
     {
         using var dir = new TestHelpers.TempDir();
