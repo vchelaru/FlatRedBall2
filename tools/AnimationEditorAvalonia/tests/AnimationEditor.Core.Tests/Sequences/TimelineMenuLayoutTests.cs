@@ -104,6 +104,25 @@ public class TimelineMenuLayoutTests
     }
 
     [Fact]
+    public void AReferenceTrackHeader_OffersGoToSequenceInItsOwnGroupBeforeDelete_AndOtherTracksDoNot()
+    {
+        var groups = TimelineMenuLayout.For(Target.TrackHeader, false, null, referenceExpanded: false, canGoToSequence: true);
+        groups[^2].ShouldBe(new[] { Cmd.GoToSequence });
+        groups[^1].ShouldBe(new[] { Cmd.Delete });
+        Groups(Target.TrackHeader).SelectMany(g => g).ShouldNotContain(Cmd.GoToSequence);
+        TimelineMenuLayout.Header(Target.TrackHeader, Cmd.GoToSequence, 1).ShouldBe("Go to Sequence");
+        TimelineMenuLayout.Icon(Cmd.GoToSequence).ShouldBe(TreeMenuIcon.Animation);
+    }
+
+    [Fact]
+    public void GoToSequence_IsUnavailableWithAReason_OnlyWhenTheFileLacksTheSequence()
+    {
+        var sequences = new System.Collections.Generic.List<FlatRedBall2.AnimationEditorCommon.SequenceSave> { new() { Name = "Earth" } };
+        TimelineMenuLayout.GoToSequenceDisabledReason(sequences, "Earth").ShouldBeNull();
+        TimelineMenuLayout.GoToSequenceDisabledReason(sequences, "Mars").ShouldBe("There is no sequence named \"Mars\".");
+    }
+
+    [Fact]
     public void ToggleVisibility_NamesWhatItWillDo()
     {
         TimelineMenuLayout.Header(Target.TrackHeader, Cmd.ToggleVisibility, 1, trackHidden: false).ShouldBe("Hide Track");

@@ -180,6 +180,51 @@ public class SequenceReferenceScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task GoToSequence_FromTheTrackMenuAndTheInspector_SelectsTheTargetAndRecordsBack_AndIsDisabledForAMissingTarget()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        var file = SequenceListSave.FromFile(boss);
+        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Ghost", Reference = new SequenceReferenceSave { Sequence = "Nope" } });
+        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Earth", Reference = new SequenceReferenceSave { Sequence = "Earth" } });
+        file.Save(boss);
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+        var back = editor.Control<MenuItem>("MenuNavBack");
+        back.IsEnabled.ShouldBeFalse();
+
+        // Track menu on the Earth reference (lane 0).
+        editor.RightClickAt(Header(editor, 0, 60));
+        var item = timeline.Menu.Items.OfType<MenuItem>().First(i => (string?)i.Header == "Go to Sequence");
+        item.IsEnabled.ShouldBeTrue();
+        editor.PickMenuItem(timeline.Menu, "Go to Sequence");
+        Selected(editor).ShouldBe(new[] { "Earth" });
+        back.IsEnabled.ShouldBeTrue();
+        editor.ClickMenu("MenuNavBack");
+        Selected(editor).ShouldBe(new[] { "Idle" });
+
+        // The Inspector button, with the reference track selected.
+        editor.ClickAt(Header(editor, 0, 60));
+        var button = editor.Control<Button>("GoToSequenceButton");
+        button.IsEnabled.ShouldBeTrue();
+        editor.Click(button);
+        Selected(editor).ShouldBe(new[] { "Earth" });
+        editor.ClickMenu("MenuNavBack");
+        Selected(editor).ShouldBe(new[] { "Idle" });
+
+        // A reference to a sequence the file lacks: both are disabled and say why.
+        editor.RightClickAt(Header(editor, 1, 60));
+        var ghost = timeline.Menu.Items.OfType<MenuItem>().First(i => (string?)i.Header == "Go to Sequence");
+        ghost.IsEnabled.ShouldBeFalse();
+        ToolTip.GetTip(ghost).ShouldBe("There is no sequence named \"Nope\".");
+        timeline.Menu.Close();
+        editor.ClickAt(Header(editor, 1, 60));
+        button = editor.Control<Button>("GoToSequenceButton");
+        button.IsEnabled.ShouldBeFalse();
+        ToolTip.GetTip(button).ShouldBe("There is no sequence named \"Nope\".");
+    }
+
+    [AvaloniaFact]
     public async Task AReferenceRow_IsCollapsedByDefault_AndTheChevronExpandsItToTheInheritedTracks()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

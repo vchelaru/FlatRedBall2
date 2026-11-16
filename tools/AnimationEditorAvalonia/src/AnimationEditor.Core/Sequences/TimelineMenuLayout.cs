@@ -1,3 +1,4 @@
+using FlatRedBall2.AnimationEditorCommon;
 using AnimationEditor.Core.CommandsAndState;
 using System;
 using System.Collections.Generic;
@@ -41,6 +42,9 @@ public enum TimelineMenuCommand
 
     /// <summary>A reference track: shows or hides the tracks it inherits.</summary>
     ToggleExpanded,
+
+    /// <summary>A reference track: selects the sequence it plays in the sequence list. Disabled when the file has no such sequence.</summary>
+    GoToSequence,
 }
 
 /// <summary>
@@ -66,7 +70,7 @@ public static class TimelineMenuLayout
     /// one that can't happen is left out, and so is the divider under the group when none can.
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<TimelineMenuCommand>> For(TimelineMenuTarget target, bool anyTrackHidden, IReadOnlyList<ReorderMove>? moves = null,
-        bool? referenceExpanded = null)
+        bool? referenceExpanded = null, bool? canGoToSequence = null)
     {
         var clipboard = new[] { TimelineMenuCommand.Copy, TimelineMenuCommand.Cut, TimelineMenuCommand.Paste, TimelineMenuCommand.Duplicate };
         var moveItems = new List<TimelineMenuCommand>();
@@ -85,6 +89,8 @@ public static class TimelineMenuLayout
         // Only a single reference track clicked offers Expand/Collapse (referenceExpanded says which, null for any other track).
         if (referenceExpanded is not null) own.Add(TimelineMenuCommand.ToggleExpanded);
         header.Add(own.ToArray());
+        // Like a chain's Go to Definition, its own group. canGoToSequence is null for any track that is not a single reference.
+        if (canGoToSequence is not null) header.Add(new[] { TimelineMenuCommand.GoToSequence });
         header.Add(new[] { TimelineMenuCommand.Delete });
         return target switch
         {
@@ -103,6 +109,10 @@ public static class TimelineMenuLayout
         };
     }
 
+    /// <summary>Why Go to Sequence is unavailable (the tooltip of the disabled menu item and Inspector button) for a reference to <paramref name="sequence"/>, or null when the file has it.</summary>
+    public static string? GoToSequenceDisabledReason(IReadOnlyList<SequenceSave> sequences, string sequence) =>
+        SequenceReferences.Find(sequences, sequence) is null ? $"There is no sequence named \"{sequence}\"." : null;
+
     /// <summary>The item's text with <paramref name="selected"/> tracks or chains selected; <paramref name="trackHidden"/> says whether the clicked track is hidden.</summary>
     public static string Header(TimelineMenuTarget target, TimelineMenuCommand command, int selected, bool trackHidden = false, bool referenceExpanded = false)
     {
@@ -120,6 +130,7 @@ public static class TimelineMenuLayout
             TimelineMenuCommand.ToggleVisibility => trackHidden ? "Show Track" : "Hide Track",
             TimelineMenuCommand.ShowAllTracks => "Show All Tracks",
             TimelineMenuCommand.GoToDefinition => "Go to Definition",
+            TimelineMenuCommand.GoToSequence => "Go to Sequence",
             TimelineMenuCommand.Delete => target == TimelineMenuTarget.Chain
                 ? (several ? $"Remove {selected} Chains" : "Remove from Track")
                 : (several ? $"Delete {selected} Tracks" : "Delete Track"),
@@ -146,7 +157,7 @@ public static class TimelineMenuLayout
         TimelineMenuCommand.AddTrack => TreeMenuIcon.Plus,
         TimelineMenuCommand.AddSequenceReference or TimelineMenuCommand.ToggleExpanded => TreeMenuIcon.Link,
         TimelineMenuCommand.ToggleVisibility or TimelineMenuCommand.ShowAllTracks => TreeMenuIcon.Visibility,
-        TimelineMenuCommand.GoToDefinition => TreeMenuIcon.Animation,
+        TimelineMenuCommand.GoToDefinition or TimelineMenuCommand.GoToSequence => TreeMenuIcon.Animation,
         TimelineMenuCommand.MoveToTop => TreeMenuIcon.MoveToTop,
         TimelineMenuCommand.MoveUp => TreeMenuIcon.MoveUp,
         TimelineMenuCommand.MoveDown => TreeMenuIcon.MoveDown,
