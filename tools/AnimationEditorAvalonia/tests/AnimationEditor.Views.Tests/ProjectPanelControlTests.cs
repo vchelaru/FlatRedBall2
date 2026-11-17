@@ -218,7 +218,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "New Animation File", "New Sequence File", "Convert Animations to .achj", "Reveal in File Manager" }, headers);
+            Assert.Equal(new object?[] { "New Animation File", "New Sequence File", "Convert Animations to .achj", "Reveal in File Manager", "Copy Full Path" }, headers);
         }
         finally { window.Close(); }
     }
@@ -264,7 +264,7 @@ public class ProjectPanelControlTests
 
             var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "Open Containing Folder", "Copy Full Path", "Duplicate", "Convert to .achj", "Delete" }, headers);
+            Assert.Equal(new object?[] { "Duplicate", "Convert to .achj", "Open Containing Folder", "Copy Full Path", "Delete" }, headers);
         }
         finally { window.Close(); }
     }
@@ -356,7 +356,7 @@ public class ProjectPanelControlTests
             {
                 "New Animation File", "New Sequence File", "-",
                 "Convert Animations to .achj", "-",
-                "Reveal in File Manager",
+                "Reveal in File Manager", "Copy Full Path",
             }, MenuLayout(control));
         }
         finally { window.Close(); }
@@ -382,7 +382,7 @@ public class ProjectPanelControlTests
             Assert.Equal(new[]
             {
                 "New Animation File", "New Sequence File", "-",
-                "Reveal in File Manager",
+                "Reveal in File Manager", "Copy Full Path",
             }, MenuLayout(control));
         }
         finally { window.Close(); }
@@ -419,8 +419,8 @@ public class ProjectPanelControlTests
 
             Assert.Equal(new[]
             {
-                "Open Containing Folder", "Copy Full Path", "-",
                 "Duplicate", "Convert to .achj", "-",
+                "Open Containing Folder", "Copy Full Path", "-",
                 "Delete",
             }, MenuLayout(control));
         }
@@ -596,6 +596,31 @@ public class ProjectPanelControlTests
             item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Equal("Sprites/hero.achx", requested);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void FolderAndFileMenus_EveryItemHasAnIcon_AndFolderOffersCopyFullPath()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites" folder
+            string? requested = null;
+            control.FileCopyPathRequested += path => requested = path;
+            var folderItems = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>().ToArray();
+            Assert.All(folderItems, i => Assert.NotNull(i.Icon));
+            folderItems.Single(i => (string)i.Header! == "Copy Full Path")
+                .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal("Sprites", requested);
+
+            RightClick(window, control, control.TreeRoots[0].Children[0]); // "hero.achx"
+            Assert.All(control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>(), i => Assert.NotNull(i.Icon));
         }
         finally { window.Close(); }
     }

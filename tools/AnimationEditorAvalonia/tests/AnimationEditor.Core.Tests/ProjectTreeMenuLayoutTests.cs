@@ -18,7 +18,7 @@ public class ProjectTreeMenuLayoutTests
         {
             new[] { Cmd.NewAnimationFile, Cmd.NewSequenceFile },
             new[] { Cmd.ConvertFolderToAchj },
-            new[] { Cmd.RevealFolder },
+            new[] { Cmd.RevealFolder, Cmd.CopyFullPath },
         });
     }
 
@@ -30,21 +30,34 @@ public class ProjectTreeMenuLayoutTests
         groups.Select(g => g.ToArray()).ShouldBe(new[]
         {
             new[] { Cmd.NewAnimationFile, Cmd.NewSequenceFile },
-            new[] { Cmd.RevealFolder },
+            new[] { Cmd.RevealFolder, Cmd.CopyFullPath },
         });
     }
 
     [Fact]
-    public void AchxFile_SeparatesLocationItems_EditItems_AndDelete()
+    public void AchxFile_SeparatesEditItems_LocationItems_AndDelete()
     {
         var groups = ProjectTreeMenuLayout.ForFile("hero.achx");
 
         groups.Select(g => g.ToArray()).ShouldBe(new[]
         {
-            new[] { Cmd.OpenContainingFolder, Cmd.CopyFullPath },
             new[] { Cmd.Duplicate, Cmd.ConvertFileToAchj },
+            new[] { Cmd.OpenContainingFolder, Cmd.CopyFullPath },
             new[] { Cmd.Delete },
         });
+    }
+
+    [Theory]
+    [InlineData(true, Cmd.RevealFolder)]
+    [InlineData(false, Cmd.OpenContainingFolder)]
+    public void ImageRow_OffersTheAnimationsTabLocationGroup(bool isFolder, Cmd reveal) =>
+        ProjectTreeMenuLayout.ForImageRow(isFolder).ToArray().ShouldBe(new[] { reveal, Cmd.CopyFullPath });
+
+    [Fact]
+    public void EveryCommand_HasAnIcon()
+    {
+        foreach (var command in System.Enum.GetValues<Cmd>())
+            Should.NotThrow(() => ProjectTreeMenuLayout.Icon(command));
     }
 
     [Theory]
@@ -57,8 +70,8 @@ public class ProjectTreeMenuLayoutTests
 
         groups.Select(g => g.ToArray()).ShouldBe(new[]
         {
-            new[] { Cmd.OpenContainingFolder, Cmd.CopyFullPath },
             new[] { Cmd.Duplicate },
+            new[] { Cmd.OpenContainingFolder, Cmd.CopyFullPath },
             new[] { Cmd.Delete },
         });
     }

@@ -4,6 +4,7 @@ using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
@@ -222,9 +223,15 @@ public partial class FilesPanelControl : UserControl
         if (_contextNode is not { AbsolutePath: { } path } node)
             return;
 
-        var revealItem = new MenuItem { Header = "Reveal in File Manager" };
-        revealItem.Click += (_, _) => RevealInExplorer(path, node.IsFolder);
-        FilesTree.ContextMenu.Items.Add(revealItem);
+        // Same commands, headers, order and icons as the Animations tab's location group.
+        foreach (var command in ProjectTreeMenuLayout.ForImageRow(node.IsFolder))
+        {
+            var (header, onClick) = command == ProjectTreeMenuCommand.CopyFullPath
+                ? ("Copy Full Path", (Action)(() => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(path)))
+                : (node.IsFolder ? "Reveal in File Manager" : "Open Containing Folder", () => RevealInExplorer(path, node.IsFolder));
+            FilesTree.ContextMenu.Items.Add(Views.Controls.TreeMenuRenderer.CreateMenuItem(
+                header, onClick, ProjectTreeMenuLayout.Icon(command)));
+        }
     }
 
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)

@@ -1,4 +1,5 @@
 using AnimationEditor.App.Services;
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.ViewModels;
@@ -462,9 +463,8 @@ public partial class ProjectPanelControl : UserControl
         // No node under the cursor -- right-clicked blank space below/between rows (issue #908).
         if (_contextNode is null)
         {
-            var newAnimationItem = new MenuItem { Header = "New Animation" };
-            newAnimationItem.Click += (_, _) => NewAnimationRequested?.Invoke();
-            ProjectTree.ContextMenu.Items.Add(newAnimationItem);
+            ProjectTree.ContextMenu.Items.Add(TreeMenuRenderer.CreateMenuItem(
+                "New Animation", () => NewAnimationRequested?.Invoke(), TreeMenuIcon.Animation));
             return;
         }
 
@@ -491,9 +491,7 @@ public partial class ProjectPanelControl : UserControl
             foreach (var command in groups[i])
             {
                 var (header, onClick) = DescribeMenuCommand(command, node);
-                var item = new MenuItem { Header = header };
-                item.Click += (_, _) => onClick();
-                items.Add(item);
+                items.Add(TreeMenuRenderer.CreateMenuItem(header, onClick, ProjectTreeMenuLayout.Icon(command)));
             }
         }
     }

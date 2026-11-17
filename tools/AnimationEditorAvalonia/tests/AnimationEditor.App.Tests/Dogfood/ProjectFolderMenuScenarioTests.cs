@@ -51,7 +51,7 @@ public class ProjectFolderMenuScenarioTests
         {
             "New Animation File", "New Sequence File", "-",
             "Convert Animations to .achj", "-",
-            "Reveal in File Manager",
+            "Reveal in File Manager", "Copy Full Path",
         });
     }
 
@@ -66,7 +66,7 @@ public class ProjectFolderMenuScenarioTests
         MenuLayout(panel).ShouldBe(new[]
         {
             "New Animation File", "New Sequence File", "-",
-            "Reveal in File Manager",
+            "Reveal in File Manager", "Copy Full Path",
         });
     }
 
@@ -80,8 +80,8 @@ public class ProjectFolderMenuScenarioTests
 
         MenuLayout(panel).ShouldBe(new[]
         {
-            "Open Containing Folder", "Copy Full Path", "-",
             "Duplicate", "Convert to .achj", "-",
+            "Open Containing Folder", "Copy Full Path", "-",
             "Delete",
         });
     }
