@@ -163,6 +163,20 @@ namespace AnimationEditor.Core.Models
         public List<string> RecentProjectFolders { get; set; } = new List<string>();
 
         /// <summary>Records <paramref name="folder"/> as the open project folder: top of <see cref="RecentProjectFolders"/> and <see cref="LastProjectFolderPath"/>.</summary>
+        /// <summary>
+        /// Settings written before <see cref="RecentProjectFolders"/> existed only have <see cref="LastProjectFolderPath"/>;
+        /// adds it to the front of the list when the list lacks it.
+        /// </summary>
+        public void SeedRecentProjectFolders()
+        {
+            if (string.IsNullOrEmpty(LastProjectFolderPath)) return;
+            var last = new FilePath(LastProjectFolderPath);
+            if (RecentProjectFolders.Any(item => new FilePath(item) == last)) return;
+            RecentProjectFolders.Insert(0, LastProjectFolderPath);
+            if (RecentProjectFolders.Count > 10)
+                RecentProjectFolders.RemoveRange(10, RecentProjectFolders.Count - 10);
+        }
+
         public void AddProjectFolder(string folder)
         {
             var key = new FilePath(folder);

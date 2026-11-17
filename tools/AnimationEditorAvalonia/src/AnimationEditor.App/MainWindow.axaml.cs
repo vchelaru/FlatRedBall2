@@ -1081,7 +1081,7 @@ public partial class MainWindow : Window
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
         // document tab is open (#772).
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
-            await LoadProjectFolderAsync(lastProjectFolder);
+            await LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false);
 
         // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
         // recovered document, or none of them) did so directly rather than through
@@ -2966,14 +2966,21 @@ public partial class MainWindow : Window
     /// without the native folder picker, which headless tests can't drive.</summary>
     public async Task OpenProjectFolderForTestAsync(string path) => await LoadAndPersistProjectFolderAsync(path);
 
-    private async Task LoadAndPersistProjectFolderAsync(string path)
+    /// <summary>
+    /// The one way a folder becomes the loaded project folder (Open Project Folder, a recent-folder
+    /// click, the startup restore): scans it, then records it in <see cref="AppSettingsModel.RecentProjectFolders"/>
+    /// and <see cref="AppSettingsModel.LastProjectFolderPath"/>, saves settings and refreshes Open Recent.
+    /// <paramref name="selectSidebarTab"/> is false at startup, which leaves the sidebar as restored.
+    /// </summary>
+    private async Task LoadAndPersistProjectFolderAsync(string path, bool selectSidebarTab = true)
     {
         var achxCount = await LoadProjectFolderAsync(path);
 
         // #875 follow-up: an empty Project tab is a dead end. The Textures tab is immediately
         // useful in that case -- its Project scope (#875) lists the folder's PNGs without needing
         // any .achx open.
-        SidebarTabs.SelectedItem = achxCount == 0 ? FilesTab : ProjectTab;
+        if (selectSidebarTab)
+            SidebarTabs.SelectedItem = achxCount == 0 ? FilesTab : ProjectTab;
 
         // Immediate, not deferred to window Closed -- a debugger Stop or crash skips Closed
         // entirely (see TabSessionPersistenceTests / issue #439), so this must be safe there too.
@@ -7392,6 +7399,7 @@ public partial class MainWindow : Window
         // Program.Main starts the read before Avalonia boots, so by now it is usually done.
         _appSettings = Services.StartupWarmup.TakeSettings(SettingsFilePath)
                        ?? SettingsPreload.Read(SettingsFilePath);
+        _appSettings.SeedRecentProjectFolders();
     }
 
     private void SaveSettingsFile()

@@ -152,6 +152,29 @@ public class AppSettingsModelTests
     }
 
     [Fact]
+    public void SeedRecentProjectFolders_LastFolderMissingFromList_IsAddedAtFront()
+    {
+        var model = new AppSettingsModel { LastProjectFolderPath = "C:/Games/A" };
+        model.RecentProjectFolders.Add("C:/Games/B");
+
+        model.SeedRecentProjectFolders();
+
+        Assert.Equal(new[] { "C:/Games/A", "C:/Games/B" }, model.RecentProjectFolders);
+    }
+
+    [Fact]
+    public void SeedRecentProjectFolders_LastFolderAlreadyListed_ChangesNothing()
+    {
+        var model = new AppSettingsModel { LastProjectFolderPath = @"C:\Games\B" };
+        model.RecentProjectFolders.Add("C:/Games/A");
+        model.RecentProjectFolders.Add("C:/Games/B");
+
+        model.SeedRecentProjectFolders();
+
+        Assert.Equal(new[] { "C:/Games/A", "C:/Games/B" }, model.RecentProjectFolders);
+    }
+
+    [Fact]
     public void AddProjectFolder_CapsAtTen_DroppingOldest()
     {
         var model = new AppSettingsModel();
