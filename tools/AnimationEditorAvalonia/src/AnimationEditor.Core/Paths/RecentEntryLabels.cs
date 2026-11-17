@@ -3,11 +3,11 @@ namespace AnimationEditor.Core.Paths;
 /// <summary>
 /// Display labels for a list of recent files or folders. An entry's label is its name; entries whose names
 /// clash (ignoring case) get the fewest nearest parent segments that make every clashing entry unique,
-/// for example <c>Content — CrankyChibiCthulu</c>. Plain text, so native menus can show it.
+/// for example <c>Content - CrankyChibiCthulu</c>. Plain text, so native menus can show it.
 /// </summary>
 public static class RecentEntryLabels
 {
-    private const string Separator = " — ";
+    private const string Separator = " - ";
 
     /// <summary>One label per path, in the same order. Backslashes and trailing slashes are normalized.</summary>
     public static List<string> Build(IReadOnlyList<string> paths)

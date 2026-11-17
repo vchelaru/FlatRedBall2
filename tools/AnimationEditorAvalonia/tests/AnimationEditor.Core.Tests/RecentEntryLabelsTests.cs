@@ -23,7 +23,7 @@ public class RecentEntryLabelsTests
             "C:/Games/KidDefense/Content",
         });
 
-        Assert.Equal(new[] { "Content — CrankyChibiCthulu", "Other", "Content — KidDefense" }, labels);
+        Assert.Equal(new[] { "Content - CrankyChibiCthulu", "Other", "Content - KidDefense" }, labels);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class RecentEntryLabelsTests
             "C:/B/Content",
         });
 
-        Assert.Equal(new[] { "Content — Work/A", "Content — Home/A", "Content — B" }, labels);
+        Assert.Equal(new[] { "Content - Work/A", "Content - Home/A", "Content - B" }, labels);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class RecentEntryLabelsTests
     {
         var labels = RecentEntryLabels.Build(new[] { "C:/Content", "D:/Content" });
 
-        Assert.Equal(new[] { "Content — C:", "Content — D:" }, labels);
+        Assert.Equal(new[] { "Content - C:", "Content - D:" }, labels);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class RecentEntryLabelsTests
     {
         var labels = RecentEntryLabels.Build(new[] { @"C:\Games\A\content", "C:/Games/B/Content" });
 
-        Assert.Equal(new[] { "content — A", "Content — B" }, labels);
+        Assert.Equal(new[] { "content - A", "Content - B" }, labels);
     }
 
     [Fact]
@@ -60,6 +60,6 @@ public class RecentEntryLabelsTests
     {
         var labels = RecentEntryLabels.Build(new[] { "C:/A/Content/", "C:/B/Content/" });
 
-        Assert.Equal(new[] { "Content — A", "Content — B" }, labels);
+        Assert.Equal(new[] { "Content - A", "Content - B" }, labels);
     }
 }

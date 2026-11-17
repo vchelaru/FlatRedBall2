@@ -132,8 +132,8 @@ public class RecentFilesMenuTests
 
             Assert.Equal(new[]
             {
-                "hero.achx — A", "hero.achx — B",
-                "Content — A", "Content — B", "hero.achx",
+                "hero.achx - A", "hero.achx - B",
+                "Content - A", "Content - B", "hero.achx",
             }, headers);
             Assert.Equal(appSettings.RecentFiles[0], ToolTip.GetTip(menu.Items.OfType<MenuItem>().First())?.ToString());
         }
