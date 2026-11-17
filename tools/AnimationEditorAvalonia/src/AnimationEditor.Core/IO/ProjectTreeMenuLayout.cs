@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AnimationEditor.Core.CommandsAndState;
 
 namespace AnimationEditor.Core.IO;
 
@@ -32,10 +33,14 @@ public static class ProjectTreeMenuLayout
         };
         if (hasConvertibleAchx)
             groups.Add(new[] { ProjectTreeMenuCommand.ConvertFolderToAchj });
-        groups.Add(new[] { ProjectTreeMenuCommand.RevealFolder });
+        groups.Add(new[] { ProjectTreeMenuCommand.RevealFolder, ProjectTreeMenuCommand.CopyFullPath });
         return groups;
     }
 
+    /// <summary>
+    /// Both menus share one order: create, edit/convert, location (reveal + copy path), then
+    /// delete last.
+    /// </summary>
     public static IReadOnlyList<IReadOnlyList<ProjectTreeMenuCommand>> ForFile(string fileName)
     {
         var edit = new List<ProjectTreeMenuCommand> { ProjectTreeMenuCommand.Duplicate };
@@ -44,9 +49,29 @@ public static class ProjectTreeMenuLayout
 
         return new IReadOnlyList<ProjectTreeMenuCommand>[]
         {
-            new[] { ProjectTreeMenuCommand.OpenContainingFolder, ProjectTreeMenuCommand.CopyFullPath },
             edit,
+            new[] { ProjectTreeMenuCommand.OpenContainingFolder, ProjectTreeMenuCommand.CopyFullPath },
             new[] { ProjectTreeMenuCommand.Delete },
         };
     }
+
+    /// <summary>The Images tab's menu: just the location group, same commands and order as the Animations tab.</summary>
+    public static IReadOnlyList<ProjectTreeMenuCommand> ForImageRow(bool isFolder) => new[]
+    {
+        isFolder ? ProjectTreeMenuCommand.RevealFolder : ProjectTreeMenuCommand.OpenContainingFolder,
+        ProjectTreeMenuCommand.CopyFullPath,
+    };
+
+    /// <summary>The icon the ANIMATIONS tree's menu gives the matching item.</summary>
+    public static TreeMenuIcon Icon(ProjectTreeMenuCommand command) => command switch
+    {
+        ProjectTreeMenuCommand.NewAnimationFile => TreeMenuIcon.Animation,
+        ProjectTreeMenuCommand.NewSequenceFile => TreeMenuIcon.Sequence,
+        ProjectTreeMenuCommand.ConvertFolderToAchj or ProjectTreeMenuCommand.ConvertFileToAchj => TreeMenuIcon.Replace,
+        ProjectTreeMenuCommand.RevealFolder or ProjectTreeMenuCommand.OpenContainingFolder => TreeMenuIcon.RevealFile,
+        ProjectTreeMenuCommand.CopyFullPath => TreeMenuIcon.CopyName,
+        ProjectTreeMenuCommand.Duplicate => TreeMenuIcon.Duplicate,
+        ProjectTreeMenuCommand.Delete => TreeMenuIcon.Delete,
+        _ => throw new ArgumentOutOfRangeException(nameof(command), command, null),
+    };
 }

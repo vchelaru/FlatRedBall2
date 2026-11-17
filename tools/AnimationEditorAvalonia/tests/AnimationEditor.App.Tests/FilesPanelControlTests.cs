@@ -54,7 +54,8 @@ public class FilesPanelControlTests
 
             var headers = control.FilesTree.ContextMenu!.Items.OfType<MenuItem>()
                 .Select(i => i.Header).ToArray();
-            Assert.Equal(new object?[] { "Reveal in File Manager" }, headers);
+            Assert.Equal(new object?[] { "Reveal in File Manager", "Copy Full Path" }, headers);
+            Assert.All(control.FilesTree.ContextMenu!.Items.OfType<MenuItem>(), i => Assert.NotNull(i.Icon));
         }
         finally
         {

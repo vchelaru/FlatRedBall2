@@ -36,6 +36,9 @@ public class EditorTextPasteTests
 
     private static (Window Window, TextBox Box) Show()
     {
+        // The refusal handler is a module initializer in the Views assembly, which loads lazily; run alone,
+        // nothing else in this test touches Views, so the handler would not exist yet.
+        System.Runtime.CompilerServices.RuntimeHelpers.RunModuleConstructor(typeof(EditorTextPaste).Module.ModuleHandle);
         var box = new TextBox { Text = "Walk" };
         var window = new Window { Content = box };
         window.Show();
