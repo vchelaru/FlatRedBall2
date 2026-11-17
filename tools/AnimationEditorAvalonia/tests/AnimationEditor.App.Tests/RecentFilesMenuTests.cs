@@ -112,6 +112,35 @@ public class RecentFilesMenuTests
     }
 
     [AvaloniaFact]
+    public void RecentEntries_WithClashingNames_AreDisambiguatedPerSection_AndKeepFullPathTooltip()
+    {
+        var (window, appSettings) = CreateWindowWithSettings();
+        try
+        {
+            var root = Path.GetTempPath();
+            appSettings.RecentFiles.Clear();
+            appSettings.RecentProjectFolders.Clear();
+            appSettings.RecentFiles.Add(Path.Combine(root, "A", "hero.achx"));
+            appSettings.RecentFiles.Add(Path.Combine(root, "B", "hero.achx"));
+            appSettings.RecentProjectFolders.Add(Path.Combine(root, "A", "Content"));
+            appSettings.RecentProjectFolders.Add(Path.Combine(root, "B", "Content"));
+            appSettings.RecentProjectFolders.Add(Path.Combine(root, "A", "hero.achx"));
+            CallRefreshRecentFiles(window);
+
+            var menu = window.FindControl<MenuItem>("MenuLoadRecent")!;
+            var headers = menu.Items.OfType<MenuItem>().Select(i => i.Header?.ToString()).ToArray();
+
+            Assert.Equal(new[]
+            {
+                "hero.achx — A", "hero.achx — B",
+                "Content — A", "Content — B", "hero.achx",
+            }, headers);
+            Assert.Equal(appSettings.RecentFiles[0], ToolTip.GetTip(menu.Items.OfType<MenuItem>().First())?.ToString());
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void RecentProjectFolders_OnlyFolders_HasNoLeadingSeparator()
     {
         var (window, appSettings) = CreateWindowWithSettings();

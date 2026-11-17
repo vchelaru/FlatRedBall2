@@ -2786,10 +2786,13 @@ public partial class MainWindow : Window
     private void RefreshRecentFiles()
     {
         MenuLoadRecent.Items.Clear();
-        foreach (var file in _appSettings.RecentFiles.Take(5))
+        var files = _appSettings.RecentFiles.Take(5).ToList();
+        var fileLabels = AnimationEditor.Core.Paths.RecentEntryLabels.Build(files);
+        for (int i = 0; i < files.Count; i++)
         {
+            var file = files[i];
             // A menu header treats "_x" as an access key, so a literal underscore in the name is doubled.
-            var item = new MenuItem { Header = System.IO.Path.GetFileName(file).Replace("_", "__") };
+            var item = new MenuItem { Header = fileLabels[i].Replace("_", "__") };
             ToolTip.SetTip(item, file);
             var captured = file;
             item.Click += async (_, _) => await LoadAnimationFileAsync(captured);
@@ -2799,10 +2802,12 @@ public partial class MainWindow : Window
         if (_appSettings.RecentProjectFolders.Count == 0) return;
         if (MenuLoadRecent.Items.Count > 0)
             MenuLoadRecent.Items.Add(new Separator());
-        foreach (var folder in _appSettings.RecentProjectFolders)
+        var folderLabels = AnimationEditor.Core.Paths.RecentEntryLabels.Build(_appSettings.RecentProjectFolders);
+        for (int i = 0; i < _appSettings.RecentProjectFolders.Count; i++)
         {
-            var name = new FilePath(folder).NoPath;
-            var item = new MenuItem { Header = (name.Length > 0 ? name : folder).Replace("_", "__") };
+            var folder = _appSettings.RecentProjectFolders[i];
+            var label = folderLabels[i];
+            var item = new MenuItem { Header = (label.Length > 0 ? label : folder).Replace("_", "__") };
             ToolTip.SetTip(item, folder);
             var captured = folder;
             item.Click += async (_, _) => await OpenRecentProjectFolderAsync(captured);
