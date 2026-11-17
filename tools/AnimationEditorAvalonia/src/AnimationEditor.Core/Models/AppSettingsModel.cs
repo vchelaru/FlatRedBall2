@@ -156,6 +156,23 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public bool LibraryAutoplayAll { get; set; }
 
+        /// <summary>
+        /// Project folders opened via File → Open Project Folder, most recent first, capped at 10.
+        /// Fed only by <see cref="AddProjectFolder"/>, which also sets <see cref="LastProjectFolderPath"/>.
+        /// </summary>
+        public List<string> RecentProjectFolders { get; set; } = new List<string>();
+
+        /// <summary>Records <paramref name="folder"/> as the open project folder: top of <see cref="RecentProjectFolders"/> and <see cref="LastProjectFolderPath"/>.</summary>
+        public void AddProjectFolder(string folder)
+        {
+            var key = new FilePath(folder);
+            RecentProjectFolders.RemoveAll(item => new FilePath(item) == key);
+            RecentProjectFolders.Insert(0, folder);
+            if (RecentProjectFolders.Count > 10)
+                RecentProjectFolders.RemoveRange(10, RecentProjectFolders.Count - 10);
+            LastProjectFolderPath = folder;
+        }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

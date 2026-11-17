@@ -2795,8 +2795,30 @@ public partial class MainWindow : Window
             item.Click += async (_, _) => await LoadAnimationFileAsync(captured);
             MenuLoadRecent.Items.Add(item);
         }
+
+        if (_appSettings.RecentProjectFolders.Count == 0) return;
+        if (MenuLoadRecent.Items.Count > 0)
+            MenuLoadRecent.Items.Add(new Separator());
+        foreach (var folder in _appSettings.RecentProjectFolders)
+        {
+            var name = new FilePath(folder).NoPath;
+            var item = new MenuItem { Header = (name.Length > 0 ? name : folder).Replace("_", "__") };
+            ToolTip.SetTip(item, folder);
+            var captured = folder;
+            item.Click += async (_, _) => await OpenRecentProjectFolderAsync(captured);
+            MenuLoadRecent.Items.Add(item);
+        }
     }
 
+    private async Task OpenRecentProjectFolderAsync(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            ShowProblem($"Project folder not found: {folder}");
+            return;
+        }
+        await LoadAndPersistProjectFolderAsync(folder);
+    }
     // ── File menu handlers ────────────────────────────────────────────────────
 
     private void OnNewClick(object? sender, RoutedEventArgs e)
@@ -2955,8 +2977,9 @@ public partial class MainWindow : Window
 
         // Immediate, not deferred to window Closed -- a debugger Stop or crash skips Closed
         // entirely (see TabSessionPersistenceTests / issue #439), so this must be safe there too.
-        _appSettings.LastProjectFolderPath = path;
+        _appSettings.AddProjectFolder(path);
         SaveSettingsFile();
+        RefreshRecentFiles();
     }
 
     /// <summary>
