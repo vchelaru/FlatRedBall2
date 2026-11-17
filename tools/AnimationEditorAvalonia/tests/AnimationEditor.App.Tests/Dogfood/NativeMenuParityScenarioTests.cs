@@ -182,6 +182,7 @@ public class NativeMenuParityScenarioTests
         await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
         NativeMenuTestSupport.RaiseOpening(Find(bar, "File").Menu!);
 
-        close.IsEnabled.ShouldBeTrue();
+        // Opening a folder records it in Open Recent, which can rebuild the File menu's native items.
+        Find(bar, "File", "Close Project Folder").IsEnabled.ShouldBeTrue();
     }
 }

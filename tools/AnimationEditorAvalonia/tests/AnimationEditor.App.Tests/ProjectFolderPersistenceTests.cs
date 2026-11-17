@@ -197,6 +197,40 @@ public class ProjectFolderPersistenceTests
     }
 
     [AvaloniaFact]
+    public async Task Startup_AutoLoadedFolder_ThenOpeningAnother_ListsBothMostRecentFirst()
+    {
+        var a = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var b = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(a);
+        Directory.CreateDirectory(b);
+
+        // Settings from before RecentProjectFolders existed: only LastProjectFolderPath is set.
+        var ctx = TestHelpers.BuildServices();
+        var settingsFile = AppSettingsLocation.ForApplicationDataRoot(ctx.SettingsRoot);
+        Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
+        File.WriteAllText(settingsFile.FullPath,
+            JsonSerializer.Serialize(new AppSettingsModel { LastProjectFolderPath = a }));
+
+        var window = ctx.CreateMainWindow();
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            await window.OpenProjectFolderForTestAsync(b);
+            Dispatcher.UIThread.RunJobs();
+
+            var settings = ReadPersistedSettings(ctx);
+            Assert.Equal(new[] { b, a }, settings.RecentProjectFolders);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(a, true);
+            Directory.Delete(b, true);
+        }
+    }
+
+    [AvaloniaFact]
     public void Startup_LastProjectFolderMissing_LeavesProjectTabEmpty()
     {
         var ctx = TestHelpers.BuildServices();

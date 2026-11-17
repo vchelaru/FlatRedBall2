@@ -129,6 +129,72 @@ public class AppSettingsModelTests
     }
 
     [Fact]
+    public void AddProjectFolder_MostRecentFirst_AndSetsLastProjectFolderPath()
+    {
+        var model = new AppSettingsModel();
+        model.AddProjectFolder("C:/Games/A");
+        model.AddProjectFolder("C:/Games/B");
+
+        Assert.Equal(new[] { "C:/Games/B", "C:/Games/A" }, model.RecentProjectFolders);
+        Assert.Equal("C:/Games/B", model.LastProjectFolderPath);
+    }
+
+    [Fact]
+    public void AddProjectFolder_SameFolderWithDifferentSeparators_MovesToFrontWithoutDuplicating()
+    {
+        var model = new AppSettingsModel();
+        model.AddProjectFolder(@"C:\Games\A");
+        model.AddProjectFolder("C:/Games/B");
+        model.AddProjectFolder("C:/Games/A");
+
+        Assert.Equal(2, model.RecentProjectFolders.Count);
+        Assert.Equal("C:/Games/A", model.RecentProjectFolders[0]);
+    }
+
+    [Fact]
+    public void SeedRecentProjectFolders_LastFolderMissingFromList_IsAddedAtFront()
+    {
+        var model = new AppSettingsModel { LastProjectFolderPath = "C:/Games/A" };
+        model.RecentProjectFolders.Add("C:/Games/B");
+
+        model.SeedRecentProjectFolders();
+
+        Assert.Equal(new[] { "C:/Games/A", "C:/Games/B" }, model.RecentProjectFolders);
+    }
+
+    [Fact]
+    public void SeedRecentProjectFolders_LastFolderAlreadyListed_ChangesNothing()
+    {
+        var model = new AppSettingsModel { LastProjectFolderPath = @"C:\Games\B" };
+        model.RecentProjectFolders.Add("C:/Games/A");
+        model.RecentProjectFolders.Add("C:/Games/B");
+
+        model.SeedRecentProjectFolders();
+
+        Assert.Equal(new[] { "C:/Games/A", "C:/Games/B" }, model.RecentProjectFolders);
+    }
+
+    [Fact]
+    public void AddProjectFolder_CapsAtTen_DroppingOldest()
+    {
+        var model = new AppSettingsModel();
+        for (int i = 0; i < 12; i++)
+            model.AddProjectFolder($"C:/Games/P{i}");
+
+        Assert.Equal(10, model.RecentProjectFolders.Count);
+        Assert.Equal("C:/Games/P11", model.RecentProjectFolders[0]);
+        Assert.DoesNotContain("C:/Games/P0", model.RecentProjectFolders);
+    }
+
+    [Fact]
+    public void RecentProjectFolders_InitiallyEmpty_AndOldSettingsJsonStillLoads()
+    {
+        Assert.Empty(new AppSettingsModel().RecentProjectFolders);
+        var loaded = JsonSerializer.Deserialize<AppSettingsModel>("{\"LastProjectFolderPath\":\"C:/x\"}")!;
+        Assert.Empty(loaded.RecentProjectFolders);
+    }
+
+    [Fact]
     public void CanvasBackgroundArgb_DefaultsToNull()
     {
         var model = new AppSettingsModel();

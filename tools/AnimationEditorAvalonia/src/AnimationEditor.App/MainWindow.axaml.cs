@@ -1081,7 +1081,7 @@ public partial class MainWindow : Window
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
         // document tab is open (#772).
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
-            await LoadProjectFolderAsync(lastProjectFolder);
+            await LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false);
 
         // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
         // recovered document, or none of them) did so directly rather than through
@@ -2786,17 +2786,44 @@ public partial class MainWindow : Window
     private void RefreshRecentFiles()
     {
         MenuLoadRecent.Items.Clear();
-        foreach (var file in _appSettings.RecentFiles.Take(5))
+        var files = _appSettings.RecentFiles.Take(5).ToList();
+        var fileLabels = AnimationEditor.Core.Paths.RecentEntryLabels.Build(files);
+        for (int i = 0; i < files.Count; i++)
         {
+            var file = files[i];
             // A menu header treats "_x" as an access key, so a literal underscore in the name is doubled.
-            var item = new MenuItem { Header = System.IO.Path.GetFileName(file).Replace("_", "__") };
+            var item = new MenuItem { Header = fileLabels[i].Replace("_", "__") };
             ToolTip.SetTip(item, file);
             var captured = file;
             item.Click += async (_, _) => await LoadAnimationFileAsync(captured);
             MenuLoadRecent.Items.Add(item);
         }
+
+        if (_appSettings.RecentProjectFolders.Count == 0) return;
+        if (MenuLoadRecent.Items.Count > 0)
+            MenuLoadRecent.Items.Add(new Separator());
+        var folderLabels = AnimationEditor.Core.Paths.RecentEntryLabels.Build(_appSettings.RecentProjectFolders);
+        for (int i = 0; i < _appSettings.RecentProjectFolders.Count; i++)
+        {
+            var folder = _appSettings.RecentProjectFolders[i];
+            var label = folderLabels[i];
+            var item = new MenuItem { Header = (label.Length > 0 ? label : folder).Replace("_", "__") };
+            ToolTip.SetTip(item, folder);
+            var captured = folder;
+            item.Click += async (_, _) => await OpenRecentProjectFolderAsync(captured);
+            MenuLoadRecent.Items.Add(item);
+        }
     }
 
+    private async Task OpenRecentProjectFolderAsync(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            ShowProblem($"Project folder not found: {folder}");
+            return;
+        }
+        await LoadAndPersistProjectFolderAsync(folder);
+    }
     // ── File menu handlers ────────────────────────────────────────────────────
 
     private void OnNewClick(object? sender, RoutedEventArgs e)
@@ -2944,19 +2971,27 @@ public partial class MainWindow : Window
     /// without the native folder picker, which headless tests can't drive.</summary>
     public async Task OpenProjectFolderForTestAsync(string path) => await LoadAndPersistProjectFolderAsync(path);
 
-    private async Task LoadAndPersistProjectFolderAsync(string path)
+    /// <summary>
+    /// The one way a folder becomes the loaded project folder (Open Project Folder, a recent-folder
+    /// click, the startup restore): scans it, then records it in <see cref="AppSettingsModel.RecentProjectFolders"/>
+    /// and <see cref="AppSettingsModel.LastProjectFolderPath"/>, saves settings and refreshes Open Recent.
+    /// <paramref name="selectSidebarTab"/> is false at startup, which leaves the sidebar as restored.
+    /// </summary>
+    private async Task LoadAndPersistProjectFolderAsync(string path, bool selectSidebarTab = true)
     {
         var achxCount = await LoadProjectFolderAsync(path);
 
         // #875 follow-up: an empty Project tab is a dead end. The Textures tab is immediately
         // useful in that case -- its Project scope (#875) lists the folder's PNGs without needing
         // any .achx open.
-        SidebarTabs.SelectedItem = achxCount == 0 ? FilesTab : ProjectTab;
+        if (selectSidebarTab)
+            SidebarTabs.SelectedItem = achxCount == 0 ? FilesTab : ProjectTab;
 
         // Immediate, not deferred to window Closed -- a debugger Stop or crash skips Closed
         // entirely (see TabSessionPersistenceTests / issue #439), so this must be safe there too.
-        _appSettings.LastProjectFolderPath = path;
+        _appSettings.AddProjectFolder(path);
         SaveSettingsFile();
+        RefreshRecentFiles();
     }
 
     /// <summary>
@@ -7369,6 +7404,7 @@ public partial class MainWindow : Window
         // Program.Main starts the read before Avalonia boots, so by now it is usually done.
         _appSettings = Services.StartupWarmup.TakeSettings(SettingsFilePath)
                        ?? SettingsPreload.Read(SettingsFilePath);
+        _appSettings.SeedRecentProjectFolders();
     }
 
     private void SaveSettingsFile()
