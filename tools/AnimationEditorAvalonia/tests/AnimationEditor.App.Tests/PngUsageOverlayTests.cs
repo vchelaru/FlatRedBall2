@@ -93,7 +93,7 @@ public class PngUsageOverlayTests
         {
             var pngPath = WriteRealPng(dir, "hero.png", 64, 64);
             WriteAchx(dir, "walk.achx", "Walk", "hero.png", left: 0, top: 0, right: 32, bottom: 16);
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
@@ -133,7 +133,7 @@ public class PngUsageOverlayTests
         {
             var pngPath = WriteRealPng(dir, "hero.png", 32, 16);
             WriteAchxTwoFrames(dir, "walk.achx", "Walk", "hero.png");
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
@@ -169,7 +169,7 @@ public class PngUsageOverlayTests
         {
             var pngPath = WriteRealPng(dir, "hero.png", 32, 32);
             WriteAchx(dir, "walk.achx", "Walk", "hero.png", left: 0, top: 0, right: 32, bottom: 32);
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
@@ -205,7 +205,7 @@ public class PngUsageOverlayTests
         {
             var pngPath = WriteRealPng(dir, "hero.png", 64, 64);
             WriteAchx(dir, "walk.achx", "Walk", "hero.png", left: 0, top: 0, right: 64, bottom: 64);
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();

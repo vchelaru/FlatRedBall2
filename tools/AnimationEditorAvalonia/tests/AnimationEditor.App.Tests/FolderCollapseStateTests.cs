@@ -58,7 +58,7 @@ public class FolderCollapseStateTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             window.ProjectPanel.TreeRoots.Single().IsExpanded = false;
 
@@ -85,7 +85,7 @@ public class FolderCollapseStateTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             window.FilesPanel.TreeRoots.Single().IsExpanded = false;
 
@@ -110,7 +110,7 @@ public class FolderCollapseStateTests
         var ctx = TestHelpers.BuildServices();
         var first = ctx.CreateMainWindow();
         first.Show();
-        await first.OpenProjectFolderForTestAsync(dir);
+        await ctx.OpenProjectFolderAsync(first, dir);
         Dispatcher.UIThread.RunJobs();
         first.ProjectPanel.TreeRoots.Single().IsExpanded = false;
         first.FilesPanel.TreeRoots.Single().IsExpanded = false;

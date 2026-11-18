@@ -22,6 +22,7 @@ internal sealed class ScriptedDialogs : IFileDialogService, IEditorDialogHost
     private readonly Queue<string?> _saveFiles = new();
     private readonly Queue<string?> _openFiles = new();
     private readonly Queue<string[]> _openFileSets = new();
+    private readonly Queue<string?> _folders = new();
 
     /// <summary>Every dialog the editor opened, in order, as "kind: title / message".</summary>
     public List<string> Shown { get; } = new();
@@ -44,6 +45,9 @@ internal sealed class ScriptedDialogs : IFileDialogService, IEditorDialogHost
 
     /// <summary>The paths picked in the next multi-file open dialog (the library's Add Source…); an empty list is Cancel.</summary>
     public void AnswerNextOpenFiles(params string[] paths) => _openFileSets.Enqueue(paths);
+
+    /// <summary>The folder picked in the next folder picker (Open Project Folder), or null for Cancel.</summary>
+    public void AnswerNextFolder(string? path) => _folders.Enqueue(path);
 
     /// <summary>
     /// Fills in the next dialog that opens through <see cref="IEditorDialogHost"/> (Adjust Frame
@@ -122,6 +126,9 @@ internal sealed class ScriptedDialogs : IFileDialogService, IEditorDialogHost
         OpenFilesFilters.AddRange(filters.Select(filter => $"{filter.Description}: {string.Join(" ", filter.Patterns)}"));
         return Task.FromResult<IReadOnlyList<string>>(Take(_openFileSets, $"open files: {title}"));
     }
+
+    public Task<string?> PickFolderAsync(string title) =>
+        Task.FromResult(Take(_folders, $"folder: {title}"));
 
     /// <summary>Fails when a dialog opened that the scenario had not answered.</summary>
     public void ThrowIfUnanswered()

@@ -50,7 +50,7 @@ public class SequenceTextureReloadScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string seqj = WriteFixture(editor);
         // The sources come from the Animations browser, so a project folder is open and its watcher sees the sheet change.
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await editor.OpenAsync(seqj);
         SpriteWidthOfFirstCell(editor).ShouldBe(TimelineLayout.FilmHeight, 1e-6);
 
@@ -67,7 +67,7 @@ public class SequenceTextureReloadScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string seqj = WriteFixture(editor);
         // The sources come from the Animations browser, so a project folder is open and its watcher sees the sheet change.
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await editor.OpenAsync(seqj);
         var before = ChipImageSize(editor);
         before.Width.ShouldBe(before.Height);

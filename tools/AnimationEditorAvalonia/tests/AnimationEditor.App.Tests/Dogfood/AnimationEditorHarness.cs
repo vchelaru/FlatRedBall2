@@ -232,6 +232,16 @@ internal sealed class AnimationEditorHarness : IDisposable
         Dialogs.ThrowIfUnanswered();
     }
 
+    /// <summary>Opens <paramref name="folder"/> (default <see cref="ProjectFolder"/>) through File &gt; Open Project Folder… with the folder picker answered.</summary>
+    public async Task OpenProjectFolderAsync(string? folder = null)
+    {
+        folder ??= ProjectFolder;
+        Dialogs.AnswerNextFolder(folder);
+        ClickMenu("MenuOpenProjectFolder");
+        await WaitUntilAsync(() => Services.ProjectManager.ProjectFolderPath == folder, TimeSpan.FromSeconds(5));
+        Layout();
+    }
+
     /// <summary>Opens <paramref name="path"/> as a PNG viewer tab, as a Files panel double-click does, and waits for it to load.</summary>
     public async Task OpenPngTabAsync(string path)
     {
@@ -535,10 +545,6 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <summary>Clicks <paramref name="item"/> the same way, for menu items built in code (recent files).</summary>
     public void ClickMenu(MenuItem item)
     {
-        if (!item.IsEnabled)
-        {
-            throw new InvalidOperationException($"{item.Header} is disabled.");
-        }
         List<MenuItem> ancestors = new List<MenuItem>();
         for (MenuItem? parent = item.Parent as MenuItem; parent != null; parent = parent.Parent as MenuItem)
         {
@@ -555,6 +561,15 @@ internal sealed class AnimationEditorHarness : IDisposable
                 ancestor.IsSubMenuOpen = true;
                 Layout();
             }
+        }
+        // Checked with the menus open, as a user sees it: some items refresh their enabled state when their menu opens.
+        if (!item.IsEnabled)
+        {
+            foreach (MenuItem ancestor in ancestors)
+            {
+                ancestor.IsSubMenuOpen = false;
+            }
+            throw new InvalidOperationException($"{item.Header} is disabled.");
         }
         if (item.IsEffectivelyVisible && item.Bounds.Width > 0)
         {

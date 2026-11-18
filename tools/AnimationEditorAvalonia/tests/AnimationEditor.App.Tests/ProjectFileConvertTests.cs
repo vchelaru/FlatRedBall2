@@ -54,7 +54,7 @@ public class ProjectFileConvertTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(false);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
@@ -77,7 +77,7 @@ public class ProjectFileConvertTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
@@ -103,7 +103,7 @@ public class ProjectFileConvertTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
@@ -128,7 +128,7 @@ public class ProjectFileConvertTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             await window.OpenFileAsTab(achx);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = _ => null;
@@ -152,7 +152,7 @@ public class ProjectFileConvertTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };

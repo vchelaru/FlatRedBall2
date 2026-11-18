@@ -198,7 +198,7 @@ public class NavigationGlobalHistoryScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         editor.WriteAchx("enemy.achx", AnimationEditorHarness.Chain("Bite", "sheet.png", (0, 0, 16, 16)));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         var panel = editor.Control<ProjectPanelControl>("ProjectPanel");
         editor.Click(PanelsScenarioTests.RowFor(editor, panel, "hero.achx"));

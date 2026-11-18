@@ -271,10 +271,8 @@ Seen and left alone:
 
 - `TextureCombo` and its "Texture:" label are hidden in the toolbar (`IsVisible="False"`); the
   handler still retargets selected frames. A vestigial control, worth deleting or restoring.
-- `MainWindow.OpenProjectFolderForTestAsync` (and `HandleDeleteForTest`, plus a few `*ForTest`
-  internals in Views) predate this branch and are on `main`. Open Project Folder calls the OS
-  folder picker directly, so the Project-panel scenarios go through that hook. A `PickFolderAsync`
-  on `IFileDialogService` would let it go; 31 test call sites use it today.
+- `MainWindow.HandleDeleteForTest`, plus a few `*ForTest` internals in Views, predate this branch
+  and are on `main`.
 - The fourth-pass note about an empty chain's first frame is closed: beside a textured chain the
   new frame takes the texture the canvas is showing.
 
@@ -345,7 +343,7 @@ knows where to look. Add to it whenever a scenario has to route around something
 | Smooth zoom, selection reveal, toast auto-hide, playback cadence | Timers tick only while the test awaits; no 60 fps loop | Wheel-zoom feel, reveal animation, toast racing a click on its button |
 | Anything drawn | `UseHeadlessDrawing = true`: no pixels; nothing here asserts on rendering | Handles, overlapping-frame highlight, onion skin, guides, grid, PNG diff view, timeline thumbnails, theme colours |
 | Tree drag-and-drop reorder (chains, frames), tab reorder by drag | Avalonia `DragDrop` needs a platform drag source | Drag rows above/below/into, drag tabs, drop a PNG from Explorer onto the wireframe and onto the tree |
-| Native dialogs: File > Load, Open Project Folder, the inspector's Browse… for a texture, About, Settings | Load, the folder picker and Browse… call `StorageProvider` directly (the Project-panel scenarios use the pre-existing `OpenProjectFolderForTestAsync` hook instead); the others build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`; Export to PixiJS and Associate Tiled Tileset go through `IFileDialogService` and are scripted too) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
+| Native dialogs: About, Settings | They build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`; File > Load, Open Project Folder, texture Browse…, Export to PixiJS and Associate Tiled Tileset go through `IFileDialogService` and are scripted too) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
 | Clipboard with other apps, file association, single-instance handoff, Velopack update, crash recovery on next launch | Stubbed or process-level | Paste from another editor instance, double-click an `.achx` in Explorer with the editor open, kill and relaunch |
 | DPI scaling, multi-monitor, window restore position, macOS Dock/menu | Platform | Move between monitors with different scaling, restart |
 | Cursor changes (add-frame cursor on Ctrl-hover, handle cursors, hand over tabs) | Cursor is set but never observed | Hover every handle and the tabs with and without Ctrl |
@@ -380,9 +378,11 @@ knows where to look. Add to it whenever a scenario has to route around something
 - **In memory the coordinates are UV.** A pixel-coordinate `.achx` (what `WriteAchx` writes)
   loads as 0..1 UV and converts back on save; `PixelRectOf` does the arithmetic against the
   wireframe's bitmap size.
-- **File > Load cannot be scripted.** `MainWindow.LoadAsync` calls `StorageProvider` directly
-  rather than `IFileDialogService`, so Ctrl+O opens nothing headlessly. Open files with
-  `OpenAsync`; Save As, File > New and the close-tab prompt do go through the seams.
+- **A dialog that bypasses the seams is a missing seam, not a harness limit.** File > Load (Ctrl+O),
+  Open Project Folder and the inspector's texture Browse… go through `IFileDialogService`, answered
+  with `AnswerNextOpenFile` / `AnswerNextFolder` (`OpenProjectFolderAsync` does both steps). A path
+  that calls `StorageProvider` or `ShowDialog` directly gets routed through `IFileDialogService` or
+  `IEditorDialogHost` in the PR that tests it.
 - **The sidebar tabs replace each other.** Clicking the History tab hides the inspector, so
   `TypeNumber` / `TypeFlanker` throw with "not visible" until the Inspector tab is clicked again.
 - **The window's constructor wires the production dialogs**, replacing anything assigned to

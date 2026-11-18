@@ -35,7 +35,7 @@ public class NewAnimationFileTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("Sprites", "Enemy.achj"));
 
@@ -56,7 +56,7 @@ public class NewAnimationFileTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("Bosses", "Boss.seqj"));
 
@@ -79,7 +79,7 @@ public class NewAnimationFileTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("", "Boss.seqj"));
 
@@ -102,7 +102,7 @@ public class NewAnimationFileTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             await window.CreateNewAnimationFileAsync(new NewAnimationFileRequest("", "Enemy.achj"));
 

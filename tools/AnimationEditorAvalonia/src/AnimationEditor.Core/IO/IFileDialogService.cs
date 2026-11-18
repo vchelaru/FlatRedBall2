@@ -57,4 +57,10 @@ public interface IFileDialogService
     /// </summary>
     Task<IReadOnlyList<string>> PickOpenFilesAsync(string title, IReadOnlyList<OpenFileFilter> filters) =>
         Task.FromResult<IReadOnlyList<string>>(System.Array.Empty<string>());
+
+    /// <summary>
+    /// Show a folder picker. Returns the chosen folder's path, or <c>null</c> if cancelled (the default, so a test double
+    /// that never picks a folder need not implement it).
+    /// </summary>
+    Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(null);
 }

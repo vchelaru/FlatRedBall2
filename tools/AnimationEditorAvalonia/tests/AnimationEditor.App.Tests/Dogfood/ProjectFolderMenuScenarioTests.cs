@@ -33,7 +33,7 @@ public class ProjectFolderMenuScenarioTests
         Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "Props"));
         editor.WriteAchx("Sprites/Enemies/hero.achx", AnimationEditorHarness.Chain("Walk", "../../sheet.png", (0, 0, 16, 16)));
         editor.WriteSeqj("Props/boss.seqj", "Sequence");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         return (editor.Control<ProjectPanelControl>("ProjectPanel"),
             Path.Combine(editor.ProjectFolder, "Sprites"), Path.Combine(editor.ProjectFolder, "Props"));
@@ -115,7 +115,7 @@ public class ProjectFolderMenuScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (panel, _, props) = await OpenTwoFolderProjectAsync(editor);
         File.Copy(Path.Combine(props, "boss.seqj"), Path.Combine(props, "NewSequence.seqj"));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
 
         RightClickFolderRow(editor, panel, "Props");

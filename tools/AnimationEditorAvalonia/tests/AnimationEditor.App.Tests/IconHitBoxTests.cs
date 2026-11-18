@@ -34,7 +34,7 @@ public class IconHitBoxTests
         editor.WritePng("sheet.png", 64, 64);
         Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "enemies"));
         editor.WriteAchx(Path.Combine("enemies", "bat.achx"), AnimationEditorHarness.Chain("Fly", "../sheet.png", (0, 0, 16, 16)));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         return editor;
     }

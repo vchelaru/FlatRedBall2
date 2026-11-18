@@ -39,8 +39,14 @@ public class TextureCopyScenarioTests : IDisposable
         editor.ClickRow(walk.Frames[0]);
         List<string> offered = new List<string>();
         editor.Dialogs.AnswerNextEditorDialog(content => ClickButton(content, "Use the existing", offered));
+        editor.Dialogs.AnswerNextOpenFile(outside);
 
-        await editor.Window.ApplyPickedTextureAsync(outside);
+        Button browse = editor.Control<Button>("PropTextureBrowseBtn");
+        // The inspector scrolls, and without this the click on the texture row's button does not land.
+        browse.BringIntoView();
+        editor.Layout();
+        editor.Click(browse);
+        await editor.WaitUntilAsync(() => walk.Frames[0].TextureName == "hero.png", TimeSpan.FromSeconds(5));
 
         offered.Count.ShouldBe(3, "a same-named, different file offers keep, overwrite and use-existing");
         walk.Frames[0].TextureName.ShouldBe("hero.png");

@@ -19,12 +19,41 @@ namespace AnimationEditor.App.Tests.Dogfood;
 public class PanelsScenarioTests
 {
     [AvaloniaFact]
+    public void OpenProjectFolder_PickedFolder_ShowsItsFilesInTheProjectPanel()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        editor.Dialogs.AnswerNextFolder(editor.ProjectFolder);
+
+        editor.ClickMenu("MenuOpenProjectFolder");
+
+        editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.Select(node => node.Name).ShouldBe(new[] { "hero.achx" });
+        editor.Services.ProjectManager.ProjectFolderPath.ShouldBe(editor.ProjectFolder);
+        editor.Dialogs.Shown.ShouldBe(new[] { "folder: Open Project Folder" });
+    }
+
+    [AvaloniaFact]
+    public void OpenProjectFolder_Cancelled_ChangesNothing()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        editor.Dialogs.AnswerNextFolder(null);
+
+        editor.ClickMenu("MenuOpenProjectFolder");
+
+        editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.ShouldBeEmpty();
+        editor.Services.ProjectManager.ProjectFolderPath.ShouldBeNull();
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public async Task CloseProject_ClearsTheTabsAndThePanel()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, "hero.achx"));
         editor.Tabs.Tabs.Count.ShouldBe(1);
@@ -56,7 +85,7 @@ public class PanelsScenarioTests
             string outside = Path.Combine(outsideFolder, "villain.achx");
             File.Move(editor.WriteAchx("villain.achx", AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16))), outside);
 
-            await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+            await editor.OpenProjectFolderAsync();
             editor.Layout();
             await editor.OpenAsync(outsideTabIsActive ? inside : outside);
             await editor.OpenAsync(outsideTabIsActive ? outside : inside);
@@ -142,7 +171,7 @@ public class PanelsScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         editor.WriteAchx("enemy.achx", AnimationEditorHarness.Chain("Bite", "sheet.png", (0, 0, 16, 16)));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
         panel.TreeRoots.Select(node => node.Name).ShouldBe(new[] { "enemy.achx", "hero.achx" }, ignoreOrder: true);
@@ -174,7 +203,7 @@ public class PanelsScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
         editor.Click(RowFor(editor, panel, "hero.achx"));
@@ -195,7 +224,7 @@ public class PanelsScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         string original = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         string copy = Path.Combine(editor.ProjectFolder, "hero2.achx");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
 

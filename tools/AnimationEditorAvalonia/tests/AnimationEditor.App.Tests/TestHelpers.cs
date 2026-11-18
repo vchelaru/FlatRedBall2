@@ -106,6 +106,41 @@ internal sealed class TestServices
         return window;
     }
 
+    /// <summary>
+    /// Opens <paramref name="folder"/> on <paramref name="window"/> through File &gt; Open Project Folder…, with the folder
+    /// picker answered, and waits for the scan to land in the Project panel.
+    /// </summary>
+    public async Task OpenProjectFolderAsync(MainWindow window, string folder)
+    {
+        var previous = AppCommands.FileDialogService;
+        AppCommands.FileDialogService = new FolderPickerAnswer(folder);
+        try
+        {
+            // The click handler asks for the folder before its first await, so the answer can be taken down right after.
+            Avalonia.Controls.ControlExtensions.FindControl<Avalonia.Controls.MenuItem>(window, "MenuOpenProjectFolder")!
+                .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.MenuItem.ClickEvent));
+        }
+        finally
+        {
+            AppCommands.FileDialogService = previous;
+        }
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        while (ProjectManager.ProjectFolderPath != folder && stopwatch.Elapsed < System.TimeSpan.FromSeconds(5))
+            await Task.Delay(10);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+    }
+
+    private sealed class FolderPickerAnswer(string folder) : IFileDialogService
+    {
+        public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(folder);
+
+        public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices) =>
+            throw new System.InvalidOperationException("Only the folder picker is answered.");
+
+        public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription) =>
+            throw new System.InvalidOperationException("Only the folder picker is answered.");
+    }
+
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {
         var ctrl = new WireframeControl();

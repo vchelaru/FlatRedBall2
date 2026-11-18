@@ -13,6 +13,38 @@ namespace AnimationEditor.App.Tests.Dogfood;
 public class TabScenarioTests
 {
     [AvaloniaFact]
+    public async Task FileOpen_CtrlO_OpensThePickedFileAsATab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        editor.Dialogs.AnswerNextOpenFile(hero);
+
+        editor.Press(Key.O, RawInputModifiers.Control);
+        await editor.WaitUntilAsync(() => editor.TabLabels.Contains("hero.achx"), TimeSpan.FromSeconds(5));
+
+        editor.TabLabels.ShouldContain("hero.achx");
+        editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("hero.achx");
+        editor.Nodes.Select(node => node.Header).ShouldContain("Walk");
+        editor.Dialogs.OpenFileFiltersOffered.ShouldContain("All Supported Files: *.achx *.achj *.tsx *.seqj");
+    }
+
+    [AvaloniaFact]
+    public void FileOpen_Cancelled_ChangesNothing()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        List<string> tabsBefore = editor.TabLabels;
+        editor.Dialogs.AnswerNextOpenFile(null);
+
+        editor.ClickMenu("MenuLoad");
+
+        editor.Dialogs.Shown.ShouldBe(new[] { "open file: Open Animation Chain" });
+        editor.TabLabels.ShouldBe(tabsBefore);
+        editor.Services.ProjectManager.FileName.ShouldBeNull();
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public async Task ClickingTheOtherTab_SwitchesTheTreeAndTheTitle()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

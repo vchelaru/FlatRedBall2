@@ -24,7 +24,7 @@ public class ProjectTabShowAllFoldersTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             window.ProjectPanel.TreeRoots.ShouldBeEmpty();
 
             window.ProjectPanel.ShowAllFoldersCheck.IsChecked = true;
