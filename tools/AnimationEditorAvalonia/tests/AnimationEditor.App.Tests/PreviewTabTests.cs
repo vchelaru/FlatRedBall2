@@ -43,7 +43,7 @@ public class PreviewTabTests
         var ctx = TestHelpers.BuildServices();
         var window = ctx.CreateMainWindow();
         window.Show();
-        await window.OpenProjectFolderForTestAsync(dir);
+        await ctx.OpenProjectFolderAsync(window, dir);
         Dispatcher.UIThread.RunJobs();
         return (window, dir);
     }

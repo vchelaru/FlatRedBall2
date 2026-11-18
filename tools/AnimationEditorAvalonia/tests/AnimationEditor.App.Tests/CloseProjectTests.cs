@@ -47,14 +47,14 @@ public class CloseProjectTests
 
     // Opens a project folder holding hero.achx and opens that file as a tab, so the tab is
     // "in the project" the way a file clicked from the Project panel is.
-    private static async Task<string> OpenProjectFolderWithOpenTabAsync(MainWindow window, string dir)
+    private static async Task<string> OpenProjectFolderWithOpenTabAsync(TestServices ctx, MainWindow window, string dir)
     {
         var heroPath = Path.Combine(dir, "hero.achx");
         var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         list.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
         list.Save(heroPath);
 
-        await window.OpenProjectFolderForTestAsync(dir);
+        await ctx.OpenProjectFolderAsync(window, dir);
         await window.OpenFileAsTab(heroPath);
         Dispatcher.UIThread.RunJobs();
         return heroPath;
@@ -74,7 +74,7 @@ public class CloseProjectTests
         var dir = NewTempDir();
         try
         {
-            await OpenProjectFolderWithOpenTabAsync(window, dir);
+            await OpenProjectFolderWithOpenTabAsync(ctx, window, dir);
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
@@ -115,7 +115,7 @@ public class CloseProjectTests
         {
             Assert.False(IsCloseProjectEnabledAfterOpeningFileMenu(window));
 
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Assert.True(IsCloseProjectEnabledAfterOpeningFileMenu(window));
 
             window.CloseProjectFolder();
@@ -135,7 +135,7 @@ public class CloseProjectTests
         var dir = NewTempDir();
         try
         {
-            await OpenProjectFolderWithOpenTabAsync(window, dir);
+            await OpenProjectFolderWithOpenTabAsync(ctx, window, dir);
             var tabManager = GetTabManager(window);
             Assert.NotEmpty(tabManager.Tabs);
 
@@ -162,7 +162,7 @@ public class CloseProjectTests
         {
             new AnimationChainListSave().Save(Path.Combine(dir, "hero.achx"));
 
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             Assert.NotEmpty(window.ProjectPanel.TreeRoots);
 

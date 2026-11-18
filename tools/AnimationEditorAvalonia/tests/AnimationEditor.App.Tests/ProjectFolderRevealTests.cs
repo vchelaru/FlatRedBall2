@@ -41,7 +41,7 @@ public class ProjectFolderRevealTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             Assert.Equal(dir, window.ResolveProjectFolderAbsolutePath(string.Empty));
         }
@@ -58,7 +58,7 @@ public class ProjectFolderRevealTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
 
             var expected = Path.Combine(dir, "Sprites", "Enemies");
             Assert.Equal(expected, window.ResolveProjectFolderAbsolutePath("Sprites/Enemies"));

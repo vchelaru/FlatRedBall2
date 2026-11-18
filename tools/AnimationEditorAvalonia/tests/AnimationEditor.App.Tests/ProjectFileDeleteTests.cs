@@ -56,7 +56,7 @@ public class ProjectFileDeleteTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(false);
             string? recycledPath = null;
             window.DeleteToRecycleBin = path => { recycledPath = path; return null; };
@@ -81,7 +81,7 @@ public class ProjectFileDeleteTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             string? recycledPath = null;
             window.DeleteToRecycleBin = path => { recycledPath = path; return null; };
@@ -106,7 +106,7 @@ public class ProjectFileDeleteTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             await window.OpenFileAsTab(achx);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = _ => null;
@@ -132,7 +132,7 @@ public class ProjectFileDeleteTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             await window.OpenFileAsTab(achx);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = _ => "Could not move to recycle bin: access denied.";
@@ -157,7 +157,7 @@ public class ProjectFileDeleteTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = _ => "Could not move to recycle bin: access denied.";
 

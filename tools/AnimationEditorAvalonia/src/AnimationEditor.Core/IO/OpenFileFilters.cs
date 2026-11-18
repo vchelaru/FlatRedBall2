@@ -25,4 +25,11 @@ public static class OpenFileFilters
         new OpenFileFilter("Tiled Tileset", new[] { "*.tsx" }),
         new OpenFileFilter("Sequence", new[] { "*.seqj" }),
     };
+
+    /// <summary>The inspector's texture Browse….</summary>
+    public static IReadOnlyList<OpenFileFilter> Textures { get; } = new[]
+    {
+        new OpenFileFilter("Images", new[] { "*.png", "*.bmp", "*.gif", "*.jpg", "*.jpeg" }),
+        new OpenFileFilter("All Files", new[] { "*.*" }),
+    };
 }

@@ -46,7 +46,9 @@ encodes, so do not rediscover them: hit-testing needs a render tick after layout
 (`AvaloniaHeadlessPlatform.ForceRenderTimerTick`), `DispatcherTimer`s tick only while the test
 awaits (`WaitAsync`, never `Thread.Sleep`+`RunJobs`), text labels are not hit-testable so a
 label-only double-tap is unreachable, file-backed documents auto-save so only Untitled tabs and tabs whose last save failed
-(`MakeUnwritable`) prompt on close, and File > Load bypasses `IFileDialogService` so it cannot be scripted.
+(`MakeUnwritable`) prompt on close.
+
+A UI path that calls `StorageProvider` or `ShowDialog` directly (About and Settings today) is a missing seam, not a limit of the harness. Route it through `IFileDialogService` or `IEditorDialogHost` in the same PR as its test, so the test fakes the dialog's answer.
 
 ## `[AvaloniaFact]` is a last resort
 

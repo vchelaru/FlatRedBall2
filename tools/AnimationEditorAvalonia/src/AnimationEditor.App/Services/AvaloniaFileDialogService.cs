@@ -76,4 +76,14 @@ internal sealed class AvaloniaFileDialogService : IFileDialogService
         });
         return files.Select(file => file.Path.LocalPath).ToList();
     }
+
+    public async Task<string?> PickFolderAsync(string title)
+    {
+        var folders = await _owner.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+        });
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
 }

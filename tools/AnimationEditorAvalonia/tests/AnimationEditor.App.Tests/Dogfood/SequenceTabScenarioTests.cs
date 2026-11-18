@@ -226,7 +226,7 @@ public class SequenceTabScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         editor.WriteSeqj("boss.seqj", "Idle");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         var panel = editor.Control<AnimationEditor.Views.Controls.ProjectPanelControl>("ProjectPanel");
         panel.TreeRoots.Select(node => node.Name).ShouldBe(new[] { "boss.seqj", "hero.achx" }, ignoreOrder: true);

@@ -52,7 +52,7 @@ public class ProjectFolderPersistenceTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
 
             var settings = ReadPersistedSettings(ctx);
@@ -87,7 +87,7 @@ public class ProjectFolderPersistenceTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             await window.ProjectPanel.ThumbnailLoadTask;
 
@@ -134,7 +134,7 @@ public class ProjectFolderPersistenceTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             await window.ProjectPanel.ThumbnailLoadTask;
             var beforeEdit = window.ProjectPanel.TreeRoots[0].Thumbnail;
@@ -216,7 +216,7 @@ public class ProjectFolderPersistenceTests
         {
             window.Show();
             Dispatcher.UIThread.RunJobs();
-            await window.OpenProjectFolderForTestAsync(b);
+            await ctx.OpenProjectFolderAsync(window, b);
             Dispatcher.UIThread.RunJobs();
 
             var settings = ReadPersistedSettings(ctx);

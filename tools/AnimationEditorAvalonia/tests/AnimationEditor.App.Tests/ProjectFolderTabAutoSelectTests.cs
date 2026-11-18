@@ -32,7 +32,7 @@ public class ProjectFolderTabAutoSelectTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
 
             var tabs = window.FindControl<TabControl>("SidebarTabs");
@@ -57,7 +57,7 @@ public class ProjectFolderTabAutoSelectTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
 
             var tabs = window.FindControl<TabControl>("SidebarTabs");

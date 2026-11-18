@@ -135,7 +135,7 @@ public class SequenceLibraryScenarioTests
         editor.WritePng("sheet.png", 64, 64);
         editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
         string boss = WriteSeqj(editor);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await editor.OpenAsync(boss);
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
 

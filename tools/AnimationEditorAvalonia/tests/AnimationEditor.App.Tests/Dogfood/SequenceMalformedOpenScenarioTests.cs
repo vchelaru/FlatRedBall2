@@ -76,7 +76,7 @@ public class SequenceMalformedOpenScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         WriteMalformed(editor);
         editor.WriteSeqj("good.seqj", "Idle");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         var panel = editor.Control<ProjectPanelControl>("ProjectPanel");
 
@@ -96,7 +96,7 @@ public class SequenceMalformedOpenScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         WriteMalformed(editor);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Layout();
         var panel = editor.Control<ProjectPanelControl>("ProjectPanel");
 

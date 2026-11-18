@@ -310,7 +310,7 @@ public class SweepScenarioTests
         string png = editor.WritePng("sheet.png", 64, 64);
         string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
         await editor.OpenAsync(path);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         editor.Window.OpenPngAsTab(png);
         await editor.Window.WhenPngTabLoaded();
         editor.Layout();

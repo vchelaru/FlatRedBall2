@@ -42,7 +42,7 @@ public class ActiveFolderLabelTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
 
             var label = window.FindControl<TextBlock>("ActiveFolderLabel");

@@ -69,7 +69,7 @@ public class ProjectFolderExternalWatchTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             Assert.Single(window.ProjectPanel.TreeRoots);
 
@@ -99,7 +99,7 @@ public class ProjectFolderExternalWatchTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             Assert.Single(window.ProjectPanel.TreeRoots);
 
@@ -131,7 +131,7 @@ public class ProjectFolderExternalWatchTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             await window.ProjectPanel.ThumbnailLoadTask;
             var beforeEdit = window.ProjectPanel.TreeRoots[0].Thumbnail;

@@ -37,7 +37,7 @@ public class ProjectFolderFilesPanelScopeTests
         window.Show();
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
 
             Assert.Single(window.FilesPanel.TreeRoots);

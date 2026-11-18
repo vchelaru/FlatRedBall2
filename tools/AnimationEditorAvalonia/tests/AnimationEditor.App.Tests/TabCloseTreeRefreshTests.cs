@@ -119,7 +119,7 @@ public class TabCloseTreeRefreshTests
         window.ShowSaveDiscardCancelDialogAsync = (_, _) => Task.FromResult(SaveDiscardCancelChoice.Discard);
         try
         {
-            await window.OpenProjectFolderForTestAsync(dir);
+            await ctx.OpenProjectFolderAsync(window, dir);
             Dispatcher.UIThread.RunJobs();
             await window.ProjectPanel.ThumbnailLoadTask;
 

@@ -2875,17 +2875,9 @@ public partial class MainWindow : Window
 
     private async Task LoadAsync()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Open Animation Chain",
-            AllowMultiple = false,
-            FileTypeFilter = OpenFileFilters.AnimationFiles
-                .Select(f => new FilePickerFileType(f.Description) { Patterns = f.Patterns.ToArray() })
-                .ToArray()
-        });
-
-        if (files.Count > 0)
-            await LoadAnimationFileAsync(files[0].Path.LocalPath);
+        var path = await _appCommands.FileDialogService.PickOpenFileAsync("Open Animation Chain", OpenFileFilters.AnimationFiles);
+        if (path is not null)
+            await LoadAnimationFileAsync(path);
     }
 
     private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
@@ -2956,19 +2948,11 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task OpenProjectFolderAsync()
     {
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Open Project Folder",
-            AllowMultiple = false,
-        });
-        if (folders.Count == 0 || folders[0].Path.LocalPath is not { } path) return;
+        var path = await _appCommands.FileDialogService.PickFolderAsync("Open Project Folder");
+        if (string.IsNullOrEmpty(path)) return;
 
         await LoadAndPersistProjectFolderAsync(path);
     }
-
-    /// <summary>Test seam: exercises the same load+persist path as <see cref="OpenProjectFolderAsync"/>
-    /// without the native folder picker, which headless tests can't drive.</summary>
-    public async Task OpenProjectFolderForTestAsync(string path) => await LoadAndPersistProjectFolderAsync(path);
 
     /// <summary>
     /// The one way a folder becomes the loaded project folder (Open Project Folder, a recent-folder
@@ -3025,7 +3009,7 @@ public partial class MainWindow : Window
     /// reflected there at all before this). No-op for a file outside the scanned folder, or when
     /// the Project tab has never been populated. Internal (not private) and returns
     /// <see cref="Task"/> so tests can await the full save-&gt;invalidate-&gt;regenerate pipeline
-    /// deterministically, same seam pattern as <see cref="OpenProjectFolderForTestAsync"/>.
+    /// deterministically.
     /// </summary>
     internal Task InvalidateProjectPanelThumbnailIfTrackedAsync(string? savedPath)
     {
@@ -5954,18 +5938,7 @@ public partial class MainWindow : Window
 
     private async Task BrowseForFrameTexture()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Select Texture",
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("Images") { Patterns = new[] { "*.png", "*.bmp", "*.gif", "*.jpg", "*.jpeg" } },
-                new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
-            }
-        });
-
-        var pickedPath = files?.FirstOrDefault()?.TryGetLocalPath();
+        var pickedPath = await _appCommands.FileDialogService.PickOpenFileAsync("Select Texture", OpenFileFilters.Textures);
         if (string.IsNullOrEmpty(pickedPath)) return;
 
         await ApplyPickedTextureAsync(pickedPath);
@@ -5973,8 +5946,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Dialog-free core of <see cref="BrowseForFrameTexture"/>: applies <paramref name="pickedPath"/>
-    /// as the texture for every currently selected frame. Split out so tests can drive it directly
-    /// without going through the real OS file picker.
+    /// as the texture for every currently selected frame.
     /// </summary>
     internal async Task ApplyPickedTextureAsync(string pickedPath)
     {

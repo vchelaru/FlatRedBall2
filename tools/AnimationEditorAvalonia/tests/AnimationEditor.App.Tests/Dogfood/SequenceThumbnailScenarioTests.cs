@@ -73,7 +73,7 @@ public class SequenceThumbnailScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         WriteFixture(editor);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         var panel = Panel(editor);
         await panel.ThumbnailLoadTask;
 
@@ -96,7 +96,7 @@ public class SequenceThumbnailScenarioTests
         wrap.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Hero" } });
         save.Sequences.Insert(0, wrap);
         save.Save(boss);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await Panel(editor).ThumbnailLoadTask;
 
         Node(Panel(editor), "boss.seqj").Thumbnail.ShouldNotBeNull("the first sequence only plays a reference");
@@ -110,7 +110,7 @@ public class SequenceThumbnailScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WriteSeqj("empty.seqj", "A");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await Panel(editor).ThumbnailLoadTask;
 
         var node = Node(Panel(editor), "empty.seqj");
@@ -123,7 +123,7 @@ public class SequenceThumbnailScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         WriteFixture(editor);
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await Panel(editor).ThumbnailLoadTask;
         var seqj = Node(Panel(editor), "boss.seqj");
         seqj.Thumbnail!.PixelSize.Height.ShouldBe(28);
@@ -140,7 +140,7 @@ public class SequenceThumbnailScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, "A");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await Panel(editor).ThumbnailLoadTask;
         await editor.OpenAsync(boss);
         var seqj = Node(Panel(editor), "boss.seqj");
@@ -195,7 +195,7 @@ public class SequenceThumbnailScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor, "A");
-        await editor.Window.OpenProjectFolderForTestAsync(editor.ProjectFolder);
+        await editor.OpenProjectFolderAsync();
         await editor.OpenAsync(boss);
         (await AllLoadedAsync(editor, "A")).ShouldBeTrue();
         ThumbnailOf(editor, "A")!.PixelSize.Height.ShouldBe(56);
