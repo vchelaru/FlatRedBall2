@@ -35,6 +35,46 @@ public class UntitledScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task FileNew_AddChainAndFrames_SaveThenCloseAndReopen_ShowsTheSameDocument()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.Dialogs.AnswerNextSaveFile(null);
+        editor.ClickMenu("MenuNew");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.Click(editor.Control<Button>("AddChainBtn"));
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        editor.Type("Idle");
+        editor.Press(Key.Enter);
+        AnimationChainSave idle = editor.ChainNamed("Idle");
+        editor.ClickRow(idle);
+        editor.Click(editor.RowButton(idle, "Add Frame"));
+        editor.Click(editor.RowButton(idle, "Add Frame"));
+        editor.Click(editor.RowButton(idle, "Add Frame"));
+        editor.ClickRow(idle.Frames[2]);
+        editor.TypeFlanker("PropFrameLen", "0.5");
+        string target = Path.Combine(editor.ProjectFolder, "idle.achx");
+        editor.Dialogs.AnswerNextSaveFile(target);
+        editor.Press(Key.S, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+        editor.ThrowIfErrorShown();
+        int dialogsBeforeClose = editor.Dialogs.Shown.Count;
+
+        editor.CloseTab("idle.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.Dialogs.Shown.Count.ShouldBe(dialogsBeforeClose, "a saved document closes without asking");
+        await editor.OpenAsync(target);
+
+        editor.TabLabels.ShouldContain("idle.achx");
+        editor.VisibleChainHeaders.ShouldBe(new[] { "Idle" });
+        AnimationChainSave reopened = editor.ChainNamed("Idle");
+        reopened.Frames.Count.ShouldBe(3);
+        reopened.Frames.Select(frame => frame.FrameLength).ShouldBe(new[] { idle.Frames[0].FrameLength, idle.Frames[1].FrameLength, 0.5f });
+        editor.Expand(reopened);
+        editor.Nodes.Select(node => node.Header).ShouldContain("Frame 3");
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public void FreshEditor_CtrlS_ThenCancel_StaysUntitledWithoutAnError()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

@@ -229,6 +229,29 @@ public class EditingScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task RecentFilesMenu_ReopensAFileWhoseTabWasClosed()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string enemy = editor.WriteAchx("enemy.achx", AnimationEditorHarness.Chain("Bite", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        await editor.OpenAsync(enemy);
+        editor.CloseTab("hero.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.TabLabels.ShouldBe(new[] { "enemy.achx" });
+        MenuItem recent = editor.Control<MenuItem>("MenuLoadRecent");
+
+        editor.ClickMenu(recent.Items.OfType<MenuItem>().Single(item => (string)item.Header! == "hero.achx"));
+        editor.WaitUntil(() => editor.Tabs.Tabs.Count == 2, TimeSpan.FromSeconds(3));
+
+        editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("hero.achx");
+        editor.TabLabels.ShouldBe(new[] { "enemy.achx", "hero.achx" }, ignoreOrder: true);
+        editor.VisibleChainHeaders.ShouldBe(new[] { "Walk" });
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public async Task RelativeXField_MovesTheFrameOffset_AndSaves()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
