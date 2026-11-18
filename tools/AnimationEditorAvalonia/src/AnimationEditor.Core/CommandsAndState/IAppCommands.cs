@@ -371,7 +371,6 @@ namespace AnimationEditor.Core.CommandsAndState
         void ScaleFrameTimesProportional(AnimationChainSave chain, float targetTotalDuration);
         void ScaleFrameTimesSetAllSame(AnimationChainSave chain, float targetTotalDuration);
         bool AddMultipleFrames(AnimationChainSave chain, int count, bool incrementUV);
-        List<AnimationFrameSave> AdjustUVAfterResize(string absoluteTextureFilePath, int oldWidth, int oldHeight, int newWidth, int newHeight);
         void NewFile();
 
         /// <summary>

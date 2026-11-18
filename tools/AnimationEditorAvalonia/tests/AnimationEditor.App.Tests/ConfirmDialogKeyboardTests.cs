@@ -141,7 +141,7 @@ public class ConfirmDialogKeyboardTests
         dialog.Close();
     }
 
-    // The Adjust Offsets / Resize Texture / Adjust Frame Time dialogs contain
+    // The Adjust Offsets / Adjust Frame Time dialogs contain
     // input controls (NumericUpDown) whose focused inner control can mark the
     // key event handled before it bubbles to the window — so Button.IsCancel
     // never fires. WireDialogKeyboard attaches at the window with

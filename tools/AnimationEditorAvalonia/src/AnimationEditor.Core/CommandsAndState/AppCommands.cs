@@ -2008,43 +2008,6 @@ namespace AnimationEditor.Core.CommandsAndState
             return result.ExceededTextureBounds;
         }
 
-        // ── IO15: Adjust UV after texture resize ──────────────────────────────
-
-        /// <summary>
-        /// Adjusts UV coordinates of every frame in the current ACLS that references
-        /// <paramref name="absoluteTextureFilePath"/> after it was resized from
-        /// (<paramref name="oldWidth"/> × <paramref name="oldHeight"/>) to
-        /// (<paramref name="newWidth"/> × <paramref name="newHeight"/>).
-        /// Returns the list of frames that were modified.
-        /// </summary>
-        public List<AnimationFrameSave> AdjustUVAfterResize(
-            string absoluteTextureFilePath,
-            int oldWidth, int oldHeight,
-            int newWidth, int newHeight)
-        {
-            var acls = _pm.AnimationChainListSave;
-            if (acls is null) return [];
-
-            var aclsDir = string.IsNullOrEmpty(_pm.FileName)
-                ? string.Empty
-                : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
-
-            // Snapshot every frame; the command compares before/after and only records
-            // when something actually changed, so an all-no-op resize leaves no entry.
-            var allFrames = acls.AnimationChains.SelectMany(c => c.Frames).ToList();
-            List<AnimationFrameSave> modified = [];
-
-            _undoManager.Execute(new BulkFrameEditCommand(
-                allFrames,
-                () => modified = TextureResizeAdjuster.AdjustAll(
-                    acls, aclsDir, absoluteTextureFilePath,
-                    oldWidth, oldHeight, newWidth, newHeight),
-                this, _events, refreshWireframe: true,
-                "Adjust UV After Resize"));
-
-            return modified;
-        }
-
         // ── IO11: File > New ──────────────────────────────────────────────────
 
         /// <summary>

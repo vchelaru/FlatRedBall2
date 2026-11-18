@@ -123,7 +123,6 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.ScaleFrameTimesProportional)]  = Category.MutatingUndoable,
         [nameof(IAppCommands.ScaleFrameTimesSetAllSame)]    = Category.MutatingUndoable,
         [nameof(IAppCommands.AddMultipleFrames)]            = Category.MutatingUndoable,
-        [nameof(IAppCommands.AdjustUVAfterResize)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrameFromPixelBounds)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameTextureName)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetAllFramesTextureName)]      = Category.MutatingUndoable,
@@ -387,8 +386,6 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.ScaleFrameTimesSetAllSame(Zebra(ctx), 3f)));
         yield return Row(nameof(IAppCommands.AddMultipleFrames),
             ctx => Sync(() => ctx.AppCommands.AddMultipleFrames(Zebra(ctx), 2, incrementUV: false)));
-        yield return Row(nameof(IAppCommands.AdjustUVAfterResize),
-            ctx => Sync(() => ctx.AppCommands.AdjustUVAfterResize("sheet.png", 64, 64, 128, 128)));
         yield return Row(nameof(IAppCommands.AddFrameFromPixelBounds),
             ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8, 64, 64)));
         yield return Row(nameof(IAppCommands.SetFrameTextureName),
