@@ -453,8 +453,6 @@
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
                         <MenuItem Header="Enable _Hot Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
                         <Separator />
-                        <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
-                        <Separator />
                         <MenuItem Header="_Associate Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
                         <Separator />
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />

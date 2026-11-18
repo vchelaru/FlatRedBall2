@@ -113,7 +113,6 @@
 | IO12 | Command-line file argument | On startup (`Window.Opened`), if `Environment.GetCommandLineArgs()[1]` is an existing `.achx` path it is loaded automatically, bypassing the file picker |
 | IO13 | Export current animation as GIF | **Old WinForms app only — not ported to the Avalonia app.** File > "Save current animation as GIF"; renders each frame's texture region into a `Bitmap` and encodes as an animated GIF using `AnimatedGifEncoder`; user picks save path via `SaveFileDialog` |
 | IO14 | Copy / paste objects | Edit > Copy / Ctrl+C serializes the selected chain(s), frame(s), rectangle, or circle to the system clipboard as a typed XML string (`List<AnimationChainSave>:...`); Paste / Ctrl+V deserializes and appends into the current context; supports chain-to-chain, frame-to-chain, and shape-to-frame paste |
-| IO15 | Resize texture | Edit > "Resize texture"; pads the selected frame's texture PNG to power-of-two dimensions; user chooses to replace the original file or save a renamed copy (`*Resize.png`); adjusts `Left/Right/Top/BottomCoordinate` on every frame across all chains that references the same texture file |
 
 ### 1.7 Application State
 
@@ -261,7 +260,6 @@
 | `FrameTimeScalerTests.cs` *(new)* | A17 (keep-proportional + set-all-same frame time scaling) |
 | `BatchFrameBuilderTests.cs` *(new)* | F12 (batch-add UV increment math) |
 | `ClipboardPayloadTests.cs` *(new)* | IO14 (XML clipboard serialization / deserialization) |
-| `TextureResizeAdjusterTests.cs` *(new)* | IO15 (UV coordinate adjustment after texture resize) |
 | `SpriteAlignmentOffsetCalculatorTests.cs` *(new)* | PL11 (sprite alignment offset math) |
 | `OffsetMultiplierConverterTests.cs` *(new)* | PL12 (offset multiplier round-trip math) |
 | `AppCommandsNewFileTests.cs` *(new)* | IO11 (`AppCommands.NewFile()` — fresh ACLS, clear state, fire events) |
@@ -280,7 +278,7 @@
 | Shape Management | 13 | 11 | 2 (S10–S11: property editor UI) |
 | Selection State | 8 | 8 | 0 |
 | Object Lookup | 3 | 3 | 0 |
-| File I/O | 15 | 14 | 1 (IO13: GIF export — **not implemented in the Avalonia app** (WinForms-only, never ported); would be untestable via unit tests regardless since it requires bitmap rendering. IO11 `NewFile()` + IO12 `CommandLineArgParser` + IO14 serialization + IO15 UV-adjust now all covered) |
+| File I/O | 14 | 13 | 1 (IO13: GIF export — **not implemented in the Avalonia app** (WinForms-only, never ported); would be untestable via unit tests regardless since it requires bitmap rendering. IO11 `NewFile()` + IO12 `CommandLineArgParser` + IO14 serialization now all covered) |
 | Application State | 6 | 6 | 0 |
 | Application Events | 8 | 8 | 0 |
 | Serialization Details | 9 | 9 | 0 |
@@ -289,7 +287,7 @@
 | Preview/Playback | 12 | 8 | 4 (PL07–PL10: SkiaSharp rendering + Avalonia pointer gesture — PL11 alignment math + PL12 offset multiplier math now covered) |
 | Tree View / UI | 9 | 8 | 1 (TV09: OS shell integration) |
 | InspectableImage | 4 | 1 | 3 (II01, II03–II04: rendering layer) |
-| **Total** | **134** | **125** | **9** |
+| **Total** | **133** | **124** | **9** |
 
 ---
 
@@ -369,8 +367,7 @@ sts pass in `AnimationEditor.App.Tests` (net8.0, xunit.v3 3.2.2).
 | MEDIUM | Extract `FrameTimeScaler` (A17) | ✅ Done | A17 Core logic covered (12 tests) |
 | MEDIUM | Extract `BatchFrameBuilder` (F12) | ✅ Done | F12 UV-increment math covered (15 tests) |
 | MEDIUM | Extract `ClipboardPayload` serialization (IO14) | ✅ Done | IO14 XML round-trips covered (18 tests) |
-| MEDIUM | Extract `TextureResizeAdjuster` (IO15) | ✅ Done | IO15 UV-adjust math covered (10 tests) |
-| MEDIUM | Wire new Core classes into `AppCommands` | ✅ Done | `AdjustOffsetsJustifyBottom`, `AdjustOffsetsAdjustAll`, `ScaleFrameTimesProportional`, `ScaleFrameTimesSetAllSame`, `AddMultipleFrames`, `AdjustUVAfterResize` |
+| MEDIUM | Wire new Core classes into `AppCommands` | ✅ Done | `AdjustOffsetsJustifyBottom`, `AdjustOffsetsAdjustAll`, `ScaleFrameTimesProportional`, `ScaleFrameTimesSetAllSame`, `AddMultipleFrames` |
 | MEDIUM | Extract `SpriteAlignment` enum + `SpriteAlignmentOffsetCalculator` (PL11) | ✅ Done | PL11 alignment offset math covered (9 tests) |
 | MEDIUM | Extract `OffsetMultiplierConverter` + `AppState.OffsetMultiplier` (PL12) | ✅ Done | PL12 multiplier round-trip math covered (13 tests) |
 | MEDIUM | Add `AppCommands.NewFile()` (IO11) | ✅ Done | IO11 Core command covered (7 tests) |
@@ -399,7 +396,7 @@ A second pass at the full source identified 8 features that were present in the 
 
 **Remaining untestable:** PL07/PL08 (SkiaSharp canvas rendering) and PL09/PL10 (Avalonia pointer-event routing). Bitmap integration tests could cover PL07/PL08 with synthetic PNGs.
 
-### 3.17 Newly Discovered Features (Top-Down UI Audit — A15–A17, F12, IO13–IO15, PL11–PL12, TV09)
+### 3.17 Newly Discovered Features (Top-Down UI Audit — A15–A17, F12, IO13–IO14, PL11–PL12, TV09)
 
 A top-down audit of the old WinForms app's `Controls/`, `Managers/`, `Plugins/`, `Gif/`, and `Editing/` folders surfaced 10 additional features that were completely absent from the inventory because the previous audit only read the Core library (bottom-up).
 
@@ -411,14 +408,13 @@ A top-down audit of the old WinForms app's `Controls/`, `Managers/`, `Plugins/`,
 | F12 | Batch add frames | `TreeViewManager.AddFramesClick` + `AnimationAddFramesWPF` dialog | UV increment math extractable; dialog interaction UI-only |
 | IO13 | Export as GIF | `GifManager.SaveCurrentAnimationAsGif()` (old WinForms app only) — requires bitmap rendering + file system | **Not ported to the Avalonia app** — no equivalent exists in `AnimationEditor.Core`/`AnimationEditor.App`. Would be untestable without a graphics context even if it were ported. |
 | IO14 | Copy / paste | `CopyManager.HandleCopy/HandlePaste` — XML serialization to system clipboard | Serialization logic testable; clipboard + paste-context wiring UI-only |
-| IO15 | Resize texture | `ResizeMethods.ResizeTextureClick` — requires `GraphicsDevice` + file I/O | UV-adjustment math (`AdjustFrameToResize`) extractable — testable; image resize requires graphics context |
 | PL11 | Preview sprite alignment | `PreviewControls.SpriteAlignmentComboBox` — rendering anchor change | Alignment enum + rendering UI-only |
 | PL12 | Preview offset multiplier | `PreviewControls.OffsetMultiplier` text box — divides `RelativeX/Y` in preview math | Multiplier applied in `PreviewManager` render — extractable formula |
 | TV09 | View texture in Explorer | `TreeViewManager.RightClick.ViewTextureInExplorer` — `Process.Start` OS shell call | OS integration — untestable in unit tests |
 
 **Root cause of gap:** The prior audit read `src/AnimationEditor.Core` and inferred features from the data model API surface. It captured what data the model *can store* but was blind to any feature delivered through a dialog, property panel, toolbar widget, or OS integration that has no 1:1 backing method in Core. The fix is to always audit the old app's UI layer top-down as a first pass before reading Core bottom-up.
 
-**Status:** All extractable logic for A15–A17, F12, IO14, IO15, WF11, and F13 has been extracted into Core and is fully unit-tested. `AppCommands` wiring methods added for all applicable features. The remaining untestable portions are the dialog UI interactions (open dialog, read user input, close) and OS-level operations (OS clipboard I/O, system process launch for TV09). GIF export (IO13) is excluded from this — it was never ported to the Avalonia app in the first place, so it is N/A rather than merely untested.
+**Status:** All extractable logic for A15–A17, F12, IO14, WF11, and F13 has been extracted into Core and is fully unit-tested. `AppCommands` wiring methods added for all applicable features. The remaining untestable portions are the dialog UI interactions (open dialog, read user input, close) and OS-level operations (OS clipboard I/O, system process launch for TV09). GIF export (IO13) is excluded from this — it was never ported to the Avalonia app in the first place, so it is N/A rather than merely untested.
 
 | WF11 | Sprite-sheet tile-index UV | `AnimationFrameDisplayer.SetTileX/SetTileY` — pure index math (`left = tileIndex * tileSize / textureSize`) | Extractable to Core math — ✅ Done (11 tests) |
 | F13  | Pixel-mode UV editing | `AnimationFrameDisplayer.CoordinateChange` X/Y/Width/Height cases — pure delta/rounding math | Extractable to Core math — ✅ Done (15 tests) |
@@ -435,7 +431,6 @@ All Core logic is extracted and tested. The table below tracks which features ar
 | A10–A12 | Duplicate chain (original / flip H / flip V) | ✅ | ✅ | Context menu sub-items |
 | F12 | Add Multiple Frames | ✅ | ✅ | "Add Multiple Frames…" context menu on chain; dialog with count + increment |
 | A16 | Adjust Offsets dialog | ✅ | ✅ | "Adjust Offsets…" context menu on chain; Justify Bottom + Adjust All modes |
-| IO15 | Resize Texture | ✅ | ✅ | Edit menu; SkiaSharp pad-to-power-of-two + UV re-adjust + re-reference |
 | TV07 | Rename Chain | ✅ | ✅ | "Rename…" context menu; string input dialog |
 | TV08 | Rename Frame | ✅ | ✅ | "Rename (texture path)…" context menu |
 | TV09 | View Texture in Explorer | — | ✅ | Process.Start("explorer.exe /select,…") |
@@ -446,8 +441,8 @@ All Core logic is extracted and tested. The table below tracks which features ar
 *Report updated. 595 unit tests across 41 test files (feature inventory: 134 items; 125 covered, 9 untestable/UI-only).*
 *`AnimationEditor.Core.Tests` (net8.0, xUnit 2.9.2): 582 tests passing.*
 *`AnimationEditor.App.Tests` (net8.0, xunit.v3 3.2.2): 13 headless Avalonia tests passing (TV05 multi-select × 4, TV06 context menu × 9).*
-*Core modules: `PlaybackController`, `HandleKind`, `DragHandleHitTester`, `DragHandleApplier`, `BoundsRect`, `FloodFillBoundsCalculator`, `CanvasTransform` (+ `Pan`), `GridSnapper`, `FlipScaleCalculator`, `UnitConverter`, `IFileDialogService`, `NullFileDialogService`, `TreeNodeVm`, `TreeBuilder`, `DirectionNameSuggester`, `AdjustOffsetCalculator`, `FrameTimeScaler`, `BatchFrameBuilder`, `ClipboardPayload`, `TextureResizeAdjuster`, `SpriteAlignment` enum, `SpriteAlignmentOffsetCalculator`, `OffsetMultiplierConverter`, `CommandLineArgParser`, `TextureListBuilder`, `TileCoordinateCalculator`, `PixelFrameEditor`.*
-*AppCommands additions: `FlipFrameHorizontally`, `FlipFrameVertically`, `RenameChain`, `RenameFrame`, `AdjustOffsetsJustifyBottom`, `AdjustOffsetsAdjustAll`, `ScaleFrameTimesProportional`, `ScaleFrameTimesSetAllSame`, `AddMultipleFrames`, `AdjustUVAfterResize`, `NewFile`, `AddFrameFromPixelBounds`.*
+*Core modules: `PlaybackController`, `HandleKind`, `DragHandleHitTester`, `DragHandleApplier`, `BoundsRect`, `FloodFillBoundsCalculator`, `CanvasTransform` (+ `Pan`), `GridSnapper`, `FlipScaleCalculator`, `UnitConverter`, `IFileDialogService`, `NullFileDialogService`, `TreeNodeVm`, `TreeBuilder`, `DirectionNameSuggester`, `AdjustOffsetCalculator`, `FrameTimeScaler`, `BatchFrameBuilder`, `ClipboardPayload`, `SpriteAlignment` enum, `SpriteAlignmentOffsetCalculator`, `OffsetMultiplierConverter`, `CommandLineArgParser`, `TextureListBuilder`, `TileCoordinateCalculator`, `PixelFrameEditor`.*
+*AppCommands additions: `FlipFrameHorizontally`, `FlipFrameVertically`, `RenameChain`, `RenameFrame`, `AdjustOffsetsJustifyBottom`, `AdjustOffsetsAdjustAll`, `ScaleFrameTimesProportional`, `ScaleFrameTimesSetAllSame`, `AddMultipleFrames`, `NewFile`, `AddFrameFromPixelBounds`.*
 *AppState additions: `SpriteAlignment`, `OffsetMultiplier`.*
 *App: `AvaloniaFileDialogService`, `IsExpanded` binding via `TreeView.Styles` `{ReflectionBinding}`, `PreviewControl` delegates to `FlipScaleCalculator`, `WireframeControl` delegates to `CanvasTransform.Pan`.*
 *Test files added (session): `TileCoordinateCalculatorTests.cs`, `PixelFrameEditorTests.cs`.*

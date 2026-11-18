@@ -190,7 +190,7 @@ public class TabKindScenarioTests
         {
             "MenuSave", "MenuSaveAs", "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
             "MenuUndo", "MenuRedo", "MenuCopy", "MenuCut", "MenuPaste", "MenuDuplicate",
-            "MenuReloadFromDisk", "MenuResizeTexture", "MenuAssociateTiledTileset",
+            "MenuReloadFromDisk", "MenuAssociateTiledTileset",
             "MenuWireframeZoomIn", "MenuWireframeZoomOut", "MenuPreviewZoomIn", "MenuPreviewZoomOut", "MenuShowHistory",
         };
         string[] appItems = { "MenuNew", "MenuLoad", "MenuOpenProjectFolder", "MenuSettings", "MenuEnableHotReload", "MenuViewLog", "MenuOpenLogFolder", "MenuAbout" };
