@@ -188,6 +188,38 @@ public class SequenceTabScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task NewSequenceFile_AddSourceAndPlaceAChain_SurvivesClosingAndReopeningTheTab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16)));
+        string boss = Path.Combine(editor.ProjectFolder, "boss.seqj");
+        editor.Dialogs.AnswerNextSaveFile(boss);
+        editor.ClickMenu("MenuNewSequence");
+        editor.WaitUntil(() => editor.TabLabels.Contains("boss.seqj"), TimeSpan.FromSeconds(5));
+        var library = editor.Control<AnimationEditor.App.Controls.SequenceLibraryControl>("SequenceLibrary");
+        editor.Dialogs.AnswerNextOpenFiles(hero);
+        editor.Click(library.AddSourceButton);
+
+        editor.DoubleClickAt(editor.CenterOf(library.ChipFor("hero.achx", "Walk")!));
+        editor.ThrowIfErrorShown();
+
+        editor.CloseTab("boss.seqj");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.TabLabels.ShouldNotContain("boss.seqj");
+        await editor.OpenAsync(boss);
+
+        SequencePaneShown(editor).ShouldBeTrue();
+        editor.SequenceNames.ShouldBe(new[] { "Sequence" });
+        var reopenedLibrary = editor.Control<AnimationEditor.App.Controls.SequenceLibraryControl>("SequenceLibrary");
+        reopenedLibrary.ChipFor("hero.achx", "Walk").ShouldNotBeNull("the source added through the picker reaches the file");
+        SequenceSave saved = SequenceListSave.FromFile(boss).Sequences.Single();
+        SequenceTrackSave track = saved.Tracks.ShouldHaveSingleItem();
+        track.Chains.Select(chain => (chain.Source, chain.Chain, chain.Start)).ShouldBe(new[] { ("hero.achx", "Walk", 0d) });
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
     public async Task ProjectPanel_ListsSeqjFiles_AndDoubleClickOpensOne()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

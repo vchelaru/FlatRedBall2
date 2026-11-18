@@ -195,4 +195,49 @@ public class TabScenarioTests
         editor.Wireframe.BitmapSize.ShouldBe((0, 0), "with no document open the canvas must be empty, like a fresh launch");
         editor.Wireframe.LoadedTexturePathCasePreserved.ShouldBeNull();
     }
+
+    [AvaloniaFact]
+    public async Task AChainBuiltThroughTheUi_SurvivesClosingAndReopeningTheTab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+
+        editor.Click(editor.Control<Avalonia.Controls.Button>("AddChainBtn"));
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        editor.Type("Jump");
+        editor.Press(Key.Enter);
+        AnimationChainSave jump = editor.ChainNamed("Jump");
+        editor.ClickRow(jump);
+        editor.Click(editor.RowButton(jump, "Add Frame"));
+        editor.Click(editor.RowButton(jump, "Add Frame"));
+        jump.Frames.Count.ShouldBe(2);
+        editor.ClickRow(jump.Frames[1]);
+        editor.TypeNumber("PropPixelX", "32");
+        editor.TypeFlanker("PropFrameLen", "0.25");
+        editor.RightClickRow(jump.Frames[0]);
+        editor.PickTreeMenuItem("Add AxisAlignedRectangle");
+        editor.ClickRow(jump);
+        editor.Click(editor.Control<Avalonia.Controls.CheckBox>("PropChainLoop"));
+        jump.Loop.ShouldBeFalse();
+        editor.ThrowIfErrorShown();
+
+        editor.CloseTab("hero.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.Tabs.Tabs.ShouldBeEmpty();
+        await editor.OpenAsync(hero);
+
+        editor.VisibleChainHeaders.ShouldBe(new[] { "Walk", "Jump" });
+        AnimationChainSave reopened = editor.ChainNamed("Jump");
+        reopened.Loop.ShouldBeFalse("Loop off reaches the file");
+        reopened.Frames.Count.ShouldBe(2);
+        reopened.Frames[0].TextureName.ShouldBe("sheet.png", "a frame added beside a textured chain takes the canvas texture");
+        reopened.Frames[0].ShapesSave!.AARectSaves.ShouldHaveSingleItem();
+        reopened.Frames[1].FrameLength.ShouldBe(0.25f, 0.0001f);
+        editor.ClickRow(reopened);
+        editor.PixelRectOf(reopened.Frames[1]).X.ShouldBe(32);
+        editor.Control<Avalonia.Controls.CheckBox>("PropChainLoop").IsChecked.ShouldBe(false);
+        editor.ThrowIfErrorShown();
+    }
 }
