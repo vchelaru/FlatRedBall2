@@ -145,6 +145,12 @@ namespace AnimationEditor.Core.Models
         public object? CachedTreeState { get; set; }
 
         /// <summary>
+        /// This tab's wireframe camera. The wireframe is bound to the active tab's memory, so switching tabs swaps
+        /// the camera with the document. <see cref="TabManager.Rename"/> carries it to the replacement entry.
+        /// </summary>
+        public TextureCameraMemory CameraMemory { get; init; } = new TextureCameraMemory();
+
+        /// <summary>
         /// True while this is the single reusable "preview" tab (issue #841): a click in the
         /// Open Project Folder tree opens/replaces this tab instead of adding a new permanent
         /// one. Cleared by <see cref="TabManager.Promote"/> when the tree row is double-clicked
