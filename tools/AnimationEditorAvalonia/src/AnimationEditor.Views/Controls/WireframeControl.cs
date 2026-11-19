@@ -602,7 +602,12 @@ public class WireframeControl : TextureViewport
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
-        _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        _appCommands.RefreshWireframeRequested += () =>
+        {
+            // In the same turn as the document, so the wireframe changes with the preview instead of a turn later.
+            if (Dispatcher.UIThread.CheckAccess()) RefreshAll();
+            else Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        };
         // RefreshAnimationFrameDisplayRequested fires from every command that mutates the selected
         // frame's live properties (offset drag, shape add/move/resize, ...) and their Undo/Redo --
         // PreviewControl already redraws on it. WireframeControl draws its own frame-derived overlay

@@ -46,6 +46,8 @@ public partial class MainWindow
 
         public async Task<bool> LoadAsync(TabEntry tab, TabLoad load)
         {
+            // A restored tab is made active without ActiveChanged; the camera must follow the document anyway.
+            _window.BindWireframeCamera(tab);
             if (load == TabLoad.Restore)
                 return await _window._appCommands.OpenProjectWorkflowAsync(tab.Path.FullPath);
 

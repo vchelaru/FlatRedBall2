@@ -346,6 +346,7 @@ namespace AnimationEditor.Core.Models
                 CachedTsxState = tab.CachedTsxState,
                 CachedReferencedPngs = tab.CachedReferencedPngs,
                 CachedTreeState = tab.CachedTreeState,
+                CameraMemory = tab.CameraMemory,
             };
             _tabs[idx] = replacement;
             if (ActiveTab == tab)

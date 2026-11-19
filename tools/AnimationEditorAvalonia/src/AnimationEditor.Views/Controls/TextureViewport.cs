@@ -1,6 +1,7 @@
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core.Input;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Models;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -301,9 +302,51 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     private Point _panAnchor;
     private float _panAnchorX, _panAnchorY;
 
-    // Per-texture saved camera (texture path → panX, panY, zoom). panX/panY are the screen
-    // position of texture pixel (0,0) — the full camera pan in the analytic model.
-    private readonly System.Collections.Generic.Dictionary<string, (float px, float py, float z)> _cameraByTexture = new();
+    private TextureCameraMemory _cameraMemory = new();
+    private bool _memoryRebound;
+
+    /// <summary>
+    /// Where this viewport remembers its camera per texture. The host binds it to the active tab's memory, so the
+    /// camera for a document is decided in one place. Binding a different memory makes the next texture load
+    /// (including a load of the texture already showing) take its camera from it.
+    /// </summary>
+    public TextureCameraMemory CameraMemory
+    {
+        get => _cameraMemory;
+        set
+        {
+            if (ReferenceEquals(_cameraMemory, value)) return;
+            _cameraMemory = value;
+            _memoryRebound = true;
+        }
+    }
+
+    /// <summary>Remembers the live camera for the texture on screen, before the memory is rebound to another tab.</summary>
+    public void RememberLiveCamera()
+    {
+        if (_loadedTexturePath != null)
+            _cameraMemory.Remember(_loadedTexturePath, new TextureCamera(_panX, _panY, _zoom));
+    }
+
+    // Applies the memory's camera for `norm`, or centres the texture when it has none.
+    private void ApplyRememberedCamera(string norm)
+    {
+        _memoryRebound = false;
+        if (_cameraMemory.Take(norm, out bool fromSeed) is not { } cam)
+        {
+            CenterTexture();
+            return;
+        }
+
+        CancelZoomAnimation();
+        (_panX, _panY, _zoom) = (cam.PanX, cam.PanY, Math.Clamp(cam.Zoom, CanvasTransform.MinZoom, CanvasTransform.MaxZoom));
+        // A camera remembered in an earlier viewport is re-clamped to this one; a seeded one is applied as saved.
+        if (!fromSeed)
+            ClampCamera();
+        InvalidateVisual();
+        RaiseViewChanged();
+        RaiseZoomChanged();
+    }
 
     // ── Public properties ─────────────────────────────────────────────────────
 
@@ -564,6 +607,9 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
 
         if (_loadedTexturePath == norm)
         {
+            // A newly bound memory (another tab showing the same texture) still decides the camera.
+            if (_memoryRebound && norm != null && _bitmap != null)
+                ApplyRememberedCamera(norm);
             // Texture hasn't changed, but the selected frame may have, so update frame rects.
             OnTextureLoaded(_bitmap);
             return true;
@@ -600,6 +646,8 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
 
         if (_loadedTexturePath == norm && _bitmap != null)
         {
+            if (_memoryRebound && norm != null)
+                ApplyRememberedCamera(norm);
             OnTextureLoaded(_bitmap);
             return true;
         }
@@ -633,8 +681,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     // view is empty until the (possibly async) decode installs the new one.
     private void BeginTextureSwap(string? norm, string? casePreserved)
     {
-        if (_loadedTexturePath != null)
-            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
+        RememberLiveCamera();
 
         _loadedTexturePath = norm;
         _loadedTexturePathCasePreserved = casePreserved;
@@ -670,19 +717,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // the SKBitmap directly (SKCanvas.DrawBitmap on the render thread would AV).
         _image = SKImage.FromBitmap(decoded);
 
-        if (_cameraByTexture.TryGetValue(norm, out var cam))
-        {
-            // Restore the full camera and re-clamp against the current viewport (window may have been
-            // resized since this texture was last shown).
-            (_panX, _panY, _zoom) = (cam.px, cam.py, cam.z);
-            ClampCamera();
-            RaiseViewChanged();
-            InvalidateVisual();
-        }
-        else
-        {
-            CenterTexture();
-        }
+        ApplyRememberedCamera(norm);
 
         OnTextureLoaded(_bitmap);
         return true;
@@ -728,7 +763,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // case-insensitive filesystem, and on Linux a hot reload found no file and went blank.
         var path = _loadedTexturePathCasePreserved ?? _loadedTexturePath;
         if (path == null) return;
-        // LoadTexture only restores a saved camera when _cameraByTexture has an entry for this
+        // LoadTexture only restores a saved camera when the camera memory has an entry for this
         // path, which is populated on cross-texture switches, not on the very first load of a
         // texture. Without saving/restoring here, a hot-reload of the only texture ever opened
         // would find no entry and fall through to CenterTexture(), resetting pan/zoom (#584).

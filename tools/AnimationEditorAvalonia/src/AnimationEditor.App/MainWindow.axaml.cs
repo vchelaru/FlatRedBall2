@@ -443,6 +443,7 @@ public partial class MainWindow : Window
 
     private void WireTabBar()
     {
+        _tabManager.ActiveChanged += BindWireframeCamera;
         _tabManager.ActiveChanged += _ => Dispatcher.UIThread.InvokeAsync(RebuildTabStrip);
         // Persist the open-tab session on every change (open / switch / close / reorder), not just
         // on graceful window close — a debugger Stop or crash never fires Closed and would otherwise
@@ -1315,7 +1316,30 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowInfo($"Reloaded {System.IO.Path.GetFileName(path)}"));
 
-        _ioManager.SettingsLoaded += s => Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
+        _ioManager.SettingsLoaded += s =>
+        {
+            // The wireframe camera has one owner, the active tab's CameraMemory: the file only seeds a tab that has
+            // never been shown (a reload from disk keeps the camera it has), and the texture load picks it up.
+            WireframeCtrl.CameraMemory.Seed(new TextureCamera(
+                s.WireframePanX,
+                s.WireframePanY,
+                Math.Clamp(s.WireframeZoomPercent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom)));
+            // The preview has no texture swap to fight, so it takes its camera in the same turn as the document.
+            if (Dispatcher.UIThread.CheckAccess())
+                ApplyCompanionPreviewCamera(s);
+            Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
+        };
+    }
+
+    /// <summary>
+    /// Points the wireframe at <paramref name="tab"/>'s camera memory, first filing the camera on screen under the
+    /// tab it belongs to. Called whenever a tab becomes active, before its document loads.
+    /// </summary>
+    private void BindWireframeCamera(TabEntry? tab)
+    {
+        if (tab is null || ReferenceEquals(WireframeCtrl.CameraMemory, tab.CameraMemory)) return;
+        WireframeCtrl.RememberLiveCamera();
+        WireframeCtrl.CameraMemory = tab.CameraMemory;
     }
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
@@ -2031,6 +2055,21 @@ public partial class MainWindow : Window
         _ioManager.SaveCompanionFileFor(new FilePath(_projectManager.FileName), BuildCompanionSettings());
     }
 
+    private void ApplyCompanionPreviewCamera(AESettingsSave settings)
+    {
+        bool wasSuppressed = _suppressCompanionSave;
+        _suppressCompanionSave = true;
+        try
+        {
+            PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
+            PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
+        }
+        finally
+        {
+            _suppressCompanionSave = wasSuppressed;
+        }
+    }
+
     private void ApplyCompanionSettings(AESettingsSave settings)
     {
         _suppressCompanionSave = true;
@@ -2039,12 +2078,6 @@ public partial class MainWindow : Window
             SnapToGridCheck.IsChecked = settings.SnapToGrid;
             GridSizeInput.Value       = settings.GridSize;
             WireframeCtrl.SetGrid(settings.SnapToGrid, CurrentGrid());
-
-            WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
-            PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
-
-            WireframeCtrl.SetCamera(settings.WireframePanX, settings.WireframePanY, WireframeCtrl.CameraState.Zoom);
-            PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
 
             var expandedSet = settings.ExpandedNodes.ToHashSet();
             foreach (var node in _treeRoots)
