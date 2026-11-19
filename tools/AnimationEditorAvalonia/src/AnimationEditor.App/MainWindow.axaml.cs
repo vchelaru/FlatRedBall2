@@ -1315,7 +1315,15 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowInfo($"Reloaded {System.IO.Path.GetFileName(path)}"));
 
-        _ioManager.SettingsLoaded += s => Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
+        _ioManager.SettingsLoaded += s =>
+        {
+            // The camera lands in the same turn as the document it belongs to: posted, the first paint after a tab
+            // switch shows the previous tab's zoom and pan and then pops. The rest waits for the tree rebuild
+            // (also posted) so it applies to the new rows.
+            if (Dispatcher.UIThread.CheckAccess())
+                ApplyCompanionCamera(s);
+            Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
+        };
     }
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
@@ -2031,6 +2039,24 @@ public partial class MainWindow : Window
         _ioManager.SaveCompanionFileFor(new FilePath(_projectManager.FileName), BuildCompanionSettings());
     }
 
+    private void ApplyCompanionCamera(AESettingsSave settings)
+    {
+        bool wasSuppressed = _suppressCompanionSave;
+        _suppressCompanionSave = true;
+        try
+        {
+            WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
+            PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
+
+            WireframeCtrl.SetCamera(settings.WireframePanX, settings.WireframePanY, WireframeCtrl.CameraState.Zoom);
+            PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
+        }
+        finally
+        {
+            _suppressCompanionSave = wasSuppressed;
+        }
+    }
+
     private void ApplyCompanionSettings(AESettingsSave settings)
     {
         _suppressCompanionSave = true;
@@ -2040,11 +2066,9 @@ public partial class MainWindow : Window
             GridSizeInput.Value       = settings.GridSize;
             WireframeCtrl.SetGrid(settings.SnapToGrid, CurrentGrid());
 
-            WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
-            PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
-
-            WireframeCtrl.SetCamera(settings.WireframePanX, settings.WireframePanY, WireframeCtrl.CameraState.Zoom);
-            PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
+            // Re-applied: the posted texture refresh and grid change can move the camera after the synchronous
+            // apply, and the saved one must still win.
+            ApplyCompanionCamera(settings);
 
             var expandedSet = settings.ExpandedNodes.ToHashSet();
             foreach (var node in _treeRoots)
