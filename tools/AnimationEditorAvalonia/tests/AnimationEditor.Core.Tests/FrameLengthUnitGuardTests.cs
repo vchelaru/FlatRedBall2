@@ -16,6 +16,8 @@ public class FrameLengthUnitGuardTests
     {
         "Core/CommandsAndState/AppCommands.cs",
         "Core/CommandsAndState/BulkFrameEditCommand.cs",
+        "Core/CommandsAndState/SetTimeUnitCommand.cs", // converts every length between units
+        "Editing/PropertyEdit.cs", // range-checks via FrameLengthUnit; reads the raw value only to skip a no-op
         "Core/DragDrop/TextureDropProcessor.cs",
         "Core/Rendering/BatchFrameBuilder.cs",
         "Core/IO/AnimationCloneHelper.cs",

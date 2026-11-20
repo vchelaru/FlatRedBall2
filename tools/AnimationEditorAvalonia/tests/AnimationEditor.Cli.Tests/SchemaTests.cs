@@ -28,7 +28,7 @@ public class SchemaTests
         r.Code.ShouldBe(0);
         using var doc = JsonDocument.Parse(r.Out);
         var ops = doc.RootElement.GetProperty("ops").EnumerateArray().ToDictionary(o => o.GetProperty("op").GetString()!);
-        ops.Keys.OrderBy(k => k).ShouldBe(["add-chain", "add-frame", "delete-chain", "delete-frame", "duplicate-chain", "duplicate-frame", "rename-chain", "rename-shape", "reorder-chain", "reorder-frame", "set-frame-texture"]);
+        ops.Keys.OrderBy(k => k).ShouldBe(["add-chain", "add-frame", "delete-chain", "delete-frame", "duplicate-chain", "duplicate-frame", "rename-chain", "rename-shape", "reorder-chain", "reorder-frame", "set-chain-locked", "set-chain-loop", "set-chain-pingpong", "set-chain-reverse", "set-frame-color", "set-frame-flip", "set-frame-length", "set-frame-offset", "set-frame-region", "set-frame-texture", "set-unit"]);
         var rename = ops["rename-chain"].GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!);
         rename["chain"].GetProperty("type").GetString().ShouldBe("string");
         rename["chain"].GetProperty("required").GetBoolean().ShouldBeTrue();

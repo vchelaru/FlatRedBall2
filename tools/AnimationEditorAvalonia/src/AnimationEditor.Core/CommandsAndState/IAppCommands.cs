@@ -441,6 +441,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// unset channel starts from the value it inherits.</summary>
         void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit red, ChannelEdit green, ChannelEdit blue);
         void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
+        /// <summary>
+        /// Sets R/G/B/alpha (each null = leave as is) and optionally the color operation in ONE undo step.
+        /// Values are stored as given; the caller validates ranges.
+        /// </summary>
+        void SetFrameColorValues(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue, int? alpha, ColorOperation? operation);
+        /// <summary>
+        /// Changes the file's time unit and converts every frame length (locked chains included) so playback
+        /// time is unchanged. One undo step; no-op when the unit is already <paramref name="unit"/>.
+        /// </summary>
+        void SetTimeMeasurementUnit(TimeMeasurementUnit unit);
         /// <summary>Edits alpha on every frame. Results clamp to 0..255; a relative edit on an unset
         /// alpha starts from the value it inherits (255 if none).</summary>
         void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha);

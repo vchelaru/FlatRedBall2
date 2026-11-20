@@ -15,6 +15,7 @@ public static class CliApp
           describe <file> [--json]               chains, frames (by index) and shapes of an .achx/.achj
           check <file> [--json]                  validate; exit 1 on errors
           new <file> [--json]                    create an empty .achx/.achj
+          convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           --schema [--json]                      list the operations and their fields
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
@@ -45,16 +46,20 @@ public static class CliApp
                 if (parsed.File is null) return cli.Usage("edit needs a file.");
                 if (parsed.OpsFile is null) return cli.Usage("edit needs --ops <ops.json>.");
                 return await cli.EditAsync(parsed.File, parsed.OpsFile);
+            case "convert":
+                if (parsed.File is null) return cli.Usage("convert needs a file.");
+                if (parsed.To is not ("achj" or "achx")) return cli.Usage("convert needs --to achj or --to achx.");
+                return cli.Convert(parsed.File, parsed.To);
             default:
                 return cli.Usage($"unknown command '{parsed.Command}'.");
         }
     }
 
-    private sealed record Arguments(string? Command, string? File, string? OpsFile, bool Json, bool Schema, string? Error)
+    private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error)
     {
         public static Arguments Parse(string[] args)
         {
-            string? command = null, file = null, ops = null;
+            string? command = null, file = null, ops = null, to = null;
             bool json = false, schema = false;
             for (int i = 0; i < args.Length; i++)
             {
@@ -67,6 +72,10 @@ public static class CliApp
                         if (i + 1 >= args.Length) return Bad("--ops needs a file.");
                         ops = args[++i];
                         break;
+                    case "--to":
+                        if (i + 1 >= args.Length) return Bad("--to needs achj or achx.");
+                        to = args[++i];
+                        break;
                     default:
                         if (a.StartsWith("--")) return Bad($"unknown option '{a}'.");
                         if (command is null) command = a;
@@ -75,9 +84,9 @@ public static class CliApp
                         break;
                 }
             }
-            return new Arguments(command, file, ops, json, schema, null);
+            return new Arguments(command, file, ops, to, json, schema, null);
 
-            static Arguments Bad(string error) => new(null, null, null, false, false, error);
+            static Arguments Bad(string error) => new(null, null, null, null, false, false, error);
         }
     }
 
@@ -134,6 +143,12 @@ public static class CliApp
         {
             var result = NewFileEdit.CreateAnimationFile(file);
             return Report(result, null, $"Created {file}");
+        }
+
+        public int Convert(string file, string to)
+        {
+            var result = FileConvertEdit.Convert(file, to);
+            return Report(result, null, $"Created {result.ChangedItems.FirstOrDefault()}");
         }
 
         public async Task<int> EditAsync(string file, string opsFile)

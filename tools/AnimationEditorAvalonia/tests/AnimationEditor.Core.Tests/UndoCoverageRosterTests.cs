@@ -131,6 +131,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameAlpha)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColor)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameColorValues)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetTimeMeasurementUnit)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframe)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframeCurve)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.SetShapeKeyframe)]             = Category.MutatingUndoable,
@@ -403,6 +405,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameColor(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColorOperation),
             ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(new[] { Zebra(ctx).Frames[0] }, ColorOperation.Add)));
+        yield return Row(nameof(IAppCommands.SetFrameColorValues),
+            ctx => Sync(() => ctx.AppCommands.SetFrameColorValues(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128, 100, ColorOperation.Add)));
+        yield return Row(nameof(IAppCommands.SetTimeMeasurementUnit),
+            ctx => Sync(() => ctx.AppCommands.SetTimeMeasurementUnit(TimeMeasurementUnit.Millisecond)));
         yield return Row(nameof(IAppCommands.SetFrameKeyframe),
             ctx => Sync(() => ctx.AppCommands.SetFrameKeyframe(new[] { Zebra(ctx).Frames[1] }, KeyframeGroup.Offset, false)));
         yield return Row(nameof(IAppCommands.SetFrameKeyframeCurve),
