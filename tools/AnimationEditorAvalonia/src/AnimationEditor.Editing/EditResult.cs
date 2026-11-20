@@ -19,6 +19,10 @@ public enum EditErrorCode
     DuplicateName,
     /// <summary>A file to create is already on disk and overwriting was not asked for.</summary>
     AlreadyExists,
+    /// <summary>A target index is outside the list it addresses.</summary>
+    IndexOutOfRange,
+    /// <summary>The chain is locked in the editor, so its frames and its removal are protected.</summary>
+    Locked,
 }
 
 /// <summary>
