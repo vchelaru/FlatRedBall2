@@ -107,7 +107,7 @@ public class AdjustFrameTimeLiveEditTests
             },
             confirm: true);
 
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
     }
 
     [AvaloniaFact]
@@ -123,7 +123,7 @@ public class AdjustFrameTimeLiveEditTests
             },
             confirm: false);
 
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(0.1f, chain.Frames[0].FrameLength, 3);
         Assert.Equal(0.3f, chain.Frames[1].FrameLength, 3);
@@ -138,7 +138,7 @@ public class AdjustFrameTimeLiveEditTests
         Assert.True(undoManager.CanUndo);
 
         var host = new ScriptedDialogHost(interact: _ => { }, confirm: false);
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // The unrelated entry pushed before the dialog opened must survive untouched.
         Assert.True(undoManager.CanUndo);
@@ -159,7 +159,7 @@ public class AdjustFrameTimeLiveEditTests
             },
             confirm: true);
 
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.True(undoManager.CanUndo);
         undoManager.Undo();
@@ -185,7 +185,7 @@ public class AdjustFrameTimeLiveEditTests
             },
             confirm: false);
 
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal("0.4", before);
         Assert.Equal("0.5", after);
@@ -206,7 +206,7 @@ public class AdjustFrameTimeLiveEditTests
             },
             confirm: false);
 
-        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal("Each frame: 0.2 seconds", label);
     }
