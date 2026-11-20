@@ -53,7 +53,7 @@ public class AchxThumbnailCacheKeyTests
         var result = AchxThumbnailCacheKey.BuildFileName(@"C:\Content\hero.achx", 1024,
             new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        Assert.Contains("_v1", result);
+        Assert.Contains("_v2", result);
     }
 
     [Fact]

@@ -34,8 +34,19 @@ public class ThumbnailSourceTests
 
         // An uncolored first frame resolves to all-null color channels.
         Assert.Equal(
-            new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false, null, null, null, null, null),
+            new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false, false, null, null, null, null, null),
             source);
+    }
+
+    [Fact]
+    public void FromChain_FirstFrameDiagonalFlipChange_ProducesUnequalSignature()
+    {
+        var plain = new AnimationChainSave { Name = "A" };
+        plain.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f });
+        var diagonal = new AnimationChainSave { Name = "B" };
+        diagonal.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipDiagonal = true });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(plain), ThumbnailSource.FromChain(diagonal));
     }
 
     [Fact]

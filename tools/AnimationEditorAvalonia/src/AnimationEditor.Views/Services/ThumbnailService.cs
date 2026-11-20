@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AnimationEditor.Core;
+using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Platform;
 using FlatRedBall2.Animation;
@@ -58,7 +59,7 @@ public sealed class ThumbnailService : IDisposable
     /// </summary>
     private readonly record struct ThumbnailKey(
         string Path, float Left, float Right, float Top, float Bottom,
-        bool FlipHorizontal, bool FlipVertical, int MaxWidth, int MaxHeight,
+        bool FlipHorizontal, bool FlipVertical, bool FlipDiagonal, int MaxWidth, int MaxHeight,
         int? Red, int? Green, int? Blue, int? Alpha, ColorOperation? Operation);
 
     /// <summary>
@@ -279,7 +280,7 @@ public sealed class ThumbnailService : IDisposable
         var key = new ThumbnailKey(
             path!.Replace('\\', '/'),
             frame.LeftCoordinate, frame.RightCoordinate, frame.TopCoordinate, frame.BottomCoordinate,
-            frame.FlipHorizontal, frame.FlipVertical, maxWidth, maxHeight,
+            frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, maxWidth, maxHeight,
             color.Red, color.Green, color.Blue, color.Alpha, color.Operation);
         if (_thumbnailCache.TryGetValue(key, out var cachedBitmap))
             return cachedBitmap;
@@ -371,9 +372,16 @@ public sealed class ThumbnailService : IDisposable
         int sw = Math.Clamp((int)(uvW * tw), 1, tw - sx);
         int sh = Math.Clamp((int)(uvH * th), 1, th - sy);
 
-        float scale = Math.Min((float)maxWidth / sw, (float)maxHeight / sh);
-        int finalW = Math.Max(1, (int)(sw * scale));
-        int finalH = Math.Max(1, (int)(sh * scale));
+        // maxWidth x maxHeight is the displayed box. A diagonal flip turns the crop a quarter, so the
+        // crop's width fills the displayed height and the output is transposed.
+        bool diagonal = frame.FlipDiagonal;
+        float scale = diagonal
+            ? Math.Min((float)maxWidth / sh, (float)maxHeight / sw)
+            : Math.Min((float)maxWidth / sw, (float)maxHeight / sh);
+        int cropW = Math.Max(1, (int)(sw * scale));
+        int cropH = Math.Max(1, (int)(sh * scale));
+        int finalW = diagonal ? cropH : cropW;
+        int finalH = diagonal ? cropW : cropH;
 
         // Crop the frame's region into its own bitmap first, then scale. Scaling a sub-rect of
         // the full sheet directly lets the sampler reach past the rect edges and pull in
@@ -410,17 +418,18 @@ public sealed class ThumbnailService : IDisposable
         if (colorFilter is not null)
             paint.ColorFilter = colorFilter;
 
-        bool anyFlip = frame.FlipHorizontal || frame.FlipVertical;
+        // The same pivoted matrix the preview applies, about the output centre.
+        bool anyFlip = FlipScaleCalculator.IsFlipped(frame.FlipHorizontal, frame.FlipVertical, diagonal);
         if (anyFlip)
         {
             canvas.Save();
-            float flipScaleX = frame.FlipHorizontal ? -1f : 1f;
-            float flipScaleY = frame.FlipVertical   ? -1f : 1f;
-            canvas.Scale(flipScaleX, flipScaleY, finalW / 2f, finalH / 2f);
+            var matrix = AnimationEditor.App.Controls.PreviewControl.ComputeFlipMatrix(
+                frame.FlipHorizontal, frame.FlipVertical, diagonal, finalW / 2f, finalH / 2f);
+            canvas.Concat(in matrix);
         }
 
         canvas.DrawImage(region,
-            SKRect.Create(0, 0, finalW, finalH),
+            SKRect.Create((finalW - cropW) / 2f, (finalH - cropH) / 2f, cropW, cropH),
             SelectSampling(scale),
             paint);
 
