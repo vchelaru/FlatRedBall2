@@ -30,7 +30,7 @@ public static class AnimationDescriber
                 sb.AppendLine(FormattableString.Invariant(
                     $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate)},{Num(f.BottomCoordinate)}"));
                 foreach (var shape in Shapes(f))
-                    sb.AppendLine(FormattableString.Invariant($"       {EditAddress.TypeName(shape)} {shape.Name}  {ShapeSummary(shape)}"));
+                    sb.AppendLine(FormattableString.Invariant($"       {chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}  {ShapeSummary(shape)}"));
             }
         }
         return sb.ToString();
@@ -68,6 +68,7 @@ public static class AnimationDescriber
                 foreach (var shape in Shapes(f))
                 {
                     w.WriteStartObject();
+                    w.WriteString("address", $"{chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}");
                     w.WriteString("type", EditAddress.TypeName(shape));
                     w.WriteString("name", shape.Name);
                     w.WriteNumber("x", shape.X);
@@ -76,7 +77,17 @@ public static class AnimationDescriber
                     {
                         case AARectSave r: w.WriteNumber("scaleX", r.ScaleX); w.WriteNumber("scaleY", r.ScaleY); break;
                         case CircleSave c: w.WriteNumber("radius", c.Radius); break;
-                        case PolygonSave p: w.WriteNumber("points", p.Points.Count); break;
+                        case PolygonSave p:
+                            w.WriteStartArray("points");
+                            foreach (var point in p.Points)
+                            {
+                                w.WriteStartArray();
+                                w.WriteNumberValue(point.X);
+                                w.WriteNumberValue(point.Y);
+                                w.WriteEndArray();
+                            }
+                            w.WriteEndArray();
+                            break;
                     }
                     w.WriteEndObject();
                 }
@@ -97,7 +108,7 @@ public static class AnimationDescriber
     {
         AARectSave r => FormattableString.Invariant($"at {Num(r.X)},{Num(r.Y)} scale {Num(r.ScaleX)}x{Num(r.ScaleY)}"),
         CircleSave c => FormattableString.Invariant($"at {Num(c.X)},{Num(c.Y)} radius {Num(c.Radius)}"),
-        PolygonSave p => FormattableString.Invariant($"at {Num(p.X)},{Num(p.Y)} {p.Points.Count} points"),
+        PolygonSave p => FormattableString.Invariant($"at {Num(p.X)},{Num(p.Y)} points {string.Join(" ", p.Points.Select(pt => $"{Num(pt.X)},{Num(pt.Y)}"))}"),
         _ => string.Empty,
     };
 

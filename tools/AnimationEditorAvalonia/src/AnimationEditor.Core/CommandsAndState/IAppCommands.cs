@@ -188,6 +188,13 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);
         void AddPolygon(AnimationFrameSave frame);
+
+        /// <summary>
+        /// Adds a ready-made shape (build one with <see cref="Utilities.NewShapeDefaults"/>) to the end of
+        /// <paramref name="frame"/>'s shapes as one undo step. Returns false, adding nothing, when the frame's chain is locked.
+        /// The caller owns the name (the Add methods above pick a unique one themselves).
+        /// </summary>
+        bool AddShape(AnimationFrameSave frame, ShapeSave shape);
         void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame);
         void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame);
         void MatchRectanglesToFrames(List<AARectSave> rectangles);
@@ -494,6 +501,13 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>Sets a polygon's name and origin. Consecutive calls on one polygon coalesce into one undo entry.</summary>
         void SetPolygonProps(AnimationFrameSave? frame, PolygonSave polygon, string name, float x, float y);
+
+        /// <summary>
+        /// Sets a polygon's origin and, when <paramref name="points"/> is not null, replaces its stored points (closing
+        /// point included, if any), as one undo step for the polygon alone (the vertex edits below also fan out to a
+        /// polygon multi-selection). Returns false, changing nothing, in a locked chain.
+        /// </summary>
+        bool SetPolygonGeometry(PolygonSave polygon, float x, float y, IReadOnlyList<Vector2Save>? points);
 
         /// <summary>
         /// Moves vertex <paramref name="index"/> (see <see cref="Utilities.PolygonVertices"/>; the

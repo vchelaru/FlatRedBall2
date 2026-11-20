@@ -169,7 +169,7 @@ public static class StructureEdit
     private static EditResult OutOfRange(int index, int count, string what) =>
         Fail(EditErrorCode.IndexOutOfRange, $"The {what} index {index} is out of range: valid indexes are 0 to {count - 1}.");
 
-    private static EditResult LockedFail(AnimationChainSave chain) =>
+    internal static EditResult LockedFail(AnimationChainSave chain) =>
         Fail(EditErrorCode.Locked, $"Chain '{chain.Name}' is locked; unlock it in the editor first.");
 
     private static EditResult Ok(params string[] changed) => new(changed, [], []);

@@ -70,7 +70,6 @@ public class ShapeOpsTests : IDisposable
 
     [Theory]
     [InlineData("""{"op":"add-shape","frame":"Walk/2","type":"rect","name":"Hitbox"}""", "already exists")]
-    [InlineData("""{"op":"add-shape","frame":"Walk/0","type":"cube","name":"X"}""", "type")]
     [InlineData("""{"op":"add-shape","frame":"Walk/9","type":"rect","name":"X"}""", "range")]
     [InlineData("""{"op":"delete-shape","shape":"Walk/2/rect/Nope"}""", "Nope")]
     [InlineData("""{"op":"set-rect","shape":"Walk/2/circle/Foot","x":1}""", "rect")]
@@ -150,6 +149,7 @@ public class ShapeOpsTests : IDisposable
     [InlineData("""{"ops":[{"op":"set-polygon","shape":"Walk/0/polygon/Z","points":[[0,0],[1]]}]}""", "points")]
     [InlineData("""{"ops":[{"op":"set-polygon","shape":"Walk/0/polygon/Z","points":[[0,"a"],[1,1],[2,2]]}]}""", "points")]
     [InlineData("""{"ops":[{"op":"set-rect","shape":"Walk/2/rect/Hitbox","scaleX":"big"}]}""", "scaleX")]
+    [InlineData("""{"ops":[{"op":"add-shape","frame":"Walk/0","type":"cube","name":"X"}]}""", "type")]
     public async Task MalformedShapeOps_AreRefusedBeforeAnythingIsApplied(string opsJson, string messagePart)
     {
         var before = _w.Bytes("hero.achx");
