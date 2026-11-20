@@ -260,6 +260,17 @@ public class FrameTextureEditTests : IDisposable
     }
 
     [Fact]
+    public void ResolveForProject_KnownChoiceCopy_CopiesWithoutPrompt()
+    {
+        var picked = Png(_elsewhere, "far.png");
+
+        var resolved = FrameTextureEdit.ResolveForProject(_pm, picked, TextureCopyChoice.Copy);
+
+        resolved.Result.Success.ShouldBeTrue();
+        File.Exists(Path.Combine(_achxFolder, "far.png")).ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task ResolveForProject_Inside_ReturnsPathUnchanged()
     {
         var picked = Png(_achxFolder, "in.png");

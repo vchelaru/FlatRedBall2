@@ -35,7 +35,22 @@ public static class FrameTextureEdit
         var plan = TextureCopyDecider.PlanCopyForProject(projectManager, texturePath);
         if (plan is null) return new TextureResolveResult(texturePath, Ok());
 
-        var choice = await chooser(plan);
+        return ApplyChoice(plan, await chooser(plan));
+    }
+
+    /// <summary>
+    /// <see cref="ResolveForProjectAsync"/> with the answer already known, such as a retry after a failed copy
+    /// or a non-interactive caller's fixed policy.
+    /// </summary>
+    public static TextureResolveResult ResolveForProject(
+        IProjectManager projectManager, string texturePath, TextureCopyChoice choice)
+    {
+        var plan = TextureCopyDecider.PlanCopyForProject(projectManager, texturePath);
+        return plan is null ? new TextureResolveResult(texturePath, Ok()) : ApplyChoice(plan, choice);
+    }
+
+    private static TextureResolveResult ApplyChoice(TextureCopyPlan plan, TextureCopyChoice choice)
+    {
         try
         {
             var path = TextureCopyDecider.Apply(plan, choice);
