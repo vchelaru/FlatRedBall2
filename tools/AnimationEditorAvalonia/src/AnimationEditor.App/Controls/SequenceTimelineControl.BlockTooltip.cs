@@ -1,3 +1,4 @@
+using System;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
 using Avalonia.Threading;
@@ -66,6 +67,22 @@ public sealed partial class SequenceTimelineControl
             InvalidatePopups();
         };
         _tipTimer.Start();
+    }
+
+    /// <summary>Raised with the (source, chain) of the chain block under the pointer, or nulls when there is none. UI-only.</summary>
+    public event Action<string?, string?>? HoveredChainChanged;
+
+    private (string, string)? _hoveredChain;
+
+    private void UpdateHoveredChain(Point? point)
+    {
+        (string, string)? hovered = null;
+        if (point is { } p && _drag == DragKind.None && !_scrubbing && !_panning && _chipGhost is null && p.X >= Viewport.ColumnWidth && Sequence is { } sequence
+            && TimelineLayout.HitTest(Viewport, _blocks, sequence.Tracks.Count, p.X, p.Y)?.Block is { } block)
+            hovered = (block.Reference.Source, block.Reference.Chain);
+        if (hovered == _hoveredChain) return;
+        _hoveredChain = hovered;
+        HoveredChainChanged?.Invoke(hovered?.Item1, hovered?.Item2);
     }
 
     private void ClearBlockTooltip()

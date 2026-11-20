@@ -318,6 +318,13 @@ public sealed class SequenceLibraryControl : UserControl
     /// <summary>The chip for <paramref name="chain"/> of <paramref name="source"/>, or null when it isn't shown.</summary>
     public LibraryChipView? ChipFor(string source, string chain) => _chips.GetValueOrDefault((source, chain));
 
+    /// <summary>Outlines the chip for <paramref name="chain"/> of <paramref name="source"/> (the timeline block under the pointer) and clears every other; null, or a chain with no chip, clears all. UI-only.</summary>
+    public void HighlightChain(string? source, string? chain)
+    {
+        foreach (var ((chipSource, chipChain), view) in _chips)
+            view.IsHighlighted = chipSource == source && chipChain == chain;
+    }
+
     /// <summary>The header row of <paramref name="source"/>, or null when it isn't shown.</summary>
     public Control? HeaderFor(string source) => _headers.GetValueOrDefault(source);
 
@@ -739,7 +746,18 @@ public sealed class LibraryChipView : Border
     internal bool IsHovered => IsPointerOver;
 
     /// <summary>True while the pointer is over a timeline block of this chain.</summary>
-    internal bool IsHighlighted => false;
+    internal bool IsHighlighted
+    {
+        get => _highlighted;
+        set
+        {
+            if (_highlighted == value) return;
+            _highlighted = value;
+            ShowOutline();
+        }
+    }
+
+    private bool _highlighted;
 
     // The outline and the hover playback both follow Avalonia's own IsPointerOver, which is re-derived from hit-testing as
     // the layout changes, so a missed enter or exit cannot leave a chip stuck on or off. The outline does not depend on
@@ -757,7 +775,7 @@ public sealed class LibraryChipView : Border
     private bool _keyboardFocused;
 
     private void ShowOutline() =>
-        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver || _keyboardFocused ? "Accent" : "LineBrush");
+        SequenceLibraryControl.BindResource(this, BorderBrushProperty, IsPointerOver || _keyboardFocused || _highlighted ? "Accent" : "LineBrush");
 
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {

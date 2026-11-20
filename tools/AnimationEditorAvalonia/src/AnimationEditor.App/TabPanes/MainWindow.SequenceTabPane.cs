@@ -821,7 +821,8 @@ public partial class MainWindow
             };
             w.SequenceTimelinePlayhead.Attach(w.SequenceTimeline);
             w.SequenceTimelinePopups.Attach(w.SequenceTimeline);
-            w.SequenceTimeline.ErrorRaised += message => w.ShowProblem(message);
+            w.SequenceTimeline.HoveredChainChanged += w.SequenceLibrary.HighlightChain;
+            w.SequenceTimeline.ErrorRaised +=message => w.ShowProblem(message);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
             w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
