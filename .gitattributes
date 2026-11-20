@@ -12,3 +12,6 @@ tests/FlatRedBall2.GoldenImage.Tests/Golden/*.png binary
 
 # Shell scripts (repo hooks) must stay LF: bash cannot run a CRLF script.
 *.sh text eol=lf
+
+# AE CLI fixtures: .achj is LF and compared byte-for-byte.
+tools/AnimationEditorAvalonia/tests/AnimationEditor.Cli.Tests/Fixtures/*.achj text eol=lf

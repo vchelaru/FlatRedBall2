@@ -1,0 +1,79 @@
+{
+  "fileRelativeTextures": true,
+  "timeMeasurementUnit": "Second",
+  "coordinateType": "Pixel",
+  "animationChains": [
+    {
+      "name": "Walk",
+      "frames": [
+        {
+          "textureName": "sheet.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 0,
+          "rightCoordinate": 16,
+          "topCoordinate": 0,
+          "bottomCoordinate": 32
+        },
+        {
+          "textureName": "sheet.png",
+          "frameLength": 0.1,
+          "leftCoordinate": 16,
+          "rightCoordinate": 32,
+          "topCoordinate": 0,
+          "bottomCoordinate": 32
+        },
+        {
+          "textureName": "sheet.png",
+          "frameLength": 0.2,
+          "leftCoordinate": 32,
+          "rightCoordinate": 48,
+          "topCoordinate": 0,
+          "bottomCoordinate": 32,
+          "shapes": {
+            "rectangles": [
+              {
+                "name": "Hitbox",
+                "x": 1,
+                "y": 2,
+                "scaleX": 4,
+                "scaleY": 6,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            ],
+            "circles": [
+              {
+                "name": "Foot",
+                "x": 0,
+                "y": -8,
+                "radius": 3,
+                "z": 0,
+                "alpha": 1,
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            ],
+            "polygons": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Idle",
+      "frames": [
+        {
+          "textureName": "sheet.png",
+          "frameLength": 0.5,
+          "leftCoordinate": 0,
+          "rightCoordinate": 16,
+          "topCoordinate": 0,
+          "bottomCoordinate": 32
+        }
+      ]
+    }
+  ]
+}

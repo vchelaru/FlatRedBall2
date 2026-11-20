@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FileRelativeTextures>true</FileRelativeTextures>
+  <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+  <CoordinateType>Pixel</CoordinateType>
+  <AnimationChain>
+    <Name>Walk</Name>
+    <Frame>
+      <TextureName>sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+    <Frame>
+      <TextureName>sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>16</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+    <Frame>
+      <TextureName>sheet.png</TextureName>
+      <FrameLength>0.2</FrameLength>
+      <LeftCoordinate>32</LeftCoordinate>
+      <RightCoordinate>48</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves>
+          <AxisAlignedRectangleSave>
+            <X>1</X>
+            <Y>2</Y>
+            <Z>0</Z>
+            <ScaleX>4</ScaleX>
+            <ScaleY>6</ScaleY>
+            <Name>Hitbox</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </AxisAlignedRectangleSave>
+        </AxisAlignedRectangleSaves>
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>0</X>
+            <Y>-8</Y>
+            <Z>0</Z>
+            <Radius>3</Radius>
+            <Name>Foot</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Idle</Name>
+    <Frame>
+      <TextureName>sheet.png</TextureName>
+      <FrameLength>0.5</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+  </AnimationChain>
+</AnimationChainArraySave>
