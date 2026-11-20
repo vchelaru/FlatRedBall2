@@ -52,8 +52,16 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
     public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength,
         IReadOnlyList<SnapTarget>? targets = null, bool bypass = false, Func<int, bool>? acceptsChains = null)
     {
-        if (x < viewport.ColumnWidth || x > viewWidth) return None;
+        if (x < 0 || x > viewWidth) return None;
         var row = viewport.RowAt(y, trackCount);
+        if (x < viewport.ColumnWidth)
+        {
+            // The new-track label in the header column is a drop too, with no time under the pointer: the chain starts at 0.
+            if (row.Kind != TimelineRowKind.NewTrack) return None;
+            double zeroLength = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
+            return new TimelineDropPlan(TimelineDropKind.NewTrack, TimelineViewport.NewTrackLane, 0, zeroLength, viewport.XAt(0),
+                zeroLength * viewport.PixelsPerSecond);
+        }
         if (row.Kind is not (TimelineRowKind.Track or TimelineRowKind.NewTrack)) return None;
         if (row.Kind == TimelineRowKind.Track && acceptsChains is not null && !acceptsChains(row.Track)) return None;
 
