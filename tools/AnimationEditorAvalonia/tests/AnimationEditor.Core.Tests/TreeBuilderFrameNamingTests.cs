@@ -35,7 +35,7 @@ public class TreeBuilderFrameNamingTests
         chain.Frames.Add(f1);
         chain.Frames.Add(f2);
 
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // Initial labels
         Assert.Equal("Frame 1", chainNode.Children[0].Header);
@@ -45,7 +45,7 @@ public class TreeBuilderFrameNamingTests
         chain.Frames.RemoveAt(0);
         chain.Frames.Insert(1, f1);
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // f2 is now at position 0 → "Frame 1"; f1 is at position 1 → "Frame 2"
         Assert.Equal("Frame 1", chainNode.Children[0].Header);

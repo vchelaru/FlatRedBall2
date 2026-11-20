@@ -26,25 +26,25 @@ public class FrameLengthUnitGuardTests
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",
         "Core/Tiled/TiledAnimationToAchjMapper.cs",
         "Core/ViewModels/TimelineStripSignature.cs",
-    };
-
-    /// <summary>Files still treating the raw value as seconds. Each later #1829 slice removes its files; the last leaves this empty.</summary>
-    private static readonly string[] Pending =
-    {
         "App/MainWindow.axaml.cs",
-        "Core/CommandsAndState/PlaybackController.cs",
-        "Core/Rendering/ChainClock.cs",
         "Core/Rendering/FrameTimeScaler.cs",
-        "Core/Sequences/EventMarkers.cs",
-        "Core/Sequences/FilmstripLayout.cs",
-        "Core/Sequences/TimelineSnapTargets.cs",
         "Core/ViewModels/TimelineBuilder.cs",
         "Core/ViewModels/TreeBuilder.cs",
         "Views/Dialogs/EditorDialogs.cs",
     };
 
+    /// <summary>Files still treating the raw value as seconds. Each later #1829 slice removes its files; the last leaves this empty.</summary>
+    private static readonly string[] Pending =
+    {
+        "Core/CommandsAndState/PlaybackController.cs",
+        "Core/Rendering/ChainClock.cs",
+        "Core/Sequences/EventMarkers.cs",
+        "Core/Sequences/FilmstripLayout.cs",
+        "Core/Sequences/TimelineSnapTargets.cs",
+    };
+
     private static readonly Regex Touches = new(@"\bFrameLength\b", RegexOptions.Compiled);
-    private static readonly Regex SecondsLiteral = new(@"FrameLength\s*(\?\?|=)\s*\d|\?\?\s*0\.1f?\b", RegexOptions.Compiled);
+    private static readonly Regex SecondsLiteral = new(@"FrameLength\s*(\?\?|=)\s*\d|FrameLength:\s*0\.|\?\?\s*0\.1f?\b", RegexOptions.Compiled);
 
     private static string SourceRoot()
     {

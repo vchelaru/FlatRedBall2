@@ -204,7 +204,7 @@ public partial class MainWindow
             if (selectedState.SelectedFrames.Count >= 2)
                 return $"{selectedState.SelectedFrames.Count} frames selected";
             int totalFrames = acls.AnimationChains.Sum(c => c.Frames.Count);
-            string totalTime = TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(acls));
+            string totalTime = TimelineBuilder.FormatTotal(acls);
             return $"{Plural.Format(acls.AnimationChains.Count, "chain")} · {Plural.Format(totalFrames, "frame")} · {totalTime}";
         }
 

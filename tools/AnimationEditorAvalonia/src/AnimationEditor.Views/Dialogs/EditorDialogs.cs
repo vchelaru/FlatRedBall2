@@ -2,6 +2,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -148,7 +149,7 @@ public static class EditorDialogs
     /// with <see cref="IAppCommands.SealPendingEdits"/>.
     /// </summary>
     public static async Task ShowAdjustFrameTimeAsync(
-        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain)
+        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain, FrameLengthUnit unit)
     {
         if (chain.Frames.Count == 0) return;
 
@@ -166,8 +167,8 @@ public static class EditorDialogs
         {
             Value = (decimal)totalDuration,
             Minimum = 0m,
-            Maximum = 3600m,
-            Increment = 0.1m,
+            Maximum = unit.DialogMaximum,
+            Increment = unit.DialogStep,
             FormatString = "0.###",
             Width = 160,
         };
@@ -189,7 +190,7 @@ public static class EditorDialogs
             float value = (float)(durationInput.Value ?? 0m);
             perFrameLabel.IsVisible = radioSetAll.IsChecked == true;
             if (perFrameLabel.IsVisible)
-                perFrameLabel.Text = $"Each frame: {value / frameCount:0.###} seconds";
+                perFrameLabel.Text = $"Each frame: {value / frameCount:0.###} {unit.Name}";
         }
 
         void ApplyLive()
@@ -210,7 +211,7 @@ public static class EditorDialogs
         UpdateLabel();
 
         var panel = new StackPanel { Margin = new Thickness(12), Spacing = 8 };
-        panel.Children.Add(new TextBlock { Text = "Total animation duration (seconds):" });
+        panel.Children.Add(new TextBlock { Text = $"Total animation duration ({unit.Name}):" });
         panel.Children.Add(durationInput);
         panel.Children.Add(radioProportional);
         panel.Children.Add(radioSetAll);

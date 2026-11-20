@@ -1131,7 +1131,7 @@
                                                     <viewsControls:FlankerNumericField x:Name="PropFrameLen" Grid.Column="1"
                                                                    Minimum="0.001" Maximum="60"
                                                                    Increment="0.05" FormatString="0.###" />
-                                                    <TextBlock Text="s" Grid.Column="2"
+                                                    <TextBlock x:Name="PropFrameLenUnit" Text="s" Grid.Column="2"
                                                                VerticalAlignment="Center" Margin="4,0,0,0"
                                                                Foreground="{DynamicResource InkDim}" FontSize="11" />
                                                 </Grid>

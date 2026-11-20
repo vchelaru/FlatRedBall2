@@ -224,7 +224,7 @@ public class AppCommandsPolygonTests
         var (ctx, frame) = FrameWithNoShapes();
         var polygon = AddPolygon(ctx, frame);
 
-        var node = TreeBuilder.BuildFrameNode(frame);
+        var node = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         node.Children.Single().Data.ShouldBe(polygon);
         node.Children.Single().Kind.ShouldBe(NodeKind.PolygonShape);
