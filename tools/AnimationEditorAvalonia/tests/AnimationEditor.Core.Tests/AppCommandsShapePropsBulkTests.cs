@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
@@ -248,5 +249,34 @@ public class AppCommandsPolygonPropsBulkTests
 
         Assert.Equal(1f, a.X);
         Assert.Equal(50f, b.X);
+    }
+}
+
+[Collection("SequentialSingletons")]
+public class AppCommandsMixedShapePropsTests
+{
+    [Fact]
+    public void SetShapePropsBulk_RectangleAndCircle_SetsXOnBoth_InOneUndoStep()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var rect = new AARectSave { Name = "R", X = -20f, Y = 1f, ScaleX = 8f, ScaleY = 8f };
+        var circle = new CircleSave { Name = "C", X = 20f, Y = 2f, Radius = 4f };
+        chain.Frames[0].ShapesSave!.Add(rect);
+        chain.Frames[0].ShapesSave!.Add(circle);
+
+        ctx.AppCommands.SetShapePropsBulk(new List<ShapeSave> { rect, circle }, null, NumericEdit.Set(7m), null);
+
+        Assert.Equal(7f, rect.X);
+        Assert.Equal(7f, circle.X);
+        Assert.Equal(1f, rect.Y);
+        Assert.Equal(2f, circle.Y);
+        Assert.Equal(8f, rect.ScaleX);
+        Assert.Equal(4f, circle.Radius);
+
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(-20f, rect.X);
+        Assert.Equal(20f, circle.X);
     }
 }

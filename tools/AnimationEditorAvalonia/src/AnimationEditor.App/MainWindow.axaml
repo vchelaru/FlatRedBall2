@@ -1312,6 +1312,43 @@
                                     </StackPanel>
 
                                     <!-- ── Rectangle properties ── -->
+                                    <!-- Shapes of different types selected together: only the fields every shape type shares. -->
+                                    <StackPanel x:Name="PropShapesPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="SHAPES"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Name" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <TextBox x:Name="PropShapesName" Grid.Column="1" FontSize="11" />
+                                                </Grid>
+                                                <TextBlock Text="Offset"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <viewsControls:KeyframeControl x:Name="PropShapesOffsetKeyframe" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropShapesX" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.###" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropShapesY" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.###" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
                                     <StackPanel x:Name="PropRectPanel" IsVisible="False" Spacing="0">
                                         <Border BorderBrush="{DynamicResource LineBrush}"
                                                 BorderThickness="0,0,0,1"

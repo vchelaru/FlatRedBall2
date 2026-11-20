@@ -165,9 +165,9 @@ public class ShapeSelectionInspectorTests
         finally { window.Close(); }
     }
 
-    /// <summary>A rect and a circle selected together: only the primary shape's kind has a panel and gets edited.</summary>
+    /// <summary>A rect and a circle selected together show the shared SHAPES panel (#1825), not either per-type panel.</summary>
     [AvaloniaFact]
-    public void RectAndCircleSelected_OnlyPrimaryKindPanelShowsAndEdits()
+    public void RectAndCircleSelected_SharedPanelShowsAndEditsBoth()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -179,17 +179,17 @@ public class ShapeSelectionInspectorTests
 
             TreeSelect(window, rect, circle);
 
-            // Whichever the tree routed as primary is the only kind with a visible panel and edit.
-            bool circlePrimary = ctx.SelectedState.SelectedShape is CircleSave;
-            Assert.Equal(circlePrimary, window.FindControl<Control>("PropCirclePanel")!.IsVisible);
-            Assert.Equal(!circlePrimary, window.FindControl<Control>("PropRectPanel")!.IsVisible);
+            Assert.True(window.FindControl<Control>("PropShapesPanel")!.IsVisible);
+            Assert.False(window.FindControl<Control>("PropCirclePanel")!.IsVisible);
+            Assert.False(window.FindControl<Control>("PropRectPanel")!.IsVisible);
 
-            if (circlePrimary) window.FindControl<NumericUpDown>("PropCircleRadius")!.Value = 40m;
-            else window.FindControl<NumericUpDown>("PropRectScaleX")!.Value = 40m;
+            window.FindControl<NumericUpDown>("PropShapesX")!.Value = 12m;
             FlushUi();
 
-            Assert.Equal(circlePrimary ? 40f : 5f, circle.Radius);
-            Assert.Equal(circlePrimary ? 8f : 40f, rect.ScaleX); // the non-primary kind is not edited
+            Assert.Equal(12f, circle.X);
+            Assert.Equal(12f, rect.X);
+            Assert.Equal(5f, circle.Radius);
+            Assert.Equal(8f, rect.ScaleX);
         }
         finally { window.Close(); }
     }

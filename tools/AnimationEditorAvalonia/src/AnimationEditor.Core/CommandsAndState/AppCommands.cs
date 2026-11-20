@@ -2392,6 +2392,25 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, _objectFinder, "Edit Circles"));
         }
 
+        public void SetShapePropsBulk(IReadOnlyList<ShapeSave> shapes,
+            string? name, NumericEdit? x, NumericEdit? y)
+        {
+            shapes = shapes.Where(s => !IsShapeLocked(null, s)).ToList();
+            if (shapes.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                shapes.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var s in shapes)
+                    {
+                        if (name != null) s.Name = name;
+                        if (x.HasValue) s.X = x.Value.Apply(s.X);
+                        if (y.HasValue) s.Y = y.Value.Apply(s.Y);
+                    }
+                },
+                this, _events, _objectFinder, "Edit Shapes"));
+        }
+
         public void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons,
             string? name, NumericEdit? x, NumericEdit? y)
         {
