@@ -4754,21 +4754,43 @@ public partial class MainWindow : Window
             EndTreeSelectionBurst();
     }
 
+    /// <summary>False for a chain, frame or shape that a command has removed from the project.</summary>
+    private bool IsStillInModel(object data)
+    {
+        var acls = _projectManager.AnimationChainListSave;
+        if (acls is null) return true;
+        return data switch
+        {
+            AnimationChainSave chain => acls.AnimationChains.Contains(chain),
+            AnimationFrameSave frame => _objectFinder.GetAnimationChainContaining(frame) is not null,
+            ShapeSave shape => _objectFinder.GetAnimationFrameContaining(shape) is not null,
+            _ => true,
+        };
+    }
+
     private void SyncTreeSelectionFromAnimTree(TreeNodeVm vm)
     {
         LogSelectionPerf($"==== SyncTreeSelectionFromAnimTree: {AnimTree.SelectedItems.Count} tree items selected ====");
         var overallSw = Stopwatch.StartNew();
 
+        // The tree can still hold rows for items a command just deleted (the TreeView drops them
+        // from its selection lazily). Syncing those back would resurrect deleted shapes, frames
+        // or animations in the selection (#1824), so only rows still in the model are synced.
+        var liveData = AnimTree.SelectedItems
+            .OfType<TreeNodeVm>()
+            .Select(n => n.Data)
+            .OfType<object>()
+            .Where(IsStillInModel)
+            .ToList();
+        if (liveData.Count == 0) return;
+        object primary = vm.Data is { } d && liveData.Contains(d) ? d : liveData[0];
+
         // Sync multi-select into SelectedState
         TimeSelectionPerf("SelectedNodes assignment (1st SelectionChanged dispatch)", () =>
-            _selectedState.SelectedNodes = AnimTree.SelectedItems
-                .OfType<TreeNodeVm>()
-                .Select(n => n.Data)
-                .OfType<object>()
-                .ToList());
+            _selectedState.SelectedNodes = liveData);
 
         TimeSelectionPerf("RouteNodeSelection (2nd SelectionChanged dispatch)", () =>
-            TreeBuilder.RouteNodeSelection(vm.Data, _selectedState, _projectManager.AnimationChainListSave));
+            TreeBuilder.RouteNodeSelection(primary, _selectedState, _projectManager.AnimationChainListSave));
 
         LogSelectionPerf($"==== SyncTreeSelectionFromAnimTree done: {overallSw.ElapsedMilliseconds}ms ====");
     }

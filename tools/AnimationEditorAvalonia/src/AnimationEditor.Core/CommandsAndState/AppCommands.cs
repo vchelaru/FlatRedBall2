@@ -1007,7 +1007,8 @@ namespace AnimationEditor.Core.CommandsAndState
             // Single shape reuses its own command's "Delete Rectangle 'X'" / "Delete Circle 'X'"
             // text so the History panel reads naturally instead of "Composite Action".
             string desc = total == 1 ? commands[0].Description : $"Delete {total} Shapes";
-            _undoManager.Execute(new CompositeCommand(commands, desc));
+            _undoManager.Execute(new DeleteWithSelectionCommand(
+                new CompositeCommand(commands, desc), deleted, _selectedState));
 
             ItemsDeleted?.Invoke(total == 1 ? deleted[0].Name : $"{total} shapes");
         }
@@ -1056,7 +1057,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 commands.Add(new DeleteChainsCommand(chainList, acls, this, _events, _selectedState));
 
             int total = chainList.Count + frameList.Count + shapeList.Count;
-            _undoManager.Execute(new CompositeCommand(commands, $"Delete {total} Items"));
+            _undoManager.Execute(new DeleteWithSelectionCommand(
+                new CompositeCommand(commands, $"Delete {total} Items"),
+                shapes.OfType<ShapeSave>().ToList(), _selectedState));
 
             ItemsDeleted?.Invoke($"{total} items");
             RefreshWireframeRequested?.Invoke();
