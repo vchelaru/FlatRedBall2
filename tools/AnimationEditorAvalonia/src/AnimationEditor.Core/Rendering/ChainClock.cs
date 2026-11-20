@@ -1,5 +1,6 @@
 using System;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Rendering;
@@ -19,11 +20,11 @@ public static class ChainClock
     /// Length of one cycle in seconds (unset lengths count as 0.1s): the sum of the chain's frames, or twice that under
     /// <see cref="AnimationChainSave.PingPong"/>.
     /// </summary>
-    public static double TotalLength(AnimationChainSave chain)
+    public static double TotalLength(AnimationChainSave chain, FrameLengthUnit unit)
     {
         double total = 0;
         foreach (var frame in chain.Frames)
-            total += PlaybackController.FrameLength(frame);
+            total += PlaybackController.FrameSeconds(frame, unit);
         return PlaybackTimeline.CycleLength(total, chain.PingPong);
     }
 
@@ -32,18 +33,18 @@ public static class ChainClock
     /// that frame to sample it at. A looping chain wraps; a non-looping chain holds its end.
     /// The chain must have at least one frame.
     /// </summary>
-    public static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double time)
+    public static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double time, FrameLengthUnit unit)
     {
-        double total = TotalLength(chain);
+        double total = TotalLength(chain, unit);
         double local = time + BoundaryTolerance;
         bool atEnd = local >= total && !chain.Loop;
         if (local >= total)
             local = chain.Loop ? local % total : total;
 
-        var at = PlaybackTimeline.Locate(chain.Frames, PlaybackController.FrameLength, local, chain.PingPong, chain.Reverse);
+        var at = PlaybackTimeline.Locate(chain.Frames, f => PlaybackController.FrameSeconds(f, unit), local, chain.PingPong, chain.Reverse);
         // Undo the nudge on the sampled position, in the direction the timeline plays.
         double elapsed = atEnd ? at.ElapsedInFrame
             : at.IsBackward ? at.ElapsedInFrame + BoundaryTolerance : at.ElapsedInFrame - BoundaryTolerance;
-        return (at.FrameIndex, Math.Clamp(elapsed, 0, PlaybackController.FrameLength(chain.Frames[at.FrameIndex])));
+        return (at.FrameIndex, Math.Clamp(elapsed, 0, PlaybackController.FrameSeconds(chain.Frames[at.FrameIndex], unit)));
     }
 }

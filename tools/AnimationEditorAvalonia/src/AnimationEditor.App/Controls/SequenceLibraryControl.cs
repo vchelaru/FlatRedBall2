@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Rendering;
@@ -784,8 +785,8 @@ public sealed class LibraryChipView : Border
     private void ShowFrameAt(double seconds)
     {
         // Loops while hovered whatever the chain's own Loop flag, so a one-shot chain can be watched more than once.
-        double cycle = ChainClock.TotalLength(Chip.Chain);
-        ShowFrame(ChainClock.Locate(Chip.Chain, cycle > 0 ? seconds % cycle : 0).FrameIndex);
+        double cycle = ChainClock.TotalLength(Chip.Chain, FrameLengthUnit.Seconds);
+        ShowFrame(ChainClock.Locate(Chip.Chain, cycle > 0 ? seconds % cycle : 0, FrameLengthUnit.Seconds).FrameIndex);
     }
 
     private void ShowFrame(int index, bool force = false)

@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,10 +15,10 @@ namespace AnimationEditor.Core.ViewModels;
 /// </summary>
 public sealed record ShapeSharedFields(bool IsMixedType, string? Name, float? X, float? Y)
 {
-    public static ShapeSharedFields For(IReadOnlyList<ShapeSave> shapes, Func<ShapeSave, AnimationChainSave?> chainOf)
+    public static ShapeSharedFields For(IReadOnlyList<ShapeSave> shapes, Func<ShapeSave, AnimationChainSave?> chainOf, FrameLengthUnit unit)
     {
         bool mixedType = shapes.Select(s => s.GetType()).Distinct().Count() > 1;
-        var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, chainOf(s))).ToList();
+        var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, chainOf(s), unit)).ToList();
         return new ShapeSharedFields(
             mixedType,
             MixedState.Common(shapes.Select(s => s.Name ?? "")),

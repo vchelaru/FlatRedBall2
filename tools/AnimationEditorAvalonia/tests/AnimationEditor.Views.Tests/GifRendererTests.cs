@@ -37,7 +37,7 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
         chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
 
-        byte[] gif = Render(new[] { new ExportSourceChain(chain) }, Solid(scale: 3));
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 3));
 
         using var codec = Open(gif);
         Assert.Equal((3, 3), (codec.Info.Width, codec.Info.Height));
@@ -56,7 +56,7 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 4));
 
-        byte[] gif = Render(new[] { new ExportSourceChain(chain) }, Solid());
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid());
 
         using var codec = Open(gif);
         // A 1px sprite centered at x=0 spans [-0.5, 0.5] snapped to [0, 1]; at x=4 it spans [4, 5].
@@ -74,7 +74,7 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 2));
 
-        byte[] gif = Render(new[] { new ExportSourceChain(chain) }, new AnimationExportOptions(50, Transparent: true, 0, 1));
+        byte[] gif = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, new AnimationExportOptions(50, Transparent: true, 0, 1));
 
         Assert.Equal(SKColors.Red, PixelAt(gif, 0, 0, 0));
         Assert.Equal(0, PixelAt(gif, 0, 2, 0).Alpha);
@@ -92,7 +92,7 @@ public class GifRendererTests : IDisposable
         var front = new AnimationChainSave { Name = "Front", Loop = true };
         front.Frames.Add(Frame("front.png", 0f, 1f));
 
-        byte[] gif = Render(new[] { new ExportSourceChain(back), new ExportSourceChain(front) }, Solid());
+        byte[] gif = Render(new[] { new ExportSourceChain(back, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), new ExportSourceChain(front, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid());
 
         Assert.Equal(SKColors.Blue, PixelAt(gif, 0, 0, 0));
     }
@@ -106,8 +106,8 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 10));
         chain.Frames[0].OffsetInterpolation = "Linear";
 
-        byte[] at50 = Render(new[] { new ExportSourceChain(chain) }, Solid(fps: 50));
-        byte[] at25 = Render(new[] { new ExportSourceChain(chain) }, Solid(fps: 25));
+        byte[] at50 = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(fps: 50));
+        byte[] at25 = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(fps: 25));
 
         using var fast = Open(at50);
         using var slow = Open(at25);
@@ -123,6 +123,6 @@ public class GifRendererTests : IDisposable
         chain.Frames.Add(Frame("missing.png", 0f, 1f));
 
         Assert.Throws<InvalidOperationException>(() =>
-            GifRenderer.Render(new[] { new ExportSourceChain(chain) }, _ => null, 1f, Solid()));
+            GifRenderer.Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, _ => null, 1f, Solid()));
     }
 }

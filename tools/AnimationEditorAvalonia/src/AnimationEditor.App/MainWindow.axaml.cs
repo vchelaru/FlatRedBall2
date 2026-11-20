@@ -3157,7 +3157,7 @@ public partial class MainWindow : Window
     {
         var sources = _selectedState.PreviewChains
             .Where(chain => chain.Frames.Count > 0)
-            .Select(chain => new ExportSourceChain(chain))
+            .Select(chain => new ExportSourceChain(chain, CurrentFrameLengthUnit))
             .ToList();
         if (sources.Count == 0)
         {
@@ -6332,7 +6332,7 @@ public partial class MainWindow : Window
                 // Keyframe off: the fields read-only and showing the value in effect at the frame's start.
                 var offsetState = KeyframeInspectorState.For(KeyframeGroup.Offset, frames, _objectFinder.GetAnimationChainContaining);
                 PropTransformKeyframe.Show(offsetState);
-                var offsets = frames.Select(f => KeyframeInspectorState.DisplayOffset(f, _objectFinder.GetAnimationChainContaining(f))).ToList();
+                var offsets = frames.Select(f => KeyframeInspectorState.DisplayOffset(f, _objectFinder.GetAnimationChainContaining(f), CurrentFrameLengthUnit)).ToList();
                 SetValueOrMixed(PropRelX, offsets.Select(o => (decimal)o.X).ToList());
                 SetValueOrMixed(PropRelY, offsets.Select(o => (decimal)o.Y).ToList());
                 SetComputedLook(offsetState.FieldsEditable, PropRelX, PropRelY);
@@ -6473,7 +6473,7 @@ public partial class MainWindow : Window
         var pointsState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Points, polygons, ChainOfShape);
         PropPolygonPointsKeyframe.Show(pointsState);
         bool editable = PolygonPointsEditable(polygon);
-        var shown = KeyframeInspectorState.DisplayShapePoints(polygon, ChainOfShape(polygon));
+        var shown = KeyframeInspectorState.DisplayShapePoints(polygon, ChainOfShape(polygon), CurrentFrameLengthUnit);
         int count = PolygonVertices.Count(shown);
         if (!ReferenceEquals(_polygonRowsFor, polygon) || _polygonVertexRows.Count != count || _polygonRowsEditable != editable)
             RebuildPolygonVertexRows(polygon, count, editable);
@@ -6745,7 +6745,7 @@ public partial class MainWindow : Window
 
     /// <summary>What the color fields display for each of <paramref name="frames"/> (see <see cref="KeyframeInspectorState.DisplayColor"/>).</summary>
     private List<KeyframeColor> InspectorColors(IReadOnlyList<AnimationFrameSave> frames) =>
-        frames.Select(f => KeyframeInspectorState.DisplayColor(f, _objectFinder.GetAnimationChainContaining(f))).ToList();
+        frames.Select(f => KeyframeInspectorState.DisplayColor(f, _objectFinder.GetAnimationChainContaining(f), CurrentFrameLengthUnit)).ToList();
 
     /// <summary>Makes numeric fields read-only and dimmed while they show a computed value.</summary>
     private static void SetComputedLook(bool editable, params NumericUpDown[] fields)
@@ -6789,7 +6789,7 @@ public partial class MainWindow : Window
     {
         var offsetState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Offset, shapes, ChainOfShape);
         offsetControl.Show(offsetState);
-        var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, ChainOfShape(s))).ToList();
+        var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, ChainOfShape(s), CurrentFrameLengthUnit)).ToList();
         SetValueOrMixed(x, offsets.Select(o => (decimal)o.X).ToList());
         SetValueOrMixed(y, offsets.Select(o => (decimal)o.Y).ToList());
         SetComputedLook(offsetState.FieldsEditable, x, y);
@@ -6797,7 +6797,7 @@ public partial class MainWindow : Window
         if (sizeControl is null || sizeX is null) return;
         var sizeState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Size, shapes, ChainOfShape);
         sizeControl.Show(sizeState);
-        var sizes = shapes.Select(s => KeyframeInspectorState.DisplayShapeSize(s, ChainOfShape(s))).ToList();
+        var sizes = shapes.Select(s => KeyframeInspectorState.DisplayShapeSize(s, ChainOfShape(s), CurrentFrameLengthUnit)).ToList();
         SetValueOrMixed(sizeX, sizes.Select(v => (decimal)v.SizeX).ToList());
         SetComputedLook(sizeState.FieldsEditable, sizeX);
         if (sizeY is null) return;

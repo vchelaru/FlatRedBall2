@@ -27,7 +27,7 @@ public class KeyframeSamplerTests
     {
         var chain = Slide();
 
-        var sample = KeyframeSampler.Sample(chain, 0, 0.09);
+        var sample = KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0.09);
 
         Assert.Equal(0f, sample.OffsetX);
         Assert.Equal(0, sample.Color.Red);
@@ -41,7 +41,7 @@ public class KeyframeSamplerTests
         chain.Frames[0].OffsetInterpolation = "Linear";
         chain.Frames[0].ColorInterpolation = "Linear";
 
-        var sample = KeyframeSampler.Sample(chain, 0, 0.05);
+        var sample = KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0.05);
 
         Assert.Equal(50f, sample.OffsetX, 3);
         Assert.Equal(100, sample.Color.Red);
@@ -58,7 +58,7 @@ public class KeyframeSamplerTests
         chain.Frames[0].OffsetInterpolation = "Quadratic";
         chain.Frames[0].OffsetEasing = "In";
 
-        var sample = KeyframeSampler.Sample(chain, 0, 0.05);
+        var sample = KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0.05);
 
         Assert.Equal(25f, sample.OffsetX, 3); // quadratic ease-in at t = 0.5
     }
@@ -72,7 +72,7 @@ public class KeyframeSamplerTests
         chain.Frames[0].OffsetInterpolation = "Linear";
         chain.Frames[1].SkipOffsetKeyframe = true;
 
-        var sample = KeyframeSampler.Sample(chain, 1, 0);
+        var sample = KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1, 0);
 
         Assert.Equal(45f, sample.OffsetX, 3);
     }
@@ -83,7 +83,7 @@ public class KeyframeSamplerTests
         var chain = new AnimationChainSave { Name = "c" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
 
-        var sample = KeyframeSampler.Sample(chain, 0, 0);
+        var sample = KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0);
 
         Assert.Null(sample.Color.Red);
         Assert.Null(sample.Color.Alpha);
@@ -92,8 +92,8 @@ public class KeyframeSamplerTests
     [Fact]
     public void EmptyOrMissingChain_IsZeroAndUnset()
     {
-        Assert.Equal(0f, KeyframeSampler.Sample(null, 0, 0).OffsetX);
-        Assert.Equal(0f, KeyframeSampler.Sample(new AnimationChainSave(), 3, 1).OffsetY);
+        Assert.Equal(0f, KeyframeSampler.Sample(null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0).OffsetX);
+        Assert.Equal(0f, KeyframeSampler.Sample(new AnimationChainSave(), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 3, 1).OffsetY);
     }
 
     [Fact]

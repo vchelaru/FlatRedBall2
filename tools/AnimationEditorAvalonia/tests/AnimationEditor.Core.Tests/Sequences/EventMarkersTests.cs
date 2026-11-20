@@ -24,7 +24,7 @@ public class EventMarkersTests
         withEvents.Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Shake", Data = "3" });
         var chain = new AnimationChainSave { Frames = { withEvents, new AnimationFrameSave { FrameLength = 0.5f } } };
 
-        var frames = EventMarkers.FramesOf(chain);
+        var frames = EventMarkers.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         frames.Count.ShouldBe(2);
         frames[0].Duration.ShouldBe(0.25, 1e-6);
@@ -196,7 +196,7 @@ public class EventMarkersTests
         sequence.Tracks.Add(track);
         double cycle = chain.Frames.Sum(f => (double)f.FrameLength) * (chain.PingPong ? 2 : 1);
         var block = TimelineLayout.Blocks(sequence, _ => cycle).First(b => ReferenceEquals(b.Reference, references[0]));
-        return EventMarkers.Occurrences(EventMarkers.FramesOf(chain), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
+        return EventMarkers.Occurrences(EventMarkers.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
     }
 
     private static SequenceChainReferenceSave Ref(double start, float loops) => new() { Source = "s.achx", Chain = "C", Start = start, Loops = loops };
@@ -253,7 +253,7 @@ public class EventMarkersTests
         sequence.Tracks.Add(track);
 
         var blocks = TimelineLayout.Blocks(sequence, _ => 0.4);
-        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain), false, false, blocks[0].Played, chain.Loop);
+        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), false, false, blocks[0].Played, chain.Loop);
 
         blocks[0].PlayedEnd.ShouldBe(0.8, 1e-9);
         Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6) });

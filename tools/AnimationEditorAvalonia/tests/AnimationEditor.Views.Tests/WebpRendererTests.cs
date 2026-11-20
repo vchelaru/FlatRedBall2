@@ -36,7 +36,7 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
         chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
 
-        byte[] webp = Render(new[] { new ExportSourceChain(chain) }, Solid(scale: 3));
+        byte[] webp = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 3));
 
         using var codec = Open(webp);
         Assert.Equal(SKEncodedImageFormat.Webp, codec.EncodedFormat);
@@ -56,7 +56,7 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 0));
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 2));
 
-        byte[] webp = Render(new[] { new ExportSourceChain(chain) }, new AnimationExportOptions(60, Transparent: true, 0, 1));
+        byte[] webp = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, new AnimationExportOptions(60, Transparent: true, 0, 1));
 
         Assert.InRange(PixelAt(webp, 0, 0, 0).Alpha, 126, 130);
         Assert.Equal(0, PixelAt(webp, 0, 2, 0).Alpha);
@@ -73,7 +73,7 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0f, 1f, x: 12));
         chain.Frames[0].OffsetInterpolation = "Linear";
 
-        byte[] webp = Render(new[] { new ExportSourceChain(chain) }, Solid(fps: 60));
+        byte[] webp = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(fps: 60));
 
         using var codec = Open(webp);
         Assert.Equal(200, codec.FrameInfo.Sum(f => f.Duration));
@@ -89,7 +89,7 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
 
         byte[] webp = Render(
-            new[] { new ExportSourceChain(chain) },
+            new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) },
             new AnimationExportOptions(30, Transparent: false, 0xFFFFFFFF, Scale: 8, Lossless: false, Quality: 50));
 
         using var codec = Open(webp);
@@ -109,7 +109,7 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("wide.png", 0f, 1f));
 
         Assert.Throws<InvalidOperationException>(() =>
-            Render(new[] { new ExportSourceChain(chain) }, Solid(scale: 16)));
+            Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 16)));
     }
 
     [Fact]
@@ -119,6 +119,6 @@ public class WebpRendererTests : IDisposable
         chain.Frames.Add(Frame("missing.png", 0f, 1f));
 
         Assert.Throws<InvalidOperationException>(() =>
-            WebpRenderer.Render(new[] { new ExportSourceChain(chain) }, _ => null, 1f, Solid()));
+            WebpRenderer.Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, _ => null, 1f, Solid()));
     }
 }

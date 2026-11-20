@@ -31,7 +31,7 @@ public class ExportTimelinePlannerTests
     {
         var walk = Chain("Walk", loop: true, (0.1f, 0f), (0.1f, 4f));
 
-        var timeline = PlanGif(50, new ExportSourceChain(walk));
+        var timeline = PlanGif(50, new ExportSourceChain(walk, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline.Select(f => f.DelayTicks).ShouldBe(new[] { 10, 10 });
         timeline.Select(f => f.Layers[0].OffsetX).ShouldBe(new[] { 0f, 4f });
@@ -43,7 +43,7 @@ public class ExportTimelinePlannerTests
         // 0.1s at 50fps is 5 steps from x=0 toward x=10: 0, 2, 4, 6, 8.
         var slide = Linear(Chain("Slide", loop: false, (0.1f, 0f), (0.1f, 10f)));
 
-        var timeline = PlanGif(50, new ExportSourceChain(slide));
+        var timeline = PlanGif(50, new ExportSourceChain(slide, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline.Take(5).Select(f => MathF.Round(f.Layers[0].OffsetX, 3)).ShouldBe(new[] { 0f, 2f, 4f, 6f, 8f });
         timeline[5].Layers[0].OffsetX.ShouldBe(10f, tolerance: 1e-3f);
@@ -55,7 +55,7 @@ public class ExportTimelinePlannerTests
         var longClip = Chain("Long", loop: false, (0.2f, 0f), (0.2f, 0f));
         var blink = Chain("Blink", loop: true, (0.1f, 1f), (0.1f, 2f));
 
-        var timeline = PlanGif(50, new ExportSourceChain(longClip), new ExportSourceChain(blink));
+        var timeline = PlanGif(50, new ExportSourceChain(longClip, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), new ExportSourceChain(blink, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline.Select(f => f.Layers[1].OffsetX).ShouldBe(new[] { 1f, 2f, 1f, 2f });
         timeline.Sum(f => f.DelayTicks).ShouldBe(40);
@@ -67,7 +67,7 @@ public class ExportTimelinePlannerTests
         var longClip = Chain("Long", loop: false, (0.2f, 0f), (0.2f, 0f));
         var once = Chain("Once", loop: false, (0.1f, 1f), (0.1f, 2f));
 
-        var timeline = PlanGif(50, new ExportSourceChain(longClip), new ExportSourceChain(once));
+        var timeline = PlanGif(50, new ExportSourceChain(longClip, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), new ExportSourceChain(once, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         // Three timeline frames: the long clip changes frame at 0.2s while "Once" sits on its last frame.
         timeline.Select(f => f.Layers[1].OffsetX).ShouldBe(new[] { 1f, 2f, 2f });
@@ -80,7 +80,7 @@ public class ExportTimelinePlannerTests
         var back = Chain("Back", loop: true, (0.1f, 0f));
         var front = Chain("Front", loop: true, (0.1f, 0f));
 
-        var timeline = PlanGif(50, new ExportSourceChain(back), new ExportSourceChain(front));
+        var timeline = PlanGif(50, new ExportSourceChain(back, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), new ExportSourceChain(front, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline[0].Layers.Select(l => l.Chain.Name).ShouldBe(new[] { "Back", "Front" });
     }
@@ -90,7 +90,7 @@ public class ExportTimelinePlannerTests
     {
         var empty = new AnimationChainSave { Name = "Empty" };
 
-        PlanGif(50, new ExportSourceChain(empty)).ShouldBeEmpty();
+        PlanGif(50, new ExportSourceChain(empty, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds)).ShouldBeEmpty();
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class ExportTimelinePlannerTests
         var slide = Linear(Chain("Slide", loop: false, (0.1f, 0f), (0.1f, 6f)));
 
         var timeline = ExportTimelinePlanner.Plan(
-            new[] { new ExportSourceChain(slide) }, frameRate: 60, ticksPerSecond: 1000, minTicks: 10);
+            new[] { new ExportSourceChain(slide, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, frameRate: 60, ticksPerSecond: 1000, minTicks: 10);
 
         timeline.Take(6).Select(f => MathF.Round(f.Layers[0].OffsetX, 3)).ShouldBe(new[] { 0f, 1f, 2f, 3f, 4f, 5f });
         timeline.Sum(f => f.DelayTicks).ShouldBe(200);
@@ -115,7 +115,7 @@ public class ExportTimelinePlannerTests
         fade.Frames[1].Alpha = 200;
         fade.Frames[0].ColorInterpolation = "Linear";
 
-        var timeline = PlanGif(50, new ExportSourceChain(fade));
+        var timeline = PlanGif(50, new ExportSourceChain(fade, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline.Take(5).Select(f => f.Layers[0].Color.Alpha).ShouldBe(new int?[] { 0, 40, 80, 120, 160 });
         timeline.Select(f => f.Layers[0].Frame).Distinct().Count().ShouldBe(2);
@@ -128,7 +128,7 @@ public class ExportTimelinePlannerTests
         steady.Frames[0].Alpha = 10;
         steady.Frames[1].Alpha = 20;
 
-        var timeline = PlanGif(50, new ExportSourceChain(steady));
+        var timeline = PlanGif(50, new ExportSourceChain(steady, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
         timeline.Select(f => f.DelayTicks).ShouldBe(new[] { 10, 10 });
         timeline.Select(f => f.Layers[0].Color.Alpha).ShouldBe(new int?[] { 10, 20 });

@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
@@ -18,12 +19,12 @@ namespace AnimationEditor.Core.Sequences;
 /// <param name="TexturePath">The frame's texture, resolved against its source's folder; null when it has none.</param>
 /// <param name="Sequence">The sequence's index in the file.</param>
 public sealed record SequenceSprite(
-    int Track, AnimationChainSave Chain, int FrameIndex, double ElapsedInFrame, string? TexturePath, int Sequence = 0)
+    int Track, AnimationChainSave Chain, FrameLengthUnit Unit, int FrameIndex, double ElapsedInFrame, string? TexturePath, int Sequence = 0)
 {
     public AnimationFrameSave Frame => Chain.Frames[FrameIndex];
 
     /// <summary>The frame's sampled offset and color.</summary>
-    public KeyframeSample Sample() => KeyframeSampler.Sample(Chain, FrameIndex, ElapsedInFrame);
+    public KeyframeSample Sample() => KeyframeSampler.Sample(Chain, Unit, FrameIndex, ElapsedInFrame);
 }
 
 /// <summary>One selected sequence and the time its own playhead is at.</summary>
@@ -71,14 +72,14 @@ public static class SequenceScene
     }
 
     private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave> file) =>
-        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0);
+        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, FrameLengthUnit.Seconds) : 0);
 
     private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack)
     {
         var tracks = sequence.Tracks;
         double CycleLength(SequenceChainReferenceSave reference) =>
-            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found) : 0;
+            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, FrameLengthUnit.Seconds) : 0;
         time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength), sequence.Loop);
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
@@ -101,9 +102,10 @@ public static class SequenceScene
 
             // The chain's own Loop flag decides what happens past one cycle: a looping chain wraps, a non-looping one holds
             // its last frame until the block ends (ChainClock does both).
-            var (frame, elapsed) = ChainClock.Locate(chain, local);
+            var unit = FrameLengthUnit.Seconds; // #1829: the source file's unit, once the lookup reports it
+            var (frame, elapsed) = ChainClock.Locate(chain, local, unit);
             string? texture = lookup.ResolveTexturePath(reference.Source, chain.Frames[frame]);
-            sprites.Add(new SequenceSprite(reported, chain, frame, elapsed, texture, sequenceIndex));
+            sprites.Add(new SequenceSprite(reported, chain, unit, frame, elapsed, texture, sequenceIndex));
         }
     }
 }

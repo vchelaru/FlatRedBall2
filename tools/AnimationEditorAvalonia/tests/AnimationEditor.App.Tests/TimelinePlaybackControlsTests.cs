@@ -184,7 +184,7 @@ public class TimelinePlaybackControlsTests
         try
         {
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
             preview.Playback.Advance(0.15);       // into frame 1
             Assert.Equal(1, preview.Playback.CurrentFrameIndex);

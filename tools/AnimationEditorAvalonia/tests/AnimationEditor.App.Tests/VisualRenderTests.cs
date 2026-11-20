@@ -268,7 +268,7 @@ public class VisualRenderTests
                 FrameLength         = 0.1f,
                 ShapesSave = new ShapesSave()
             });
-        ctrl.Playback.SetChain(chain);  // resets to frame 0, keeps IsPlaying=false
+        ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);  // resets to frame 0, keeps IsPlaying=false
 
         int before = ctrl.Playback.CurrentFrameIndex;
         ctrl.Playback.Advance(1.0);     // no-op because IsPlaying=false
@@ -292,7 +292,7 @@ public class VisualRenderTests
                 FrameLength         = 0.1f,  // each frame = 100 ms
                 ShapesSave = new ShapesSave()
             });
-        ctrl.Playback.SetChain(chain);
+        ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Playback.Play();   // re-enable playback with timer still stopped
 
         // 0.15 s > 0.1 s (frame 0 length) → should have advanced to frame 1
@@ -881,7 +881,7 @@ public class VisualRenderTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chain);  // reset to frame 0, IsPlaying=false
+            ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);  // reset to frame 0, IsPlaying=false
             ctrl.Playback.Play();           // re-enable; timer is still stopped
             ctrl.Playback.Advance(0.15);    // 0.15 s > 0.1 s → advances to frame 1
 

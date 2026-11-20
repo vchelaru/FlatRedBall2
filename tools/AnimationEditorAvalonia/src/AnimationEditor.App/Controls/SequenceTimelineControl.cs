@@ -538,7 +538,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private TimelineDropPlan PlanDrop(LibraryChip chip, Point point) =>
         Sequence is null
             ? TimelineDropPlan.None
-            : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain),
+            : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain, FrameLengthUnit.Seconds),
                 TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass, TakesChains);
 
     /// <summary>
@@ -779,7 +779,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragSelectionBefore = _model.Chains.ToList();
         _dragPrimaryBefore = _model.PrimaryChain;
         _snapOthers = TimelineSnapTargets.Others(_blocks, _dragItems.Select(item => item.Reference).ToList(), _playhead);
-        _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain) : null;
+        _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain, FrameLengthUnit.Seconds) : null;
         _dragRepeats = _document.FindChain(block.Reference)?.Loop ?? true;
         _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
