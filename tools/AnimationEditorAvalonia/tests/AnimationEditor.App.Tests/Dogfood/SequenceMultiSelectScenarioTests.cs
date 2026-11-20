@@ -216,8 +216,12 @@ public class SequenceMultiSelectScenarioTests
         ClickRow(editor, 0);
         ClickRow(editor, 2, RawInputModifiers.Control);
         editor.Click(editor.Control<Button>("SequencePlayButton"));
-        (await editor.WaitUntilAsync(() => Shown(editor).Contains("Walk:1"), TimeSpan.FromSeconds(3)))
-            .ShouldBeTrue($"shown [{string.Join(",", Shown(editor))}], playing {IsPlaying(editor)} (CI-only timeout: was playback advancing at all?)");
+        bool startedPlaying = IsPlaying(editor);
+        // Wait for any progress, not for "Walk:1": that frame lasts 0.1 s, and a stalled timer tick on a loaded CI machine
+        // jumps straight past it (Walk:0 to Walk:2), so polling for it times out although playback is fine (#1819).
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        (await editor.WaitUntilAsync(() => !Shown(editor).SequenceEqual(new[] { "Walk:0", "Run:0" }), TimeSpan.FromSeconds(5)))
+            .ShouldBeTrue($"shown [{string.Join(",", Shown(editor))}], playing {IsPlaying(editor)} (was {startedPlaying} right after the click), playhead {Timeline(editor).Playhead:0.###}, waited {stopwatch.Elapsed.TotalSeconds:0.##} s");
 
         editor.Click(editor.Control<Button>("SequencePlayButton"));
         var frozen = Shown(editor);
