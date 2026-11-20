@@ -105,6 +105,14 @@ public static class SequenceTimeline
         return null;
     }
 
+    /// <summary>Stub.</summary>
+    public static double CarryOver(SequenceTrackSave track, double sequenceLength, int pass,
+        Func<SequenceChainReferenceSave, double> cycleLength) => throw new NotImplementedException();
+
+    /// <summary>Stub.</summary>
+    public static SequenceChainReferenceSave? ActiveAtPass(SequenceTrackSave track, double time, int pass, double sequenceLength,
+        Func<SequenceChainReferenceSave, double> cycleLength, out double localTime) => throw new NotImplementedException();
+
     /// <summary>
     /// Seconds until the sequence ends: the latest end of any clip on any track. A chain ends where it stops playing; a
     /// reference clip ends <see cref="SequenceReferenceSave.Loops"/> cycles of its target's own length after its start,

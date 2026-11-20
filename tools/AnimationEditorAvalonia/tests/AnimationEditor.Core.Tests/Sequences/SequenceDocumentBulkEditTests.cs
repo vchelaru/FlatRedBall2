@@ -47,7 +47,7 @@ public class SequenceDocumentBulkEditTests
         using var dir = new TestHelpers.TempDir();
         var sequence = Load(dir).Save.Sequences[0];
 
-        SequenceBulkState.ForTracks(sequence, AllTracks).ShouldBe(new TrackBulkState(null));
+        SequenceBulkState.ForTracks(sequence, AllTracks).ShouldBe(new TrackBulkState(null, false));
         SequenceBulkState.ForTracks(sequence, new[] { 0, 1 }).Visible.ShouldBe(true);
     }
 

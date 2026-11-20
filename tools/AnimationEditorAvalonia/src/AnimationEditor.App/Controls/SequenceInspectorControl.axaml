@@ -71,6 +71,8 @@
                             </Grid>
                             <CheckBox x:Name="TrackVisibleBox" Content="Visible"
                                       AutomationProperties.AutomationId="seq-track-visible" />
+                            <CheckBox x:Name="TrackContinuousBox" Content="Continuous" IsThreeState="False"
+                                      AutomationProperties.AutomationId="seq-track-continuous" />
                         </StackPanel>
                     </Border>
                     <!-- Only for a track that plays another sequence of the file (a reference): its clip, like a chain's block. -->

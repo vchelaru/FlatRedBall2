@@ -1005,6 +1005,11 @@ public sealed class SequenceDocument : ISequenceChainLookup
         Edit(undo, SequenceLabel.Named(visible ? "Show" : "Hide", "Track", Save.Sequences[sequence].Tracks[track].Name),
             save => save.Sequences[sequence].Tracks[track].Visible = visible);
 
+    /// <summary>Stub.</summary>
+    public void SetTracksContinuous(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool continuous)
+    {
+    }
+
     /// <summary>Shows every track of a sequence again, as one undo entry; none when all are already shown.</summary>
     public void ShowAllTracks(IUndoManager undo, int sequence) =>
         Edit(undo, "Show All Tracks", save =>

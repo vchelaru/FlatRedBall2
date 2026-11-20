@@ -28,7 +28,7 @@ public sealed record SequenceSprite(
 }
 
 /// <summary>One selected sequence and the time its own playhead is at.</summary>
-public readonly record struct SequenceTime(int Sequence, double Time);
+public readonly record struct SequenceTime(int Sequence, double Time, int Pass = 0);
 
 /// <summary>What the sequence preview draws at an instant.</summary>
 public static class SequenceScene
@@ -50,7 +50,7 @@ public static class SequenceScene
     /// length the sprites are those of its last instant (<see cref="SequenceTimeline.PoseTime"/>), so a track whose chains
     /// finished earlier stays hidden. A looping sequence is sampled at exactly <paramref name="time"/>.
     /// </summary>
-    public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time) =>
+    public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time, int pass = 0) =>
         sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count
             ? []
             : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document, document.Save.Sequences);

@@ -11,6 +11,9 @@ public sealed class SequenceClock
 {
     public double Time { get; private set; }
 
+    /// <summary>Stub.</summary>
+    public int Pass { get; private set; }
+
     public bool IsPlaying { get; private set; }
 
     /// <summary>Starts advancing. At the end, starts again from 0. Does nothing for an empty sequence.</summary>

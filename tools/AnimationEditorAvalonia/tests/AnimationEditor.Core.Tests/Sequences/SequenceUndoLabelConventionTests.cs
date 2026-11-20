@@ -98,6 +98,8 @@ public class SequenceUndoLabelConventionTests
         Run((document, undo) => document.SetTracksVisible(undo, 0, new[] { 0 }, true));
         Run((document, undo) => document.SetTrackVisible(undo, 0, 1, false));
         Run((document, undo) => document.ShowAllTracks(undo, 0));
+        Run((document, undo) => document.SetTracksContinuous(undo, 0, new[] { 0, 1, 2 }, true));
+        Run((document, undo) => document.SetTracksContinuous(undo, 0, new[] { 0 }, true));
         Run((document, undo) => document.MoveTrack(undo, 0, 0, 2));
         NumericEdit.TryParse("3", out var three).ShouldBeTrue();
         NumericEdit.TryParse("+ 1", out var plusOne).ShouldBeTrue();

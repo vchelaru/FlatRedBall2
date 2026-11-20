@@ -21,6 +21,9 @@ public class SequenceTrackSave
     /// </summary>
     public bool Visible { get; set; } = true;
 
+    /// <summary>Stub, see the implementation commit.</summary>
+    public bool Continuous { get; set; }
+
     /// <summary>
     /// When set, the track plays another sequence of the file instead of chains (a clip with a start and a loop count,
     /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> must stay empty: reading a file whose track has
