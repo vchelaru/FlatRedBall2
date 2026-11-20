@@ -48,7 +48,7 @@ public class SequenceTrackNoFlipScenarioTests
 
         inspector.TrackPanel.IsVisible.ShouldBeTrue();
         VisibleHeadings(inspector).ShouldBe(new[] { "TRACK" });
-        VisibleControls(inspector).ShouldBe(new[] { "TextBox", "CheckBox:Visible" });
+        VisibleControls(inspector).ShouldBe(new[] { "TextBox", "CheckBox:Visible", "CheckBox:Continuous" });
     }
 
     [AvaloniaFact]
@@ -62,6 +62,6 @@ public class SequenceTrackNoFlipScenarioTests
 
         inspector.TrackNameBox.IsEnabled.ShouldBeFalse("a name is for one track");
         VisibleHeadings(inspector).ShouldBe(new[] { "TRACK" });
-        VisibleControls(inspector).ShouldBe(new[] { "TextBox", "CheckBox:Visible" });
+        VisibleControls(inspector).ShouldBe(new[] { "TextBox", "CheckBox:Visible", "CheckBox:Continuous" });
     }
 }
