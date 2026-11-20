@@ -118,4 +118,7 @@ public interface ISequenceChainLookup
 
     /// <summary>The texture of <paramref name="frame"/> (a frame of a chain of <paramref name="source"/>), or null when it has none.</summary>
     string? ResolveTexturePath(string source, AnimationFrameSave frame);
+
+    /// <summary>The unit of the frame lengths in the file <paramref name="reference"/> points at (seconds when it is missing).</summary>
+    FrameLengthUnit UnitOf(SequenceChainReferenceSave reference);
 }

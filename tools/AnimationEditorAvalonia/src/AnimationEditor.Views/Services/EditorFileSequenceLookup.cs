@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -31,6 +32,9 @@ internal sealed class EditorFileSequenceLookup : ISequenceChainLookup
         _sources.TryGetValue(reference.Source, out var list)
             ? list.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain)
             : null;
+
+    public FrameLengthUnit UnitOf(SequenceChainReferenceSave reference) =>
+        FrameLengthUnit.Of(_sources.GetValueOrDefault(reference.Source));
 
     public string? ResolveTexturePath(string source, AnimationFrameSave frame)
     {

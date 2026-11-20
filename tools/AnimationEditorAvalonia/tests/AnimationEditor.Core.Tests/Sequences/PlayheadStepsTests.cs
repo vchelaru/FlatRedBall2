@@ -33,7 +33,7 @@ public class PlayheadStepsTests
         sequence.Tracks.AddRange(tracks);
         var blocks = TimelineLayout.Blocks(sequence, Cycle);
         double length = SequenceTimeline.Length([sequence], sequence, reference => Cycle(reference) ?? 0);
-        return PlayheadSteps.Boundaries(sequence, blocks, Find, length).Select(time => Math.Round(time, 4)).ToList();
+        return PlayheadSteps.Boundaries(sequence, blocks, Find, _ => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, length).Select(time => Math.Round(time, 4)).ToList();
     }
 
     private static SequenceTrackSave Track(bool visible, params SequenceChainReferenceSave[] chains) =>

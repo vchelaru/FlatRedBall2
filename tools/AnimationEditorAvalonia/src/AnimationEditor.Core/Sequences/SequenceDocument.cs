@@ -806,6 +806,12 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
+    /// <summary>The unit of the frame lengths in the source file <paramref name="source"/> (seconds when it is missing).</summary>
+    public FrameLengthUnit UnitOfSource(string source) => FrameLengthUnit.Of(SourceChains(source));
+
+    /// <inheritdoc/>
+    public FrameLengthUnit UnitOf(SequenceChainReferenceSave reference) => UnitOfSource(reference.Source);
+
     public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) =>
         SourceChains(reference.Source)?.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain);
 
