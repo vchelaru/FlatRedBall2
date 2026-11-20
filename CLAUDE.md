@@ -94,6 +94,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
 - `shaders` — Custom .fx shaders, precompiled XNBs, Wine/libmojoshader setup, version guard
 - `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
+- `aecli` — Command-line `describe`/`check`/`new`/`edit --ops`/`--schema` for `.achx`/`.achj` files, no editor window
 - `sample-project-setup` — How to create a new sample `.csproj` (KNI desktop head, Common project, content pipeline)
 - `multiplatform-conversion` — Add a KNI BlazorGL (web/WASM) head to a desktop sample
 - `desktop-distribution` — Self-contained per-RID publish profiles and the macOS .app layout
