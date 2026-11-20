@@ -585,6 +585,19 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _selectedState!.SelectShape(shape);
     }
 
+    /// <summary>
+    /// Ctrl/Cmd+click: adds <paramref name="shape"/> to the shape selection or removes it. The first
+    /// selected shape stays the primary (<see cref="ISelectedState.SelectedShape"/>) until deselected;
+    /// the tree follows through <see cref="ISelectedState.SelectedNodes"/>.
+    /// </summary>
+    private void ToggleShapeSelection(object shape)
+    {
+        var result = ShapeSelectionToggle.Toggle(_selectedState!.SelectedShapes, shape);
+        _selectedState.SelectedNodes = result.Count > 1 ? result : new List<object>();
+        _selectedState.SelectShape(result.Count > 0 ? result[0] : null);
+        InvalidateVisual();
+    }
+
     /// <summary>Selects a clicked shape: in place within a group, otherwise as the sole selection.</summary>
     private void SelectShapeFromClick(object shape)
     {
@@ -3049,6 +3062,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (TrySelectTrackAt(pos)) return;
 
         // No guide hit — try to drag a shape (or just select one).
+
+        // Ctrl/Cmd+click toggles the shape under the pointer in or out of the selection (#1821).
+        // Shift stays the axis lock, so it is not part of this gesture.
+        if (props.IsLeftButtonPressed
+            && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
+            && !IsGroupPreviewActive)
+        {
+            if (HitTestShape(px, py) is { } toggled) ToggleShapeSelection(toggled);
+            return;
+        }
 
         // The selected polygon's vertex and edge-midpoint handles come first.
         if (TryBeginPolygonVertexGesture(px, py))
