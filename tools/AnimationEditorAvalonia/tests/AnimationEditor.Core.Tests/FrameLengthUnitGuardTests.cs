@@ -19,6 +19,7 @@ public class FrameLengthUnitGuardTests
         "Core/DragDrop/TextureDropProcessor.cs",
         "Core/Rendering/BatchFrameBuilder.cs",
         "Core/IO/AnimationCloneHelper.cs",
+        "Core/IO/ClipboardPayload.cs",
         "Core/Export/GodotSpriteFramesExporter.cs",
         "Core/Export/PixiJsSpriteSheetExporter.cs",
         "Core/Tiled/AchjSyncSnapshot.cs",

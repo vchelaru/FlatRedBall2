@@ -24,14 +24,14 @@ public static class ClipboardPayload
 
     public static string Serialize(List<AnimationChainSave> chains, FrameLengthUnit sourceUnit)
     {
-        var acls = new AnimationChainListSave();
+        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit };
         acls.AnimationChains.AddRange(chains);
         return $"{TypeName<List<AnimationChainSave>>()}:{acls.ToXmlString()}";
     }
 
     public static string Serialize(List<AnimationFrameSave> frames, FrameLengthUnit sourceUnit)
     {
-        var acls = new AnimationChainListSave();
+        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit };
         var chain = new AnimationChainSave();
         chain.Frames.AddRange(frames);
         acls.AnimationChains.Add(chain);
@@ -141,13 +141,17 @@ public static class ClipboardPayload
         {
             if (typeName == TypeName<List<AnimationChainSave>>())
             {
-                chains = AnimationChainListSave.FromString(payload).AnimationChains;
+                var chainList = AnimationChainListSave.FromString(payload);
+                chains = chainList.AnimationChains;
+                ConvertLengths(chains.SelectMany(c => c.Frames), FrameLengthUnit.Of(chainList), destinationUnit);
                 return true;
             }
             if (typeName == TypeName<List<AnimationFrameSave>>())
             {
-                frames = AnimationChainListSave.FromString(payload)
+                var frameList = AnimationChainListSave.FromString(payload);
+                frames = frameList
                     .AnimationChains.SelectMany(c => c.Frames).ToList();
+                ConvertLengths(frames, FrameLengthUnit.Of(frameList), destinationUnit);
                 return true;
             }
             if (typeName == ShapesTypeName)
@@ -183,6 +187,13 @@ public static class ClipboardPayload
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>Rewrites each frame's length from the copied file's unit to the pasting file's (#1829).</summary>
+    private static void ConvertLengths(IEnumerable<AnimationFrameSave> frames, FrameLengthUnit source, FrameLengthUnit destination)
+    {
+        foreach (var frame in frames)
+            frame.FrameLength = destination.Convert(frame.FrameLength, source);
+    }
 
     private static string Encode<T>(T obj)
     {
