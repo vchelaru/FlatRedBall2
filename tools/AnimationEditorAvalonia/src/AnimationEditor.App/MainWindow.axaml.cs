@@ -5933,61 +5933,47 @@ public partial class MainWindow : Window
         var frames = InspectorFrames();
         if (frames.Count == 0) return;
 
-        var inputText = PropTextureName.Text?.Trim() ?? string.Empty;
+        // Clearing blanks the wireframe too: SetFrameTextureName doesn't refresh it on its own.
+        bool clearing = string.IsNullOrWhiteSpace(PropTextureName.Text);
+        bool hadTexture = frames.Any(f => !string.IsNullOrEmpty(f.TextureName));
 
-        // Clearing the field clears every selected frame's texture and blanks the wireframe, rather
-        // than being ignored (which left the old texture showing). Only touch frames that actually
-        // have a texture to clear, so re-committing an already-empty field adds no spurious undo
-        // entry. SetFrameTextureName doesn't refresh the wireframe on its own, so blank it explicitly
-        // (DetermineTexturePath now resolves to no texture for the selected frame).
-        if (string.IsNullOrEmpty(inputText))
+        var result = FrameTextureEdit.SetFromText(_projectManager, _appCommands, frames, PropTextureName.Text, _textureProbe);
+        if (clearing)
         {
-            var toClear = frames.Where(f => !string.IsNullOrEmpty(f.TextureName)).ToList();
-            if (toClear.Count > 0)
+            if (hadTexture)
             {
-                _appCommands.SetFrameTextureName(toClear, string.Empty);
                 WireframeCtrl.RefreshAll();
                 RefreshPropertyPanel();
             }
             return;
         }
-
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-
-        string absolutePath = TexturePathHelper.ResolveDisplayPath(inputText, achxFolder);
-        string storePath    = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-
-        // Only frames whose displayed path actually differs get touched, so committing an
-        // unedited (or already-shared) value adds no spurious undo entry.
-        var toChange = frames
-            .Where(f => TexturePathHelper.ComputeDisplayPath(f.TextureName, _projectManager.FileName) != inputText)
-            .ToList();
-        if (toChange.Count == 0) return;
-
-        CommitFrameTexture(toChange, storePath, absolutePath);
+        ReportTextureResult(result);
     }
 
-    /// <summary>
-    /// Displays <paramref name="absolutePath"/> and, only if it decodes, commits
-    /// <paramref name="storePath"/> as the texture name for every frame in <paramref name="frames"/>
-    /// as one undo step. If the image can't be loaded (corrupt/undecodable/missing — see issue
-    /// #479), every frame's name is left untouched so no broken reference reaches the undo stack or
-    /// the saved .achx, the wireframe is restored to the current texture, and a non-fatal status
-    /// message is shown.
-    /// </summary>
-    private void CommitFrameTexture(IReadOnlyList<AnimationFrameSave> frames, string storePath, string absolutePath)
+    /// <summary>Probes by loading into the wireframe, which also displays the texture on success.</summary>
+    private sealed class WireframeTextureProbe(Func<string, bool> load) : ITextureProbe
     {
-        if (!WireframeCtrl.LoadTexture(absolutePath))
+        public bool CanDecode(string absolutePath) => load(absolutePath);
+    }
+
+    private ITextureProbe _textureProbe => new WireframeTextureProbe(path => WireframeCtrl.LoadTexture(path));
+
+    /// <summary>
+    /// A rejected image (corrupt/undecodable/missing, issue #479) leaves every frame's name untouched, so no
+    /// broken reference reaches the undo stack or the saved .achx; the wireframe is restored to the current
+    /// texture and a problem is shown. Success refreshes the inspector.
+    /// </summary>
+    private void ReportTextureResult(EditResult result)
+    {
+        if (result.Success)
         {
-            ShowProblem($"⚠ Could not load image: {absolutePath}");
-            WireframeCtrl.RefreshAll();   // restore the display to the frame's current texture
+            if (result.ChangedItems.Count > 0) RefreshPropertyPanel();
             return;
         }
+        if (result.HasError(EditErrorCode.Cancelled)) return;
 
-        _appCommands.SetFrameTextureName(frames, storePath);
-        RefreshPropertyPanel();
+        ShowProblem($"⚠ {result.Errors[0]}");
+        WireframeCtrl.RefreshAll();   // restore the display to the frame's current texture
     }
 
     private async Task BrowseForFrameTexture()
@@ -6013,54 +5999,30 @@ public partial class MainWindow : Window
             CommitPickedTexture(frames, resolvedAbsPath);
     }
 
-    private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath)
-    {
-        // Store relative path when possible; ../relative paths are allowed for textures
-        // outside the .achx folder so they round-trip correctly.
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-        string storePath = string.IsNullOrEmpty(achxFolder)
-            ? absolutePath
-            : TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-
-        CommitFrameTexture(frames, storePath, absolutePath);
-    }
+    private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath) =>
+        ReportTextureResult(FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _textureProbe));
 
     /// <summary>
     /// The one "bring a user's texture into the project" step shared by Browse… and every PNG drop.
-    /// When <paramref name="texturePath"/> is outside the .achx's folder (<see cref="TextureCopyDecider"/>),
-    /// asks whether to copy it, keep it, or (when a different same-named file is already there)
-    /// overwrite or use that file, and carries the answer out. Returns the absolute path to
-    /// reference, or null when cancelled or the copy failed; a failed copy shows a toast whose
+    /// Asks the copy prompt through <see cref="FrameTextureEdit.ResolveForProjectAsync"/> and returns the
+    /// absolute path to reference, or null when cancelled or the copy failed; a failed copy shows a toast whose
     /// Retry re-runs the same choice and hands the result to <paramref name="applyAfterRetry"/>.
     /// </summary>
     private async Task<string?> ResolveTextureForProjectAsync(string texturePath, Action<string> applyAfterRetry)
     {
-        var plan = TextureCopyDecider.PlanCopyForProject(_projectManager, texturePath);
-        if (plan is null) return texturePath;
+        var choice = TextureCopyChoice.Cancel;
+        var resolved = await FrameTextureEdit.ResolveForProjectAsync(_projectManager, texturePath,
+            async plan => choice = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan));
+        if (resolved.AbsolutePath is not null) return resolved.AbsolutePath;
+        if (resolved.Result.HasError(EditErrorCode.Cancelled)) return null;
 
-        var choice = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
-        try
+        ShowProblem(resolved.Result.Errors[0], retry: () =>
         {
-            return TextureCopyDecider.Apply(plan, choice);
-        }
-        catch (Exception ex)
-        {
-            ShowProblem($"Could not copy: {ex.Message}", retry: () =>
-            {
-                try
-                {
-                    if (TextureCopyDecider.Apply(plan, choice) is { } retried)
-                        applyAfterRetry(retried);
-                }
-                catch (Exception retryEx)
-                {
-                    ShowProblem($"Retry failed: {retryEx.Message}");
-                }
-            });
-            return null;
-        }
+            var retried = FrameTextureEdit.ResolveForProject(_projectManager, texturePath, choice);
+            if (retried.AbsolutePath is { } path) applyAfterRetry(path);
+            else ShowProblem($"Retry failed: {retried.Result.Errors[0]}");
+        });
+        return null;
     }
 
     /// <summary>
