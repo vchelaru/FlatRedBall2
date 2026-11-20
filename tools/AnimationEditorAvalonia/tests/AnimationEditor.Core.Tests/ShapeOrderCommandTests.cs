@@ -94,7 +94,7 @@ public class ShapeOrderCommandTests
         var text = ClipboardPayload.SerializeShapes(
             [new CircleSave { Name = "c" }, new AARectSave { Name = "r" }]);
 
-        ClipboardPayload.TryDeserialize(text, out _, out _, out var shapes).ShouldBeTrue();
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out _, out var shapes).ShouldBeTrue();
 
         shapes!.Select(s => ((ShapeSave)s).Name).ShouldBe(["r", "c"]);
     }

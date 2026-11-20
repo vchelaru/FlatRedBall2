@@ -55,7 +55,7 @@ public class CopyPasteFocusGateTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             var xml = ClipboardPayload.Serialize(
-                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
+                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             await window.Clipboard!.SetTextAsync(xml);
 
             // SpeedInput is a FlankerNumericField (#963); focus lands on its inner ValueBox TextBox.
@@ -91,7 +91,7 @@ public class CopyPasteFocusGateTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             var xml = ClipboardPayload.Serialize(
-                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
+                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             await window.Clipboard!.SetTextAsync(xml);
 
             var tree = window.AnimTree!;
@@ -127,7 +127,7 @@ public class CopyPasteFocusGateTests
             ctx.SelectedState.SelectedFrame = b; // mid-list selection
 
             var xml = ClipboardPayload.Serialize(
-                new List<AnimationFrameSave> { new() { TextureName = "pasted.png", FrameLength = 0.1f } });
+                new List<AnimationFrameSave> { new() { TextureName = "pasted.png", FrameLength = 0.1f } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             await window.Clipboard!.SetTextAsync(xml);
 
             var tree = window.AnimTree!;
@@ -190,7 +190,7 @@ public class CopyPasteFocusGateTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             var xml = ClipboardPayload.Serialize(
-                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
+                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             await window.Clipboard!.SetTextAsync(xml);
 
             var tree = window.AnimTree!;

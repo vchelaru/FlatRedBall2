@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,14 +22,14 @@ public static class ClipboardPayload
 
     // ── Serialization ─────────────────────────────────────────────────────
 
-    public static string Serialize(List<AnimationChainSave> chains)
+    public static string Serialize(List<AnimationChainSave> chains, FrameLengthUnit sourceUnit)
     {
         var acls = new AnimationChainListSave();
         acls.AnimationChains.AddRange(chains);
         return $"{TypeName<List<AnimationChainSave>>()}:{acls.ToXmlString()}";
     }
 
-    public static string Serialize(List<AnimationFrameSave> frames)
+    public static string Serialize(List<AnimationFrameSave> frames, FrameLengthUnit sourceUnit)
     {
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave();
@@ -64,12 +65,12 @@ public static class ClipboardPayload
     /// destination folder instead. Pass <see langword="null"/> (e.g. an unsaved document with no
     /// folder yet) to embed <c>TextureName</c> unchanged.
     /// </param>
-    public static string SerializeFromPayload(CopySelectionPayload payload, string? sourceAchxFolder = null) => payload.Kind switch
+    public static string SerializeFromPayload(CopySelectionPayload payload, FrameLengthUnit sourceUnit, string? sourceAchxFolder = null) => payload.Kind switch
     {
         CopySelectionKind.Chain => Serialize(ResolveChainTextures(
-            payload.Chains.Select(AnimationCloneHelper.CloneChain).ToList(), sourceAchxFolder)),
+            payload.Chains.Select(AnimationCloneHelper.CloneChain).ToList(), sourceAchxFolder), sourceUnit),
         CopySelectionKind.Frame => Serialize(ResolveFrameTextures(
-            payload.Frames.Select(AnimationCloneHelper.CloneFrame).ToList(), sourceAchxFolder)),
+            payload.Frames.Select(AnimationCloneHelper.CloneFrame).ToList(), sourceAchxFolder), sourceUnit),
         CopySelectionKind.Shape => payload.Shapes.Count == 1 && payload.Shapes[0] is AARectSave r
             ? Serialize((AARectSave)AnimationCloneHelper.CloneShape(r)!)
             : payload.Shapes.Count == 1 && payload.Shapes[0] is CircleSave c
@@ -120,6 +121,7 @@ public static class ClipboardPayload
 
     public static bool TryDeserialize(
         string? text,
+        FrameLengthUnit destinationUnit,
         out List<AnimationChainSave>? chains,
         out List<AnimationFrameSave>? frames,
         out List<object>? shapes)
