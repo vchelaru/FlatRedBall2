@@ -85,12 +85,14 @@ public class TimelineDropPlanTests
     }
 
     [Fact]
-    public void For_OverTheHeaderOrPastTheRightEdge_TargetsNothing()
+    public void For_OverTheHeaderOfATrack_AppendsAtTrackEnd_AndPastTheRightEdgeTargetsNothing()
     {
         var viewport = new TimelineViewport();
         double y = viewport.LaneTop(0) + TimelineViewport.LaneHeight / 2;
 
-        TimelineDropPlan.For(viewport, ViewWidth, 1, TimelineViewport.HeaderWidth - 5, y, 0.5).Kind.ShouldBe(TimelineDropKind.None);
+        var header = TimelineDropPlan.For(viewport, ViewWidth, 1, TimelineViewport.HeaderWidth - 5, y, 0.5, trackEnd: _ => 1.25);
+        header.Kind.ShouldBe(TimelineDropKind.Track);
+        header.Start.ShouldBe(1.25);
         TimelineDropPlan.For(viewport, ViewWidth, 1, ViewWidth + 5, y, 0.5).Kind.ShouldBe(TimelineDropKind.None);
     }
 

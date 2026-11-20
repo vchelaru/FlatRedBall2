@@ -539,7 +539,8 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         Sequence is null
             ? TimelineDropPlan.None
             : TimelineDropPlan.For(Viewport, Bounds.Width, TrackCount, point.X, point.Y, ChainClock.TotalLength(chip.Chain, chip.Unit),
-                TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass, TakesChains);
+                TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead), _chipBypass, TakesChains,
+                track => TimelineLayout.TrackEnd(_blocks, track));
 
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at <paramref name="point"/>: on a lane, at the time under the point; on the

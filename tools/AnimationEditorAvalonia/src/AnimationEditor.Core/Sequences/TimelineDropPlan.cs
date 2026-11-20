@@ -47,16 +47,25 @@ public readonly record struct TimelineDropPlan(TimelineDropKind Kind, int Row, d
     /// The plan for a chip released at (<paramref name="x"/>, <paramref name="y"/>) in the timeline's own coordinates.
     /// <paramref name="cycleLength"/> is the chip's chain length in seconds, 0 when it is missing. Either end of the ghost
     /// snaps to <paramref name="targets"/> (see <see cref="TimelineSnapTargets.Others"/>) unless <paramref name="bypass"/>.
-    /// A lane <paramref name="acceptsChains"/> rejects (a track that plays a sequence) is no drop.
+    /// A lane <paramref name="acceptsChains"/> rejects (a track that plays a sequence) is no drop. A point in the
+    /// header column over an existing track starts the chain at <paramref name="trackEnd"/> of that track (0 when omitted), unsnapped.
     /// </summary>
     public static TimelineDropPlan For(TimelineViewport viewport, double viewWidth, int trackCount, double x, double y, double cycleLength,
-        IReadOnlyList<SnapTarget>? targets = null, bool bypass = false, Func<int, bool>? acceptsChains = null)
+        IReadOnlyList<SnapTarget>? targets = null, bool bypass = false, Func<int, bool>? acceptsChains = null, Func<int, double>? trackEnd = null)
     {
         if (x < 0 || x > viewWidth) return None;
         var row = viewport.RowAt(y, trackCount);
         if (x < viewport.ColumnWidth)
         {
-            // The new-track label in the header column is a drop too, with no time under the pointer: the chain starts at 0.
+            // A label in the header column is a drop too, with no time under the pointer: an existing track appends the chain at
+            // its end (trackEnd), the new-track label starts it at 0.
+            if (row.Kind == TimelineRowKind.Track)
+            {
+                if (acceptsChains is not null && !acceptsChains(row.Track)) return None;
+                double endLength = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
+                double end = trackEnd?.Invoke(row.Track) ?? 0;
+                return new TimelineDropPlan(TimelineDropKind.Track, row.Track, end, endLength, viewport.XAt(end), endLength * viewport.PixelsPerSecond);
+            }
             if (row.Kind != TimelineRowKind.NewTrack) return None;
             double zeroLength = cycleLength > 0 ? cycleLength : TimelineLayout.MissingLength;
             return new TimelineDropPlan(TimelineDropKind.NewTrack, TimelineViewport.NewTrackLane, 0, zeroLength, viewport.XAt(0),

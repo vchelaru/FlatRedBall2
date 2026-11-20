@@ -127,6 +127,15 @@ public static class TimelineLayout
         return blocks;
     }
 
+    /// <summary>The latest <see cref="TimelineBlock.FullEnd"/> across <paramref name="track"/>'s blocks (start + loops x cycle length), 0 when it has none.</summary>
+    public static double TrackEnd(IReadOnlyList<TimelineBlock> blocks, int track)
+    {
+        double end = 0;
+        foreach (var block in blocks)
+            if (block.Track == track && block.FullEnd > end) end = block.FullEnd;
+        return end;
+    }
+
     /// <summary>
     /// Where each track's blocks start in <paramref name="blocks"/> (which <see cref="Blocks"/> lists track by track): entry
     /// <c>t</c> is the index of track <c>t</c>'s first block and entry <c>trackCount</c> is the block count, so track
