@@ -26,15 +26,15 @@ public class PlaybackModePreviewTests
     private static float PreviewXAt(AnimationChainSave chain, double seconds)
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(chain);
+        ctrl.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(seconds);
-        return KeyframeSampler.Sample(chain, ctrl.CurrentFrameIndex, ctrl.FrameElapsed).OffsetX;
+        return KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, ctrl.CurrentFrameIndex, ctrl.FrameElapsed).OffsetX;
     }
 
     private static float ClockXAt(AnimationChainSave chain, double seconds)
     {
-        var (frame, elapsed) = ChainClock.Locate(chain, seconds);
-        return KeyframeSampler.Sample(chain, frame, elapsed).OffsetX;
+        var (frame, elapsed) = ChainClock.Locate(chain, seconds, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        return KeyframeSampler.Sample(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, frame, elapsed).OffsetX;
     }
 
     [Theory]
@@ -67,8 +67,8 @@ public class PlaybackModePreviewTests
     [Fact]
     public void TotalLength_PingPongCycleIsTwiceTheChain()
     {
-        Assert.Equal(2.4, ChainClock.TotalLength(BounceChain(pingPong: true)), 5);
-        Assert.Equal(1.2, ChainClock.TotalLength(BounceChain(reverse: true)), 5);
+        Assert.Equal(2.4, ChainClock.TotalLength(BounceChain(pingPong: true), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), 5);
+        Assert.Equal(1.2, ChainClock.TotalLength(BounceChain(reverse: true), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), 5);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class PlaybackModePreviewTests
     {
         var ctrl = new PlaybackController();
 
-        ctrl.SetChain(BounceChain(reverse: true));
+        ctrl.SetChain(BounceChain(reverse: true), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(1, ctrl.CurrentFrameIndex);
         Assert.Equal(0.6, ctrl.FrameElapsed, 5);
@@ -86,7 +86,7 @@ public class PlaybackModePreviewTests
     public void Advance_PingPong_FrameIndexChangedOnlyWhenTheShownFrameChanges()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(BounceChain(pingPong: true));
+        ctrl.SetChain(BounceChain(pingPong: true), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int changes = 0;
         ctrl.FrameIndexChanged += _ => changes++;
 
@@ -99,7 +99,7 @@ public class PlaybackModePreviewTests
     public void Advance_NonLoopingPingPong_PlaysOneFullCycleThenStopsOnTheFirstFrame()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(BounceChain(loop: false, pingPong: true));
+        ctrl.SetChain(BounceChain(loop: false, pingPong: true), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Advance(2.3);
         Assert.True(ctrl.IsPlaying);
@@ -116,7 +116,7 @@ public class PlaybackModePreviewTests
         // Clicking 25% across A's cell shows A at forward 0.15s, the same value the forward chain shows there.
         var reverse = BounceChain(reverse: true);
         var ctrl = new PlaybackController();
-        ctrl.SetChain(reverse);
+        ctrl.SetChain(reverse, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.SeekToFrame(0, 0.25);
 

@@ -146,10 +146,10 @@ public class KeyframeInspectorStateTests
         chain.Frames[1].RelativeX = 999;
         chain.Frames[2].RelativeX = 90;
 
-        Assert.Equal(999f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain).X);
+        Assert.Equal(999f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).X);
 
         chain.Frames[1].SkipOffsetKeyframe = true;
-        Assert.Equal(45f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain).X, 3);
+        Assert.Equal(45f, KeyframeInspectorState.DisplayOffset(chain.Frames[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).X, 3);
     }
 
     [Fact]
@@ -162,11 +162,11 @@ public class KeyframeInspectorStateTests
         chain.Frames[2].Red = 200;
         chain.Frames[2].Alpha = 100;
 
-        var own = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain);
+        var own = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Null(own.Red);
 
         chain.Frames[1].SkipColorKeyframe = true;
-        var effective = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain);
+        var effective = KeyframeInspectorState.DisplayColor(chain.Frames[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal(100, effective.Red);
         Assert.Equal(50, effective.Alpha);
         Assert.Null(effective.Green);

@@ -130,7 +130,7 @@ public class ShapeKeyframeTests
         rects[1].X = 999; rects[1].SkipOffsetKeyframe = true;
         rects[2].X = 100;
 
-        var shown = KeyframeInspectorState.DisplayShapeOffset(rects[1], chain);
+        var shown = KeyframeInspectorState.DisplayShapeOffset(rects[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(50f, shown.X, 3); // halfway through the 2-second glide
     }
@@ -142,7 +142,7 @@ public class ShapeKeyframeTests
         var (chain, rects) = RectChain(ctx, 2);
         rects[1].ScaleX = 33; rects[1].ScaleY = 44;
 
-        var shown = KeyframeInspectorState.DisplayShapeSize(rects[1], chain);
+        var shown = KeyframeInspectorState.DisplayShapeSize(rects[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal((33f, 44f), shown);
     }
@@ -328,7 +328,7 @@ public class ShapeKeyframeTests
         rects[0].X = 0; rects[0].OffsetInterpolation = "Linear";
         rects[1].X = 100;
 
-        var value = KeyframeSampler.SampleShape(chain, 0, 0.5, rects[0]);
+        var value = KeyframeSampler.SampleShape(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0.5, rects[0]);
 
         Assert.Equal(50f, value.X, 3);
     }

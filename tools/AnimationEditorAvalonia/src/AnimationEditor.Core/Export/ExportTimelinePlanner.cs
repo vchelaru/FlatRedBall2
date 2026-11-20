@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Export;
 
 /// <summary>An animation to export. Its offset and color glide by the curves stored on its frames, as in the preview.</summary>
-public sealed record ExportSourceChain(AnimationChainSave Chain);
+public sealed record ExportSourceChain(AnimationChainSave Chain, FrameLengthUnit Unit);
 
 /// <summary>One animation's contribution to a composed frame: its current frame at its (possibly glided) offset and color.</summary>
 public sealed record ExportLayer(
@@ -31,7 +32,7 @@ public static class ExportTimelinePlanner
         var playable = sources.Where(s => s.Chain.Frames.Count > 0).ToList();
         if (playable.Count == 0) return Array.Empty<ExportTimelineFrame>();
 
-        double duration = playable.Max(s => ChainClock.TotalLength(s.Chain));
+        double duration = playable.Max(s => ChainClock.TotalLength(s.Chain, s.Unit));
         int[] delays = ExportTiming.PlanDelays(duration, frameRate, ticksPerSecond, minTicks);
 
         var frames = new List<ExportTimelineFrame>();
@@ -40,10 +41,11 @@ public static class ExportTimelinePlanner
         {
             double time = (double)step / frameRate;
             var layers = new List<ExportLayer>(playable.Count);
-            foreach (var chain in playable.Select(s => s.Chain))
+            foreach (var source in playable)
             {
-                var (index, elapsed) = ChainClock.Locate(chain, time);
-                var sample = KeyframeSampler.Sample(chain, index, elapsed);
+                var chain = source.Chain;
+                var (index, elapsed) = ChainClock.Locate(chain, time, source.Unit);
+                var sample = KeyframeSampler.Sample(chain, source.Unit, index, elapsed);
                 layers.Add(new ExportLayer(chain, chain.Frames[index], sample.OffsetX, sample.OffsetY, sample.Color));
             }
 

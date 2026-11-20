@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -37,7 +38,7 @@ public static class PlayheadSteps
 
             times.Add(block.Start);
             times.Add(block.PlayedEnd);
-            var inCycle = TimelineSnapTargets.FrameBoundaries(chain);
+            var inCycle = TimelineSnapTargets.FrameBoundaries(chain, FrameLengthUnit.Seconds);
             int cycles = chain.Loop ? (int)Math.Ceiling(block.Played / block.CycleLength) : 1;
             int added = 0;
             for (int cycle = 0; cycle < cycles && added < MaxBoundariesPerChain; cycle++)

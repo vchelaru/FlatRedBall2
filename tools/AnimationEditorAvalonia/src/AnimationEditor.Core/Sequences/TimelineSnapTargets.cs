@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -52,7 +53,7 @@ public static class TimelineSnapTargets
     }
 
     /// <summary>The frame boundaries inside one cycle of <paramref name="chain"/>, in seconds from the cycle start. The cycle's start and end are not boundaries.</summary>
-    public static IReadOnlyList<double> FrameBoundaries(AnimationChainSave chain)
+    public static IReadOnlyList<double> FrameBoundaries(AnimationChainSave chain, FrameLengthUnit unit)
     {
         var offsets = new List<double>();
         int count = chain.Frames.Count;
@@ -64,7 +65,7 @@ public static class TimelineSnapTargets
             int frame = PlaybackTimeline.FrameOfVisit(v, count, chain.PingPong, chain.Reverse);
             // A ping-pong shows its end frames twice in a row; there is no boundary between the two showings.
             if (v > 0 && frame != previous) offsets.Add(time);
-            time += PlaybackController.FrameLength(chain.Frames[frame]);
+            time += PlaybackController.FrameSeconds(chain.Frames[frame], unit);
             previous = frame;
         }
         return offsets;

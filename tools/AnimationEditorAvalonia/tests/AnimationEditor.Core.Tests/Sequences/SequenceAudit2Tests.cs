@@ -467,7 +467,7 @@ public class SequenceAudit2Tests
         var frame = new AnimationFrameSave { FrameLength = 0.1f };
         frame.Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = null! });
 
-        EventMarkers.FramesOf(new AnimationChainSave { Frames = { frame } })[0].Names.ShouldBe(new[] { string.Empty });
+        EventMarkers.FramesOf(new AnimationChainSave { Frames = { frame } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds)[0].Names.ShouldBe(new[] { string.Empty });
     }
 
     [Fact]
@@ -569,7 +569,7 @@ public class SequenceAudit2Tests
     {
         var chain = new AnimationChainSave { Frames = { new AnimationFrameSave { LeftCoordinate = 0.5f, RightCoordinate = 0f, TopCoordinate = 0f, BottomCoordinate = 1f, FrameLength = 0.1f } } };
 
-        FilmstripLayout.FramesOf(chain, _ => (100, 50))[0].SpriteWidth.ShouldBe(50);
+        FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => (100, 50))[0].SpriteWidth.ShouldBe(50);
     }
 
     [Fact]

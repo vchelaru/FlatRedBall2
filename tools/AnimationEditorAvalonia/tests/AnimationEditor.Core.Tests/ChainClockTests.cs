@@ -20,7 +20,7 @@ public class ChainClockTests
     {
         var chain = Chain(loop: true, 0.1f, 0.1f, 0.1f);
 
-        var (index, elapsed) = ChainClock.Locate(chain, 0.35);
+        var (index, elapsed) = ChainClock.Locate(chain, 0.35, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         index.ShouldBe(0);
         elapsed.ShouldBe(0.05, tolerance: 1e-6);
@@ -32,7 +32,7 @@ public class ChainClockTests
         // 0.1f is not exactly 0.1, so a naive running sum puts the boundary a hair after t = 0.2.
         var chain = Chain(loop: true, 0.1f, 0.1f, 0.1f);
 
-        ChainClock.Locate(chain, 0.2).FrameIndex.ShouldBe(2);
+        ChainClock.Locate(chain, 0.2, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).FrameIndex.ShouldBe(2);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class ChainClockTests
     {
         var chain = Chain(loop: false, 0.1f, 0.2f);
 
-        var (index, _) = ChainClock.Locate(chain, 5.0);
+        var (index, _) = ChainClock.Locate(chain, 5.0, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         index.ShouldBe(1);
     }
@@ -50,7 +50,7 @@ public class ChainClockTests
     {
         var chain = Chain(loop: true, 0f, 0f);
 
-        ChainClock.Locate(chain, 0.15).FrameIndex.ShouldBe(1);
+        ChainClock.Locate(chain, 0.15, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).FrameIndex.ShouldBe(1);
     }
 
     [Fact]
@@ -58,6 +58,6 @@ public class ChainClockTests
     {
         var chain = Chain(loop: true, 0.25f, 0f);
 
-        ChainClock.TotalLength(chain).ShouldBe(0.35, tolerance: 1e-6);
+        ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).ShouldBe(0.35, tolerance: 1e-6);
     }
 }

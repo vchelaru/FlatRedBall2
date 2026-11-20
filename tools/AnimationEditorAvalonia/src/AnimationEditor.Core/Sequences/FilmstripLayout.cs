@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -54,13 +55,13 @@ public static class FilmstripLayout
     /// <paramref name="chain"/>'s frames as the filmstrip needs them. <paramref name="textureSize"/> returns a frame's
     /// texture size in pixels, or null when it can't be read (the frame then has no sprite size).
     /// </summary>
-    public static IReadOnlyList<FilmstripFrame> FramesOf(AnimationChainSave chain, Func<AnimationFrameSave, (int Width, int Height)?> textureSize)
+    public static IReadOnlyList<FilmstripFrame> FramesOf(AnimationChainSave chain, FrameLengthUnit unit, Func<AnimationFrameSave, (int Width, int Height)?> textureSize)
     {
         var frames = new FilmstripFrame[chain.Frames.Count];
         for (int i = 0; i < frames.Length; i++)
         {
             var frame = chain.Frames[i];
-            double duration = PlaybackController.FrameLength(frame);
+            double duration = PlaybackController.FrameSeconds(frame, unit);
             if (textureSize(frame) is not { } size || size.Width <= 0 || size.Height <= 0)
             {
                 frames[i] = new FilmstripFrame(duration, 0, 0);

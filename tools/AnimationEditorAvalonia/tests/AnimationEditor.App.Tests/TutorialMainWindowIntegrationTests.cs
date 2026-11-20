@@ -388,7 +388,7 @@ public class TutorialMainWindowIntegrationTests
                           ?? throw new InvalidOperationException("PreviewCtrl not found");
 
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
 
             using var bm = preview.RenderToBitmap(64, 64);

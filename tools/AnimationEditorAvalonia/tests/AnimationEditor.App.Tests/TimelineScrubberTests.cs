@@ -44,7 +44,7 @@ public class TimelineScrubberTests
             Assert.Equal(2, items.Count);
 
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
@@ -91,7 +91,7 @@ public class TimelineScrubberTests
             Assert.Equal(2, items.Count);
 
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
@@ -141,7 +141,7 @@ public class TimelineScrubberTests
             var items = Assert.IsType<ObservableCollection<TimelineFrameVm>>(timeline.ItemsSource);
 
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
@@ -185,7 +185,7 @@ public class TimelineScrubberTests
             var items = Assert.IsType<ObservableCollection<TimelineFrameVm>>(timeline.ItemsSource);
 
             preview.PauseAutoPlayback();
-            preview.Playback.SetChain(chain);
+            preview.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 

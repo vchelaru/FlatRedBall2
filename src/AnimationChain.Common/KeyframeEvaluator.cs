@@ -13,7 +13,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// </summary>
 public interface IKeyframeFrame
 {
-    /// <summary>How long the frame is displayed, in the same unit as the <c>elapsedInFrame</c> passed to the evaluator.</summary>
+    /// <summary>How long the frame is displayed in seconds, the same unit as the <c>elapsedInFrame</c> passed to the evaluator.</summary>
     double DurationSeconds { get; }
 
     /// <summary>The frame's own X offset. Ignored when <see cref="SkipOffsetKeyframe"/> is set.</summary>
@@ -78,12 +78,12 @@ public static class KeyframeEvaluator
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>
     /// of an editor-side chain. Frames with no length use 0.1 (the editor's playback default).
     /// </summary>
-    public static (float X, float Y) EvaluateOffset(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
-        => EvaluateOffset(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
+    public static (float X, float Y) EvaluateOffset(AnimationChainSave chain, int frameIndex, double elapsedInFrame, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
+        => EvaluateOffset(SaveKeyframeFrame.Create(chain, unit), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
-    /// <summary>The color channels to display, same contract as <see cref="EvaluateOffset(AnimationChainSave, int, double)"/>.</summary>
-    public static KeyframeColor EvaluateColor(AnimationChainSave chain, int frameIndex, double elapsedInFrame)
-        => EvaluateColor(SaveKeyframeFrame.Create(chain), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
+    /// <summary>The color channels to display, same contract as <see cref="EvaluateOffset(AnimationChainSave, int, double, TimeMeasurementUnit)"/>.</summary>
+    public static KeyframeColor EvaluateColor(AnimationChainSave chain, int frameIndex, double elapsedInFrame, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
+        => EvaluateColor(SaveKeyframeFrame.Create(chain, unit), GlidesAcrossLoop(chain), frameIndex, elapsedInFrame);
 
     /// <summary>
     /// The offset to display <paramref name="elapsedInFrame"/> into frame <paramref name="frameIndex"/>.
@@ -174,9 +174,9 @@ public static class KeyframeEvaluator
     /// own skip flag and curve; the first frame of a run of frames holding the name is always a keyframe.
     /// A shape that is not in the frame returns its own values. Back curves swing past the endpoints.
     /// </summary>
-    public static KeyframeShapeValue EvaluateShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape)
+    public static KeyframeShapeValue EvaluateShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
     {
-        var frames = SaveKeyframeFrame.Create(chain);
+        var frames = SaveKeyframeFrame.Create(chain, unit);
         frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
         var adapter = SaveKeyframeShape.Create(shape);
         if (frames.Length > 0)
@@ -190,7 +190,7 @@ public static class KeyframeEvaluator
     }
 
     /// <summary>
-    /// Same contract as <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> over any frame
+    /// Same contract as <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave, TimeMeasurementUnit)"/> over any frame
     /// list. <paramref name="shape"/> is looked up in frame <paramref name="frameIndex"/> by name and kind.
     /// </summary>
     public static KeyframeShapeValue EvaluateShape<TFrame>(
@@ -229,14 +229,14 @@ public static class KeyframeEvaluator
     /// <summary>
     /// The points of <paramref name="polygon"/> (a polygon of frame <paramref name="frameIndex"/>)
     /// <paramref name="elapsedInFrame"/> into that frame (#1484). Points are their own keyframe group, matched across
-    /// frames like <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/> (by name and kind, the first
+    /// frames like <see cref="EvaluateShape(AnimationChainSave, int, double, ShapeSave, TimeMeasurementUnit)"/> (by name and kind, the first
     /// frame of a run is always a keyframe). Point i glides to point i of the next points keyframe; when the counts
     /// differ the glide snaps and the earlier keyframe's points hold until the next frame plays. Back curves swing past
     /// the endpoints. A polygon that is not in the frame returns its own points.
     /// </summary>
-    public static IReadOnlyList<Vector2> EvaluateShapePoints(AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon)
+    public static IReadOnlyList<Vector2> EvaluateShapePoints(AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
     {
-        var frames = SaveKeyframeFrame.Create(chain);
+        var frames = SaveKeyframeFrame.Create(chain, unit);
         frameIndex = Math.Clamp(frameIndex, 0, Math.Max(frames.Length - 1, 0));
         var adapter = SaveKeyframeShape.Create(polygon);
         if (frames.Length > 0)
@@ -250,7 +250,7 @@ public static class KeyframeEvaluator
     }
 
     /// <summary>
-    /// Same contract as <see cref="EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/> over any frame
+    /// Same contract as <see cref="EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave, TimeMeasurementUnit)"/> over any frame
     /// list. Returns the keyframe's own list (no copy) whenever nothing glides.
     /// </summary>
     public static IReadOnlyList<Vector2> EvaluateShapePoints<TFrame>(

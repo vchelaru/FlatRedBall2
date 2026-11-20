@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Keyframes;
@@ -17,12 +18,12 @@ public static class KeyframeSampler
     /// (clamped to the chain). A missing or empty chain yields zero and unset color. The color operation is
     /// the frame's resolved one; it never glides.
     /// </summary>
-    public static KeyframeSample Sample(AnimationChainSave? chain, int frameIndex, double elapsedInFrame)
+    public static KeyframeSample Sample(AnimationChainSave? chain, FrameLengthUnit unit, int frameIndex, double elapsedInFrame)
     {
         if (chain is null || chain.Frames.Count == 0) return default;
         frameIndex = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
 
-        var frames = SaveKeyframeFrame.Create(chain);
+        var frames = SaveKeyframeFrame.Create(chain, unit.Unit);
         bool wraps = PlaybackTimeline.GlidesAcrossLoop(chain.Loop, chain.PingPong);
         var (x, y) = KeyframeEvaluator.EvaluateOffset(frames, wraps, frameIndex, elapsedInFrame);
         var c = KeyframeEvaluator.EvaluateColor(frames, wraps, frameIndex, elapsedInFrame);
@@ -32,19 +33,19 @@ public static class KeyframeSampler
     /// <summary>
     /// The offset and size of <paramref name="shape"/> <paramref name="elapsedInFrame"/> seconds into frame
     /// <paramref name="frameIndex"/>, glided by the shape curves stored in the chain (see
-    /// <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave)"/>).
+    /// <see cref="KeyframeEvaluator.EvaluateShape(AnimationChainSave, int, double, ShapeSave, TimeMeasurementUnit)"/>).
     /// </summary>
-    public static KeyframeShapeValue SampleShape(AnimationChainSave chain, int frameIndex, double elapsedInFrame, ShapeSave shape) =>
-        KeyframeEvaluator.EvaluateShape(chain, frameIndex, elapsedInFrame, shape);
+    public static KeyframeShapeValue SampleShape(AnimationChainSave chain, FrameLengthUnit unit, int frameIndex, double elapsedInFrame, ShapeSave shape) =>
+        KeyframeEvaluator.EvaluateShape(chain, frameIndex, elapsedInFrame, shape, unit.Unit);
 
     /// <summary>
     /// The points of <paramref name="polygon"/> <paramref name="elapsedInFrame"/> seconds into frame
     /// <paramref name="frameIndex"/>, glided by the points curves stored in the chain (see
-    /// <see cref="KeyframeEvaluator.EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave)"/>).
+    /// <see cref="KeyframeEvaluator.EvaluateShapePoints(AnimationChainSave, int, double, PolygonSave, TimeMeasurementUnit)"/>).
     /// </summary>
     public static IReadOnlyList<System.Numerics.Vector2> SampleShapePoints(
-        AnimationChainSave chain, int frameIndex, double elapsedInFrame, PolygonSave polygon) =>
-        KeyframeEvaluator.EvaluateShapePoints(chain, frameIndex, elapsedInFrame, polygon);
+        AnimationChainSave chain, FrameLengthUnit unit, int frameIndex, double elapsedInFrame, PolygonSave polygon) =>
+        KeyframeEvaluator.EvaluateShapePoints(chain, frameIndex, elapsedInFrame, polygon, unit.Unit);
 
     /// <summary>Whether any frame of <paramref name="chain"/> has a curve that glides, so playback must repaint every tick.</summary>
     public static bool IsAnimated(AnimationChainSave? chain)

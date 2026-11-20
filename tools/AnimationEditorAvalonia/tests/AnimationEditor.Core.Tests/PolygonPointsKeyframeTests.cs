@@ -107,7 +107,7 @@ public class PolygonPointsKeyframeTests
         polys[1].SkipPointsKeyframe = true;
         polys[1].Points[0].X = 999;
 
-        var shown = KeyframeInspectorState.DisplayShapePoints(polys[1], chain);
+        var shown = KeyframeInspectorState.DisplayShapePoints(polys[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(10f, shown[0].X, 3); // half way from x=0 (frame 0) to x=20 (frame 2)
     }
@@ -119,7 +119,7 @@ public class PolygonPointsKeyframeTests
         var (chain, polys) = PolyChain(ctx, 3);
         polys[0].PointsInterpolation = "Linear";
 
-        var shown = KeyframeInspectorState.DisplayShapePoints(polys[1], chain);
+        var shown = KeyframeInspectorState.DisplayShapePoints(polys[1], chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(10f, shown[0].X, 3);
         Assert.Equal(3, shown.Count);
@@ -245,7 +245,7 @@ public class PolygonPointsKeyframeTests
         var (chain, polys) = PolyChain(ctx, 2);
         polys[0].PointsInterpolation = "Linear";
 
-        var points = KeyframeSampler.SampleShapePoints(chain, 0, 0.5, polys[0]);
+        var points = KeyframeSampler.SampleShapePoints(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0, 0.5, polys[0]);
 
         Assert.Equal(5f, points[0].X, 3);
         Assert.Equal(15f, points[1].X, 3);

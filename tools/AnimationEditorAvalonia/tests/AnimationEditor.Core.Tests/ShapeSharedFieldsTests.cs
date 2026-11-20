@@ -12,7 +12,7 @@ public class ShapeSharedFieldsTests
     private static PolygonSave Poly(string name, float x, float y) => new() { Name = name, X = x, Y = y };
 
     private static ShapeSharedFields For(params ShapeSave[] shapes) =>
-        ShapeSharedFields.For(shapes, _ => null);
+        ShapeSharedFields.For(shapes, _ => null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
     [Fact]
     public void For_RectangleAndCircle_IsMixedType()
@@ -60,7 +60,7 @@ public class ShapeSharedFieldsTests
     [Fact]
     public void For_NoShapes_IsEmpty()
     {
-        var state = ShapeSharedFields.For(new List<ShapeSave>(), _ => null);
+        var state = ShapeSharedFields.For(new List<ShapeSave>(), _ => null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(state.IsMixedType);
         Assert.Null(state.X);

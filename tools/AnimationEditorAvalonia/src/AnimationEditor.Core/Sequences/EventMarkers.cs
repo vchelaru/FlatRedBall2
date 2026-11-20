@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -33,9 +34,9 @@ public static class EventMarkers
     /// <summary>Stops a pathological chain (microsecond frames, thousands of loops) from building millions of occurrences.</summary>
     private const int MaxOccurrences = 50_000;
 
-    public static IReadOnlyList<EventFrame> FramesOf(AnimationChainSave chain) =>
+    public static IReadOnlyList<EventFrame> FramesOf(AnimationChainSave chain, FrameLengthUnit unit) =>
         chain.Frames.Select(frame => new EventFrame(
-            PlaybackController.FrameLength(frame), frame.Events.Select(e => e.Name ?? string.Empty).ToArray())).ToArray();
+            PlaybackController.FrameSeconds(frame, unit), frame.Events.Select(e => e.Name ?? string.Empty).ToArray())).ToArray();
 
     /// <summary>
     /// Every event that fires while <paramref name="frames"/> play for <paramref name="played"/> seconds, in time order.

@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.Keyframes;
@@ -65,11 +66,11 @@ public static class KeyframeInspectorState
     /// value in effect at the start of the frame (the glide from the previous keyframe), so a read-only
     /// field reads what playback shows there.
     /// </summary>
-    public static (float X, float Y) DisplayOffset(AnimationFrameSave frame, AnimationChainSave? chain)
+    public static (float X, float Y) DisplayOffset(AnimationFrameSave frame, AnimationChainSave? chain, FrameLengthUnit unit)
     {
         if (chain is null || IsEffectivelyKeyframe(KeyframeGroup.Offset, frame, chain))
             return (frame.RelativeX, frame.RelativeY);
-        var sample = KeyframeSampler.Sample(chain, chain.Frames.IndexOf(frame), 0);
+        var sample = KeyframeSampler.Sample(chain, unit, chain.Frames.IndexOf(frame), 0);
         return (sample.OffsetX, sample.OffsetY);
     }
 
@@ -77,11 +78,11 @@ public static class KeyframeInspectorState
     /// The color channels the inspector shows for <paramref name="frame"/>: its own stored channels (so an
     /// omitted one stays blank) when it is a keyframe, else the value in effect at the start of the frame.
     /// </summary>
-    public static KeyframeColor DisplayColor(AnimationFrameSave frame, AnimationChainSave? chain)
+    public static KeyframeColor DisplayColor(AnimationFrameSave frame, AnimationChainSave? chain, FrameLengthUnit unit)
     {
         if (chain is null || IsEffectivelyKeyframe(KeyframeGroup.Color, frame, chain))
             return new KeyframeColor(frame.Red, frame.Green, frame.Blue, frame.Alpha);
-        var color = KeyframeSampler.Sample(chain, chain.Frames.IndexOf(frame), 0).Color;
+        var color = KeyframeSampler.Sample(chain, unit, chain.Frames.IndexOf(frame), 0).Color;
         return new KeyframeColor(color.Red, color.Green, color.Blue, color.Alpha);
     }
 
@@ -137,11 +138,11 @@ public static class KeyframeInspectorState
     /// The offset the inspector shows for <paramref name="shape"/>: its own when it is a keyframe, else the value in
     /// effect at the start of its frame, so a read-only field reads what playback shows there.
     /// </summary>
-    public static (float X, float Y) DisplayShapeOffset(ShapeSave shape, AnimationChainSave? chain)
+    public static (float X, float Y) DisplayShapeOffset(ShapeSave shape, AnimationChainSave? chain, FrameLengthUnit unit)
     {
         if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, shape, chain))
             return (shape.X, shape.Y);
-        var value = KeyframeSampler.SampleShape(chain, IndexOfFrameHolding(shape, chain), 0, shape);
+        var value = KeyframeSampler.SampleShape(chain, unit, IndexOfFrameHolding(shape, chain), 0, shape);
         return (value.X, value.Y);
     }
 
@@ -149,14 +150,14 @@ public static class KeyframeInspectorState
     /// The size components the inspector shows for <paramref name="shape"/> (rectangle ScaleX/ScaleY, circle Radius and 0):
     /// its own when it is a keyframe, else the value in effect at the start of its frame.
     /// </summary>
-    public static (float SizeX, float SizeY) DisplayShapeSize(ShapeSave shape, AnimationChainSave? chain)
+    public static (float SizeX, float SizeY) DisplayShapeSize(ShapeSave shape, AnimationChainSave? chain, FrameLengthUnit unit)
     {
         if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Size, shape, chain))
         {
             var own = SaveKeyframeShape.Create(shape);
             return (own.SizeX, own.SizeY);
         }
-        var value = KeyframeSampler.SampleShape(chain, IndexOfFrameHolding(shape, chain), 0, shape);
+        var value = KeyframeSampler.SampleShape(chain, unit, IndexOfFrameHolding(shape, chain), 0, shape);
         return (value.SizeX, value.SizeY);
     }
 
@@ -164,11 +165,11 @@ public static class KeyframeInspectorState
     /// The points the inspector shows for <paramref name="polygon"/>: its own when it is a points keyframe, else the
     /// value in effect at the start of its frame (the glide from the previous points keyframe).
     /// </summary>
-    public static IReadOnlyList<System.Numerics.Vector2> DisplayShapePoints(PolygonSave polygon, AnimationChainSave? chain)
+    public static IReadOnlyList<System.Numerics.Vector2> DisplayShapePoints(PolygonSave polygon, AnimationChainSave? chain, FrameLengthUnit unit)
     {
         if (chain is null || IsEffectivelyKeyframe(ShapeKeyframeGroup.Points, polygon, chain))
             return SaveKeyframeShape.Create(polygon).Points;
-        return KeyframeSampler.SampleShapePoints(chain, IndexOfFrameHolding(polygon, chain), 0, polygon);
+        return KeyframeSampler.SampleShapePoints(chain, unit, IndexOfFrameHolding(polygon, chain), 0, polygon);
     }
 
     internal static int IndexOfFrameHolding(ShapeSave shape, AnimationChainSave? chain)

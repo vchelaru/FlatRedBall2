@@ -32,7 +32,7 @@ public class PlaybackControllerTests
     public void Advance_WithSingleFrameChain_DoesNotChangeIndex()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(1));
+        ctrl.SetChain(MakeChain(1), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(999.0);
         Assert.Equal(0, ctrl.CurrentFrameIndex);
     }
@@ -43,7 +43,7 @@ public class PlaybackControllerTests
     public void Advance_MovesToNextFrame_WhenTimeExceedsFirstFrameLength()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // 3 frames × 0.1 s = 0.3 s total
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // 3 frames × 0.1 s = 0.3 s total
         ctrl.Advance(0.15);                // 0.15 s > frame[0]=0.1 s → frame 1
         Assert.Equal(1, ctrl.CurrentFrameIndex);
     }
@@ -52,7 +52,7 @@ public class PlaybackControllerTests
     public void Advance_StaysOnFirstFrame_WhenTimeLessThanFrameLength()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05); // 0.05 s < 0.1 s → still frame 0
         Assert.Equal(0, ctrl.CurrentFrameIndex);
     }
@@ -61,7 +61,7 @@ public class PlaybackControllerTests
     public void Advance_ReachesLastFrame_WhenTimeInLastFrameWindow()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // total = 0.3 s
         ctrl.Advance(0.25);                // frame 0=0-0.1, frame 1=0.1-0.2, frame 2=0.2-0.3 → idx 2
         Assert.Equal(2, ctrl.CurrentFrameIndex);
     }
@@ -72,7 +72,7 @@ public class PlaybackControllerTests
     public void Advance_LoopsBackToFirstFrame_AfterTotalDuration()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // total = 0.3 s
         ctrl.Advance(0.35);                // 0.35 % 0.3 = 0.05 → frame 0
         Assert.Equal(0, ctrl.CurrentFrameIndex);
     }
@@ -81,7 +81,7 @@ public class PlaybackControllerTests
     public void Advance_AccumulatesTimeAcrossMultipleCalls()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05); // frame 0
         ctrl.Advance(0.09); // 0.14 total → still frame 1
         Assert.Equal(1, ctrl.CurrentFrameIndex);
@@ -93,7 +93,7 @@ public class PlaybackControllerTests
     public void Advance_FiresFrameIndexChanged_WhenFrameChanges()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int firedIdx = -1;
         ctrl.FrameIndexChanged += i => firedIdx = i;
 
@@ -106,7 +106,7 @@ public class PlaybackControllerTests
     public void Advance_DoesNotFireEvent_WhenFrameDoesNotChange()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int eventCount = 0;
         ctrl.FrameIndexChanged += _ => eventCount++;
 
@@ -121,11 +121,11 @@ public class PlaybackControllerTests
     public void SetChain_ResetsAnimTimeAndFrameIndex()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.25);
         Assert.Equal(2, ctrl.CurrentFrameIndex);
 
-        ctrl.SetChain(MakeChain(3, 0.1f)); // new chain → reset
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // new chain → reset
         Assert.Equal(0, ctrl.CurrentFrameIndex);
         Assert.Equal(0.0, ctrl.AnimTime);
     }
@@ -134,7 +134,7 @@ public class PlaybackControllerTests
     public void Reset_ResetsWithoutChangingChain()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.25);
 
         ctrl.Reset();
@@ -147,7 +147,7 @@ public class PlaybackControllerTests
     public void Reset_FiresFrameIndexChangedWithZero()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.25);
         int? lastFired = null;
         ctrl.FrameIndexChanged += i => lastFired = i;
@@ -166,7 +166,7 @@ public class PlaybackControllerTests
         var chain = new AnimationChainSave { Name = "Z" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0 });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0 });
-        ctrl.SetChain(chain);
+        ctrl.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Advance(0.15); // 0.15 > 0.1 default → frame 1
 
@@ -203,7 +203,7 @@ public class PlaybackControllerTests
     public void Advance_DoesNotMoveFrame_WhenPaused()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Pause();
 
         ctrl.Advance(0.5); // would skip to frame 2 if playing
@@ -216,7 +216,7 @@ public class PlaybackControllerTests
     public void Advance_ResumesMovement_AfterPlay()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Pause();
         ctrl.Advance(0.5); // no-op while paused
         ctrl.Play();
@@ -229,7 +229,7 @@ public class PlaybackControllerTests
     public void Pause_DoesNotFireFrameIndexChanged()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int eventCount = 0;
         ctrl.FrameIndexChanged += _ => eventCount++;
 
@@ -252,7 +252,7 @@ public class PlaybackControllerTests
     public void Advance_WithDoubleSpeed_AdvancesTwiceAsFast()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.SpeedMultiplier = 2.0;
 
         // At 2× speed, 0.075 s of real time = 0.15 s of anim time → frame 1
@@ -265,7 +265,7 @@ public class PlaybackControllerTests
     public void Advance_WithHalfSpeed_AdvancesHalfAsFast()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.SpeedMultiplier = 0.5;
 
         // At 0.5× speed, 0.3 s of real time = 0.15 s of anim time → frame 1
@@ -278,7 +278,7 @@ public class PlaybackControllerTests
     public void Advance_WithZeroSpeed_DoesNotAdvanceFrame()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.SpeedMultiplier = 0.0;
 
         ctrl.Advance(999.0); // any real delta → 0 anim delta
@@ -302,7 +302,7 @@ public class PlaybackControllerTests
         chain.Loop = false;
         var ctrl = new PlaybackController();
 
-        ctrl.SetChain(chain);
+        ctrl.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(ctrl.Loop);
     }
@@ -312,7 +312,7 @@ public class PlaybackControllerTests
     {
         var chain = MakeChain(2);
         var ctrl = new PlaybackController();
-        ctrl.SetChain(chain);
+        ctrl.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Loop = false;
 
@@ -326,9 +326,9 @@ public class PlaybackControllerTests
         var nonLoopingChain = MakeChain(2);
         nonLoopingChain.Loop = false;
         var ctrl = new PlaybackController();
-        ctrl.SetChain(loopingChain);
+        ctrl.SetChain(loopingChain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
-        ctrl.SetChain(nonLoopingChain);
+        ctrl.SetChain(nonLoopingChain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(ctrl.Loop);
     }
@@ -337,7 +337,7 @@ public class PlaybackControllerTests
     public void Advance_StopsOnLastFrame_WhenLoopIsFalse()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // total = 0.3 s
         ctrl.Loop = false;
 
         ctrl.Advance(0.35); // would wrap to frame 0 if looping
@@ -349,7 +349,7 @@ public class PlaybackControllerTests
     public void Advance_PausesAtEnd_WhenLoopIsFalse()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Loop = false;
 
         ctrl.Advance(0.35);
@@ -361,7 +361,7 @@ public class PlaybackControllerTests
     public void Advance_DoesNotPause_WhenLoopIsTrueAndAnimationWraps()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Advance(0.35); // wraps, Loop defaults to true
 
@@ -372,7 +372,7 @@ public class PlaybackControllerTests
     public void Advance_FreezesAnimTimeAtTotalDuration_WhenLoopFalseAndOverrun()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // total = 0.3 s
         ctrl.Loop = false;
 
         ctrl.Advance(999.0); // way past the end
@@ -385,7 +385,7 @@ public class PlaybackControllerTests
     public void Play_RestartsFromBeginning_WhenNotLoopingAndAnimationFinished()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // total = 0.3 s
         ctrl.Loop = false;
         ctrl.Advance(0.35); // finishes and auto-pauses on the last frame
 
@@ -400,7 +400,7 @@ public class PlaybackControllerTests
     public void Play_ResumesInPlace_WhenNotLoopingButNotYetFinished()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Loop = false;
         ctrl.Advance(0.15); // mid-animation, frame 1
         ctrl.Pause();
@@ -414,7 +414,7 @@ public class PlaybackControllerTests
     public void Play_FiresFrameIndexChanged_WhenRestartingFromEnd()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Loop = false;
         ctrl.Advance(0.35); // ends on frame 2
 
@@ -431,7 +431,7 @@ public class PlaybackControllerTests
     public void FrameElapsed_IsZero_AfterSetChain()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal(0.0, ctrl.FrameElapsed);
     }
 
@@ -439,7 +439,7 @@ public class PlaybackControllerTests
     public void FrameElapsed_IsZero_AfterReset()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05);
 
         ctrl.Reset();
@@ -451,7 +451,7 @@ public class PlaybackControllerTests
     public void FrameElapsed_ReturnsElapsedWithinCurrentFrame()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Advance(0.05); // 0.05s into frame 0 (which spans 0.0–0.1)
 
@@ -462,7 +462,7 @@ public class PlaybackControllerTests
     public void FrameElapsed_ResetsToSmallValue_WhenFrameChanges()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05); // mid frame 0
 
         ctrl.Advance(0.1); // advances to frame 1; anim time = 0.15, frame 1 starts at 0.1 → elapsed = 0.05
@@ -475,7 +475,7 @@ public class PlaybackControllerTests
     public void FrameElapsed_IsCorrectForNonFirstFrame()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.Advance(0.25); // anim time = 0.25, frame 2 starts at 0.2 → elapsed = 0.05
 
@@ -489,7 +489,7 @@ public class PlaybackControllerTests
     public void PlaybackTicked_FiresOnEveryAdvance_EvenWithoutFrameChange()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int tickCount = 0;
         ctrl.PlaybackTicked += () => tickCount++;
 
@@ -504,7 +504,7 @@ public class PlaybackControllerTests
     public void PlaybackTicked_FiresOnAdvance_WhenFrameChanges()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int tickCount = 0;
         ctrl.PlaybackTicked += () => tickCount++;
 
@@ -517,7 +517,7 @@ public class PlaybackControllerTests
     public void PlaybackTicked_DoesNotFire_WhenPaused()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Pause();
         int tickCount = 0;
         ctrl.PlaybackTicked += () => tickCount++;
@@ -531,7 +531,7 @@ public class PlaybackControllerTests
     public void PlaybackTicked_DoesNotFire_ForSingleFrameChain()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(1, 0.1f));
+        ctrl.SetChain(MakeChain(1, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int tickCount = 0;
         ctrl.PlaybackTicked += () => tickCount++;
 
@@ -544,7 +544,7 @@ public class PlaybackControllerTests
     public void PlaybackTicked_FiresOnReset()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05);
         int tickCount = 0;
         ctrl.PlaybackTicked += () => tickCount++;
@@ -560,7 +560,7 @@ public class PlaybackControllerTests
         // FrameElapsed for the NEW frame must be correct inside FrameIndexChanged,
         // not the stale value from the old frame.
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Advance(0.05); // mid frame 0
 
         double elapsedAtFrameChange = -1;
@@ -616,7 +616,7 @@ public class PlaybackControllerTests
     public void SeekToFrame_FiresFrameIndexChanged_WithTargetIndex()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         int fired = -1;
         ctrl.FrameIndexChanged += i => fired = i;
 
@@ -629,7 +629,7 @@ public class PlaybackControllerTests
     public void SeekToFrame_SetsCurrentFrameIndex()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         ctrl.SeekToFrame(2);
 
@@ -641,7 +641,7 @@ public class PlaybackControllerTests
     {
         // Scrubbing happens while paused, so the seek must not be gated by IsPlaying.
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Pause();
 
         ctrl.SeekToFrame(2);
@@ -653,7 +653,7 @@ public class PlaybackControllerTests
     public void SeekToFrame_WithFraction_SetsAnimTimeAndFrameElapsed()
     {
         var ctrl = new PlaybackController();
-        ctrl.SetChain(MakeChain(3, 0.1f)); // each frame 0.1 s; frame 1 starts at 0.1 s
+        ctrl.SetChain(MakeChain(3, 0.1f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // each frame 0.1 s; frame 1 starts at 0.1 s
 
         ctrl.SeekToFrame(1, 0.5); // halfway into frame 1
 

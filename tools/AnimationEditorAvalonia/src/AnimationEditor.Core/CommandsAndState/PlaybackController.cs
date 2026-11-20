@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 
@@ -17,6 +18,7 @@ public class PlaybackController
     private double _animTime;
     private int _currentFrameIndex;
     private AnimationChainSave? _chain;
+    private FrameLengthUnit _unit;
 
     // Forward seconds into the current frame (see PlaybackTimeline): falls while Reverse/PingPong plays it mirrored.
     private double _frameElapsed;
@@ -109,9 +111,10 @@ public class PlaybackController
     /// Set the animation chain to play. Resets time and frame index to zero.
     /// Pass <c>null</c> to stop playback.
     /// </summary>
-    public void SetChain(AnimationChainSave? chain)
+    public void SetChain(AnimationChainSave? chain, FrameLengthUnit unit)
     {
         _chain = chain;
+        _unit = unit;
         Reset();
     }
 
@@ -161,13 +164,13 @@ public class PlaybackController
 
         double start = 0;
         for (int i = 0; i < idx; i++)
-            start += FrameLength(chain.Frames[i]);
+            start += FrameSeconds(chain.Frames[i], _unit);
 
         // The fraction is through the frame's forward time (left to right on the timeline), whichever direction plays
         // there; the first cycle time showing it is the seek target. Set before events so handlers see it.
-        double forward = start + frac * FrameLength(chain.Frames[idx]);
+        double forward = start + frac * FrameSeconds(chain.Frames[idx], _unit);
         _animTime = PlaybackTimeline.ToCycleTime(forward, ForwardLength(chain), chain.Reverse);
-        _frameElapsed = frac * FrameLength(chain.Frames[idx]);
+        _frameElapsed = frac * FrameSeconds(chain.Frames[idx], _unit);
 
         if (idx != _currentFrameIndex)
         {
@@ -232,22 +235,22 @@ public class PlaybackController
 
     // Reverse and PingPong mirror the forward timeline (PlaybackTimeline); a time on a frame boundary shows the frame
     // being entered, the same rule every runtime uses.
-    private static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double cycleTime)
+    private (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double cycleTime)
     {
-        var at = PlaybackTimeline.Locate(chain.Frames, FrameLength, cycleTime, chain.PingPong, chain.Reverse);
+        var at = PlaybackTimeline.Locate(chain.Frames, f => FrameSeconds(f, _unit), cycleTime, chain.PingPong, chain.Reverse);
         return (at.FrameIndex, at.ElapsedInFrame);
     }
 
-    private static double ForwardLength(AnimationChainSave chain)
+    private double ForwardLength(AnimationChainSave chain)
     {
         double total = 0;
-        foreach (var f in chain.Frames) total += FrameLength(f);
+        foreach (var f in chain.Frames) total += FrameSeconds(f, _unit);
         return total;
     }
 
-    private static double CycleLength(AnimationChainSave chain) => PlaybackTimeline.CycleLength(ForwardLength(chain), chain.PingPong);
+    private double CycleLength(AnimationChainSave chain) => PlaybackTimeline.CycleLength(ForwardLength(chain), chain.PingPong);
 
-    // Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
-    internal static double FrameLength(AnimationFrameSave frame) =>
-        frame.FrameLength > 0 ? frame.FrameLength : 0.1;
+    // A frame's playing time in seconds. Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
+    internal static double FrameSeconds(AnimationFrameSave frame, FrameLengthUnit unit) =>
+        unit.PlaybackSeconds(frame.FrameLength);
 }

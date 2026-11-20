@@ -175,8 +175,8 @@ public class TimelineSnapTargetsTests
     public void FrameBoundaries_ListTheCuts_AndPingPongSkipsTheTurnaroundWhereAFrameShowsTwice()
     {
         // 0.1, 0.2, 0.3: cuts at 0.1 and 0.3.
-        TimelineSnapTargets.FrameBoundaries(ChainOf(false, 0.1f, 0.2f, 0.3f)).Select(x => System.Math.Round(x, 3)).ShouldBe(new[] { 0.1, 0.3 });
+        TimelineSnapTargets.FrameBoundaries(ChainOf(false, 0.1f, 0.2f, 0.3f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).Select(x => System.Math.Round(x, 3)).ShouldBe(new[] { 0.1, 0.3 });
         // Ping-pong plays 0.1 0.2 0.3 | 0.3 0.2 0.1: no cut at 0.6 where the 0.3 frame is shown twice.
-        TimelineSnapTargets.FrameBoundaries(ChainOf(true, 0.1f, 0.2f, 0.3f)).Select(x => System.Math.Round(x, 3)).ShouldBe(new[] { 0.1, 0.3, 0.9, 1.1 });
+        TimelineSnapTargets.FrameBoundaries(ChainOf(true, 0.1f, 0.2f, 0.3f), AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).Select(x => System.Math.Round(x, 3)).ShouldBe(new[] { 0.1, 0.3, 0.9, 1.1 });
     }
 }

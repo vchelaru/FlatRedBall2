@@ -524,7 +524,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             // reflects its own chain's persisted Loop value instead of inheriting the primary
             // track's.
             var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier };
-            controller.SetChain(chain);
+            controller.SetChain(chain, DocumentUnit);
             _groupPlayback[chain] = controller;
         }
 
@@ -674,7 +674,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     {
         if (!_showShapes) return Array.Empty<PreviewShapeInfo>();
         return sprites
-            .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Chain))
+            .SelectMany(sprite => BuildShapeInfos(sprite.Frame, pinned: false, sprite.ElapsedInFrame, sprite.Unit, sprite.Chain))
             .ToArray();
     }
 
@@ -687,7 +687,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         int index = chain.Frames.IndexOf(frame);
         var controller = GetPlaybackController(chain);
         bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == index;
-        return KeyframeSampler.Sample(chain, index, playheadOnFrame ? controller!.FrameElapsed : 0);
+        return KeyframeSampler.Sample(chain, DocumentUnit, index, playheadOnFrame ? controller!.FrameElapsed : 0);
     }
 
     /// <summary>Whether the animation is currently playing.</summary>
@@ -931,6 +931,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private IAppCommands? _appCommands;
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
+
+    /// <summary>The unit of the open file's frame lengths (#1829), for everything the preview plays or samples from it.</summary>
+    private FrameLengthUnit DocumentUnit => FrameLengthUnit.Of(_projectManager?.AnimationChainListSave);
     private IUndoManager? _undoManager;
     private ThumbnailService? _thumbnailService;
     private IPendingCutState? _pendingCutState;
@@ -1170,7 +1173,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         // Only reload (which resets to the start) when the chain itself changes; a frame select or
         // a resume on the same chain must keep the current playhead position.
         if (!ReferenceEquals(chain, _playback.Chain))
-            _playback.SetChain(chain);
+            _playback.SetChain(chain, DocumentUnit);
 
         if (frame is not null && chain is not null)
         {
@@ -1209,7 +1212,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         bool playheadOnFrame = _playback.CurrentFrameIndex == displayIndex;
         if (displayIndex < 0)
             return new KeyframeSample(displayFrame.RelativeX, displayFrame.RelativeY, ResolveColor(chain, displayFrame));
-        return KeyframeSampler.Sample(chain, displayIndex, pinned && !playheadOnFrame ? 0 : _playback.FrameElapsed);
+        return KeyframeSampler.Sample(chain, DocumentUnit, displayIndex, pinned && !playheadOnFrame ? 0 : _playback.FrameElapsed);
     }
 
     // -- Public API ------------------------------------------------------------
@@ -1907,7 +1910,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                     var controller = GetPlaybackController(chain);
                     bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == chain.Frames.IndexOf(groupFrame);
                     all.AddRange(BuildShapeInfos(groupFrame, pinned: GroupPinnedFrame(chain) is not null,
-                        playheadOnFrame ? controller!.FrameElapsed : 0));
+                        playheadOnFrame ? controller!.FrameElapsed : 0, DocumentUnit));
                 }
             return all.ToArray();
         }
@@ -1918,10 +1921,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         // A pinned frame the playhead is not on shows its shapes at the start of the frame; otherwise they glide
         // with the playhead, like the sprite (#1478).
         bool playheadOnPinned = FindOwningChain(frame) is { } owner && _playback.CurrentFrameIndex == owner.Frames.IndexOf(frame);
-        return BuildShapeInfos(frame, pinnedFrame is not null, pinnedFrame is not null && !playheadOnPinned ? 0 : _playback.FrameElapsed);
+        return BuildShapeInfos(frame, pinnedFrame is not null, pinnedFrame is not null && !playheadOnPinned ? 0 : _playback.FrameElapsed, DocumentUnit);
     }
 
-    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame,
+    private PreviewShapeInfo[] BuildShapeInfos(AnimationFrameSave frame, bool pinned, double elapsedInFrame, FrameLengthUnit unit,
         AnimationChainSave? owningChain = null)
     {
         if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
@@ -1937,7 +1940,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 var own = SaveKeyframeShape.Create(shape);
                 return new KeyframeShapeValue(own.X, own.Y, own.SizeX, own.SizeY);
             }
-            return KeyframeSampler.SampleShape(chain, frameIndex, elapsedInFrame, shape);
+            return KeyframeSampler.SampleShape(chain, unit, frameIndex, elapsedInFrame, shape);
         }
 
         var selectedRects   = new HashSet<AARectSave>();
@@ -1973,7 +1976,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             // The vertices glide by the polygon's stored points curve (#1484); with the default snap curve they are its own.
             var sampled = chain is null || frameIndex < 0
                 ? SaveKeyframeShape.Create(p).Points
-                : KeyframeSampler.SampleShapePoints(chain, frameIndex, elapsedInFrame, p);
+                : KeyframeSampler.SampleShapePoints(chain, unit, frameIndex, elapsedInFrame, p);
             int n = PolygonVertices.Count(sampled);
             var points = new float[n * 2];
             for (int i = 0; i < n; i++)

@@ -143,7 +143,7 @@ public class ZeroDurationFrameVisualTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chain);
+            ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();               // re-enable after PauseAutoPlayback()
             ctrl.Playback.Advance(0.15);        // 0.15 > 0.1 fallback → frame 1
 
@@ -180,7 +180,7 @@ public class ZeroDurationFrameVisualTests
 
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
-        ctrl.Playback.SetChain(chain);
+        ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         ctrl.Playback.Play();
 
         // Simulate 100 16 ms timer ticks (≈ 1.6 s total)
@@ -234,7 +234,7 @@ public class ZeroDurationFrameVisualTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chain);
+            ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();
 
             // Total cycle = 0.1 + 0.1(fallback) = 0.2 s

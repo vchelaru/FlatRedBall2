@@ -24,7 +24,7 @@ namespace AnimationEditor.App.Tests;
 /// means the wrong frame is shown — a silent, hard-to-notice display bug.
 ///
 /// The tests cover:
-///   1. Direct API path: <c>ctrl.Playback.SetChain()</c> resets frame index and shows new chain.
+///   1. Direct API path: <c>ctrl.Playback.SetChain(, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds)</c> resets frame index and shows new chain.
 ///   2. Event path: <c>SelectedState.SelectedChain = newChain</c> → <c>RunJobs()</c> → frame 0 of new chain.
 ///   3. Switch to null: preview shows dark background.
 ///   4. SpeedMultiplier property binding: the PreviewControl property delegates to the playback controller.
@@ -69,7 +69,7 @@ public class ChainSwitchTests
     // ── Direct API path ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Using the direct <c>ctrl.Playback.SetChain()</c> API: advance chain A to frame 1,
+    /// Using the direct <c>ctrl.Playback.SetChain(, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds)</c> API: advance chain A to frame 1,
     /// then switch to chain B. After <c>SetChain(chainB)</c> the frame index resets to 0
     /// and <see cref="PreviewControl.RenderToBitmap"/> must show chain B's frame 0 texture.
     /// </summary>
@@ -104,7 +104,7 @@ public class ChainSwitchTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chainA);
+            ctrl.Playback.SetChain(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();
             ctrl.Playback.Advance(0.15);    // now at frame 1 (lime)
 
@@ -112,7 +112,7 @@ public class ChainSwitchTests
 
             // Switch to chain B via direct API and update SelectedState
             ctx.SelectedState.SelectedChain = chainB;
-            ctrl.Playback.SetChain(chainB); // direct reset — bypasses dispatcher
+            ctrl.Playback.SetChain(chainB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds); // direct reset — bypasses dispatcher
             ctrl.Playback.Play();
 
             Assert.Equal(0, ctrl.Playback.CurrentFrameIndex);
@@ -174,7 +174,7 @@ public class ChainSwitchTests
 
             // Now set chain A — fires SelectionChanged, which the control handles via InvokeAsync
             ctx.SelectedState.SelectedChain = chainA;
-            Dispatcher.UIThread.RunJobs();  // flush → OnSelectionChanged → _playback.SetChain(chainA)
+            Dispatcher.UIThread.RunJobs();  // flush → OnSelectionChanged → _playback.SetChain(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds)
 
             ctrl.Playback.Play();
             ctrl.Playback.Advance(0.15);    // advance to frame 1 of chain A
@@ -240,7 +240,7 @@ public class ChainSwitchTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chainA);
+            ctrl.Playback.SetChain(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();
             // Advance to frame 2 (last frame of chain A, index = 2)
             ctrl.Playback.Advance(0.25);
@@ -356,7 +356,7 @@ public class ChainSwitchTests
 
             var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
-            ctrl.Playback.SetChain(chain);
+            ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
             // Set 2× speed via the PreviewControl property
             ctrl.SpeedMultiplier = 2.0;
