@@ -2223,6 +2223,33 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, "Set Frame Color Mode"));
         }
 
+        public void SetFrameColorValues(
+            IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue, int? alpha, ColorOperation? operation)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
+            _undoManager.Execute(new BulkFrameEditCommand(
+                unlockedFrames, () =>
+                {
+                    foreach (var f in unlockedFrames)
+                    {
+                        if (red.HasValue) f.Red = red;
+                        if (green.HasValue) f.Green = green;
+                        if (blue.HasValue) f.Blue = blue;
+                        if (alpha.HasValue) f.Alpha = alpha;
+                        if (operation.HasValue) f.ColorOperation = operation;
+                    }
+                },
+                this, _events, false, "Set Frame Color"));
+        }
+
+        public void SetTimeMeasurementUnit(TimeMeasurementUnit unit)
+        {
+            if (_pm.AnimationChainListSave is not { } list) return;
+            _undoManager.Execute(new SetTimeUnitCommand(list, unit, this, _events));
+        }
+
         public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, ChannelEdit alpha)
         {
             if (IsAchxOnlyEditBlocked()) return;

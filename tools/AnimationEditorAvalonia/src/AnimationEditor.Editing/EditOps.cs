@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using AnimationEditor.Core.IO;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -35,6 +36,9 @@ public sealed record EditRunResult(EditResult Result, IReadOnlyList<int?> ErrorO
 public static class EditOps
 {
     private static readonly IReadOnlyList<string> CopyValues = ["keep", "copy", "overwrite"];
+    private static readonly IReadOnlyList<string> ColorOperationValues = ["multiply", "add"];
+    private static readonly IReadOnlyList<string> UnitValues = ["second", "millisecond"];
+    private const string RegionDescription = "Pixel rectangle of the texture, as x,y,width,height.";
 
     public static IReadOnlyList<OpSpec> Specs { get; } =
     [
@@ -92,6 +96,62 @@ public static class EditOps
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
             new("index", "integer", true, "Final zero-based position, 0 to frame count - 1."),
+        ]),
+        new("set-chain-loop", "Turns looping on or off for a chain. Fails on a locked chain.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("value", "boolean", true, "true to loop."),
+        ]),
+        new("set-chain-pingpong", "Turns ping-pong playback on or off for a chain. Fails on a locked chain.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("value", "boolean", true, "true to play forward then backward."),
+        ]),
+        new("set-chain-reverse", "Turns reverse playback on or off for a chain. Fails on a locked chain.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("value", "boolean", true, "true to play backward."),
+        ]),
+        new("set-chain-locked", "Locks or unlocks a chain. Locked chains reject every other edit of the chain and its frames.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("value", "boolean", true, "true to lock."),
+        ]),
+        new("set-frame-length", "Sets one frame's length in the file's own time unit (see describe). Valid range: 0.001 to 60 seconds, or 1 to 60000 milliseconds.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("length", "number", true, "New length in the file's time unit."),
+        ]),
+        new("set-frame-region", "Sets the pixel rectangle of the texture a frame shows. The frame's texture must be an existing PNG and the rectangle must lie inside it.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("region", "string", true, RegionDescription),
+        ]),
+        new("set-frame-offset", "Sets a frame's relative offset. Give x, y or both; an omitted axis is left as it is.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("x", "number", false, "Relative X."),
+            new("y", "number", false, "Relative Y."),
+        ]),
+        new("set-frame-color", "Sets a frame's color channels and operation. Give at least one; omitted ones are left as they are. A channel cannot be cleared back to inherited.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("red", "integer", false, "Red, -255 to 255."),
+            new("green", "integer", false, "Green, -255 to 255."),
+            new("blue", "integer", false, "Blue, -255 to 255."),
+            new("alpha", "integer", false, "Alpha, 0 to 255."),
+            new("operation", "string", false, "How red, green and blue combine with the texture.", ColorOperationValues),
+        ]),
+        new("set-frame-flip", "Sets a frame's flip flags to the given values (not a toggle). Give at least one; omitted ones are left as they are. A change also mirrors the frame's offset and shapes, as in the editor.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("flipH", "boolean", false, "Flip horizontally."),
+            new("flipV", "boolean", false, "Flip vertically."),
+            new("flipDiagonal", "boolean", false, "Flip along the diagonal."),
+        ]),
+        new("set-unit", "Changes the file's time unit and converts every frame length (locked chains too) so playback time is unchanged. Later ops in the batch use the new unit.",
+        [
+            new("unit", "string", true, "The new time unit.", UnitValues),
         ]),
     ];
 
@@ -166,6 +226,9 @@ public static class EditOps
             case "integer":
                 return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var i)
                     ? i.ToString(CultureInfo.InvariantCulture) : null;
+            case "boolean":
+                return value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? (value.GetBoolean() ? "true" : "false") : null;
             case "number":
                 return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var d) && double.IsFinite(d)
                     ? d.ToString("R", CultureInfo.InvariantCulture) : null;
@@ -257,6 +320,32 @@ public static class EditOps
             case "reorder-frame":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
                     StructureEdit.ReorderFrame(session.Commands, chain, frame, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));
+            case "set-chain-loop":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainLoop(session.Commands, c, Flag(op, "value"))));
+            case "set-chain-pingpong":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainPingPong(session.Commands, c, Flag(op, "value"))));
+            case "set-chain-reverse":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainReverse(session.Commands, c, Flag(op, "value"))));
+            case "set-chain-locked":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainLocked(session.Commands, c, Flag(op, "value"))));
+            case "set-frame-length":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
+                    PropertyEdit.SetFrameLength(session.ProjectManager, session.Commands, chain, frame, Number(op, "length")!.Value)));
+            case "set-frame-region":
+                return Task.FromResult(SetFrameRegion(session, op));
+            case "set-frame-offset":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
+                    PropertyEdit.SetFrameOffset(session.Commands, chain, frame, Number(op, "x"), Number(op, "y"))));
+            case "set-frame-color":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => PropertyEdit.SetFrameColor(session.Commands, chain, frame,
+                    new FrameColorEdit(Integer(op, "red"), Integer(op, "green"), Integer(op, "blue"), Integer(op, "alpha"),
+                        op.Values.GetValueOrDefault("operation") switch { "multiply" => ColorOperation.Multiply, "add" => ColorOperation.Add, _ => null }))));
+            case "set-frame-flip":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
+                    PropertyEdit.SetFrameFlip(session.Commands, chain, frame, OptionalFlag(op, "flipH"), OptionalFlag(op, "flipV"), OptionalFlag(op, "flipDiagonal"))));
+            case "set-unit":
+                return Task.FromResult(PropertyEdit.SetTimeUnit(session.ProjectManager, session.Commands,
+                    op.Values["unit"] == "millisecond" ? TimeMeasurementUnit.Millisecond : TimeMeasurementUnit.Second));
             default:
                 return Task.FromResult(Fail($"Unhandled op '{op.Spec.Name}'."));
         }
@@ -299,11 +388,9 @@ public static class EditOps
         FramePixelRegion? region = null;
         if (op.Values.TryGetValue("region", out var text))
         {
-            var parts = text.Split(',');
-            if (parts.Length != 4 || !parts.All(p => int.TryParse(p.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
-                return Fail($"The region '{text}' must be four whole pixel numbers: x,y,width,height.");
-            var n = parts.Select(p => int.Parse(p.Trim(), CultureInfo.InvariantCulture)).ToArray();
-            region = new FramePixelRegion(n[0], n[1], n[2], n[3]);
+            var parsed = ParseRegion(text);
+            if (parsed.Region is null) return Fail(parsed.Error!);
+            region = parsed.Region;
         }
 
         float? length = op.Values.TryGetValue("length", out var lengthText)
@@ -316,6 +403,33 @@ public static class EditOps
         return StructureEdit.AddFrame(
             session.ProjectManager, session.Commands, chain.Value!, resolved.AbsolutePath, region, length, new HeaderTextureProbe());
     }
+
+    private static EditResult SetFrameRegion(EditSession session, EditOp op)
+    {
+        var parsed = ParseRegion(op.Values["region"]);
+        if (parsed.Region is null) return Fail(parsed.Error!);
+        return WithFrame(session.Document, op, (chain, frame) =>
+            PropertyEdit.SetFrameRegion(session.ProjectManager, session.Commands, chain, frame, parsed.Region.Value));
+    }
+
+    private static (FramePixelRegion? Region, string? Error) ParseRegion(string text)
+    {
+        var parts = text.Split(',');
+        if (parts.Length != 4 || !parts.All(p => int.TryParse(p.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
+            return (null, $"The region '{text}' must be four whole pixel numbers: x,y,width,height.");
+        var n = parts.Select(p => int.Parse(p.Trim(), CultureInfo.InvariantCulture)).ToArray();
+        return (new FramePixelRegion(n[0], n[1], n[2], n[3]), null);
+    }
+
+    private static bool Flag(EditOp op, string field) => op.Values[field] == "true";
+
+    private static bool? OptionalFlag(EditOp op, string field) => op.Values.TryGetValue(field, out var v) ? v == "true" : null;
+
+    private static float? Number(EditOp op, string field) =>
+        op.Values.TryGetValue(field, out var v) ? float.Parse(v, CultureInfo.InvariantCulture) : null;
+
+    private static int? Integer(EditOp op, string field) =>
+        op.Values.TryGetValue(field, out var v) ? int.Parse(v, CultureInfo.InvariantCulture) : null;
 
     private static EditResult WithChain(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, EditResult> apply)
     {
