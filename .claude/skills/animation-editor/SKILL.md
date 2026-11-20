@@ -83,6 +83,10 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 Call `MainWindow.ShowInfo(message)` for a confirmation or FYI that needs nothing from the user (top-right toast, about 6 s), and `ShowProblem(message, retry?)` when work is not saved or an action the user asked for failed or was refused (top-centre banner, about 8 s, dismissable, optional Retry; `sticky: true` keeps it until dismissed, used for the newer-format `.seqj` notice); `NotificationEntryPointGuardTests` fails on any other entry point. The status bar message (`ShowStatusMessage`) is a separate ambient label, so a failure never goes there.
 
+## Frame lengths are in the file's own unit, never assumed seconds
+
+`AnimationFrameSave.FrameLength` is in the file's `TimeMeasurementUnit` (Undefined counts as seconds). Anything that creates, shows, converts, plays or glides a length goes through `FrameLengthUnit` (`AnimationEditor.Core/Utilities`, from `FrameLengthUnit.Of(list)`), and a sequence takes each source's unit from `ISequenceChainLookup.UnitOf`. `FrameLengthUnitGuardTests` fails on a file that touches `FrameLength` unreviewed, a hard-coded seconds literal, or a hard-coded unit constant; add new readers to its list only after routing them through the unit.
+
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 
 **Never use `System.IO.Path.GetFileName`, `Path.GetDirectoryName`, or `Path.Combine` on paths stored in `ProjectManager.FileName` or any user-supplied path.** These methods are OS-native: on Linux they only recognise `/` as a separator, so a Windows-authored `C:\foo\bar.achx` path would be returned whole by `Path.GetFileName`.

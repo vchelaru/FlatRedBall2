@@ -102,7 +102,7 @@ internal sealed partial class FilmstripRenderer
         var key = new LayoutKey(chain, chain.Loop, played, pixelsPerSecond, height);
         if (_layouts.TryGetValue(key, out var cached)) return cached.Cells;
         var paths = InfoFor(document, source, chain).Paths;
-        var frames = FilmstripLayout.FramesOf(chain, FrameLengthUnit.Seconds, frame =>
+        var frames = FilmstripLayout.FramesOf(chain, document.UnitOfSource(source), frame =>
             Thumbnails?.GetBitmap(document.ResolveTexturePath(source, frame)) is { } bitmap ? (bitmap.Width, bitmap.Height) : null);
         var cells = FilmstripLayout.Cells(frames, chain.PingPong, chain.Reverse, played, pixelsPerSecond, height, chain.Loop);
         if (_layouts.Count >= MaxCachedLayouts) _layouts.Clear();

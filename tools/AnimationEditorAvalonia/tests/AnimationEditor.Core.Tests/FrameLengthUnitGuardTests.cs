@@ -41,19 +41,9 @@ public class FrameLengthUnitGuardTests
     /// <summary>
     /// Files that pass a hard-coded <c>FrameLengthUnit.Seconds</c> instead of the unit of the file they play. Nothing else
     /// may name a unit constant: a file's unit comes from its list (<c>FrameLengthUnit.Of</c>). The sequence tab's sources
-    /// each have their own unit; the last #1829 slice empties this list.
+    /// each have their own unit. Empty since #1829 slice 5, and it stays empty.
     /// </summary>
-    private static readonly string[] UnitPlaceholders =
-    {
-        "App/Controls/FilmstripRenderer.cs",
-        "App/Controls/SequenceLibraryControl.cs",
-        "App/Controls/SequenceTimelineControl.cs",
-        "App/Controls/SequenceTimelineControl.Events.cs",
-        "Core/Sequences/PlayheadSteps.cs",
-        "Core/Sequences/ReferenceFilmstrip.cs",
-        "Core/Sequences/SequenceDocument.cs",
-        "Core/Sequences/SequenceScene.cs",
-    };
+    private static readonly string[] UnitPlaceholders = System.Array.Empty<string>();
 
     private static readonly Regex UnitConstant = new(@"FrameLengthUnit\.(Seconds|Milliseconds)\b", RegexOptions.Compiled);
 

@@ -832,7 +832,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// when the chain is missing.
     /// </summary>
     public double? CycleLength(SequenceChainReferenceSave reference) =>
-        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, FrameLengthUnit.Seconds) : null;
+        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, UnitOf(reference)) : null;
 
     /// <summary>
     /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on

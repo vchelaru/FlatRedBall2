@@ -39,7 +39,7 @@ public static class PlayheadSteps
 
             times.Add(block.Start);
             times.Add(block.PlayedEnd);
-            var inCycle = TimelineSnapTargets.FrameBoundaries(chain, FrameLengthUnit.Seconds);
+            var inCycle = TimelineSnapTargets.FrameBoundaries(chain, unitOf(block.Reference));
             int cycles = chain.Loop ? (int)Math.Ceiling(block.Played / block.CycleLength) : 1;
             int added = 0;
             for (int cycle = 0; cycle < cycles && added < MaxBoundariesPerChain; cycle++)
