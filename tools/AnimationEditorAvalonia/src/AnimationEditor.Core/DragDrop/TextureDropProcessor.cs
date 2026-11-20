@@ -54,7 +54,8 @@ public static class TextureDropProcessor
         AnimationFrameSave? targetFrame,
         string droppedFilePath,
         string? achxFileName,
-        bool createFrameOnCtrl)
+        bool createFrameOnCtrl,
+        AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit = default)
     {
         if (string.IsNullOrWhiteSpace(droppedFilePath))
             return TextureDropResult.NotApplied;

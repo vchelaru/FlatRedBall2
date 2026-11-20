@@ -40,7 +40,8 @@ public static class BatchFrameBuilder
     public static BatchResult BuildBatch(
         AnimationFrameSave? lastFrame,
         int count,
-        bool incrementUV)
+        bool incrementUV,
+        AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit = default)
     {
         if (count <= 0)
             return new BatchResult { Frames = [] };
