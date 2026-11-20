@@ -1,10 +1,11 @@
+using System.Globalization;
 using System.Text.Json;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
 
-/// <param name="Type">JSON type of the value; every field of this slice is a "string".</param>
+/// <param name="Type">JSON type of the value: "string", "integer" or "number".</param>
 /// <param name="Values">The allowed values when the field is an enumeration.</param>
 public sealed record OpField(string Name, string Type, bool Required, string Description, IReadOnlyList<string>? Values = null);
 
@@ -51,11 +52,51 @@ public static class EditOps
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
             new("texture", "string", true, "Texture path, relative to the animation file or absolute."),
-            new("copy", "string", false,
-                "What to do when the texture is outside the animation file's folder: keep references it in place (default), copy copies it next to the file, overwrite copies over a different same-named file.",
-                CopyValues),
+            new("copy", "string", false, CopyDescription, CopyValues),
+        ]),
+        new("add-chain", "Appends an empty chain. The name must be unique in the file and cannot contain '/'.",
+        [
+            new("name", "string", true, "New chain name."),
+        ]),
+        new("delete-chain", "Deletes a chain and its frames.",
+        [
+            new("chain", "string", true, "Chain name."),
+        ]),
+        new("duplicate-chain", "Inserts a copy of a chain right after it, frames and shapes included.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("name", "string", false, "Name of the copy, unique in the file. Default: the source name with a number added (Walk becomes Walk2)."),
+        ]),
+        new("reorder-chain", "Moves a chain so it ends up at the given position in the file.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("index", "integer", true, "Final zero-based position, 0 to chain count - 1."),
+        ]),
+        new("add-frame", "Appends a frame to a chain. The texture must exist and be a PNG, JPEG, GIF or BMP image. Shows the whole texture unless region is given.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("texture", "string", true, "Texture path, relative to the animation file or absolute."),
+            new("region", "string", false, "Pixel rectangle of the texture to show, as x,y,width,height. PNG textures only."),
+            new("length", "number", false, "Frame length in the file's own time unit (see describe). Default: that unit's default length."),
+            new("copy", "string", false, CopyDescription, CopyValues),
+        ]),
+        new("delete-frame", "Deletes one frame.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+        ]),
+        new("duplicate-frame", "Inserts a copy of a frame right after it, shapes included.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+        ]),
+        new("reorder-frame", "Moves a frame so it ends up at the given position in its chain.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("index", "integer", true, "Final zero-based position, 0 to frame count - 1."),
         ]),
     ];
+
+    private const string CopyDescription =
+        "What to do when the texture is outside the animation file's folder: keep references it in place (default), copy copies it next to the file, overwrite copies over a different same-named file.";
 
     /// <summary>Validates the text of an ops file: JSON shape, known ops, known fields, field types. Nothing is applied.</summary>
     public static OpsParse Parse(string json)
@@ -102,9 +143,10 @@ public static class EditOps
             if (property.Name == "op") continue;
             var field = spec.Fields.FirstOrDefault(f => f.Name == property.Name);
             if (field is null) return (null, At($"'{name}' has no field '{property.Name}'."));
-            if (property.Value.ValueKind != JsonValueKind.String)
-                return (null, At($"field '{field.Name}' of '{name}' must be a string."));
-            var value = property.Value.GetString()!;
+            var typed = ReadValue(field, property.Value);
+            if (typed is null)
+                return (null, At($"field '{field.Name}' of '{name}' must be {(field.Type == "integer" ? "an integer" : $"a {field.Type}")}."));
+            var value = typed;
             if (field.Values is not null && !field.Values.Contains(value))
                 return (null, At($"field '{field.Name}' of '{name}' must be one of {string.Join("|", field.Values)}, not '{value}'."));
             values[field.Name] = value;
@@ -114,6 +156,22 @@ public static class EditOps
         if (missing is not null) return (null, At($"'{name}' needs the field '{missing.Name}'."));
 
         return (new EditOp(index, spec, values), null);
+    }
+
+    /// <summary>The field's value as text (numbers in invariant culture), or null when the JSON type does not match the field.</summary>
+    private static string? ReadValue(OpField field, JsonElement value)
+    {
+        switch (field.Type)
+        {
+            case "integer":
+                return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var i)
+                    ? i.ToString(CultureInfo.InvariantCulture) : null;
+            case "number":
+                return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var d) && double.IsFinite(d)
+                    ? d.ToString("R", CultureInfo.InvariantCulture) : null;
+            default:
+                return value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        }
     }
 
     private static OpsParse Bad(string error) => new(null, error);
@@ -180,6 +238,25 @@ public static class EditOps
             }
             case "set-frame-texture":
                 return SetFrameTextureAsync(session, op);
+            case "add-chain":
+                return Task.FromResult(StructureEdit.AddChain(session.ProjectManager, session.Commands, op.Values["name"]));
+            case "delete-chain":
+                return Task.FromResult(WithChain(doc, op, c => StructureEdit.DeleteChain(session.ProjectManager, session.Commands, c)));
+            case "duplicate-chain":
+                return Task.FromResult(WithChain(doc, op, c =>
+                    StructureEdit.DuplicateChain(session.ProjectManager, session.Commands, c, op.Values.GetValueOrDefault("name"))));
+            case "reorder-chain":
+                return Task.FromResult(WithChain(doc, op, c =>
+                    StructureEdit.ReorderChain(session.ProjectManager, session.Commands, c, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));
+            case "add-frame":
+                return Task.FromResult(AddFrame(session, op));
+            case "delete-frame":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => StructureEdit.DeleteFrame(session.Commands, chain, frame)));
+            case "duplicate-frame":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => StructureEdit.DuplicateFrame(session.Commands, chain, frame)));
+            case "reorder-frame":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
+                    StructureEdit.ReorderFrame(session.Commands, chain, frame, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));
             default:
                 return Task.FromResult(Fail($"Unhandled op '{op.Spec.Name}'."));
         }
@@ -190,10 +267,20 @@ public static class EditOps
         var frame = EditAddress.ResolveFrame(session.Document, op.Values["frame"]);
         if (!frame.Ok) return Task.FromResult(Fail(frame.Error!));
 
+        var resolved = ResolveTexture(session, op);
+        if (resolved.AbsolutePath is null) return Task.FromResult(resolved.Result);
+
+        return Task.FromResult(FrameTextureEdit.SetResolved(
+            session.ProjectManager, session.Commands, [frame.Value!], resolved.AbsolutePath, new HeaderTextureProbe()));
+    }
+
+    /// <summary>The op's texture as an absolute path inside the project, after applying its <c>copy</c> choice.</summary>
+    private static TextureResolveResult ResolveTexture(EditSession session, EditOp op)
+    {
         var folder = Path.GetDirectoryName(session.Path) ?? string.Empty;
         var absolute = TexturePathHelper.ResolveDisplayPath(op.Values["texture"], folder);
         if (!File.Exists(absolute))
-            return Task.FromResult(Fail($"Could not load image: {absolute}", EditErrorCode.TextureNotFound));
+            return new TextureResolveResult(null, Fail($"Could not load image: {absolute}", EditErrorCode.TextureNotFound));
 
         var choice = (op.Values.GetValueOrDefault("copy") ?? "keep") switch
         {
@@ -201,11 +288,47 @@ public static class EditOps
             "overwrite" => TextureCopyChoice.Overwrite,
             _ => TextureCopyChoice.KeepInPlace,
         };
-        var resolved = FrameTextureEdit.ResolveForProject(session.ProjectManager, absolute, choice);
-        if (resolved.AbsolutePath is null) return Task.FromResult(resolved.Result);
+        return FrameTextureEdit.ResolveForProject(session.ProjectManager, absolute, choice);
+    }
 
-        return Task.FromResult(FrameTextureEdit.SetResolved(
-            session.ProjectManager, session.Commands, [frame.Value!], resolved.AbsolutePath, new HeaderTextureProbe()));
+    private static EditResult AddFrame(EditSession session, EditOp op)
+    {
+        var chain = EditAddress.ResolveChain(session.Document, op.Values["chain"]);
+        if (!chain.Ok) return Fail(chain.Error!);
+
+        FramePixelRegion? region = null;
+        if (op.Values.TryGetValue("region", out var text))
+        {
+            var parts = text.Split(',');
+            if (parts.Length != 4 || !parts.All(p => int.TryParse(p.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
+                return Fail($"The region '{text}' must be four whole pixel numbers: x,y,width,height.");
+            var n = parts.Select(p => int.Parse(p.Trim(), CultureInfo.InvariantCulture)).ToArray();
+            region = new FramePixelRegion(n[0], n[1], n[2], n[3]);
+        }
+
+        float? length = op.Values.TryGetValue("length", out var lengthText)
+            ? float.Parse(lengthText, CultureInfo.InvariantCulture)
+            : null;
+
+        var resolved = ResolveTexture(session, op);
+        if (resolved.AbsolutePath is null) return resolved.Result;
+
+        return StructureEdit.AddFrame(
+            session.ProjectManager, session.Commands, chain.Value!, resolved.AbsolutePath, region, length, new HeaderTextureProbe());
+    }
+
+    private static EditResult WithChain(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, EditResult> apply)
+    {
+        var chain = EditAddress.ResolveChain(doc, op.Values["chain"]);
+        return chain.Ok ? apply(chain.Value!) : Fail(chain.Error!);
+    }
+
+    private static EditResult WithFrame(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, AnimationFrameSave, EditResult> apply)
+    {
+        var frame = EditAddress.ResolveFrame(doc, op.Values["frame"]);
+        if (!frame.Ok) return Fail(frame.Error!);
+        var chain = EditAddress.ResolveChain(doc, op.Values["frame"].Split('/')[0]);
+        return chain.Ok ? apply(chain.Value!, frame.Value!) : Fail(chain.Error!);
     }
 
     private static EditResult Fail(string message, EditErrorCode code = EditErrorCode.Unspecified) =>

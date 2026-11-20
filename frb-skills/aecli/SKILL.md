@@ -21,7 +21,14 @@ Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command
 
 Chain `Walk`, frame `Walk/2` (zero-based), shape `Walk/2/rect/Hitbox` (type is `rect`, `circle` or `polygon`). Names containing `/` cannot be addressed; rename them in the editor.
 
+Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`, `duplicate-chain`, `reorder-chain`, `add-frame`, `delete-frame`, `duplicate-frame`, `reorder-frame`. Fields are in `--schema`.
+
 ## Landmines
+
+- `reorder-*` takes the final zero-based position. Moving to the current position changes nothing.
+- `add-chain` and a named `duplicate-chain` fail on a name already in use (the editor renames silently, aecli does not). An unnamed `duplicate-chain` numbers the copy (`Walk` becomes `Walk2`).
+- `add-frame` shows the whole texture unless `region` (`x,y,width,height` in pixels) is given. `region` needs a PNG, because the size is read from the PNG header. `length` is in the file's own time unit; leave it out for that unit's default.
+- Frame indexes shift after `delete-frame`, `duplicate-frame` and `add-frame`; address later frames of the same batch by their new index.
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
 - `edit` writes nothing unless every op succeeds and no new `check` error appears. A batch that changes nothing leaves the file byte-identical.
