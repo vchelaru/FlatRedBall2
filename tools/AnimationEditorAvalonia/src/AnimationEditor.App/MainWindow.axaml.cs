@@ -13,6 +13,7 @@ using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Editing;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Layout;
 using AnimationEditor.Core.Models;
@@ -2518,9 +2519,7 @@ public partial class MainWindow : Window
         var folder = ResolveProjectFolderAbsolutePath(relativePath);
         if (folder is null) return;
 
-        var sources = Directory.EnumerateFiles(folder, "*.achx", SearchOption.AllDirectories)
-            .Where(f => !BinObjPathFilter.IsExcluded(Path.GetRelativePath(folder, f)))
-            .ToList();
+        var sources = AchxToAchjBatch.FindSources(folder);
         if (sources.Count == 0)
         {
             ShowStatusMessage("No .achx files to convert in this folder.");
@@ -2544,23 +2543,13 @@ public partial class MainWindow : Window
     {
         if (!await _appCommands.ConfirmAsync(confirmText, "Convert to .achj")) return;
 
-        int converted = 0, skipped = 0;
-        var problems = new List<string>();
-        foreach (var source in sources)
+        var batch = AchxToAchjBatch.Convert(sources);
+        int converted = 0, skipped = batch.Skipped.Count();
+        var problems = new List<string>(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
+        foreach (var file in batch.Converted)
         {
-            var result = AchxToAchjConverter.Convert(source);
+            var source = file.SourcePath;
             var name = new FilePath(source).NoPath;
-            if (result.Status == AchxConversionStatus.SkippedTargetExists)
-            {
-                skipped++;
-                continue;
-            }
-            if (result.Status == AchxConversionStatus.Failed)
-            {
-                problems.Add($"{name}: {result.Error}");
-                continue;
-            }
-
             var error = DeleteToRecycleBin(source);
             if (error is not null)
             {
