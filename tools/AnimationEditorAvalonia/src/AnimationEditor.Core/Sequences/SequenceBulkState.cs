@@ -18,7 +18,7 @@ public static class SequenceBulkState
     public static TrackBulkState ForTracks(SequenceSave sequence, IReadOnlyList<int> tracks)
     {
         var selected = tracks.Select(index => sequence.Tracks[index]).ToList();
-        return new TrackBulkState(MixedState.Common(selected.Select(t => t.Visible)), null);
+        return new TrackBulkState(MixedState.Common(selected.Select(t => t.Visible)), MixedState.Common(selected.Select(t => t.Continuous)));
     }
 
     public static ChainBulkState ForChains(SequenceSave sequence, IReadOnlyList<TimelineChainId> chains)

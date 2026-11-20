@@ -1358,7 +1358,7 @@ public partial class MainWindow
             w.SequencePreview.Composite = _document is not { } document
                 ? null
                 : SequenceScene.At(document, document.Selection.Names
-                    .Select(name => new SequenceTime(IndexOf(name), _playback.TimeOf(name))).ToList());
+                    .Select(name => new SequenceTime(IndexOf(name), _playback.TimeOf(name), _playback.PassOf(name))).ToList());
             w.SequenceTimeText.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.00} s / {1:0.00} s",
                 time, w.SequenceTimeline.SequenceLength);
             w.SequencePlayIcon.Path = _playback.IsPlaying

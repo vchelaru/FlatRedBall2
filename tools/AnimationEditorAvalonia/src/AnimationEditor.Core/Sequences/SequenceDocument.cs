@@ -528,6 +528,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
                 {
                     Name = NameGenerator.Unique(destination.Select(t => t.Name), source.Name),
                     Visible = source.Visible,
+                    Continuous = source.Continuous,
                 };
                 if (atFront)
                 {
@@ -1005,9 +1006,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
         Edit(undo, SequenceLabel.Named(visible ? "Show" : "Hide", "Track", Save.Sequences[sequence].Tracks[track].Name),
             save => save.Sequences[sequence].Tracks[track].Visible = visible);
 
-    /// <summary>Stub.</summary>
+    /// <summary>
+    /// Sets <see cref="SequenceTrackSave.Continuous"/> on several tracks, as one undo entry; none when they all already
+    /// have that value.
+    /// </summary>
     public void SetTracksContinuous(IUndoManager undo, int sequence, IReadOnlyList<int> tracks, bool continuous)
     {
+        var set = tracks.Distinct().OrderBy(track => track).ToList();
+        if (set.Count == 0) return;
+        var names = set.Select(index => Save.Sequences[sequence].Tracks[index].Name).ToList();
+        string target = names.Count == 1 ? SequenceLabel.Quoted(names[0]) : SequenceLabel.Count(names.Count, "Track");
+        Edit(undo, SequenceLabel.Toggled("Continuous", continuous, target), save =>
+        {
+            foreach (int index in set) save.Sequences[sequence].Tracks[index].Continuous = continuous;
+        });
     }
 
     /// <summary>Shows every track of a sequence again, as one undo entry; none when all are already shown.</summary>

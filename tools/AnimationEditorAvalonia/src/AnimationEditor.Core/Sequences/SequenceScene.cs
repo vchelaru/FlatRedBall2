@@ -28,6 +28,9 @@ public sealed record SequenceSprite(
 }
 
 /// <summary>One selected sequence and the time its own playhead is at.</summary>
+/// <param name="Sequence">The sequence's index in the file.</param>
+/// <param name="Time">The playhead inside the current pass of the sequence.</param>
+/// <param name="Pass">How many times a looping sequence has wrapped (<see cref="SequenceClock.Pass"/>); only continuous tracks look at it.</param>
 public readonly record struct SequenceTime(int Sequence, double Time, int Pass = 0);
 
 /// <summary>What the sequence preview draws at an instant.</summary>
@@ -38,7 +41,7 @@ public static class SequenceScene
     /// Sequences are drawn in the order given, first at the back; within one, back to front in reverse track order (the first track is in front). All share the entity origin.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, IEnumerable<SequenceTime> sequences) =>
-        sequences.SelectMany(s => At(document, s.Sequence, s.Time)).ToList();
+        sequences.SelectMany(s => At(document, s.Sequence, s.Time, s.Pass)).ToList();
 
     /// <summary>
     /// The sprite of every track with a chain playing at <paramref name="time"/> in sequence
@@ -48,12 +51,14 @@ public static class SequenceScene
     /// <see cref="SequenceTrackSave.Visible"/> is false is left out too, shapes included; the sequence's length and
     /// playback do not change. A sequence with <see cref="SequenceSave.Loop"/> off holds its final pose: at or past its
     /// length the sprites are those of its last instant (<see cref="SequenceTimeline.PoseTime"/>), so a track whose chains
-    /// finished earlier stays hidden. A looping sequence is sampled at exactly <paramref name="time"/>.
+    /// finished earlier stays hidden. A looping sequence is sampled at exactly <paramref name="time"/>, in pass
+    /// <paramref name="pass"/> (the number of wraps so far): a <see cref="SequenceTrackSave.Continuous"/> track carries its
+    /// chain's phase across them (<see cref="SequenceTimeline.ActiveAtPass"/>).
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceDocument document, int sequenceIndex, double time, int pass = 0) =>
         sequenceIndex < 0 || sequenceIndex >= document.Save.Sequences.Count
             ? []
-            : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document, document.Save.Sequences);
+            : At(document.Save.Sequences[sequenceIndex], sequenceIndex, time, document, document.Save.Sequences, pass);
 
     /// <summary>
     /// <see cref="At(SequenceDocument, int, double)"/> for one sequence and any source of chains: the open document, or a
@@ -61,13 +66,14 @@ public static class SequenceScene
     /// (<see cref="SequenceTrackSave.Reference"/>) shows that sequence's sprites in its own place in the stack, sampled by
     /// <see cref="SequenceTimeline.ReferenceTime"/> and honouring each hidden track on the way; they report the reference
     /// track's index as <see cref="SequenceSprite.Track"/>, so a click selects it. Pass <paramref name="file"/>, the file's
-    /// sequences, to resolve references; without it they show nothing.
+    /// sequences, to resolve references; without it they show nothing. <paramref name="pass"/> counts the wraps of a looping
+    /// sequence, and applies to this sequence's own chain tracks only: a played sequence runs at pass 0.
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
-        IReadOnlyList<SequenceSave>? file = null)
+        IReadOnlyList<SequenceSave>? file = null, int pass = 0)
     {
         var sprites = new List<SequenceSprite>();
-        Collect(sequence, sequenceIndex, time, lookup, file, sprites, null, new List<SequenceSave> { sequence });
+        Collect(sequence, sequenceIndex, time, lookup, file, sprites, null, new List<SequenceSave> { sequence }, pass);
         return sprites;
     }
 
@@ -75,12 +81,15 @@ public static class SequenceScene
         SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0);
 
     private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
-        IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack)
+        IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack, int pass = 0)
     {
         var tracks = sequence.Tracks;
         double CycleLength(SequenceChainReferenceSave reference) =>
             lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0;
-        time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength), sequence.Loop);
+        double length = SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength);
+        time = SequenceTimeline.PoseTime(time, length, sequence.Loop);
+        // Only a looping sequence wraps, so a pass means nothing to one that stops at its end.
+        if (!sequence.Loop) pass = 0;
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
             var track = tracks[t];
@@ -97,7 +106,7 @@ public static class SequenceScene
                 stack.RemoveAt(stack.Count - 1);
                 continue;
             }
-            var reference = SequenceTimeline.ActiveAt(track, time, CycleLength, out double local);
+            var reference = SequenceTimeline.ActiveAtPass(track, time, pass, length, CycleLength, out double local);
             if (reference is null || lookup.FindChain(reference) is not { Frames.Count: > 0 } chain) continue;
 
             // The chain's own Loop flag decides what happens past one cycle: a looping chain wraps, a non-looping one holds
