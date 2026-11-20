@@ -26,8 +26,9 @@ public static class PlayheadSteps
     /// </summary>
     /// <param name="blocks">The timeline's blocks for <paramref name="sequence"/> (<see cref="TimelineLayout.Blocks"/>).</param>
     /// <param name="chainOf">The chain a reference points at, or null when it cannot be found.</param>
+    /// <param name="unitOf">The unit of the frame lengths in the file a reference points at.</param>
     public static IReadOnlyList<double> Boundaries(SequenceSave sequence, IReadOnlyList<TimelineBlock> blocks,
-        Func<SequenceChainReferenceSave, AnimationChainSave?> chainOf, double length)
+        Func<SequenceChainReferenceSave, AnimationChainSave?> chainOf, Func<SequenceChainReferenceSave, FrameLengthUnit> unitOf, double length)
     {
         length = Math.Max(0, length);
         var times = new List<double> { 0, length };
@@ -38,7 +39,7 @@ public static class PlayheadSteps
 
             times.Add(block.Start);
             times.Add(block.PlayedEnd);
-            var inCycle = TimelineSnapTargets.FrameBoundaries(chain, FrameLengthUnit.Seconds);
+            var inCycle = TimelineSnapTargets.FrameBoundaries(chain, unitOf(block.Reference));
             int cycles = chain.Loop ? (int)Math.Ceiling(block.Played / block.CycleLength) : 1;
             int added = 0;
             for (int cycle = 0; cycle < cycles && added < MaxBoundariesPerChain; cycle++)

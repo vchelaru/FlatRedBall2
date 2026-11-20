@@ -72,14 +72,14 @@ public static class SequenceScene
     }
 
     private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave> file) =>
-        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, FrameLengthUnit.Seconds) : 0);
+        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0);
 
     private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack)
     {
         var tracks = sequence.Tracks;
         double CycleLength(SequenceChainReferenceSave reference) =>
-            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, FrameLengthUnit.Seconds) : 0;
+            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0;
         time = SequenceTimeline.PoseTime(time, SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength), sequence.Loop);
         for (int t = tracks.Count - 1; t >= 0; t--)
         {
@@ -102,7 +102,7 @@ public static class SequenceScene
 
             // The chain's own Loop flag decides what happens past one cycle: a looping chain wraps, a non-looping one holds
             // its last frame until the block ends (ChainClock does both).
-            var unit = FrameLengthUnit.Seconds; // #1829: the source file's unit, once the lookup reports it
+            var unit = lookup.UnitOf(reference);
             var (frame, elapsed) = ChainClock.Locate(chain, local, unit);
             string? texture = lookup.ResolveTexturePath(reference.Source, chain.Frames[frame]);
             sprites.Add(new SequenceSprite(reported, chain, unit, frame, elapsed, texture, sequenceIndex));
@@ -118,4 +118,7 @@ public interface ISequenceChainLookup
 
     /// <summary>The texture of <paramref name="frame"/> (a frame of a chain of <paramref name="source"/>), or null when it has none.</summary>
     string? ResolveTexturePath(string source, AnimationFrameSave frame);
+
+    /// <summary>The unit of the frame lengths in the file <paramref name="reference"/> points at (seconds when it is missing).</summary>
+    FrameLengthUnit UnitOf(SequenceChainReferenceSave reference);
 }

@@ -91,7 +91,7 @@ public static class ReferenceFilmstrip
     public static ScenePose? PoseAt(SequenceReferenceSave reference, SequenceSave target, double clipTime, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave> file)
     {
-        double length = SequenceTimeline.Length(file, target, chain => lookup.FindChain(chain) is { } found ? ChainClock.TotalLength(found, FrameLengthUnit.Seconds) : 0);
+        double length = SequenceTimeline.Length(file, target, chain => lookup.FindChain(chain) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(chain)) : 0);
         if (SequenceTimeline.ReferenceTime(reference, target, length, reference.Start + clipTime) is not { } inner) return null;
         var sprites = SequenceScene.At(target, 0, inner, lookup, file);
         if (sprites.Count == 0) return null;

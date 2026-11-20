@@ -806,6 +806,12 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>The chain <paramref name="reference"/> points at, or null when its source or chain is missing.</summary>
+    /// <summary>The unit of the frame lengths in the source file <paramref name="source"/> (seconds when it is missing).</summary>
+    public FrameLengthUnit UnitOfSource(string source) => FrameLengthUnit.Of(SourceChains(source));
+
+    /// <inheritdoc/>
+    public FrameLengthUnit UnitOf(SequenceChainReferenceSave reference) => UnitOfSource(reference.Source);
+
     public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) =>
         SourceChains(reference.Source)?.AnimationChains.FirstOrDefault(chain => chain.Name == reference.Chain);
 
@@ -826,7 +832,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// when the chain is missing.
     /// </summary>
     public double? CycleLength(SequenceChainReferenceSave reference) =>
-        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, FrameLengthUnit.Seconds) : null;
+        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, UnitOf(reference)) : null;
 
     /// <summary>
     /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on

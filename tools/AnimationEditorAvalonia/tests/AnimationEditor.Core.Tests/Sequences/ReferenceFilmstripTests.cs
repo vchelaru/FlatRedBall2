@@ -36,6 +36,8 @@ public class ReferenceFilmstripTests
         public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) => _chains.GetValueOrDefault(reference.Chain);
 
         public string? ResolveTexturePath(string source, AnimationFrameSave frame) => frame.TextureName;
+
+        public AnimationEditor.Core.Utilities.FrameLengthUnit UnitOf(SequenceChainReferenceSave reference) => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds;
     }
 
     private static SequenceTrackSave ChainTrack(string chain, bool visible = true) =>

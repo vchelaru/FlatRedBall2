@@ -33,7 +33,7 @@ public sealed partial class SequenceTimelineControl
             return Array.Empty<EventOccurrence>();
         var key = (chain, chain.Loop, block.Played);
         if (_eventOccurrences.TryGetValue(key, out var cached)) return cached;
-        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain, FrameLengthUnit.Seconds), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
+        var occurrences = EventMarkers.Occurrences(EventMarkers.FramesOf(chain, document.UnitOf(block.Reference)), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
         if (_eventOccurrences.Count >= MaxCachedEventLayouts) _eventOccurrences.Clear();
         _eventOccurrences[key] = occurrences;
         return occurrences;
