@@ -30,7 +30,7 @@ public static class BatchFrameBuilder
     /// </summary>
     /// <param name="lastFrame">
     ///     The last frame already in the chain, used as the copy-from source.
-    ///     <c>null</c> is allowed (all frames get default UV 0/1/0/1, FrameLength 0.1 s).
+    ///     <c>null</c> is allowed (all frames get default UV 0/1/0/1, default FrameLength 0.1 s in the file's unit).
     /// </param>
     /// <param name="count">Number of frames to create (must be ≥ 1).</param>
     /// <param name="incrementUV">
@@ -40,7 +40,8 @@ public static class BatchFrameBuilder
     public static BatchResult BuildBatch(
         AnimationFrameSave? lastFrame,
         int count,
-        bool incrementUV)
+        bool incrementUV,
+        AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit)
     {
         if (count <= 0)
             return new BatchResult { Frames = [] };
@@ -93,7 +94,7 @@ public static class BatchFrameBuilder
             var frame = new AnimationFrameSave
             {
                 TextureName      = lastFrame?.TextureName      ?? string.Empty,
-                FrameLength      = lastFrame?.FrameLength      ?? 0.1f,
+                FrameLength      = lastFrame?.FrameLength      ?? frameLengthUnit.DefaultFrameLength,
                 LeftCoordinate   = currentLeft,
                 RightCoordinate  = currentRight,
                 TopCoordinate    = currentTop,

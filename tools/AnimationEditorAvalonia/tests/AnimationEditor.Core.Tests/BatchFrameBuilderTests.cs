@@ -27,14 +27,14 @@ public class BatchFrameBuilderTests
     [Fact]
     public void ZeroCount_ReturnsEmpty()
     {
-        var result = BatchFrameBuilder.BuildBatch(null, 0, false);
+        var result = BatchFrameBuilder.BuildBatch(null, 0, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Empty(result.Frames);
     }
 
     [Fact]
     public void Count_Returns_CorrectNumberOfFrames()
     {
-        var result = BatchFrameBuilder.BuildBatch(null, 5, false);
+        var result = BatchFrameBuilder.BuildBatch(null, 5, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal(5, result.Frames.Count);
     }
 
@@ -43,7 +43,7 @@ public class BatchFrameBuilderTests
     [Fact]
     public void NoLastFrame_EachFrameHasDefaultUV()
     {
-        var result = BatchFrameBuilder.BuildBatch(null, 3, false);
+        var result = BatchFrameBuilder.BuildBatch(null, 3, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         foreach (var f in result.Frames)
         {
             Assert.Equal(0f, f.LeftCoordinate,   precision: 5);
@@ -60,7 +60,7 @@ public class BatchFrameBuilderTests
     public void WithoutIncrement_AllFramesCopyLastFrameUV()
     {
         var last = MakeLastFrame(0.25f, 0.5f, 0f, 0.5f);
-        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: false);
+        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         foreach (var f in result.Frames)
         {
@@ -75,7 +75,7 @@ public class BatchFrameBuilderTests
     public void WithoutIncrement_CopiesTextureAndFrameLength()
     {
         var last = MakeLastFrame(0f, 1f, 0f, 1f, texture: "Hero.png", frameLength: 0.25f);
-        var result = BatchFrameBuilder.BuildBatch(last, 2, incrementUV: false);
+        var result = BatchFrameBuilder.BuildBatch(last, 2, incrementUV: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         foreach (var f in result.Frames)
         {
             Assert.Equal("Hero.png", f.TextureName);
@@ -92,7 +92,7 @@ public class BatchFrameBuilderTests
         // Last frame is cell (0,0): L=0, R=0.25, T=0, B=0.25
         // Adding 3 more: cell(1,0), cell(2,0), cell(3,0)
         var last = MakeLastFrame(0f, 0.25f, 0f, 0.25f);
-        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: true);
+        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(3, result.Frames.Count);
 
@@ -115,7 +115,7 @@ public class BatchFrameBuilderTests
         // 4×4 sheet; last frame is cell (3,0): L=0.75, R=1.0, T=0, B=0.25
         // Next frame should be cell (0,1): L=0, R=0.25, T=0.25, B=0.50
         var last = MakeLastFrame(0.75f, 1.0f, 0f, 0.25f);
-        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true);
+        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Single(result.Frames);
         Assert.Equal(0f,    result.Frames[0].LeftCoordinate,   precision: 4);
@@ -130,7 +130,7 @@ public class BatchFrameBuilderTests
         // 2×2 sheet; last frame is bottom-right cell (1,1): L=0.5, R=1, T=0.5, B=1
         // One more frame would go beyond the texture (B > 1)
         var last = MakeLastFrame(0.5f, 1.0f, 0.5f, 1.0f);
-        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true);
+        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.True(result.ExceededTextureBounds);
     }
 
@@ -138,7 +138,7 @@ public class BatchFrameBuilderTests
     public void WithIncrement_StillCreatesFramesEvenWhenExceedingBounds()
     {
         var last = MakeLastFrame(0.5f, 1.0f, 0.5f, 1.0f);
-        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: true);
+        var result = BatchFrameBuilder.BuildBatch(last, 3, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal(3, result.Frames.Count); // frames created, warning is caller's job
     }
 
@@ -147,7 +147,7 @@ public class BatchFrameBuilderTests
     {
         // 4×4 sheet; first cell, adding 1 more — still within bounds
         var last = MakeLastFrame(0f, 0.25f, 0f, 0.25f);
-        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true);
+        var result = BatchFrameBuilder.BuildBatch(last, 1, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.False(result.ExceededTextureBounds);
     }
 
@@ -156,7 +156,7 @@ public class BatchFrameBuilderTests
     [Fact]
     public void AllFrames_HaveNullShapesSave()
     {
-        var result = BatchFrameBuilder.BuildBatch(null, 4, incrementUV: false);
+        var result = BatchFrameBuilder.BuildBatch(null, 4, incrementUV: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.All(result.Frames, f => Assert.Null(f.ShapesSave));
     }
 }
