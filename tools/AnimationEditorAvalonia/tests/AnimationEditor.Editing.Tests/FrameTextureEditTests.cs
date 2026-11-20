@@ -11,12 +11,13 @@ namespace AnimationEditor.Editing.Tests;
 
 public class FrameTextureEditTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "AnimationEditorEditingTests", Guid.NewGuid().ToString("N"));
+    private readonly EditingTestGraph _graph = new();
     private readonly string _achxFolder;
     private readonly string _elsewhere;
-    private readonly ProjectManager _pm = new();
-    private readonly AppCommands _commands;
-    private readonly UndoManager _undo = new();
+    private ProjectManager _pm => _graph.ProjectManager;
+    private AppCommands _commands => _graph.Commands;
+    private UndoManager _undo => _graph.Undo;
+    private string _root => _graph.Root;
     private readonly AnimationFrameSave _frame = new() { TextureName = "old.png" };
 
     private sealed class FakeProbe(bool decodes = true) : ITextureProbe
@@ -32,12 +33,6 @@ public class FrameTextureEditTests : IDisposable
         Directory.CreateDirectory(_achxFolder);
         Directory.CreateDirectory(_elsewhere);
 
-        var events = new ApplicationEvents();
-        var selected = new SelectedState(_pm);
-        var appState = new AppState(events, selected);
-        var io = new IoManager(appState, Path.Combine(_root, "recovery.achx"));
-        _commands = new AppCommands(_pm, selected, events, io, new ObjectFinder(_pm), _undo);
-
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(_frame);
@@ -48,7 +43,7 @@ public class FrameTextureEditTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+        _graph.Dispose();
     }
 
     private static string Png(string folder, string name, string content = "png")

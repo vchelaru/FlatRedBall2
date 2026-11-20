@@ -8667,40 +8667,15 @@ public partial class MainWindow : Window
         newName = newName.Trim();
         vm.IsEditing = false;
 
+        EditResult? result = null;
         if (vm.Data is AnimationChainSave chain)
-        {
-            // Empty reverts a tsx chain to its auto "ID:{tileId}" name; RenameChain rejects it
-            // outside a tsx project.
-            if (string.IsNullOrEmpty(newName) && !_appCommands.RenameChain(chain, newName))
-            {
-                ShowProblem("Chain name cannot be empty.");
-            }
-            else if (newName.Length > 0 && newName != chain.Name)
-            {
-                _appCommands.RenameChain(chain, newName);
-            }
-        }
-        else if (vm.Data is AARectSave rect)
-        {
-            if (!string.IsNullOrEmpty(newName) && newName != rect.Name)
-                _appCommands.SetRectProps(
-                    _objectFinder.GetAnimationFrameContaining(rect),
-                    rect, newName, rect.X, rect.Y, rect.ScaleX, rect.ScaleY);
-        }
-        else if (vm.Data is CircleSave circle)
-        {
-            if (!string.IsNullOrEmpty(newName) && newName != circle.Name)
-                _appCommands.SetCircleProps(
-                    _objectFinder.GetAnimationFrameContaining(circle),
-                    circle, newName, circle.X, circle.Y, circle.Radius);
-        }
-        else if (vm.Data is PolygonSave polygon)
-        {
-            if (!string.IsNullOrEmpty(newName) && newName != polygon.Name)
-                _appCommands.SetPolygonProps(
-                    _objectFinder.GetAnimationFrameContaining(polygon),
-                    polygon, newName, polygon.X, polygon.Y);
-        }
+            result = RenameEdit.RenameChain(_projectManager, _appCommands, chain, newName);
+        else if (vm.Data is ShapeSave shape)
+            result = RenameEdit.RenameShape(_appCommands, _objectFinder, shape, newName);
+
+        // An emptied shape name reverts silently; everything else that fails is reported.
+        if (result is { Success: false } && !(vm.Data is ShapeSave && result.HasError(EditErrorCode.EmptyName)))
+            ShowProblem(result.Errors[0]);
 
         AnimTree.Focus();
     }

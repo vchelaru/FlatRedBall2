@@ -13,6 +13,10 @@ public enum EditErrorCode
     TextureCopyFailed,
     /// <summary>The caller declined an interactive choice (for example the copy-into-project prompt).</summary>
     Cancelled,
+    /// <summary>A rename was given an empty name that cannot be applied.</summary>
+    EmptyName,
+    /// <summary>A rename collides with another chain of the file or another shape of the frame.</summary>
+    DuplicateName,
 }
 
 /// <summary>
