@@ -20,19 +20,14 @@ public class TsxCompatibilityCheckerTests
         </tileset>
         """;
 
-    // Real Tiled tsx wangset schema -- one of the constructs TsxWriter throws on (see its
+    // Real Tiled tsx transformations schema -- one of the constructs TsxWriter throws on (see its
     // remarks); used here to prove the compatibility checker catches it before AE ever tries
     // to save this tileset natively.
-    private const string WangsetFixtureXml = """
+    private const string TransformationsFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Terrain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
          <image source="Terrain.png" width="64" height="64"/>
-         <wangsets>
-          <wangset name="Ground" type="corner" tile="-1">
-           <wangcolor name="Grass" color="#00ff00" tile="0" probability="1"/>
-           <wangtile tileid="0" wangid="0,1,0,1,0,1,0,1"/>
-          </wangset>
-         </wangsets>
+         <transformations hflip="1" vflip="0" rotate="0" preferuntransformed="0"/>
         </tileset>
         """;
 
@@ -97,13 +92,13 @@ public class TsxCompatibilityCheckerTests
     }
 
     [Fact]
-    public void CheckOpenCompatibility_TilesetWithWangsets_ReturnsBlockingReason()
+    public void CheckOpenCompatibility_TilesetWithTransformations_ReturnsBlockingReason()
     {
-        var tileset = Loader.Default().LoadTileset(WriteFixture(WangsetFixtureXml, "Terrain.tsx"));
+        var tileset = Loader.Default().LoadTileset(WriteFixture(TransformationsFixtureXml, "Terrain.tsx"));
 
         var canOpen = TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason);
 
         Assert.False(canOpen);
-        Assert.Contains("wangsets", blockingReason);
+        Assert.Contains("transformations", blockingReason);
     }
 }
