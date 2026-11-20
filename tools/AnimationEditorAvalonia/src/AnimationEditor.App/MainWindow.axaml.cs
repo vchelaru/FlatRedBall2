@@ -2594,26 +2594,13 @@ public partial class MainWindow : Window
         if (folder is null) return;
 
         var absolutePath = Path.Combine(folder, request.FileName);
-        if (AchxFolderScanner.IsSequencePath(request.FileName))
+        // Unlike File > New Sequence File there is no save dialog to confirm an overwrite, so both kinds refuse an existing file.
+        var result = AchxFolderScanner.IsSequencePath(request.FileName)
+            ? NewFileEdit.CreateSequenceFile(absolutePath)
+            : NewFileEdit.CreateAnimationFile(absolutePath);
+        if (!result.Success)
         {
-            // Unlike File > New Sequence File there is no save dialog to confirm an overwrite.
-            if (File.Exists(absolutePath))
-            {
-                ShowProblem($"⚠ Could not create {request.FileName}: it already exists.");
-                return;
-            }
-            await CreateSequenceFileAsync(absolutePath);
-            return;
-        }
-
-        try
-        {
-            using (var stream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write))
-                NewAnimationFileWriter.WriteEmpty(stream, request.FileName);
-        }
-        catch (Exception ex)
-        {
-            ShowProblem($"⚠ Could not create {request.FileName}: {ex.Message}");
+            ShowProblem($"⚠ {result.Errors[0]}");
             return;
         }
 
