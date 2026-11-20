@@ -11,13 +11,24 @@ public sealed class SequenceClock
 {
     public double Time { get; private set; }
 
+    /// <summary>
+    /// How many times a looping sequence has wrapped since the playhead last started at the beginning (0 on the first run
+    /// through). A seek, stop, or restart from the end makes it 0 again. It is what carries a continuous track's phase
+    /// across the wrap (<see cref="SequenceTimeline.ActiveAtPass"/>).
+    /// </summary>
+    public int Pass { get; private set; }
+
     public bool IsPlaying { get; private set; }
 
     /// <summary>Starts advancing. At the end, starts again from 0. Does nothing for an empty sequence.</summary>
     public void Play(double length)
     {
         if (length <= 0) return;
-        if (Time >= length) Time = 0;
+        if (Time >= length)
+        {
+            Time = 0;
+            Pass = 0;
+        }
         IsPlaying = true;
     }
 
@@ -28,10 +39,15 @@ public sealed class SequenceClock
     {
         IsPlaying = false;
         Time = 0;
+        Pass = 0;
     }
 
     /// <summary>Moves the playhead to <paramref name="time"/>, clamped to 0..<paramref name="length"/>.</summary>
-    public void Seek(double time, double length) => Time = Math.Clamp(time, 0, Math.Max(0, length));
+    public void Seek(double time, double length)
+    {
+        Time = Math.Clamp(time, 0, Math.Max(0, length));
+        Pass = 0;
+    }
 
     /// <summary>The most real time one timer tick may advance playback by, so a stalled frame does not skip ahead.</summary>
     public const double MaxTickSeconds = 0.25;
@@ -53,6 +69,7 @@ public sealed class SequenceClock
         if (!IsPlaying) return;
         double next = Time + seconds;
         if (next >= length && !loop) IsPlaying = false;
+        if (next >= length && loop && length > 0) Pass += (int)(next / length);
         Time = SequenceTimeline.WrapTime(next, length, loop);
     }
 }

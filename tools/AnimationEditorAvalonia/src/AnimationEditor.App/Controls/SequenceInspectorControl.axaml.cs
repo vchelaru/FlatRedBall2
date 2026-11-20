@@ -48,6 +48,7 @@ public partial class SequenceInspectorControl : UserControl
             document.SetLoop(_undo!, _sequence, SequenceLoopBox.IsChecked == true));
 
         TrackVisibleBox.IsCheckedChanged += (_, _) => CommitVisible();
+        TrackContinuousBox.IsCheckedChanged += (_, _) => CommitContinuous();
 
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
         ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
@@ -208,6 +209,7 @@ public partial class SequenceInspectorControl : UserControl
             TrackNameBox.Tag = null;
             TrackNameBox.PlaceholderText = "(multiple — same sequence)";
             TrackVisibleBox.IsChecked = state.Visible;
+            TrackContinuousBox.IsChecked = state.Continuous;
             ReferenceSection.IsVisible = false;
             return;
         }
@@ -215,6 +217,9 @@ public partial class SequenceInspectorControl : UserControl
         TrackNameBox.PlaceholderText = null;
         Put(TrackNameBox, track.Name, force);
         TrackVisibleBox.IsChecked = track.Visible;
+        TrackContinuousBox.IsChecked = track.Continuous;
+        // Continuous is about chains; a track that plays another sequence has none to carry.
+        TrackContinuousBox.IsVisible = track.Reference is null;
         ShowReference(track, force);
     }
 
@@ -402,6 +407,15 @@ public partial class SequenceInspectorControl : UserControl
             return;
         }
         Commit(document => document.SetTrackVisible(_undo!, _sequence, _track!.Value, TrackVisibleBox.IsChecked == true));
+    }
+
+    private void CommitContinuous()
+    {
+        if (_refreshing) return;
+        // Indeterminate means a multi-selection that disagrees and the user did not touch it.
+        if (TrackContinuousBox.IsChecked is not { } continuous) return;
+        var tracks = BulkTracks() ?? new[] { _track!.Value };
+        Commit(document => document.SetTracksContinuous(_undo!, _sequence, tracks, continuous));
     }
 
     private void CommitChainStart()

@@ -28,6 +28,9 @@ public sealed class SequencePlayback
         set => _speed = double.IsNaN(value) ? 1 : Math.Clamp(value, MinSpeed, MaxSpeed);
     }
 
+    /// <summary>How many times sequence <paramref name="name"/> has wrapped since its playhead started at 0 (see <see cref="SequenceClock.Pass"/>); 0 when it is not selected.</summary>
+    public int PassOf(string name) => _clocks.TryGetValue(name, out var clock) ? clock.Pass : 0;
+
     /// <summary>The playhead of sequence <paramref name="name"/>; 0 when it is not selected.</summary>
     public double TimeOf(string name) => _clocks.TryGetValue(name, out var clock) ? clock.Time : 0;
 

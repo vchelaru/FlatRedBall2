@@ -30,7 +30,7 @@ public sealed record TimelineClipboardContent(TimelineClipboardKind Kind, IReadO
 public sealed record CopiedChain(SequenceChainReferenceSave Chain, SequenceTrackSave Track, int Lane);
 
 /// <summary>A track the copied chains came from: its lane in the source sequence and the settings a missing track is made with.</summary>
-public sealed record CopiedTrack(string Name, int Lane, bool Visible);
+public sealed record CopiedTrack(string Name, int Lane, bool Visible, bool Continuous = false);
 
 /// <summary>What a timeline paste or duplicate made: where the new chains and tracks are, and a message for each source refused.</summary>
 public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, IReadOnlyList<int> Tracks, IReadOnlyList<string> Errors)
@@ -107,6 +107,7 @@ public static class TimelineClipboard
                     ["name"] = item.Track.Name,
                     ["lane"] = item.Lane,
                     ["visible"] = item.Track.Visible,
+                    ["continuous"] = item.Track.Continuous,
                 });
             }
             chainTracks.Add((JsonNode?)JsonValue.Create(index));
@@ -217,7 +218,8 @@ public static class TimelineClipboard
             if (node is not JsonObject track || !TryGet(track, "name", out string? name) || name is null || !TryGet(track, "lane", out int lane)) return false;
             // An "x"/"y" or "flipHorizontal" from a copy made before tracks lost them is left unread, whatever type it holds.
             if (!TryGetOptional(track, "visible", true, out bool visible)) return false;
-            tracks.Add(new CopiedTrack(name, lane, visible));
+            if (!TryGetOptional(track, "continuous", false, out bool continuous)) return false;
+            tracks.Add(new CopiedTrack(name, lane, visible, continuous));
         }
         var indices = new List<int>();
         foreach (var node in indicesArray)

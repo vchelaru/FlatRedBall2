@@ -71,6 +71,9 @@
                             </Grid>
                             <CheckBox x:Name="TrackVisibleBox" Content="Visible"
                                       AutomationProperties.AutomationId="seq-track-visible" />
+                            <CheckBox x:Name="TrackContinuousBox" Content="Continuous"
+                                      ToolTip.Tip="Keeps this track's animation going across the loop wrap of a looping sequence instead of restarting it, when the chain playing at the wrap is the same chain the track starts with at 0. Useful when the track is stretched to a fractional number of cycles. A different chain at the wrap restarts normally; tracks may drift against each other."
+                                      AutomationProperties.AutomationId="seq-track-continuous" />
                         </StackPanel>
                     </Border>
                     <!-- Only for a track that plays another sequence of the file (a reference): its clip, like a chain's block. -->

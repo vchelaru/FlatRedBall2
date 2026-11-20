@@ -106,6 +106,54 @@ public static class SequenceTimeline
     }
 
     /// <summary>
+    /// Seconds of playback a <see cref="SequenceTrackSave.Continuous"/> track's first block has already advanced when pass
+    /// <paramref name="pass"/> (0 = the first run through, 1 = after the first wrap) begins: 0 for pass 0, and for a track
+    /// that restarts at the wrap. At each wrap the carry becomes the playback time of the block playing at the wrap
+    /// (<paramref name="sequenceLength"/> minus its start, plus its own carry when it is the first block), if that block
+    /// is the same chain (source and name) as the first block and the first block starts at 0; otherwise 0. Passes are
+    /// counted by the player: the number of times the looping sequence has wrapped.
+    /// </summary>
+    public static double CarryOver(SequenceTrackSave track, double sequenceLength, int pass,
+        Func<SequenceChainReferenceSave, double> cycleLength)
+    {
+        if (!track.Continuous || pass <= 0 || sequenceLength <= 0 || track.Chains.Count == 0) return 0;
+        var first = Ordered(track)[0];
+        if (first.Start > Slack(0)) return 0;
+
+        // The block playing just before the end of a pass: the wrap instant itself belongs to the next pass.
+        double endTime = sequenceLength - Math.Min(HoldEpsilon, sequenceLength);
+        double carry = 0;
+        for (int i = 0; i < pass; i++)
+        {
+            var atWrap = ActiveAt(track, endTime, cycleLength, out _);
+            if (atWrap is null || atWrap.Source != first.Source || atWrap.Chain != first.Chain)
+            {
+                carry = 0;
+                continue;
+            }
+            carry = (ReferenceEquals(atWrap, first) ? carry : 0) + (sequenceLength - atWrap.Start);
+        }
+        return carry;
+    }
+
+    /// <summary>
+    /// <see cref="ActiveAt"/> for pass <paramref name="pass"/> of a looping sequence of <paramref name="sequenceLength"/>
+    /// seconds, where <paramref name="time"/> is the time inside that pass (0 to the length). A
+    /// <see cref="SequenceTrackSave.Continuous"/> track's first block does not restart at the wrap: its
+    /// <paramref name="localTime"/> includes <see cref="CarryOver"/>, so the caller maps it onto the chain as usual (wrapped
+    /// when the chain loops). Every other block, and every other track, is exactly <see cref="ActiveAt"/>. A player counts
+    /// the wraps itself (a seek or restart makes it pass 0 again).
+    /// </summary>
+    public static SequenceChainReferenceSave? ActiveAtPass(SequenceTrackSave track, double time, int pass, double sequenceLength,
+        Func<SequenceChainReferenceSave, double> cycleLength, out double localTime)
+    {
+        var active = ActiveAt(track, time, cycleLength, out localTime);
+        if (active is not null && track.Continuous && pass > 0 && ReferenceEquals(active, Ordered(track)[0]))
+            localTime += CarryOver(track, sequenceLength, pass, cycleLength);
+        return active;
+    }
+
+    /// <summary>
     /// Seconds until the sequence ends: the latest end of any clip on any track. A chain ends where it stops playing; a
     /// reference clip ends <see cref="SequenceReferenceSave.Loops"/> cycles of its target's own length after its start,
     /// measured the same way, through every level. A reference that does not <see cref="SequenceReferences.Plays"/> (a

@@ -22,6 +22,16 @@ public class SequenceTrackSave
     public bool Visible { get; set; } = true;
 
     /// <summary>
+    /// When true, the track does not restart its chain at the wrap of a looping sequence if the chain playing at the wrap
+    /// is the same chain (same source and chain name) as the track's first block, which must start at 0. It carries its
+    /// playback phase across the wrap instead, so a chain stretched to a fractional number of cycles does not snap back.
+    /// If a different chain is playing at the wrap, or none, the track restarts as usual. Tracks then drift against each
+    /// other across passes; that is intended. The rule is <see cref="SequenceTimeline.ActiveAtPass"/>. Written to the file
+    /// only when true, so every file without it stays unchanged.
+    /// </summary>
+    public bool Continuous { get; set; }
+
+    /// <summary>
     /// When set, the track plays another sequence of the file instead of chains (a clip with a start and a loop count,
     /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> must stay empty: reading a file whose track has
     /// both throws. The target's tracks are inlined under this track's name; <see cref="Visible"/> false hides all of them.

@@ -148,6 +148,7 @@ public class SequenceListSave
             ["name"] = track.Name,
         };
         if (!track.Visible) result["visible"] = false;
+        if (track.Continuous) result["continuous"] = true;
         if (track.Reference is { } playing)
         {
             result["reference"] = AppendUnknown(new JsonObject
@@ -211,11 +212,12 @@ public class SequenceListSave
         {
             Name = node.String("name"),
             Visible = node.Bool("visible", fallback: true),
+            Continuous = node.Bool("continuous", fallback: false),
         };
         // "x", "y", "z" and "flipHorizontal" are listed so they are dropped unread, not kept as unknown properties: files
         // written before tracks lost their offset, Z and flip still hold them, and saving must not write them back. Sprites
         // sit at their frames' offsets, draw with their frames' flips and stack in track order.
-        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "reference", "chains");
+        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "continuous", "reference", "chains");
         if (node.Node.ContainsKey("reference"))
         {
             var reference = node.Object("reference");
