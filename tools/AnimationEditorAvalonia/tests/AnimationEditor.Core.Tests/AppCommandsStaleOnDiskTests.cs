@@ -12,7 +12,7 @@ namespace AnimationEditor.Core.Tests;
 /// <summary>
 /// Fresh-eyes pass #21 (plan/1147-tsx-sync-hardening/phase-01-bug-sweep.md): the whole point of a
 /// native tsx project is coexisting with Tiled on one file. When Tiled saves something this
-/// editor can't load (a wangset, say), the hot reload fails and the tab keeps its now-stale
+/// editor can't load (a tileset transformation, say), the hot reload fails and the tab keeps its now-stale
 /// in-memory tileset -- and the very next autosave wrote that stale tileset back over Tiled's
 /// file, destroying whatever Tiled had just added. Same hole for an achx edited outside the
 /// editor into something the parser rejects.
@@ -39,8 +39,8 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         """;
 
     // What Tiled writes after the user paints a terrain set onto the same tileset: the animation
-    // is untouched, a <wangsets> block (unsupported by TsxWriter) is added.
-    private const string TsxWithWangsetXml = """
+    // is untouched, a <transformations> element (unsupported by TsxWriter) is added.
+    private const string TsxWithTransformationsXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
          <image source="Heroes.png" width="64" height="64"/>
@@ -50,12 +50,7 @@ public class AppCommandsStaleOnDiskTests : IDisposable
            <frame tileid="1" duration="200"/>
           </animation>
          </tile>
-         <wangsets>
-          <wangset name="Ground" type="corner" tile="-1">
-           <wangcolor name="Grass" color="#00ff00" tile="0" probability="1"/>
-           <wangtile tileid="4" wangid="0,1,0,1,0,1,0,1"/>
-          </wangset>
-         </wangsets>
+         <transformations hflip="1" vflip="0" rotate="0" preferuntransformed="0"/>
         </tileset>
         """;
 
@@ -77,7 +72,7 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         _ctx.AppCommands.HotReloadFailed += (_, reason) => reloadFailure = reason;
         _ctx.AppCommands.SaveFailed += message => saveFailure = message;
 
-        File.WriteAllText(path, TsxWithWangsetXml);          // Tiled saved
+        File.WriteAllText(path, TsxWithTransformationsXml);          // Tiled saved
         _ctx.AppCommands.ReloadAchxFromDisk(path);            // watcher fired, reload can't load it
         Assert.NotNull(reloadFailure);
 
@@ -87,17 +82,17 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         Assert.Equal(SaveState.Failed, _ctx.UndoManager.SaveState);
         Assert.NotNull(saveFailure);
         Assert.Contains("changed on disk", saveFailure);
-        Assert.Contains("<wangsets>", File.ReadAllText(path)); // Tiled's work is still there
+        Assert.Contains("<transformations", File.ReadAllText(path)); // Tiled's work is still there
     }
 
     [Fact]
     public void SaveCurrentAnimationChainList_AfterALaterHotReloadSucceeds_SavesAgain()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithWangsetXml);
+        File.WriteAllText(path, TsxWithTransformationsXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
 
-        File.WriteAllText(path, PlainTsxXml);                 // user removed the wangset in Tiled
+        File.WriteAllText(path, PlainTsxXml);                 // user removed the transformations in Tiled
         _ctx.AppCommands.ReloadAchxFromDisk(path);
         var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
         chain.Frames[0].FrameLength = 0.3f;
@@ -114,7 +109,7 @@ public class AppCommandsStaleOnDiskTests : IDisposable
     public async System.Threading.Tasks.Task SaveCurrentAnimationChainList_AfterReopeningTheFixedFile_SavesAgain()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithWangsetXml);
+        File.WriteAllText(path, TsxWithTransformationsXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
 
         File.WriteAllText(path, PlainTsxXml);
@@ -131,13 +126,13 @@ public class AppCommandsStaleOnDiskTests : IDisposable
     public void SaveCurrentAnimationChainList_ToAnotherPathWhileStale_Writes()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithWangsetXml);
+        File.WriteAllText(path, TsxWithTransformationsXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
         var copyPath = Path.Combine(_dir.Path, "HeroesCopy.tsx");
 
         _ctx.AppCommands.SaveCurrentAnimationChainList(copyPath);
 
         Assert.True(File.Exists(copyPath));
-        Assert.Contains("<wangsets>", File.ReadAllText(path));
+        Assert.Contains("<transformations", File.ReadAllText(path));
     }
 }

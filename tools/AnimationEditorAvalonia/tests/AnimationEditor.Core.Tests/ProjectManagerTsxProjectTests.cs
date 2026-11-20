@@ -34,7 +34,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
 
     // Columns=0 makes every "% columns"/"/ columns" tile-position computation in
     // TiledAnimationToAchjMapper.Map fail loudly (InvalidOperationException) rather than
-    // divide-by-zero or wrap into nonsense -- unlike the wangset case below, this throw happens
+    // divide-by-zero or wrap into nonsense -- unlike the transformations case below, this throw happens
     // from inside Map, called *after* LoadTsxProject has already assigned _tsxTileset.
     private const string ColumnsZeroFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -96,16 +96,11 @@ public class ProjectManagerTsxProjectTests : IDisposable
         </tileset>
         """;
 
-    private const string WangsetFixtureXml = """
+    private const string TransformationsFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Terrain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
          <image source="Terrain.png" width="64" height="64"/>
-         <wangsets>
-          <wangset name="Ground" type="corner" tile="-1">
-           <wangcolor name="Grass" color="#00ff00" tile="0" probability="1"/>
-           <wangtile tileid="0" wangid="0,1,0,1,0,1,0,1"/>
-          </wangset>
-         </wangsets>
+         <transformations hflip="1" vflip="0" rotate="0" preferuntransformed="0"/>
         </tileset>
         """;
 
@@ -238,11 +233,11 @@ public class ProjectManagerTsxProjectTests : IDisposable
     public void LoadTsxProject_UnsupportedConstruct_ThrowsAndLeavesProjectUnchanged()
     {
         var pm = new ProjectManager();
-        var path = WriteFixture(WangsetFixtureXml, "Terrain.tsx");
+        var path = WriteFixture(TransformationsFixtureXml, "Terrain.tsx");
 
         var ex = Assert.Throws<NotSupportedException>(() => pm.LoadTsxProject(new FilePath(path)));
 
-        Assert.Contains("wangsets", ex.Message);
+        Assert.Contains("transformations", ex.Message);
         Assert.False(pm.IsNativeTsxProject);
         Assert.Null(pm.AnimationChainListSave);
     }
@@ -250,7 +245,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
     [Fact]
     public void LoadTsxProject_MapThrows_ThrowsAndLeavesProjectUnchanged()
     {
-        // Unlike the wangset case above (rejected before _tsxTileset is ever assigned, by the
+        // Unlike the transformations case above (rejected before _tsxTileset is ever assigned, by the
         // TsxCompatibilityChecker dry-run), a Columns=0 tsx passes that check fine -- TsxWriter
         // never divides by Columns -- so the throw comes from TiledAnimationToAchjMapper.Map,
         // called *after* LoadTsxProject already set _tsxTileset. The load must still be all-or-

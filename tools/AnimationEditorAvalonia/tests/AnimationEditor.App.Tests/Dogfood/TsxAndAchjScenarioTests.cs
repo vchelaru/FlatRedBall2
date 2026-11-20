@@ -201,6 +201,33 @@ public class TsxAndAchjScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task Tsx_WithWangsets_OpensAndKeepsThemWhenAnAnimationIsEdited()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("Heroes.png", 64, 64);
+        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
+        string wangsets =
+            " <wangsets>\n" +
+            "  <wangset name=\"CollisionSet\" type=\"mixed\" tile=\"-1\">\n" +
+            "   <wangcolor name=\"SolidCollision\" color=\"#ff0000\" tile=\"-1\" probability=\"1\"/>\n" +
+            "   <wangtile tileid=\"0\" wangid=\"1,1,1,1,1,1,1,1\"/>\n" +
+            "  </wangset>\n" +
+            " </wangsets>\n";
+        File.WriteAllText(tsx, TsxXml.ReplaceLineEndings("\n").Replace("</tileset>", wangsets + "</tileset>"));
+
+        await editor.OpenAsync(tsx);
+        editor.Services.ProjectManager.IsNativeTsxProject.ShouldBeTrue();
+        AnimationChainSave chain = editor.Project.AnimationChains.Single();
+        editor.Expand(chain);
+        editor.ClickRow(chain.Frames[0]);
+        editor.TypeFlanker("PropFrameLen", "0.25");
+
+        string saved = File.ReadAllText(tsx);
+        saved.ShouldContain("duration=\"250\"");
+        saved.ShouldContain(wangsets.TrimEnd('\n'));
+    }
+
+    [AvaloniaFact]
     public async Task Tsx_GridCannotBeTurnedOff_AndInspectorHidesAchxOnlySections()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

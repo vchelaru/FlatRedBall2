@@ -21,9 +21,12 @@ namespace AnimationEditor.Core.Tiled;
 /// Covers the subset of the format needed to round-trip a tileset: tileset attributes, the
 /// tileset image, tile offset/grid, tileset- and tile-level properties (string/int/float/bool/
 /// color/file/object), and per-tile type/probability/x/y/width/height/image/animation frames.
-/// Wangsets, transformations, per-tile object layers, and custom class/enum properties are not
-/// supported -- writing a <see cref="Tileset"/> that uses any of those throws
-/// <see cref="NotSupportedException"/> rather than silently dropping data.
+/// Wangsets (colors, tiles, properties) are written too. DotTiled does not model a wangset's
+/// <c>type</c> attribute (corner/edge/mixed), so a write to an existing file carries each
+/// wangset's <c>type</c> over from that file by wangset name. Transformations, per-tile object
+/// layers, and custom class/enum properties are not supported -- writing a <see cref="Tileset"/>
+/// that uses any of those throws <see cref="NotSupportedException"/> rather than silently
+/// dropping data.
 ///
 /// <para>Writing to a path that already exists patches in place: every unchanged &lt;tile&gt;
 /// keeps its original file text byte-for-byte, and only tiles whose content actually differs get
@@ -47,13 +50,18 @@ public static class TsxWriter
         // keeps the original root text verbatim, so this only matters when patching wasn't
         // possible -- carry those attributes over from the file rather than drop them.
         var extraRootAttributes = File.Exists(path) ? ReadUnmodelledRootAttributes(path) : [];
+        var wangsetTypes = File.Exists(path) ? ReadWangsetTypes(path) : new Dictionary<string, string>();
 
-        AtomicFile.Write(path, stream => Write(tileset, stream, extraRootAttributes));
+        AtomicFile.Write(path, stream => Write(tileset, stream, extraRootAttributes, wangsetTypes));
     }
 
-    public static void Write(Tileset tileset, Stream stream) => Write(tileset, stream, []);
+    public static void Write(Tileset tileset, Stream stream) => Write(tileset, stream, [], new Dictionary<string, string>());
 
-    private static void Write(Tileset tileset, Stream stream, IReadOnlyList<(string Name, string Value)> extraRootAttributes)
+    private static void Write(
+        Tileset tileset,
+        Stream stream,
+        IReadOnlyList<(string Name, string Value)> extraRootAttributes,
+        IReadOnlyDictionary<string, string> wangsetTypes)
     {
         var settings = new XmlWriterSettings
         {
@@ -63,7 +71,7 @@ public static class TsxWriter
         };
         using var writer = XmlWriter.Create(stream, settings);
         writer.WriteStartDocument();
-        WriteTileset(writer, tileset, extraRootAttributes);
+        WriteTileset(writer, tileset, extraRootAttributes, wangsetTypes);
         writer.WriteEndDocument();
     }
 
@@ -93,6 +101,29 @@ public static class TsxWriter
             // exactly as it always did.
             return [];
         }
+    }
+
+    /// <summary>Each wangset's <c>type</c> attribute in the file at <paramref name="path"/>, by
+    /// wangset name (DotTiled drops it on load).</summary>
+    private static Dictionary<string, string> ReadWangsetTypes(string path)
+    {
+        var types = new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            var root = XDocument.Load(path).Root;
+            foreach (var wangset in root?.Element("wangsets")?.Elements("wangset") ?? [])
+            {
+                var name = wangset.Attribute("name")?.Value;
+                var type = wangset.Attribute("type")?.Value;
+                if (name is not null && type is not null)
+                    types.TryAdd(name, type);
+            }
+        }
+        catch
+        {
+            // Unreadable original: nothing to carry over.
+        }
+        return types;
     }
 
     /// <summary>
@@ -131,6 +162,18 @@ public static class TsxWriter
 
         var lineStarts = ComputeLineStartOffsets(rawText);
         var xdoc = XDocument.Load(new StringReader(rawText), LoadOptions.SetLineInfo);
+
+        // Everything from <wangsets> on is reused verbatim (TopLevelEquals already proved the
+        // model's wangsets match the file's), so the last tile's slice must stop where it starts
+        // instead of running on to </tileset> and swallowing it.
+        var tailStart = closingTagOffset;
+        var wangsetsElement = xdoc.Root!.Element("wangsets");
+        if (wangsetsElement is not null)
+        {
+            tailStart = lineStarts[((IXmlLineInfo)wangsetsElement).LineNumber - 1];
+            if (!rawText[tailStart..].TrimStart(' ').StartsWith("<wangsets", StringComparison.Ordinal))
+                return false;
+        }
         var originalTileElements = xdoc.Root!.Elements("tile").ToList();
         // Throws (caught above) if the file has two <tile> elements sharing one id -- already
         // invalid TSX, and not something worth a bespoke recovery path for.
@@ -148,12 +191,14 @@ public static class TsxWriter
             .ToList();
         if (tileLineStarts.Count != tileLineStarts.Distinct().Count())
             return false;
+        if (tileLineStarts.Any(start => start >= tailStart))
+            return false;
 
         var originalSlicesById = new Dictionary<uint, string>();
         for (var i = 0; i < originalTileElements.Count; i++)
         {
             var start = tileLineStarts[i];
-            var end = i + 1 < tileLineStarts.Count ? tileLineStarts[i + 1] : closingTagOffset;
+            var end = i + 1 < tileLineStarts.Count ? tileLineStarts[i + 1] : tailStart;
             if (!TileLineLooksLikeATile(rawText, start))
                 return false;
 
@@ -161,7 +206,7 @@ public static class TsxWriter
             originalSlicesById[id] = rawText[start..end];
         }
 
-        var prologueEnd = tileLineStarts.Count > 0 ? tileLineStarts[0] : closingTagOffset;
+        var prologueEnd = tileLineStarts.Count > 0 ? tileLineStarts[0] : tailStart;
         var newline = rawText.Contains("\r\n") ? "\r\n" : "\n";
 
         var sb = new StringBuilder(rawText[..prologueEnd]);
@@ -177,7 +222,7 @@ public static class TsxWriter
 
             sb.Append(RenderTileFragment(tile, newline)).Append(newline);
         }
-        sb.Append(rawText[closingTagOffset..]);
+        sb.Append(rawText[tailStart..]);
 
         var patchedText = sb.ToString();
         var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
@@ -261,8 +306,28 @@ public static class TsxWriter
         TileOffsetsEqual(a.TileOffset, b.TileOffset) &&
         GridsEqual(a.Grid, b.Grid) &&
         PropertiesEqual(a.Properties, b.Properties) &&
-        a.Wangsets.Count == b.Wangsets.Count &&
+        WangsetsEqual(a.Wangsets, b.Wangsets) &&
         a.Transformations.HasValue == b.Transformations.HasValue;
+
+    private static bool WangsetsEqual(List<Wangset> a, List<Wangset> b) =>
+        a.Count == b.Count && a.Zip(b).All(pair => WangsetEquals(pair.First, pair.Second));
+
+    private static bool WangsetEquals(Wangset a, Wangset b) =>
+        a.Name == b.Name &&
+        a.Class == b.Class &&
+        a.Tile == b.Tile &&
+        PropertiesEqual(a.Properties, b.Properties) &&
+        a.WangColors.Count == b.WangColors.Count &&
+        a.WangColors.Zip(b.WangColors).All(p =>
+            p.First.Name == p.Second.Name &&
+            p.First.Class == p.Second.Class &&
+            p.First.Color.ToString() == p.Second.Color.ToString() &&
+            p.First.Tile == p.Second.Tile &&
+            p.First.Probability == p.Second.Probability &&
+            PropertiesEqual(p.First.Properties, p.Second.Properties)) &&
+        a.WangTiles.Count == b.WangTiles.Count &&
+        a.WangTiles.Zip(b.WangTiles).All(p =>
+            p.First.TileID == p.Second.TileID && p.First.WangID.AsSpan().SequenceEqual(p.Second.WangID));
 
     // ObjectLayer content itself is never compared (DotTiled gives no cheap equality for it,
     // and WriteTile throws NotSupportedException the moment it actually has to render one) --
@@ -331,10 +396,12 @@ public static class TsxWriter
             $"TsxWriter does not yet support '{property.Type}' properties (property '{property.Name}')."),
     };
 
-    private static void WriteTileset(XmlWriter writer, Tileset tileset, IReadOnlyList<(string Name, string Value)> extraRootAttributes)
+    private static void WriteTileset(
+        XmlWriter writer,
+        Tileset tileset,
+        IReadOnlyList<(string Name, string Value)> extraRootAttributes,
+        IReadOnlyDictionary<string, string> wangsetTypes)
     {
-        if (tileset.Wangsets.Count > 0)
-            throw new NotSupportedException("TsxWriter does not yet support wangsets.");
         if (tileset.Transformations.HasValue)
             throw new NotSupportedException("TsxWriter does not yet support tileset transformations.");
 
@@ -373,7 +440,49 @@ public static class TsxWriter
         WriteProperties(writer, tileset.Properties);
         foreach (var tile in tileset.Tiles)
             WriteTile(writer, tile);
+        WriteWangsets(writer, tileset.Wangsets, wangsetTypes);
 
+        writer.WriteEndElement();
+    }
+
+    private static void WriteWangsets(XmlWriter writer, List<Wangset> wangsets, IReadOnlyDictionary<string, string> wangsetTypes)
+    {
+        if (wangsets.Count == 0)
+            return;
+
+        writer.WriteStartElement("wangsets");
+        foreach (var wangset in wangsets)
+        {
+            writer.WriteStartElement("wangset");
+            writer.WriteAttributeString("name", wangset.Name);
+            if (!string.IsNullOrEmpty(wangset.Class))
+                writer.WriteAttributeString("class", wangset.Class);
+            if (wangsetTypes.TryGetValue(wangset.Name, out var type))
+                writer.WriteAttributeString("type", type);
+            writer.WriteAttributeString("tile", XmlConvert.ToString(wangset.Tile));
+
+            WriteProperties(writer, wangset.Properties);
+            foreach (var color in wangset.WangColors)
+            {
+                writer.WriteStartElement("wangcolor");
+                writer.WriteAttributeString("name", color.Name);
+                if (!string.IsNullOrEmpty(color.Class))
+                    writer.WriteAttributeString("class", color.Class);
+                writer.WriteAttributeString("color", color.Color.ToString());
+                writer.WriteAttributeString("tile", XmlConvert.ToString(color.Tile));
+                writer.WriteAttributeString("probability", XmlConvert.ToString(color.Probability));
+                WriteProperties(writer, color.Properties);
+                writer.WriteEndElement();
+            }
+            foreach (var wangTile in wangset.WangTiles)
+            {
+                writer.WriteStartElement("wangtile");
+                writer.WriteAttributeString("tileid", XmlConvert.ToString(wangTile.TileID));
+                writer.WriteAttributeString("wangid", string.Join(",", wangTile.WangID));
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
         writer.WriteEndElement();
     }
 

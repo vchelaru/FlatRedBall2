@@ -9,7 +9,7 @@ namespace AnimationEditor.Core.Tiled;
 /// Checks whether a Tiled <see cref="Tileset"/> can be opened as a native AnimationEditor project
 /// (issue #1140) without losing data on the first save. Deliberately reuses <see
 /// cref="TsxWriter"/> itself as the source of truth (a dry-run write to a throwaway stream) rather
-/// than duplicating its wangsets/transformations/object-layer/property-type checks -- so this stays
+/// than duplicating its transformations/object-layer/property-type checks -- so this stays
 /// in sync automatically if <see cref="TsxWriter"/>'s supported subset ever changes.
 /// </summary>
 public static class TsxCompatibilityChecker
