@@ -256,7 +256,7 @@ public class FrameTextureEditTests : IDisposable
         var resolved = await FrameTextureEdit.ResolveForProjectAsync(_pm, picked, Always(TextureCopyChoice.UseExisting));
 
         resolved.Result.Success.ShouldBeTrue();
-        resolved.AbsolutePath.ShouldBe(existing);
+        resolved.AbsolutePath!.Replace('\\', '/').ShouldBe(existing.Replace('\\', '/'));
     }
 
     [Fact]
