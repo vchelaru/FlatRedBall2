@@ -20,7 +20,7 @@ public class TextureDropProcessorTests
             frameA,
             TestPaths.Abs("Project", "Content", "NewTex.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.UpdatedFrame, result);
         Assert.Equal("../Content/NewTex.png", frameA.TextureName);
@@ -39,7 +39,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "Shared.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.UpdatedChainFrames, result);
         Assert.All(chain.Frames, frame => Assert.Equal("../Content/Shared.png", frame.TextureName));
@@ -56,7 +56,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "NewFrameTex.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: true);
+            createFrameOnCtrl: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.CreatedFrame, result);
         Assert.Equal(2, chain.Frames.Count);
@@ -73,7 +73,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "FirstFrameTex.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.CreatedFrame, result);
         Assert.Single(chain.Frames);
@@ -93,7 +93,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "FirstFrameTex.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Null(chain.Frames[0].ShapesSave);
     }
@@ -109,7 +109,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "NotTexture.jpg"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.NotApplied, result);
         Assert.Single(chain.Frames);
@@ -129,7 +129,7 @@ public class TextureDropProcessorTests
             chain.Frames[0],
             TestPaths.Abs("Project", "Tex.png"),
             TestPaths.Abs("Project", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // Same folder → just the filename, no directory prefix
         Assert.Equal("Tex.png", chain.Frames[0].TextureName);
@@ -146,7 +146,7 @@ public class TextureDropProcessorTests
             chain.Frames[0],
             TestPaths.Abs("Project", "Content", "Sprites", "Hero.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // FRB FileManager.MakeRelative normalises to forward slashes
         Assert.Equal("../Content/Sprites/Hero.png", chain.Frames[0].TextureName);
@@ -163,7 +163,7 @@ public class TextureDropProcessorTests
             chain.Frames[0],
             TestPaths.Abs("Project", "Content", "NewTex.png"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         var tex = chain.Frames[0].TextureName;
         Assert.DoesNotContain(@"\", tex);
@@ -185,7 +185,7 @@ public class TextureDropProcessorTests
             null,
             TestPaths.Abs("Project", "Content", "Items.PNG"),
             TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false);
+            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.CreatedFrame, result);
         Assert.Equal("../Content/Items.PNG", chain.Frames[0].TextureName);
@@ -201,7 +201,7 @@ public class TextureDropProcessorTests
         var chain = new AnimationChainSave();
 
         var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.CreatedFrame, result);
     }
@@ -211,7 +211,7 @@ public class TextureDropProcessorTests
     {
         var chain = new AnimationChainSave();
         TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), chain.Frames[0].TextureName);
     }
@@ -223,7 +223,7 @@ public class TextureDropProcessorTests
         chain.Frames.Add(new AnimationFrameSave { TextureName = "old.png" });
 
         var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.UpdatedChainFrames, result);
         Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), chain.Frames[0].TextureName);
@@ -235,7 +235,7 @@ public class TextureDropProcessorTests
         var frame = new AnimationFrameSave();
 
         var result = TextureDropProcessor.ApplyPngDrop(null, frame,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.UpdatedFrame, result);
         Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), frame.TextureName);
@@ -247,7 +247,7 @@ public class TextureDropProcessorTests
         var chain = new AnimationChainSave();
 
         var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.jpg"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.jpg"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.NotApplied, result);
     }
@@ -256,7 +256,7 @@ public class TextureDropProcessorTests
     public void ApplyPngDrop_NullAchx_NullChainAndFrame_IsIgnored()
     {
         var result = TextureDropProcessor.ApplyPngDrop(null, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false);
+            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TextureDropResult.NotApplied, result);
     }

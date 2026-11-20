@@ -262,9 +262,7 @@ public static class AchjToTiledAnimationMapper
     /// mean seconds (matching how the runtime treats "Undefined"), "Millisecond" passes through.
     /// Widened to <c>internal</c> so <see cref="MultiTileToTiledAnimationMapper"/> can reuse it.</summary>
     internal static int FrameDurationMs(float frameLength, TimeMeasurementUnit timeUnit) =>
-        timeUnit == TimeMeasurementUnit.Millisecond
-            ? (int)Math.Round(frameLength)
-            : (int)Math.Round(frameLength * 1000f);
+        new AnimationEditor.Core.Utilities.FrameLengthUnit(timeUnit).ToMilliseconds(frameLength);
 
     private sealed class SkipCountsBuilder
     {

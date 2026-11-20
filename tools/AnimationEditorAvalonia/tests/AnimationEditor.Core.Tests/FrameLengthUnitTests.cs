@@ -58,3 +58,16 @@ public class FrameLengthUnitTests
         Assert.Equal("100ms", FrameLengthUnit.Milliseconds.Format(100f));
     }
 }
+
+public class FrameLengthUnitTiledPinTests
+{
+    [Theory]
+    [InlineData(TimeMeasurementUnit.Millisecond, 100f, 100)]
+    [InlineData(TimeMeasurementUnit.Second, 0.1f, 100)]
+    [InlineData(TimeMeasurementUnit.Undefined, 0.25f, 250)]
+    public void TiledDuration_IsWholeMillisecondsInEitherUnit(TimeMeasurementUnit unit, float length, int expectedMs)
+    {
+        Assert.Equal(expectedMs, AnimationEditor.Core.Tiled.AchjToTiledAnimationMapper.FrameDurationMs(length, unit));
+        Assert.Equal(expectedMs, new FrameLengthUnit(unit).ToMilliseconds(length));
+    }
+}

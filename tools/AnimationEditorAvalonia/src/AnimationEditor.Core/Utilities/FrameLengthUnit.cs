@@ -34,6 +34,9 @@ public readonly record struct FrameLengthUnit(TimeMeasurementUnit Unit)
     /// <summary>Converts a length in this unit to seconds.</summary>
     public double ToSeconds(double length) => length / UnitsPerSecond;
 
+    /// <summary>Converts a length in this unit to whole milliseconds (Tiled durations).</summary>
+    public int ToMilliseconds(double length) => (int)System.Math.Round(ToSeconds(length) * 1000.0);
+
     /// <summary>Converts seconds to a length in this unit.</summary>
     public float FromSeconds(double seconds) => (float)(seconds * UnitsPerSecond);
 

@@ -34,6 +34,9 @@ namespace AnimationEditor.Core.CommandsAndState
     public class AppCommands : IAppCommands
     {
         private readonly IProjectManager _pm;
+
+        /// <summary>The unit of the open file's frame lengths (#1829). Every frame length the commands create or edit is in it.</summary>
+        private FrameLengthUnit CurrentFrameLengthUnit => FrameLengthUnit.Of(_pm.AnimationChainListSave);
         private readonly ISelectedState _selectedState;
         private readonly IApplicationEvents _events;
         private readonly IObjectFinder _objectFinder;
@@ -1221,7 +1224,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 TopCoordinate    = top,
                 RightCoordinate  = right,
                 BottomCoordinate = bottom,
-                FrameLength      = 0.1f,
+                FrameLength      = CurrentFrameLengthUnit.DefaultFrameLength,
             };
             _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
         }
@@ -2000,7 +2003,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (IsChainLocked(chain)) return false;
 
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
-            var result    = BatchFrameBuilder.BuildBatch(lastFrame, count, incrementUV);
+            var result    = BatchFrameBuilder.BuildBatch(lastFrame, count, incrementUV, CurrentFrameLengthUnit);
 
             var added = result.Frames.ToArray();
             if (added.Length > 0)
