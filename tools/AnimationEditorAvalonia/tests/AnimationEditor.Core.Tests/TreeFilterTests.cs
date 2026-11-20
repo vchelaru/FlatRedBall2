@@ -34,7 +34,7 @@ public class TreeFilterTests
         frame.ShapesSave.Add(new AARectSave { Name = shapeName });
         var chain = new AnimationChainSave { Name = chainName };
         chain.Frames.Add(frame);
-        return TreeBuilder.BuildChainNode(chain);
+        return TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
     }
 
     // ── Query-change path (can shrink) — ApplyQueryFilter ─────────────────────

@@ -9,7 +9,7 @@ public class TimelineBuilderTests
     [Fact]
     public void BuildFrameItems_NullChain_ReturnsEmptyList()
     {
-        var result = TimelineBuilder.BuildFrameItems(null);
+        var result = TimelineBuilder.BuildFrameItems(null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Empty(result);
     }
 
@@ -20,7 +20,7 @@ public class TimelineBuilderTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.35f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(2, result.Count);
         Assert.True(result[1].Width > result[0].Width);
@@ -35,7 +35,7 @@ public class TimelineBuilderTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // A 0.2s frame must be exactly twice as wide as a 0.1s frame regardless of scaling.
         Assert.Equal(result[0].Width * 2.0, result[1].Width, precision: 6);
@@ -47,7 +47,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = -1f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Single(result);
         Assert.Equal(TimelineBuilder.MinCellWidth, result[0].Width);
@@ -59,7 +59,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Single(result);
         Assert.Equal(TimelineBuilder.MinCellWidth, result[0].Width);
@@ -73,7 +73,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TimelineBuilder.MinCellWidth, result[0].Width, precision: 6);
     }
@@ -87,7 +87,7 @@ public class TimelineBuilderTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.10f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.50f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TimelineBuilder.MinCellWidth, result[0].Width, precision: 3);
         Assert.Equal(result[0].Width * 2.0, result[1].Width, precision: 3);  // 0.10 = 2× 0.05
@@ -101,7 +101,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.5f });
 
-        var result = TimelineBuilder.BuildFrameItems(chain);
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(0.5 * TimelineBuilder.PixelsPerSecond, result[0].Width, precision: 6);
     }
@@ -111,7 +111,7 @@ public class TimelineBuilderTests
     [Fact]
     public void ComputeEffectivePps_NullChain_ReturnsBaseline()
     {
-        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(null));
+        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f });
 
-        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(chain));
+        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 1.0f });
 
-        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(chain));
+        Assert.Equal(TimelineBuilder.PixelsPerSecond, TimelineBuilder.ComputeEffectivePixelsPerSecond(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class TimelineBuilderTests
         var chain = new AnimationChainSave { Name = "Run" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.05f });
 
-        double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
+        double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TimelineBuilder.MinCellWidth / 0.05, pps, precision: 3);
         Assert.True(pps > TimelineBuilder.PixelsPerSecond);
@@ -155,7 +155,7 @@ public class TimelineBuilderTests
         var chainB = new AnimationChainSave { Name = "B" };
         chainB.Frames.Add(new AnimationFrameSave { FrameLength = 0.01f });
 
-        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB });
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(TimelineBuilder.MinCellWidth / 0.01, sharedPps, precision: 3);
     }
@@ -172,9 +172,9 @@ public class TimelineBuilderTests
         chainB.Frames.Add(new AnimationFrameSave { FrameLength = 0.01f });
         chainB.Frames.Add(new AnimationFrameSave { FrameLength = 1.0f });
 
-        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB });
-        var itemsA = TimelineBuilder.BuildFrameItems(chainA, sharedPps);
-        var itemsB = TimelineBuilder.BuildFrameItems(chainB, sharedPps);
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        var itemsA = TimelineBuilder.BuildFrameItems(chainA, sharedPps, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        var itemsB = TimelineBuilder.BuildFrameItems(chainB, sharedPps, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(itemsA[1].Width, itemsB[1].Width, precision: 6);
     }

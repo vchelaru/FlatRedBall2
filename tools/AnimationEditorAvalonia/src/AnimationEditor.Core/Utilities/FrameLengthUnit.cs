@@ -53,6 +53,27 @@ public readonly record struct FrameLengthUnit(TimeMeasurementUnit Unit)
     /// <summary>Label suffix: <c>s</c> or <c>ms</c>.</summary>
     public string Suffix => IsMilliseconds ? "ms" : "s";
 
+    /// <summary>Spelled-out unit for dialogs: <c>seconds</c> or <c>milliseconds</c>.</summary>
+    public string Name => IsMilliseconds ? "milliseconds" : "seconds";
+
+    /// <summary>Smallest length the Inspector accepts: 1 ms.</summary>
+    public decimal Minimum => IsMilliseconds ? 1m : 0.001m;
+
+    /// <summary>Largest length the Inspector accepts: 60 s.</summary>
+    public decimal Maximum => IsMilliseconds ? 60000m : 60m;
+
+    /// <summary>Inspector arrow/wheel step: 0.05 s.</summary>
+    public decimal Step => IsMilliseconds ? 50m : 0.05m;
+
+    /// <summary>Largest total duration the Adjust Frame Time dialog accepts: one hour.</summary>
+    public decimal DialogMaximum => IsMilliseconds ? 3600000m : 3600m;
+
+    /// <summary>Adjust Frame Time dialog step: 0.1 s.</summary>
+    public decimal DialogStep => IsMilliseconds ? 100m : 0.1m;
+
+    /// <summary>A value with no padded zeros and the suffix, as undo labels show it: <c>0.1s</c> or <c>100ms</c>.</summary>
+    public string FormatCompact(decimal length) => length.ToString("0.###", CultureInfo.CurrentCulture) + Suffix;
+
     /// <summary>A length as shown in the tree and undo labels: <c>0.10s</c> or <c>100ms</c>.</summary>
     public string Format(float length) =>
         length.ToString(IsMilliseconds ? "0.##" : "0.00", CultureInfo.CurrentCulture) + Suffix;

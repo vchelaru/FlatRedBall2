@@ -2,6 +2,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -148,7 +149,7 @@ public static class EditorDialogs
     /// with <see cref="IAppCommands.SealPendingEdits"/>.
     /// </summary>
     public static async Task ShowAdjustFrameTimeAsync(
-        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain)
+        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain, FrameLengthUnit unit)
     {
         if (chain.Frames.Count == 0) return;
 

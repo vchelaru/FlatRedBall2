@@ -187,6 +187,29 @@ internal sealed class AnimationEditorHarness : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// Like <see cref="WriteAchx(string, AnimationChainSave[])"/> for a file in <paramref name="unit"/>: every frame length
+    /// built in seconds (as <see cref="Chain"/> does) is converted to that unit (0.1 becomes 100 for Millisecond).
+    /// </summary>
+    public string WriteAchx(string name, TimeMeasurementUnit unit, params AnimationChainSave[] chains)
+    {
+        string path = Path.Combine(ProjectFolder, name);
+        AnimationChainListSave list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel, TimeMeasurementUnit = unit };
+        foreach (AnimationChainSave chain in chains)
+        {
+            foreach (AnimationFrameSave frame in chain.Frames)
+            {
+                if (unit == TimeMeasurementUnit.Millisecond && frame.FrameLength < 1f)
+                {
+                    frame.FrameLength *= 1000f;
+                }
+            }
+        }
+        list.AnimationChains.AddRange(chains);
+        list.Save(path);
+        return path;
+    }
+
     /// <summary>Writes a <c>.seqj</c> holding one empty sequence per name, in order.</summary>
     public string WriteSeqj(string name, params string[] sequenceNames)
     {

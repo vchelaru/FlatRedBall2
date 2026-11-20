@@ -50,6 +50,9 @@ namespace AnimationEditor.App;
 public partial class MainWindow : Window
 {
     private readonly IProjectManager _projectManager;
+
+    /// <summary>The unit of the open file's frame lengths (#1829). Every length the window shows or edits is in it.</summary>
+    private FrameLengthUnit CurrentFrameLengthUnit => FrameLengthUnit.Of(_projectManager.AnimationChainListSave);
     private readonly ISelectedState _selectedState;
     private readonly IAppCommands _appCommands;
     private readonly IAppState _appState;
@@ -4858,7 +4861,7 @@ public partial class MainWindow : Window
 
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
-            TreeBuilder.SyncChainsInto(_treeRoots, chains);
+            TreeBuilder.SyncChainsInto(_treeRoots, chains, CurrentFrameLengthUnit);
             ApplyPendingPastedChainExpand();
 
             // Grow-only: never hide a chain that was visible; add newly-relevant ones.
@@ -4977,15 +4980,15 @@ public partial class MainWindow : Window
             if (node is null)
             {
                 // Brand-new node defaults to visible (never hide something just created).
-                _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
+                _treeRoots.Add(TreeBuilder.BuildChainNode(chain, CurrentFrameLengthUnit));
             }
             else
             {
                 node.Header = chain.Name;
-                node.Meta   = TreeBuilder.BuildChainMeta(chain);
+                node.Meta   = TreeBuilder.BuildChainMeta(chain, CurrentFrameLengthUnit);
                 node.IsLocked = chain.IsLocked;
                 node.IsAutoName = _projectManager.IsChainNameAuto(chain);
-                TreeBuilder.SyncFramesInto(node, chain.Frames);
+                TreeBuilder.SyncFramesInto(node, chain.Frames, CurrentFrameLengthUnit);
                 // Grow-only: keep it visible if it already was, or if it now matches.
                 node.PinnedVisible = node.PinnedVisible
                     || TreeBuilder.MatchesFilter(chain.Name, _treeFilterQuery);
@@ -5011,7 +5014,7 @@ public partial class MainWindow : Window
         var frameNode = chainNode.Children
             .FirstOrDefault(n => n.Data is AnimationFrameSave f && f == frame);
 
-        var rebuiltFrameNode = TreeBuilder.BuildFrameNode(frame, frameIndex);
+        var rebuiltFrameNode = TreeBuilder.BuildFrameNode(frame, CurrentFrameLengthUnit, frameIndex);
 
         if (frameNode is null)
         {
@@ -5027,7 +5030,7 @@ public partial class MainWindow : Window
         }
         // The chain node's Meta carries the total play time (#623), which a frame-length edit
         // changes — keep it in sync whenever a frame under it is refreshed.
-        chainNode.Meta = TreeBuilder.BuildChainMeta(chain);
+        chainNode.Meta = TreeBuilder.BuildChainMeta(chain, CurrentFrameLengthUnit);
         // A new frame/shape node must inherit its chain group's zebra parity.
         TreeBuilder.RestripeRoots(_treeRoots);
         RefreshTreeThumbnails();
@@ -5229,7 +5232,7 @@ public partial class MainWindow : Window
         // Show the active chain's total play time next to the ruler label so the duration is
         // visible without adding up per-frame times (#623).
         TimelineHeaderLabel.Text = chain is { Frames.Count: > 0 }
-            ? $"TIMELINE · {TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(chain))}"
+            ? $"TIMELINE · {TimelineBuilder.FormatTotal(chain, CurrentFrameLengthUnit)}"
             : "TIMELINE";
 
         // Only clear-and-rebuild the cells when the frame structure (chain identity, count,
@@ -5306,9 +5309,9 @@ public partial class MainWindow : Window
         // no per-cell dispose (that would invalidate a bitmap a later cache hit returns).
         _timelineFrames.Clear();
 
-        foreach (var item in TimelineBuilder.BuildFrameItems(chain))
+        foreach (var item in TimelineBuilder.BuildFrameItems(chain, CurrentFrameLengthUnit))
             _timelineFrames.Add(item);
-        _timelineEffectivePps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
+        _timelineEffectivePps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain, CurrentFrameLengthUnit);
 
         // Populate frame thumbnails (texture crop tinted by the frame's effective color, no shapes).
         // Resolve all effective colors in one O(n) pass here — on data change, never in the playback
@@ -5368,7 +5371,7 @@ public partial class MainWindow : Window
         // Shared across every row (#1056) so a frame of equal duration renders at equal width in
         // every chain's row, instead of each chain scaling independently to its own shortest frame.
         double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
-            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+            PreviewCtrl.GroupTracks.Select(t => t.Chain), CurrentFrameLengthUnit);
 
         LogSelectionPerf($"    RefreshGroupTimelineTracks: {groupTracks.Count} tracks, sharedPps computed at {overallSw.ElapsedMilliseconds}ms");
 
@@ -5378,7 +5381,7 @@ public partial class MainWindow : Window
         foreach (var (chain, _) in groupTracks)
         {
             stepSw.Restart();
-            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain, sharedPps));
+            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain, sharedPps, CurrentFrameLengthUnit));
             buildMs += stepSw.ElapsedMilliseconds;
             frameCount += track.Frames.Count;
 
@@ -5415,7 +5418,7 @@ public partial class MainWindow : Window
         // Must match the shared pps RefreshGroupTimelineTracks built the frame widths with (#1056) —
         // recomputing per-chain here would desync the sub-frame playhead offset from those widths.
         double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
-            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+            PreviewCtrl.GroupTracks.Select(t => t.Chain), CurrentFrameLengthUnit);
 
         foreach (var (chain, playback) in PreviewCtrl.GroupTracks)
         {
@@ -5764,7 +5767,7 @@ public partial class MainWindow : Window
 
     private void AskAdjustFrameTime(AnimationChainSave chain)
     {
-        _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain);
+        _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain, CurrentFrameLengthUnit);
     }
 
     // ── Frame events (#1121) ──────────────────────────────────────────────────

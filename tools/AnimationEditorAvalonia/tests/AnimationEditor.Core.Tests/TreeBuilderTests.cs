@@ -56,7 +56,7 @@ public class TreeBuilderPureTests
     {
         var chain = new AnimationChainSave { Name = "Walk", IsLocked = true };
 
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.True(node.IsLocked);
     }
@@ -66,7 +66,7 @@ public class TreeBuilderPureTests
     {
         var chain = new AnimationChainSave { Name = "Walk" };
 
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(node.IsLocked);
     }
@@ -80,7 +80,7 @@ public class TreeBuilderPureTests
         var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(acls));
 
         chain.IsLocked = true;
-        TreeBuilder.SyncChainsInto(roots, acls.AnimationChains);
+        TreeBuilder.SyncChainsInto(roots, acls.AnimationChains, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.True(roots[0].IsLocked);
     }
@@ -129,7 +129,7 @@ public class TreeBuilderPureTests
     public void BuildChainNode_SetsHeaderAndData()
     {
         var chain = new AnimationChainSave { Name = "Jump" };
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal("Jump", node.Header);
         Assert.Same(chain, node.Data);
     }
@@ -138,7 +138,7 @@ public class TreeBuilderPureTests
     public void BuildChainNode_DefaultsIsExpandedTrue()
     {
         var chain = new AnimationChainSave { Name = "Jump" };
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.True(node.IsExpanded);
     }
 
@@ -146,7 +146,7 @@ public class TreeBuilderPureTests
     public void BuildChainNode_SetsIsChainNodeTrue()
     {
         var chain = new AnimationChainSave { Name = "Jump" };
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.True(node.IsChainNode);
     }
 
@@ -159,7 +159,7 @@ public class TreeBuilderPureTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
 
-        var node = TreeBuilder.BuildChainNode(chain);
+        var node = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal("2 fr · 0.50s", node.Meta);
     }
@@ -168,7 +168,7 @@ public class TreeBuilderPureTests
     public void BuildFrameNode_HasIsChainNodeFalse()
     {
         var frame = new AnimationFrameSave { TextureName = "run1.png" };
-        var node = TreeBuilder.BuildFrameNode(frame);
+        var node = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.False(node.IsChainNode);
     }
 
@@ -222,7 +222,7 @@ public class TreeBuilderPureTests
         frame.ShapesSave!.Add(
             new CircleSave { Name = "HurtCircle" });
 
-        var node = TreeBuilder.BuildFrameNode(frame);
+        var node = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(2, node.Children.Count);
         Assert.Equal("HitBox",     node.Children[0].Header);
@@ -240,7 +240,7 @@ public class TreeBuilderPureTests
         frame.ShapesSave!.Add(new AARectSave { Name = "Rect1" });
         frame.ShapesSave!.Add(new CircleSave { Name = "Circle1" });
 
-        var node = TreeBuilder.BuildFrameNode(frame, index: 1);
+        var node = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, index: 1);
 
         Assert.True(node.IsFrameNode);
         Assert.Equal("Frame 2", node.Header);
@@ -388,11 +388,11 @@ public class TreeBuilderPureTests
     {
         // Default for a new chain VM (before App-layer paste inherit) is expanded.
         var existing = new AnimationChainSave { Name = "Walk" };
-        var roots = new ObservableCollection<TreeNodeVm> { TreeBuilder.BuildChainNode(existing) };
+        var roots = new ObservableCollection<TreeNodeVm> { TreeBuilder.BuildChainNode(existing, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) };
         roots[0].IsExpanded = false;  // user collapsed the existing chain
         var pasted = new AnimationChainSave { Name = "Walk2" };
 
-        TreeBuilder.SyncChainsInto(roots, new[] { existing, pasted });
+        TreeBuilder.SyncChainsInto(roots, new[] { existing, pasted }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(2, roots.Count);
         Assert.False(roots[0].IsExpanded);   // pre-existing chain stays collapsed
@@ -407,8 +407,8 @@ public class TreeBuilderPureTests
         var run = new AnimationChainSave { Name = "Run" };
         var roots = new List<TreeNodeVm>
         {
-            TreeBuilder.BuildChainNode(walk),
-            TreeBuilder.BuildChainNode(run),
+            TreeBuilder.BuildChainNode(walk, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            TreeBuilder.BuildChainNode(run, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
         };
         roots[0].IsExpanded = false;
         roots[1].IsExpanded = true;
@@ -422,7 +422,7 @@ public class TreeBuilderPureTests
     public void ApplyExpandStates_CollapsesPastedChainVm()
     {
         var pasted = new AnimationChainSave { Name = "Walk2" };
-        var roots = new List<TreeNodeVm> { TreeBuilder.BuildChainNode(pasted) };
+        var roots = new List<TreeNodeVm> { TreeBuilder.BuildChainNode(pasted, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) };
         Assert.True(roots[0].IsExpanded);
 
         TreeBuilder.ApplyExpandStates(roots, new[] { pasted }, new[] { false });
@@ -437,11 +437,11 @@ public class TreeBuilderPureTests
         var chainB = new AnimationChainSave { Name = "Run" };
         var roots = new ObservableCollection<TreeNodeVm>
         {
-            TreeBuilder.BuildChainNode(chainA),
-            TreeBuilder.BuildChainNode(chainB),
+            TreeBuilder.BuildChainNode(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            TreeBuilder.BuildChainNode(chainB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
         };
 
-        TreeBuilder.SyncChainsInto(roots, new[] { chainB });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Single(roots);
         Assert.Same(chainB, roots[0].Data);
@@ -455,13 +455,13 @@ public class TreeBuilderPureTests
         var chainB = new AnimationChainSave { Name = "Run" };
         var roots = new ObservableCollection<TreeNodeVm>
         {
-            TreeBuilder.BuildChainNode(chainA),
-            TreeBuilder.BuildChainNode(chainB),
+            TreeBuilder.BuildChainNode(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            TreeBuilder.BuildChainNode(chainB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
         };
         roots[0].IsExpanded = false;  // user collapsed "Walk"
         var vmA = roots[0];
 
-        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(vmA.IsExpanded);
     }
@@ -473,13 +473,13 @@ public class TreeBuilderPureTests
         var chainB = new AnimationChainSave { Name = "Run" };
         var roots = new ObservableCollection<TreeNodeVm>
         {
-            TreeBuilder.BuildChainNode(chainA),
-            TreeBuilder.BuildChainNode(chainB),
+            TreeBuilder.BuildChainNode(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            TreeBuilder.BuildChainNode(chainB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
         };
         var originalVmA = roots[0];
         var originalVmB = roots[1];
 
-        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(originalVmA, roots[1]);
         Assert.Same(originalVmB, roots[0]);
@@ -489,13 +489,13 @@ public class TreeBuilderPureTests
     public void SyncChainsInto_RetainedChain_RefreshesHeaderMetaAndSyncsFrames()
     {
         var chain = new AnimationChainSave { Name = "Walk" };
-        var roots = new ObservableCollection<TreeNodeVm> { TreeBuilder.BuildChainNode(chain) };
+        var roots = new ObservableCollection<TreeNodeVm> { TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) };
 
         // Mutate the data model the way a rename + add-frame would.
         chain.Name = "Walk Renamed";
         chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
 
-        TreeBuilder.SyncChainsInto(roots, new[] { chain });
+        TreeBuilder.SyncChainsInto(roots, new[] { chain }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal("Walk Renamed", roots[0].Header);
         Assert.Equal("1 fr · 0.00s", roots[0].Meta);
@@ -511,14 +511,14 @@ public class TreeBuilderPureTests
         var frameA = new AnimationFrameSave { TextureName = "a.png" };
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));
 
         var originalVmA = chainNode.Children[0];
         var originalVmB = chainNode.Children[1];
 
         // Reorder: put B first
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(originalVmA, chainNode.Children[1]);
         Assert.Same(originalVmB, chainNode.Children[0]);
@@ -531,11 +531,11 @@ public class TreeBuilderPureTests
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         var frameC = new AnimationFrameSave { TextureName = "c.png" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, 2));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 2));
 
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(frameC, chainNode.Children[0].Data);
         Assert.Same(frameA, chainNode.Children[1].Data);
@@ -548,13 +548,13 @@ public class TreeBuilderPureTests
         var frameA = new AnimationFrameSave { TextureName = "a.png" };
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));
 
         chainNode.Children[0].IsExpanded = true;  // mark frameA VM expanded
         var vmA = chainNode.Children[0];
 
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.True(vmA.IsExpanded);
     }
@@ -566,10 +566,10 @@ public class TreeBuilderPureTests
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         var frameC = new AnimationFrameSave { TextureName = "c.png" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));
 
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC, frameB });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC, frameB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(3, chainNode.Children.Count);
         Assert.Same(frameC, chainNode.Children[1].Data);
@@ -582,11 +582,11 @@ public class TreeBuilderPureTests
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         var frameC = new AnimationFrameSave { TextureName = "c.png" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, 2));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 2));
 
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal(2, chainNode.Children.Count);
         Assert.Same(frameA, chainNode.Children[0].Data);
@@ -601,11 +601,11 @@ public class TreeBuilderPureTests
         var frameA = new AnimationFrameSave { TextureName = "" };
         var frameB = new AnimationFrameSave { TextureName = "" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));  // "Frame 1"
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));  // "Frame 2"
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));  // "Frame 1"
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));  // "Frame 2"
 
         // Move frameA to index 1 (swap order)
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // Both frames now have positional labels matching their new positions.
         Assert.Equal("Frame 1", chainNode.Children[0].Header);  // frameB is now at index 0
@@ -620,11 +620,11 @@ public class TreeBuilderPureTests
         var frameB = new AnimationFrameSave { TextureName = "" };
         var frameC = new AnimationFrameSave { TextureName = "" };
         var chainNode = new TreeNodeVm();
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));  // "Frame 1"
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));  // "Frame 2"
-        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, 2));  // "Frame 3"
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 0));  // "Frame 1"
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 1));  // "Frame 2"
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, 2));  // "Frame 3"
 
-        TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB });
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Equal("Frame 1", chainNode.Children[0].Header);  // frameC at index 0
         Assert.Equal("Frame 2", chainNode.Children[1].Header);  // frameA at index 1
@@ -760,7 +760,7 @@ public class TreeBuilderSyncShapesTests
         rect = new AARectSave { Name = "HitBox" };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
         frame.ShapesSave.Add(rect);
-        return TreeBuilder.BuildFrameNode(frame);
+        return TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
     }
 
     private static TreeNodeVm FrameNodeWithCircle(out CircleSave circle)
@@ -768,7 +768,7 @@ public class TreeBuilderSyncShapesTests
         circle = new CircleSave { Name = "Hurt" };
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
         frame.ShapesSave.Add(circle);
-        return TreeBuilder.BuildFrameNode(frame);
+        return TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
     }
 
     [Fact]
@@ -827,7 +827,7 @@ public class TreeBuilderSyncShapesTests
     public void SyncShapesInto_AddedRect_IsInserted()
     {
         var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
-        var frameNode = TreeBuilder.BuildFrameNode(frame);
+        var frameNode = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var newRect = new AARectSave { Name = "New" };
         frame.ShapesSave.Add(newRect);
 
@@ -867,7 +867,7 @@ public class TreeBuilderSyncShapesTests
         var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
         frame.ShapesSave.Add(rect);
         frame.ShapesSave.Add(circle);
-        var frameNode  = TreeBuilder.BuildFrameNode(frame);
+        var frameNode  = TreeBuilder.BuildFrameNode(frame, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var originalRectVm   = frameNode.Children[0];
         var originalCircleVm = frameNode.Children[1];
 
@@ -888,10 +888,10 @@ public class TreeBuilderSyncFramesTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "walk1.png" };
         chain.Frames.Add(frame);
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var originalVm = chainNode.Children[0];
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(originalVm, chainNode.Children[0]);
     }
@@ -904,7 +904,7 @@ public class TreeBuilderSyncFramesTests
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var vmA = chainNode.Children[0];
         var vmB = chainNode.Children[1];
 
@@ -912,7 +912,7 @@ public class TreeBuilderSyncFramesTests
         chain.Frames.Add(frameB);
         chain.Frames.Add(frameA);
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(vmB, chainNode.Children[0]);
         Assert.Same(vmA, chainNode.Children[1]);
@@ -926,14 +926,14 @@ public class TreeBuilderSyncFramesTests
         var frameB = new AnimationFrameSave { TextureName = "b.png" };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         chainNode.Children[0].IsExpanded = true;
 
         chain.Frames.Clear();
         chain.Frames.Add(frameB);
         chain.Frames.Add(frameA);
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // frameA moved to index 1 and must still be expanded
         Assert.False(chainNode.Children[0].IsExpanded);
@@ -944,11 +944,11 @@ public class TreeBuilderSyncFramesTests
     public void SyncFramesInto_NewFrame_IsAdded()
     {
         var chain     = new AnimationChainSave { Name = "Walk" };
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var newFrame  = new AnimationFrameSave { TextureName = "new.png" };
         chain.Frames.Add(newFrame);
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Single(chainNode.Children);
         Assert.Same(newFrame, chainNode.Children[0].Data);
@@ -960,10 +960,10 @@ public class TreeBuilderSyncFramesTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "walk1.png" };
         chain.Frames.Add(frame);
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         chain.Frames.Clear();
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Empty(chainNode.Children);
     }
@@ -976,11 +976,11 @@ public class TreeBuilderSyncFramesTests
         var frame = new AnimationFrameSave { TextureName = "w1.png", ShapesSave = new ShapesSave() };
         frame.ShapesSave.Add(rect);
         chain.Frames.Add(frame);
-        var chainNode     = TreeBuilder.BuildChainNode(chain);
+        var chainNode     = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         var frameVm       = chainNode.Children[0];
         var originalRectVm = frameVm.Children[0];
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(frameVm,        chainNode.Children[0]);
         Assert.Same(originalRectVm, chainNode.Children[0].Children[0]);
@@ -994,7 +994,7 @@ public class TreeBuilderSyncFramesTests
         var frameB = new AnimationFrameSave { TextureName = "" };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
-        var chainNode = TreeBuilder.BuildChainNode(chain);
+        var chainNode = TreeBuilder.BuildChainNode(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
         Assert.Equal("Frame 1", chainNode.Children[0].Header);
         Assert.Equal("Frame 2", chainNode.Children[1].Header);
 
@@ -1002,7 +1002,7 @@ public class TreeBuilderSyncFramesTests
         chain.Frames.Add(frameB);
         chain.Frames.Add(frameA);
 
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
+        TreeBuilder.SyncFramesInto(chainNode, chain.Frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         // After swap, labels update dynamically to reflect the new position —
         // auto-named frames always show "Frame N" for their current index.
@@ -1074,7 +1074,7 @@ public class TreeBuilderStripeTests
         Assert.True(roots[1].IsOddStripe);  // B odd
 
         // Swap order: B now index 0 (even), A now index 1 (odd).
-        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.Same(chainB, roots[0].Data);
         Assert.Same(chainA, roots[1].Data);
@@ -1092,7 +1092,7 @@ public class TreeBuilderStripeTests
             new AnimationChainListSave { AnimationChains = { chainA, chainB, chainC } }));
 
         // Remove A: B slides to index 0 (even), C to index 1 (odd).
-        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainC });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainC }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.False(roots[0].IsOddStripe); // B now even
         Assert.True(roots[1].IsOddStripe);  // C now odd
@@ -1106,7 +1106,7 @@ public class TreeBuilderStripeTests
             new AnimationChainListSave { AnimationChains = { chainA } }));
 
         var chainB = ChainWithFrameAndShape("B"); // will be index 1 → odd
-        TreeBuilder.SyncChainsInto(roots, new[] { chainA, chainB });
+        TreeBuilder.SyncChainsInto(roots, new[] { chainA, chainB }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         var newChain = roots[1];
         Assert.True(newChain.IsOddStripe);
@@ -1122,8 +1122,8 @@ public class TreeBuilderStripeTests
         // Build detached nodes (BuildChainNode leaves parity at its default).
         var roots = new List<TreeNodeVm>
         {
-            TreeBuilder.BuildChainNode(chainA),
-            TreeBuilder.BuildChainNode(chainB),
+            TreeBuilder.BuildChainNode(chainA, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            TreeBuilder.BuildChainNode(chainB, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
         };
 
         TreeBuilder.RestripeRoots(roots);

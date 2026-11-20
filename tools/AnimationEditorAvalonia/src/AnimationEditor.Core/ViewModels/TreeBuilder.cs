@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.ViewModels;
@@ -32,7 +33,7 @@ public static class TreeBuilder
         var result = new List<TreeNodeVm>(acls.AnimationChains.Count);
         foreach (var chain in acls.AnimationChains)
         {
-            var node = BuildChainNode(chain);
+            var node = BuildChainNode(chain, FrameLengthUnit.Of(acls));
             node.IsExpanded = expanded is null || expanded.Contains(chain.Name);
             result.Add(node);
         }
@@ -155,11 +156,11 @@ public static class TreeBuilder
     /// e.g. <c>"12 fr · 1.50s"</c> (#623). Single source of truth so every chain-meta refresh
     /// path stays in sync.
     /// </summary>
-    public static string BuildChainMeta(AnimationChainSave chain) =>
-        $"{chain.Frames.Count} fr · {TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(chain))}";
+    public static string BuildChainMeta(AnimationChainSave chain, FrameLengthUnit unit) =>
+        $"{chain.Frames.Count} fr · {TimelineBuilder.FormatTotal(chain, unit)}";
 
     /// <summary>Builds a single chain node with all its frame children.</summary>
-    public static TreeNodeVm BuildChainNode(AnimationChainSave chain)
+    public static TreeNodeVm BuildChainNode(AnimationChainSave chain, FrameLengthUnit unit)
     {
         var node = new TreeNodeVm
         {
@@ -168,11 +169,11 @@ public static class TreeBuilder
             IsExpanded = true,
             IsChainNode = true,
             Kind = NodeKind.Chain,
-            Meta = BuildChainMeta(chain),
+            Meta = BuildChainMeta(chain, unit),
             IsLocked = chain.IsLocked,
         };
         for (int i = 0; i < chain.Frames.Count; i++)
-            node.Children.Add(BuildFrameNode(chain.Frames[i], i));
+            node.Children.Add(BuildFrameNode(chain.Frames[i], unit, i));
         return node;
     }
 
@@ -182,7 +183,7 @@ public static class TreeBuilder
     /// position-based label ("Frame N") computed at display time — see
     /// <see cref="BuildFrameHeader"/>.
     /// </summary>
-    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
+    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, FrameLengthUnit unit, int index = 0)
     {
         var node = new TreeNodeVm
         {
@@ -337,7 +338,7 @@ public static class TreeBuilder
     /// automatically on reorder.
     /// </para>
     /// </summary>
-    public static void SyncFramesInto(TreeNodeVm chainNode, IList<AnimationFrameSave> frames)
+    public static void SyncFramesInto(TreeNodeVm chainNode, IList<AnimationFrameSave> frames, FrameLengthUnit unit)
     {
         var children = chainNode.Children;
 
@@ -357,7 +358,7 @@ public static class TreeBuilder
         // Step 2: Append new VMs for frames not yet represented (step 3 reorders them).
         for (int i = 0; i < frames.Count; i++)
             if (!existingByFrame.ContainsKey(frames[i]))
-                children.Add(BuildFrameNode(frames[i], i));
+                children.Add(BuildFrameNode(frames[i], unit, i));
 
         // Step 3: Reorder children to match the target frame order, then refresh
         //         Header and Meta.  Dynamic frames get positional labels; custom-named
@@ -402,7 +403,8 @@ public static class TreeBuilder
     /// </summary>
     public static void SyncChainsInto(
         ObservableCollection<TreeNodeVm> roots,
-        IList<AnimationChainSave> chains)
+        IList<AnimationChainSave> chains,
+        FrameLengthUnit unit)
     {
         // Step 1: Remove root VMs whose chain is no longer in the list.
         var chainSet = new HashSet<AnimationChainSave>(chains, ReferenceEqualityComparer.Instance);
@@ -422,7 +424,7 @@ public static class TreeBuilder
         // Step 2: Append new VMs for chains not yet represented (step 3 reorders them).
         foreach (var chain in chains)
             if (!existingByChain.ContainsKey(chain))
-                roots.Add(BuildChainNode(chain));
+                roots.Add(BuildChainNode(chain, unit));
 
         // Step 3: Reorder to match the target chain order, then resync each retained
         //         node's Header/Meta and diff-update its frame children.
@@ -436,9 +438,9 @@ public static class TreeBuilder
                     { roots.Move(j, i); break; }
             }
             roots[i].Header = target.Name;
-            roots[i].Meta   = BuildChainMeta(target);
+            roots[i].Meta   = BuildChainMeta(target, unit);
             roots[i].IsLocked = target.IsLocked;
-            SyncFramesInto(roots[i], target.Frames);
+            SyncFramesInto(roots[i], target.Frames, unit);
         }
 
         // Striping is positional and cascades to descendants; recompute after the diff so
