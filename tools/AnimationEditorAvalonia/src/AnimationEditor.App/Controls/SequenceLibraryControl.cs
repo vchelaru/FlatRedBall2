@@ -738,6 +738,9 @@ public sealed class LibraryChipView : Border
     /// <summary>True while the pointer is over the chip.</summary>
     internal bool IsHovered => IsPointerOver;
 
+    /// <summary>True while the pointer is over a timeline block of this chain.</summary>
+    internal bool IsHighlighted => false;
+
     // The outline and the hover playback both follow Avalonia's own IsPointerOver, which is re-derived from hit-testing as
     // the layout changes, so a missed enter or exit cannot leave a chip stuck on or off. The outline does not depend on
     // the chain having frames to play: it also tells the user the chip is interactive (draggable, has a menu).
