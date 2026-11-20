@@ -794,6 +794,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         UpdateNameHover(e.GetPosition(this));
         UpdateHover(e.GetPosition(this));
         UpdateBlockTooltip(e.GetPosition(this));
+        UpdateHoveredChain(e.GetPosition(this));
         UpdateNewTrackHot(e.GetPosition(this));
         UpdateColumnEdgeHot(e.GetPosition(this));
         if (_columnResizing)
@@ -972,6 +973,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     {
         base.OnPointerExited(e);
         ClearHover();
+        UpdateHoveredChain(null);
         UpdateEyeHover(null);
         UpdateNameHover(null);
         UpdateNewTrackHot(new Point(-1, -1));
