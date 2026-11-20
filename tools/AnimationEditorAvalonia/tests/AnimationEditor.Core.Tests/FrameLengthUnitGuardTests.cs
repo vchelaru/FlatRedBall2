@@ -27,6 +27,7 @@ public class FrameLengthUnitGuardTests
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",
         "Core/Tiled/TiledAnimationToAchjMapper.cs",
         "Core/ViewModels/TimelineStripSignature.cs",
+        "Core/CommandsAndState/PlaybackController.cs",
         "App/MainWindow.axaml.cs",
         "Core/Rendering/FrameTimeScaler.cs",
         "Core/ViewModels/TimelineBuilder.cs",
@@ -34,15 +35,27 @@ public class FrameLengthUnitGuardTests
         "Views/Dialogs/EditorDialogs.cs",
     };
 
-    /// <summary>Files still treating the raw value as seconds. Each later #1829 slice removes its files; the last leaves this empty.</summary>
-    private static readonly string[] Pending =
+    /// <summary>Files still treating the raw value as seconds. Empty: every file that touches FrameLength is reviewed.</summary>
+    private static readonly string[] Pending = System.Array.Empty<string>();
+
+    /// <summary>
+    /// Files that pass a hard-coded <c>FrameLengthUnit.Seconds</c> instead of the unit of the file they play. Nothing else
+    /// may name a unit constant: a file's unit comes from its list (<c>FrameLengthUnit.Of</c>). The sequence tab's sources
+    /// each have their own unit; the last #1829 slice empties this list.
+    /// </summary>
+    private static readonly string[] UnitPlaceholders =
     {
-        "Core/CommandsAndState/PlaybackController.cs",
-        "Core/Rendering/ChainClock.cs",
-        "Core/Sequences/EventMarkers.cs",
-        "Core/Sequences/FilmstripLayout.cs",
-        "Core/Sequences/TimelineSnapTargets.cs",
+        "App/Controls/FilmstripRenderer.cs",
+        "App/Controls/SequenceLibraryControl.cs",
+        "App/Controls/SequenceTimelineControl.cs",
+        "App/Controls/SequenceTimelineControl.Events.cs",
+        "Core/Sequences/PlayheadSteps.cs",
+        "Core/Sequences/ReferenceFilmstrip.cs",
+        "Core/Sequences/SequenceDocument.cs",
+        "Core/Sequences/SequenceScene.cs",
     };
+
+    private static readonly Regex UnitConstant = new(@"FrameLengthUnit\.(Seconds|Milliseconds)\b", RegexOptions.Compiled);
 
     private static readonly Regex Touches = new(@"\bFrameLength\b", RegexOptions.Compiled);
     private static readonly Regex SecondsLiteral = new(@"FrameLength\s*(\?\?|=)\s*\d|FrameLength:\s*0\.|\?\?\s*0\.1f?\b", RegexOptions.Compiled);
@@ -99,5 +112,19 @@ public class FrameLengthUnitGuardTests
         Assert.True(offenders.Count == 0,
             "Hard-coded frame length literal (a Millisecond file needs 100, not 0.1). Use FrameLengthUnit.DefaultFrameLength: "
             + string.Join(", ", offenders));
+    }
+
+    [Fact]
+    public void OnlyTheListedPlaceholders_NameAUnitConstant()
+    {
+        var code = CodeByFile();
+        var offenders = code.Where(f => !f.Key.EndsWith("Utilities/FrameLengthUnit.cs") && UnitConstant.IsMatch(f.Value))
+            .Select(f => f.Key).Where(k => !UnitPlaceholders.Contains(k)).OrderBy(k => k).ToList();
+        Assert.True(offenders.Count == 0,
+            "Hard-coded FrameLengthUnit.Seconds/Milliseconds: take the unit from the file being played (FrameLengthUnit.Of(list)): "
+            + string.Join(", ", offenders));
+
+        var stale = UnitPlaceholders.Where(k => !code.TryGetValue(k, out var text) || !UnitConstant.IsMatch(text)).ToList();
+        Assert.True(stale.Count == 0, "No longer hard-code a unit (remove from UnitPlaceholders): " + string.Join(", ", stale));
     }
 }

@@ -40,11 +40,12 @@ public class FrameLengthUnitPlaybackTests
         ms.SetChain(Walk(Ms), Ms);
         sec.SetChain(Walk(Sec), Sec);
 
+        // 65 ms steps never land on a frame boundary, where the float 0.1f and the double 0.1 differ by a hair.
         for (int step = 0; step < 12; step++)
         {
-            ms.Advance(0.07);
-            sec.Advance(0.07);
-            Assert.Equal(sec.CurrentFrameIndex, ms.CurrentFrameIndex);
+            ms.Advance(0.065);
+            sec.Advance(0.065);
+            Assert.True(sec.CurrentFrameIndex == ms.CurrentFrameIndex, $"step {step}: seconds {sec.CurrentFrameIndex} at {sec.AnimTime}, ms {ms.CurrentFrameIndex} at {ms.AnimTime}");
             Assert.Equal(sec.FrameElapsed, ms.FrameElapsed, precision: 4);
             Assert.Equal(sec.AnimTime, ms.AnimTime, precision: 4);
         }

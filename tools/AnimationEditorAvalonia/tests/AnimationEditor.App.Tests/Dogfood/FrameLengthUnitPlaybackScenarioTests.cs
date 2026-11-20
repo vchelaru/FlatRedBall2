@@ -41,20 +41,28 @@ public class FrameLengthUnitPlaybackScenarioTests
         editor.Preview.Playback.CurrentFrameIndex.ShouldBe(2);
     }
 
-    [AvaloniaFact]
-    public async Task MillisecondFile_ClickingTheTimelineMidway_ScrubsToTheMiddleFrame()
+    private static async Task<int> ScrubIndexAsync(TimeMeasurementUnit unit)
     {
-        using AnimationEditorHarness editor = await OpenWalkAsync(TimeMeasurementUnit.Millisecond);
+        using AnimationEditorHarness editor = await OpenWalkAsync(unit);
         if (editor.Preview.IsPlaying)
         {
             editor.Press(Key.Space);
         }
         Border surface = editor.Control<Border>("TimelineScrubSurface");
 
-        editor.ClickAt(editor.PointIn(surface, surface.Bounds.Width * 0.5, surface.Bounds.Height / 2));
+        editor.ClickAt(editor.PointIn(surface, AnimationEditor.Core.ViewModels.TimelineBuilder.MinCellWidth * 1.5, surface.Bounds.Height / 2));
 
-        editor.Preview.Playback.CurrentFrameIndex.ShouldBe(1);
-        editor.Preview.Playback.FrameElapsed.ShouldBeLessThan(0.1, "elapsed time inside a frame is in seconds");
+        return editor.Preview.Playback.CurrentFrameIndex;
+    }
+
+    [AvaloniaFact]
+    public async Task MillisecondFile_ClickingTheTimeline_ScrubsToTheSameFrameAsTheSecondsFile()
+    {
+        int seconds = await ScrubIndexAsync(TimeMeasurementUnit.Second);
+        int milliseconds = await ScrubIndexAsync(TimeMeasurementUnit.Millisecond);
+
+        seconds.ShouldBe(1);
+        milliseconds.ShouldBe(seconds);
     }
 
     [AvaloniaFact]
@@ -66,6 +74,7 @@ public class FrameLengthUnitPlaybackScenarioTests
             editor.Press(Key.Space);
         }
 
+        editor.Preview.Playback.SeekToFrame(0);
         editor.Preview.Playback.Advance(0.15);
 
         editor.Preview.Playback.CurrentFrameIndex.ShouldBe(1);

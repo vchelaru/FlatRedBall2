@@ -252,5 +252,5 @@ public class PlaybackController
 
     // A frame's playing time in seconds. Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
     internal static double FrameSeconds(AnimationFrameSave frame, FrameLengthUnit unit) =>
-        frame.FrameLength > 0 ? frame.FrameLength : 0.1;
+        unit.PlaybackSeconds(frame.FrameLength);
 }
