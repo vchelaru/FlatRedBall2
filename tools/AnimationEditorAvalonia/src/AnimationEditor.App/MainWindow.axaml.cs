@@ -5833,6 +5833,12 @@ public partial class MainWindow : Window
         PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
 
+        PropShapesName.LostFocus   += (_, _) => ApplyMixedShapeProps();
+        PropShapesName.KeyDown     += (_, e) => { if (e.Key == Key.Enter) ApplyMixedShapeProps(); };
+        PropShapesX.ValueChanged   += (_, _) => ApplyMixedShapeProps();
+        PropShapesY.ValueChanged   += (_, _) => ApplyMixedShapeProps();
+        WireShapeKeyframe(PropShapesOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorMixedShapes());
+
         PropPolygonName.LostFocus  += (_, _) => ApplyPolygonProps();
         PropPolygonName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyPolygonProps(); };
         PropPolygonX.ValueChanged  += (_, _) => ApplyPolygonProps();
@@ -5849,7 +5855,7 @@ public partial class MainWindow : Window
         // and Enter seal that entry so the next edit — even to the same field — starts a fresh one.
         SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
             PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
-            PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY);
+            PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY, PropShapesX, PropShapesY);
 
         // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
         ApplyRelativeEditsWith(ApplyFrameLen, PropFrameLen);
@@ -5858,6 +5864,7 @@ public partial class MainWindow : Window
         ApplyRelativeEditsWith(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
         ApplyRelativeEditsWith(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
         ApplyRelativeEditsWith(ApplyPolygonProps, PropPolygonX, PropPolygonY);
+        ApplyRelativeEditsWith(ApplyMixedShapeProps, PropShapesX, PropShapesY);
         ApplyRelativeEditsWith(() => ApplyFrameColor(PropRed), PropRed);
         ApplyRelativeEditsWith(() => ApplyFrameColor(PropGreen), PropGreen);
         ApplyRelativeEditsWith(() => ApplyFrameColor(PropBlue), PropBlue);
@@ -6133,6 +6140,29 @@ public partial class MainWindow : Window
         return unlocked.Count > 0 ? unlocked : all;
     }
 
+    /// <summary>The selected shapes the Inspector edits when they are of different types (empty for a single-type selection),
+    /// by the same locked-shape rule as <see cref="InspectorShapes{T}"/>.</summary>
+    private List<ShapeSave> InspectorMixedShapes()
+    {
+        var all = _selectedState.SelectedShapes.OfType<ShapeSave>().ToList();
+        if (all.Select(s => s.GetType()).Distinct().Count() < 2) return new List<ShapeSave>();
+        return InspectorShapes(all);
+    }
+
+    private void ApplyMixedShapeProps()
+    {
+        if (_suppressPropRefresh) return;
+        var shapes = InspectorMixedShapes();
+        if (shapes.Count == 0) return;
+        // Same null-means-"not edited" rule as ApplyRectProps; the Name box is disabled when two shapes share a frame.
+        NumericEdit? x = EditOf(PropShapesX);
+        NumericEdit? y = EditOf(PropShapesY);
+        string? name = PropShapesName.Text;
+        if (name != null) _appCommands.SetShapePropsBulk(shapes, name, null, null);
+        if (x != null || y != null)
+            _appCommands.SetShapePropsBulk(ShapeKeyframes(shapes, ShapeKeyframeGroup.Offset), null, x, y);
+    }
+
     private void RefreshPropertyPanel()
     {
         // Deliberately does NOT call SealPendingEdits here -- this method also runs after every
@@ -6211,6 +6241,12 @@ public partial class MainWindow : Window
             PropRectPanel.IsVisible   = rect  is not null && !_projectManager.IsNativeTsxProject;
             PropCirclePanel.IsVisible = circ  is not null && !_projectManager.IsNativeTsxProject;
             PropPolygonPanel.IsVisible = poly is not null && !_projectManager.IsNativeTsxProject;
+            // Shapes of different types share only Name and Offset, so one SHAPES panel replaces the per-type panels.
+            var mixedShapes = InspectorMixedShapes();
+            bool mixedTypes = mixedShapes.Count > 0;
+            PropShapesPanel.IsVisible = mixedTypes && !_projectManager.IsNativeTsxProject;
+            if (mixedTypes)
+                PropRectPanel.IsVisible = PropCirclePanel.IsVisible = PropPolygonPanel.IsVisible = false;
 
             // A native tsx project can't express flip/relative-offset/color data (issue #1140) --
             // hide the sections that would let a user set values that get silently dropped on save.
@@ -6242,11 +6278,13 @@ public partial class MainWindow : Window
             PropRectPanel.IsEnabled   = !IsShapeLocked(rects.FirstOrDefault() ?? rect);
             PropCirclePanel.IsEnabled = !IsShapeLocked(circles.FirstOrDefault() ?? circ);
             PropPolygonPanel.IsEnabled = !IsShapeLocked(polygons.FirstOrDefault() ?? poly);
+            PropShapesPanel.IsEnabled = !IsShapeLocked(mixedShapes.FirstOrDefault());
             // Vertex rows edit the primary polygon only, so they follow its lock, not the selection's.
             PropLockedNotice.IsVisible = (PropFramePanel.IsVisible && !PropFramePanel.IsEnabled)
                 || (PropRectPanel.IsVisible && !PropRectPanel.IsEnabled)
                 || (PropCirclePanel.IsVisible && !PropCirclePanel.IsEnabled)
-                || (PropPolygonPanel.IsVisible && !PropPolygonPanel.IsEnabled);
+                || (PropPolygonPanel.IsVisible && !PropPolygonPanel.IsEnabled)
+                || (PropShapesPanel.IsVisible && !PropShapesPanel.IsEnabled);
             PropPolygonVertices.IsEnabled = !IsShapeLocked(poly);
             PropPolygonAddVertex.IsEnabled = !IsShapeLocked(poly) && PolygonPointsEditable(poly);
 
@@ -6371,6 +6409,13 @@ public partial class MainWindow : Window
 
             if (poly is not null)
                 RefreshPolygonPanel(poly);
+
+            if (mixedTypes)
+            {
+                bool shapesCollide = _appCommands.HasSameFrameNameCollision(mixedShapes.Cast<object>().ToList());
+                SetNameOrMixed(PropShapesName, mixedShapes.Select(s => s.Name ?? "").ToList(), shapesCollide);
+                ShowShapeKeyframes(mixedShapes, PropShapesOffsetKeyframe, PropShapesX, PropShapesY, null, null, null);
+            }
         }
         finally
         {
@@ -8688,6 +8733,7 @@ public partial class MainWindow : Window
         else if (ReferenceEquals(focused, PropRectName)) ApplyRectProps();
         else if (ReferenceEquals(focused, PropCircleName)) ApplyCircleProps();
         else if (ReferenceEquals(focused, PropPolygonName)) ApplyPolygonProps();
+        else if (ReferenceEquals(focused, PropShapesName)) ApplyMixedShapeProps();
         else if (ReferenceEquals(focused, PropTextureName)) ApplyTextureName();
     }
 

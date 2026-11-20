@@ -556,6 +556,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="MovePolygonVertex"/> for the vertex fan-out). See <see cref="SetRectPropsBulk"/>
         /// for the null-means-"don't touch" semantics and the same-frame name-collision caveat.
         /// </summary>
+        /// <summary>Sets Name and/or Offset X/Y on shapes of any mix of types in one undo step (the fields every shape type shares). A null argument leaves that field alone.</summary>
+        void SetShapePropsBulk(IReadOnlyList<ShapeSave> shapes, string? name, NumericEdit? x, NumericEdit? y);
+
         void SetPolygonPropsBulk(IReadOnlyList<PolygonSave> polygons, string? name, NumericEdit? x, NumericEdit? y);
 
         /// <summary>
