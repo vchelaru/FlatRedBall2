@@ -424,7 +424,7 @@ namespace AnimationEditor.Core
         /// <see cref="Tiled.TiledAnimationToAchjMapper"/>, editable the same way achx chains are.
         /// </summary>
         /// <exception cref="NotSupportedException">The tsx uses a construct (tileset transformations,
-        /// per-tile object layers, unsupported property types) that would be lost on the first
+        /// custom class/enum property types) that would be lost on the first
         /// save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
         /// <exception cref="InvalidOperationException">The tsx is corrupt in a way <see
         /// cref="Tiled.TiledAnimationToAchjMapper.Map"/> can't tolerate (e.g. <c>Columns &lt;= 0</c>

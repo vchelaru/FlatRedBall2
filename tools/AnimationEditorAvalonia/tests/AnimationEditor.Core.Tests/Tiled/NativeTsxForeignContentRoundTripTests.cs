@@ -23,8 +23,8 @@ public class NativeTsxForeignContentRoundTripTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
-    // Everything Tiled 1.12 can put on a plain (non-collection, no transformations/
-    // object layers -- those are refused up front) tileset.
+    // Everything Tiled 1.12 can put on a plain (non-collection, no transformations or
+    // class/enum properties -- those are refused up front) tileset.
     private const string KitchenSinkXml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tileset version="1.10" tiledversion="1.12.2" name="Heroes" class="Actors" tilewidth="16" tileheight="16" tilecount="16" columns="4" objectalignment="bottomleft" tilerendersize="grid" fillmode="preserve-aspect-fit" backgroundcolor="#ff336699">

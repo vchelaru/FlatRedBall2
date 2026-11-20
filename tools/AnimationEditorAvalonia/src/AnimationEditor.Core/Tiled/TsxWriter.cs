@@ -23,8 +23,10 @@ namespace AnimationEditor.Core.Tiled;
 /// color/file/object), and per-tile type/probability/x/y/width/height/image/animation frames.
 /// Wangsets (colors, tiles, properties) are written too. DotTiled does not model a wangset's
 /// <c>type</c> attribute (corner/edge/mixed), so a write to an existing file carries each
-/// wangset's <c>type</c> over from that file by wangset name. Transformations, per-tile object
-/// layers, and custom class/enum properties are not supported -- writing a <see cref="Tileset"/>
+/// wangset's <c>type</c> over from that file by wangset name. Per-tile object layers are written
+/// too (rectangle, ellipse, point, polygon, polyline, text and tile objects, with properties) and
+/// compared by their rendered XML, so an object edit always saves. Transformations and custom
+/// class/enum properties are not supported -- writing a <see cref="Tileset"/>
 /// that uses any of those throws <see cref="NotSupportedException"/> rather than silently
 /// dropping data.
 ///
@@ -329,14 +331,9 @@ public static class TsxWriter
         a.WangTiles.Zip(b.WangTiles).All(p =>
             p.First.TileID == p.Second.TileID && p.First.WangID.AsSpan().SequenceEqual(p.Second.WangID));
 
-    // ObjectLayer content itself is never compared (DotTiled gives no cheap equality for it,
-    // and WriteTile throws NotSupportedException the moment it actually has to render one) --
-    // only presence is. That's deliberate, not an oversight: nothing in this codebase mutates a
-    // tile's collision data, so an unchanged ObjectLayer-bearing tile round-trips by reusing its
-    // original slice, verbatim, without ever hitting that throw. If a future caller starts
-    // editing ObjectLayer content, this stays correct (the edited tile just fails to match on
-    // some other field too) right up until the day a change touches ObjectLayer and nothing
-    // else, at which point it would need updating to compare it for real.
+    // DotTiled gives ObjectLayer no equality, so it is compared by its rendered XML
+    // (ObjectLayerSignature). An object edit is then an ordinary tile change: the tile is
+    // regenerated, while an unedited layer keeps its original bytes with the rest of its slice.
     private static bool TileContentEquals(Tile a, Tile b) =>
         a.Type == b.Type &&
         a.Probability == b.Probability &&
@@ -344,7 +341,7 @@ public static class TsxWriter
         a.Y == b.Y &&
         a.Width == b.Width &&
         a.Height == b.Height &&
-        a.ObjectLayer.HasValue == b.ObjectLayer.HasValue &&
+        ObjectLayerSignature(a.ObjectLayer) == ObjectLayerSignature(b.ObjectLayer) &&
         PropertiesEqual(a.Properties, b.Properties) &&
         ImagesEqual(a.Image, b.Image) &&
         AnimationEqual(a.Animation, b.Animation);
@@ -522,9 +519,6 @@ public static class TsxWriter
 
     private static void WriteTile(XmlWriter writer, Tile tile)
     {
-        if (tile.ObjectLayer.HasValue)
-            throw new NotSupportedException($"TsxWriter does not yet support per-tile object layers (tile {tile.ID}).");
-
         writer.WriteStartElement("tile");
         writer.WriteAttributeString("id", XmlConvert.ToString(tile.ID));
         if (!string.IsNullOrEmpty(tile.Type))
@@ -546,9 +540,149 @@ public static class TsxWriter
         WriteProperties(writer, tile.Properties);
         if (tile.Image.HasValue)
             WriteImage(writer, tile.Image.Value);
+        if (tile.ObjectLayer.HasValue)
+            WriteObjectLayer(writer, tile.ObjectLayer.Value);
         WriteAnimation(writer, tile.Animation);
 
         writer.WriteEndElement();
+    }
+
+    /// <summary>Writes a tile's collision layer as <c>&lt;objectgroup&gt;</c>, in Tiled's own
+    /// attribute order and omitting values equal to the format defaults.</summary>
+    private static void WriteObjectLayer(XmlWriter writer, ObjectLayer layer)
+    {
+        writer.WriteStartElement("objectgroup");
+        writer.WriteAttributeString("draworder", layer.DrawOrder == DrawOrder.TopDown ? "topdown" : "index");
+        writer.WriteAttributeString("id", XmlConvert.ToString(layer.ID));
+        if (!string.IsNullOrEmpty(layer.Name))
+            writer.WriteAttributeString("name", layer.Name);
+        if (!string.IsNullOrEmpty(layer.Class))
+            writer.WriteAttributeString("class", layer.Class);
+        if (layer.Color.HasValue)
+            writer.WriteAttributeString("color", layer.Color.Value.ToString());
+        if (layer.OffsetX != 0)
+            writer.WriteAttributeString("offsetx", XmlConvert.ToString(layer.OffsetX));
+        if (layer.OffsetY != 0)
+            writer.WriteAttributeString("offsety", XmlConvert.ToString(layer.OffsetY));
+        if (layer.Opacity != 1f)
+            writer.WriteAttributeString("opacity", XmlConvert.ToString(layer.Opacity));
+        if (!layer.Visible)
+            writer.WriteAttributeString("visible", "0");
+        if (layer.TintColor.HasValue)
+            writer.WriteAttributeString("tintcolor", layer.TintColor.Value.ToString());
+        if (layer.ParallaxX != 1f)
+            writer.WriteAttributeString("parallaxx", XmlConvert.ToString(layer.ParallaxX));
+        if (layer.ParallaxY != 1f)
+            writer.WriteAttributeString("parallaxy", XmlConvert.ToString(layer.ParallaxY));
+
+        WriteProperties(writer, layer.Properties);
+        foreach (var obj in layer.Objects)
+            WriteObject(writer, obj);
+        writer.WriteEndElement();
+    }
+
+    private static void WriteObject(XmlWriter writer, DotTiled.Object obj)
+    {
+        writer.WriteStartElement("object");
+        if (obj.ID.HasValue)
+            writer.WriteAttributeString("id", XmlConvert.ToString(obj.ID.Value));
+        if (!string.IsNullOrEmpty(obj.Name))
+            writer.WriteAttributeString("name", obj.Name);
+        if (!string.IsNullOrEmpty(obj.Type))
+            writer.WriteAttributeString("type", obj.Type);
+        if (obj.Template.HasValue)
+            writer.WriteAttributeString("template", obj.Template.Value);
+        if (obj is TileObject tileObject)
+            writer.WriteAttributeString("gid", XmlConvert.ToString((uint)tileObject.GID | (uint)tileObject.FlippingFlags));
+        writer.WriteAttributeString("x", XmlConvert.ToString(obj.X));
+        writer.WriteAttributeString("y", XmlConvert.ToString(obj.Y));
+        if (obj.Width != 0)
+            writer.WriteAttributeString("width", XmlConvert.ToString(obj.Width));
+        if (obj.Height != 0)
+            writer.WriteAttributeString("height", XmlConvert.ToString(obj.Height));
+        if (obj.Rotation != 0)
+            writer.WriteAttributeString("rotation", XmlConvert.ToString(obj.Rotation));
+        if (!obj.Visible)
+            writer.WriteAttributeString("visible", "0");
+
+        WriteProperties(writer, obj.Properties);
+        switch (obj)
+        {
+            case EllipseObject:
+                writer.WriteStartElement("ellipse");
+                writer.WriteEndElement();
+                break;
+            case PointObject:
+                writer.WriteStartElement("point");
+                writer.WriteEndElement();
+                break;
+            case PolygonObject polygon:
+                WritePoints(writer, "polygon", polygon.Points);
+                break;
+            case PolylineObject polyline:
+                WritePoints(writer, "polyline", polyline.Points);
+                break;
+            case TextObject text:
+                WriteText(writer, text);
+                break;
+            case RectangleObject:
+            case TileObject:
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"TsxWriter does not yet support '{obj.GetType().Name}' objects (object {obj.ID}).");
+        }
+        writer.WriteEndElement();
+    }
+
+    private static void WritePoints(XmlWriter writer, string element, List<System.Numerics.Vector2> points)
+    {
+        writer.WriteStartElement(element);
+        writer.WriteAttributeString("points", string.Join(" ",
+            points.Select(p => $"{XmlConvert.ToString(p.X)},{XmlConvert.ToString(p.Y)}")));
+        writer.WriteEndElement();
+    }
+
+    private static void WriteText(XmlWriter writer, TextObject text)
+    {
+        writer.WriteStartElement("text");
+        if (text.FontFamily != "sans-serif")
+            writer.WriteAttributeString("fontfamily", text.FontFamily);
+        if (text.PixelSize != 16)
+            writer.WriteAttributeString("pixelsize", XmlConvert.ToString(text.PixelSize));
+        if (text.Wrap)
+            writer.WriteAttributeString("wrap", "1");
+        if (text.Color.ToString() != "#000000")
+            writer.WriteAttributeString("color", text.Color.ToString());
+        if (text.Bold)
+            writer.WriteAttributeString("bold", "1");
+        if (text.Italic)
+            writer.WriteAttributeString("italic", "1");
+        if (text.Underline)
+            writer.WriteAttributeString("underline", "1");
+        if (text.Strikeout)
+            writer.WriteAttributeString("strikeout", "1");
+        if (!text.Kerning)
+            writer.WriteAttributeString("kerning", "0");
+        if (text.HorizontalAlignment != TextHorizontalAlignment.Left)
+            writer.WriteAttributeString("halign", text.HorizontalAlignment.ToString().ToLowerInvariant());
+        if (text.VerticalAlignment != TextVerticalAlignment.Top)
+            writer.WriteAttributeString("valign", text.VerticalAlignment.ToString().ToLowerInvariant());
+        writer.WriteString(text.Text);
+        writer.WriteEndElement();
+    }
+
+    /// <summary>The layer rendered to XML text: a cheap, exact equality for content DotTiled gives
+    /// no equality for. Two layers with equal signatures write identical bytes.</summary>
+    private static string ObjectLayerSignature(Optional<ObjectLayer> layer)
+    {
+        if (!layer.HasValue)
+            return "";
+        var settings = new XmlWriterSettings { OmitXmlDeclaration = true, ConformanceLevel = ConformanceLevel.Fragment };
+        var sb = new StringBuilder();
+        using (var writer = XmlWriter.Create(sb, settings))
+            WriteObjectLayer(writer, layer.Value);
+        return sb.ToString();
     }
 
     private static void WriteAnimation(XmlWriter writer, List<Frame> frames)

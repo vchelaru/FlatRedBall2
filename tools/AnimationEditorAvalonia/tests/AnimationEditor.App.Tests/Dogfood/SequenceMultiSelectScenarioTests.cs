@@ -216,7 +216,8 @@ public class SequenceMultiSelectScenarioTests
         ClickRow(editor, 0);
         ClickRow(editor, 2, RawInputModifiers.Control);
         editor.Click(editor.Control<Button>("SequencePlayButton"));
-        (await editor.WaitUntilAsync(() => Shown(editor).Contains("Walk:1"), TimeSpan.FromSeconds(3))).ShouldBeTrue();
+        (await editor.WaitUntilAsync(() => Shown(editor).Contains("Walk:1"), TimeSpan.FromSeconds(3)))
+            .ShouldBeTrue($"shown [{string.Join(",", Shown(editor))}], playing {IsPlaying(editor)} (CI-only timeout: was playback advancing at all?)");
 
         editor.Click(editor.Control<Button>("SequencePlayButton"));
         var frozen = Shown(editor);
