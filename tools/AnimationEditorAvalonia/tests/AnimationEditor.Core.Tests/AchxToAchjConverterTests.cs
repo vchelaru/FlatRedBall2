@@ -85,20 +85,4 @@ public class AchxToAchjConverterTests : IDisposable
         result.Error.ShouldNotBeNullOrEmpty();
         File.Exists(Path.Combine(_root, "broken.achj")).ShouldBeFalse();
     }
-
-    [Fact]
-    public void ConvertFolder_NestedFolders_ConvertsEveryAchxExceptUnderBinAndObj()
-    {
-        WriteAchx(Path.Combine(_root, "a.achx"), "A", TextureCoordinateType.UV);
-        WriteAchx(Path.Combine(_root, "Sub", "b.achx"), "B", TextureCoordinateType.UV);
-        WriteAchx(Path.Combine(_root, "bin", "Debug", "c.achx"), "C", TextureCoordinateType.UV);
-
-        var results = AchxToAchjConverter.ConvertFolder(_root);
-
-        results.Count.ShouldBe(2);
-        results.ShouldAllBe(r => r.Status == AchxConversionStatus.Converted);
-        File.Exists(Path.Combine(_root, "a.achj")).ShouldBeTrue();
-        File.Exists(Path.Combine(_root, "Sub", "b.achj")).ShouldBeTrue();
-        File.Exists(Path.Combine(_root, "bin", "Debug", "c.achj")).ShouldBeFalse();
-    }
 }

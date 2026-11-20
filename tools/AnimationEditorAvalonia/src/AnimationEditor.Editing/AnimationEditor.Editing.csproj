@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AnimationEditorTargetFramework Condition="'$(AnimationEditorTargetFramework)' == ''">net10.0</AnimationEditorTargetFramework>
+    <TargetFramework>$(AnimationEditorTargetFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- UI-free editing operations shared by the editor and a future CLI. No Avalonia or SkiaSharp. -->
+  <ItemGroup>
+    <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\AnimationChain.Common\AnimationChain.Common.csproj" />
+  </ItemGroup>
+
+</Project>

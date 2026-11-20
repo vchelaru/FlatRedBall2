@@ -42,16 +42,4 @@ public static class AchxToAchjConverter
             return new AchxConversionResult(achxPath, targetPath, AchxConversionStatus.Failed, ex.Message);
         }
     }
-
-    /// <summary>
-    /// Converts every <c>.achx</c> under <paramref name="folderPath"/>, recursively, skipping
-    /// anything under a <c>bin</c> or <c>obj</c> folder (build output copies, same rule as the
-    /// Project tree's default exclusion).
-    /// </summary>
-    public static IReadOnlyList<AchxConversionResult> ConvertFolder(string folderPath) =>
-        Directory.EnumerateFiles(folderPath, "*.achx", SearchOption.AllDirectories)
-            .Where(f => !BinObjPathFilter.IsExcluded(Path.GetRelativePath(folderPath, f)))
-            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-            .Select(Convert)
-            .ToList();
 }
