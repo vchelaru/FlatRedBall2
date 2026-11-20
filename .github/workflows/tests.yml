@@ -106,6 +106,9 @@ jobs:
       - name: Test AnimationEditor.Core
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      - name: Test AnimationEditor.Editing
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Editing.Tests/AnimationEditor.Editing.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+
       - name: Test AnimationEditor.Views
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
