@@ -120,4 +120,39 @@ public class TsxWriterCustomPropertyTests
 
         Assert.Contains("name=\"hp\" type=\"int\" value=\"12\"", File.ReadAllText(path));
     }
+
+    [Fact]
+    public void Write_EnumOnObjectAndWangset_IsKept()
+    {
+        const string xml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"T\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"16\" columns=\"4\">\n" +
+            " <image source=\"T.png\" width=\"64\" height=\"64\"/>\n" +
+            " <tile id=\"1\" type=\"Rock\">\n" +
+            "  <objectgroup draworder=\"index\" id=\"2\">\n" +
+            "   <object id=\"1\" x=\"0\" y=\"0\" width=\"8\" height=\"8\">\n" +
+            "    <properties>\n" +
+            "     <property name=\"kind\" propertytype=\"Kind\" value=\"Wall\"/>\n" +
+            "    </properties>\n" +
+            "   </object>\n" +
+            "  </objectgroup>\n" +
+            " </tile>\n" +
+            " <wangsets>\n" +
+            "  <wangset name=\"W\" type=\"corner\" tile=\"-1\">\n" +
+            "   <properties>\n" +
+            "    <property name=\"kind\" propertytype=\"Kind\" value=\"Floor\"/>\n" +
+            "   </properties>\n" +
+            "   <wangcolor name=\"C\" color=\"#ff0000\" tile=\"-1\" probability=\"1\"/>\n" +
+            "  </wangset>\n" +
+            " </wangsets>\n" +
+            "</tileset>\n";
+        var tileset = Load(xml, out var path);
+        tileset.Tiles.Single().Type = "Boulder";
+
+        TsxWriter.Write(tileset, path);
+
+        var raw = File.ReadAllText(path);
+        Assert.Contains("name=\"kind\" propertytype=\"Kind\" value=\"Wall\"", raw);
+        Assert.Contains("name=\"kind\" propertytype=\"Kind\" value=\"Floor\"", raw);
+    }
 }

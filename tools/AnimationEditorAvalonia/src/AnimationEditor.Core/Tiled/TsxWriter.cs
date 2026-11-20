@@ -20,15 +20,17 @@ namespace AnimationEditor.Core.Tiled;
 /// <remarks>
 /// Covers the subset of the format needed to round-trip a tileset: tileset attributes, the
 /// tileset image, tile offset/grid, tileset- and tile-level properties (string/int/float/bool/
-/// color/file/object), and per-tile type/probability/x/y/width/height/image/animation frames.
+/// color/file/object/class/enum), and per-tile type/probability/x/y/width/height/image/animation frames.
 /// Wangsets (colors, tiles, properties) are written too. DotTiled does not model a wangset's
 /// <c>type</c> attribute (corner/edge/mixed), so a write to an existing file carries each
 /// wangset's <c>type</c> over from that file by wangset name. Per-tile object layers are written
 /// too (rectangle, ellipse, point, polygon, polyline, text and tile objects, with properties) and
-/// compared by their rendered XML, so an object edit always saves. Transformations and custom
-/// class/enum properties are not supported -- writing a <see cref="Tileset"/>
-/// that uses any of those throws <see cref="NotSupportedException"/> rather than silently
-/// dropping data.
+/// compared by their rendered XML, so an object edit always saves. Custom class properties are
+/// written with their nested members, and enum properties keep their <c>propertytype</c> (DotTiled
+/// reads an enum as a plain string/int, so <see cref="TsxLoader"/> turns it into an
+/// <see cref="EnumReferenceProperty"/>); the type definitions themselves live in the Tiled project,
+/// not the tsx. Transformations are not supported -- writing a <see cref="Tileset"/> that uses them
+/// throws <see cref="NotSupportedException"/> rather than silently dropping data.
 ///
 /// <para>Writing to a path that already exists patches in place: every unchanged &lt;tile&gt;
 /// keeps its original file text byte-for-byte, and only tiles whose content actually differs get
@@ -389,6 +391,8 @@ public static class TsxWriter
         ColorProperty p => $"color|{p.Name}|{(p.Value.HasValue ? p.Value.Value.ToString() : "")}",
         FileProperty p => $"file|{p.Name}|{p.Value}",
         ObjectProperty p => $"object|{p.Name}|{p.Value}",
+        ClassProperty p => $"class|{p.Name}|{p.PropertyType}|[{string.Join(";", p.Value.Select(PropertySignature))}]",
+        EnumReferenceProperty p => $"enum|{p.Name}|{p.StorageType}|{p.PropertyType}|{p.Value}",
         _ => throw new NotSupportedException(
             $"TsxWriter does not yet support '{property.Type}' properties (property '{property.Name}')."),
     };
@@ -701,7 +705,7 @@ public static class TsxWriter
         writer.WriteEndElement();
     }
 
-    private static void WriteProperties(XmlWriter writer, List<IProperty> properties)
+    private static void WriteProperties(XmlWriter writer, IList<IProperty> properties)
     {
         if (properties.Count == 0)
             return;
@@ -745,6 +749,17 @@ public static class TsxWriter
             case ObjectProperty objectProperty:
                 writer.WriteAttributeString("type", "object");
                 writer.WriteAttributeString("value", XmlConvert.ToString(objectProperty.Value));
+                break;
+            case ClassProperty classProperty:
+                writer.WriteAttributeString("type", "class");
+                writer.WriteAttributeString("propertytype", classProperty.PropertyType);
+                WriteProperties(writer, classProperty.Value);
+                break;
+            case EnumReferenceProperty enumProperty:
+                if (enumProperty.StorageType is not null)
+                    writer.WriteAttributeString("type", enumProperty.StorageType);
+                writer.WriteAttributeString("propertytype", enumProperty.PropertyType);
+                writer.WriteAttributeString("value", enumProperty.Value);
                 break;
             default:
                 throw new NotSupportedException(
