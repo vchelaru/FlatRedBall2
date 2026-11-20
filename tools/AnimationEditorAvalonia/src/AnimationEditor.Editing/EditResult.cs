@@ -17,6 +17,8 @@ public enum EditErrorCode
     EmptyName,
     /// <summary>A rename collides with another chain of the file or another shape of the frame.</summary>
     DuplicateName,
+    /// <summary>A file to create is already on disk and overwriting was not asked for.</summary>
+    AlreadyExists,
 }
 
 /// <summary>
