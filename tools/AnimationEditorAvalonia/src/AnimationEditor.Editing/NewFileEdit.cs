@@ -1,8 +1,69 @@
+using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Paths;
+using FlatRedBall2.AnimationEditorCommon;
+
 namespace AnimationEditor.Editing;
 
-/// <summary>Stub so the red tests compile; implemented in the next commit.</summary>
+/// <summary>
+/// Creates new empty animation and sequence files (#1811). The format follows the path's
+/// extension (<c>.achx</c> XML or <c>.achj</c> JSON for animation files). Never opens the file or
+/// touches selection; <see cref="EditResult.ChangedItems"/> holds the created path. IO failures
+/// come back as errors, never exceptions.
+/// </summary>
 public static class NewFileEdit
 {
-    public static EditResult CreateAnimationFile(string path) => throw new NotImplementedException();
-    public static EditResult CreateSequenceFile(string path, bool overwrite = false) => throw new NotImplementedException();
+    /// <summary>
+    /// Writes an empty chain list at <paramref name="path"/>. Fails with
+    /// <see cref="EditErrorCode.AlreadyExists"/> rather than overwrite: the write uses
+    /// <see cref="FileMode.CreateNew"/>, so a file that appeared after the caller last looked is safe.
+    /// </summary>
+    public static EditResult CreateAnimationFile(string path)
+    {
+        var name = new FilePath(path).NoPath;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            NewAnimationFileWriter.WriteEmpty(stream, name);
+            return Created(path);
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            return AlreadyExists(name);
+        }
+        catch (Exception ex)
+        {
+            return Failed(name, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Writes a sequence file holding one empty sequence at <paramref name="path"/>. An existing file
+    /// fails with <see cref="EditErrorCode.AlreadyExists"/> unless <paramref name="overwrite"/> is
+    /// set, for a caller that already confirmed the overwrite with the user.
+    /// </summary>
+    public static EditResult CreateSequenceFile(string path, bool overwrite = false)
+    {
+        var name = new FilePath(path).NoPath;
+        if (!overwrite && File.Exists(path)) return AlreadyExists(name);
+
+        var save = new SequenceListSave();
+        save.Sequences.Add(new SequenceSave { Name = "Sequence" });
+        try
+        {
+            save.Save(path);
+            return Created(path);
+        }
+        catch (Exception ex)
+        {
+            return Failed(name, ex.Message);
+        }
+    }
+
+    private static EditResult Created(string path) =>
+        new(new[] { path }, Array.Empty<string>(), Array.Empty<string>());
+
+    private static EditResult AlreadyExists(string name) => Failed(name, "it already exists.", EditErrorCode.AlreadyExists);
+
+    private static EditResult Failed(string name, string reason, EditErrorCode code = EditErrorCode.Unspecified) =>
+        new(Array.Empty<string>(), new[] { $"Could not create {name}: {reason}" }, Array.Empty<string>(), new[] { code });
 }

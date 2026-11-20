@@ -1,3 +1,4 @@
+using AnimationEditor.Editing;
 using AnimationEditor.App.Models;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
@@ -44,15 +45,11 @@ public partial class MainWindow
     /// <summary>Writes a file with one empty sequence at <paramref name="path"/> and opens it. Shared by File &gt; New Sequence File and the Animations tab's folder menu.</summary>
     internal async Task CreateSequenceFileAsync(string path)
     {
-        var save = new SequenceListSave();
-        save.Sequences.Add(new SequenceSave { Name = "Sequence" });
-        try
+        // The save dialog already confirmed any overwrite.
+        var result = NewFileEdit.CreateSequenceFile(path, overwrite: true);
+        if (!result.Success)
         {
-            save.Save(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            ShowProblem($"Could not create {new FilePath(path).NoPath}: {ex.Message}");
+            ShowProblem(result.Errors[0]);
             return;
         }
         await LoadAnimationFileAsync(path);
