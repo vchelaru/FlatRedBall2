@@ -3186,6 +3186,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
+            (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             if (Point.Distance(pos, _shapeDragAnchor) > ShapeClickSlopPx) _shapeDragTraveled = true;
             var dragged = (ShapeSave)_draggingShape;
             dragged.X = SnapToPixel(_shapeDragStartX + dx);
