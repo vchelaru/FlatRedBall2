@@ -92,7 +92,7 @@ public class FrameCopyWithShapeTests
             Dispatcher.UIThread.RunJobs();
 
             var clip = await window.Clipboard!.TryGetTextAsync();
-            ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out var shapes);
+            ClipboardPayload.TryDeserialize(clip!, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out var shapes);
             var rectangle = shapes?.OfType<AARectSave>().FirstOrDefault();
 
             Assert.True(frames is { Count: > 0 },

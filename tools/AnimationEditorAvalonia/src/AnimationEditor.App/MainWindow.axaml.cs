@@ -8100,7 +8100,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder));
         _pendingCutState.Clear();
         SyncPendingCutHighlights();
     }
@@ -8123,7 +8123,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder));
         _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!);
         SyncPendingCutHighlights();
     }
@@ -8137,7 +8137,7 @@ public partial class MainWindow : Window
         var text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        bool ok = ClipboardPayload.TryDeserialize(text,
+        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit,
             out var chains, out var frames, out var shapes);
         if (!ok) return;
 

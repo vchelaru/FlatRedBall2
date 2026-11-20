@@ -57,7 +57,7 @@ public class EditorClipboardTests
     [Fact]
     public void CopiedAchxChains_AreAnEnvelope()
     {
-        var text = ClipboardPayload.Serialize(new List<AnimationChainSave> { new() { Name = "Walk" } });
+        var text = ClipboardPayload.Serialize(new List<AnimationChainSave> { new() { Name = "Walk" } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         EditorClipboard.IsEditorEnvelope(text).ShouldBeTrue();
     }
@@ -65,7 +65,7 @@ public class EditorClipboardTests
     [Fact]
     public void CopiedAchxFrames_AreAnEnvelope()
     {
-        var text = ClipboardPayload.Serialize(new List<AnimationFrameSave> { new() { TextureName = "a.png" } });
+        var text = ClipboardPayload.Serialize(new List<AnimationFrameSave> { new() { TextureName = "a.png" } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         EditorClipboard.IsEditorEnvelope(text).ShouldBeTrue();
     }

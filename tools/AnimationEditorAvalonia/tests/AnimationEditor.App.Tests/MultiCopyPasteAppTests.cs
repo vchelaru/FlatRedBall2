@@ -79,7 +79,7 @@ public class MultiCopyPasteAppTests
             FlushUi();
 
             var clip = await window.Clipboard!.TryGetTextAsync();
-            Assert.True(ClipboardPayload.TryDeserialize(clip!, out _, out var frames, out _));
+            Assert.True(ClipboardPayload.TryDeserialize(clip!, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _));
             Assert.Equal(3, frames!.Count);
             Assert.Equal(new[] { "a.png", "b.png", "c.png" },
                 frames.Select(f => f.TextureName));
@@ -101,7 +101,7 @@ public class MultiCopyPasteAppTests
             RebuildTree(window);
 
             await window.Clipboard!.SetTextAsync(
-                ClipboardPayload.Serialize(new List<AnimationFrameSave> { frame }));
+                ClipboardPayload.Serialize(new List<AnimationFrameSave> { frame }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
             var tree = window.AnimTree!;
             var chainNode = FirstChainNode(tree);
@@ -143,7 +143,7 @@ public class MultiCopyPasteAppTests
                 new() { TextureName = "b.png", FrameLength = 0.1f },
                 new() { TextureName = "c.png", FrameLength = 0.1f },
             };
-            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames));
+            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
             var tree = window.AnimTree!;
             var seedNode = FirstChainNode(tree).Children[0];
@@ -188,7 +188,7 @@ public class MultiCopyPasteAppTests
             {
                 new() { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = null },
             };
-            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames));
+            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipFrames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
             var tree = window.AnimTree!;
             var seedNode = FirstChainNode(tree).Children[0];
@@ -224,7 +224,7 @@ public class MultiCopyPasteAppTests
                 new() { Name = "Idle", Frames = { new AnimationFrameSave { TextureName = "i.png", FrameLength = 0.1f } } },
                 new() { Name = "Jump", Frames = { new AnimationFrameSave { TextureName = "j.png", FrameLength = 0.1f } } },
             };
-            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipChains));
+            await window.Clipboard!.SetTextAsync(ClipboardPayload.Serialize(clipChains, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
 
             var tree = window.AnimTree!;
             var runNode = tree.ItemsSource!.Cast<TreeNodeVm>().First(n => n.Header == "Run");

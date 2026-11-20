@@ -215,8 +215,8 @@ public class NameBoxPasteScenarioTests
         {
             TimelineClipboard.WriteTracks(new[] { track }, @"C:\game"),
             TimelineClipboard.WriteChains(new[] { new CopiedChain(track.Chains[0], track, 0) }, @"C:\game"),
-            ClipboardPayload.Serialize(new List<AnimationChainSave> { new() { Name = "Walk" } }),
-            ClipboardPayload.Serialize(new List<AnimationFrameSave> { new() { TextureName = "a.png" } }),
+            ClipboardPayload.Serialize(new List<AnimationChainSave> { new() { Name = "Walk" } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
+            ClipboardPayload.Serialize(new List<AnimationFrameSave> { new() { TextureName = "a.png" } }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds),
             ClipboardPayload.Serialize(new AARectSave { Name = "Box" }),
             "{ \"kind\": \"frb2-animation-editor-sequence\" }",
         };

@@ -10,7 +10,7 @@ namespace AnimationEditor.Core.Tests;
 /// Cross-tab/cross-folder copy-paste (#1026): a frame's <c>TextureName</c> is stored relative to
 /// its own <c>.achx</c> folder, so copying it as-is into a document that lives in a different
 /// folder would resolve against the wrong base and silently break the reference.
-/// <see cref="ClipboardPayload.SerializeFromPayload(CopySelectionPayload, string?)"/> resolves
+/// <see cref="ClipboardPayload.SerializeFromPayload(CopySelectionPayload, AnimationEditor.Core.Utilities.FrameLengthUnit, string?)"/> resolves
 /// <c>TextureName</c> to an absolute path at copy time so the same physical file is still found
 /// regardless of which folder it ends up pasted into.
 /// </summary>
@@ -25,8 +25,8 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } };
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
-        var text = ClipboardPayload.SerializeFromPayload(payload, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, out var chains, out _, out _);
+        var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, sourceFolder);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out var chains, out _, out _);
 
         var expected = new[]
         {
@@ -43,8 +43,8 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
-        var text = ClipboardPayload.SerializeFromPayload(payload, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
+        var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, sourceFolder);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
 
         Assert.Equal(TexturePathHelper.ResolveDisplayPath("sheet.png", sourceFolder), frames!.Single().TextureName);
     }
@@ -55,8 +55,8 @@ public class ClipboardPayloadCrossFolderTests
         var frame = new AnimationFrameSave { TextureName = "sheet.png" };
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
-        var text = ClipboardPayload.SerializeFromPayload(payload);
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
+        var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
 
         Assert.Equal("sheet.png", frames!.Single().TextureName);
     }
@@ -68,8 +68,8 @@ public class ClipboardPayloadCrossFolderTests
         var frame = new AnimationFrameSave { TextureName = absolutePath };
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
-        var text = ClipboardPayload.SerializeFromPayload(payload, TestPaths.AbsDir("Project", "Animations", "Player"));
-        ClipboardPayload.TryDeserialize(text, out _, out var frames, out _);
+        var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, TestPaths.AbsDir("Project", "Animations", "Player"));
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
 
         Assert.Equal(absolutePath, frames!.Single().TextureName);
     }
