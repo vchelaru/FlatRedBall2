@@ -1448,6 +1448,7 @@ public class WireframeControl : TextureViewport
         var props = e.GetCurrentPoint(this).Properties;
         var pos = e.GetPosition(this);
         bool isCtrl = CommandModifier.IsHeld(e.KeyModifiers);
+        _commandKeyHeld = null; // a real press carries the live modifiers
 
         if (!props.IsLeftButtonPressed) return;
 
@@ -1634,7 +1635,9 @@ public class WireframeControl : TextureViewport
         }
 
         _hoverPointerPos = pos;
-        UpdateHoverCursor(pos, isCtrl: CommandModifier.IsHeld(e.KeyModifiers));
+        // A resting pointer is re-hovered with the modifiers of its last real event, which are stale
+        // after the key changed, so the key's own state wins once a key event has reported it (#1832).
+        UpdateHoverCursor(pos, isCtrl: _commandKeyHeld ?? CommandModifier.IsHeld(e.KeyModifiers));
 
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
@@ -1766,7 +1769,15 @@ public class WireframeControl : TextureViewport
     /// pressed or released while the pointer sits still over this control, so the add-frame
     /// cursor toggles immediately (#882) instead of waiting for the next pointer move.
     /// </summary>
-    public void RefreshCursorForCommandModifierChange(bool isHeld) => UpdateHoverCursor(_lastPointerPos, isHeld);
+    public void RefreshCursorForCommandModifierChange(bool isHeld)
+    {
+        _commandKeyHeld = isHeld;
+        UpdateHoverCursor(_hoverPointerPos ?? _lastPointerPos, isHeld);
+    }
+
+    /// <summary>Command-key state last reported by a key event; null until one arrives, and again when the
+    /// pointer leaves (a key released while the window was elsewhere is never reported).</summary>
+    private bool? _commandKeyHeld;
 
     /// <summary>
     /// The modifier that turns a click into add-frame and shows the add-frame ghost: ⌘ on macOS,
@@ -2082,6 +2093,7 @@ public class WireframeControl : TextureViewport
         if (_showPreview) { _showPreview = false; InvalidateVisual(); }
         ClearHoverFrame();
         _hoverPointerPos = null;
+        _commandKeyHeld = null;
         UpdateAddFrameGhost();
     }
 
