@@ -20,12 +20,12 @@ public static class AchxThumbnailCacheKey
     /// cache when the <em>source</em> changes, so without this a build that renders thumbnails
     /// differently keeps serving every file written by the old one -- the improvement stays
     /// invisible until each .achx happens to be touched. <b>Bump this whenever
-    /// <c>ThumbnailService.RenderFrameThumbnail</c> changes what it draws</b> (v1: filtered
+    /// <c>ThumbnailService.RenderFrameThumbnail</c> changes what it draws</b> (v2: diagonal flip; v1: filtered
     /// minification, issue #1013). Superseded files are cleaned up by
     /// <c>ProjectTreeThumbnailService.TrySaveToDisk</c>'s existing same-hash glob, so a bump
     /// replaces them rather than accumulating.
     /// </summary>
-    public const int RenderVersion = 1;
+    public const int RenderVersion = 2;
 
     /// <param name="sourceIdentity">
     /// A string that identifies the source <c>.achx</c>. Callers pass <c>AchxFileEntry.RelativePath</c>
