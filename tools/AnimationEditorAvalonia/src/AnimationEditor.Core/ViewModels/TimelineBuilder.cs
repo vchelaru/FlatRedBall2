@@ -33,7 +33,7 @@ public static class TimelineBuilder
         foreach (var frame in chain.Frames)
         {
             if (frame.FrameLength > 0)
-                minDuration = Math.Min(minDuration, frame.FrameLength);
+                minDuration = Math.Min(minDuration, unit.ToSeconds(frame.FrameLength));
         }
 
         if (minDuration == double.MaxValue)
@@ -61,7 +61,7 @@ public static class TimelineBuilder
             foreach (var frame in chain.Frames)
             {
                 if (frame.FrameLength > 0)
-                    minDuration = Math.Min(minDuration, frame.FrameLength);
+                    minDuration = Math.Min(minDuration, unit.ToSeconds(frame.FrameLength));
             }
         }
 
@@ -73,11 +73,15 @@ public static class TimelineBuilder
 
     /// <summary>
     /// Total play duration of <paramref name="chain"/> in seconds — the sum of every frame's
-    /// <see cref="AnimationFrameSave.FrameLength"/>. FrameLength is treated as seconds (matching
-    /// the editor's per-frame display) regardless of the file's <c>TimeMeasurementUnit</c>.
+    /// <see cref="AnimationFrameSave.FrameLength"/>, which is in the file's unit (matching
+    /// the editor's per-frame display), converted to seconds.
     /// Returns 0 for a null or empty chain.
     /// </summary>
-    public static float TotalSeconds(AnimationChainSave? chain)
+    public static float TotalSeconds(AnimationChainSave? chain, FrameLengthUnit unit) =>
+        (float)unit.ToSeconds(TotalLength(chain));
+
+    /// <summary>Sum of every frame length in the chain, in the file's own unit.</summary>
+    private static float TotalLength(AnimationChainSave? chain)
     {
         if (chain is null)
             return 0f;
@@ -88,23 +92,26 @@ public static class TimelineBuilder
         return total;
     }
 
-    /// <summary>Sum of <see cref="TotalSeconds(AnimationChainSave?)"/> across every chain in the list.</summary>
-    public static float TotalSeconds(AnimationChainListSave? acls)
+    /// <summary>Sum of <see cref="TotalLength(AnimationChainSave?)"/> across every chain in the list.</summary>
+    public static float TotalSeconds(AnimationChainListSave? acls) =>
+        (float)FrameLengthUnit.Of(acls).ToSeconds(TotalLength(acls));
+
+    private static float TotalLength(AnimationChainListSave? acls)
     {
         if (acls is null)
             return 0f;
 
         float total = 0f;
         foreach (var chain in acls.AnimationChains)
-            total += TotalSeconds(chain);
+            total += TotalLength(chain);
         return total;
     }
 
     /// <summary>Total play time of a chain in the file's own unit, formatted for display: <c>"1.50s"</c> or <c>"1500ms"</c>.</summary>
-    public static string FormatTotal(AnimationChainSave? chain, FrameLengthUnit unit) => FormatSeconds(TotalSeconds(chain));
+    public static string FormatTotal(AnimationChainSave? chain, FrameLengthUnit unit) => unit.Format(TotalLength(chain));
 
     /// <summary>Total play time of every chain in the file, in its own unit, formatted for display.</summary>
-    public static string FormatTotal(AnimationChainListSave? acls) => FormatSeconds(TotalSeconds(acls));
+    public static string FormatTotal(AnimationChainListSave? acls) => FrameLengthUnit.Of(acls).Format(TotalLength(acls));
 
     /// <summary>Formats a duration in seconds for display, e.g. <c>1.5</c> → <c>"1.50s"</c>.</summary>
     public static string FormatSeconds(float seconds) => $"{seconds:0.00}s";
@@ -126,7 +133,7 @@ public static class TimelineBuilder
         var result = new List<TimelineFrameVm>(chain.Frames.Count);
         for (int i = 0; i < chain.Frames.Count; i++)
         {
-            var length = Math.Max(0f, chain.Frames[i].FrameLength);
+            var length = Math.Max(0.0, unit.ToSeconds(chain.Frames[i].FrameLength));
             var width = length > 0 ? length * pixelsPerSecond : MinCellWidth;
             result.Add(new TimelineFrameVm(i, width));
         }

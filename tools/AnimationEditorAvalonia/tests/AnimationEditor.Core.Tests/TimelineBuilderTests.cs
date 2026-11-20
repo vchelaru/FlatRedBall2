@@ -189,13 +189,13 @@ public class TimelineBuilderTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
 
-        Assert.Equal(0.5, TimelineBuilder.TotalSeconds(chain), precision: 4);
+        Assert.Equal(0.5, TimelineBuilder.TotalSeconds(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), precision: 4);
     }
 
     [Fact]
     public void TotalSeconds_NullChain_ReturnsZero()
     {
-        Assert.Equal(0f, TimelineBuilder.TotalSeconds((AnimationChainSave?)null));
+        Assert.Equal(0f, TimelineBuilder.TotalSeconds((AnimationChainSave?)null, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds));
     }
 
     [Fact]

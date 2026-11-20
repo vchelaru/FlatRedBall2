@@ -2149,7 +2149,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
-            var desc = newLength.IsRelative ? "Set Length" : $"Set Length: {newLength.Apply(0m):0.###}s";
+            var desc = newLength.IsRelative ? "Set Length" : $"Set Length: {CurrentFrameLengthUnit.FormatCompact(newLength.Apply(0m))}";
             _undoManager.Execute(new BulkFrameEditCommand(
                 unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength.Apply(f.FrameLength); },
                 this, _events, false, desc, coalesceKind: "Length"));

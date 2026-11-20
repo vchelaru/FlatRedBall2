@@ -72,13 +72,15 @@ public class FrameLengthUnitDisplayTests
         var ms = TimelineBuilder.BuildFrameItems(Chain(100f, 250f), FrameLengthUnit.Milliseconds);
         var seconds = TimelineBuilder.BuildFrameItems(Chain(0.1f, 0.25f), FrameLengthUnit.Seconds);
 
-        Assert.Equal(seconds.Select(f => f.Width).ToArray(), ms.Select(f => f.Width).ToArray());
+        Assert.Equal(seconds.Count, ms.Count);
+        for (int i = 0; i < ms.Count; i++)
+            Assert.Equal(seconds[i].Width, ms[i].Width, precision: 3);
         Assert.Equal(
             TimelineBuilder.ComputeEffectivePixelsPerSecond(Chain(0.02f), FrameLengthUnit.Seconds),
-            TimelineBuilder.ComputeEffectivePixelsPerSecond(Chain(20f), FrameLengthUnit.Milliseconds));
+            TimelineBuilder.ComputeEffectivePixelsPerSecond(Chain(20f), FrameLengthUnit.Milliseconds), precision: 3);
         Assert.Equal(
             TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { Chain(0.02f) }, FrameLengthUnit.Seconds),
-            TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { Chain(20f) }, FrameLengthUnit.Milliseconds));
+            TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { Chain(20f) }, FrameLengthUnit.Milliseconds), precision: 3);
     }
 
     [Fact]

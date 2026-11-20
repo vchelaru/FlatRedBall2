@@ -191,7 +191,7 @@ public static class TreeBuilder
             Data = frame,
             Kind = NodeKind.Frame,
             IsFrameNode = true,
-            Meta = $"{frame.FrameLength:0.00}s",
+            Meta = unit.Format(frame.FrameLength),
         };
         if (frame.ShapesSave is not null)
         {
@@ -381,7 +381,7 @@ public static class TreeBuilder
                     }
             }
             children[i].Header = BuildFrameHeader(target, i);
-            children[i].Meta   = $"{target.FrameLength:0.00}s";
+            children[i].Meta   = unit.Format(target.FrameLength);
             SyncShapesInto(children[i], target.ShapesSave);
         }
     }

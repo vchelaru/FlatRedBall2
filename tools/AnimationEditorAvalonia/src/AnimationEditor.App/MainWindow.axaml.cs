@@ -6327,6 +6327,7 @@ public partial class MainWindow : Window
                 PropFlipV.IsChecked = flipVMixed ? null : shownFrame.FlipVertical;
                 PropFlipD.IsChecked = flipDMixed ? null : shownFrame.FlipDiagonal;
 
+                ApplyFrameLengthUnitToInspector();
                 SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
                 // Keyframe off: the fields read-only and showing the value in effect at the frame's start.
                 var offsetState = KeyframeInspectorState.For(KeyframeGroup.Offset, frames, _objectFinder.GetAnimationChainContaining);
@@ -6829,6 +6830,16 @@ public partial class MainWindow : Window
         // mixed/indeterminate state (the selection disagrees and the user didn't touch it), so
         // it passes straight through as "leave this axis untouched".
         _appCommands.SetFrameFlip(frames, PropFlipH.IsChecked, PropFlipV.IsChecked, PropFlipD.IsChecked);
+    }
+
+    /// <summary>Gives the Length field the open file's unit: suffix, limits and arrow step (#1829).</summary>
+    private void ApplyFrameLengthUnitToInspector()
+    {
+        var unit = CurrentFrameLengthUnit;
+        PropFrameLenUnit.Text = unit.Suffix;
+        PropFrameLen.Maximum = unit.Maximum;
+        PropFrameLen.Minimum = unit.Minimum;
+        PropFrameLen.Increment = unit.Step;
     }
 
     private void ApplyFrameLen()
