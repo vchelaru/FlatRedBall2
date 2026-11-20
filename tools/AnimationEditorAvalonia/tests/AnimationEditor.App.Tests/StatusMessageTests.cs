@@ -53,6 +53,26 @@ public class StatusMessageTests
     }
 
     [AvaloniaFact]
+    public void CommitInlineRename_DuplicateChainName_ShowsErrorBanner()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.AppCommands.AddAnimationChainWithName("Run");
+            var chain = ctx.AppCommands.AddAnimationChainWithName("Walk")!;
+            Dispatcher.UIThread.RunJobs();
+
+            window.CommitInlineRenamePublic(window.GetTreeRoots().First(v => v.Data == chain), "Run");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(window.Notifications.ErrorBanner.IsVisible);
+            Assert.Contains("already exists", window.Notifications.ErrorBannerText.Text);
+            Assert.Equal("Walk", chain.Name);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void LoadFailed_Event_ShowsErrorBanner()
     {
         var (window, ctx) = CreateWindow();
