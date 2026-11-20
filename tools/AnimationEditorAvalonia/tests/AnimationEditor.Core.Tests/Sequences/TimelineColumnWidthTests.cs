@@ -84,14 +84,18 @@ public class TimelineColumnWidthTests
     }
 
     [Fact]
-    public void DropPlan_RejectsAPointInsideAWiderColumn_AndAcceptsOneInTheLanes()
+    public void DropPlan_TreatsAPointInsideAWiderColumnAsALabelDrop_AndOneInTheLanesAsABodyDrop()
     {
         var viewport = new TimelineViewport();
         viewport.SetColumnWidth(300);
         double y = viewport.LaneTop(0) + 10;
 
-        TimelineDropPlan.For(viewport, 1000, 1, 200, y, 1).Kind.ShouldBe(TimelineDropKind.None);
-        TimelineDropPlan.For(viewport, 1000, 1, 400, y, 1).Kind.ShouldBe(TimelineDropKind.Track);
+        var label = TimelineDropPlan.For(viewport, 1000, 1, 200, y, 1, trackEnd: _ => 0.0);
+        label.Kind.ShouldBe(TimelineDropKind.Track);
+        label.Start.ShouldBe(0.0);
+        var body = TimelineDropPlan.For(viewport, 1000, 1, 400, y, 1, trackEnd: _ => 0.0);
+        body.Kind.ShouldBe(TimelineDropKind.Track);
+        body.Start.ShouldBe(viewport.TimeAt(400), 0.05); // pointer time (grid-snapped), not the track end
     }
 
     [Fact]
