@@ -188,14 +188,29 @@ public class EditCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task PreexistingErrors_DoNotBlockAnEdit_ButIntroducedOnesWould()
+    public async Task PreexistingErrors_DoNotBlockAnEdit()
     {
-        var r = await Edit("broken.achx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
+        var path = _w.PathOf("hero.achx");
+        File.WriteAllText(path, File.ReadAllText(path).Replace("<Name>Foot</Name>", "<Name>Hitbox</Name>"));
+
+        var r = await Edit("hero.achx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
 
         r.Code.ShouldBe(0, r.Out + r.Err);
         r.Out.ShouldContain("already");
-        using var d = await Describe("broken.achx");
+        using var d = await Describe("hero.achx");
         d.RootElement.GetProperty("chains")[0].GetProperty("name").GetString().ShouldBe("Run");
+    }
+
+    [Fact]
+    public async Task MissingTexture_BlocksSavingAPixelFile_SoNothingIsWritten()
+    {
+        var before = _w.Bytes("broken.achx");
+
+        var r = await Edit("broken.achx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
+
+        r.Code.ShouldBe(1);
+        r.Out.ShouldContain("missing.png");
+        _w.Bytes("broken.achx").ShouldBe(before);
     }
 
     [Theory]

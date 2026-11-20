@@ -77,7 +77,16 @@ namespace AnimationEditor.Core.CommandsAndState
         // snapshot when there is no file yet, so an untitled document is covered too. Commands
         // must NOT call SaveCurrentAnimationChainList on their own as well: every edit, undo and
         // redo used to be written twice (two disk writes, two Tiled-sync pushes, two toasts).
-        private void OnAnimationChainsChanged() => SaveCurrentAnimationChainList();
+        private void OnAnimationChainsChanged()
+        {
+            if (AutosaveOnChange) SaveCurrentAnimationChainList();
+        }
+
+        /// <summary>
+        /// When false, an edit raises its events but writes nothing, so a headless caller (the CLI) can apply
+        /// a batch of edits and save once, or not at all. The editor leaves it true.
+        /// </summary>
+        public bool AutosaveOnChange { get; set; } = true;
 
         // ── Chain lock (#1032) ────────────────────────────────────────────────────
         // A locked chain's frame/shape *content* cannot be edited (add/delete/move/duplicate/
