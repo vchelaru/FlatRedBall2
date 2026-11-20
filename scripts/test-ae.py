@@ -24,7 +24,7 @@ from app_test_shards import shard_filters, test_classes
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AE = os.path.join(ROOT, "tools", "AnimationEditorAvalonia")
 TESTS = os.path.join(AE, "tests")
-PROJECTS = ["AnimationEditor.Core.Tests", "AnimationEditor.Editing.Tests","AnimationEditor.Views.Tests", "AnimationEditor.DocScreenshots",
+PROJECTS = ["AnimationEditor.Core.Tests", "AnimationEditor.Editing.Tests", "AnimationEditor.Cli.Tests", "AnimationEditor.Views.Tests", "AnimationEditor.DocScreenshots",
             "AnimationEditor.App.Tests"]
 APP_SHARDS = 6
 # A test that parks on a real dialog never returns; fail it instead of hanging the run.
