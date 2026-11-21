@@ -60,6 +60,7 @@ public static class AnimationDescriber
             w.WriteBoolean("loop", chain.Loop);
             w.WriteBoolean("pingPong", chain.PingPong);
             w.WriteBoolean("reverse", chain.Reverse);
+            w.WriteNumber("length", Math.Round(AnimationEditor.Core.Rendering.ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Of(doc)), 6));
             if (ownerTiles is not null && ownerTiles.TryGetValue(chain, out var ownerTile)) w.WriteNumber("ownerTile", ownerTile);
             w.WriteStartArray("frames");
             for (int i = 0; i < chain.Frames.Count; i++)

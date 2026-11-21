@@ -9,7 +9,7 @@ Headless front end to the AnimationEditor's editing code (`tools/AnimationEditor
 
 | Command | Does |
 |---|---|
-| `describe <file> [--json]` | Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end. |
+| `describe <file> [--json]` | Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
 | `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
@@ -50,7 +50,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 The extension picks the op set for `describe`, `check`, `new` and `edit`; `--schema` lists both. Logic is `SequenceEdit`/`SequenceOps` in `AnimationEditor.Editing`, over the editor's `SequenceDocument`.
 
-Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an index), block `Run/Body/1` (index in the track). A reference track (plays another sequence) has one block, its clip, at index 0. Ops: add/rename/delete/reorder `sequence`, `set-sequence-loop`; add/rename/delete/reorder `track`, `set-track-continuous`, `add-reference-track`; `add-source`, `remove-source`, `replace-source`; `add-block`, `set-block-start`, `set-block-loops`, `delete-block`. Setters and `delete-*` take selectors (`Run/*`, `Run/0-1`, `Run/Body/0,2`, globs); see `--schema`.
+Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an index), block `Run/Body/1` (index in the track). A reference track (plays another sequence) has one block, its clip, at index 0. Ops: add/rename/delete/reorder `sequence`, `set-sequence-loop`; add/rename/delete/reorder `track`, `set-track-continuous`, `add-reference-track`; `add-source`, `remove-source`, `replace-source`; `add-block`, `set-block-start`, `set-block-loops`, `set-block-end` (loops so the block ends at `end` seconds, using its current start; fractions kept; not for reference clips), `delete-block`. Setters and `delete-*` take selectors (`Run/*`, `Run/0-1`, `Run/Body/0,2`, globs); see `--schema`.
 
 - `add-block` needs the source in the library (`add-source` first) and the chain in that source.
 - `add-track` and `add-reference-track` insert at `index` (default 0, the front: index 0 draws on top).

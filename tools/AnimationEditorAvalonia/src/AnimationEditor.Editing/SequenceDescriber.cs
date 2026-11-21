@@ -92,6 +92,8 @@ public static class SequenceDescriber
                         w.WriteBoolean("missingChain", b.MissingChain);
                     }
                     w.WriteNumber("start", Math.Round(b.Start, 6));
+                    if (b.PlaysSequence is null && !b.MissingSource && !b.MissingChain)
+                        w.WriteNumber("chainLength", Math.Round(b.ChainLength, 6));
                     w.WriteNumber("loops", Math.Round(b.Loops, 6));
                     w.WriteNumber("end", Math.Round(b.End, 6));
                     w.WriteEndObject();
@@ -107,7 +109,7 @@ public static class SequenceDescriber
     }
 
     private sealed record BlockInfo(int Index, string Source, string Chain, string? PlaysSequence, double Start, double Loops, double End,
-        bool MissingSource, bool MissingChain);
+        bool MissingSource, bool MissingChain, double ChainLength = 0);
 
     private static double Length(SequenceListSave save, SequenceSave sequence, SequenceSources sources) =>
         SequenceTimeline.Length(save.Sequences, sequence, sources.CycleLength);
@@ -130,7 +132,7 @@ public static class SequenceDescriber
             bool missingSource = !sources.IsListed(block.Source) || sources.Chains(block.Source) is null;
             bool missingChain = !missingSource && !sources.HasChain(block);
             double played = SequenceTimeline.PlayedLength(track, block, sources.CycleLength(block));
-            result.Add(new BlockInfo(i, block.Source, block.Chain, null, block.Start, block.Loops, block.Start + played, missingSource, missingChain));
+            result.Add(new BlockInfo(i, block.Source, block.Chain, null, block.Start, block.Loops, block.Start + played, missingSource, missingChain, sources.CycleLength(block)));
         }
         return result;
     }
