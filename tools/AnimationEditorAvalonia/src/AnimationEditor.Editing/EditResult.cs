@@ -25,6 +25,16 @@ public enum EditErrorCode
     Locked,
     /// <summary>A bulk selector (range, list, wildcard or glob) matched nothing.</summary>
     NoMatch,
+    /// <summary>A named item (sequence, track, source, chain) is not there.</summary>
+    NotFound,
+    /// <summary>A value is out of its allowed range (a negative start, zero loops).</summary>
+    InvalidValue,
+    /// <summary>A source cannot be removed because blocks still use it.</summary>
+    SourceInUse,
+    /// <summary>The edit would make sequences play each other in a loop.</summary>
+    WouldCycle,
+    /// <summary>A block op hit a track of the wrong kind (a chain op on a reference track, or the reverse).</summary>
+    WrongTrackKind,
 }
 
 /// <summary>
