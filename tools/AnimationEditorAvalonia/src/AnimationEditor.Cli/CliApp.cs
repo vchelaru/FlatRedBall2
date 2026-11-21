@@ -12,9 +12,9 @@ public static class CliApp
 {
     private const string Usage = """
         usage: aecli <command> [options]
-          describe <file> [--json]               chains, frames (by index) and shapes of an .achx/.achj
+          describe <file> [--json]               chains, frames and shapes of an .achx/.achj; sequences, tracks and blocks of a .seqj
           check <file> [--json]                  validate; exit 1 on errors
-          new <file> [--json]                    create an empty .achx/.achj
+          new <file> [--json]                    create an empty .achx/.achj/.seqj
           convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           --schema [--json]                      list the operations and their fields
@@ -109,6 +109,16 @@ public static class CliApp
 
         public int Describe(string file)
         {
+            if (SequenceFileReader.IsSequenceFile(file))
+            {
+                var seq = SequenceFileReader.Read(file);
+                if (seq.Document is null) return Failed(seq.Error!);
+                stdout.Write(Json
+                    ? EditJson.Render(w => SequenceDescriber.WriteJson(w, seq.Document, file)) + Environment.NewLine
+                    : SequenceDescriber.ToText(seq.Document, file));
+                return 0;
+            }
+
             var read = AnimationFileReader.Read(file);
             if (read.Document is null) return Failed(read.Error!);
 
@@ -120,10 +130,19 @@ public static class CliApp
 
         public int Check(string file)
         {
-            var read = AnimationFileReader.Read(file);
-            if (read.Document is null) return Failed(read.Error!);
-
-            var report = CheckReport.Run(read.Document, file);
+            CheckReport report;
+            if (SequenceFileReader.IsSequenceFile(file))
+            {
+                var seq = SequenceFileReader.Read(file);
+                if (seq.Document is null) return Failed(seq.Error!);
+                report = SequenceCheck.Run(seq.Document, file);
+            }
+            else
+            {
+                var read = AnimationFileReader.Read(file);
+                if (read.Document is null) return Failed(read.Error!);
+                report = CheckReport.Run(read.Document, file);
+            }
             if (Json)
             {
                 stdout.WriteLine(EditJson.Render(w => EditJson.WriteCheck(w, report)));
@@ -141,7 +160,9 @@ public static class CliApp
 
         public int New(string file)
         {
-            var result = NewFileEdit.CreateAnimationFile(file);
+            var result = SequenceFileReader.IsSequenceFile(file)
+                ? NewFileEdit.CreateSequenceFile(file)
+                : NewFileEdit.CreateAnimationFile(file);
             return Report(result, null, $"Created {file}");
         }
 
@@ -157,6 +178,9 @@ public static class CliApp
             try { text = File.ReadAllText(opsFile); }
             catch (Exception ex) { return Usage($"cannot read the ops file {opsFile}: {ex.Message}"); }
 
+            if (SequenceFileReader.IsSequenceFile(file))
+                return EditSequence(file, text);
+
             var parsed = EditOps.Parse(text);
             if (parsed.Ops is null) return Usage(parsed.Error!);
 
@@ -168,6 +192,23 @@ public static class CliApp
                 ? $"No changes; {Path.GetFileName(file)} left as it was."
                 : $"Applied {parsed.Ops.Count} op(s) and saved {Path.GetFileName(file)}.";
             return Report(run.Result, run.ErrorOps, applied);
+        }
+
+        private int EditSequence(string file, string opsText)
+        {
+            var parsed = SequenceOps.Parse(opsText);
+            if (parsed.Ops is null) return Usage(parsed.Error!);
+
+            var open = SequenceSession.Open(file);
+            if (open.Session is null) return Report(open.Result, null, null);
+
+            var run = SequenceOps.Apply(open.Session, parsed.Ops);
+            var warnings = open.Result.Warnings.Concat(run.Result.Warnings).ToList();
+            var result = run.Result with { Warnings = warnings };
+            var applied = result.ChangedItems.Count == 0
+                ? $"No changes; {Path.GetFileName(file)} left as it was."
+                : $"Applied {parsed.Ops.Count} op(s) and saved {Path.GetFileName(file)}.";
+            return Report(result, run.ErrorOps, applied);
         }
 
         private int Report(EditResult result, IReadOnlyList<int?>? errorOps, string? successText)

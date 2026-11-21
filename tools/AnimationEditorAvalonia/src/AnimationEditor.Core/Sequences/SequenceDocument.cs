@@ -311,10 +311,13 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return new FilePath(System.IO.Path.Combine(sourceFolder, frame.TextureName)).FullPath;
     }
 
-    /// <summary>Adds an empty sequence with a name no other sequence uses. Returns that name.</summary>
-    public string AddSequence(IUndoManager undo)
+    /// <summary>
+    /// Adds an empty sequence. Without <paramref name="requestedName"/> the name is one no other sequence uses; a given name
+    /// is used as is (the caller checks it is free). Returns the name.
+    /// </summary>
+    public string AddSequence(IUndoManager undo, string? requestedName = null)
     {
-        string name = NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
+        string name = requestedName ?? NameGenerator.Unique(Save.Sequences.Select(s => s.Name), DefaultSequenceName);
         Edit(undo, SequenceLabel.Named("Add", "Sequence", name), save => save.Sequences.Add(new SequenceSave { Name = name }),
             selectBefore: SelectedSequence, selectAfter: Save.Sequences.Count);
         return name;
@@ -840,9 +843,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// track <paramref name="track"/> of sequence <paramref name="sequence"/>. A null track adds a new track named
     /// after the chain, as the first track (index 0), so it is drawn in front. The caller selects the placed chain.
     /// </summary>
-    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start)
+    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start, float loops = 1)
     {
-        var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start) };
+        var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start), Loops = loops };
         if (track is { } index)
         {
             string trackName = Save.Sequences[sequence].Tracks[index].Name;
@@ -919,15 +922,18 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>
     /// Adds an empty track as the first track of sequence <paramref name="sequence"/> (index 0, so it is drawn in front of
     /// the rest), named <c>Track</c> (or <c>Track 2</c>, and so on, when that is taken), and selects it. Returns the name.
+    /// A given <paramref name="requestedName"/> is used as is (the caller checks it is free) and <paramref name="slot"/>
+    /// puts the track at that index instead of the front.
     /// </summary>
-    public string AddTrack(IUndoManager undo, int sequence)
+    public string AddTrack(IUndoManager undo, int sequence, string? requestedName = null, int slot = 0)
     {
-        string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
+        string name = requestedName ?? NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), DefaultTrackName);
+        slot = Math.Clamp(slot, 0, Save.Sequences[sequence].Tracks.Count);
         Edit(undo, SequenceLabel.Named("Add", "Track", name), save =>
         {
             var tracks = save.Sequences[sequence].Tracks;
-            tracks.Insert(0, new SequenceTrackSave { Name = name });
-        }, trackAfter: 0);
+            tracks.Insert(slot, new SequenceTrackSave { Name = name });
+        }, trackAfter: slot);
         return name;
     }
 

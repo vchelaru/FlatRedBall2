@@ -287,7 +287,10 @@ public static class EditOps
         "What to do when the texture is outside the animation file's folder: keep references it in place (default), copy copies it next to the file, overwrite copies over a different same-named file.";
 
     /// <summary>Validates the text of an ops file: JSON shape, known ops, known fields, field types. Nothing is applied.</summary>
-    public static OpsParse Parse(string json)
+    public static OpsParse Parse(string json) => Parse(json, Specs);
+
+    /// <summary>Validates an ops file against <paramref name="specs"/>, so the same parser serves every file kind.</summary>
+    public static OpsParse Parse(string json, IReadOnlyList<OpSpec> specs)
     {
         JsonDocument doc;
         try { doc = JsonDocument.Parse(json); }
@@ -303,7 +306,7 @@ public static class EditOps
             int index = 0;
             foreach (var element in array.EnumerateArray())
             {
-                var parsed = ParseOp(index, element);
+                var parsed = ParseOp(index, element, specs);
                 if (parsed.Error is not null) return Bad(parsed.Error);
                 ops.Add(parsed.Op!);
                 index++;
@@ -312,7 +315,7 @@ public static class EditOps
         }
     }
 
-    private static (EditOp? Op, string? Error) ParseOp(int index, JsonElement element)
+    private static (EditOp? Op, string? Error) ParseOp(int index, JsonElement element, IReadOnlyList<OpSpec> specs)
     {
         string At(string message) => $"op {index}: {message}";
 
@@ -321,9 +324,9 @@ public static class EditOps
             return (null, At("needs a string \"op\" field."));
 
         var name = nameElement.GetString()!;
-        var spec = Specs.FirstOrDefault(s => s.Name == name);
+        var spec = specs.FirstOrDefault(s => s.Name == name);
         if (spec is null)
-            return (null, At($"unknown op '{name}'. Known ops: {string.Join(", ", Specs.Select(s => s.Name))}."));
+            return (null, At($"unknown op '{name}'. Known ops: {string.Join(", ", specs.Select(s => s.Name))}."));
 
         var values = new Dictionary<string, string>();
         foreach (var property in element.EnumerateObject())

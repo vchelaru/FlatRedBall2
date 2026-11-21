@@ -1,6 +1,6 @@
 ---
 name: aecli
-description: "aecli, the command-line tool for reading and editing .achx/.achj animation files without the AnimationEditor window. Use when scripting or agent-editing animation chains: describe, check, new, edit --ops, --schema."
+description: "aecli, the command-line tool for reading and editing .achx/.achj animation files and .seqj sequence files without the AnimationEditor window. Use when scripting or agent-editing animation chains: describe, check, new, edit --ops, --schema."
 ---
 
 # aecli
@@ -9,12 +9,12 @@ Headless front end to the AnimationEditor's editing code (`tools/AnimationEditor
 
 | Command | Does |
 |---|---|
-| `describe <file> [--json]` | Chains, frames by index (texture, length, region) and shapes, as stored on disk. |
-| `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. |
-| `new <file>` | Empty `.achx` or `.achj`, chosen by extension. Never overwrites. |
+| `describe <file> [--json]` | Chains, frames by index (texture, length, region) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end. |
+| `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
+| `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
 | `edit <file> --ops ops.json [--json]` | Applies the ops in order, then saves once. |
-| `--schema [--json]` | Lists every op with its fields, types and allowed values. Run it before writing an ops file; it is the source of truth for ops. |
+| `--schema [--json]` | Lists every op (animation ops, then `sequenceOps` in JSON) with its fields, types and allowed values. Run it before writing an ops file; it is the source of truth for ops. |
 
 Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command line or ops file. `--json` output on `edit` and `new` is `{success, changed, errors:[{op, code, message}], warnings}`.
 
@@ -45,3 +45,14 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - `set-rect|circle|polygon` need that exact type in the address, change only the fields given, and require scale and radius above 0. `set-polygon` `points` is `[[x,y],...]`, at least 3, stored exactly as given: the editor's closed outlines repeat the first point at the end, so repeat it to keep one closed.
 - Keyframe flags: a chain's first frame, and the first shape of a run of frames with the same name, is always a keyframe, so turning that off fails. A curve can only be set on a keyframe; the curve is the glide to the next keyframe. `describe` lists `offset=skip` for a keyframe turned off and `offset-curve=Type/Easing` for a stored curve.
 - `reorder-shape` takes the final position among shapes of the same type in the frame; shapes never cross types. `set-frame-event` keeps an omitted name or data, and empty `data` clears it.
+
+## Sequence files (.seqj)
+
+The extension picks the op set for `describe`, `check`, `new` and `edit`; `--schema` lists both. Logic is `SequenceEdit`/`SequenceOps` in `AnimationEditor.Editing`, over the editor's `SequenceDocument`.
+
+Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an index), block `Run/Body/1` (index in the track). A reference track (plays another sequence) has one block, its clip, at index 0. Ops: add/rename/delete/reorder `sequence`, `set-sequence-loop`; add/rename/delete/reorder `track`, `set-track-continuous`, `add-reference-track`; `add-source`, `remove-source`, `replace-source`; `add-block`, `set-block-start`, `set-block-loops`, `delete-block`. Setters and `delete-*` take selectors (`Run/*`, `Run/0-1`, `Run/Body/0,2`, globs); see `--schema`.
+
+- `add-block` needs the source in the library (`add-source` first) and the chain in that source.
+- `add-track` and `add-reference-track` insert at `index` (default 0, the front: index 0 draws on top).
+- A block is cut short by the next block on its track; `check` warns, `describe` shows the cut end.
+- Not available: moving a block between tracks, track flip fields (the model has none).

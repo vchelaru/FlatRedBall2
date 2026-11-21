@@ -92,10 +92,10 @@ public static class EditSelectors
 
     private static bool NameMatches(string pattern, string name) => IsGlob(pattern) ? GlobMatches(pattern, name) : pattern == name;
 
-    private static bool GlobMatches(string pattern, string text) =>
+    internal static bool GlobMatches(string pattern, string text) =>
         Regex.IsMatch(text, "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$", RegexOptions.Singleline);
 
-    private static (IReadOnlyList<int>? Indexes, string? Error, EditErrorCode Code) ParseIndexes(string text, int count, string chainName)
+    internal static (IReadOnlyList<int>? Indexes, string? Error, EditErrorCode Code) ParseIndexes(string text, int count, string chainName, string noun = "frame")
     {
         if (text == "*") return (Enumerable.Range(0, count).ToList(), null, EditErrorCode.Unspecified);
 
@@ -104,14 +104,14 @@ public static class EditSelectors
         {
             var range = item.Split('-');
             if (range.Length > 2 || range.Any(p => p.Length == 0 || !p.All(char.IsAsciiDigit) || p.Length > 9))
-                return (null, $"'{text}' is not a frame selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.Unspecified);
+                return (null, $"'{text}' is not a {noun} selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.Unspecified);
 
             var from = int.Parse(range[0], CultureInfo.InvariantCulture);
             var to = int.Parse(range[^1], CultureInfo.InvariantCulture);
             if (to < from)
                 return (null, $"The range '{item}' runs backwards; write it low to high.", EditErrorCode.Unspecified);
             if (to >= count)
-                return (null, $"Frame index {to} is out of range: '{chainName}' has {count} frame(s).", EditErrorCode.IndexOutOfRange);
+                return (null, $"{char.ToUpperInvariant(noun[0])}{noun[1..]} index {to} is out of range: '{chainName}' has {count} {noun}(s).", EditErrorCode.IndexOutOfRange);
             for (int i = from; i <= to; i++)
                 if (!result.Contains(i)) result.Add(i);
         }
