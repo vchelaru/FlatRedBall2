@@ -70,9 +70,9 @@ public class StructureOpsTests : IDisposable
         var frame = (await Chains("hero.achx"))[1].GetProperty("frames")[1];
         frame.GetProperty("length").GetSingle().ShouldBe(0.3f, 0.0001f);
         var region = frame.GetProperty("region");
-        region.GetProperty("left").GetSingle().ShouldBe(16f, 0.01f);
-        region.GetProperty("right").GetSingle().ShouldBe(32f, 0.01f);
-        region.GetProperty("bottom").GetSingle().ShouldBe(32f, 0.01f);
+        region.GetProperty("x").GetSingle().ShouldBe(16f, 0.01f);
+        region.GetProperty("width").GetSingle().ShouldBe(16f, 0.01f);
+        region.GetProperty("height").GetSingle().ShouldBe(32f, 0.01f);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class StructureOpsTests : IDisposable
         r.Code.ShouldBe(0, r.Out + r.Err);
         var frame = (await Chains("hero.achx"))[1].GetProperty("frames")[1];
         frame.GetProperty("length").GetSingle().ShouldBe(0.1f, 0.0001f);
-        frame.GetProperty("region").GetProperty("right").GetSingle().ShouldBe(48f, 0.01f);
+        frame.GetProperty("region").GetProperty("width").GetSingle().ShouldBe(48f, 0.01f);
     }
 
     [Fact]
