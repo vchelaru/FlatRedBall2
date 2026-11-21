@@ -249,7 +249,7 @@ public static class TiledAnimationToAchjMapper
     /// (<c>Columns * TileWidth</c> by however many rows <c>TileCount</c> needs) -- keeps UV
     /// conversion well-defined instead of dividing by a missing/zero size.
     /// </summary>
-    internal static (int Width, int Height) GetTextureSize(Tileset tileset)
+    public static (int Width, int Height) GetTextureSize(Tileset tileset)
     {
         if (tileset.Image.HasValue)
         {

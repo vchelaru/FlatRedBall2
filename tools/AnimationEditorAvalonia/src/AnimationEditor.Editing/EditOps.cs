@@ -57,6 +57,13 @@ public static class EditOps
         + "A selector that matches nothing is an error (NoMatch), as is any index past a chain's end. Any failing target fails the whole batch and nothing is written. "
         + "Shape selectors skip frames that lack the shape. A chain whose name really contains * or ? cannot be addressed by glob.";
 
+    /// <summary>How <c>--schema</c> explains Tiled .tsx files; shared by the text and JSON output.</summary>
+    public static string TsxNote =>
+        "Tiled tilesets (.tsx): describe, check and edit open a .tsx as a native project, the way the editor does; a tileset the editor cannot open is refused with its reason. "
+        + $"A tile animation stores only frame rectangles and durations, so only these ops work on a .tsx: {string.Join(", ", TsxOpPolicy.Supported)}; every other op fails with NotSupportedInTsx. "
+        + "add-frame needs a region and the tileset's own image. Chains map to tiles: a chain whose frames are not whole tiles, or two chains on one owner tile, fail the batch. "
+        + "Everything else in the file (wangsets, object layers, properties, other tiles) is preserved on save, and a batch that changes nothing leaves the file untouched.";
+
     private const string RegionDescription = "Pixel rectangle of the texture, as x,y,width,height.";
 
     public static IReadOnlyList<OpSpec> Specs { get; } =
@@ -277,6 +284,16 @@ public static class EditOps
             new("alpha", "boolean", false, "true to clear alpha."),
             new("operation", "boolean", false, "true to clear the color operation."),
         ]),
+        new("associate-tileset", "Records a Tiled .tsx as a sync target of this .achx/.achj (the editor's Associate Tiled Tileset): the batch's save then pushes the file's animations onto that tileset, and so does every later save. Writes the companion .tiledsync file; not undoable. A .tsx that is an association target cannot be opened as a native project. Not for a .tsx.",
+        [
+            new("path", "string", true, "Tileset path, relative to the animation file or absolute."),
+        ]),
+        new("set-chain-owner-tile", "Native .tsx only: chooses which tile carries a chain's animation in the Tiled file. Give tile, or clear to return to the tile of the chain's first frame. A tile past the tileset or owned by another chain fails.",
+        [
+            new("chain", "string", true, "Chain name (a glob works with clear)."),
+            new("tile", "integer", false, "Zero-based tile id."),
+            new("clear", "boolean", false, "true to return to the first frame's tile."),
+        ]),
         new("set-unit", "Changes the file's time unit and converts every frame length (locked chains too) so playback time is unchanged. Later ops in the batch use the new unit.",
         [
             new("unit", "string", true, "The new time unit.", UnitValues),
@@ -411,8 +428,31 @@ public static class EditOps
         if (!before.Ok)
             warnings.Add($"The file already had {before.Errors.Count()} check error(s) before the edit.");
 
+        var tsxBefore = session.IsNativeTsx ? TsxOpPolicy.Take(session) : null;
+        var associations = new List<string>();
+
         foreach (var op in ops)
         {
+            var refused = TsxOpPolicy.Check(session, op);
+            if (refused is not null)
+                return new EditRunResult(
+                    new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {refused.Errors[0]}"], warnings, refused.ErrorCodes),
+                    [op.Index]);
+
+            if (op.Spec.Name == "associate-tileset")
+            {
+                // Writes a companion file, so it waits until every other op and check has passed.
+                var tsxPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(session.Path) ?? string.Empty, op.Values["path"]));
+                var check = TsxEdit.CheckAssociation(session.ProjectManager, tsxPath);
+                if (!check.Success)
+                    return new EditRunResult(
+                        new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {check.Errors[0]}"], warnings, check.ErrorCodes),
+                        [op.Index]);
+                associations.Add(tsxPath);
+                changed.Add(tsxPath);
+                continue;
+            }
+
             var expansion = SelectorExpander.Expand(session.Document, op);
             if (expansion.Ops is null)
                 return new EditRunResult(
@@ -440,13 +480,29 @@ public static class EditOps
                 new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings),
                 added.Select(_ => (int?)null).ToList());
 
+        if (tsxBefore is not null && TsxOpPolicy.CheckWritable(session, tsxBefore) is { } unwritable)
+            return new EditRunResult(
+                new EditResult([], unwritable.Errors, warnings, unwritable.ErrorCodes),
+                unwritable.Errors.Select(_ => (int?)null).ToList());
+
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
 
+        foreach (var tsxPath in associations)
+        {
+            var associated = TsxEdit.AssociateTileset(session.Commands, session.ProjectManager, tsxPath);
+            if (!associated.Success)
+                return new EditRunResult(
+                    new EditResult([], associated.Errors, warnings, associated.ErrorCodes),
+                    associated.Errors.Select(_ => (int?)null).ToList());
+        }
+
         var save = session.Save();
-        return save.Success
-            ? new EditRunResult(new EditResult(changed, [], warnings), [])
-            : new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
+        if (!save.Success)
+            return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
+
+        var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path && !changed.Contains(p))).ToList();
+        return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }
 
     private static Task<EditResult> ApplyOneAsync(EditSession session, EditOp op)
@@ -561,12 +617,28 @@ public static class EditOps
                     session.Commands, chain, frame,
                     new FrameColorClear(OptionalFlag(op, "red") == true, OptionalFlag(op, "green") == true, OptionalFlag(op, "blue") == true,
                         OptionalFlag(op, "alpha") == true, OptionalFlag(op, "operation") == true))));
+            case "set-chain-owner-tile":
+                return Task.FromResult(WithChain(doc, op, c => SetOwnerTile(session, op, c)));
             case "set-unit":
                 return Task.FromResult(PropertyEdit.SetTimeUnit(session.ProjectManager, session.Commands,
                     op.Values["unit"] == "millisecond" ? TimeMeasurementUnit.Millisecond : TimeMeasurementUnit.Second));
             default:
                 return Task.FromResult(Fail($"Unhandled op '{op.Spec.Name}'."));
         }
+    }
+
+    private static EditResult SetOwnerTile(EditSession session, EditOp op, AnimationChainSave chain)
+    {
+        var hasTile = op.Values.ContainsKey("tile");
+        var clear = OptionalFlag(op, "clear") == true;
+        if (hasTile == clear)
+            return Fail("set-chain-owner-tile needs exactly one of tile and clear.", EditErrorCode.InvalidValue);
+        if (hasTile && Integer(op, "tile")!.Value < 0)
+            return Fail("The tile id cannot be negative.", EditErrorCode.InvalidValue);
+
+        return hasTile
+            ? TsxEdit.SetChainOwnerTile(session.ProjectManager, session.Commands, chain, (uint)Integer(op, "tile")!.Value)
+            : TsxEdit.ClearChainOwnerTile(session.ProjectManager, session.Commands, chain);
     }
 
     private static Task<EditResult> SetFrameTextureAsync(EditSession session, EditOp op)

@@ -35,6 +35,16 @@ public enum EditErrorCode
     WouldCycle,
     /// <summary>A block op hit a track of the wrong kind (a chain op on a reference track, or the reverse).</summary>
     WrongTrackKind,
+    /// <summary>A .tsx cannot be opened as a native project (the compatibility checker's reason is the message), or is already a sync target.</summary>
+    UnsupportedTsx,
+    /// <summary>The edit has no representation in a Tiled tile animation, so the editor disables it for a .tsx too.</summary>
+    NotSupportedInTsx,
+    /// <summary>A .tsx-only op ran on an .achx/.achj, or an .achx/.achj-only op ran on a .tsx.</summary>
+    WrongFileKind,
+    /// <summary>Two chains of a .tsx map to the same owner tile, so only one could be written; give one its own (set-chain-owner-tile).</summary>
+    DuplicateOwnerTile,
+    /// <summary>A .tsx chain's frames do not line up with whole tiles of the tileset, so it cannot be written back.</summary>
+    UnmappableChain,
 }
 
 /// <summary>

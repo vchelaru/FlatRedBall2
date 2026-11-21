@@ -127,7 +127,7 @@ internal sealed record ExpandedOp(EditOp Op, string? Target);
 /// <summary>Turns an op whose address fields are selectors into one op per target (#1811).</summary>
 internal static class SelectorExpander
 {
-    private static readonly HashSet<string> ChainOps = ["set-chain-loop", "set-chain-pingpong", "set-chain-reverse", "set-chain-locked"];
+    private static readonly HashSet<string> ChainOps = ["set-chain-loop", "set-chain-pingpong", "set-chain-reverse", "set-chain-locked", "set-chain-owner-tile"];
 
     private static readonly HashSet<string> FrameOps =
     [

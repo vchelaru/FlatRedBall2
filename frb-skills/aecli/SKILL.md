@@ -1,6 +1,6 @@
 ---
 name: aecli
-description: "aecli, the command-line tool for reading and editing .achx/.achj animation files and .seqj sequence files without the AnimationEditor window. Use when scripting or agent-editing animation chains: describe, check, new, edit --ops, --schema."
+description: "aecli, the command-line tool for reading and editing .achx/.achj animation files, Tiled .tsx tilesets and .seqj sequence files without the AnimationEditor window. Use when scripting or agent-editing animation chains: describe, check, new, edit --ops, --schema."
 ---
 
 # aecli
@@ -56,3 +56,13 @@ Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an inde
 - `add-track` and `add-reference-track` insert at `index` (default 0, the front: index 0 draws on top).
 - A block is cut short by the next block on its track; `check` warns, `describe` shows the cut end.
 - Not available: moving a block between tracks, track flip fields (the model has none).
+
+## Tiled tilesets (.tsx)
+
+`describe`, `check` and `edit` open a `.tsx` as the editor's native project (`TsxOpPolicy`, `TsxEdit` in `AnimationEditor.Editing`). A tileset the editor cannot open (image collection, transformations, or one already an association target) is refused up front with the editor's reason (`UnsupportedTsx`). `describe` shows pixels and each chain's `ownerTile`.
+
+- A tile animation stores only frame rectangles and durations, so only chain ops (`rename|add|delete|duplicate|reorder-chain`), frame ops (`add-frame`, `add-frames-grid`, `delete|duplicate|reorder-frame`, `set-frame-length|region`) and `set-chain-owner-tile` work. Anything else fails with `NotSupportedInTsx` and the reason. `add-frame` needs `region` and the tileset's own image.
+- `set-chain-owner-tile` takes `tile` or `clear` (back to the first frame's tile). A tile owned by another chain fails; a duplicated chain shares its source's tile, so give it one in the same batch or the batch fails (`DuplicateOwnerTile`). Frames that are not whole tiles fail the batch (`UnmappableChain`).
+- Save goes through the editor's `TsxWriter`, so wangsets, object layers, properties and other tiles survive (XML spacing and `tintcolor` may be normalised). Save notes arrive as `warnings`.
+- `associate-tileset` (`path`) is for `.achx/.achj`: it writes the `.tiledsync` file, and the batch's save then pushes the animations onto that tileset (reported in `changed`; sync failures are `warnings`). A tileset that is an association target cannot be opened natively.
+- `new` and `convert` do not handle `.tsx`; author the tileset in Tiled.

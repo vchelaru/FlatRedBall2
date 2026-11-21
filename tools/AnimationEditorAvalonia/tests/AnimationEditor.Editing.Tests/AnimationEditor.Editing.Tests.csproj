@@ -26,4 +26,11 @@
     <ProjectReference Include="..\..\src\AnimationEditor.Editing\AnimationEditor.Editing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\AnimationEditor.Cli.Tests\Fixtures\tiles.tsx" Link="Fixtures\tiles.tsx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\AnimationEditor.Cli.Tests\Fixtures\collection.tsx" Link="Fixtures\collection.tsx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\AnimationEditor.Cli.Tests\Fixtures\hero.achx" Link="Fixtures\hero.achx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\AnimationEditor.Cli.Tests\Fixtures\sheet.png" Link="Fixtures\sheet.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
