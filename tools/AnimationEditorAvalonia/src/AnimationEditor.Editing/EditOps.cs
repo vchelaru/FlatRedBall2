@@ -46,6 +46,17 @@ public static class EditOps
         ["snap", "linear", "ease-in", "ease-out", "ease-in-out", "anticipate", "overshoot", "bounce"];
     private const string EventAddressDescription = "Event address: Chain/frameIndex/event/eventIndex (zero-based).";
     private const string ShapeAddressDescription = "Shape address: Chain/frameIndex/rect|circle|polygon/name.";
+    /// <summary>How <c>--schema</c> explains bulk addressing; shared by the text and JSON output.</summary>
+    public const string SelectorSyntax =
+        "Bulk selectors: where an op takes a frame address, the index may be * (every frame), a range (Walk/2-5), "
+        + "or a list of numbers and ranges (Walk/0,3,7 or Walk/0,2-3,6), and the chain may be a glob with * and ? (Walk*/0-2). "
+        + "Shape addresses take the same frame selector, and the shape name may be * or a glob (Walk/*/rect/Hitbox). "
+        + "Chain ops set-chain-loop, set-chain-pingpong, set-chain-reverse and set-chain-locked take a glob (Walk*, *). "
+        + "Selectors work on every op that addresses a frame, event or shape except reorder-frame, reorder-shape, rename-shape and the add-/delete-/duplicate-/reorder-/rename-chain ops; those take one exact address. "
+        + "A selector expands when its op starts, in chain order then in the order written; delete-frame and duplicate-frame run from the highest index down so earlier targets keep their index. "
+        + "A selector that matches nothing is an error (NoMatch), as is any index past a chain's end. Any failing target fails the whole batch and nothing is written. "
+        + "Shape selectors skip frames that lack the shape. A chain whose name really contains * or ? cannot be addressed by glob.";
+
     private const string RegionDescription = "Pixel rectangle of the texture, as x,y,width,height.";
 
     public static IReadOnlyList<OpSpec> Specs { get; } =
@@ -90,6 +101,19 @@ public static class EditOps
             new("texture", "string", true, "Texture path, relative to the animation file or absolute."),
             new("region", "string", false, "Pixel rectangle of the texture to show, as x,y,width,height. PNG textures only."),
             new("length", "number", false, "Frame length in the file's own time unit (see describe). Default: that unit's default length."),
+            new("copy", "string", false, CopyDescription, CopyValues),
+        ]),
+        new("add-frames-grid", "Appends one frame per cell of a sprite sheet grid, row by row from the top-left. The texture must be an existing PNG and the whole grid must lie inside it.",
+        [
+            new("chain", "string", true, "Chain name."),
+            new("texture", "string", true, "Texture path, relative to the animation file or absolute."),
+            new("cellWidth", "integer", true, "Cell width in pixels, greater than 0."),
+            new("cellHeight", "integer", true, "Cell height in pixels, greater than 0."),
+            new("columns", "integer", true, "Cells per row, greater than 0."),
+            new("rows", "integer", true, "Number of rows, greater than 0."),
+            new("start", "integer", false, "First cell to add, numbered row by row from 0. Default 0."),
+            new("count", "integer", false, "How many cells to add from start. Default: through the last cell."),
+            new("frameLength", "number", false, "Length of each frame in the file's own time unit. Default: that unit's default length."),
             new("copy", "string", false, CopyDescription, CopyValues),
         ]),
         new("delete-frame", "Deletes one frame.",
@@ -386,15 +410,25 @@ public static class EditOps
 
         foreach (var op in ops)
         {
-            var result = await ApplyOneAsync(session, op);
-            if (!result.Success)
-            {
-                var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {e}").ToList();
+            var expansion = SelectorExpander.Expand(session.Document, op);
+            if (expansion.Ops is null)
                 return new EditRunResult(
-                    new EditResult([], errors, warnings, result.ErrorCodes),
-                    errors.Select(_ => (int?)op.Index).ToList());
+                    new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {expansion.Error}"], warnings, [expansion.Code]),
+                    [op.Index]);
+
+            foreach (var target in expansion.Ops)
+            {
+                var result = await ApplyOneAsync(session, target.Op);
+                if (!result.Success)
+                {
+                    var where = target.Target is null ? "" : $"target {target.Target}: ";
+                    var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {where}{e}").ToList();
+                    return new EditRunResult(
+                        new EditResult([], errors, warnings, result.ErrorCodes),
+                        errors.Select(_ => (int?)op.Index).ToList());
+                }
+                changed.AddRange(result.ChangedItems);
             }
-            changed.AddRange(result.ChangedItems);
         }
 
         var added = CheckReport.NewErrors(before, CheckReport.Run(session.Document, session.Path));
@@ -445,6 +479,8 @@ public static class EditOps
                     StructureEdit.ReorderChain(session.ProjectManager, session.Commands, c, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));
             case "add-frame":
                 return Task.FromResult(AddFrame(session, op));
+            case "add-frames-grid":
+                return Task.FromResult(AddFramesGrid(session, op));
             case "delete-frame":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) => StructureEdit.DeleteFrame(session.Commands, chain, frame)));
             case "duplicate-frame":
@@ -581,6 +617,20 @@ public static class EditOps
 
         return StructureEdit.AddFrame(
             session.ProjectManager, session.Commands, chain.Value!, resolved.AbsolutePath, region, length, new HeaderTextureProbe());
+    }
+
+    private static EditResult AddFramesGrid(EditSession session, EditOp op)
+    {
+        var chain = EditAddress.ResolveChain(session.Document, op.Values["chain"]);
+        if (!chain.Ok) return Fail(chain.Error!);
+
+        var resolved = ResolveTexture(session, op);
+        if (resolved.AbsolutePath is null) return resolved.Result;
+
+        return StructureEdit.AddFramesGrid(
+            session.ProjectManager, session.Commands, chain.Value!, resolved.AbsolutePath,
+            Integer(op, "cellWidth")!.Value, Integer(op, "cellHeight")!.Value, Integer(op, "columns")!.Value, Integer(op, "rows")!.Value,
+            Integer(op, "start") ?? 0, Integer(op, "count"), Number(op, "frameLength"), new HeaderTextureProbe());
     }
 
     private static EditResult SetFrameRegion(EditSession session, EditOp op)

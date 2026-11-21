@@ -117,6 +117,49 @@ public static class StructureEdit
         return Ok($"{chain.Name}/{chain.Frames.Count - 1}");
     }
 
+    /// <summary>
+    /// Appends a frame for each cell of a sprite sheet grid (#1811), row by row from the top-left, starting at
+    /// cell <paramref name="start"/> and taking <paramref name="count"/> cells (null: to the end of the grid). Cells are
+    /// <paramref name="cellWidth"/> by <paramref name="cellHeight"/> pixels; the whole grid must lie inside the PNG
+    /// texture. Everything is validated before the first frame is added. Each frame goes through
+    /// <see cref="AddFrame"/>, so the texture checks, stored path and length rules are the same.
+    /// </summary>
+    public static EditResult AddFramesGrid(
+        IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain, string absoluteTexture,
+        int cellWidth, int cellHeight, int columns, int rows, int start, int? count, float? frameLength, ITextureProbe probe)
+    {
+        if (chain.IsLocked) return LockedFail(chain);
+        if (cellWidth <= 0 || cellHeight <= 0 || columns <= 0 || rows <= 0)
+            return Fail(EditErrorCode.Unspecified, "cellWidth, cellHeight, columns and rows must all be greater than zero.");
+        if (!File.Exists(absoluteTexture))
+            return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absoluteTexture}");
+        if (!probe.CanDecode(absoluteTexture))
+            return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
+
+        var size = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
+        if (size is null)
+            return Fail(EditErrorCode.Unspecified, "A grid needs the texture's size, which is only read from PNG files.");
+        if ((long)columns * cellWidth > size.Value.W || (long)rows * cellHeight > size.Value.H)
+            return Fail(EditErrorCode.Unspecified,
+                $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells does not fit the {size.Value.W}x{size.Value.H} texture.");
+
+        var cells = columns * rows;
+        if (start < 0 || start >= cells)
+            return Fail(EditErrorCode.IndexOutOfRange, $"start {start} is out of range: the grid has {cells} cell(s), numbered 0 to {cells - 1} row by row.");
+        var take = count ?? cells - start;
+        if (take <= 0 || start + take > cells)
+            return Fail(EditErrorCode.IndexOutOfRange, $"count {take} does not fit: {cells - start} cell(s) remain from start {start}.");
+
+        var firstNew = chain.Frames.Count;
+        for (int cell = start; cell < start + take; cell++)
+        {
+            var region = new FramePixelRegion(cell % columns * cellWidth, cell / columns * cellHeight, cellWidth, cellHeight);
+            var added = AddFrame(projectManager, commands, chain, absoluteTexture, region, frameLength, probe);
+            if (!added.Success) return added;
+        }
+        return Ok($"{chain.Name}/{firstNew}-{chain.Frames.Count - 1}");
+    }
+
     public static EditResult DeleteFrame(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame)
     {
         var index = chain.Frames.IndexOf(frame);

@@ -23,6 +23,8 @@ public enum EditErrorCode
     IndexOutOfRange,
     /// <summary>The chain is locked in the editor, so its frames and its removal are protected.</summary>
     Locked,
+    /// <summary>A bulk selector (range, list, wildcard or glob) matched nothing.</summary>
+    NoMatch,
 }
 
 /// <summary>
