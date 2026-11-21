@@ -343,14 +343,14 @@ public static class EditOps
         var name = nameElement.GetString()!;
         var spec = specs.FirstOrDefault(s => s.Name == name);
         if (spec is null)
-            return (null, At($"unknown op '{name}'. Known ops: {string.Join(", ", specs.Select(s => s.Name))}."));
+            return (null, At($"unknown op '{name}'." + OpHint(name, specs)));
 
         var values = new Dictionary<string, string>();
         foreach (var property in element.EnumerateObject())
         {
             if (property.Name == "op") continue;
             var field = spec.Fields.FirstOrDefault(f => f.Name == property.Name);
-            if (field is null) return (null, At($"'{name}' has no field '{property.Name}'."));
+            if (field is null) return (null, At($"'{name}' has no field '{property.Name}'." + NameHints.For(property.Name, spec.Fields.Select(f => f.Name), "fields")));
             var typed = ReadValue(field, property.Value);
             if (typed is null)
                 return (null, At($"field '{field.Name}' of '{name}' must be {FieldTypeText(field.Type)}."));
@@ -412,6 +412,13 @@ public static class EditOps
         "points" => "a list of [x, y] number pairs, as [[x,y],[x,y],...]",
         _ => $"a {type}",
     };
+
+    /// <summary>The nearest op name, or the whole list when nothing is close.</summary>
+    private static string OpHint(string name, IReadOnlyList<OpSpec> specs)
+    {
+        var hint = NameHints.For(name, specs.Select(s => s.Name), "ops");
+        return hint.Contains("Did you mean") ? hint : $" Known ops: {string.Join(", ", specs.Select(s => s.Name))}.";
+    }
 
     private static OpsParse Bad(string error) => new(null, error);
 

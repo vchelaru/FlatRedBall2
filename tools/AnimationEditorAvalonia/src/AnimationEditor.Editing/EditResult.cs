@@ -57,6 +57,8 @@ public enum EditErrorCode
     Ambiguous,
     /// <summary>The editor's own command refused the edit (a keyframe rule, an unchanged-state rule, a library rule).</summary>
     Refused,
+    /// <summary>The command line or ops file is malformed (bad JSON, unknown op or field, a missing argument); the CLI exits 2.</summary>
+    UsageError,
     /// <summary>The edits applied, but the result would have a check error, so nothing was written.</summary>
     WouldBreakFile,
 }

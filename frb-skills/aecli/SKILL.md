@@ -16,7 +16,7 @@ Headless front end to the AnimationEditor's editing code (`tools/AnimationEditor
 | `edit <file> --ops ops.json [--json]` | Applies the ops in order, then saves once. |
 | `--schema [--json]` | Lists every op (animation ops, then `sequenceOps` in JSON) with its fields, types and allowed values. Run it before writing an ops file; it is the source of truth for ops. |
 
-Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command line or ops file. `--json` output on `edit` and `new` is `{success, changed, errors:[{op, code, message}], warnings}`. Branch on `code` (full list in `--schema`): `NotFound` (unknown chain, shape or file), `IndexOutOfRange`, `InvalidValue` (out of range), `InvalidAddress` (malformed address or selector), `NoMatch` (selector matched nothing), `WrongShapeType`, `Ambiguous`, `Refused`; `Unspecified` is only a fallback.
+Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command line or ops file (with `--json` also `{success:false, errors:[{code:"UsageError", message}]}` on stdout; text mode prints the message and one hint line). Not-found names carry "Did you mean ..." or the list of valid names in the message. `--json` output on `edit` and `new` is `{success, changed, errors:[{op, code, message}], warnings}`. Branch on `code` (full list in `--schema`): `NotFound` (unknown chain, shape or file), `IndexOutOfRange`, `InvalidValue` (out of range), `InvalidAddress` (malformed address or selector), `NoMatch` (selector matched nothing), `WrongShapeType`, `Ambiguous`, `Refused`; `Unspecified` is only a fallback.
 
 ## Addresses
 

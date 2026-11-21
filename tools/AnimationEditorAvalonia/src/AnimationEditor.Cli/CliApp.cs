@@ -23,8 +23,8 @@ public static class CliApp
 
     public static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr)
     {
-        var cli = new Invocation(stdout, stderr);
-        if (args.Length == 0) return cli.Usage("no command given.");
+        var cli = new Invocation(stdout, stderr) { Json = args.Contains("--json") };
+        if (args.Length == 0) return cli.Usage("no command given.", showUsage: true);
         if (args[0] is "-h" or "--help" or "help")
         {
             stdout.WriteLine(Usage);
@@ -94,10 +94,17 @@ public static class CliApp
     {
         public bool Json { get; set; }
 
-        public int Usage(string message)
+        public int Usage(string message, bool showUsage = false)
         {
+            if (Json)
+            {
+                stdout.WriteLine(EditJson.Render(w => EditJson.WriteResult(
+                    w, new EditResult([], [message], [], [EditErrorCode.UsageError]))));
+                return 2;
+            }
+
             stderr.WriteLine($"aecli: {message}");
-            stderr.WriteLine(CliApp.Usage);
+            stderr.WriteLine(showUsage ? CliApp.Usage : "Run 'aecli help' for usage.");
             return 2;
         }
 
