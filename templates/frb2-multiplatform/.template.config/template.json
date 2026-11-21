@@ -5,13 +5,22 @@
   "identity": "FlatRedBall2.Templates.Multiplatform",
   "name": "FlatRedBall2 Multiplatform Game (Desktop + Web)",
   "shortName": "frb2-multiplatform",
-  "sourceName": "MyGame",
   "preferNameDirectory": true,
   "tags": {
     "language": "C#",
     "type": "project"
   },
+  "forms": {
+    "noSpaces": { "identifier": "replace", "pattern": " ", "replacement": "_" }
+  },
   "symbols": {
+    "safeName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "noSpaces",
+      "replaces": "MyGame",
+      "fileRename": "MyGame"
+    },
     "IncludeStarterContent": {
       "type": "parameter",
       "datatype": "bool",
@@ -46,7 +55,7 @@
       "generator": "coalesce",
       "parameters": {
         "sourceVariableName": "namespace",
-        "fallbackVariableName": "name"
+        "fallbackVariableName": "safeName"
       },
       "replaces": "GameNamespace"
     }
