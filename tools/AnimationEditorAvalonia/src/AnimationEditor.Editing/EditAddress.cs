@@ -9,10 +9,14 @@ public sealed record AddressResult<T>(T? Value, string? Error) where T : class
     public bool Ok => Value is not null;
 }
 
+/// <summary>A frame event addressed by its position; the index is not checked against the frame's events.</summary>
+public sealed record FrameEventRef(AnimationChainSave Chain, AnimationFrameSave Frame, int Index);
+
 /// <summary>
 /// Text addresses for the items of an animation file, stable across runs (#1811): a chain by name
 /// (<c>Walk</c>), a frame by zero-based index (<c>Walk/2</c>), a shape by frame index, type and name
-/// (<c>Walk/2/rect/Hitbox</c>, type is rect, circle or polygon). Segments are split on '/', so a chain or
+/// (<c>Walk/2/rect/Hitbox</c>, type is rect, circle or polygon), a frame event by frame and event index
+/// (<c>Walk/2/event/0</c>). Segments are split on '/', so a chain or
 /// shape name containing '/' cannot be addressed and is refused; rename it in the editor.
 /// </summary>
 public static class EditAddress
@@ -49,6 +53,21 @@ public static class EditAddress
         return match is null
             ? Shape(null, $"No {type} named '{name}' in frame {parts[1]} of '{parts[0]}'.")
             : new AddressResult<ShapeSave>(match, null);
+    }
+
+    /// <summary>Resolves <c>Chain/frameIndex/event/eventIndex</c> to the frame and the event's position in it.</summary>
+    public static AddressResult<FrameEventRef> ResolveEvent(AnimationChainListSave doc, string address)
+    {
+        var parts = address.Split('/');
+        if (parts.Length != 4 || parts[2] != "event")
+            return new(null, $"'{address}' is not an event address; expected Chain/frameIndex/event/index.");
+
+        var frame = FrameAt(doc, parts[0], parts[1]);
+        if (!frame.Ok) return new(null, frame.Error);
+        if (!int.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var index))
+            return new(null, $"Event index '{parts[3]}' is not a zero-based index.");
+        var chain = FindChain(doc, parts[0]).Value!;
+        return new AddressResult<FrameEventRef>(new FrameEventRef(chain, frame.Value!, index), null);
     }
 
     /// <summary>The address type word of <paramref name="shape"/>.</summary>

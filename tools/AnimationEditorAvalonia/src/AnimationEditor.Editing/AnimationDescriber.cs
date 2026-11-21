@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using AnimationEditor.Core.Keyframes;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -29,8 +30,17 @@ public static class AnimationDescriber
                 var f = chain.Frames[i];
                 sb.AppendLine(FormattableString.Invariant(
                     $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate)},{Num(f.BottomCoordinate)}"));
+                var color = ColorText(f);
+                if (color.Length > 0) sb.AppendLine($"       color {color}");
+                var frameKeys = FrameKeyframeText(chain, f);
+                if (frameKeys.Length > 0) sb.AppendLine($"       keyframes {frameKeys}");
+                for (int e = 0; e < f.Events.Count; e++)
+                    sb.AppendLine($"       {chain.Name}/{i}/event/{e}  {f.Events[e].Name}{(f.Events[e].Data is { } d ? "  data " + d : "")}");
                 foreach (var shape in Shapes(f))
-                    sb.AppendLine(FormattableString.Invariant($"       {chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}  {ShapeSummary(shape)}"));
+                {
+                    var keys = ShapeKeyframeText(chain, shape);
+                    sb.AppendLine(FormattableString.Invariant($"       {chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}  {ShapeSummary(shape)}{(keys.Length > 0 ? "  " + keys : "")}"));
+                }
             }
         }
         return sb.ToString();
@@ -64,6 +74,30 @@ public static class AnimationDescriber
                 w.WriteNumber("right", f.RightCoordinate);
                 w.WriteNumber("bottom", f.BottomCoordinate);
                 w.WriteEndObject();
+                if (f.Red is not null || f.Green is not null || f.Blue is not null || f.Alpha is not null || f.ColorOperation is not null)
+                {
+                    w.WriteStartObject("color");
+                    if (f.Red is { } r) w.WriteNumber("red", r);
+                    if (f.Green is { } g) w.WriteNumber("green", g);
+                    if (f.Blue is { } b) w.WriteNumber("blue", b);
+                    if (f.Alpha is { } a) w.WriteNumber("alpha", a);
+                    if (f.ColorOperation is { } op) w.WriteString("operation", op.ToString());
+                    w.WriteEndObject();
+                }
+                w.WriteStartObject("keyframes");
+                WriteKeyframe(w, "offset", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Offset, f, chain), f.OffsetInterpolation, f.OffsetEasing);
+                WriteKeyframe(w, "color", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Color, f, chain), f.ColorInterpolation, f.ColorEasing);
+                w.WriteEndObject();
+                w.WriteStartArray("events");
+                for (int e = 0; e < f.Events.Count; e++)
+                {
+                    w.WriteStartObject();
+                    w.WriteString("address", $"{chain.Name}/{i}/event/{e}");
+                    w.WriteString("name", f.Events[e].Name);
+                    if (f.Events[e].Data is { } data) w.WriteString("data", data);
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
                 w.WriteStartArray("shapes");
                 foreach (var shape in Shapes(f))
                 {
@@ -89,6 +123,15 @@ public static class AnimationDescriber
                             w.WriteEndArray();
                             break;
                     }
+                    w.WriteStartObject("keyframes");
+                    foreach (var group in new[] { ShapeKeyframeGroup.Offset, ShapeKeyframeGroup.Size, ShapeKeyframeGroup.Points })
+                    {
+                        if (!KeyframeInspectorState.HasGroup(group, shape)) continue;
+                        var (type, easing) = Stored(shape, group);
+                        WriteKeyframe(w, group.ToString().ToLowerInvariant(),
+                            KeyframeInspectorState.IsEffectivelyKeyframe(group, shape, chain), type, easing);
+                    }
+                    w.WriteEndObject();
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -99,6 +142,61 @@ public static class AnimationDescriber
         }
         w.WriteEndArray();
         w.WriteEndObject();
+    }
+
+    private static void WriteKeyframe(Utf8JsonWriter w, string name, bool isKeyframe, string? interpolation, string? easing)
+    {
+        w.WriteStartObject(name);
+        w.WriteBoolean("keyframe", isKeyframe);
+        if (interpolation is not null) w.WriteString("interpolation", interpolation);
+        if (easing is not null) w.WriteString("easing", easing);
+        w.WriteEndObject();
+    }
+
+    private static (string? Type, string? Easing) Stored(ShapeSave shape, ShapeKeyframeGroup group) => group switch
+    {
+        ShapeKeyframeGroup.Offset => (shape.OffsetInterpolation, shape.OffsetEasing),
+        ShapeKeyframeGroup.Size => shape is SizedShapeSave s ? (s.SizeInterpolation, s.SizeEasing) : (null, null),
+        _ => shape is PolygonSave p ? (p.PointsInterpolation, p.PointsEasing) : (null, null),
+    };
+
+    /// <summary>Only the color parts a frame sets; parts it leaves out inherit from earlier frames.</summary>
+    private static string ColorText(AnimationFrameSave f)
+    {
+        var parts = new List<string>();
+        if (f.Red is { } r) parts.Add($"red={r}");
+        if (f.Green is { } g) parts.Add($"green={g}");
+        if (f.Blue is { } b) parts.Add($"blue={b}");
+        if (f.Alpha is { } a) parts.Add($"alpha={a}");
+        if (f.ColorOperation is { } op) parts.Add($"operation={op}");
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>Only what differs from the default: a keyframe turned off (<c>offset=skip</c>) or a stored curve (<c>offset-curve=Quadratic/In</c>).</summary>
+    private static string FrameKeyframeText(AnimationChainSave chain, AnimationFrameSave f)
+    {
+        var parts = new List<string>();
+        Add(parts, "offset", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Offset, f, chain), f.OffsetInterpolation, f.OffsetEasing);
+        Add(parts, "color", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Color, f, chain), f.ColorInterpolation, f.ColorEasing);
+        return string.Join(" ", parts);
+    }
+
+    private static string ShapeKeyframeText(AnimationChainSave chain, ShapeSave shape)
+    {
+        var parts = new List<string>();
+        foreach (var group in new[] { ShapeKeyframeGroup.Offset, ShapeKeyframeGroup.Size, ShapeKeyframeGroup.Points })
+        {
+            if (!KeyframeInspectorState.HasGroup(group, shape)) continue;
+            var (type, easing) = Stored(shape, group);
+            Add(parts, group.ToString().ToLowerInvariant(), KeyframeInspectorState.IsEffectivelyKeyframe(group, shape, chain), type, easing);
+        }
+        return string.Join(" ", parts);
+    }
+
+    private static void Add(List<string> parts, string group, bool isKeyframe, string? type, string? easing)
+    {
+        if (!isKeyframe) parts.Add($"{group}=skip");
+        if (type is not null) parts.Add($"{group}-curve={type}{(easing is not null ? "/" + easing : "")}");
     }
 
     private static IEnumerable<ShapeSave> Shapes(AnimationFrameSave frame) =>

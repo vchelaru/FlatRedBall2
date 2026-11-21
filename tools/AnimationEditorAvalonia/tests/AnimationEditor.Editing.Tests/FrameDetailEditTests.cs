@@ -15,6 +15,7 @@ public class FrameDetailEditTests : IDisposable
     private readonly AARectSave _rect3 = new() { Name = "C", ScaleX = 1, ScaleY = 1 };
     private readonly CircleSave _circle = new() { Name = "Foot", Radius = 2 };
     private readonly PolygonSave _poly = new() { Name = "Poly" };
+    private readonly PolygonSave _poly2 = new() { Name = "Poly" };
 
     public FrameDetailEditTests()
     {
@@ -33,6 +34,7 @@ public class FrameDetailEditTests : IDisposable
         foreach (var (x, y) in new[] { (0f, 0f), (4f, 0f), (4f, 4f) })
             _poly.Points.Add(new Vector2Save { X = x, Y = y });
         shapes.Add(_poly);
+        _walk.Frames[2].ShapesSave!.Add(_poly2);
         _acls.AnimationChains.Add(_walk);
         _g.ProjectManager.AnimationChainListSave = _acls;
         _g.ProjectManager.FileName = Path.Combine(_g.Root, "hero.achx");
@@ -151,13 +153,13 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframe_Off_ThenOn_OneStepEach_NoOpWhenAlreadySo()
     {
-        var off = FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, false);
+        var off = FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(1), KeyframeGroup.Offset, false);
 
         off.ChangedItems.ShouldBe(["Walk/1"]);
         F(1).SkipOffsetKeyframe.ShouldBeTrue();
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, false)
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(1), KeyframeGroup.Offset, false)
             .ChangedItems.ShouldBeEmpty();
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, true).Success.ShouldBeTrue();
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(1), KeyframeGroup.Offset, true).Success.ShouldBeTrue();
         F(1).SkipOffsetKeyframe.ShouldBeFalse();
         UndoDepth().ShouldBe(2);
     }
@@ -165,7 +167,7 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframe_ColorGroup_SetsColorFlag()
     {
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(2), KeyframeGroup.Color, false).Success.ShouldBeTrue();
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(2), KeyframeGroup.Color, false).Success.ShouldBeTrue();
 
         F(2).SkipColorKeyframe.ShouldBeTrue();
         F(2).SkipOffsetKeyframe.ShouldBeFalse();
@@ -174,9 +176,9 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframe_FirstFrame_CannotBeTurnedOff_ButOnIsNoOp()
     {
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(0), KeyframeGroup.Offset, false)
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(0), KeyframeGroup.Offset, false)
             .Success.ShouldBeFalse();
-        var on = FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(0), KeyframeGroup.Offset, true);
+        var on = FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(0), KeyframeGroup.Offset, true);
 
         on.Success.ShouldBeTrue();
         on.ChangedItems.ShouldBeEmpty();
@@ -186,11 +188,11 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframeCurve_StoresPickerPair_OneStep_NoOpWhenSame()
     {
-        var r = FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.EaseIn);
+        var r = FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.EaseIn);
 
         r.ChangedItems.ShouldBe(["Walk/1"]);
         (F(1).OffsetInterpolation, F(1).OffsetEasing).ShouldBe(("Quadratic", "In"));
-        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.EaseIn)
+        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.EaseIn)
             .ChangedItems.ShouldBeEmpty();
         UndoDepth().ShouldBe(1);
     }
@@ -198,9 +200,9 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframeCurve_Snap_ClearsStoredPair()
     {
-        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Color, KeyframeCurveChoice.Bounce);
+        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Color, KeyframeCurveChoice.Bounce);
 
-        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Color, KeyframeCurveChoice.Snap);
+        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Color, KeyframeCurveChoice.Snap);
 
         F(1).ColorInterpolation.ShouldBeNull();
         F(1).ColorEasing.ShouldBeNull();
@@ -209,9 +211,9 @@ public class FrameDetailEditTests : IDisposable
     [Fact]
     public void FrameKeyframeCurve_OnNonKeyframe_FailsWithAdvice()
     {
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, false);
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(1), KeyframeGroup.Offset, false);
 
-        var r = FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.Linear);
+        var r = FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.Linear);
 
         r.Success.ShouldBeFalse();
         r.Errors[0].ShouldContain("keyframe");
@@ -223,9 +225,9 @@ public class FrameDetailEditTests : IDisposable
     {
         _walk.IsLocked = true;
 
-        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, false)
+        FrameDetailEdit.SetFrameKeyframe(_g.Commands, _walk, F(1), KeyframeGroup.Offset, false)
             .HasError(EditErrorCode.Locked).ShouldBeTrue();
-        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _g.ObjectFinder, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.Linear)
+        FrameDetailEdit.SetFrameKeyframeCurve(_g.Commands, _walk, F(1), KeyframeGroup.Offset, KeyframeCurveChoice.Linear)
             .HasError(EditErrorCode.Locked).ShouldBeTrue();
         F(1).SkipOffsetKeyframe.ShouldBeFalse();
     }
@@ -252,8 +254,8 @@ public class FrameDetailEditTests : IDisposable
     {
         FrameDetailEdit.SetShapeKeyframe(_g.Commands, _g.ObjectFinder, _poly, ShapeKeyframeGroup.Size, false).Success.ShouldBeFalse();
         FrameDetailEdit.SetShapeKeyframe(_g.Commands, _g.ObjectFinder, _rect2, ShapeKeyframeGroup.Points, false).Success.ShouldBeFalse();
-        FrameDetailEdit.SetShapeKeyframe(_g.Commands, _g.ObjectFinder, _poly, ShapeKeyframeGroup.Points, false).Success.ShouldBeTrue();
-        _poly.SkipPointsKeyframe.ShouldBeTrue();
+        FrameDetailEdit.SetShapeKeyframe(_g.Commands, _g.ObjectFinder, _poly2, ShapeKeyframeGroup.Points, false).Success.ShouldBeTrue();
+        _poly2.SkipPointsKeyframe.ShouldBeTrue();
     }
 
     [Fact]
