@@ -27,12 +27,12 @@ public static class StructureEdit
         if (check is not null) return check;
 
         var chain = commands.AddAnimationChainWithName(name);
-        return chain is null ? Fail(EditErrorCode.Unspecified, $"Could not add chain '{name}'.") : Ok(chain.Name);
+        return chain is null ? Fail(EditErrorCode.Refused, $"Could not add chain '{name}'.") : Ok(chain.Name);
     }
 
     public static EditResult DeleteChain(IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain)
     {
-        if (!Contains(projectManager, chain)) return Fail(EditErrorCode.Unspecified, $"Chain '{chain.Name}' is not in the file.");
+        if (!Contains(projectManager, chain)) return Fail(EditErrorCode.NotFound, $"Chain '{chain.Name}' is not in the file.");
         if (chain.IsLocked) return LockedFail(chain);
 
         commands.DeleteAnimationChains([chain]);
@@ -46,7 +46,7 @@ public static class StructureEdit
     public static EditResult DuplicateChain(
         IProjectManager projectManager, IAppCommands commands, AnimationChainSave source, string? newName)
     {
-        if (!Contains(projectManager, source)) return Fail(EditErrorCode.Unspecified, $"Chain '{source.Name}' is not in the file.");
+        if (!Contains(projectManager, source)) return Fail(EditErrorCode.NotFound, $"Chain '{source.Name}' is not in the file.");
 
         if (newName is not null)
         {
@@ -56,7 +56,7 @@ public static class StructureEdit
         }
 
         var copy = commands.DuplicateChain(source, ChainFlip.None, newName);
-        return copy is null ? Fail(EditErrorCode.Unspecified, $"Could not duplicate chain '{source.Name}'.") : Ok(copy.Name);
+        return copy is null ? Fail(EditErrorCode.Refused, $"Could not duplicate chain '{source.Name}'.") : Ok(copy.Name);
     }
 
     /// <summary>Moves <paramref name="chain"/> so it ends up at zero-based <paramref name="index"/>.</summary>
@@ -65,7 +65,7 @@ public static class StructureEdit
     {
         var chains = projectManager.AnimationChainListSave?.AnimationChains;
         var current = chains?.IndexOf(chain) ?? -1;
-        if (chains is null || current < 0) return Fail(EditErrorCode.Unspecified, $"Chain '{chain.Name}' is not in the file.");
+        if (chains is null || current < 0) return Fail(EditErrorCode.NotFound, $"Chain '{chain.Name}' is not in the file.");
         if (index < 0 || index >= chains.Count) return OutOfRange(index, chains.Count, "chain");
 
         if (index == current) return Ok();
@@ -90,17 +90,17 @@ public static class StructureEdit
         if (!probe.CanDecode(absoluteTexture))
             return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
         if (length is { } l && !(l > 0f))
-            return Fail(EditErrorCode.Unspecified, "A frame length must be greater than zero.");
+            return Fail(EditErrorCode.InvalidValue, "A frame length must be greater than zero.");
 
         (int W, int H) size = default;
         if (region is { } r)
         {
             var read = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
             if (read is null)
-                return Fail(EditErrorCode.Unspecified, "A region needs the texture's size, which is only read from PNG files.");
+                return Fail(EditErrorCode.UnsupportedFile, "A region needs the texture's size, which is only read from PNG files.");
             size = read.Value;
             if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X + r.Width > size.W || r.Y + r.Height > size.H)
-                return Fail(EditErrorCode.Unspecified,
+                return Fail(EditErrorCode.InvalidValue,
                     $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.W}x{size.H} texture.");
         }
 
@@ -130,7 +130,7 @@ public static class StructureEdit
     {
         if (chain.IsLocked) return LockedFail(chain);
         if (cellWidth <= 0 || cellHeight <= 0 || columns <= 0 || rows <= 0)
-            return Fail(EditErrorCode.Unspecified, "cellWidth, cellHeight, columns and rows must all be greater than zero.");
+            return Fail(EditErrorCode.InvalidValue, "cellWidth, cellHeight, columns and rows must all be greater than zero.");
         if (!File.Exists(absoluteTexture))
             return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absoluteTexture}");
         if (!probe.CanDecode(absoluteTexture))
@@ -138,9 +138,9 @@ public static class StructureEdit
 
         var size = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
         if (size is null)
-            return Fail(EditErrorCode.Unspecified, "A grid needs the texture's size, which is only read from PNG files.");
+            return Fail(EditErrorCode.UnsupportedFile, "A grid needs the texture's size, which is only read from PNG files.");
         if ((long)columns * cellWidth > size.Value.W || (long)rows * cellHeight > size.Value.H)
-            return Fail(EditErrorCode.Unspecified,
+            return Fail(EditErrorCode.InvalidValue,
                 $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells does not fit the {size.Value.W}x{size.Value.H} texture.");
 
         var cells = columns * rows;
@@ -163,7 +163,7 @@ public static class StructureEdit
     public static EditResult DeleteFrame(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame)
     {
         var index = chain.Frames.IndexOf(frame);
-        if (index < 0) return Fail(EditErrorCode.Unspecified, $"The frame is not in chain '{chain.Name}'.");
+        if (index < 0) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
         if (chain.IsLocked) return LockedFail(chain);
 
         commands.DeleteFrames([frame]);
@@ -174,12 +174,12 @@ public static class StructureEdit
     public static EditResult DuplicateFrame(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame)
     {
         var index = chain.Frames.IndexOf(frame);
-        if (index < 0) return Fail(EditErrorCode.Unspecified, $"The frame is not in chain '{chain.Name}'.");
+        if (index < 0) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
         if (chain.IsLocked) return LockedFail(chain);
 
         var copy = commands.DuplicateFrame(frame, chain);
         return copy is null
-            ? Fail(EditErrorCode.Unspecified, $"Could not duplicate frame {index} of '{chain.Name}'.")
+            ? Fail(EditErrorCode.Refused, $"Could not duplicate frame {index} of '{chain.Name}'.")
             : Ok($"{chain.Name}/{chain.Frames.IndexOf(copy)}");
     }
 
@@ -187,7 +187,7 @@ public static class StructureEdit
     public static EditResult ReorderFrame(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame, int index)
     {
         var current = chain.Frames.IndexOf(frame);
-        if (current < 0) return Fail(EditErrorCode.Unspecified, $"The frame is not in chain '{chain.Name}'.");
+        if (current < 0) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
         if (chain.IsLocked) return LockedFail(chain);
         if (index < 0 || index >= chain.Frames.Count) return OutOfRange(index, chain.Frames.Count, "frame");
 
@@ -200,7 +200,7 @@ public static class StructureEdit
     private static EditResult? CheckNewChainName(IProjectManager projectManager, string name)
     {
         if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Chain name cannot be empty.");
-        if (name.Contains('/')) return Fail(EditErrorCode.Unspecified, $"Chain name '{name}' cannot contain '/'.");
+        if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"Chain name '{name}' cannot contain '/'.");
         if (projectManager.AnimationChainListSave?.AnimationChains.Any(c => c.Name == name) == true)
             return Fail(EditErrorCode.DuplicateName, $"A chain named '{name}' already exists.");
         return null;

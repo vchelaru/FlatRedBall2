@@ -23,22 +23,22 @@ public static class SequenceAddress
 {
     public static SeqAddrResult ResolveSequence(SequenceListSave save, string address)
     {
-        if (address.Length == 0) return Fail("A sequence address cannot be empty.");
-        if (address.Contains('/')) return Fail($"'{address}' is not a sequence name: names containing '/' cannot be addressed.");
+        if (address.Length == 0) return Fail("A sequence address cannot be empty.", EditErrorCode.InvalidAddress);
+        if (address.Contains('/')) return Fail($"'{address}' is not a sequence name: names containing '/' cannot be addressed.", EditErrorCode.InvalidAddress);
 
         var matches = Enumerable.Range(0, save.Sequences.Count).Where(i => save.Sequences[i].Name == address).ToList();
         return matches.Count switch
         {
             0 => Fail($"No sequence named '{address}'.", EditErrorCode.NotFound),
             1 => new SeqAddrResult(new SeqAddr(matches[0]), null),
-            _ => Fail($"More than one sequence is named '{address}'; rename them in the editor first."),
+            _ => Fail($"More than one sequence is named '{address}'; rename them in the editor first.", EditErrorCode.Ambiguous),
         };
     }
 
     public static SeqAddrResult ResolveTrack(SequenceListSave save, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 2) return Fail($"'{address}' is not a track address; expected Sequence/Track.");
+        if (parts.Length != 2) return Fail($"'{address}' is not a track address; expected Sequence/Track.", EditErrorCode.InvalidAddress);
         var sequence = ResolveSequence(save, parts[0]);
         if (!sequence.Ok) return sequence;
         return TrackIn(save, sequence.Value!.Sequence, parts[1]);
@@ -47,11 +47,11 @@ public static class SequenceAddress
     public static SeqAddrResult ResolveBlock(SequenceListSave save, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 3) return Fail($"'{address}' is not a block address; expected Sequence/Track/index.");
+        if (parts.Length != 3) return Fail($"'{address}' is not a block address; expected Sequence/Track/index.", EditErrorCode.InvalidAddress);
         var track = ResolveTrack(save, $"{parts[0]}/{parts[1]}");
         if (!track.Ok) return track;
         if (parts[2].Length == 0 || !parts[2].All(char.IsAsciiDigit) || parts[2].Length > 9)
-            return Fail($"Block index '{parts[2]}' is not a zero-based index.");
+            return Fail($"Block index '{parts[2]}' is not a zero-based index.", EditErrorCode.InvalidAddress);
 
         int index = int.Parse(parts[2], CultureInfo.InvariantCulture);
         var owner = save.Sequences[track.Value!.Sequence].Tracks[track.Value.Track];
@@ -67,12 +67,12 @@ public static class SequenceAddress
     private static SeqAddrResult TrackIn(SequenceListSave save, int sequence, string segment)
     {
         var tracks = save.Sequences[sequence].Tracks;
-        if (segment.Length == 0) return Fail("A track name or index cannot be empty.");
+        if (segment.Length == 0) return Fail("A track name or index cannot be empty.", EditErrorCode.InvalidAddress);
 
         var named = Enumerable.Range(0, tracks.Count).Where(i => tracks[i].Name == segment).ToList();
         if (named.Count == 1) return new SeqAddrResult(new SeqAddr(sequence, named[0]), null);
         if (named.Count > 1)
-            return Fail($"More than one track of '{save.Sequences[sequence].Name}' is named '{segment}'; rename them in the editor first.");
+            return Fail($"More than one track of '{save.Sequences[sequence].Name}' is named '{segment}'; rename them in the editor first.", EditErrorCode.Ambiguous);
 
         if (!segment.All(char.IsAsciiDigit) || segment.Length > 9)
             return Fail($"No track named '{segment}' in '{save.Sequences[sequence].Name}'.", EditErrorCode.NotFound);
@@ -97,8 +97,8 @@ public static class SequenceSelectors
 {
     public static SelectorExpansion ExpandSequences(SequenceListSave save, string pattern)
     {
-        if (pattern.Length == 0) return Fail("A sequence address cannot be empty.");
-        if (pattern.Contains('/')) return Fail($"'{pattern}' is not a sequence name: names containing '/' cannot be addressed.");
+        if (pattern.Length == 0) return Fail("A sequence address cannot be empty.", EditErrorCode.InvalidAddress);
+        if (pattern.Contains('/')) return Fail($"'{pattern}' is not a sequence name: names containing '/' cannot be addressed.", EditErrorCode.InvalidAddress);
 
         var names = save.Sequences.Select(s => s.Name).Where(n => EditSelectors.IsGlob(pattern) ? EditSelectors.GlobMatches(pattern, n) : n == pattern).Distinct().ToList();
         return names.Count == 0
@@ -109,7 +109,7 @@ public static class SequenceSelectors
     public static SelectorExpansion ExpandTracks(SequenceListSave save, string selector)
     {
         var parts = selector.Split('/');
-        if (parts.Length != 2) return Fail($"'{selector}' is not a track address; expected Sequence/Track.");
+        if (parts.Length != 2) return Fail($"'{selector}' is not a track address; expected Sequence/Track.", EditErrorCode.InvalidAddress);
         var sequences = ExpandSequences(save, parts[0]);
         if (!sequences.Ok) return sequences;
 
@@ -119,7 +119,7 @@ public static class SequenceSelectors
             var tracks = save.Sequences.First(s => s.Name == name).Tracks;
             var chosen = new List<int>();
             var sel = parts[1];
-            if (sel.Length == 0) return Fail("A track name or index cannot be empty.");
+            if (sel.Length == 0) return Fail("A track name or index cannot be empty.", EditErrorCode.InvalidAddress);
 
             if (!EditSelectors.IsGlob(sel) && tracks.Any(t => t.Name == sel))
                 chosen.AddRange(Enumerable.Range(0, tracks.Count).Where(i => tracks[i].Name == sel));
@@ -136,7 +136,7 @@ public static class SequenceSelectors
             {
                 var trackName = tracks[i].Name;
                 if (trackName.Length == 0 || trackName.Contains('/') || tracks.Count(t => t.Name == trackName) > 1)
-                    return Fail($"Track {i} of '{name}' has a name that cannot be addressed ('{trackName}'); rename it in the editor first.");
+                    return Fail($"Track {i} of '{name}' has a name that cannot be addressed ('{trackName}'); rename it in the editor first.", EditErrorCode.InvalidAddress);
                 targets.Add($"{name}/{trackName}");
             }
         }
@@ -148,7 +148,7 @@ public static class SequenceSelectors
     public static SelectorExpansion ExpandBlocks(SequenceListSave save, string selector)
     {
         var parts = selector.Split('/');
-        if (parts.Length != 3) return Fail($"'{selector}' is not a block address; expected Sequence/Track/index.");
+        if (parts.Length != 3) return Fail($"'{selector}' is not a block address; expected Sequence/Track/index.", EditErrorCode.InvalidAddress);
         var tracks = ExpandTracks(save, $"{parts[0]}/{parts[1]}");
         if (!tracks.Ok) return tracks;
 

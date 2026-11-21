@@ -32,7 +32,7 @@ public static class FrameDetailEdit
         commands.AddFrameEvent(frame, name, data);
         return frame.Events.Count == before + 1
             ? Ok(EventAddress(chain, frame, before))
-            : Fail(EditErrorCode.Unspecified, "The event could not be added to this frame.");
+            : Fail(EditErrorCode.Refused, "The event could not be added to this frame.");
     }
 
     /// <summary>Changes an event's name and/or data; an omitted part is kept, empty <paramref name="data"/> clears it.</summary>
@@ -41,7 +41,7 @@ public static class FrameDetailEdit
     {
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
-        if (name is null && data is null) return Fail(EditErrorCode.Unspecified, "An event edit needs a name, data or both.");
+        if (name is null && data is null) return Fail(EditErrorCode.InvalidValue, "An event edit needs a name, data or both.");
         if (name is not null && string.IsNullOrWhiteSpace(name)) return Fail(EditErrorCode.EmptyName, "An event name cannot be empty.");
         var range = CheckEventIndex(chain, frame, index);
         if (range is not null) return range;
@@ -79,7 +79,7 @@ public static class FrameDetailEdit
         bool current = KeyframeInspectorState.IsEffectivelyKeyframe(group, frame, chain);
         if (current == isKeyframe) return Ok();
         if (KeyframeInspectorState.IsFirstFrame(frame, chain))
-            return Fail(EditErrorCode.Unspecified, $"{Address(chain, frame)} is the chain's first frame, which is always a {Word(group)} keyframe.");
+            return Fail(EditErrorCode.Refused, $"{Address(chain, frame)} is the chain's first frame, which is always a {Word(group)} keyframe.");
 
         commands.SetFrameKeyframe([frame], group, isKeyframe);
         return Ok(Address(chain, frame));
@@ -92,7 +92,7 @@ public static class FrameDetailEdit
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
         if (!KeyframeInspectorState.IsEffectivelyKeyframe(group, frame, chain))
-            return Fail(EditErrorCode.Unspecified,
+            return Fail(EditErrorCode.Refused,
                 $"{Address(chain, frame)} is not a {Word(group)} keyframe, so it has no curve; turn the keyframe on first (set-frame-keyframe).");
 
         var (type, easing) = group == KeyframeGroup.Offset
@@ -117,7 +117,7 @@ public static class FrameDetailEdit
 
         if (KeyframeInspectorState.IsEffectivelyKeyframe(group, shape, owner.Chain) == isKeyframe) return Ok();
         if (KeyframeInspectorState.IsRunStart(shape, owner.Chain))
-            return Fail(EditErrorCode.Unspecified, $"'{ShapeAddress(owner, shape)}' is the first of its run of frames, which is always a {Word(group)} keyframe.");
+            return Fail(EditErrorCode.Refused, $"'{ShapeAddress(owner, shape)}' is the first of its run of frames, which is always a {Word(group)} keyframe.");
 
         commands.SetShapeKeyframe([shape], group, isKeyframe);
         return Ok(ShapeAddress(owner, shape));
@@ -132,7 +132,7 @@ public static class FrameDetailEdit
         var missing = CheckGroup(owner, shape, group);
         if (missing is not null) return missing;
         if (!KeyframeInspectorState.IsEffectivelyKeyframe(group, shape, owner.Chain))
-            return Fail(EditErrorCode.Unspecified,
+            return Fail(EditErrorCode.Refused,
                 $"'{ShapeAddress(owner, shape)}' is not a {Word(group)} keyframe, so it has no curve; turn the keyframe on first (set-shape-keyframe).");
 
         var (type, easing) = StoredCurve(shape, group);
@@ -174,7 +174,7 @@ public static class FrameDetailEdit
     {
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
-        if (clear == default) return Fail(EditErrorCode.Unspecified, "A clear needs at least one of red, green, blue, alpha, operation.");
+        if (clear == default) return Fail(EditErrorCode.InvalidValue, "A clear needs at least one of red, green, blue, alpha, operation.");
 
         bool anySet = (clear.Red && frame.Red is not null) || (clear.Green && frame.Green is not null)
             || (clear.Blue && frame.Blue is not null) || (clear.Alpha && frame.Alpha is not null)
@@ -189,7 +189,7 @@ public static class FrameDetailEdit
 
     private static EditResult? CheckFrame(AnimationChainSave chain, AnimationFrameSave frame)
     {
-        if (!chain.Frames.Contains(frame)) return Fail(EditErrorCode.Unspecified, $"The frame is not in chain '{chain.Name}'.");
+        if (!chain.Frames.Contains(frame)) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
         return chain.IsLocked ? StructureEdit.LockedFail(chain) : null;
     }
 
@@ -203,7 +203,7 @@ public static class FrameDetailEdit
         (AnimationChainSave? Chain, AnimationFrameSave? Frame, EditResult? Error) owner, ShapeSave shape, ShapeKeyframeGroup group) =>
         KeyframeInspectorState.HasGroup(group, shape)
             ? null
-            : Fail(EditErrorCode.Unspecified, $"'{ShapeAddress(owner, shape)}' has no {Word(group)} keyframe: " +
+            : Fail(EditErrorCode.Refused, $"'{ShapeAddress(owner, shape)}' has no {Word(group)} keyframe: " +
                 (group == ShapeKeyframeGroup.Points ? "only polygons have points." : "polygons have no size, use points."));
 
     private static (string? Type, string? Easing) StoredCurve(ShapeSave shape, ShapeKeyframeGroup group) => group switch

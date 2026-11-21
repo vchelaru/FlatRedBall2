@@ -50,9 +50,9 @@ public sealed class EditSession
     {
         var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
         if (ext != ".achx" && ext != ".achj" && ext != ".tsx")
-            return Fail($"Only .achx, .achj and .tsx files can be edited: {path}");
+            return Fail($"Only .achx, .achj and .tsx files can be edited: {path}", EditErrorCode.UnsupportedFile);
         if (!File.Exists(path))
-            return Fail($"File not found: {path}");
+            return Fail($"File not found: {path}", EditErrorCode.NotFound);
 
         var session = new EditSession(System.IO.Path.GetFullPath(path));
         string? loadError = null;
@@ -77,8 +77,8 @@ public sealed class EditSession
         if (!ok || session._projectManager.AnimationChainListSave is null)
         {
             if (declinedUv)
-                return Fail($"{System.IO.Path.GetFileName(path)} uses legacy UV coordinates. Open and save it in the editor once to convert it to pixel coordinates.");
-            return Fail($"Could not open {System.IO.Path.GetFileName(path)}: {loadError ?? "unknown error"}");
+                return Fail($"{System.IO.Path.GetFileName(path)} uses legacy UV coordinates. Open and save it in the editor once to convert it to pixel coordinates.", EditErrorCode.UnsupportedFile);
+            return Fail($"Could not open {System.IO.Path.GetFileName(path)}: {loadError ?? "unknown error"}", EditErrorCode.IoFailed);
         }
         return new EditSessionOpen(session, new EditResult([], [], []));
     }
@@ -116,7 +116,8 @@ public sealed class EditSession
         }
         return errors.Count == 0
             ? new EditResult(changed, [], warnings)
-            : new EditResult([], errors.Select(e => $"Could not save {System.IO.Path.GetFileName(Path)}: {e}").ToList(), warnings);
+            : new EditResult([], errors.Select(e => $"Could not save {System.IO.Path.GetFileName(Path)}: {e}").ToList(), warnings,
+                errors.Select(_ => EditErrorCode.IoFailed).ToList());
     }
 
     /// <summary>True when the document is a Tiled .tsx opened as a native project.</summary>

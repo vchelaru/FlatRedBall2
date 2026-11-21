@@ -36,7 +36,7 @@ public static class RenameEdit
 
         return commands.RenameChain(chain, newName)
             ? Ok(newName)
-            : Fail(EditErrorCode.Unspecified, $"Could not rename chain to '{newName}'.");
+            : Fail(EditErrorCode.Refused, $"Could not rename chain to '{newName}'.");
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ public static class RenameEdit
                 commands.SetPolygonProps(frame, polygon, newName, polygon.X, polygon.Y);
                 break;
             default:
-                return Fail(EditErrorCode.Unspecified, $"Cannot rename a {shape.GetType().Name}.");
+                return Fail(EditErrorCode.WrongShapeType, $"Cannot rename a {shape.GetType().Name}.");
         }
         return Ok(newName);
     }

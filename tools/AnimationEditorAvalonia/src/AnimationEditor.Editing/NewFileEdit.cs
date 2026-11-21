@@ -21,7 +21,7 @@ public static class NewFileEdit
     {
         var name = new FilePath(path).NoPath;
         if (new FilePath(path).Extension == "tsx")
-            return Failed(name, "aecli does not create Tiled tilesets; author the .tsx in Tiled, then describe and edit it here.");
+            return Failed(name, "aecli does not create Tiled tilesets; author the .tsx in Tiled, then describe and edit it here.", EditErrorCode.UnsupportedFile);
         try
         {
             using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
@@ -34,7 +34,7 @@ public static class NewFileEdit
         }
         catch (Exception ex)
         {
-            return Failed(name, ex.Message);
+            return Failed(name, ex.Message, EditErrorCode.IoFailed);
         }
     }
 
@@ -57,7 +57,7 @@ public static class NewFileEdit
         }
         catch (Exception ex)
         {
-            return Failed(name, ex.Message);
+            return Failed(name, ex.Message, EditErrorCode.IoFailed);
         }
     }
 
