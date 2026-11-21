@@ -114,6 +114,37 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
         listedEngineProjects.OrderBy(p => p).ShouldBe(closure.OrderBy(p => p));
     }
 
+    // A project name with spaces ("Tales Of Hollows") once produced folders/files with spaces but a
+    // .slnx and ProjectReferences pointing at underscored paths, plus an invalid C# namespace.
+    [Theory]
+    [InlineData("frb2-desktop")]
+    [InlineData("frb2-multiplatform")]
+    public void ProjectNameWithSpaces_ProducesConsistentPathsAndValidNamespace(string template)
+    {
+        var output = _fixture.Generate(template, enginePath: null, projectName: "Tales Of Hollows");
+
+        foreach (var csproj in Directory.GetFiles(output, "*.csproj", SearchOption.AllDirectories))
+        {
+            foreach (var reference in ProjectReferences(csproj))
+            {
+                File.Exists(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(csproj)!, reference)))
+                    .ShouldBeTrue($"{csproj} references missing {reference}");
+            }
+        }
+
+        var slnx = Directory.GetFiles(output, "*.slnx").Single();
+        foreach (var path in SlnxPaths(output, Path.GetFileName(slnx)))
+        {
+            File.Exists(Path.Combine(output, path)).ShouldBeTrue($"solution lists missing {path}");
+        }
+
+        foreach (var csproj in Directory.GetFiles(output, "*.csproj", SearchOption.AllDirectories))
+        {
+            Regex.Matches(File.ReadAllText(csproj), @"<RootNamespace>([^<]+)</RootNamespace>")
+                .ShouldAllBe(m => !m.Groups[1].Value.Contains(' '), $"{csproj} has a RootNamespace with spaces");
+        }
+    }
+
     // Project-level files only: generated .cs legitimately contains C# "#if KNI" directives.
     private static IEnumerable<string> TextFiles(string root) =>
         Directory.GetFiles(root, "*", SearchOption.AllDirectories)
@@ -124,8 +155,8 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
             .Select(m => m.Groups[1].Value.Replace('\\', '/'))
             .ToList();
 
-    private static List<string> SlnxPaths(string outputDir) =>
-        Regex.Matches(File.ReadAllText(Path.Combine(outputDir, "Game.slnx")), @"<Project\s+Path=""([^""]+)""")
+    private static List<string> SlnxPaths(string outputDir, string slnxName = "Game.slnx") =>
+        Regex.Matches(File.ReadAllText(Path.Combine(outputDir, slnxName)), @"<Project\s+Path=""([^""]+)""")
             .Select(m => m.Groups[1].Value.Replace('\\', '/'))
             .ToList();
 
@@ -144,9 +175,9 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
 
         // Returns the generated project folder (named "Game"). Results are cached per
         // (template, enginePath) so each combination runs `dotnet new` once.
-        public string Generate(string template, string? enginePath)
+        public string Generate(string template, string? enginePath, string projectName = "Game")
         {
-            var key = template + "|" + enginePath;
+            var key = template + "|" + enginePath + "|" + projectName;
             if (_generated.TryGetValue(key, out var existing))
             {
                 return existing;
@@ -160,7 +191,7 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
 
             var workDir = Path.Combine(_root, "out-" + _generated.Count);
             Directory.CreateDirectory(workDir);
-            var args = new List<string> { "new", template, "-n", "Game", "--debug:custom-hive", _hive };
+            var args = new List<string> { "new", template, "-n", projectName, "--debug:custom-hive", _hive };
             if (enginePath != null)
             {
                 args.Add("--EnginePath");
@@ -168,7 +199,7 @@ public class TemplateEnginePathParameterTests : IClassFixture<TemplateEnginePath
             }
 
             Run(workDir, args.ToArray());
-            var output = Path.Combine(workDir, "Game");
+            var output = Path.Combine(workDir, projectName);
             _generated[key] = output;
             return output;
         }

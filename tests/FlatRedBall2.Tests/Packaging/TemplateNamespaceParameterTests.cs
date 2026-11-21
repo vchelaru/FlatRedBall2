@@ -22,7 +22,7 @@ public class TemplateNamespaceParameterTests
         replacer.GetProperty("generator").GetString().ShouldBe("coalesce");
         replacer.GetProperty("replaces").GetString().ShouldBe("GameNamespace");
         replacer.GetProperty("parameters").GetProperty("sourceVariableName").GetString().ShouldBe("namespace");
-        replacer.GetProperty("parameters").GetProperty("fallbackVariableName").GetString().ShouldBe("name");
+        replacer.GetProperty("parameters").GetProperty("fallbackVariableName").GetString().ShouldBe("safeName");
     }
 
     // Guards the split between the C# namespace (driven by --namespace, defaulting to the project
