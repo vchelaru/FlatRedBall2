@@ -51,7 +51,7 @@ public static class EditAddress
         var shapes = frame.Value!.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
         var match = shapes.FirstOrDefault(s => s.Name == name && TypeName(s) == type);
         return match is null
-            ? Shape(null, $"No {type} named '{name}' in frame {parts[1]} of '{parts[0]}'.", EditErrorCode.NotFound)
+            ? Shape(null, $"No {type} named '{name}' in frame {parts[1]} of '{parts[0]}'." + NameHints.For(name, shapes.Where(s => TypeName(s) == type).Select(s => s.Name), $"{type}s in that frame"), EditErrorCode.NotFound)
             : new AddressResult<ShapeSave>(match, null);
     }
 
@@ -84,7 +84,7 @@ public static class EditAddress
         var matches = doc.AnimationChains.Where(c => c.Name == name).ToList();
         return matches.Count switch
         {
-            0 => Chain(null, $"No chain named '{name}'.", EditErrorCode.NotFound),
+            0 => Chain(null, $"No chain named '{name}'." + NameHints.For(name, doc.AnimationChains.Select(c => c.Name), "chains"), EditErrorCode.NotFound),
             1 => new AddressResult<AnimationChainSave>(matches[0], null),
             _ => Chain(null, $"More than one chain is named '{name}'; rename them in the editor first.", EditErrorCode.Ambiguous),
         };

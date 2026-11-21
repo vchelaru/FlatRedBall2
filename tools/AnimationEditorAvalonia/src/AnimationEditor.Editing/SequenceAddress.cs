@@ -29,7 +29,7 @@ public static class SequenceAddress
         var matches = Enumerable.Range(0, save.Sequences.Count).Where(i => save.Sequences[i].Name == address).ToList();
         return matches.Count switch
         {
-            0 => Fail($"No sequence named '{address}'.", EditErrorCode.NotFound),
+            0 => Fail($"No sequence named '{address}'." + NameHints.For(address, save.Sequences.Select(s => s.Name), "sequences"), EditErrorCode.NotFound),
             1 => new SeqAddrResult(new SeqAddr(matches[0]), null),
             _ => Fail($"More than one sequence is named '{address}'; rename them in the editor first.", EditErrorCode.Ambiguous),
         };
@@ -75,7 +75,7 @@ public static class SequenceAddress
             return Fail($"More than one track of '{save.Sequences[sequence].Name}' is named '{segment}'; rename them in the editor first.", EditErrorCode.Ambiguous);
 
         if (!segment.All(char.IsAsciiDigit) || segment.Length > 9)
-            return Fail($"No track named '{segment}' in '{save.Sequences[sequence].Name}'.", EditErrorCode.NotFound);
+            return Fail($"No track named '{segment}' in '{save.Sequences[sequence].Name}'." + NameHints.For(segment, tracks.Select(t => t.Name), "tracks"), EditErrorCode.NotFound);
 
         int index = int.Parse(segment, CultureInfo.InvariantCulture);
         return index >= tracks.Count
