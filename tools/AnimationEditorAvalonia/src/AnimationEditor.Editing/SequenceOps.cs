@@ -112,6 +112,11 @@ public static class SequenceOps
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("loops", "number", true, "Cycles, above 0 (fractions allowed)."),
         ]),
+        new("set-block-end", "Sets a chain block's loops so it ends at a time in seconds: loops = (end - start) / chain length, fractions kept. Uses the block's current start, so set that first. A following block still cuts it short. Not for a reference clip (use set-block-loops).",
+        [
+            new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+            new("end", "number", true, "Seconds from the sequence start, after the block's start."),
+        ]),
         new("delete-block", "Deletes a block of a chain track; later blocks shift down. To remove a reference track use delete-track.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
@@ -181,7 +186,7 @@ public static class SequenceOps
     {
         "set-sequence-loop" => "sequence",
         "delete-track" or "set-track-continuous" => "track",
-        "set-block-start" or "set-block-loops" or "delete-block" => "block",
+        "set-block-start" or "set-block-loops" or "set-block-end" or "delete-block" => "block",
         _ => null,
     };
 
@@ -233,6 +238,7 @@ public static class SequenceOps
             case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), (float)Num("loops", 1));
             case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
             case "set-block-loops": return SequenceEdit.SetBlockLoops(doc, undo, target, (float)Num("loops"));
+            case "set-block-end": return SequenceEdit.SetBlockEnd(doc, undo, target, Num("end"));
             case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
             default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");
         }

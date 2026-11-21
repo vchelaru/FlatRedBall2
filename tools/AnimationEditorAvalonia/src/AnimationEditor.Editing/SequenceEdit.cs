@@ -308,6 +308,28 @@ public static class SequenceEdit
         return refused is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refused);
     }
 
+    /// <summary>
+    /// Sets a chain block's loops so its own cycles end at <paramref name="end"/> seconds: (end - start) / chain length,
+    /// keeping the fraction. A reference clip is refused, since its length depends on the played sequence.
+    /// </summary>
+    public static EditResult SetBlockEnd(SequenceDocument doc, IUndoManager undo, string block, double end)
+    {
+        var at = SequenceAddress.ResolveBlock(doc.Save, block);
+        if (!at.Ok) return FromAddress(at);
+        var a = at.Value!;
+        var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
+        if (track.Reference is not null)
+            return Fail(EditErrorCode.WrongTrackKind, "A track that plays a sequence has no chain length; set its clip's loops with set-block-loops.");
+
+        var reference = track.Chains[a.Block];
+        if (!double.IsFinite(end) || end <= reference.Start)
+            return Fail(EditErrorCode.InvalidValue, $"The end {end.ToString(System.Globalization.CultureInfo.InvariantCulture)} must be after the block's start {reference.Start.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+        if (doc.CycleLength(reference) is not { } cycle || cycle <= 0)
+            return Fail(EditErrorCode.NotFound, $"The chain '{reference.Chain}' of '{reference.Source}' is missing or unreadable, so its length is unknown.");
+
+        return SetBlockLoops(doc, undo, block, (float)((end - reference.Start) / cycle));
+    }
+
     /// <summary>Deletes a block of a chain track; later blocks of the track shift down by one. A reference track is deleted whole.</summary>
     public static EditResult DeleteBlock(SequenceDocument doc, IUndoManager undo, string block)
     {
