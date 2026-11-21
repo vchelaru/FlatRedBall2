@@ -42,8 +42,8 @@ public class TsxCommandTests : IDisposable
         frames.GetArrayLength().ShouldBe(3);
         frames[1].GetProperty("texture").GetString().ShouldBe("sheet.png");
         frames[1].GetProperty("length").GetDouble().ShouldBe(0.1, 0.0001);
-        frames[1].GetProperty("region").GetProperty("left").GetDouble().ShouldBe(16);
-        frames[1].GetProperty("region").GetProperty("right").GetDouble().ShouldBe(32);
+        frames[1].GetProperty("region").GetProperty("x").GetDouble().ShouldBe(16);
+        frames[1].GetProperty("region").GetProperty("width").GetDouble().ShouldBe(16);
         frames[2].GetProperty("length").GetDouble().ShouldBe(0.2, 0.0001);
     }
 
@@ -118,7 +118,7 @@ public class TsxCommandTests : IDisposable
         var frames = chain.GetProperty("frames");
         frames.GetArrayLength().ShouldBe(3);
         frames[0].GetProperty("length").GetDouble().ShouldBe(0.25, 0.0001);
-        frames[2].GetProperty("region").GetProperty("top").GetDouble().ShouldBe(16);
+        frames[2].GetProperty("region").GetProperty("y").GetDouble().ShouldBe(16);
 
         var raw = Raw("tiles.tsx");
         raw.ShouldContain("name=\"Name\" value=\"Run\"");
@@ -165,7 +165,7 @@ public class TsxCommandTests : IDisposable
         var r = await Edit("tiles.tsx", """{"ops":[{"op":"set-frame-region","frame":"Walk/0","region":"32,16,16,16"}]}""");
 
         r.Code.ShouldBe(0, r.Out + r.Err);
-        var left = (await Describe("tiles.tsx")).GetProperty("chains")[0].GetProperty("frames")[0].GetProperty("region").GetProperty("left");
+        var left = (await Describe("tiles.tsx")).GetProperty("chains")[0].GetProperty("frames")[0].GetProperty("region").GetProperty("x");
         left.GetDouble().ShouldBe(32);
     }
 

@@ -9,7 +9,7 @@ Headless front end to the AnimationEditor's editing code (`tools/AnimationEditor
 
 | Command | Does |
 |---|---|
-| `describe <file> [--json]` | Chains, frames by index (texture, length, region) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end. |
+| `describe <file> [--json]` | Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end. |
 | `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
@@ -34,7 +34,6 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - Setting a value a thing already has is a no-op. Every edit of a locked chain fails with code `Locked`, except `set-chain-locked` itself; `set-unit` converts locked chains too.
 - `set-frame-length` is in the file's unit and range-checked (0.001-60 s, 1-60000 ms). `set-unit` converts all lengths so playback time stays the same; later ops in the batch use the new unit.
 - `set-frame-region` needs the frame's texture to exist and be a PNG. `set-frame-flip` sets flags (not a toggle) and mirrors the offset and shapes like the editor. `set-frame-color` only sets; `clear-frame-color` returns parts to inherited.
-- `describe` prints a region as `left,top,right,bottom`, but `add-frame` and `set-frame-region` take `x,y,width,height`; convert before pasting it back, or the edit succeeds with the wrong size.
 - Frame indexes shift after `delete-frame`, `duplicate-frame` and `add-frame`; address later frames of the same batch by their new index.
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.

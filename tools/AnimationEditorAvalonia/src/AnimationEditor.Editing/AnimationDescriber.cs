@@ -29,7 +29,7 @@ public static class AnimationDescriber
             {
                 var f = chain.Frames[i];
                 sb.AppendLine(FormattableString.Invariant(
-                    $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate)},{Num(f.BottomCoordinate)}"));
+                    $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate - f.LeftCoordinate)},{Num(f.BottomCoordinate - f.TopCoordinate)}"));
                 var color = ColorText(f);
                 if (color.Length > 0) sb.AppendLine($"       color {color}");
                 var frameKeys = FrameKeyframeText(chain, f);
@@ -70,10 +70,10 @@ public static class AnimationDescriber
                 w.WriteString("texture", f.TextureName);
                 w.WriteNumber("length", f.FrameLength);
                 w.WriteStartObject("region");
-                w.WriteNumber("left", f.LeftCoordinate);
-                w.WriteNumber("top", f.TopCoordinate);
-                w.WriteNumber("right", f.RightCoordinate);
-                w.WriteNumber("bottom", f.BottomCoordinate);
+                w.WriteNumber("x", f.LeftCoordinate);
+                w.WriteNumber("y", f.TopCoordinate);
+                w.WriteNumber("width", f.RightCoordinate - f.LeftCoordinate);
+                w.WriteNumber("height", f.BottomCoordinate - f.TopCoordinate);
                 w.WriteEndObject();
                 if (f.Red is not null || f.Green is not null || f.Blue is not null || f.Alpha is not null || f.ColorOperation is not null)
                 {

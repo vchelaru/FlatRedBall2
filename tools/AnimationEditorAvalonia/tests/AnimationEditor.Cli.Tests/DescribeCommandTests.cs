@@ -45,8 +45,8 @@ public class DescribeCommandTests : IDisposable
         frames[2].GetProperty("texture").GetString().ShouldBe("sheet.png");
         frames[2].GetProperty("length").GetDouble().ShouldBe(0.2, 0.0001);
         var region = frames[2].GetProperty("region");
-        region.GetProperty("left").GetDouble().ShouldBe(32);
-        region.GetProperty("right").GetDouble().ShouldBe(48);
+        region.GetProperty("x").GetDouble().ShouldBe(32);
+        region.GetProperty("width").GetDouble().ShouldBe(16);
         var shapes = frames[2].GetProperty("shapes");
         shapes[0].GetProperty("type").GetString().ShouldBe("rect");
         shapes[0].GetProperty("name").GetString().ShouldBe("Hitbox");
