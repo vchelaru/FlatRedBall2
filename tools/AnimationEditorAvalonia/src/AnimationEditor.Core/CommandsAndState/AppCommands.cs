@@ -2089,10 +2089,10 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
         }
 
-        public void AddFrameEvent(AnimationFrameSave frame, string name)
+        public void AddFrameEvent(AnimationFrameSave frame, string name, string? data = null)
         {
             if (!CanEditFrameEvents(frame)) return;
-            var after = frame.Events.Append(new AnimationFrameEvent { Name = name });
+            var after = frame.Events.Append(new AnimationFrameEvent { Name = name, Data = string.IsNullOrWhiteSpace(data) ? null : data });
             _undoManager.Execute(new SetFrameEventsCommand(frame, after, $"Add Event '{name}'", this, _events));
         }
 
@@ -2228,6 +2228,26 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, "Set Frame Color"));
         }
 
+        public void ClearFrameColorValues(
+            IReadOnlyList<AnimationFrameSave> frames, bool red, bool green, bool blue, bool alpha, bool operation)
+        {
+            if (IsAchxOnlyEditBlocked()) return;
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
+            _undoManager.Execute(new BulkFrameEditCommand(
+                unlockedFrames, () =>
+                {
+                    foreach (var f in unlockedFrames)
+                    {
+                        if (red) f.Red = null;
+                        if (green) f.Green = null;
+                        if (blue) f.Blue = null;
+                        if (alpha) f.Alpha = null;
+                        if (operation) f.ColorOperation = null;
+                    }
+                },
+                this, _events, false, "Clear Frame Color"));
+        }
         public void SetTimeMeasurementUnit(TimeMeasurementUnit unit)
         {
             if (_pm.AnimationChainListSave is not { } list) return;

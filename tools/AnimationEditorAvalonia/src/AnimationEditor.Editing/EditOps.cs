@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Keyframes;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -39,6 +40,11 @@ public static class EditOps
     private static readonly IReadOnlyList<string> ColorOperationValues = ["multiply", "add"];
     private static readonly IReadOnlyList<string> UnitValues = ["second", "millisecond"];
     private static readonly IReadOnlyList<string> ShapeTypeValues = ["rect", "circle", "polygon"];
+    private static readonly IReadOnlyList<string> FrameGroupValues = ["offset", "color"];
+    private static readonly IReadOnlyList<string> ShapeGroupValues = ["offset", "size", "points"];
+    private static readonly IReadOnlyList<string> CurveValues =
+        ["snap", "linear", "ease-in", "ease-out", "ease-in-out", "anticipate", "overshoot", "bounce"];
+    private const string EventAddressDescription = "Event address: Chain/frameIndex/event/eventIndex (zero-based).";
     private const string ShapeAddressDescription = "Shape address: Chain/frameIndex/rect|circle|polygon/name.";
     private const string RegionDescription = "Pixel rectangle of the texture, as x,y,width,height.";
 
@@ -192,6 +198,60 @@ public static class EditOps
             new("shape", "string", true, ShapeAddressDescription),
             new("x", "number", false, "X."),
             new("y", "number", false, "Y."),
+        ]),
+        new("add-frame-event", "Appends a named event to a frame. Data is an optional free-form string the game interprets.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("name", "string", true, "Event name."),
+            new("data", "string", false, "Optional payload."),
+        ]),
+        new("set-frame-event", "Changes an event's name and/or data. Give at least one; an omitted one is kept, empty data clears it.",
+        [
+            new("event", "string", true, EventAddressDescription),
+            new("name", "string", false, "New event name."),
+            new("data", "string", false, "New payload; empty clears it."),
+        ]),
+        new("delete-frame-event", "Deletes one event; later events of the frame shift down by one.",
+        [
+            new("event", "string", true, EventAddressDescription),
+        ]),
+        new("set-frame-keyframe", "Turns a frame's offset or color keyframe on or off. A chain's first frame is always a keyframe. Frames that are not keyframes glide between their neighbours.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("group", "string", true, "Which values glide.", FrameGroupValues),
+            new("value", "boolean", true, "true for a keyframe."),
+        ]),
+        new("set-frame-keyframe-curve", "Sets the curve from a frame's offset or color keyframe to the next one. The frame must be a keyframe of that group.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("group", "string", true, "Which values glide.", FrameGroupValues),
+            new("curve", "string", true, "The curve.", CurveValues),
+        ]),
+        new("set-shape-keyframe", "Turns a shape's offset, size or points keyframe on or off. The first shape of a run of frames holding its name is always a keyframe. Size is for rect and circle, points for polygon.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("group", "string", true, "Which values glide.", ShapeGroupValues),
+            new("value", "boolean", true, "true for a keyframe."),
+        ]),
+        new("set-shape-keyframe-curve", "Sets the curve from a shape's offset, size or points keyframe to the next one. The shape must be a keyframe of that group.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("group", "string", true, "Which values glide.", ShapeGroupValues),
+            new("curve", "string", true, "The curve.", CurveValues),
+        ]),
+        new("reorder-shape", "Moves a shape so it ends up at the given position among the shapes of its own type in the frame. Files store shapes grouped by type, so a shape never crosses types.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("index", "integer", true, "Final zero-based position among shapes of that type, 0 to count - 1."),
+        ]),
+        new("clear-frame-color", "Clears color parts back to inherited from earlier frames (set-frame-color can only set). Give at least one part as true.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("red", "boolean", false, "true to clear red."),
+            new("green", "boolean", false, "true to clear green."),
+            new("blue", "boolean", false, "true to clear blue."),
+            new("alpha", "boolean", false, "true to clear alpha."),
+            new("operation", "boolean", false, "true to clear the color operation."),
         ]),
         new("set-unit", "Changes the file's time unit and converts every frame length (locked chains too) so playback time is unchanged. Later ops in the batch use the new unit.",
         [
@@ -434,6 +494,34 @@ public static class EditOps
             case "set-shape-common":
                 return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape =>
                     ShapeEdit.SetCommon(session.Commands, session.ObjectFinder, shape, Number(op, "x"), Number(op, "y"))));
+            case "add-frame-event":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
+                    FrameDetailEdit.AddFrameEvent(session.Commands, chain, frame, op.Values["name"], op.Values.GetValueOrDefault("data"))));
+            case "set-frame-event":
+                return Task.FromResult(WithEvent(doc, op, e => FrameDetailEdit.SetFrameEvent(
+                    session.Commands, e.Chain, e.Frame, e.Index, op.Values.GetValueOrDefault("name"), op.Values.GetValueOrDefault("data"))));
+            case "delete-frame-event":
+                return Task.FromResult(WithEvent(doc, op, e => FrameDetailEdit.DeleteFrameEvent(session.Commands, e.Chain, e.Frame, e.Index)));
+            case "set-frame-keyframe":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => FrameDetailEdit.SetFrameKeyframe(
+                    session.Commands, chain, frame, op.Values["group"] == "offset" ? KeyframeGroup.Offset : KeyframeGroup.Color, Flag(op, "value"))));
+            case "set-frame-keyframe-curve":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => FrameDetailEdit.SetFrameKeyframeCurve(
+                    session.Commands, chain, frame, op.Values["group"] == "offset" ? KeyframeGroup.Offset : KeyframeGroup.Color, Curve(op))));
+            case "set-shape-keyframe":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => FrameDetailEdit.SetShapeKeyframe(
+                    session.Commands, session.ObjectFinder, shape, ShapeGroup(op), Flag(op, "value"))));
+            case "set-shape-keyframe-curve":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => FrameDetailEdit.SetShapeKeyframeCurve(
+                    session.Commands, session.ObjectFinder, shape, ShapeGroup(op), Curve(op))));
+            case "reorder-shape":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => FrameDetailEdit.ReorderShape(
+                    session.Commands, session.ObjectFinder, shape, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));
+            case "clear-frame-color":
+                return Task.FromResult(WithFrame(doc, op, (chain, frame) => FrameDetailEdit.ClearFrameColor(
+                    session.Commands, chain, frame,
+                    new FrameColorClear(OptionalFlag(op, "red") == true, OptionalFlag(op, "green") == true, OptionalFlag(op, "blue") == true,
+                        OptionalFlag(op, "alpha") == true, OptionalFlag(op, "operation") == true))));
             case "set-unit":
                 return Task.FromResult(PropertyEdit.SetTimeUnit(session.ProjectManager, session.Commands,
                     op.Values["unit"] == "millisecond" ? TimeMeasurementUnit.Millisecond : TimeMeasurementUnit.Second));
@@ -542,6 +630,31 @@ public static class EditOps
         return shape.Value is T typed
             ? apply(typed)
             : Fail($"'{op.Values["shape"]}' is a {EditAddress.TypeName(shape.Value!)}, but {op.Spec.Name} needs a {typeWord}.");
+    }
+
+    private static KeyframeCurveChoice Curve(EditOp op) => op.Values["curve"] switch
+    {
+        "snap" => KeyframeCurveChoice.Snap,
+        "linear" => KeyframeCurveChoice.Linear,
+        "ease-in" => KeyframeCurveChoice.EaseIn,
+        "ease-out" => KeyframeCurveChoice.EaseOut,
+        "ease-in-out" => KeyframeCurveChoice.EaseInOut,
+        "anticipate" => KeyframeCurveChoice.Anticipate,
+        "overshoot" => KeyframeCurveChoice.Overshoot,
+        _ => KeyframeCurveChoice.Bounce,
+    };
+
+    private static ShapeKeyframeGroup ShapeGroup(EditOp op) => op.Values["group"] switch
+    {
+        "offset" => ShapeKeyframeGroup.Offset,
+        "size" => ShapeKeyframeGroup.Size,
+        _ => ShapeKeyframeGroup.Points,
+    };
+
+    private static EditResult WithEvent(AnimationChainListSave doc, EditOp op, Func<FrameEventRef, EditResult> apply)
+    {
+        var e = EditAddress.ResolveEvent(doc, op.Values["event"]);
+        return e.Ok ? apply(e.Value!) : Fail(e.Error!);
     }
 
     private static EditResult WithChain(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, EditResult> apply)

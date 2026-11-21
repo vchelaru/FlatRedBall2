@@ -135,6 +135,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameColor)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColorValues)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.ClearFrameColorValues)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetTimeMeasurementUnit)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframe)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameKeyframeCurve)]        = Category.MutatingUndoable,
@@ -416,6 +417,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(new[] { Zebra(ctx).Frames[0] }, ColorOperation.Add)));
         yield return Row(nameof(IAppCommands.SetFrameColorValues),
             ctx => Sync(() => ctx.AppCommands.SetFrameColorValues(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128, 100, ColorOperation.Add)));
+        yield return Row(nameof(IAppCommands.ClearFrameColorValues),
+            ctx => Sync(() => ctx.AppCommands.ClearFrameColorValues(new[] { Zebra(ctx).Frames[2] }, false, true, false, false, false)));
         yield return Row(nameof(IAppCommands.SetTimeMeasurementUnit),
             ctx => Sync(() => ctx.AppCommands.SetTimeMeasurementUnit(TimeMeasurementUnit.Millisecond)));
         yield return Row(nameof(IAppCommands.SetFrameKeyframe),
@@ -547,6 +550,7 @@ public class UndoCoverageRosterTests
             polygon.Points.Add(new Vector2Save { X = x, Y = y });
         zebra.Frames[0].ShapesSave!.Add(polygon);
         zebra.Frames[1].Events.Add(new AnimationFrameEvent { Name = "Step" });
+        zebra.Frames[2].Green = 40;
 
         var alpha = new AnimationChainSave { Name = "Alpha" };
         alpha.Frames.Add(new AnimationFrameSave

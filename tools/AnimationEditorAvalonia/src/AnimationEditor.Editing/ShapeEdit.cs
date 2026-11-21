@@ -168,7 +168,7 @@ public static class ShapeEdit
         return Ok(Address(owner.Chain!, owner.Frame!, EditAddress.TypeName(shape), shape.Name));
     }
 
-    private static (AnimationChainSave? Chain, AnimationFrameSave? Frame, EditResult? Error) Owner(IObjectFinder finder, ShapeSave shape)
+    internal static (AnimationChainSave? Chain, AnimationFrameSave? Frame, EditResult? Error) Owner(IObjectFinder finder, ShapeSave shape)
     {
         var frame = finder.GetAnimationFrameContaining(shape);
         var chain = frame is null ? null : finder.GetAnimationChainContaining(frame);
@@ -187,7 +187,7 @@ public static class ShapeEdit
             ? Fail(EditErrorCode.Unspecified, $"{field} must be greater than zero (a shape's scale and radius are half-extents).")
             : null;
 
-    private static string Address(AnimationChainSave chain, AnimationFrameSave frame, string type, string name) =>
+    internal static string Address(AnimationChainSave chain, AnimationFrameSave frame, string type, string name) =>
         $"{chain.Name}/{chain.Frames.IndexOf(frame)}/{type}/{name}";
 
     private static EditResult Ok(params string[] changed) => new(changed, [], []);

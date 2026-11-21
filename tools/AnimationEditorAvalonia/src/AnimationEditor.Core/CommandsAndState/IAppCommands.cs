@@ -405,10 +405,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Appends an event named <paramref name="name"/> to <paramref name="frame"/>'s
-        /// <see cref="AnimationFrameSave.Events"/>. Undoable. No-op on a locked frame or in a native
+        /// <see cref="AnimationFrameSave.Events"/> with optional <paramref name="data"/> (blank is stored as null). Undoable. No-op on a locked frame or in a native
         /// tsx project (a Tiled tile animation can't hold events).
         /// </summary>
-        void AddFrameEvent(AnimationFrameSave frame, string name);
+        void AddFrameEvent(AnimationFrameSave frame, string name, string? data = null);
 
         /// <summary>
         /// Replaces the name and data of the event at <paramref name="index"/>. Blank
@@ -453,6 +453,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Values are stored as given; the caller validates ranges.
         /// </summary>
         void SetFrameColorValues(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue, int? alpha, ColorOperation? operation);
+        /// <summary>
+        /// Clears the chosen color parts (R/G/B/alpha/operation) back to inherited (null) on every frame in ONE undo step.
+        /// The counterpart of <see cref="SetFrameColorValues"/>, which can only set.
+        /// </summary>
+        void ClearFrameColorValues(IReadOnlyList<AnimationFrameSave> frames, bool red, bool green, bool blue, bool alpha, bool operation);
         /// <summary>
         /// Changes the file's time unit and converts every frame length (locked chains included) so playback
         /// time is unchanged. One undo step; no-op when the unit is already <paramref name="unit"/>.
