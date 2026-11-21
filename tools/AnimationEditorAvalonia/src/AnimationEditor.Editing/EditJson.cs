@@ -62,6 +62,7 @@ public static class EditJson
     {
         w.WriteStartObject();
         w.WriteString("format", "{\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}");
+        w.WriteString("selectors", EditOps.SelectorSyntax);
         w.WriteStartArray("ops");
         foreach (var spec in EditOps.Specs)
         {
@@ -96,6 +97,7 @@ public static class EditJson
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
+        sb.AppendLine(EditOps.SelectorSyntax);
         foreach (var spec in EditOps.Specs)
         {
             sb.AppendLine();
