@@ -59,7 +59,7 @@ Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an inde
 
 ## Tiled tilesets (.tsx)
 
-`describe`, `check` and `edit` open a `.tsx` as the editor's native project (`TsxOpPolicy`, `TsxEdit` in `AnimationEditor.Editing`). A tileset the editor cannot open (image collection, transformations, or one already an association target) is refused up front with the editor's reason (`UnsupportedTsx`). `describe` shows pixels and each chain's `ownerTile`.
+`describe`, `check` and `edit` open a `.tsx` as the editor's native project (`TsxOpPolicy`, `TsxEdit` in `AnimationEditor.Editing`). A tileset the editor cannot open (image collection, or one already an association target) is refused up front with the editor's reason (`UnsupportedTsx`). `describe` shows pixels and each chain's `ownerTile`.
 
 - A tile animation stores only frame rectangles and durations, so only chain ops (`rename|add|delete|duplicate|reorder-chain`), frame ops (`add-frame`, `add-frames-grid`, `delete|duplicate|reorder-frame`, `set-frame-length|region`) and `set-chain-owner-tile` work. Anything else fails with `NotSupportedInTsx` and the reason. `add-frame` needs `region` and the tileset's own image.
 - `set-chain-owner-tile` takes `tile` or `clear` (back to the first frame's tile). A tile owned by another chain fails; a duplicated chain shares its source's tile, so give it one in the same batch or the batch fails (`DuplicateOwnerTile`). Frames that are not whole tiles fail the batch (`UnmappableChain`).
