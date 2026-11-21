@@ -64,28 +64,34 @@ public static class EditJson
         w.WriteString("format", "{\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}");
         w.WriteString("selectors", EditOps.SelectorSyntax);
         w.WriteStartArray("ops");
-        foreach (var spec in EditOps.Specs)
+        foreach (var spec in EditOps.Specs) WriteSpec(w, spec);
+        w.WriteEndArray();
+        w.WriteString("sequenceSelectors", SequenceOps.AddressSyntax);
+        w.WriteStartArray("sequenceOps");
+        foreach (var spec in SequenceOps.Specs) WriteSpec(w, spec);
+        w.WriteEndArray();
+        w.WriteEndObject();
+    }
+
+    private static void WriteSpec(Utf8JsonWriter w, OpSpec spec)
+    {
+        w.WriteStartObject();
+        w.WriteString("op", spec.Name);
+        w.WriteString("description", spec.Description);
+        w.WriteStartArray("fields");
+        foreach (var f in spec.Fields)
         {
             w.WriteStartObject();
-            w.WriteString("op", spec.Name);
-            w.WriteString("description", spec.Description);
-            w.WriteStartArray("fields");
-            foreach (var f in spec.Fields)
+            w.WriteString("name", f.Name);
+            w.WriteString("type", f.Type);
+            w.WriteBoolean("required", f.Required);
+            w.WriteString("description", f.Description);
+            if (f.Values is not null)
             {
-                w.WriteStartObject();
-                w.WriteString("name", f.Name);
-                w.WriteString("type", f.Type);
-                w.WriteBoolean("required", f.Required);
-                w.WriteString("description", f.Description);
-                if (f.Values is not null)
-                {
-                    w.WriteStartArray("values");
-                    foreach (var v in f.Values) w.WriteStringValue(v);
-                    w.WriteEndArray();
-                }
-                w.WriteEndObject();
+                w.WriteStartArray("values");
+                foreach (var v in f.Values) w.WriteStringValue(v);
+                w.WriteEndArray();
             }
-            w.WriteEndArray();
             w.WriteEndObject();
         }
         w.WriteEndArray();
@@ -95,10 +101,20 @@ public static class EditJson
     public static string SchemaText()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
+        sb.AppendLine("Animation files (.achx/.achj). Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
         sb.AppendLine(EditOps.SelectorSyntax);
-        foreach (var spec in EditOps.Specs)
+        AppendSpecs(sb, EditOps.Specs);
+        sb.AppendLine();
+        sb.AppendLine("Sequence files (.seqj) take these ops instead; the file extension picks the set.");
+        sb.AppendLine(SequenceOps.AddressSyntax);
+        AppendSpecs(sb, SequenceOps.Specs);
+        return sb.ToString();
+    }
+
+    private static void AppendSpecs(System.Text.StringBuilder sb, IReadOnlyList<OpSpec> specs)
+    {
+        foreach (var spec in specs)
         {
             sb.AppendLine();
             sb.AppendLine($"{spec.Name}: {spec.Description}");
@@ -108,6 +124,5 @@ public static class EditJson
                 sb.AppendLine($"  {f.Name}  {f.Type}{values}  {(f.Required ? "required" : "optional")}  {f.Description}");
             }
         }
-        return sb.ToString();
     }
 }

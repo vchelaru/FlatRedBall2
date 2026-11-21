@@ -122,7 +122,7 @@ public class SequenceEditTests : IDisposable
         var s = _w.Open();
 
         Run(s, () => SequenceEdit.AddTrack(s.Document, s.Undo, "Run", "Arm", null)).Success.ShouldBeTrue();
-        Run(s, () => SequenceEdit.AddTrack(s.Document, s.Undo, "Run", "Leg", 3)).Success.ShouldBeTrue();
+        Run(s, () => SequenceEdit.AddTrack(s.Document, s.Undo, "Run", "Leg", 2)).Success.ShouldBeTrue();
         var plain = Run(s, () => SequenceEdit.AddTrack(s.Document, s.Undo, "Run", null, null));
 
         plain.ChangedItems.ShouldBe(["Run/Track"]);
@@ -314,7 +314,7 @@ public class SequenceEditTests : IDisposable
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/1", 2)).CodeAt(0).ShouldBe(EditErrorCode.IndexOutOfRange);
         Run(s, () => SequenceEdit.DeleteBlock(s.Document, s.Undo, "Rest/Run/0")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
 
-        var clip = Seq(s, "Rest").Tracks[1].Reference!;
+        var clip = Seq(s, "Rest").Tracks[0].Reference!;
         (clip.Start, clip.Loops).ShouldBe((2.0, 3f));
     }
 

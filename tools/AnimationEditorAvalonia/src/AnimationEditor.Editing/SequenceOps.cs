@@ -1,0 +1,239 @@
+using System.Globalization;
+
+namespace AnimationEditor.Editing;
+
+/// <summary>
+/// The operations an ops file for a <c>.seqj</c> can hold (#1811), run by <see cref="Apply"/>. Same file shape and parser
+/// as <see cref="EditOps"/> (<c>{"ops":[{"op":"add-block",...}, ...]}</c>, applied in order); addresses are described on
+/// <see cref="SequenceAddress"/>. <see cref="Specs"/> is the single source for validation and for <c>--schema</c>.
+/// </summary>
+public static class SequenceOps
+{
+    /// <summary>How <c>--schema</c> explains sequence addressing; shared by the text and JSON output.</summary>
+    public const string AddressSyntax =
+        "Sequence files (.seqj): sequence Run, track Run/Body or Run/0 (name wins over index), block Run/Body/1 (zero-based index in the track). "
+        + "A track that plays another sequence has one block, its clip, at index 0. "
+        + "Selectors: set-sequence-loop takes a glob over sequence names (R*, *); set-track-continuous and delete-track take a track name, glob or index selector "
+        + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-loops and delete-block take the same track part and a block index selector "
+        + "(Run/Body/*, Run/*/0, Run/Body/0-1). Every other op takes one exact address. A selector matching nothing is NoMatch, an index past the end is "
+        + "IndexOutOfRange, and any failing target fails the whole batch and nothing is written. delete-block and delete-track run from the highest index down. "
+        + "Sources are named as listed in the file (relative to the .seqj). Times are seconds; loops are playback cycles of the chain (above 0). "
+        + "Tracks draw in list order, index 0 in front; add-track and add-reference-track insert at index (default 0, the front).";
+
+    private const string SequenceAddressDescription = "Sequence name.";
+    private const string TrackAddressDescription = "Track address: Sequence/TrackName or Sequence/index.";
+    private const string BlockAddressDescription = "Block address: Sequence/Track/index (zero-based). On a reference track the clip is block 0.";
+
+    public static IReadOnlyList<OpSpec> Specs { get; } =
+    [
+        new("add-sequence", "Appends an empty sequence. Without a name it gets a free default (Sequence, Sequence 2).",
+        [
+            new("name", "string", false, "Sequence name, unique in the file, no '/'."),
+        ]),
+        new("rename-sequence", "Renames a sequence; tracks that play it follow the rename. The new name must be unused.",
+        [
+            new("sequence", "string", true, SequenceAddressDescription),
+            new("to", "string", true, "New sequence name."),
+        ]),
+        new("delete-sequence", "Deletes a sequence. Fails if that leaves a track playing it (a missing reference target is a check error).",
+        [
+            new("sequence", "string", true, SequenceAddressDescription),
+        ]),
+        new("reorder-sequence", "Moves a sequence so it ends up at the given position in the file.",
+        [
+            new("sequence", "string", true, SequenceAddressDescription),
+            new("index", "integer", true, "Final zero-based position, 0 to sequence count - 1."),
+        ]),
+        new("set-sequence-loop", "Turns looping on or off for a sequence. Off, it stops at its end and holds its final pose.",
+        [
+            new("sequence", "string", true, "Sequence name or glob."),
+            new("value", "boolean", true, "true to loop."),
+        ]),
+        new("add-track", "Adds an empty track to a sequence. Tracks draw in list order, index 0 in front.",
+        [
+            new("sequence", "string", true, SequenceAddressDescription),
+            new("name", "string", false, "Track name, unique in the sequence, no '/'. Default: Track, Track 2, ..."),
+            new("index", "integer", false, "Zero-based position, 0 to track count. Default 0 (front)."),
+        ]),
+        new("rename-track", "Renames a track. The new name must be unique in its sequence.",
+        [
+            new("track", "string", true, TrackAddressDescription),
+            new("to", "string", true, "New track name."),
+        ]),
+        new("delete-track", "Deletes a track and its blocks.",
+        [
+            new("track", "string", true, TrackAddressDescription + " Takes selectors."),
+        ]),
+        new("reorder-track", "Moves a track so it ends up at the given position in its sequence (0 draws in front).",
+        [
+            new("track", "string", true, TrackAddressDescription),
+            new("index", "integer", true, "Final zero-based position, 0 to track count - 1."),
+        ]),
+        new("set-track-continuous", "Sets the per-track continuous flag. At the wrap of a looping sequence a continuous track keeps its playback phase if the same chain is playing, instead of restarting.",
+        [
+            new("track", "string", true, TrackAddressDescription + " Takes selectors."),
+            new("value", "boolean", true, "true for continuous."),
+        ]),
+        new("add-reference-track", "Adds a track, named after the target, that plays another sequence of the file from start seconds, once. Its clip is block 0 (set-block-start, set-block-loops). Fails if the target would play the sequence back.",
+        [
+            new("sequence", "string", true, "Sequence that gets the track."),
+            new("target", "string", true, "Sequence to play."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default 0."),
+            new("index", "integer", false, "Zero-based position, 0 to track count. Default 0 (front)."),
+        ]),
+        new("add-source", "Adds an .achx or .achj to the source library. The file must exist.",
+        [
+            new("path", "string", true, "Path relative to the .seqj, or absolute."),
+        ]),
+        new("remove-source", "Removes a source from the library. Fails with SourceInUse while blocks use it.",
+        [
+            new("source", "string", true, "Source as listed in the file."),
+        ]),
+        new("replace-source", "Swaps a library source for another file and points its blocks at it. Blocks naming a chain the new file lacks are kept (check reports them).",
+        [
+            new("source", "string", true, "Source as listed in the file."),
+            new("path", "string", true, "New file, relative to the .seqj or absolute; must exist."),
+        ]),
+        new("add-block", "Appends a block (a chain placement) to a chain track. The source must be in the library and have the chain.",
+        [
+            new("track", "string", true, TrackAddressDescription),
+            new("source", "string", true, "Source as listed in the file."),
+            new("chain", "string", true, "Chain name in the source."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default 0."),
+            new("loops", "number", false, "Length in playback cycles, above 0. Default 1."),
+        ]),
+        new("set-block-start", "Moves a block to a start time in seconds. The next block on the track cuts it short from there.",
+        [
+            new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+            new("start", "number", true, "Seconds from the sequence start, 0 or more."),
+        ]),
+        new("set-block-loops", "Sets a block's length in playback cycles.",
+        [
+            new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+            new("loops", "number", true, "Cycles, above 0 (fractions allowed)."),
+        ]),
+        new("delete-block", "Deletes a block of a chain track; later blocks shift down. To remove a reference track use delete-track.",
+        [
+            new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+        ]),
+    ];
+
+    /// <summary>Validates the text of an ops file against <see cref="Specs"/>. Nothing is applied.</summary>
+    public static OpsParse Parse(string json) => EditOps.Parse(json, Specs);
+
+    /// <summary>
+    /// Applies <paramref name="ops"/> to <paramref name="session"/>'s document in order and, only if every op succeeded and no
+    /// new check error appeared, saves once. Otherwise nothing is written. A batch that changes nothing writes nothing either,
+    /// so the file stays byte-identical.
+    /// </summary>
+    public static EditRunResult Apply(SequenceSession session, IReadOnlyList<EditOp> ops)
+    {
+        var doc = session.Document;
+        var before = SequenceCheck.Run(doc.Save, session.Path);
+        var original = doc.Save.ToJsonString();
+        var changed = new List<string>();
+        var warnings = new List<string>();
+        if (!before.Ok)
+            warnings.Add($"The file already had {before.Errors.Count()} check error(s) before the edit.");
+
+        foreach (var op in ops)
+        {
+            var targets = Expand(session, op);
+            if (targets.Error is not null)
+                return Failed(warnings, op, targets.Error, targets.Code);
+
+            foreach (var target in targets.List!)
+            {
+                var result = ApplyOne(session, op, target);
+                if (!result.Success)
+                {
+                    var where = SelectorField(op) is null ? "" : $"target {target}: ";
+                    var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {where}{e}").ToList();
+                    return new EditRunResult(new EditResult([], errors, warnings, result.ErrorCodes), errors.Select(_ => (int?)op.Index).ToList());
+                }
+                changed.AddRange(result.ChangedItems);
+            }
+        }
+
+        var added = CheckReport.NewErrors(before, SequenceCheck.Run(doc.Save, session.Path));
+        if (added.Count > 0)
+            return new EditRunResult(
+                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings),
+                added.Select(_ => (int?)null).ToList());
+
+        if (changed.Count == 0 || doc.Save.ToJsonString() == original)
+            return new EditRunResult(new EditResult([], [], warnings), []);
+
+        var save = session.Save();
+        return save.Success
+            ? new EditRunResult(new EditResult(changed, [], warnings), [])
+            : new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
+    }
+
+    private static EditRunResult Failed(List<string> warnings, EditOp op, string error, EditErrorCode code) =>
+        new(new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {error}"], warnings, [code]), [op.Index]);
+
+    private sealed record Targets(IReadOnlyList<string>? List, string? Error, EditErrorCode Code);
+
+    /// <summary>The field holding the selector for ops that take one; null for exact-address ops.</summary>
+    private static string? SelectorField(EditOp op) => op.Spec.Name switch
+    {
+        "set-sequence-loop" => "sequence",
+        "delete-track" or "set-track-continuous" => "track",
+        "set-block-start" or "set-block-loops" or "delete-block" => "block",
+        _ => null,
+    };
+
+    private static Targets Expand(SequenceSession session, EditOp op)
+    {
+        var field = SelectorField(op);
+        if (field is null) return new Targets([""], null, EditErrorCode.Unspecified);
+
+        var save = session.Document.Save;
+        var text = op.Values[field];
+        var expansion = field switch
+        {
+            "sequence" => SequenceSelectors.ExpandSequences(save, text),
+            "track" => SequenceSelectors.ExpandTracks(save, text),
+            _ => SequenceSelectors.ExpandBlocks(save, text),
+        };
+        if (!expansion.Ok) return new Targets(null, expansion.Error, expansion.Code);
+        // Deleting shifts the indexes after a block, so blocks go from the highest down.
+        var list = op.Spec.Name == "delete-block" ? expansion.Targets!.Reverse().ToList() : expansion.Targets!;
+        return new Targets(list, null, EditErrorCode.Unspecified);
+    }
+
+    private static EditResult ApplyOne(SequenceSession session, EditOp op, string target)
+    {
+        var doc = session.Document;
+        var undo = session.Undo;
+        var v = op.Values;
+        string? Opt(string field) => v.GetValueOrDefault(field);
+        int? OptInt(string field) => v.TryGetValue(field, out var t) ? int.Parse(t, CultureInfo.InvariantCulture) : null;
+        double Num(string field, double fallback = 0) => v.TryGetValue(field, out var t) ? double.Parse(t, CultureInfo.InvariantCulture) : fallback;
+        bool Flag(string field) => v[field] == "true";
+
+        switch (op.Spec.Name)
+        {
+            case "add-sequence": return SequenceEdit.AddSequence(doc, undo, Opt("name"));
+            case "rename-sequence": return SequenceEdit.RenameSequence(doc, undo, v["sequence"], v["to"]);
+            case "delete-sequence": return SequenceEdit.DeleteSequence(doc, undo, v["sequence"]);
+            case "reorder-sequence": return SequenceEdit.ReorderSequence(doc, undo, v["sequence"], OptInt("index")!.Value);
+            case "set-sequence-loop": return SequenceEdit.SetSequenceLoop(doc, undo, target, Flag("value"));
+            case "add-track": return SequenceEdit.AddTrack(doc, undo, v["sequence"], Opt("name"), OptInt("index"));
+            case "rename-track": return SequenceEdit.RenameTrack(doc, undo, v["track"], v["to"]);
+            case "delete-track": return SequenceEdit.DeleteTrack(doc, undo, target);
+            case "reorder-track": return SequenceEdit.ReorderTrack(doc, undo, v["track"], OptInt("index")!.Value);
+            case "set-track-continuous": return SequenceEdit.SetTrackContinuous(doc, undo, target, Flag("value"));
+            case "add-reference-track": return SequenceEdit.AddReferenceTrack(doc, undo, v["sequence"], v["target"], Num("start"), OptInt("index"));
+            case "add-source": return SequenceEdit.AddSource(doc, undo, v["path"]);
+            case "remove-source": return SequenceEdit.RemoveSource(doc, undo, v["source"]);
+            case "replace-source": return SequenceEdit.ReplaceSource(doc, undo, v["source"], v["path"]);
+            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), (float)Num("loops", 1));
+            case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
+            case "set-block-loops": return SequenceEdit.SetBlockLoops(doc, undo, target, (float)Num("loops"));
+            case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
+            default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");
+        }
+    }
+}

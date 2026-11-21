@@ -35,9 +35,9 @@ public class SequenceOpsTests : IDisposable
     [Fact]
     public void Parse_RejectsAnimationOps_AndUnknownFields()
     {
-        SequenceOps.Parse("""{"ops":[{"op":"add-chain","name":"x"}]}""").Error.ShouldContain("unknown op 'add-chain'");
-        SequenceOps.Parse("""{"ops":[{"op":"rename-sequence","sequence":"Run","to":"X","bogus":1}]}""").Error.ShouldContain("no field 'bogus'");
-        SequenceOps.Parse("""{"ops":[{"op":"rename-sequence","sequence":"Run"}]}""").Error.ShouldContain("needs the field 'to'");
+        SequenceOps.Parse("""{"ops":[{"op":"add-chain","name":"x"}]}""").Error!.ShouldContain("unknown op 'add-chain'");
+        SequenceOps.Parse("""{"ops":[{"op":"rename-sequence","sequence":"Run","to":"X","bogus":1}]}""").Error!.ShouldContain("no field 'bogus'");
+        SequenceOps.Parse("""{"ops":[{"op":"rename-sequence","sequence":"Run"}]}""").Error!.ShouldContain("needs the field 'to'");
     }
 
     [Fact]
