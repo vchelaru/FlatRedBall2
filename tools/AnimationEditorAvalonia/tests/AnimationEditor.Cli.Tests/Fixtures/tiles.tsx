@@ -9,6 +9,7 @@
   <property name="biome" propertytype="Biome" value="Forest"/>
  </properties>
  <image source="sheet.png" width="48" height="32"/>
+ <transformations hflip="1" vflip="0" rotate="1" preferuntransformed="0"/>
  <tile id="0" type="Hero">
   <properties>
    <property name="Name" value="Walk"/>
