@@ -145,3 +145,20 @@ public class SequenceAddressTests
         r.Code.ShouldBe(code);
     }
 }
+
+public class SequenceNameHintTests
+{
+    private static readonly FlatRedBall2.AnimationEditorCommon.SequenceListSave Save = SeqWorkspace.Build();
+
+    [Fact]
+    public void TypoSequence_SuggestsNearest() =>
+        SequenceAddress.ResolveSequence(Save, "Rnu").Error.ShouldNotBeNull().ShouldContain("Did you mean 'Run'");
+
+    [Fact]
+    public void UnrelatedSequence_ListsValidNames() =>
+        SequenceAddress.ResolveSequence(Save, "Zzzzzzzz").Error.ShouldNotBeNull().ShouldContain("Valid sequences: Run, Rest");
+
+    [Fact]
+    public void TypoTrack_SuggestsNearest() =>
+        SequenceAddress.ResolveTrack(Save, "Run/Shdow").Error.ShouldNotBeNull().ShouldContain("Did you mean 'Shadow'");
+}
