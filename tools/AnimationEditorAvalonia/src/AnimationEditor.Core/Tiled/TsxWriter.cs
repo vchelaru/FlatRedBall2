@@ -29,8 +29,9 @@ namespace AnimationEditor.Core.Tiled;
 /// written with their nested members, and enum properties keep their <c>propertytype</c> (DotTiled
 /// reads an enum as a plain string/int, so <see cref="TsxLoader"/> turns it into an
 /// <see cref="EnumReferenceProperty"/>); the type definitions themselves live in the Tiled project,
-/// not the tsx. Transformations are not supported -- writing a <see cref="Tileset"/> that uses them
-/// throws <see cref="NotSupportedException"/> rather than silently dropping data.
+/// not the tsx. The tileset's <c>&lt;transformations&gt;</c> element (hflip/vflip/rotate/
+/// preferuntransformed) is written with all four flags, as Tiled does; DotTiled reads it fully, so
+/// nothing is lost.
 ///
 /// <para>Writing to a path that already exists patches in place: every unchanged &lt;tile&gt;
 /// keeps its original file text byte-for-byte, and only tiles whose content actually differs get
@@ -311,7 +312,7 @@ public static class TsxWriter
         GridsEqual(a.Grid, b.Grid) &&
         PropertiesEqual(a.Properties, b.Properties) &&
         WangsetsEqual(a.Wangsets, b.Wangsets) &&
-        a.Transformations.HasValue == b.Transformations.HasValue;
+        TransformationsEqual(a.Transformations, b.Transformations);
 
     private static bool WangsetsEqual(List<Wangset> a, List<Wangset> b) =>
         a.Count == b.Count && a.Zip(b).All(pair => WangsetEquals(pair.First, pair.Second));
@@ -368,6 +369,15 @@ public static class TsxWriter
         return !a.HasValue || (a.Value.X == b.Value.X && a.Value.Y == b.Value.Y);
     }
 
+    private static bool TransformationsEqual(Optional<Transformations> a, Optional<Transformations> b)
+    {
+        if (a.HasValue != b.HasValue)
+            return false;
+        return !a.HasValue
+            || (a.Value.HFlip == b.Value.HFlip && a.Value.VFlip == b.Value.VFlip
+                && a.Value.Rotate == b.Value.Rotate && a.Value.PreferUntransformed == b.Value.PreferUntransformed);
+    }
+
     private static bool GridsEqual(Optional<Grid> a, Optional<Grid> b)
     {
         if (a.HasValue != b.HasValue)
@@ -403,9 +413,6 @@ public static class TsxWriter
         IReadOnlyList<(string Name, string Value)> extraRootAttributes,
         IReadOnlyDictionary<string, string> wangsetTypes)
     {
-        if (tileset.Transformations.HasValue)
-            throw new NotSupportedException("TsxWriter does not yet support tileset transformations.");
-
         writer.WriteStartElement("tileset");
 
         if (tileset.Version.HasValue)
@@ -438,6 +445,8 @@ public static class TsxWriter
             WriteTileOffset(writer, tileset.TileOffset.Value);
         if (tileset.Grid.HasValue)
             WriteGrid(writer, tileset.Grid.Value);
+        if (tileset.Transformations.HasValue)
+            WriteTransformations(writer, tileset.Transformations.Value);
         WriteProperties(writer, tileset.Properties);
         foreach (var tile in tileset.Tiles)
             WriteTile(writer, tile);
@@ -518,6 +527,17 @@ public static class TsxWriter
             writer.WriteAttributeString("orientation", grid.Orientation.ToString().ToLowerInvariant());
         writer.WriteAttributeString("width", XmlConvert.ToString(grid.Width));
         writer.WriteAttributeString("height", XmlConvert.ToString(grid.Height));
+        writer.WriteEndElement();
+    }
+
+    // Tiled always writes all four flags, so a regenerated element matches what Tiled itself saves.
+    private static void WriteTransformations(XmlWriter writer, Transformations transformations)
+    {
+        writer.WriteStartElement("transformations");
+        writer.WriteAttributeString("hflip", transformations.HFlip ? "1" : "0");
+        writer.WriteAttributeString("vflip", transformations.VFlip ? "1" : "0");
+        writer.WriteAttributeString("rotate", transformations.Rotate ? "1" : "0");
+        writer.WriteAttributeString("preferuntransformed", transformations.PreferUntransformed ? "1" : "0");
         writer.WriteEndElement();
     }
 

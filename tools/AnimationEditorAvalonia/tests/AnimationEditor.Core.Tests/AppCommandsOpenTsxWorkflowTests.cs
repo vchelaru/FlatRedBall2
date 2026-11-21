@@ -26,11 +26,13 @@ public class AppCommandsOpenTsxWorkflowTests : IDisposable
         </tileset>
         """;
 
-    private const string TransformationsFixtureXml = """
+    private const string ImageCollectionFixtureXml = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <tileset version="1.10" tiledversion="1.12.2" name="Terrain" tilewidth="16" tileheight="16" tilecount="16" columns="4">
-         <image source="Terrain.png" width="64" height="64"/>
-         <transformations hflip="1" vflip="0" rotate="0" preferuntransformed="0"/>
+        <tileset version="1.10" tiledversion="1.12.2" name="Props" tilewidth="32" tileheight="48" tilecount="2" columns="0">
+         <grid orientation="orthogonal" width="1" height="1"/>
+         <tile id="0">
+          <image source="barrel.png" width="32" height="48"/>
+         </tile>
         </tileset>
         """;
 
@@ -60,14 +62,14 @@ public class AppCommandsOpenTsxWorkflowTests : IDisposable
     public async Task OpenTsxWorkflowAsync_UnsupportedConstruct_FiresLoadFailedAndLeavesProjectUntouched()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var path = WriteFixture(TransformationsFixtureXml, "Terrain.tsx");
+        var path = WriteFixture(ImageCollectionFixtureXml, "Terrain.tsx");
         Exception? failure = null;
         ctx.AppCommands.LoadFailed += (_, ex) => failure = ex;
 
         await ctx.AppCommands.OpenTsxWorkflowAsync(path);
 
         Assert.NotNull(failure);
-        Assert.Contains("transformations", failure!.Message);
+        Assert.Contains("image collection", failure!.Message);
         Assert.False(ctx.ProjectManager.IsNativeTsxProject);
     }
 
@@ -89,7 +91,7 @@ public class AppCommandsOpenTsxWorkflowTests : IDisposable
     public async Task OpenTsxWorkflowAsync_UnsupportedConstruct_ReturnsFalse()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var path = WriteFixture(TransformationsFixtureXml, "Terrain.tsx");
+        var path = WriteFixture(ImageCollectionFixtureXml, "Terrain.tsx");
 
         bool opened = await ctx.AppCommands.OpenTsxWorkflowAsync(path);
 

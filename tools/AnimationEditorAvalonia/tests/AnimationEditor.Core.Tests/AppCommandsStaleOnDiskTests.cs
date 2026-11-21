@@ -39,18 +39,14 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         """;
 
     // What Tiled writes after the user paints a terrain set onto the same tileset: the animation
-    // is untouched, a <transformations> element (unsupported by TsxWriter) is added.
-    private const string TsxWithTransformationsXml = """
+    // is untouched, it becomes an image collection (unsupported).
+    private const string TsxImageCollectionXml = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
-         <image source="Heroes.png" width="64" height="64"/>
+        <tileset version="1.10" tiledversion="1.12.2" name="Props" tilewidth="32" tileheight="48" tilecount="2" columns="0">
+         <grid orientation="orthogonal" width="1" height="1"/>
          <tile id="0">
-          <animation>
-           <frame tileid="0" duration="200"/>
-           <frame tileid="1" duration="200"/>
-          </animation>
+          <image source="barrel.png" width="32" height="48"/>
          </tile>
-         <transformations hflip="1" vflip="0" rotate="0" preferuntransformed="0"/>
         </tileset>
         """;
 
@@ -72,7 +68,7 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         _ctx.AppCommands.HotReloadFailed += (_, reason) => reloadFailure = reason;
         _ctx.AppCommands.SaveFailed += message => saveFailure = message;
 
-        File.WriteAllText(path, TsxWithTransformationsXml);          // Tiled saved
+        File.WriteAllText(path, TsxImageCollectionXml);          // Tiled saved
         _ctx.AppCommands.ReloadAchxFromDisk(path);            // watcher fired, reload can't load it
         Assert.NotNull(reloadFailure);
 
@@ -82,17 +78,17 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         Assert.Equal(SaveState.Failed, _ctx.UndoManager.SaveState);
         Assert.NotNull(saveFailure);
         Assert.Contains("changed on disk", saveFailure);
-        Assert.Contains("<transformations", File.ReadAllText(path)); // Tiled's work is still there
+        Assert.Contains("barrel.png", File.ReadAllText(path)); // Tiled's work is still there
     }
 
     [Fact]
     public void SaveCurrentAnimationChainList_AfterALaterHotReloadSucceeds_SavesAgain()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithTransformationsXml);
+        File.WriteAllText(path, TsxImageCollectionXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
 
-        File.WriteAllText(path, PlainTsxXml);                 // user removed the transformations in Tiled
+        File.WriteAllText(path, PlainTsxXml);                 // user went back to a plain tileset in Tiled
         _ctx.AppCommands.ReloadAchxFromDisk(path);
         var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
         chain.Frames[0].FrameLength = 0.3f;
@@ -109,7 +105,7 @@ public class AppCommandsStaleOnDiskTests : IDisposable
     public async System.Threading.Tasks.Task SaveCurrentAnimationChainList_AfterReopeningTheFixedFile_SavesAgain()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithTransformationsXml);
+        File.WriteAllText(path, TsxImageCollectionXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
 
         File.WriteAllText(path, PlainTsxXml);
@@ -126,13 +122,13 @@ public class AppCommandsStaleOnDiskTests : IDisposable
     public void SaveCurrentAnimationChainList_ToAnotherPathWhileStale_Writes()
     {
         var path = OpenTsx();
-        File.WriteAllText(path, TsxWithTransformationsXml);
+        File.WriteAllText(path, TsxImageCollectionXml);
         _ctx.AppCommands.ReloadAchxFromDisk(path);
         var copyPath = Path.Combine(_dir.Path, "HeroesCopy.tsx");
 
         _ctx.AppCommands.SaveCurrentAnimationChainList(copyPath);
 
         Assert.True(File.Exists(copyPath));
-        Assert.Contains("<transformations", File.ReadAllText(path));
+        Assert.Contains("barrel.png", File.ReadAllText(path));
     }
 }
