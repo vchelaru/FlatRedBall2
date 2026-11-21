@@ -423,7 +423,7 @@ namespace AnimationEditor.Core
         /// the tsx's own per-tile animations become <see cref="AnimationChainListSave"/> chains via
         /// <see cref="Tiled.TiledAnimationToAchjMapper"/>, editable the same way achx chains are.
         /// </summary>
-        /// <exception cref="NotSupportedException">The tsx uses a construct (tileset transformations)
+        /// <exception cref="NotSupportedException">The tsx uses a construct (an unwritable tileset feature)
         /// that would be lost on the first
         /// save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
         /// <exception cref="InvalidOperationException">The tsx is corrupt in a way <see

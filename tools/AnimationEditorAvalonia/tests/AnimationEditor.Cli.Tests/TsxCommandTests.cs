@@ -127,6 +127,7 @@ public class TsxCommandTests : IDisposable
         raw.ShouldContain("<wangset name=\"CollisionSet\" type=\"mixed\"");
         raw.ShouldContain("<wangtile tileid=\"3\"");
         raw.ShouldContain("<objectgroup");
+        raw.ShouldContain("<transformations hflip=\"1\" vflip=\"0\" rotate=\"1\" preferuntransformed=\"0\"");
         raw.ShouldContain("<tile id=\"3\" type=\"SolidCollision\"");
         raw.ShouldContain("<tile id=\"4\" type=\"Water\"");
         raw.ShouldContain("duration=\"250\"");

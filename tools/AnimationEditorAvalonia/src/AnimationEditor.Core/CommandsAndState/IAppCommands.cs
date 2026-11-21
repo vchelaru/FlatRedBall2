@@ -116,7 +116,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Opens <paramref name="path"/> (a <c>.tsx</c>) as a native AnimationEditor project (issue
         /// #1140) -- see <see cref="ProjectManager.LoadTsxProject"/>. Unlike <see
         /// cref="OpenAchxWorkflowAsync"/>, there is no conversion prompt: an incompatible tsx
-        /// (transformations/etc.) fires <see cref="LoadFailed"/> and aborts immediately.
+        /// (an image collection, say) fires <see cref="LoadFailed"/> and aborts immediately.
         /// Returns true when the tileset ended up loaded, false when it was refused.
         /// </summary>
         Task<bool> OpenTsxWorkflowAsync(string path);
