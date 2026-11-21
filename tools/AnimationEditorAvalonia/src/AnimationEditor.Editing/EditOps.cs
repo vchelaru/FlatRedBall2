@@ -38,6 +38,8 @@ public static class EditOps
     private static readonly IReadOnlyList<string> CopyValues = ["keep", "copy", "overwrite"];
     private static readonly IReadOnlyList<string> ColorOperationValues = ["multiply", "add"];
     private static readonly IReadOnlyList<string> UnitValues = ["second", "millisecond"];
+    private static readonly IReadOnlyList<string> ShapeTypeValues = ["rect", "circle", "polygon"];
+    private const string ShapeAddressDescription = "Shape address: Chain/frameIndex/rect|circle|polygon/name.";
     private const string RegionDescription = "Pixel rectangle of the texture, as x,y,width,height.";
 
     public static IReadOnlyList<OpSpec> Specs { get; } =
@@ -149,6 +151,48 @@ public static class EditOps
             new("flipV", "boolean", false, "Flip vertically."),
             new("flipDiagonal", "boolean", false, "Flip along the diagonal."),
         ]),
+        new("add-shape", "Appends a rect, circle or polygon to a frame with the editor's default size, centred on the frame's offset. Name defaults to a unique default name; a given name must be unused by any shape of the frame.",
+        [
+            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("type", "string", true, "Shape type.", ShapeTypeValues),
+            new("name", "string", false, "Shape name, unique in the frame, no '/'."),
+        ]),
+        new("delete-shape", "Deletes one shape.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+        ]),
+        new("duplicate-shape", "Appends a copy of a shape to its frame under a unique name (Hitbox becomes Hitbox2).",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+        ]),
+        new("set-rect", "Sets a rect's center and half-extents. Give at least one; omitted ones are left as they are.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("x", "number", false, "Center X."),
+            new("y", "number", false, "Center Y."),
+            new("scaleX", "number", false, "Half-width, greater than 0."),
+            new("scaleY", "number", false, "Half-height, greater than 0."),
+        ]),
+        new("set-circle", "Sets a circle's center and radius. Give at least one; omitted ones are left as they are.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("x", "number", false, "Center X."),
+            new("y", "number", false, "Center Y."),
+            new("radius", "number", false, "Radius, greater than 0."),
+        ]),
+        new("set-polygon", "Sets a polygon's origin and/or replaces its points. Give at least one; omitted ones are left as they are. The editor's closed outlines repeat the first point at the end; points are stored exactly as given.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("x", "number", false, "Origin X."),
+            new("y", "number", false, "Origin Y."),
+            new("points", "points", false, "At least 3 points relative to the origin, Y+ up, as [[x,y],[x,y],...]."),
+        ]),
+        new("set-shape-common", "Sets the position every shape type has (rect and circle center, polygon origin). Give at least one; omitted ones are left as they are.",
+        [
+            new("shape", "string", true, ShapeAddressDescription),
+            new("x", "number", false, "X."),
+            new("y", "number", false, "Y."),
+        ]),
         new("set-unit", "Changes the file's time unit and converts every frame length (locked chains too) so playback time is unchanged. Later ops in the batch use the new unit.",
         [
             new("unit", "string", true, "The new time unit.", UnitValues),
@@ -205,7 +249,7 @@ public static class EditOps
             if (field is null) return (null, At($"'{name}' has no field '{property.Name}'."));
             var typed = ReadValue(field, property.Value);
             if (typed is null)
-                return (null, At($"field '{field.Name}' of '{name}' must be {(field.Type == "integer" ? "an integer" : $"a {field.Type}")}."));
+                return (null, At($"field '{field.Name}' of '{name}' must be {FieldTypeText(field.Type)}."));
             var value = typed;
             if (field.Values is not null && !field.Values.Contains(value))
                 return (null, At($"field '{field.Name}' of '{name}' must be one of {string.Join("|", field.Values)}, not '{value}'."));
@@ -232,10 +276,38 @@ public static class EditOps
             case "number":
                 return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var d) && double.IsFinite(d)
                     ? d.ToString("R", CultureInfo.InvariantCulture) : null;
+            case "points":
+                return ReadPoints(value);
             default:
                 return value.ValueKind == JsonValueKind.String ? value.GetString() : null;
         }
     }
+
+    /// <summary>A JSON array of [x, y] number pairs as "x,y;x,y;..." (invariant culture), or null when it is not one.</summary>
+    private static string? ReadPoints(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array) return null;
+        var parts = new List<string>();
+        foreach (var pair in value.EnumerateArray())
+        {
+            if (pair.ValueKind != JsonValueKind.Array || pair.GetArrayLength() != 2) return null;
+            var coords = new List<string>();
+            foreach (var n in pair.EnumerateArray())
+            {
+                if (n.ValueKind != JsonValueKind.Number || !n.TryGetDouble(out var d) || !double.IsFinite(d)) return null;
+                coords.Add(d.ToString("R", CultureInfo.InvariantCulture));
+            }
+            parts.Add($"{coords[0]},{coords[1]}");
+        }
+        return string.Join(";", parts);
+    }
+
+    private static string FieldTypeText(string type) => type switch
+    {
+        "integer" => "an integer",
+        "points" => "a list of [x, y] number pairs, as [[x,y],[x,y],...]",
+        _ => $"a {type}",
+    };
 
     private static OpsParse Bad(string error) => new(null, error);
 
@@ -343,6 +415,25 @@ public static class EditOps
             case "set-frame-flip":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
                     PropertyEdit.SetFrameFlip(session.Commands, chain, frame, OptionalFlag(op, "flipH"), OptionalFlag(op, "flipV"), OptionalFlag(op, "flipDiagonal"))));
+            case "add-shape":
+                return Task.FromResult(WithFrame(doc, op, (_, frame) =>
+                    ShapeEdit.AddShape(session.Commands, session.ObjectFinder, frame, op.Values["type"], op.Values.GetValueOrDefault("name"))));
+            case "delete-shape":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => ShapeEdit.DeleteShape(session.Commands, session.ObjectFinder, shape)));
+            case "duplicate-shape":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => ShapeEdit.DuplicateShape(session.Commands, session.ObjectFinder, shape)));
+            case "set-rect":
+                return Task.FromResult(WithShape<AARectSave>(doc, op, "rect", rect =>
+                    ShapeEdit.SetRect(session.Commands, session.ObjectFinder, rect, Number(op, "x"), Number(op, "y"), Number(op, "scaleX"), Number(op, "scaleY"))));
+            case "set-circle":
+                return Task.FromResult(WithShape<CircleSave>(doc, op, "circle", circle =>
+                    ShapeEdit.SetCircle(session.Commands, session.ObjectFinder, circle, Number(op, "x"), Number(op, "y"), Number(op, "radius"))));
+            case "set-polygon":
+                return Task.FromResult(WithShape<PolygonSave>(doc, op, "polygon", polygon =>
+                    ShapeEdit.SetPolygon(session.Commands, session.ObjectFinder, polygon, Number(op, "x"), Number(op, "y"), Points(op))));
+            case "set-shape-common":
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape =>
+                    ShapeEdit.SetCommon(session.Commands, session.ObjectFinder, shape, Number(op, "x"), Number(op, "y"))));
             case "set-unit":
                 return Task.FromResult(PropertyEdit.SetTimeUnit(session.ProjectManager, session.Commands,
                     op.Values["unit"] == "millisecond" ? TimeMeasurementUnit.Millisecond : TimeMeasurementUnit.Second));
@@ -430,6 +521,28 @@ public static class EditOps
 
     private static int? Integer(EditOp op, string field) =>
         op.Values.TryGetValue(field, out var v) ? int.Parse(v, CultureInfo.InvariantCulture) : null;
+
+    private static IReadOnlyList<(float X, float Y)>? Points(EditOp op) =>
+        op.Values.TryGetValue("points", out var text)
+            ? text.Length == 0
+                ? []
+                : text.Split(';').Select(pair =>
+                {
+                    var xy = pair.Split(',');
+                    return (float.Parse(xy[0], CultureInfo.InvariantCulture), float.Parse(xy[1], CultureInfo.InvariantCulture));
+                }).ToList()
+            : null;
+
+    /// <summary>Resolves the op's shape address and checks it is a <typeparamref name="T"/> (<paramref name="typeWord"/> names it in the message).</summary>
+    private static EditResult WithShape<T>(AnimationChainListSave doc, EditOp op, string typeWord, Func<T, EditResult> apply)
+        where T : ShapeSave
+    {
+        var shape = EditAddress.ResolveShape(doc, op.Values["shape"]);
+        if (!shape.Ok) return Fail(shape.Error!);
+        return shape.Value is T typed
+            ? apply(typed)
+            : Fail($"'{op.Values["shape"]}' is a {EditAddress.TypeName(shape.Value!)}, but {op.Spec.Name} needs a {typeWord}.");
+    }
 
     private static EditResult WithChain(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, EditResult> apply)
     {

@@ -857,31 +857,16 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
 
-            var rectangleSave = new AARectSave
-            {
-                ScaleX = 8,
-                ScaleY = 8,
-                Name = StringFunctions.MakeStringUnique("AxisAlignedRectangleInstance",
-                    GetSelectedFrameShapeNames())
-            };
-
-            ApplyRectangleMatch(rectangleSave, frame);
-            _undoManager.Execute(new AddShapeCommand(rectangleSave, frame, this, _events, _selectedState));
+            var name = StringFunctions.MakeStringUnique(NewShapeDefaults.RectName, GetSelectedFrameShapeNames());
+            _undoManager.Execute(new AddShapeCommand(NewShapeDefaults.Rect(frame, name), frame, this, _events, _selectedState));
         }
 
         public void AddCircle(AnimationFrameSave frame)
         {
             if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
 
-            var circleSave = new CircleSave
-            {
-                Radius = 8,
-                Name = StringFunctions.MakeStringUnique("CircleInstance",
-                    GetSelectedFrameShapeNames())
-            };
-
-            ApplyCircleMatch(circleSave, frame);
-            _undoManager.Execute(new AddShapeCommand(circleSave, frame, this, _events, _selectedState));
+            var name = StringFunctions.MakeStringUnique(NewShapeDefaults.CircleName, GetSelectedFrameShapeNames());
+            _undoManager.Execute(new AddShapeCommand(NewShapeDefaults.Circle(frame, name), frame, this, _events, _selectedState));
         }
 
         /// <summary>
@@ -892,17 +877,16 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return;
 
-            var polygonSave = new PolygonSave
-            {
-                X = frame.RelativeX,
-                Y = frame.RelativeY,
-                Name = StringFunctions.MakeStringUnique("PolygonInstance",
-                    GetSelectedFrameShapeNames())
-            };
-            foreach (var (x, y) in new[] { (-8f, -8f), (8f, -8f), (8f, 8f), (-8f, 8f), (-8f, -8f) })
-                polygonSave.Points.Add(new Vector2Save { X = x, Y = y });
+            var name = StringFunctions.MakeStringUnique(NewShapeDefaults.PolygonName, GetSelectedFrameShapeNames());
+            _undoManager.Execute(new AddShapeCommand(NewShapeDefaults.Polygon(frame, name), frame, this, _events, _selectedState));
+        }
 
-            _undoManager.Execute(new AddShapeCommand(polygonSave, frame, this, _events, _selectedState));
+        /// <inheritdoc cref="IAppCommands.AddShape"/>
+        public bool AddShape(AnimationFrameSave frame, ShapeSave shape)
+        {
+            if (IsFrameLocked(frame) || IsAchxOnlyEditBlocked()) return false;
+            _undoManager.Execute(new AddShapeCommand(shape, frame, this, _events, _selectedState));
+            return true;
         }
 
         /// <summary>
@@ -2473,6 +2457,27 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsShapeLocked(frame, polygon)) return;
             _undoManager.Execute(SetShapePropsCommand.ForPolygon(frame, polygon, name, x, y, this, _events));
+        }
+
+        /// <inheritdoc cref="IAppCommands.SetPolygonGeometry"/>
+        public bool SetPolygonGeometry(PolygonSave polygon, float x, float y, IReadOnlyList<Vector2Save>? points)
+        {
+            var frame = _objectFinder.GetAnimationFrameContaining(polygon);
+            if (frame is not null && IsFrameLocked(frame)) return false;
+
+            var steps = new List<IUndoableCommand>();
+            if (polygon.X != x || polygon.Y != y)
+                steps.Add(SetShapePropsCommand.ForPolygon(frame, polygon, polygon.Name, x, y, this, _events));
+            if (points is not null)
+            {
+                var after = points.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList();
+                var entry = new SetPolygonPointsCommand.Entry(frame, polygon, PolygonVertices.CopyPoints(polygon), after);
+                steps.Add(new SetPolygonPointsCommand(new[] { entry }, this, _events, $"Edit Points of {ShapeUndoLabel.Format(polygon)}"));
+            }
+
+            if (steps.Count == 1) _undoManager.Execute(steps[0]);
+            else if (steps.Count > 1) _undoManager.Execute(new CompositeCommand(steps, $"Edit {ShapeUndoLabel.Format(polygon)}"));
+            return true;
         }
 
         /// <inheritdoc cref="IAppCommands.MovePolygonVertex"/>

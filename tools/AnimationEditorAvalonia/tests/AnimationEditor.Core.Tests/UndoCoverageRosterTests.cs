@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -71,6 +72,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AddAxisAlignedRectangle)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.AddCircle)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.AddPolygon)]                   = Category.MutatingUndoable,
+        [nameof(IAppCommands.AddShape)]                    = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetPolygonGeometry)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetPolygonProps)]              = Category.MutatingUndoable,
         [nameof(IAppCommands.MovePolygonVertex)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.InsertPolygonVertex)]          = Category.MutatingUndoable,
@@ -265,6 +268,12 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddCircle(Zebra(ctx).Frames[1])));
         yield return Row(nameof(IAppCommands.AddPolygon),
             ctx => Sync(() => ctx.AppCommands.AddPolygon(Zebra(ctx).Frames[1])));
+        yield return Row(nameof(IAppCommands.AddShape),
+            ctx => Sync(() => ctx.AppCommands.AddShape(Zebra(ctx).Frames[1],
+                NewShapeDefaults.Circle(Zebra(ctx).Frames[1], "Added"))));
+        yield return Row(nameof(IAppCommands.SetPolygonGeometry),
+            ctx => Sync(() => ctx.AppCommands.SetPolygonGeometry(Polygon(ctx), 3f, 4f,
+                new[] { new Vector2Save { X = 0, Y = 0 }, new Vector2Save { X = 9, Y = 0 }, new Vector2Save { X = 9, Y = 9 } })));
         yield return Row(nameof(IAppCommands.SetPolygonProps),
             ctx => Sync(() => ctx.AppCommands.SetPolygonProps(Zebra(ctx).Frames[0], Polygon(ctx), "Renamed", 3f, 4f)));
         yield return Row(nameof(IAppCommands.MovePolygonVertex),

@@ -22,7 +22,7 @@ Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command
 
 Chain `Walk`, frame `Walk/2` (zero-based), shape `Walk/2/rect/Hitbox` (type is `rect`, `circle` or `polygon`). Names containing `/` cannot be addressed; rename them in the editor.
 
-Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`, `duplicate-chain`, `reorder-chain`, `add-frame`, `delete-frame`, `duplicate-frame`, `reorder-frame`. Property ops: `set-chain-loop|pingpong|reverse|locked` (`value` true/false), `set-frame-length|region|offset|color|flip`, and file-level `set-unit`. Fields are in `--schema`.
+Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`, `duplicate-chain`, `reorder-chain`, `add-frame`, `delete-frame`, `duplicate-frame`, `reorder-frame`. Property ops: `set-chain-loop|pingpong|reverse|locked` (`value` true/false), `set-frame-length|region|offset|color|flip`, and file-level `set-unit`. Shape ops: `add-shape`, `delete-shape`, `duplicate-shape`, `set-rect`, `set-circle`, `set-polygon`, `set-shape-common` (x, y only). Fields are in `--schema`.
 
 ## Landmines
 
@@ -39,3 +39,5 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - A file that already has check errors can still be edited, with one exception: a `.achx` with a missing texture cannot be saved in pixel coordinates (the editor's save path needs the texture size), so every edit of it fails. Fix the texture path first.
 - A file in legacy UV coordinates is refused. Open and save it in the editor once.
 - `set-frame-texture` takes a path relative to the animation file or absolute. Outside the file's folder it references the texture in place unless `copy` is `copy` or `overwrite`. The image check reads the file header only, so a truncated PNG passes.
+- `add-shape` takes `frame`, `type` and an optional `name` (default unique per frame; unique across all three types). Defaults match the editor's Add buttons, centred on the frame offset. Not yet available: moving a shape to another frame, shape color or keyframe flags.
+- `set-rect|circle|polygon` need that exact type in the address, change only the fields given, and require scale and radius above 0. `set-polygon` `points` is `[[x,y],...]`, at least 3, stored exactly as given: the editor's closed outlines repeat the first point at the end, so repeat it to keep one closed.
