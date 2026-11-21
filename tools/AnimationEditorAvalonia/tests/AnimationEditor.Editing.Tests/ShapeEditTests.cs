@@ -109,7 +109,7 @@ public class ShapeEditTests : IDisposable
 
     [Theory]
     [InlineData("  ", EditErrorCode.EmptyName)]
-    [InlineData("a/b", EditErrorCode.Unspecified)]
+    [InlineData("a/b", EditErrorCode.InvalidAddress)]
     public void Add_BadName_Fails(string name, EditErrorCode code)
     {
         var r = Add(_f0, "rect", name);

@@ -58,7 +58,7 @@ public static class PropertyEdit
 
         var unit = FrameLengthUnit.Of(projectManager.AnimationChainListSave);
         if (!float.IsFinite(length) || (decimal)length < unit.Minimum || (decimal)length > unit.Maximum)
-            return Fail(EditErrorCode.Unspecified,
+            return Fail(EditErrorCode.InvalidValue,
                 $"A frame length of {length.ToString(CultureInfo.InvariantCulture)} is out of range: valid lengths are " +
                 $"{unit.Minimum.ToString(CultureInfo.InvariantCulture)} to {unit.Maximum.ToString(CultureInfo.InvariantCulture)} {unit.Name}.");
 
@@ -84,11 +84,11 @@ public static class PropertyEdit
 
         var size = TextureCoordinateConverter.TryReadPngSize(absolute);
         if (size is null)
-            return Fail(EditErrorCode.Unspecified, "A region needs the texture's size, which is only read from PNG files.");
+            return Fail(EditErrorCode.UnsupportedFile, "A region needs the texture's size, which is only read from PNG files.");
 
         var (w, h) = size.Value;
         if (region.X < 0 || region.Y < 0 || region.Width <= 0 || region.Height <= 0 || region.X + region.Width > w || region.Y + region.Height > h)
-            return Fail(EditErrorCode.Unspecified,
+            return Fail(EditErrorCode.InvalidValue,
                 $"The region {region.X},{region.Y},{region.Width},{region.Height} is not inside the {w}x{h} texture.");
 
         var before = Coordinates(frame);
@@ -101,9 +101,9 @@ public static class PropertyEdit
     {
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
-        if (x is null && y is null) return Fail(EditErrorCode.Unspecified, "An offset needs x, y or both.");
+        if (x is null && y is null) return Fail(EditErrorCode.InvalidValue, "An offset needs x, y or both.");
         if ((x is { } nx && !float.IsFinite(nx)) || (y is { } ny && !float.IsFinite(ny)))
-            return Fail(EditErrorCode.Unspecified, "An offset must be a finite number.");
+            return Fail(EditErrorCode.InvalidValue, "An offset must be a finite number.");
 
         var before = (frame.RelativeX, frame.RelativeY);
         commands.SetFrameRelative([frame], Edit(x), Edit(y));
@@ -115,13 +115,13 @@ public static class PropertyEdit
     {
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
-        if (edit == default) return Fail(EditErrorCode.Unspecified, "A color edit needs red, green, blue, alpha or operation.");
+        if (edit == default) return Fail(EditErrorCode.InvalidValue, "A color edit needs red, green, blue, alpha or operation.");
 
         foreach (var (name, value) in new[] { ("red", edit.Red), ("green", edit.Green), ("blue", edit.Blue) })
             if (value is < -255 or > 255)
-                return Fail(EditErrorCode.Unspecified, $"The {name} channel {value} is out of range: valid values are -255 to 255.");
+                return Fail(EditErrorCode.InvalidValue, $"The {name} channel {value} is out of range: valid values are -255 to 255.");
         if (edit.Alpha is < 0 or > 255)
-            return Fail(EditErrorCode.Unspecified, $"The alpha channel {edit.Alpha} is out of range: valid values are 0 to 255.");
+            return Fail(EditErrorCode.InvalidValue, $"The alpha channel {edit.Alpha} is out of range: valid values are 0 to 255.");
 
         var before = (frame.Red, frame.Green, frame.Blue, frame.Alpha, frame.ColorOperation);
         commands.SetFrameColorValues([frame], edit.Red, edit.Green, edit.Blue, edit.Alpha, edit.Operation);
@@ -135,7 +135,7 @@ public static class PropertyEdit
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
         if (flipH is null && flipV is null && flipDiagonal is null)
-            return Fail(EditErrorCode.Unspecified, "A flip edit needs flipH, flipV, flipDiagonal or several of them.");
+            return Fail(EditErrorCode.InvalidValue, "A flip edit needs flipH, flipV, flipDiagonal or several of them.");
 
         var before = (frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
         commands.SetFrameFlip([frame], flipH, flipV, flipDiagonal);
@@ -152,9 +152,9 @@ public static class PropertyEdit
     public static EditResult SetTimeUnit(IProjectManager projectManager, IAppCommands commands, TimeMeasurementUnit unit)
     {
         if (unit == TimeMeasurementUnit.Undefined)
-            return Fail(EditErrorCode.Unspecified, "The time unit must be second or millisecond.");
+            return Fail(EditErrorCode.InvalidValue, "The time unit must be second or millisecond.");
         if (projectManager.AnimationChainListSave is not { } list)
-            return Fail(EditErrorCode.Unspecified, "No animation file is loaded.");
+            return Fail(EditErrorCode.NotFound, "No animation file is loaded.");
         if (list.TimeMeasurementUnit == unit) return Ok();
 
         commands.SetTimeMeasurementUnit(unit);
@@ -167,7 +167,7 @@ public static class PropertyEdit
 
     private static EditResult? CheckFrame(AnimationChainSave chain, AnimationFrameSave frame)
     {
-        if (!chain.Frames.Contains(frame)) return Fail(EditErrorCode.Unspecified, $"The frame is not in chain '{chain.Name}'.");
+        if (!chain.Frames.Contains(frame)) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
         return chain.IsLocked ? LockedFail(chain) : null;
     }
 

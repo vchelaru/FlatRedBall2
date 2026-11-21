@@ -33,9 +33,9 @@ public sealed class SequenceSession
     public static SequenceSessionOpen Open(string path)
     {
         if (!SequenceFileReader.IsSequenceFile(path))
-            return Fail($"Only .seqj files can be edited with sequence ops: {path}");
+            return Fail($"Only .seqj files can be edited with sequence ops: {path}", EditErrorCode.UnsupportedFile);
         if (!File.Exists(path))
-            return Fail($"File not found: {path}");
+            return Fail($"File not found: {path}", EditErrorCode.NotFound);
         try
         {
             var session = new SequenceSession(System.IO.Path.GetFullPath(path), SequenceDocument.Load(path));
@@ -44,7 +44,7 @@ public sealed class SequenceSession
         }
         catch (Exception ex)
         {
-            return Fail($"Could not open {System.IO.Path.GetFileName(path)}: {ex.Message}");
+            return Fail($"Could not open {System.IO.Path.GetFileName(path)}: {ex.Message}", EditErrorCode.IoFailed);
         }
     }
 
@@ -62,5 +62,5 @@ public sealed class SequenceSession
         }
     }
 
-    private static SequenceSessionOpen Fail(string message) => new(null, new EditResult([], [message], []));
+    private static SequenceSessionOpen Fail(string message, EditErrorCode code) => new(null, new EditResult([], [message], [], [code]));
 }

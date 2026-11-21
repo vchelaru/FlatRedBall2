@@ -477,7 +477,8 @@ public static class EditOps
         var added = CheckReport.NewErrors(before, CheckReport.Run(session.Document, session.Path));
         if (added.Count > 0)
             return new EditRunResult(
-                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings),
+                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
+                added.Select(_ => EditErrorCode.WouldBreakFile).ToList()),
                 added.Select(_ => (int?)null).ToList());
 
         if (tsxBefore is not null && TsxOpPolicy.CheckWritable(session, tsxBefore) is { } unwritable)
@@ -515,14 +516,14 @@ public static class EditOps
                 var chain = EditAddress.ResolveChain(doc, op.Values["chain"]);
                 return Task.FromResult(chain.Ok
                     ? RenameEdit.RenameChain(session.ProjectManager, session.Commands, chain.Value!, op.Values["to"])
-                    : Fail(chain.Error!));
+                    : Fail(chain.Error!, chain.Code));
             }
             case "rename-shape":
             {
                 var shape = EditAddress.ResolveShape(doc, op.Values["shape"]);
                 return Task.FromResult(shape.Ok
                     ? RenameEdit.RenameShape(session.Commands, session.ObjectFinder, shape.Value!, op.Values["to"])
-                    : Fail(shape.Error!));
+                    : Fail(shape.Error!, shape.Code));
             }
             case "set-frame-texture":
                 return SetFrameTextureAsync(session, op);
@@ -623,7 +624,7 @@ public static class EditOps
                 return Task.FromResult(PropertyEdit.SetTimeUnit(session.ProjectManager, session.Commands,
                     op.Values["unit"] == "millisecond" ? TimeMeasurementUnit.Millisecond : TimeMeasurementUnit.Second));
             default:
-                return Task.FromResult(Fail($"Unhandled op '{op.Spec.Name}'."));
+                return Task.FromResult(Fail($"Unhandled op '{op.Spec.Name}'.", EditErrorCode.InvalidValue));
         }
     }
 
@@ -644,7 +645,7 @@ public static class EditOps
     private static Task<EditResult> SetFrameTextureAsync(EditSession session, EditOp op)
     {
         var frame = EditAddress.ResolveFrame(session.Document, op.Values["frame"]);
-        if (!frame.Ok) return Task.FromResult(Fail(frame.Error!));
+        if (!frame.Ok) return Task.FromResult(Fail(frame.Error!, frame.Code));
 
         var resolved = ResolveTexture(session, op);
         if (resolved.AbsolutePath is null) return Task.FromResult(resolved.Result);
@@ -673,13 +674,13 @@ public static class EditOps
     private static EditResult AddFrame(EditSession session, EditOp op)
     {
         var chain = EditAddress.ResolveChain(session.Document, op.Values["chain"]);
-        if (!chain.Ok) return Fail(chain.Error!);
+        if (!chain.Ok) return Fail(chain.Error!, chain.Code);
 
         FramePixelRegion? region = null;
         if (op.Values.TryGetValue("region", out var text))
         {
             var parsed = ParseRegion(text);
-            if (parsed.Region is null) return Fail(parsed.Error!);
+            if (parsed.Region is null) return Fail(parsed.Error!, EditErrorCode.InvalidValue);
             region = parsed.Region;
         }
 
@@ -697,7 +698,7 @@ public static class EditOps
     private static EditResult AddFramesGrid(EditSession session, EditOp op)
     {
         var chain = EditAddress.ResolveChain(session.Document, op.Values["chain"]);
-        if (!chain.Ok) return Fail(chain.Error!);
+        if (!chain.Ok) return Fail(chain.Error!, chain.Code);
 
         var resolved = ResolveTexture(session, op);
         if (resolved.AbsolutePath is null) return resolved.Result;
@@ -711,7 +712,7 @@ public static class EditOps
     private static EditResult SetFrameRegion(EditSession session, EditOp op)
     {
         var parsed = ParseRegion(op.Values["region"]);
-        if (parsed.Region is null) return Fail(parsed.Error!);
+        if (parsed.Region is null) return Fail(parsed.Error!, EditErrorCode.InvalidValue);
         return WithFrame(session.Document, op, (chain, frame) =>
             PropertyEdit.SetFrameRegion(session.ProjectManager, session.Commands, chain, frame, parsed.Region.Value));
     }
@@ -751,10 +752,10 @@ public static class EditOps
         where T : ShapeSave
     {
         var shape = EditAddress.ResolveShape(doc, op.Values["shape"]);
-        if (!shape.Ok) return Fail(shape.Error!);
+        if (!shape.Ok) return Fail(shape.Error!, shape.Code);
         return shape.Value is T typed
             ? apply(typed)
-            : Fail($"'{op.Values["shape"]}' is a {EditAddress.TypeName(shape.Value!)}, but {op.Spec.Name} needs a {typeWord}.");
+            : Fail($"'{op.Values["shape"]}' is a {EditAddress.TypeName(shape.Value!)}, but {op.Spec.Name} needs a {typeWord}.", EditErrorCode.WrongShapeType);
     }
 
     private static KeyframeCurveChoice Curve(EditOp op) => op.Values["curve"] switch
@@ -779,21 +780,21 @@ public static class EditOps
     private static EditResult WithEvent(AnimationChainListSave doc, EditOp op, Func<FrameEventRef, EditResult> apply)
     {
         var e = EditAddress.ResolveEvent(doc, op.Values["event"]);
-        return e.Ok ? apply(e.Value!) : Fail(e.Error!);
+        return e.Ok ? apply(e.Value!) : Fail(e.Error!, e.Code);
     }
 
     private static EditResult WithChain(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, EditResult> apply)
     {
         var chain = EditAddress.ResolveChain(doc, op.Values["chain"]);
-        return chain.Ok ? apply(chain.Value!) : Fail(chain.Error!);
+        return chain.Ok ? apply(chain.Value!) : Fail(chain.Error!, chain.Code);
     }
 
     private static EditResult WithFrame(AnimationChainListSave doc, EditOp op, Func<AnimationChainSave, AnimationFrameSave, EditResult> apply)
     {
         var frame = EditAddress.ResolveFrame(doc, op.Values["frame"]);
-        if (!frame.Ok) return Fail(frame.Error!);
+        if (!frame.Ok) return Fail(frame.Error!, frame.Code);
         var chain = EditAddress.ResolveChain(doc, op.Values["frame"].Split('/')[0]);
-        return chain.Ok ? apply(chain.Value!, frame.Value!) : Fail(chain.Error!);
+        return chain.Ok ? apply(chain.Value!, frame.Value!) : Fail(chain.Error!, chain.Code);
     }
 
     private static EditResult Fail(string message, EditErrorCode code = EditErrorCode.Unspecified) =>

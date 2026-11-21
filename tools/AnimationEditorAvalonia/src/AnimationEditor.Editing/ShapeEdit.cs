@@ -30,10 +30,10 @@ public static class ShapeEdit
             _ => null,
         };
         if (defaultName is null)
-            return Fail(EditErrorCode.Unspecified, $"Shape type '{type}' is not one of rect|circle|polygon.");
+            return Fail(EditErrorCode.InvalidAddress, $"Shape type '{type}' is not one of rect|circle|polygon.");
 
         var chain = finder.GetAnimationChainContaining(frame);
-        if (chain is null) return Fail(EditErrorCode.Unspecified, "The frame is not in the file.");
+        if (chain is null) return Fail(EditErrorCode.NotFound, "The frame is not in the file.");
         if (chain.IsLocked) return StructureEdit.LockedFail(chain);
 
         var existing = frame.ShapesSave?.Shapes.OfType<ShapeSave>().Select(s => s.Name).ToList() ?? [];
@@ -45,7 +45,7 @@ public static class ShapeEdit
         {
             name = name.Trim();
             if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Shape name cannot be empty.");
-            if (name.Contains('/')) return Fail(EditErrorCode.Unspecified, $"Shape name '{name}' cannot contain '/'.");
+            if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"Shape name '{name}' cannot contain '/'.");
             if (existing.Contains(name))
                 return Fail(EditErrorCode.DuplicateName, $"A shape named '{name}' already exists in this frame.");
         }
@@ -58,7 +58,7 @@ public static class ShapeEdit
         };
         return commands.AddShape(frame, shape)
             ? Ok(Address(chain, frame, type, name))
-            : Fail(EditErrorCode.Unspecified, $"Could not add a {type} to the frame.");
+            : Fail(EditErrorCode.Refused, $"Could not add a {type} to the frame.");
     }
 
     public static EditResult DeleteShape(IAppCommands commands, IObjectFinder finder, ShapeSave shape)
@@ -79,7 +79,7 @@ public static class ShapeEdit
 
         return commands.DuplicateShape(shape) is ShapeSave copy
             ? Ok(Address(owner.Chain!, owner.Frame!, EditAddress.TypeName(copy), copy.Name))
-            : Fail(EditErrorCode.Unspecified, $"Could not duplicate shape '{shape.Name}'.");
+            : Fail(EditErrorCode.Refused, $"Could not duplicate shape '{shape.Name}'.");
     }
 
     /// <summary>Sets any of a rectangle's center and half-extents; a null field is left as it is.</summary>
@@ -89,7 +89,7 @@ public static class ShapeEdit
         var owner = Owner(finder, rect);
         if (owner.Error is not null) return owner.Error;
         if (x is null && y is null && scaleX is null && scaleY is null)
-            return Fail(EditErrorCode.Unspecified, "A rect edit needs at least one of x, y, scaleX, scaleY.");
+            return Fail(EditErrorCode.InvalidValue, "A rect edit needs at least one of x, y, scaleX, scaleY.");
         var bad = CheckPosition(x, y) ?? CheckPositive(scaleX, "scaleX") ?? CheckPositive(scaleY, "scaleY");
         if (bad is not null) return bad;
 
@@ -107,7 +107,7 @@ public static class ShapeEdit
         var owner = Owner(finder, circle);
         if (owner.Error is not null) return owner.Error;
         if (x is null && y is null && radius is null)
-            return Fail(EditErrorCode.Unspecified, "A circle edit needs at least one of x, y, radius.");
+            return Fail(EditErrorCode.InvalidValue, "A circle edit needs at least one of x, y, radius.");
         var bad = CheckPosition(x, y) ?? CheckPositive(radius, "radius");
         if (bad is not null) return bad;
 
@@ -129,15 +129,15 @@ public static class ShapeEdit
         var owner = Owner(finder, polygon);
         if (owner.Error is not null) return owner.Error;
         if (x is null && y is null && points is null)
-            return Fail(EditErrorCode.Unspecified, "A polygon edit needs at least one of x, y, points.");
+            return Fail(EditErrorCode.InvalidValue, "A polygon edit needs at least one of x, y, points.");
         var bad = CheckPosition(x, y);
         if (bad is not null) return bad;
         if (points is not null)
         {
             if (points.Count < 3)
-                return Fail(EditErrorCode.Unspecified, $"A polygon needs at least 3 points; {points.Count} given.");
+                return Fail(EditErrorCode.InvalidValue, $"A polygon needs at least 3 points; {points.Count} given.");
             if (points.Any(p => !float.IsFinite(p.X) || !float.IsFinite(p.Y)))
-                return Fail(EditErrorCode.Unspecified, "Polygon points must be finite numbers.");
+                return Fail(EditErrorCode.InvalidValue, "Polygon points must be finite numbers.");
         }
 
         var (nx, ny) = (x ?? polygon.X, y ?? polygon.Y);
@@ -156,7 +156,7 @@ public static class ShapeEdit
     {
         var owner = Owner(finder, shape);
         if (owner.Error is not null) return owner.Error;
-        if (x is null && y is null) return Fail(EditErrorCode.Unspecified, "A shape edit needs at least one of x, y.");
+        if (x is null && y is null) return Fail(EditErrorCode.InvalidValue, "A shape edit needs at least one of x, y.");
         var bad = CheckPosition(x, y);
         if (bad is not null) return bad;
 
@@ -172,19 +172,19 @@ public static class ShapeEdit
     {
         var frame = finder.GetAnimationFrameContaining(shape);
         var chain = frame is null ? null : finder.GetAnimationChainContaining(frame);
-        if (frame is null || chain is null) return (null, null, Fail(EditErrorCode.Unspecified, $"Shape '{shape.Name}' is not in the file."));
+        if (frame is null || chain is null) return (null, null, Fail(EditErrorCode.NotFound, $"Shape '{shape.Name}' is not in the file."));
         if (chain.IsLocked) return (null, null, StructureEdit.LockedFail(chain));
         return (chain, frame, null);
     }
 
     private static EditResult? CheckPosition(float? x, float? y) =>
         (x is { } a && !float.IsFinite(a)) || (y is { } b && !float.IsFinite(b))
-            ? Fail(EditErrorCode.Unspecified, "x and y must be finite numbers.")
+            ? Fail(EditErrorCode.InvalidValue, "x and y must be finite numbers.")
             : null;
 
     private static EditResult? CheckPositive(float? value, string field) =>
         value is { } v && !(float.IsFinite(v) && v > 0f)
-            ? Fail(EditErrorCode.Unspecified, $"{field} must be greater than zero (a shape's scale and radius are half-extents).")
+            ? Fail(EditErrorCode.InvalidValue, $"{field} must be greater than zero (a shape's scale and radius are half-extents).")
             : null;
 
     internal static string Address(AnimationChainSave chain, AnimationFrameSave frame, string type, string name) =>

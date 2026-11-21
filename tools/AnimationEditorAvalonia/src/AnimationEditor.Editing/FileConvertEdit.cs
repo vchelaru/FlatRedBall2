@@ -17,15 +17,15 @@ public static class FileConvertEdit
     {
         to = to.ToLowerInvariant();
         if (to is not ("achj" or "achx"))
-            return Fail(EditErrorCode.Unspecified, $"Unknown target format '{to}': use achj or achx.");
+            return Fail(EditErrorCode.InvalidValue, $"Unknown target format '{to}': use achj or achx.");
 
         var ext = Path.GetExtension(path).ToLowerInvariant();
         if (ext != ".achx" && ext != ".achj")
-            return Fail(EditErrorCode.Unspecified, $"Only .achx and .achj files can be converted: {path}");
+            return Fail(EditErrorCode.UnsupportedFile, $"Only .achx and .achj files can be converted: {path}");
         if (!File.Exists(path))
-            return Fail(EditErrorCode.Unspecified, $"File not found: {path}");
+            return Fail(EditErrorCode.NotFound, $"File not found: {path}");
         if (ext == "." + to)
-            return Fail(EditErrorCode.Unspecified, $"{Path.GetFileName(path)} is already an .{to} file.");
+            return Fail(EditErrorCode.AlreadyExists, $"{Path.GetFileName(path)} is already an .{to} file.");
 
         if (to == "achj")
         {
@@ -46,7 +46,7 @@ public static class FileConvertEdit
         catch (Exception ex)
         {
             if (File.Exists(target) && new FileInfo(target).Length == 0) File.Delete(target);
-            return Fail(EditErrorCode.Unspecified, $"Could not convert {Path.GetFileName(path)}: {ex.Message}");
+            return Fail(EditErrorCode.IoFailed, $"Could not convert {Path.GetFileName(path)}: {ex.Message}");
         }
     }
 

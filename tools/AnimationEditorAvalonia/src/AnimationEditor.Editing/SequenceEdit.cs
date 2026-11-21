@@ -121,7 +121,7 @@ public static class SequenceEdit
 
         undo.SealCoalescing();
         var refused = doc.RenameTrack(undo, at.Value.Sequence, at.Value.Track, to);
-        return refused is null ? Ok($"{owner.Name}/{to}") : Fail(EditErrorCode.Unspecified, refused);
+        return refused is null ? Ok($"{owner.Name}/{to}") : Fail(EditErrorCode.Refused, refused);
     }
 
     public static EditResult DeleteTrack(SequenceDocument doc, IUndoManager undo, string track)
@@ -187,7 +187,7 @@ public static class SequenceEdit
         undo.SealCoalescing();
         var slot = index ?? 0;
         var refused = doc.AddSequenceReference(undo, at.Value.Sequence, targetName, start, slot);
-        return refused is null ? Ok($"{owner.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[slot].Name}") : Fail(EditErrorCode.Unspecified, refused);
+        return refused is null ? Ok($"{owner.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[slot].Name}") : Fail(EditErrorCode.Refused, refused);
     }
 
     // ---- sources ----
@@ -202,7 +202,7 @@ public static class SequenceEdit
 
         undo.SealCoalescing();
         var errors = doc.AddSources(undo, [full]);
-        return errors.Count > 0 ? Fail(EditErrorCode.Unspecified, errors[0]) : Ok(doc.Save.Sources[^1]);
+        return errors.Count > 0 ? Fail(EditErrorCode.Refused, errors[0]) : Ok(doc.Save.Sources[^1]);
     }
 
     /// <summary>Removes an unused source (named as listed in the file) from the library.</summary>
@@ -228,7 +228,7 @@ public static class SequenceEdit
 
         undo.SealCoalescing();
         var refused = doc.ReplaceSource(undo, listed, full);
-        return refused is null ? Ok(doc.Save.Sources.FirstOrDefault(s => SamePath(doc, s, full)) ?? listed) : Fail(EditErrorCode.Unspecified, refused);
+        return refused is null ? Ok(doc.Save.Sources.FirstOrDefault(s => SamePath(doc, s, full)) ?? listed) : Fail(EditErrorCode.Refused, refused);
     }
 
     // ---- blocks ----
@@ -327,7 +327,7 @@ public static class SequenceEdit
     private static EditResult? CheckNewName(string name, IEnumerable<string> used, string what)
     {
         if (name.Length == 0) return Fail(EditErrorCode.EmptyName, $"A {what} needs a name.");
-        if (name.Contains('/')) return Fail(EditErrorCode.Unspecified, $"A {what} name cannot contain '/'.");
+        if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"A {what} name cannot contain '/'.");
         if (used.Contains(name)) return Fail(EditErrorCode.DuplicateName, $"A {what} named '{name}' already exists.");
         return null;
     }
@@ -354,7 +354,7 @@ public static class SequenceEdit
         full = System.IO.Path.GetFullPath(System.IO.Path.Combine(folder, path));
         var ext = System.IO.Path.GetExtension(full).ToLowerInvariant();
         if (ext is not (".achx" or ".achj"))
-            return Fail(EditErrorCode.Unspecified, $"{System.IO.Path.GetFileName(full)} can't be a source. Only .achx and .achj files can.");
+            return Fail(EditErrorCode.UnsupportedFile, $"{System.IO.Path.GetFileName(full)} can't be a source. Only .achx and .achj files can.");
         if (!File.Exists(full))
             return Fail(EditErrorCode.NotFound, $"File not found: {full}");
         return null;

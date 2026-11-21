@@ -85,7 +85,7 @@ public static class TsxEdit
         var companion = Path.ChangeExtension(projectManager.FileName!, ".tiledsync");
         return File.Exists(companion)
             ? check
-            : Fail(EditErrorCode.Unspecified, $"Could not write the Tiled sync file {Path.GetFileName(companion)}.");
+            : Fail(EditErrorCode.IoFailed, $"Could not write the Tiled sync file {Path.GetFileName(companion)}.");
     }
 
     private static EditResult NotTsx() =>

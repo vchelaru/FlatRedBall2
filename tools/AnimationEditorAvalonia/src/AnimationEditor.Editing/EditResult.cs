@@ -45,6 +45,20 @@ public enum EditErrorCode
     DuplicateOwnerTile,
     /// <summary>A .tsx chain's frames do not line up with whole tiles of the tileset, so it cannot be written back.</summary>
     UnmappableChain,
+    /// <summary>An address is malformed: wrong number of parts, a non-numeric index, an unknown shape type, or a name containing '/'.</summary>
+    InvalidAddress,
+    /// <summary>A shape op addressed a shape of the wrong type (set-rect on a circle).</summary>
+    WrongShapeType,
+    /// <summary>The file kind or content is not supported for this command (wrong extension, legacy UV coordinates, a texture whose size cannot be read).</summary>
+    UnsupportedFile,
+    /// <summary>Reading or writing a file failed (unreadable, unparsable, or a write error).</summary>
+    IoFailed,
+    /// <summary>A name matches more than one item, so it cannot be addressed; rename them first.</summary>
+    Ambiguous,
+    /// <summary>The editor's own command refused the edit (a keyframe rule, an unchanged-state rule, a library rule).</summary>
+    Refused,
+    /// <summary>The edits applied, but the result would have a check error, so nothing was written.</summary>
+    WouldBreakFile,
 }
 
 /// <summary>

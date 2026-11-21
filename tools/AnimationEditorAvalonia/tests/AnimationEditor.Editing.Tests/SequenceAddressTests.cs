@@ -18,8 +18,8 @@ public class SequenceAddressTests
 
     [Theory]
     [InlineData("Nope", EditErrorCode.NotFound)]
-    [InlineData("", EditErrorCode.Unspecified)]
-    [InlineData("a/b", EditErrorCode.Unspecified)]
+    [InlineData("", EditErrorCode.InvalidAddress)]
+    [InlineData("a/b", EditErrorCode.InvalidAddress)]
     public void Sequence_Errors(string address, EditErrorCode code)
     {
         var r = SequenceAddress.ResolveSequence(Save, address);
@@ -44,8 +44,8 @@ public class SequenceAddressTests
     [InlineData("Run/Nope", EditErrorCode.NotFound)]
     [InlineData("Run/2", EditErrorCode.IndexOutOfRange)]
     [InlineData("Nope/Body", EditErrorCode.NotFound)]
-    [InlineData("Run", EditErrorCode.Unspecified)]
-    [InlineData("Run/Body/0", EditErrorCode.Unspecified)]
+    [InlineData("Run", EditErrorCode.InvalidAddress)]
+    [InlineData("Run/Body/0", EditErrorCode.InvalidAddress)]
     public void Track_Errors(string address, EditErrorCode code)
     {
         var r = SequenceAddress.ResolveTrack(Save, address);
@@ -65,8 +65,8 @@ public class SequenceAddressTests
 
     [Theory]
     [InlineData("Run/Body/2", EditErrorCode.IndexOutOfRange)]
-    [InlineData("Run/Body/x", EditErrorCode.Unspecified)]
-    [InlineData("Run/Body", EditErrorCode.Unspecified)]
+    [InlineData("Run/Body/x", EditErrorCode.InvalidAddress)]
+    [InlineData("Run/Body", EditErrorCode.InvalidAddress)]
     public void Block_Errors(string address, EditErrorCode code)
     {
         var r = SequenceAddress.ResolveBlock(Save, address);

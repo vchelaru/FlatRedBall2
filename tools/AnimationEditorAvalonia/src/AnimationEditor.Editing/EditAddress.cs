@@ -4,7 +4,7 @@ using FlatRedBall2.AnimationEditorCommon;
 namespace AnimationEditor.Editing;
 
 /// <summary>A resolved item, or the reason it could not be resolved.</summary>
-public sealed record AddressResult<T>(T? Value, string? Error) where T : class
+public sealed record AddressResult<T>(T? Value, string? Error, EditErrorCode Code = EditErrorCode.Unspecified) where T : class
 {
     public bool Ok => Value is not null;
 }
@@ -23,35 +23,35 @@ public static class EditAddress
 {
     public static AddressResult<AnimationChainSave> ResolveChain(AnimationChainListSave doc, string address)
     {
-        if (address.Length == 0) return Chain(null, "A chain address cannot be empty.");
-        if (address.Contains('/')) return Chain(null, $"'{address}' is not a chain name: names containing '/' cannot be addressed.");
+        if (address.Length == 0) return Chain(null, "A chain address cannot be empty.", EditErrorCode.InvalidAddress);
+        if (address.Contains('/')) return Chain(null, $"'{address}' is not a chain name: names containing '/' cannot be addressed.", EditErrorCode.InvalidAddress);
         return FindChain(doc, address);
     }
 
     public static AddressResult<AnimationFrameSave> ResolveFrame(AnimationChainListSave doc, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 2) return Frame(null, $"'{address}' is not a frame address; expected Chain/index.");
+        if (parts.Length != 2) return Frame(null, $"'{address}' is not a frame address; expected Chain/index.", EditErrorCode.InvalidAddress);
         return FrameAt(doc, parts[0], parts[1]);
     }
 
     public static AddressResult<ShapeSave> ResolveShape(AnimationChainListSave doc, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 4) return Shape(null, $"'{address}' is not a shape address; expected Chain/index/type/name.");
+        if (parts.Length != 4) return Shape(null, $"'{address}' is not a shape address; expected Chain/index/type/name.", EditErrorCode.InvalidAddress);
 
         var frame = FrameAt(doc, parts[0], parts[1]);
-        if (!frame.Ok) return Shape(null, frame.Error);
+        if (!frame.Ok) return Shape(null, frame.Error, frame.Code);
 
         var type = parts[2];
         if (type is not ("rect" or "circle" or "polygon"))
-            return Shape(null, $"Shape type '{type}' is not one of rect|circle|polygon.");
+            return Shape(null, $"Shape type '{type}' is not one of rect|circle|polygon.", EditErrorCode.InvalidAddress);
 
         var name = parts[3];
         var shapes = frame.Value!.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
         var match = shapes.FirstOrDefault(s => s.Name == name && TypeName(s) == type);
         return match is null
-            ? Shape(null, $"No {type} named '{name}' in frame {parts[1]} of '{parts[0]}'.")
+            ? Shape(null, $"No {type} named '{name}' in frame {parts[1]} of '{parts[0]}'.", EditErrorCode.NotFound)
             : new AddressResult<ShapeSave>(match, null);
     }
 
@@ -60,12 +60,12 @@ public static class EditAddress
     {
         var parts = address.Split('/');
         if (parts.Length != 4 || parts[2] != "event")
-            return new(null, $"'{address}' is not an event address; expected Chain/frameIndex/event/index.");
+            return new(null, $"'{address}' is not an event address; expected Chain/frameIndex/event/index.", EditErrorCode.InvalidAddress);
 
         var frame = FrameAt(doc, parts[0], parts[1]);
-        if (!frame.Ok) return new(null, frame.Error);
+        if (!frame.Ok) return new(null, frame.Error, frame.Code);
         if (!int.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var index))
-            return new(null, $"Event index '{parts[3]}' is not a zero-based index.");
+            return new(null, $"Event index '{parts[3]}' is not a zero-based index.", EditErrorCode.InvalidAddress);
         var chain = FindChain(doc, parts[0]).Value!;
         return new AddressResult<FrameEventRef>(new FrameEventRef(chain, frame.Value!, index), null);
     }
@@ -84,25 +84,25 @@ public static class EditAddress
         var matches = doc.AnimationChains.Where(c => c.Name == name).ToList();
         return matches.Count switch
         {
-            0 => Chain(null, $"No chain named '{name}'."),
+            0 => Chain(null, $"No chain named '{name}'.", EditErrorCode.NotFound),
             1 => new AddressResult<AnimationChainSave>(matches[0], null),
-            _ => Chain(null, $"More than one chain is named '{name}'; rename them in the editor first."),
+            _ => Chain(null, $"More than one chain is named '{name}'; rename them in the editor first.", EditErrorCode.Ambiguous),
         };
     }
 
     private static AddressResult<AnimationFrameSave> FrameAt(AnimationChainListSave doc, string chainName, string indexText)
     {
         var chain = ResolveChain(doc, chainName);
-        if (!chain.Ok) return Frame(null, chain.Error);
+        if (!chain.Ok) return Frame(null, chain.Error, chain.Code);
         if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
-            return Frame(null, $"Frame index '{indexText}' is not a zero-based index.");
+            return Frame(null, $"Frame index '{indexText}' is not a zero-based index.", EditErrorCode.InvalidAddress);
         var frames = chain.Value!.Frames;
         return index >= frames.Count
-            ? Frame(null, $"Frame index {index} is out of range: '{chainName}' has {frames.Count} frame(s).")
+            ? Frame(null, $"Frame index {index} is out of range: '{chainName}' has {frames.Count} frame(s).", EditErrorCode.IndexOutOfRange)
             : new AddressResult<AnimationFrameSave>(frames[index], null);
     }
 
-    private static AddressResult<AnimationChainSave> Chain(AnimationChainSave? v, string? e) => new(v, e);
-    private static AddressResult<AnimationFrameSave> Frame(AnimationFrameSave? v, string? e) => new(v, e);
-    private static AddressResult<ShapeSave> Shape(ShapeSave? v, string? e) => new(v, e);
+    private static AddressResult<AnimationChainSave> Chain(AnimationChainSave? v, string? e, EditErrorCode c = EditErrorCode.Unspecified) => new(v, e, c);
+    private static AddressResult<AnimationFrameSave> Frame(AnimationFrameSave? v, string? e, EditErrorCode c = EditErrorCode.Unspecified) => new(v, e, c);
+    private static AddressResult<ShapeSave> Shape(ShapeSave? v, string? e, EditErrorCode c = EditErrorCode.Unspecified) => new(v, e, c);
 }

@@ -29,8 +29,8 @@ public static class EditSelectors
 
     public static SelectorExpansion ExpandChains(AnimationChainListSave doc, string pattern)
     {
-        if (pattern.Length == 0) return Fail("A chain address cannot be empty.");
-        if (pattern.Contains('/')) return Fail($"'{pattern}' is not a chain name: names containing '/' cannot be addressed.");
+        if (pattern.Length == 0) return Fail("A chain address cannot be empty.", EditErrorCode.InvalidAddress);
+        if (pattern.Contains('/')) return Fail($"'{pattern}' is not a chain name: names containing '/' cannot be addressed.", EditErrorCode.InvalidAddress);
 
         var names = IsGlob(pattern)
             ? doc.AnimationChains.Select(c => c.Name).Where(n => GlobMatches(pattern, n)).Distinct().ToList()
@@ -43,7 +43,7 @@ public static class EditSelectors
     public static SelectorExpansion ExpandFrames(AnimationChainListSave doc, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 2) return Fail($"'{address}' is not a frame address; expected Chain/index.");
+        if (parts.Length != 2) return Fail($"'{address}' is not a frame address; expected Chain/index.", EditErrorCode.InvalidAddress);
 
         var chains = ExpandChains(doc, parts[0]);
         if (!chains.Ok) return chains;
@@ -68,9 +68,9 @@ public static class EditSelectors
     public static SelectorExpansion ExpandShapes(AnimationChainListSave doc, string address)
     {
         var parts = address.Split('/');
-        if (parts.Length != 4) return Fail($"'{address}' is not a shape address; expected Chain/index/type/name.");
+        if (parts.Length != 4) return Fail($"'{address}' is not a shape address; expected Chain/index/type/name.", EditErrorCode.InvalidAddress);
         var type = parts[2];
-        if (!ShapeTypes.Contains(type)) return Fail($"Shape type '{type}' is not one of rect|circle|polygon.");
+        if (!ShapeTypes.Contains(type)) return Fail($"Shape type '{type}' is not one of rect|circle|polygon.", EditErrorCode.InvalidAddress);
 
         var frames = ExpandFrames(doc, $"{parts[0]}/{parts[1]}");
         if (!frames.Ok) return frames;
@@ -104,12 +104,12 @@ public static class EditSelectors
         {
             var range = item.Split('-');
             if (range.Length > 2 || range.Any(p => p.Length == 0 || !p.All(char.IsAsciiDigit) || p.Length > 9))
-                return (null, $"'{text}' is not a {noun} selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.Unspecified);
+                return (null, $"'{text}' is not a {noun} selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.InvalidAddress);
 
             var from = int.Parse(range[0], CultureInfo.InvariantCulture);
             var to = int.Parse(range[^1], CultureInfo.InvariantCulture);
             if (to < from)
-                return (null, $"The range '{item}' runs backwards; write it low to high.", EditErrorCode.Unspecified);
+                return (null, $"The range '{item}' runs backwards; write it low to high.", EditErrorCode.InvalidAddress);
             if (to >= count)
                 return (null, $"{char.ToUpperInvariant(noun[0])}{noun[1..]} index {to} is out of range: '{chainName}' has {count} {noun}(s).", EditErrorCode.IndexOutOfRange);
             for (int i = from; i <= to; i++)

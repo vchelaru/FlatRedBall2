@@ -158,7 +158,8 @@ public static class SequenceOps
         var added = CheckReport.NewErrors(before, SequenceCheck.Run(doc.Save, session.Path));
         if (added.Count > 0)
             return new EditRunResult(
-                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings),
+                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
+                added.Select(_ => EditErrorCode.WouldBreakFile).ToList()),
                 added.Select(_ => (int?)null).ToList());
 
         if (changed.Count == 0 || doc.Save.ToJsonString() == original)

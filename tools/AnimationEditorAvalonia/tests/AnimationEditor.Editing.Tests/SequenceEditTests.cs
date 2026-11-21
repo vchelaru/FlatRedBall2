@@ -49,7 +49,7 @@ public class SequenceEditTests : IDisposable
     [Theory]
     [InlineData("Run", EditErrorCode.DuplicateName)]
     [InlineData("  ", EditErrorCode.EmptyName)]
-    [InlineData("a/b", EditErrorCode.Unspecified)]
+    [InlineData("a/b", EditErrorCode.InvalidAddress)]
     public void AddSequence_BadName_Fails(string name, EditErrorCode code)
     {
         var s = _w.Open();
