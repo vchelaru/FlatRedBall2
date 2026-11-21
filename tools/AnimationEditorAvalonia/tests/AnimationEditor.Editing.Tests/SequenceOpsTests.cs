@@ -28,7 +28,7 @@ public class SequenceOpsTests : IDisposable
             "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop",
             "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "add-reference-track",
             "add-source", "remove-source", "replace-source",
-            "add-block", "set-block-start", "set-block-loops", "delete-block",
+            "add-block", "set-block-start", "set-block-loops", "set-block-end", "delete-block",
         ], ignoreOrder: true);
     }
 
@@ -195,6 +195,57 @@ public class SequenceOpsTests : IDisposable
 
         var clip = Reload().Sequences[1].Tracks[0].Reference!;
         (clip.Sequence, clip.Start, clip.Loops).ShouldBe(("Run", 1.0, 2f));
+    }
+
+    [Fact]
+    public void SetBlockEnd_ComputesLoops_KeepingFractions()
+    {
+        var run = Apply("""
+            {"ops":[
+              {"op":"set-block-end","block":"Run/Shadow/0","end":1.25},
+              {"op":"set-block-end","block":"Run/Body/1","end":2.2}
+            ]}
+            """);
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        var tracks = Reload().Sequences[0].Tracks;
+        tracks[1].Chains[0].Loops.ShouldBe(2.5f, 1e-4f); // Idle is 0.5 s
+        tracks[0].Chains[1].Loops.ShouldBe(3f, 1e-4f);   // starts at 1, Walk is 0.4 s
+    }
+
+    [Fact]
+    public void SetBlockEnd_TakesSelectors_AndEveryBlockEndsAtTheTarget()
+    {
+        Apply("""{"ops":[{"op":"set-block-end","block":"Run/*/0","end":2}]}""").Success.ShouldBeTrue();
+
+        var tracks = Reload().Sequences[0].Tracks;
+        tracks[0].Chains[0].Loops.ShouldBe(5f, 1e-4f);
+        tracks[1].Chains[0].Loops.ShouldBe(4f, 1e-4f);
+    }
+
+    [Theory]
+    [InlineData("Run/Body/1", 1.0, EditErrorCode.InvalidValue)]
+    [InlineData("Run/Body/1", 0.5, EditErrorCode.InvalidValue)]
+    public void SetBlockEnd_EndNotAfterStart_Fails(string block, double end, EditErrorCode code)
+    {
+        var run = Apply($$"""{"ops":[{"op":"set-block-end","block":"{{block}}","end":{{end.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}]}""");
+
+        run.Success.ShouldBeFalse();
+        run.Result.CodeAt(0).ShouldBe(code);
+    }
+
+    [Fact]
+    public void SetBlockEnd_OnAReferenceClip_IsRefused()
+    {
+        var run = Apply("""
+            {"ops":[
+              {"op":"add-reference-track","sequence":"Rest","target":"Run"},
+              {"op":"set-block-end","block":"Rest/Run/0","end":3}
+            ]}
+            """);
+
+        run.Success.ShouldBeFalse();
+        run.Result.CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
     }
 
     private static System.Text.Json.Nodes.JsonNode JsonValue(string v) => System.Text.Json.Nodes.JsonValue.Create(v)!;
