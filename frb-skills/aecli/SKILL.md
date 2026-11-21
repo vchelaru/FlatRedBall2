@@ -34,6 +34,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - Setting a value a thing already has is a no-op. Every edit of a locked chain fails with code `Locked`, except `set-chain-locked` itself; `set-unit` converts locked chains too.
 - `set-frame-length` is in the file's unit and range-checked (0.001-60 s, 1-60000 ms). `set-unit` converts all lengths so playback time stays the same; later ops in the batch use the new unit.
 - `set-frame-region` needs the frame's texture to exist and be a PNG. `set-frame-flip` sets flags (not a toggle) and mirrors the offset and shapes like the editor. `set-frame-color` only sets; `clear-frame-color` returns parts to inherited.
+- `describe` prints a region as `left,top,right,bottom`, but `add-frame` and `set-frame-region` take `x,y,width,height`; convert before pasting it back, or the edit succeeds with the wrong size.
 - Frame indexes shift after `delete-frame`, `duplicate-frame` and `add-frame`; address later frames of the same batch by their new index.
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
