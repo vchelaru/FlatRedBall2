@@ -20,6 +20,8 @@ public static class NewFileEdit
     public static EditResult CreateAnimationFile(string path)
     {
         var name = new FilePath(path).NoPath;
+        if (new FilePath(path).Extension == "tsx")
+            return Failed(name, "aecli does not create Tiled tilesets; author the .tsx in Tiled, then describe and edit it here.");
         try
         {
             using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);

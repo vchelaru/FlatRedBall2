@@ -49,8 +49,8 @@ public sealed class EditSession
     public static async Task<EditSessionOpen> OpenAsync(string path)
     {
         var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-        if (ext != ".achx" && ext != ".achj")
-            return Fail($"Only .achx and .achj files can be edited: {path}");
+        if (ext != ".achx" && ext != ".achj" && ext != ".tsx")
+            return Fail($"Only .achx, .achj and .tsx files can be edited: {path}");
         if (!File.Exists(path))
             return Fail($"File not found: {path}");
 
@@ -64,6 +64,15 @@ public sealed class EditSession
             return Task.FromResult(false);
         };
 
+        if (ext == ".tsx")
+        {
+            // The editor's own native-tsx open: the compatibility checker's message is the refusal.
+            var opened = await session._commands.OpenTsxWorkflowAsync(session.Path);
+            if (!opened || !session._projectManager.IsNativeTsxProject)
+                return Fail(loadError ?? $"Could not open {System.IO.Path.GetFileName(path)}.", EditErrorCode.UnsupportedTsx);
+            return new EditSessionOpen(session, new EditResult([], [], []));
+        }
+
         var ok = await session._commands.OpenAchxWorkflowAsync(session.Path);
         if (!ok || session._projectManager.AnimationChainListSave is null)
         {
@@ -75,11 +84,25 @@ public sealed class EditSession
     }
 
     /// <summary>Writes the document back to the file it was opened from.</summary>
+    /// <remarks>
+    /// The editor reports save side effects through events; they are captured here: a .tsx save's
+    /// "could not be written" notes and an .achx/.achj save's associated-tileset sync outcomes become
+    /// <see cref="EditResult.Warnings"/> (a synced tileset is also listed in <see cref="EditResult.ChangedItems"/>).
+    /// </remarks>
     public EditResult Save()
     {
         var errors = new List<string>();
+        var warnings = new List<string>();
+        var changed = new List<string> { Path };
         void OnFailed(string message) => errors.Add(message);
+        void OnTsxWarnings(IReadOnlyList<string> notes) => warnings.AddRange(notes);
+        void OnSynced(string tsx, int count) => changed.Add(tsx);
+        void OnSyncFailed(string target, Exception ex) =>
+            warnings.Add($"Associated tileset {System.IO.Path.GetFileName(target)} was not updated: {ex.Message}");
         _commands.SaveFailed += OnFailed;
+        _commands.TsxSaveCompletedWithWarnings += OnTsxWarnings;
+        _commands.TiledSyncSucceeded += OnSynced;
+        _commands.TiledSyncFailed += OnSyncFailed;
         try
         {
             _commands.SaveCurrentAnimationChainList(Path);
@@ -87,12 +110,18 @@ public sealed class EditSession
         finally
         {
             _commands.SaveFailed -= OnFailed;
+            _commands.TsxSaveCompletedWithWarnings -= OnTsxWarnings;
+            _commands.TiledSyncSucceeded -= OnSynced;
+            _commands.TiledSyncFailed -= OnSyncFailed;
         }
         return errors.Count == 0
-            ? new EditResult([Path], [], [])
-            : new EditResult([], errors.Select(e => $"Could not save {System.IO.Path.GetFileName(Path)}: {e}").ToList(), []);
+            ? new EditResult(changed, [], warnings)
+            : new EditResult([], errors.Select(e => $"Could not save {System.IO.Path.GetFileName(Path)}: {e}").ToList(), warnings);
     }
 
-    private static EditSessionOpen Fail(string message) =>
-        new(null, new EditResult([], [message], []));
+    /// <summary>True when the document is a Tiled .tsx opened as a native project.</summary>
+    public bool IsNativeTsx => _projectManager.IsNativeTsxProject;
+
+    private static EditSessionOpen Fail(string message, EditErrorCode code = EditErrorCode.Unspecified) =>
+        new(null, new EditResult([], [message], [], [code]));
 }

@@ -149,7 +149,7 @@ public class TsxCommandTests : IDisposable
         var r = await Edit("tiles.tsx", """
             {"ops":[
               {"op":"add-chain","name":"Jump"},
-              {"op":"add-frame","chain":"Jump","texture":"sheet.png","region":"32,16,16,16"},
+              {"op":"add-frame","chain":"Jump","texture":"sheet.png","region":"16,16,16,16"},
               {"op":"reorder-chain","chain":"Jump","index":0}
             ]}
             """);
@@ -404,6 +404,6 @@ public class TsxCommandTests : IDisposable
         var ops = doc.RootElement.GetProperty("ops").EnumerateArray().Select(o => o.GetProperty("op").GetString()).ToList();
         ops.ShouldContain("associate-tileset");
         ops.ShouldContain("set-chain-owner-tile");
-        doc.RootElement.GetProperty("tsx").GetString().ShouldContain("rename-chain");
+        doc.RootElement.GetProperty("tsx").GetString()!.ShouldContain("rename-chain");
     }
 }

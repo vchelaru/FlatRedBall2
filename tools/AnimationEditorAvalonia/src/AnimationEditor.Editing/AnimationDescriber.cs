@@ -12,7 +12,7 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class AnimationDescriber
 {
-    public static string ToText(AnimationChainListSave doc, string path)
+    public static string ToText(AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine(FormattableString.Invariant(
@@ -24,7 +24,7 @@ public static class AnimationDescriber
             if (chain.PingPong) flags.Add("pingpong");
             if (chain.Reverse) flags.Add("reverse");
             sb.AppendLine(FormattableString.Invariant(
-                $"{chain.Name}  ({chain.Frames.Count} frames, length {Num(chain.Frames.Sum(f => f.FrameLength))}{(flags.Count > 0 ? ", " + string.Join(" ", flags) : "")})"));
+                $"{chain.Name}  ({chain.Frames.Count} frames, length {Num(chain.Frames.Sum(f => f.FrameLength))}{(flags.Count > 0 ? ", " + string.Join(" ", flags) : "")}{(ownerTiles is not null && ownerTiles.TryGetValue(chain, out var owner) ? $", owner tile {owner}" : "")})"));
             for (int i = 0; i < chain.Frames.Count; i++)
             {
                 var f = chain.Frames[i];
@@ -46,7 +46,7 @@ public static class AnimationDescriber
         return sb.ToString();
     }
 
-    public static void WriteJson(Utf8JsonWriter w, AnimationChainListSave doc, string path)
+    public static void WriteJson(Utf8JsonWriter w, AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null)
     {
         w.WriteStartObject();
         w.WriteString("file", Path.GetFileName(path));
@@ -60,6 +60,7 @@ public static class AnimationDescriber
             w.WriteBoolean("loop", chain.Loop);
             w.WriteBoolean("pingPong", chain.PingPong);
             w.WriteBoolean("reverse", chain.Reverse);
+            if (ownerTiles is not null && ownerTiles.TryGetValue(chain, out var ownerTile)) w.WriteNumber("ownerTile", ownerTile);
             w.WriteStartArray("frames");
             for (int i = 0; i < chain.Frames.Count; i++)
             {

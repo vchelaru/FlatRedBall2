@@ -123,8 +123,8 @@ public static class CliApp
             if (read.Document is null) return Failed(read.Error!);
 
             stdout.Write(Json
-                ? EditJson.Render(w => AnimationDescriber.WriteJson(w, read.Document, file)) + Environment.NewLine
-                : AnimationDescriber.ToText(read.Document, file));
+                ? EditJson.Render(w => AnimationDescriber.WriteJson(w, read.Document, file, read.OwnerTiles)) + Environment.NewLine
+                : AnimationDescriber.ToText(read.Document, file, read.OwnerTiles));
             return 0;
         }
 
@@ -142,6 +142,8 @@ public static class CliApp
                 var read = AnimationFileReader.Read(file);
                 if (read.Document is null) return Failed(read.Error!);
                 report = CheckReport.Run(read.Document, file);
+                if (read.Issues is { Count: > 0 })
+                    report = new CheckReport([.. report.Issues, .. read.Issues]);
             }
             if (Json)
             {

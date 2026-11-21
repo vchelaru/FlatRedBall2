@@ -63,6 +63,7 @@ public static class EditJson
         w.WriteStartObject();
         w.WriteString("format", "{\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}");
         w.WriteString("selectors", EditOps.SelectorSyntax);
+        w.WriteString("tsx", EditOps.TsxNote);
         w.WriteStartArray("ops");
         foreach (var spec in EditOps.Specs) WriteSpec(w, spec);
         w.WriteEndArray();
@@ -104,6 +105,7 @@ public static class EditJson
         sb.AppendLine("Animation files (.achx/.achj). Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
         sb.AppendLine(EditOps.SelectorSyntax);
+        sb.AppendLine(EditOps.TsxNote);
         AppendSpecs(sb, EditOps.Specs);
         sb.AppendLine();
         sb.AppendLine("Sequence files (.seqj) take these ops instead; the file extension picks the set.");
