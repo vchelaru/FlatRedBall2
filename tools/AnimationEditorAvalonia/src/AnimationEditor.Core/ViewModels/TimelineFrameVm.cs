@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -67,6 +68,18 @@ public sealed class TimelineFrameVm : INotifyPropertyChanged
             }
         }
     }
+
+    /// <summary>Names of this frame's events, in order. Empty when it has none.</summary>
+    public IReadOnlyList<string> EventNames { get; init; } = [];
+
+    public int EventCount => EventNames.Count;
+    public bool HasEvents => EventNames.Count > 0;
+
+    /// <summary>The count drawn on the event flag: blank for one event, the number for two or more.</summary>
+    public string EventCountText => EventNames.Count >= 2 ? EventNames.Count.ToString(CultureInfo.InvariantCulture) : "";
+
+    /// <summary>One event name per line, for the flag's tooltip.</summary>
+    public string EventTooltip => string.Join('\n', EventNames);
 
     public TimelineFrameVm(int index, double width)
     {

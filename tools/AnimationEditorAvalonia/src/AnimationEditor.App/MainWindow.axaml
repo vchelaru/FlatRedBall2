@@ -2063,10 +2063,18 @@
                                                             <Image Source="{Binding Thumbnail}"
                                                                    Stretch="Uniform" />
                                                         </Border>
-                                                        <TextBlock Text="{Binding IndexLabel}"
-                                                                   HorizontalAlignment="Center"
-                                                                   FontSize="9"
-                                                                   Foreground="{DynamicResource InkDim}" />
+                                                        <!-- Index label, with the event flag (or count pill) inline after it so it never covers the thumbnail. -->
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    HorizontalAlignment="Center"
+                                                                    Spacing="3">
+                                                            <TextBlock Text="{Binding IndexLabel}"
+                                                                       VerticalAlignment="Center"
+                                                                       FontSize="9"
+                                                                       Foreground="{DynamicResource InkDim}" />
+                                                            <viewsControls:EventFlagGlyph IsVisible="{Binding HasEvents}"
+                                                                                          CountText="{Binding EventCountText}"
+                                                                                          ToolTip.Tip="{Binding EventTooltip}" />
+                                                        </StackPanel>
                                                     </StackPanel>
                                                 </Border>
                                                 <Canvas ClipToBounds="True"

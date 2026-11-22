@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -135,7 +136,7 @@ public static class TimelineBuilder
         {
             var length = Math.Max(0.0, unit.ToSeconds(chain.Frames[i].FrameLength));
             var width = length > 0 ? length * pixelsPerSecond : MinCellWidth;
-            result.Add(new TimelineFrameVm(i, width));
+            result.Add(new TimelineFrameVm(i, width) { EventNames = chain.Frames[i].Events.Select(e => e.Name).ToArray() });
         }
 
         return result;

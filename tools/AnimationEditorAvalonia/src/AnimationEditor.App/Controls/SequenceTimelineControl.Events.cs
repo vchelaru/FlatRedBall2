@@ -1,3 +1,4 @@
+using AnimationEditor.Views.Controls;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.Sequences;
 using Avalonia;
@@ -55,7 +56,6 @@ public sealed partial class SequenceTimelineControl
         return markers;
     }
 
-    private const double FlagHeight = 7;
     private const double NameGap = 3;
 
     private void DrawEvents(DrawingContext context, TimelineBlock block, double size)
@@ -97,15 +97,7 @@ public sealed partial class SequenceTimelineControl
             double flagTop = rowTop + 1;
             if (marker.Count == 1)
             {
-                var flag = new StreamGeometry();
-                using (var g = flag.Open())
-                {
-                    g.BeginFigure(new Point(poleX, flagTop), true);
-                    g.LineTo(new Point(poleX + EventMarkers.MarkerPixels - 1, flagTop + FlagHeight / 2));
-                    g.LineTo(new Point(poleX, flagTop + FlagHeight));
-                    g.EndFigure(true);
-                }
-                context.DrawGeometry(ink, new Pen(Brush("BgCanvas"), 1), flag);
+                EventFlag.DrawTriangle(context, poleX, flagTop, ink, Brush("BgCanvas"));
                 DrawEventName(context, marker, markers, i, poleX, rowTop, trackRoomRight);
             }
             else

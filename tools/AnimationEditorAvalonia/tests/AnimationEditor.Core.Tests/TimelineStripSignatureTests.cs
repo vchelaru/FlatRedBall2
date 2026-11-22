@@ -139,4 +139,17 @@ public class TimelineStripSignatureTests
 
         Assert.NotEqual(before, after);
     }
+
+    [Fact]
+    public void From_EventAddedToFrame_IsNotEqual()
+    {
+        // Events show on the cells, so editing them must rebuild the strip.
+        var chain = new AnimationChainSave { Name = "Run" };
+        chain.Frames.Add(Frame(0.1f));
+        var before = TimelineStripSignature.From(chain);
+
+        chain.Frames[0].Events.Add(new AnimationFrameEvent { Name = "Step" });
+
+        Assert.NotEqual(before, TimelineStripSignature.From(chain));
+    }
 }
