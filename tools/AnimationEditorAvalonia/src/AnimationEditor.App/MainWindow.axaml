@@ -2052,10 +2052,10 @@
                                                         BorderThickness="0,0,1,0"
                                                         Background="{DynamicResource BgPanel}">
                                                     <StackPanel VerticalAlignment="Center"
-                                                                HorizontalAlignment="Center"
+                                                                HorizontalAlignment="Stretch"
                                                                 Spacing="2">
                                                         <!-- frame thumbnail (texture crop, no shapes) -->
-                                                        <Border Width="22" Height="18"
+                                                        <Border Width="22" Height="18" HorizontalAlignment="Center"
                                                                 Background="{DynamicResource BgCanvas}"
                                                                 BorderBrush="{DynamicResource LineStrong}"
                                                                 BorderThickness="1"
@@ -2063,18 +2063,18 @@
                                                             <Image Source="{Binding Thumbnail}"
                                                                    Stretch="Uniform" />
                                                         </Border>
-                                                        <!-- Index label, with the event flag (or count pill) inline after it so it never covers the thumbnail. -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    HorizontalAlignment="Center"
-                                                                    Spacing="3">
-                                                            <TextBlock Text="{Binding IndexLabel}"
-                                                                       VerticalAlignment="Center"
-                                                                       FontSize="9"
-                                                                       Foreground="{DynamicResource InkDim}" />
+                                                        <!-- Index label; the event flag (or count pill) sits at the cell's left edge, where the frame starts and the event fires, and never covers the thumbnail. -->
+                                                        <Grid ColumnDefinitions="Auto,*">
                                                             <viewsControls:EventFlagGlyph IsVisible="{Binding HasEvents}"
                                                                                           CountText="{Binding EventCountText}"
                                                                                           ToolTip.Tip="{Binding EventTooltip}" />
-                                                        </StackPanel>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding IndexLabel}"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       FontSize="9"
+                                                                       Foreground="{DynamicResource InkDim}" />
+                                                        </Grid>
                                                     </StackPanel>
                                                 </Border>
                                                 <Canvas ClipToBounds="True"

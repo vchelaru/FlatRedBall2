@@ -7,7 +7,7 @@ using Avalonia.Media;
 namespace AnimationEditor.Views.Controls;
 
 /// <summary>
-/// The event flag on a chain timeline frame cell, inline beside the index label: the sequence timeline's flag (<see cref="EventFlag"/>), or its count
+/// The event flag on a chain timeline frame cell, at the left edge of the cell, in the index label row: the sequence timeline's flag (<see cref="EventFlag"/>), or its count
 /// pill when the frame has two or more events. Pointer presses bubble up unhandled to the strip's scrub surface; it is hit-testable only so its tooltip can show.
 /// </summary>
 public sealed class EventFlagGlyph : Control
