@@ -198,6 +198,41 @@ public class SequenceOpsTests : IDisposable
     }
 
     [Fact]
+    public void SetBlockLength_Clear_UnsetsBlocksAndClips()
+    {
+        Apply("""
+            {"ops":[
+              {"op":"add-reference-track","sequence":"Rest","target":"Run","start":1},
+              {"op":"set-block-length","block":"Rest/Run/0","length":2},
+              {"op":"set-block-length","block":"Run/Body/*","length":1.2}
+            ]}
+            """).Success.ShouldBeTrue();
+
+        var run = Apply("""
+            {"ops":[
+              {"op":"set-block-length","block":"Run/Body/*","clear":true},
+              {"op":"set-block-length","block":"Rest/Run/0","clear":true}
+            ]}
+            """);
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        var save = Reload();
+        save.Sequences[0].Tracks[0].Chains.ShouldAllBe(c => c.Length == null);
+        save.Sequences[1].Tracks[0].Reference!.Length.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SetBlockLength_NeedsExactlyOneOfLengthAndClear()
+    {
+        var before = _w.Bytes;
+
+        Apply("""{"ops":[{"op":"set-block-length","block":"Run/Body/0"}]}""").Result.HasError(EditErrorCode.InvalidValue).ShouldBeTrue();
+        Apply("""{"ops":[{"op":"set-block-length","block":"Run/Body/0","length":1,"clear":true}]}""").Result.HasError(EditErrorCode.InvalidValue).ShouldBeTrue();
+
+        _w.Bytes.ShouldBe(before);
+    }
+
+    [Fact]
     public void SetBlockEnd_SetsTheLengthToEndMinusStart()
     {
         var run = Apply("""

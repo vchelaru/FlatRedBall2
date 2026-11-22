@@ -79,6 +79,16 @@ public partial class FlankerNumericField : UserControl
     /// _suppressPropRefresh around SetValueOrMixed).</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>
+    /// When true the value is optional: committing a blank box, or Delete/Backspace in a box that is already blank (the
+    /// only way to clear a "(mixed)" field), raises <see cref="Cleared"/> instead of restoring the old value. A blank
+    /// mixed box left without Delete still changes nothing.
+    /// </summary>
+    public bool IsClearable { get; set; }
+
+    /// <summary>Raised when the user clears an <see cref="IsClearable"/> field; the owner unsets the value and re-shows it.</summary>
+    public event EventHandler? Cleared;
+
     /// <summary>Matches ThemeStyles.axaml's global <c>Button:disabled</c> Opacity so a disabled
     /// field's uniform fade (see <see cref="OnIsEnabledChanged"/>) reads the same as every other
     /// disabled control in the app.</summary>
@@ -122,6 +132,7 @@ public partial class FlankerNumericField : UserControl
             RaiseEvent(new FocusChangedEventArgs(LostFocusEvent));
         };
         ValueBox.AddHandler(KeyDownEvent, OnValueBoxKeyDown);
+        ValueBox.AddHandler(KeyDownEvent, OnValueBoxPreviewKeyDown, RoutingStrategies.Tunnel);
     }
 
     // #1242: wheel steps the value like NumericUpDown's ButtonSpinner does -- only while focused,
@@ -134,6 +145,14 @@ public partial class FlankerNumericField : UserControl
         // Focus stays in ValueBox, so typed-but-uncommitted text would otherwise be overwritten.
         Commit();
         Step(Math.Sign(e.Delta.Y));
+        e.Handled = true;
+    }
+
+    // Tunnel, so it sees the key before the TextBox handles it, and the text before the key edits it.
+    private void OnValueBoxPreviewKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!IsClearable || e.Key is not (Key.Delete or Key.Back) || !string.IsNullOrEmpty(ValueBox.Text)) return;
+        RaiseCleared();
         e.Handled = true;
     }
 
@@ -181,6 +200,12 @@ public partial class FlankerNumericField : UserControl
             return;
         }
 
+        if (IsClearable && string.IsNullOrWhiteSpace(ValueBox.Text))
+        {
+            RaiseCleared();
+            return;
+        }
+
         decimal fallback = Value.Value;
         decimal parsed = NumericToolbarInput.ParseClamp(ValueBox.Text, Minimum, Maximum, fallback);
 
@@ -191,6 +216,13 @@ public partial class FlankerNumericField : UserControl
             ValueBox.Text = Format(parsed);
         else
             Value = parsed;
+    }
+
+    // The owner re-shows the unset value from the handler; reformat too in case it equals the old Value (no change event).
+    private void RaiseCleared()
+    {
+        Cleared?.Invoke(this, EventArgs.Empty);
+        ValueBox.Text = Format(Value);
     }
 
     private string Format(decimal? value) =>

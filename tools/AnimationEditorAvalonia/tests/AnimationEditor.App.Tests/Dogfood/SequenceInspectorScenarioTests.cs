@@ -280,6 +280,57 @@ public class SequenceInspectorScenarioTests
         SavedTrack(boss, 0).Chains.Single().Start.ShouldBe(0);
     }
 
+    // As a blank .achx color channel goes back to inherited: deleting the Length text unsets it, so it follows the chain.
+    [AvaloniaFact]
+    public async Task ClearingTheLengthText_UnsetsTheLength_Undoably()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1.0)));
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+        editor.ClickAt(OnChain(editor, 0, 0.1));
+
+        var box = BoxOf(inspector.ChainLengthField);
+        box.Focus();
+        box.SelectAll();
+        editor.Press(Key.Delete);
+        editor.Press(Key.Enter);
+
+        SavedTrack(boss, 0).Chains.Single().Length.ShouldBeNull();
+        inspector.ChainLengthField.Value.ShouldBe(0.5m);
+        inspector.ChainCycleText.Text.ShouldBe("0.5 s (length follows it)");
+        editor.UndoLabels.ShouldBe(new[] { "Clear Length of 'Walk'" });
+        SavedTrack(boss, 0).Chains.Count.ShouldBe(1, "Delete in the field must not delete the selected chain");
+
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        SavedTrack(boss, 0).Chains.Single().Length.ShouldBe(1.0);
+    }
+
+    [AvaloniaFact]
+    public async Task ClearingAClipsLengthText_UnsetsIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
+        var save = SequenceListSave.FromFile(boss);
+        var combo = new SequenceSave { Name = "Combo" };
+        combo.Tracks.Add(new SequenceTrackSave { Name = "Attack", Reference = new SequenceReferenceSave { Sequence = "Attack", Length = 2 } });
+        save.Sequences.Insert(0, combo);
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+        var inspector = Inspector(editor);
+        editor.ClickAt(OnHeader(editor, 0));
+
+        var box = BoxOf(inspector.ReferenceLengthField);
+        box.Focus();
+        box.SelectAll();
+        editor.Press(Key.Delete);
+        editor.Press(Key.Enter);
+
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Reference!.Length.ShouldBeNull();
+        inspector.ReferenceLengthField.Value.ShouldBe(0.5m);
+        editor.UndoLabels.ShouldBe(new[] { "Clear Length of 'Attack'" });
+    }
+
     [AvaloniaFact]
     public async Task EditingTheSequence_NameAndLoop_AreUndoable()
     {

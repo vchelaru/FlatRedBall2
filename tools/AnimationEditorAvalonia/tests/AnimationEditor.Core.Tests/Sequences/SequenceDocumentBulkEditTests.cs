@@ -122,6 +122,34 @@ public class SequenceDocumentBulkEditTests
     }
 
     [Fact]
+    public void ClearChainsLength_UnsetsEverySetLength_InOneUndoEntry()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+
+        document.ClearChainsLength(undo, 0, AllChains);
+        Saved(document).Tracks.Select(t => t.Chains[0].Length).ShouldBe(new double?[] { null, null, null });
+        // Body was already unset, so the label counts the two that changed.
+        undo.UndoHistory.Single().Description.ShouldBe("Clear Length of 2 Chains");
+
+        undo.Undo();
+        Saved(document).Tracks.Select(t => t.Chains[0].Length).ShouldBe(new double?[] { null, 2, 2 });
+    }
+
+    [Fact]
+    public void ClearChainsLength_NoneSet_AddsNoUndoEntry()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+
+        document.ClearChainsLength(undo, 0, new TimelineChainId[] { new(0, 0) });
+
+        undo.UndoHistory.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void SetChainsStart_RefusesANegativeResult_ChangingNone()
     {
         using var dir = new TestHelpers.TempDir();

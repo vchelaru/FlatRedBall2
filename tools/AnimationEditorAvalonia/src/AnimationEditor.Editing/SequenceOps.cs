@@ -107,10 +107,11 @@ public static class SequenceOps
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("start", "number", true, "Seconds from the sequence start, 0 or more."),
         ]),
-        new("set-block-length", "Sets a block's length in seconds, so its end stays put when the chain changes. A following block still cuts it short.",
+        new("set-block-length", "Sets a block's length in seconds, so its end stays put when the chain changes. Give length, or clear to unset it (describe's length auto: one cycle of the chain, or one run of a clip's target, following edits to it). A following block still cuts it short.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
-            new("length", "number", true, "Seconds, above 0."),
+            new("length", "number", false, "Seconds, above 0."),
+            new("clear", "boolean", false, "true to unset the length."),
         ]),
         new("set-block-end", "Sets a block's length so it ends at a time in seconds: length = end - start. Uses the block's current start, so set that first. A following block still cuts it short.",
         [
@@ -237,7 +238,11 @@ public static class SequenceOps
             case "replace-source": return SequenceEdit.ReplaceSource(doc, undo, v["source"], v["path"]);
             case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), v.ContainsKey("length") ? Num("length") : (double?)null);
             case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
-            case "set-block-length": return SequenceEdit.SetBlockLength(doc, undo, target, Num("length"));
+            case "set-block-length":
+                bool clear = v.TryGetValue("clear", out var c) && c == "true";
+                if (v.ContainsKey("length") == clear)
+                    return new EditResult([], ["set-block-length needs exactly one of length and clear."], [], [EditErrorCode.InvalidValue]);
+                return clear ? SequenceEdit.ClearBlockLength(doc, undo, target) : SequenceEdit.SetBlockLength(doc, undo, target, Num("length"));
             case "set-block-end": return SequenceEdit.SetBlockEnd(doc, undo, target, Num("end"));
             case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
             default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");
