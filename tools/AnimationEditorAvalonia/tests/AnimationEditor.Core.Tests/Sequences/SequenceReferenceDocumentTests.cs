@@ -197,6 +197,22 @@ public class SequenceReferenceDocumentTests
     }
 
     [Fact]
+    public void ClearReferenceLength_UnsetsTheClipLength()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0);
+        document.SetReferenceLength(undo, 0, 0, 2.5);
+        undo.SealCoalescing();
+
+        document.ClearReferenceLength(undo, 0, 0).ShouldBeNull();
+
+        document.Save.Sequences[0].Tracks[0].Reference!.Length.ShouldBeNull();
+        undo.UndoHistory.Last().Description.ShouldBe("Clear Length of 'Earth'");
+    }
+
+    [Fact]
     public void PasteTracks_ReferenceThatWouldCycle_IsRefusedWithAMessage()
     {
         using var dir = new TestHelpers.TempDir();

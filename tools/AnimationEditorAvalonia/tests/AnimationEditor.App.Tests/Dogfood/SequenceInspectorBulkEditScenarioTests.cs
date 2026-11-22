@@ -119,6 +119,42 @@ public class SequenceInspectorBulkEditScenarioTests
         inspector.ChainStartField.PlaceholderText.ShouldBe("(mixed)");
     }
 
+    // A mixed Length field is already blank, so Delete there (as Delete clears the .achx color Mode) unsets every selected
+    // chain's length; leaving the mixed field without Delete changes nothing.
+    [AvaloniaFact]
+    public async Task TwoChains_WithMixedLengths_DeleteInTheBlankFieldClearsBoth()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor);
+        var save = SequenceListSave.FromFile(path);
+        save.Sequences[0].Tracks[0].Chains[0].Length = 2;
+        save.Sequences[0].Tracks[1].Chains[1].Length = 3;
+        save.Save(path);
+        await editor.OpenAsync(path);
+        editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 0, 0.25));
+        editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 1, 1.75), RawInputModifiers.Control);
+        var inspector = Inspector(editor);
+        inspector.ChainLengthField.PlaceholderText.ShouldBe("(mixed)");
+
+        var box = BoxOf(inspector.ChainLengthField);
+        box.Focus();
+        editor.Press(Key.Tab);
+        editor.UndoLabels.ShouldBeEmpty("tabbing through a mixed field changes nothing");
+
+        box.Focus();
+        editor.Press(Key.Delete);
+
+        Saved(path).Tracks[0].Chains[0].Length.ShouldBeNull();
+        Saved(path).Tracks[1].Chains[1].Length.ShouldBeNull();
+        Saved(path).Tracks[0].Chains.Count.ShouldBe(3, "Delete in the field must not delete the selected chains");
+        editor.UndoLabels.ShouldBe(new[] { "Clear Length of 2 Chains" });
+        inspector.ChainLengthField.Value.ShouldBe(0.5m);
+
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        Saved(path).Tracks[0].Chains[0].Length.ShouldBe(2);
+        Saved(path).Tracks[1].Chains[1].Length.ShouldBe(3);
+    }
+
     [AvaloniaFact]
     public async Task TwoChains_OfDifferentNames_SayHowManyChains_AndOneChainKeepsItsOwnPanel()
     {

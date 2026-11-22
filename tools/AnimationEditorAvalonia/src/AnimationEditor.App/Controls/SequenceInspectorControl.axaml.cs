@@ -58,6 +58,16 @@ public partial class SequenceInspectorControl : UserControl
         ReferenceLengthField.ValueChanged += (_, _) => CommitReference(start: false);
         ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
         ApplyRelativeEditsWith(CommitChainLength, ChainLengthField);
+        // An unset length follows the chain (or the clip's target); clearing the field goes back to that, as a blank
+        // .achx color channel goes back to inherited.
+        ChainLengthField.IsClearable = true;
+        ReferenceLengthField.IsClearable = true;
+        ChainLengthField.Cleared += (_, _) => ClearChainLength();
+        ReferenceLengthField.Cleared += (_, _) =>
+        {
+            if (!_refreshing && _track is { } track)
+                Commit(document => document.ClearReferenceLength(_undo!, _sequence, track));
+        };
         GoToDefinitionButton.Click += (_, _) =>
         {
             if (CurrentChain is { } reference)
@@ -448,6 +458,14 @@ public partial class SequenceInspectorControl : UserControl
         }
         if (ChainLengthField.Value is { } length && _chain is { } chain)
             Commit(document => document.SetChainLength(_undo!, _sequence, chain.Track, chain.Chain, (double)length));
+    }
+
+    private void ClearChainLength()
+    {
+        if (_refreshing) return;
+        var chains = BulkChains() ?? (_chain is { } chain ? new[] { chain } : null);
+        if (chains is not null)
+            Commit(document => document.ClearChainsLength(_undo!, _sequence, chains));
     }
 
     private string? CommitSequenceName(SequenceDocument document, string text) => CurrentSequence is null

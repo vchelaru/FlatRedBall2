@@ -108,6 +108,12 @@ public class SequenceUndoLabelConventionTests
         Run((document, undo) => document.SetChainsLength(undo, 0, chains2, three));
         Run((document, undo) => document.SetChainStart(undo, 0, 0, 0, 2));
         Run((document, undo) => document.SetChainLength(undo, 0, 0, 0, 2));
+        Run((document, undo) =>
+        {
+            document.SetChainsLength(undo, 0, chains2, three);
+            document.ClearChainsLength(undo, 0, new[] { chains2[0] });
+            document.ClearChainsLength(undo, 0, chains2);
+        });
         Run((document, undo) => document.PlaceChain(undo, 0, track: 0, "hero.achx", "Jump", 0));
         Run((document, undo) => document.PlaceChain(undo, 0, track: null, "hero.achx", "Jump", 0));
         Run((document, undo) => document.RenameTrack(undo, 0, 0, "Torso"));

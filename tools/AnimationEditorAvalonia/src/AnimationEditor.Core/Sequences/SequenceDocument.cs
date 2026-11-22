@@ -934,6 +934,19 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
+    /// <summary>
+    /// Unsets a reference track's clip length, so it plays one run of its target and follows edits to it. Does nothing
+    /// when it is already unset. Returns why it was refused (not a reference), or null.
+    /// </summary>
+    public string? ClearReferenceLength(IUndoManager undo, int sequence, int track)
+    {
+        if (Save.Sequences[sequence].Tracks[track].Reference is not { } reference) return "That track does not play a sequence.";
+        if (reference.Length is null) return null;
+        string name = Save.Sequences[sequence].Tracks[track].Name;
+        Edit(undo, $"Clear Length of '{name}'", save => save.Sequences[sequence].Tracks[track].Reference!.Length = null);
+        return null;
+    }
+
     private const string LengthRefusal = "Length must be above 0.";
 
     /// <summary>
@@ -1098,6 +1111,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
             foreach (var (id, value) in targets) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Length = value;
         }, coalesceGroup: $"length:{sequence}:{ChainSetKey(set)}");
         return null;
+    }
+
+    /// <summary>
+    /// Unsets the length of every chain in <paramref name="chains"/>, so each plays one cycle of its chain and follows
+    /// edits to it, in one undo entry. Chains already unset are left alone; none set adds no entry.
+    /// </summary>
+    public void ClearChainsLength(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains)
+    {
+        var set = chains.Distinct().Where(id => Save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Length is not null).ToList();
+        if (set.Count == 0) return;
+        Edit(undo, $"Clear Length of {ChainsNamed(sequence, set)}", save =>
+        {
+            foreach (var id in set) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Length = null;
+        });
     }
 
     // An absolute edit says what it set; a relative one ("+ 4") has no single value to name.

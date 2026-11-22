@@ -93,9 +93,10 @@
                             </Grid>
                             <Grid ColumnDefinitions="78,*,Auto">
                                 <TextBlock Text="Length" Classes="label"
-                                           ToolTip.Tip="The clip's length in seconds. Until set, it is one run of the played sequence and follows edits to it; once set, its end stays put. A sequence with Loop on repeats across it; one with Loop off plays once, then holds its final pose." />
+                                           ToolTip.Tip="The clip's length in seconds. Until set, it is one run of the played sequence and follows edits to it; once set, its end stays put; delete the value to follow it again. A sequence with Loop on repeats across it; one with Loop off plays once, then holds its final pose." />
                                 <viewsControls:FlankerNumericField x:Name="ReferenceLengthField" Grid.Column="1"
-                                                                   Minimum="0.01" Increment="0.05" FormatString="0.###" />
+                                                                   Minimum="0.01" Increment="0.05" FormatString="0.###"
+                                                                   ToolTip.Tip="The clip's length in seconds. Until set, it is one run of the played sequence and follows edits to it; once set, its end stays put; delete the value to follow it again. A sequence with Loop on repeats across it; one with Loop off plays once, then holds its final pose." />
                                 <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
                             </Grid>
                             <TextBlock x:Name="ReferenceMissingText" Classes="note" IsVisible="False"
@@ -131,10 +132,10 @@
                         </Grid>
                         <Grid ColumnDefinitions="78,*,Auto">
                             <TextBlock Text="Length" Classes="label"
-                                       ToolTip.Tip="The block's length in seconds. Until set, it is one cycle of the chain and follows edits to the chain; once set, its end stays put. A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
+                                       ToolTip.Tip="The block's length in seconds. Until set, it is one cycle of the chain and follows edits to the chain; once set, its end stays put; delete the value to follow the chain again. A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                             <viewsControls:FlankerNumericField x:Name="ChainLengthField" Grid.Column="1"
                                                                Minimum="0.01" Increment="0.05" FormatString="0.###"
-                                                               ToolTip.Tip="The block's length in seconds. Until set, it is one cycle of the chain and follows edits to the chain; once set, its end stays put. A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
+                                                               ToolTip.Tip="The block's length in seconds. Until set, it is one cycle of the chain and follows edits to the chain; once set, its end stays put; delete the value to follow the chain again. A chain with Loop on repeats across it; one with Loop off plays once, then holds its last frame." />
                             <TextBlock Text="s" Grid.Column="2" Classes="note" VerticalAlignment="Center" Margin="4,0,0,0" />
                         </Grid>
                         <Grid x:Name="ChainCycleRow" ColumnDefinitions="78,*">

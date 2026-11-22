@@ -313,6 +313,29 @@ public static class SequenceEdit
     }
 
     /// <summary>
+    /// Unsets a block's length, so it plays one cycle of its chain (a clip, one run of its target) and follows edits to
+    /// it. On a reference track block 0 is the clip. Already unset is a no-op.
+    /// </summary>
+    public static EditResult ClearBlockLength(SequenceDocument doc, IUndoManager undo, string block)
+    {
+        var at = SequenceAddress.ResolveBlock(doc.Save, block);
+        if (!at.Ok) return FromAddress(at);
+        var a = at.Value!;
+        var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
+
+        undo.SealCoalescing();
+        if (track.Reference is { } clip)
+        {
+            if (clip.Length is null) return Ok();
+            var refused = doc.ClearReferenceLength(undo, a.Sequence, a.Track);
+            return refused is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refused);
+        }
+        if (track.Chains[a.Block].Length is null) return Ok();
+        doc.ClearChainsLength(undo, a.Sequence, [new TimelineChainId(a.Track, a.Block)]);
+        return Ok(block);
+    }
+
+    /// <summary>
     /// Sets a block's length so it ends at <paramref name="end"/> seconds: end - start, from the block's current start.
     /// On a reference track block 0 is the clip.
     /// </summary>
