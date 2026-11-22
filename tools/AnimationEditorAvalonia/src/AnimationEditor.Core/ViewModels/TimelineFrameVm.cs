@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -67,6 +68,15 @@ public sealed class TimelineFrameVm : INotifyPropertyChanged
             }
         }
     }
+
+    /// <summary>Names of this frame's events, in order. Empty when it has none.</summary>
+    public IReadOnlyList<string> EventNames { get; init; } = [];
+
+    public bool HasEvents => EventNames.Count > 0;
+
+
+    /// <summary>One event name per line, for the flag's tooltip.</summary>
+    public string EventTooltip => string.Join('\n', EventNames);
 
     public TimelineFrameVm(int index, double width)
     {

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Core.ViewModels;
@@ -17,9 +18,9 @@ public sealed class TimelineStripSignature : IEquatable<TimelineStripSignature>
     // Reference identity, not value identity: selecting a different chain object rebuilds even
     // when frame data matches. Held only for comparison — never dereferenced.
     private readonly object? _chain;
-    private readonly (float FrameLength, ThumbnailSource Thumbnail)[] _frames;
+    private readonly (float FrameLength, ThumbnailSource Thumbnail, string Events)[] _frames;
 
-    private TimelineStripSignature(object? chain, (float, ThumbnailSource)[] frames)
+    private TimelineStripSignature(object? chain, (float, ThumbnailSource, string)[] frames)
     {
         _chain = chain;
         _frames = frames;
@@ -28,17 +29,17 @@ public sealed class TimelineStripSignature : IEquatable<TimelineStripSignature>
     public static TimelineStripSignature From(AnimationChainSave? chain)
     {
         if (chain is null)
-            return new TimelineStripSignature(null, Array.Empty<(float, ThumbnailSource)>());
+            return new TimelineStripSignature(null, Array.Empty<(float, ThumbnailSource, string)>());
 
         // Resolve every frame's effective (sticky) color in one O(n) pass so a color edit on frame
         // N shows up in the signature of frames N…(next frame that re-sets that channel) — that's how
         // the strip knows to rebuild the downstream cells the edit re-tints, not just the edited one.
         var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
-        var frames = new (float, ThumbnailSource)[chain.Frames.Count];
+        var frames = new (float, ThumbnailSource, string)[chain.Frames.Count];
         for (int i = 0; i < chain.Frames.Count; i++)
         {
             var frame = chain.Frames[i];
-            frames[i] = (frame.FrameLength, ThumbnailSource.FromFrame(frame, colors[i]));
+            frames[i] = (frame.FrameLength, ThumbnailSource.FromFrame(frame, colors[i]), string.Join('\u001f',frame.Events.Select(e => e.Name)));
         }
         return new TimelineStripSignature(chain, frames);
     }

@@ -1,3 +1,4 @@
+using FlatRedBall2.Animation;
 using AnimationEditor.Core.ViewModels;
 using FlatRedBall2.AnimationEditorCommon;
 using Xunit;
@@ -218,5 +219,26 @@ public class TimelineBuilderTests
     {
         Assert.Equal("1.50s", TimelineBuilder.FormatSeconds(1.5f));
     }
-}
 
+    [Fact]
+    public void BuildFrameItems_FramesWithEvents_ExposeEventNames()
+    {
+        var chain = new AnimationChainSave { Name = "Hit" };
+        var first = new AnimationFrameSave { FrameLength = 0.1f };
+        first.Events.Add(new AnimationFrameEvent { Name = "Start" });
+        chain.Frames.Add(first);
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
+        var last = new AnimationFrameSave { FrameLength = 0.1f };
+        last.Events.Add(new AnimationFrameEvent { Name = "Spark" });
+        last.Events.Add(new AnimationFrameEvent { Name = "Boom" });
+        chain.Frames.Add(last);
+
+        var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        Assert.True(result[0].HasEvents);
+        Assert.Equal("Start", result[0].EventTooltip);
+        Assert.False(result[1].HasEvents);
+        Assert.True(result[2].HasEvents);
+        Assert.Equal("Spark\nBoom", result[2].EventTooltip);
+    }
+}
