@@ -15,7 +15,7 @@ public class SequenceClipboardTests
         var track = new SequenceTrackSave { Name = "Body" };
         double start = 0;
         foreach (string source in sources)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = start += 0.5, Loops = 2 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = start += 0.5, Length = 2 });
         var sequence = new SequenceSave { Name = "Idle", Loop = true };
         sequence.Tracks.Add(track);
         return sequence;
@@ -67,7 +67,7 @@ public class SequenceClipboardTests
         track.Visible.ShouldBeFalse();
         track.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
         var chain = track.Chains.Single();
-        (chain.Source, chain.Chain, chain.Start, chain.Loops).ShouldBe(("C:/game/anims/hero.achx", "Walk", 0.5, 2f));
+        (chain.Source, chain.Chain, chain.Start, chain.Length).ShouldBe(("C:/game/anims/hero.achx", "Walk", 0.5, (double?)2));
     }
 
     [Theory]

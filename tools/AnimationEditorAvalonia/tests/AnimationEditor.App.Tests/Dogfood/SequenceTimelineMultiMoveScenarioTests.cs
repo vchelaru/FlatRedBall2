@@ -152,10 +152,10 @@ public class SequenceTimelineMultiMoveScenarioTests
 
         editor.Drag(At(editor, 0, 0.5, dx: -2), At(editor, 0, 0.5, dx: 28), RawInputModifiers.Alt);
 
-        SavedTrack(boss, 0).Chains[0].Loops.ShouldBeGreaterThan(1f);
-        SavedTrack(boss, 0).Chains[1].Loops.ShouldBe(1f);
+        SavedTrack(boss, 0).Chains[0].Length!.Value.ShouldBeGreaterThan(0.5);
+        SavedTrack(boss, 0).Chains[1].Length.ShouldBeNull();
         editor.UndoLabels.Count.ShouldBe(1);
-        editor.UndoLabels[0].ShouldStartWith("Set Cycles");
+        editor.UndoLabels[0].ShouldStartWith("Set Length");
         timeline.SelectedChains.ShouldBe(new[] { new TimelineChainId(0, 0) });
     }
 

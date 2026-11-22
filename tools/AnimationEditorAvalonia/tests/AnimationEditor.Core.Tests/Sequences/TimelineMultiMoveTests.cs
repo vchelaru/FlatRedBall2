@@ -67,7 +67,7 @@ public class TimelineMultiMoveTests
     {
         var a = new SequenceChainReferenceSave { Source = "s", Chain = "Walk", Start = 0 };
         var b = new SequenceChainReferenceSave { Source = "s", Chain = "Walk", Start = 3 };
-        var early = new SequenceChainReferenceSave { Source = "s", Chain = "Run", Start = 2, Loops = 2 };   // asks for 2..3, cut at 3 by b
+        var early = new SequenceChainReferenceSave { Source = "s", Chain = "Run", Start = 2, Length = 1 };   // asks for 2..3, cut at 3 by b
         var far = new SequenceChainReferenceSave { Source = "s", Chain = "Jump", Start = 9 };
         var sequence = new SequenceSave();
         sequence.Tracks.Add(new SequenceTrackSave { Chains = { a } });

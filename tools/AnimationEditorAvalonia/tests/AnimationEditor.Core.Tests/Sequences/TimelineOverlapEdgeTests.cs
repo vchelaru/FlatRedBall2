@@ -8,13 +8,13 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// <summary>A chain pasted over the next one must keep its far end grabbable, wherever that end lies.</summary>
 public class TimelineOverlapEdgeTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
-    // Every cycle is 1 s. A starts at 0 and asks for 'aLoops' s; B is 2..3 s.
-    private static (TimelineViewport Viewport, System.Collections.Generic.IReadOnlyList<TimelineBlock> Blocks) Setup(float aLoops, double bStart = 2)
+    // Every cycle is 1 s. A starts at 0 and asks for 'aLength' s; B is 2..3 s.
+    private static (TimelineViewport Viewport, System.Collections.Generic.IReadOnlyList<TimelineBlock> Blocks) Setup(double aLength, double bStart = 2)
     {
-        var track = new SequenceTrackSave { Chains = { Ref("A", 0, aLoops), Ref("B", bStart) } };
+        var track = new SequenceTrackSave { Chains = { Ref("A", 0, aLength), Ref("B", bStart) } };
         return (new TimelineViewport(), TimelineLayout.Blocks(new SequenceSave { Tracks = { track } }, _ => 1.0));
     }
 
@@ -27,7 +27,7 @@ public class TimelineOverlapEdgeTests
     [Fact]
     public void AEndsInsideB_TheEdgeInTheBodyBandIsA_AndTheRestOfBIsB()
     {
-        var s = Setup(2.5f);
+        var s = Setup(2.5);
         Hit(s, 2.5).ShouldBe(new TimelineHit(s.Blocks[0], TimelineHitPart.Edge));
         Hit(s, 2.5, 4).ShouldBe(new TimelineHit(s.Blocks[0], TimelineHitPart.Edge));
         Hit(s, 2.5, -4).ShouldBe(new TimelineHit(s.Blocks[0], TimelineHitPart.Edge));
@@ -47,7 +47,7 @@ public class TimelineOverlapEdgeTests
     public void AEndsBeyondB_BothEdgesNearEachOther_NearestWins_TieGoesToTheLaterBlock()
     {
         // A ends at 3.01 s, B at 3 s; at 100 px/s that is 1 px apart.
-        var s = Setup(3.01f);
+        var s = Setup(3.01);
         s.Viewport.SetPixelsPerSecond(100);
         Hit(s, 3.01, 0.5)!.Value.Block.Reference.Chain.ShouldBe("A");
         Hit(s, 3, -0.5)!.Value.Block.Reference.Chain.ShouldBe("B");

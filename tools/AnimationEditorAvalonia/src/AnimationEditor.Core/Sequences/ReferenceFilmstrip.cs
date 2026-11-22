@@ -56,18 +56,18 @@ public static class ReferenceFilmstrip
     public const int MaxCellsPerCycle = 96;
 
     /// <summary>
-    /// The cells of a clip of <paramref name="loops"/> cycles of a target <paramref name="targetLength"/> seconds long, at
+    /// The cells of a clip <paramref name="length"/> seconds long (null: one run) of a target <paramref name="targetLength"/> seconds long, at
     /// <paramref name="pixelsPerSecond"/>. Every cycle is cut into the same whole number of equal cells (about
     /// <see cref="CellPixels"/> wide), so each cycle repeats the same pictures and its boundary falls on a cell edge; a last
     /// partial cycle is cut at the clip's end. Empty when the target has no length.
     /// </summary>
-    public static IReadOnlyList<ReferenceCell> Cells(double targetLength, float loops, double pixelsPerSecond)
+    public static IReadOnlyList<ReferenceCell> Cells(double targetLength, double? length, double pixelsPerSecond)
     {
-        if (targetLength <= 0 || loops <= 0 || pixelsPerSecond <= 0) return Array.Empty<ReferenceCell>();
+        double clipSeconds = SequenceTimeline.FullLength(length, targetLength);
+        if (clipSeconds <= 0 || pixelsPerSecond <= 0) return Array.Empty<ReferenceCell>();
         double cyclePixels = targetLength * pixelsPerSecond;
         int perCycle = Math.Clamp((int)Math.Round(cyclePixels / CellPixels), 1, MaxCellsPerCycle);
         double cellSeconds = targetLength / perCycle;
-        double clipSeconds = SequenceTimeline.FullLength(loops, targetLength);
         var cells = new List<ReferenceCell>();
         for (int cycle = 0; cycle * targetLength < clipSeconds - 1e-9; cycle++)
         {

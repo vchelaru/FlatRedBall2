@@ -120,8 +120,9 @@ public class SequenceReportTests : IDisposable
         text.ShouldContain("Run  (loop, 2 tracks, length 1.4)");
         text.ShouldContain("Rest  (no loop, 1 track, length 0.5)");
         text.ShouldContain("Body  continuous");
-        text.ShouldContain("Run/Body/1  Walk  hero.achj  start 1  loops 1  end 1.4");
-        text.ShouldContain("Run/Shadow/0  Idle  hero.achj  start 0  loops 1  end 0.5");
+        text.ShouldContain("Run/Body/1  Walk  hero.achj  start 1  length auto  end 1.4");
+        text.ShouldContain("Run/Shadow/0  Idle  hero.achj  start 0  length auto  end 0.5");
+        text.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8  end 0.8");
     }
 
     [Fact]
@@ -129,14 +130,14 @@ public class SequenceReportTests : IDisposable
     {
         var save = SeqWorkspace.Build();
         save.Sequences[0].Tracks[0].Chains[1].Chain = "Fly";
-        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Inner", Reference = new SequenceReferenceSave { Sequence = "Run", Start = 0.5, Loops = 2 } });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Inner", Reference = new SequenceReferenceSave { Sequence = "Run", Start = 0.5, Length = 2 } });
         save.Save(_w.SeqPath);
         var doc = SequenceFileReader.Read(_w.SeqPath).Document!;
 
         var text = SequenceDescriber.ToText(doc, _w.SeqPath);
 
-        text.ShouldContain("Run/Body/1  Fly  hero.achj  start 1  loops 1  end 1  MISSING chain");
-        text.ShouldContain("Rest/Inner/0  plays Run  start 0.5  loops 2");
+        text.ShouldContain("Run/Body/1  Fly  hero.achj  start 1  length auto  end 1  MISSING chain");
+        text.ShouldContain("Rest/Inner/0  plays Run  start 0.5  length 2");
     }
 
     [Fact]
@@ -163,7 +164,8 @@ public class SequenceReportTests : IDisposable
         var block = body.GetProperty("blocks")[1];
         block.GetProperty("chain").GetString().ShouldBe("Walk");
         block.GetProperty("start").GetDouble().ShouldBe(1.0, 1e-6);
-        block.GetProperty("loops").GetDouble().ShouldBe(1.0, 1e-6);
+        block.GetProperty("length").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("blocks")[0].GetProperty("length").GetDouble().ShouldBe(0.8, 1e-6);
         block.GetProperty("end").GetDouble().ShouldBe(1.4, 1e-6);
     }
 }

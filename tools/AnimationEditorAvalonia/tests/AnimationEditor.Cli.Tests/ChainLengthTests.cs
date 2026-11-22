@@ -43,7 +43,7 @@ public class ChainLengthTests : IDisposable
         _w.Write("a.seqj", """
             { "version": 1, "sources": ["hero.achx"],
               "sequences": [ { "name": "Run", "loop": true, "tracks": [
-                { "name": "Body", "chains": [ { "source": "hero.achx", "chain": "Walk", "start": 0, "loops": 2 } ] } ] } ] }
+                { "name": "Body", "chains": [ { "source": "hero.achx", "chain": "Walk", "start": 0, "length": 0.8 } ] } ] } ] }
             """);
 
         var r = await _w.RunAsync("describe", _w.PathOf("a.seqj"), "--json");

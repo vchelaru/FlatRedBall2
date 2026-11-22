@@ -14,10 +14,10 @@ public static class SequenceOps
         "Sequence files (.seqj): sequence Run, track Run/Body or Run/0 (name wins over index), block Run/Body/1 (zero-based index in the track). "
         + "A track that plays another sequence has one block, its clip, at index 0. "
         + "Selectors: set-sequence-loop takes a glob over sequence names (R*, *); set-track-continuous and delete-track take a track name, glob or index selector "
-        + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-loops and delete-block take the same track part and a block index selector "
+        + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-length, set-block-end and delete-block take the same track part and a block index selector "
         + "(Run/Body/*, Run/*/0, Run/Body/0-1). Every other op takes one exact address. A selector matching nothing is NoMatch, an index past the end is "
         + "IndexOutOfRange, and any failing target fails the whole batch and nothing is written. delete-block and delete-track run from the highest index down. "
-        + "Sources are named as listed in the file (relative to the .seqj). Times are seconds; loops are playback cycles of the chain (above 0). "
+        + "Sources are named as listed in the file (relative to the .seqj). Times and lengths are seconds. A block with no length set plays one cycle of its chain (one run of the played sequence for a clip) and follows edits to it; a set length keeps the block's end. "
         + "Tracks draw in list order, index 0 in front; add-track and add-reference-track insert at index (default 0, the front).";
 
     private const string SequenceAddressDescription = "Sequence name.";
@@ -74,7 +74,7 @@ public static class SequenceOps
             new("track", "string", true, TrackAddressDescription + " Takes selectors."),
             new("value", "boolean", true, "true for continuous."),
         ]),
-        new("add-reference-track", "Adds a track, named after the target, that plays another sequence of the file from start seconds, once. Its clip is block 0 (set-block-start, set-block-loops). Fails if the target would play the sequence back.",
+        new("add-reference-track", "Adds a track, named after the target, that plays another sequence of the file from start seconds, once. Its clip is block 0 (set-block-start, set-block-length, set-block-end). Fails if the target would play the sequence back.",
         [
             new("sequence", "string", true, "Sequence that gets the track."),
             new("target", "string", true, "Sequence to play."),
@@ -100,19 +100,19 @@ public static class SequenceOps
             new("source", "string", true, "Source as listed in the file."),
             new("chain", "string", true, "Chain name in the source."),
             new("start", "number", false, "Seconds from the sequence start, 0 or more. Default 0."),
-            new("loops", "number", false, "Length in playback cycles, above 0. Default 1."),
+            new("length", "number", false, "Length in seconds, above 0. Default: none, so the block plays one cycle of the chain and follows edits to it."),
         ]),
         new("set-block-start", "Moves a block to a start time in seconds. The next block on the track cuts it short from there.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("start", "number", true, "Seconds from the sequence start, 0 or more."),
         ]),
-        new("set-block-loops", "Sets a block's length in playback cycles.",
+        new("set-block-length", "Sets a block's length in seconds, so its end stays put when the chain changes. A following block still cuts it short.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
-            new("loops", "number", true, "Cycles, above 0 (fractions allowed)."),
+            new("length", "number", true, "Seconds, above 0."),
         ]),
-        new("set-block-end", "Sets a chain block's loops so it ends at a time in seconds: loops = (end - start) / chain length, fractions kept. Uses the block's current start, so set that first. A following block still cuts it short. Not for a reference clip (use set-block-loops).",
+        new("set-block-end", "Sets a block's length so it ends at a time in seconds: length = end - start. Uses the block's current start, so set that first. A following block still cuts it short.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("end", "number", true, "Seconds from the sequence start, after the block's start."),
@@ -186,7 +186,7 @@ public static class SequenceOps
     {
         "set-sequence-loop" => "sequence",
         "delete-track" or "set-track-continuous" => "track",
-        "set-block-start" or "set-block-loops" or "set-block-end" or "delete-block" => "block",
+        "set-block-start" or "set-block-length" or "set-block-end" or "delete-block" => "block",
         _ => null,
     };
 
@@ -235,9 +235,9 @@ public static class SequenceOps
             case "add-source": return SequenceEdit.AddSource(doc, undo, v["path"]);
             case "remove-source": return SequenceEdit.RemoveSource(doc, undo, v["source"]);
             case "replace-source": return SequenceEdit.ReplaceSource(doc, undo, v["source"], v["path"]);
-            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), (float)Num("loops", 1));
+            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), v.ContainsKey("length") ? Num("length") : (double?)null);
             case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
-            case "set-block-loops": return SequenceEdit.SetBlockLoops(doc, undo, target, (float)Num("loops"));
+            case "set-block-length": return SequenceEdit.SetBlockLength(doc, undo, target, Num("length"));
             case "set-block-end": return SequenceEdit.SetBlockEnd(doc, undo, target, Num("end"));
             case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
             default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");

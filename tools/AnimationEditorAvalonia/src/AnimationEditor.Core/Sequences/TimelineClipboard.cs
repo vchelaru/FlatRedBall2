@@ -47,7 +47,7 @@ public sealed record TimelinePasteResult(IReadOnlyList<TimelineChainId> Chains, 
 /// <code>{ "kind": "frb2-animation-editor-chains", "version": 1, "sources": ["C:/a/hero.achx"], "track": "Body",
 ///   "sourceTracks": [ { "name": "Body", "lane": 0, "visible": true } ],
 ///   "chainTracks": [ 0 ],
-///   "chains": [ { "source": "C:/a/hero.achx", "chain": "Walk", "start": 0, "loops": 1 } ] }</code>
+///   "chains": [ { "source": "C:/a/hero.achx", "chain": "Walk", "start": 0 } ] }</code>
 /// A chain's <c>start</c> is seconds after the earliest copied chain, so a paste can put that one anywhere. <c>track</c>
 /// names the track the first copied chain was on. <c>sourceTracks</c> lists the tracks the chains came from in lane order
 /// (the lane is the track's index in the source sequence, and the rest is what a missing track is made with) and

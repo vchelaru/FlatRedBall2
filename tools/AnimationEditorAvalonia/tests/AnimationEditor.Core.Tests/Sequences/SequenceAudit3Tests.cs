@@ -188,8 +188,8 @@ public class SequenceAudit3Tests
 
     // ---- the edge drag magnets
 
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     [Fact]
     public void ResizeEdge_OfAChainThatDoesNotRepeatAndStartsLater_StillOffersFrameBoundariesInItsFirstCycleOnly()
@@ -221,7 +221,7 @@ public class SequenceAudit3Tests
         var result = TimelineSnapTargets.ResizeEdge(blocks[0], 1.5 + 2 / 1500.0, others, new[] { 0.1, 0.2 }, 1500, false, repeats: false);
 
         result.Snap.Target!.Value.Kind.ShouldBe(SnapKind.OwnCycle);
-        result.Loops.ShouldBe(3f, 1e-4f);
+        result.Length.ShouldBe(1.5, 1e-4);
     }
 
     // ---- the scene
@@ -253,11 +253,11 @@ public class SequenceAudit3Tests
         return chain;
     }
 
-    private static SequenceTrackSave Track(params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = "Body" };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -265,7 +265,7 @@ public class SequenceAudit3Tests
     public void At_ANonLoopingChainWithLessThanOneCycle_PlaysThatPartAndNeverHolds()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Once", 0, 0.5f)));
+        var document = Load(dir, Track(("Once", 0, 0.15)));
 
         // The block is 0.15 s: frame 1 is showing at 0.12 s, and at 0.16 s the block is over rather than holding frame 1.
         SequenceScene.At(document, 0, 0.12).Single().FrameIndex.ShouldBe(1);
@@ -276,7 +276,7 @@ public class SequenceAudit3Tests
     public void At_AHeldChainCutByTheNextOne_HoldsUntilTheNextStarts_ThenYieldsToIt()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Once", 0, 3), ("Spin", 0.5, 1)));
+        var document = Load(dir, Track(("Once", 0, 0.9), ("Spin", 0.5, null)));
 
         var held = SequenceScene.At(document, 0, 0.45).Single();
         held.Chain.Name.ShouldBe("Once");
@@ -290,7 +290,7 @@ public class SequenceAudit3Tests
     public void At_TwoChainsStartingTogether_TheEarlierOneInTheListNeverHoldsEvenWhenItDoesNotLoop()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Once", 0, 3), ("Spin", 0, 1)));
+        var document = Load(dir, Track(("Once", 0, 0.9), ("Spin", 0, null)));
 
         var sprite = SequenceScene.At(document, 0, 0.05).Single();
         sprite.Chain.Name.ShouldBe("Spin");
@@ -300,7 +300,7 @@ public class SequenceAudit3Tests
     public void At_ANonLoopingReverseChain_HoldsFrameZero_WhereItsCycleEnds()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Back", 0, 2)));
+        var document = Load(dir, Track(("Back", 0, 0.6)));
 
         SequenceScene.At(document, 0, 0.05).Single().FrameIndex.ShouldBe(2);
         SequenceScene.At(document, 0, 0.25).Single().FrameIndex.ShouldBe(0);
@@ -314,7 +314,7 @@ public class SequenceAudit3Tests
     public void At_ANonLoopingReversePingPong_HoldsTheLastFrame_WhereItsCycleEnds()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("BackBounce", 0, 2)));
+        var document = Load(dir, Track(("BackBounce", 0, 1.2)));
 
         // A reversed ping-pong runs 2 1 0 | 0 1 2 (0.6 s), so the hold is frame 2 at its full length.
         SequenceScene.At(document, 0, 0.55).Single().FrameIndex.ShouldBe(2);
@@ -327,7 +327,7 @@ public class SequenceAudit3Tests
     public void At_AChainWhoseLoopFlagIsTurnedOffUnderAnOpenSequence_HoldsFromThenOn()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Spin", 0, 3)));
+        var document = Load(dir, Track(("Spin", 0, 0.9)));
         var spin = document.FindChain(document.Save.Sequences[0].Tracks[0].Chains[0])!;
 
         SequenceScene.At(document, 0, 0.35).Single().FrameIndex.ShouldBe(0);
@@ -341,7 +341,7 @@ public class SequenceAudit3Tests
     public void At_ANonLoopingChainOfAThousandMillionCycles_HoldsItsLastFrameDeepIntoTheBlock()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track(("Once", 0, 1e9f)));
+        var document = Load(dir, Track(("Once", 0, 3e8)));
 
         SequenceScene.At(document, 0, 5e7).Single().FrameIndex.ShouldBe(2);
         SequenceScene.At(document, 0, 5e7).Single().ElapsedInFrame.ShouldBe(0.1, 1e-6);

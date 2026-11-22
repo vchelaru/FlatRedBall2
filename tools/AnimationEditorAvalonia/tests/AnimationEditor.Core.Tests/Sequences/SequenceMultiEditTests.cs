@@ -18,7 +18,7 @@ public class SequenceMultiEditTests
     private static SequenceSave Sequence(string name)
     {
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk" });
         var sequence = new SequenceSave { Name = name };
         sequence.Tracks.Add(track);
         return sequence;

@@ -225,7 +225,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
     public async Task FromTheLastLane_TheChainLeavesItsTrackEmpty_AndTheTrackStays()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteCustomFixture(editor, Track("Only", ("Run", 0, 1)));
+        string boss = WriteCustomFixture(editor, Track("Only", ("Run", 0, null)));
         await editor.OpenAsync(boss);
 
         editor.Drag(Row(editor, 0, 0.1), Row(editor, TimelineViewport.NewTrackLane, 0.1, dx: 60), RawInputModifiers.Alt);
@@ -239,7 +239,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
     public async Task AMissingChain_MovesToo_WithItsOneSecondPlaceholderAsTheGhost()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteCustomFixture(editor, Track("Body", ("Gone", 0, 1)));
+        string boss = WriteCustomFixture(editor, Track("Body", ("Gone", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
@@ -255,7 +255,7 @@ public class SequenceTimelineMoveToNewTrackScenarioTests
     public async Task WithATallEventLane_TheNewTrackRowStaysAtTheTop_AndTheLanesStartBelowIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteCustomFixture(editor, Track("A", ("Walk", 0, 1)), Track("B", ("Run", 0, 1)));
+        string boss = WriteCustomFixture(editor, Track("A", ("Walk", 0, null)), Track("B", ("Run", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         timeline.Viewport.LaneHeightOf(0).ShouldBeGreaterThan(timeline.Viewport.LaneHeightOf(1));

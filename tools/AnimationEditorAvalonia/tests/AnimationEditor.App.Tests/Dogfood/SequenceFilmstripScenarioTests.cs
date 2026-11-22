@@ -34,11 +34,11 @@ public class SequenceFilmstripScenarioTests
         return once;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -49,7 +49,7 @@ public class SequenceFilmstripScenarioTests
     public async Task ABlock_ShowsOneCellPerFrame_ToScaleInTime()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
 
         var cells = timeline.FilmstripCells(timeline.Blocks.Single());
@@ -63,7 +63,7 @@ public class SequenceFilmstripScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Once is 0.5 s a cycle; three cycles ask for 1.5 s, but it plays once and holds frame 4.
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 3))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 1.5))));
         var timeline = Timeline(editor);
 
         var cells = timeline.FilmstripCells(timeline.Blocks.Single());
@@ -79,7 +79,7 @@ public class SequenceFilmstripScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk x2 would run to 1.0 s, but Run at 0.25 s cuts it.
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 2), ("Run", 0.25, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1.0), ("Run", 0.25, null))));
         var timeline = Timeline(editor);
 
         var cells = timeline.FilmstripCells(timeline.Blocks.Single(b => b.Reference.Chain == "Walk"));
@@ -91,7 +91,7 @@ public class SequenceFilmstripScenarioTests
     public async Task AMissingChain_HasNoFilmstrip()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Gone", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Gone", 0, null))));
         var timeline = Timeline(editor);
 
         timeline.FilmstripCells(timeline.Blocks.Single()).ShouldBeEmpty();
@@ -101,7 +101,7 @@ public class SequenceFilmstripScenarioTests
     public async Task PressingAFilmstripCell_OnlySelectsTheChain_AndLeavesThePlayheadAlone()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
         double y = timeline.Viewport.LaneTop(0) + TimelineLayout.FilmTop + TimelineLayout.FilmHeight / 2;
 
@@ -116,7 +116,7 @@ public class SequenceFilmstripScenarioTests
     public async Task ThePlayheadStaysPutWhenAFilmstripCellIsClicked_WhileItIsParked()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Head", ("Run", 0.1, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Head", ("Run", 0.1, null))));
         var timeline = Timeline(editor);
         timeline.Playhead = 0.4;
         double y = timeline.Viewport.LaneTop(1) + TimelineLayout.FilmTop + TimelineLayout.FilmHeight / 2;

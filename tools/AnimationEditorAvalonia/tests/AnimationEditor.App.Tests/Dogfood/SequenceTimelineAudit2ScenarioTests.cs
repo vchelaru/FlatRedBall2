@@ -112,7 +112,7 @@ public class SequenceTimelineAudit2ScenarioTests
         using var editor = await OpenAsync();
         editor.ClickAt(Header(editor, 2));
         await editor.Window.Clipboard!.SetTextAsync(
-            "{\"kind\":\"frb2-animation-editor-chains\",\"version\":1,\"sources\":[],\"chains\":[{\"source\":\"sheet.png\",\"chain\":\"Walk\",\"start\":0,\"loops\":1}]}");
+            "{\"kind\":\"frb2-animation-editor-chains\",\"version\":1,\"sources\":[],\"chains\":[{\"source\":\"sheet.png\",\"chain\":\"Walk\",\"start\":0}]}");
 
         await CtrlAsync(editor, Key.V, () => editor.ProblemText is not null);
 

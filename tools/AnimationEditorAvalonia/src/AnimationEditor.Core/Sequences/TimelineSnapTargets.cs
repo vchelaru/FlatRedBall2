@@ -7,8 +7,8 @@ using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
-/// <summary>The length in cycles an edge drag asks for, and the snap that produced the edge time.</summary>
-public readonly record struct EdgeDragResult(float Loops, SnapResult Snap);
+/// <summary>The length in seconds an edge drag asks for, and the snap that produced the edge time.</summary>
+public readonly record struct EdgeDragResult(double Length, SnapResult Snap);
 
 /// <summary>
 /// Builds the targets <see cref="TimelineSnap"/> snaps to from what the timeline shows, and applies it to a resize.
@@ -74,7 +74,7 @@ public static class TimelineSnapTargets
     /// <summary>
     /// The right-edge drag of <paramref name="block"/> to <paramref name="edgeTime"/>: snaps to <paramref name="others"/>,
     /// the block's own whole-cycle marks, and its frame boundaries (<paramref name="frameBoundaries"/>, from
-    /// <see cref="FrameBoundaries"/>, or null), then converts to a loop count. The edge never goes below the minimum loops.
+    /// <see cref="FrameBoundaries"/>, or null), then converts to a length. The edge never goes below <see cref="SequenceTimeline.MinimumLength"/>.
     /// <paramref name="repeats"/> is whether the chain repeats its frames across the block (its Loop flag): when false the
     /// block past the first cycle is a held last frame, which has no frame boundaries to snap to.
     /// </summary>
@@ -89,8 +89,8 @@ public static class TimelineSnapTargets
             targets.AddRange(repeats ? marks : marks.Where(mark => mark.Time <= block.Start + block.CycleLength + 1e-9));
         }
 
-        double minEdge = SequenceTimeline.MinimumEdge(block.Start, block.CycleLength);
+        double minEdge = SequenceTimeline.MinimumEdge(block.Start);
         var snap = TimelineSnap.Edge(edgeTime, targets, pixelsPerSecond, bypass, minEdge);
-        return new EdgeDragResult(SequenceTimeline.LoopsForEdge(block.Start, snap.Time, block.CycleLength), snap);
+        return new EdgeDragResult(SequenceTimeline.LengthForEdge(block.Start, snap.Time), snap);
     }
 }

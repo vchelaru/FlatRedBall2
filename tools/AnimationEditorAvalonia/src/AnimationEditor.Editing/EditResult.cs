@@ -27,7 +27,7 @@ public enum EditErrorCode
     NoMatch,
     /// <summary>A named item (sequence, track, source, chain) is not there.</summary>
     NotFound,
-    /// <summary>A value is out of its allowed range (a negative start, zero loops).</summary>
+    /// <summary>A value is out of its allowed range (a negative start, a zero length).</summary>
     InvalidValue,
     /// <summary>A source cannot be removed because blocks still use it.</summary>
     SourceInUse,

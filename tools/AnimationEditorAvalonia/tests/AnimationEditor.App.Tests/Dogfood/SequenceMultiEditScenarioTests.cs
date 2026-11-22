@@ -55,7 +55,7 @@ public class SequenceMultiEditScenarioTests
         {
             var sequence = new SequenceSave { Name = name };
             var body = new SequenceTrackSave { Name = "Body" };
-            body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Loops = 2 });
+            body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Length = 0.4 });
             sequence.Tracks.Add(body);
             save.Sequences.Add(sequence);
         }

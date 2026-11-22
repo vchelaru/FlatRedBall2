@@ -32,11 +32,11 @@ public class SequenceTimelineScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -155,7 +155,7 @@ public class SequenceTimelineScenarioTests
     public async Task DraggingAChain_MovesItInTimeAsOneUndoStep_AndCtrlZPutsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
 
         editor.Drag(At(editor, 0, 0.25), At(editor, 0, 1.25));
@@ -170,7 +170,7 @@ public class SequenceTimelineScenarioTests
     public async Task DraggingAChainToAnotherLane_MovesItToThatTrack_AndCtrlZPutsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms"));
         await editor.OpenAsync(boss);
 
         editor.Drag(At(editor, 0, 0.25), At(editor, 1, 0.25));
@@ -188,14 +188,14 @@ public class SequenceTimelineScenarioTests
     public async Task DraggingTheEndOfAChainPastTheNextOne_GrabsItsEdge_AndSnapsBackToTheNextStartExactly()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        // Walk asks for 4 cycles (0..2 s); Run (1.25..1.75 s) sits wholly inside it, so Walk's end lies past Run's.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 4), ("Run", 1.25, 1)));
+        // Walk asks for 2 s, 4 cycles; Run (1.25..1.75 s) sits wholly inside it, so Walk's end lies past Run's.
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 2.0), ("Run", 1.25, null)));
         await editor.OpenAsync(boss);
 
         editor.Drag(At(editor, 0, 2.0, dx: -1), At(editor, 0, 1.25, dx: 2));
 
         var chains = SavedTrack(boss, 0).Chains;
-        chains.Single(c => c.Chain == "Walk").Loops.ShouldBe(2.5f);
+        chains.Single(c => c.Chain == "Walk").Length.ShouldBe(1.25);
         chains.Single(c => c.Chain == "Run").Start.ShouldBe(1.25);
     }
 
@@ -204,33 +204,33 @@ public class SequenceTimelineScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk's 0.5 s cycle at 0; Run starts at 1.25.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1), ("Run", 1.25, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null), ("Run", 1.25, null)));
         await editor.OpenAsync(boss);
-        float WalkLoops() => SavedTrack(boss, 0).Chains[0].Loops;
+        double? WalkLength() => SavedTrack(boss, 0).Chains[0].Length;
 
         // A few pixels past two cycles: the magnet pulls it to exactly 2.
         editor.Drag(At(editor, 0, 0.5, dx: -2), At(editor, 0, 1.0, dx: 1));
-        WalkLoops().ShouldBe(2f);
-        // A few pixels short of Run's start: pulled to it, 2.5 loops.
+        WalkLength().ShouldBe(1.0);
+        // A few pixels short of Run's start: pulled to it.
         editor.Drag(At(editor, 0, 1.0, dx: -2), At(editor, 0, 1.25, dx: -6));
-        WalkLoops().ShouldBe(2.5f, 1e-5f);
+        WalkLength().ShouldBe(1.25);
         // On past Run: allowed; the part under Run is the cut tail.
         editor.Drag(At(editor, 0, 1.25, dx: -3), At(editor, 0, 1.9, dx: -3));
-        WalkLoops().ShouldBe(3.8f, 1e-4f);
+        WalkLength().ShouldBe(1.9);
 
         var walk = Timeline(editor).Blocks.Single(b => b.Reference.Chain == "Walk");
         walk.IsCut.ShouldBeTrue();
         walk.Played.ShouldBe(1.25, 1e-6);
-        editor.UndoLabels.ShouldBe(new[] { "Set Cycles of 'Walk' to 2", "Set Cycles of 'Walk' to 2.5", "Set Cycles of 'Walk' to 3.8" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Length of 'Walk' to 1", "Set Length of 'Walk' to 1.25", "Set Length of 'Walk' to 1.9" });
         editor.Press(Key.Z, RawInputModifiers.Control);
-        WalkLoops().ShouldBe(2.5f, 1e-5f);
+        WalkLength().ShouldBe(1.25);
     }
 
     [AvaloniaFact]
-    public async Task DraggingTheRightEdge_NamesTheCycles_WithADotWhateverTheCulture()
+    public async Task DraggingTheRightEdge_NamesTheLength_WithADotWhateverTheCulture()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1), ("Run", 1.25, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null), ("Run", 1.25, null)));
         await editor.OpenAsync(boss);
         // The drag's handlers run on the UI thread, which is not the test's thread, so the culture is set there.
         System.Globalization.CultureInfo before = Avalonia.Threading.Dispatcher.UIThread.Invoke(() => System.Globalization.CultureInfo.CurrentCulture);
@@ -245,14 +245,14 @@ public class SequenceTimelineScenarioTests
             Avalonia.Threading.Dispatcher.UIThread.Invoke(() => System.Globalization.CultureInfo.CurrentCulture = before);
         }
 
-        editor.UndoLabels.ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Length of 'Walk' to 1.25" });
     }
 
     [AvaloniaFact]
     public async Task Escape_DuringADrag_PutsTheChainBackWithNoUndoEntry()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         Point from = At(editor, 0, 0.25);
         Point to = At(editor, 0, 1.25);
@@ -272,7 +272,7 @@ public class SequenceTimelineScenarioTests
     public async Task DeleteKey_RemovesTheSelectedChain_NotTheHiddenAchxSelection()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1), ("Run", 1, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null), ("Run", 1, null)));
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, "hero.achx"));
         editor.ClickRow(editor.ChainNamed("Run"));
         await editor.OpenAsync(boss);
@@ -292,7 +292,7 @@ public class SequenceTimelineScenarioTests
     public async Task TrackHeaderMenu_RenamesAndDeletesATrack_EachUndoable()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms"));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         Point armsHeader = editor.PointIn(timeline, 20, timeline.Viewport.LaneTop(1) + 10);
@@ -314,21 +314,21 @@ public class SequenceTimelineScenarioTests
     public async Task AMissingChain_IsFlaggedAndDrawnOneSecondLong()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Gone", 0.5, 3)));
+        string boss = WriteFixture(editor, Track("Body", ("Gone", 0.5, 3.0)));
         await editor.OpenAsync(boss);
 
         var block = Timeline(editor).Blocks.Single();
 
         block.IsMissing.ShouldBeTrue();
         block.Full.ShouldBe(TimelineLayout.MissingLength);
-        SavedTrack(boss, 0).Chains.Single().Loops.ShouldBe(3f);
+        SavedTrack(boss, 0).Chains.Single().Length.ShouldBe(3);
     }
 
     [AvaloniaFact]
     public async Task CtrlWheel_ZoomsAroundThePointer_AndShiftWheelScrollsSideways()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var viewport = Timeline(editor).Viewport;
         double x = TimelineViewport.HeaderWidth + 300;
@@ -358,7 +358,7 @@ public class SequenceTimelineScenarioTests
     public async Task HoveringAnEdge_SetsTheControlsCursor_AndLeavingItClearsTheCursor()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         editor.Layout();
@@ -377,7 +377,7 @@ public class SequenceTimelineScenarioTests
     public async Task HoveringTheRightEdgeGrabZone_ShowsResize_AndOneStepInsideTheBodyDoesNot(double pixelsPerSecond)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         timeline.Viewport.SetPixelsPerSecond(pixelsPerSecond);
@@ -406,8 +406,8 @@ public class SequenceTimelineScenarioTests
     public async Task HoveringACutTail_ShowsResizeAtItsEdge_AndItsBodyDoesNot()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        // Walk loops 3 times (1.5 s) but Run starts at 1.0 s and cuts it.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 3), ("Run", 1.0, 1)));
+        // Walk asks for 1.5 s (3 cycles) but Run starts at 1.0 s and cuts it.
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1.5), ("Run", 1.0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         double tailY = timeline.Viewport.LaneTop(0) + TimelineLayout.TailTop + 2;
@@ -422,7 +422,7 @@ public class SequenceTimelineScenarioTests
     public async Task DraggingTheEdge_KeepsResizeOutsideTheBlockAndTheTimeline_AndReleaseRestoresIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
@@ -447,7 +447,7 @@ public class SequenceTimelineScenarioTests
     public async Task MovingAChain_NeverShowsResize_EvenPassingOverAnEdge_AndEscapeEndsTheEdgeCursor()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Other", ("Run", 3, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Other", ("Run", 3, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 

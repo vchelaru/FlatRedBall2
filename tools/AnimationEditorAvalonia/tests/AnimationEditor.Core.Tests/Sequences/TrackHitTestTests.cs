@@ -47,7 +47,7 @@ public class TrackHitTestTests
         for (int i = 0; i < tracks; i++)
         {
             var track = new SequenceTrackSave { Name = i == 0 ? "Body" : "Fx" + i };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "body.achj", Chain = "Walk", Start = 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "body.achj", Chain = "Walk", Start = 0 });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);

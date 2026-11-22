@@ -36,11 +36,11 @@ internal sealed partial class FilmstripRenderer
     // At most this long per paint is spent cutting new composite cells (one is always cut), the rest wait for the next paint.
     private const double ReferenceBudgetMs = 6;
 
-    // A clip's cells at one zoom and loop count, with each cell's pose worked out the first time it is visible.
-    private sealed class ClipCells(double pixelsPerSecond, float loops, ReferenceCell[] cells)
+    // A clip's cells at one zoom and clip length, with each cell's pose worked out the first time it is visible.
+    private sealed class ClipCells(double pixelsPerSecond, double length, ReferenceCell[] cells)
     {
         public readonly double PixelsPerSecond = pixelsPerSecond;
-        public readonly float Loops = loops;
+        public readonly double Length = length;
         public readonly ReferenceCell[] Cells = cells;
         public readonly ScenePose?[] Poses = new ScenePose?[cells.Length];
         public readonly bool[] Known = new bool[cells.Length];
@@ -73,10 +73,10 @@ internal sealed partial class FilmstripRenderer
     {
         if (Thumbnails is not { } thumbnails || clip.TargetLength <= 0
             || SequenceReferences.Find(document.Save.Sequences, clip.Reference.Sequence) is not { } target) return 0;
-        if (!_clips.TryGetValue(clip, out var info) || info.PixelsPerSecond != pixelsPerSecond || info.Loops != clip.Reference.Loops)
+        if (!_clips.TryGetValue(clip, out var info) || info.PixelsPerSecond != pixelsPerSecond || info.Length != clip.Length)
         {
-            info = new ClipCells(pixelsPerSecond, clip.Reference.Loops,
-                ReferenceFilmstrip.Cells(clip.TargetLength, clip.Reference.Loops, pixelsPerSecond).ToArray());
+            info = new ClipCells(pixelsPerSecond, clip.Length,
+                ReferenceFilmstrip.Cells(clip.TargetLength, clip.Reference.Length, pixelsPerSecond).ToArray());
             _clips.AddOrUpdate(clip, info);
         }
         var all = info.Cells;

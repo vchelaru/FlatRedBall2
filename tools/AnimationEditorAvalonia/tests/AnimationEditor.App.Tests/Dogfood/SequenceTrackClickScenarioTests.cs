@@ -47,7 +47,7 @@ public class SequenceTrackClickScenarioTests
     private static SequenceTrackSave Track(string name, string chain)
     {
         var track = new SequenceTrackSave { Name = name };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0 });
         return track;
     }
 

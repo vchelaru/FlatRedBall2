@@ -27,7 +27,7 @@ public class SequenceAddChipScenarioTests
         if (withSequence)
         {
             var body = new SequenceTrackSave { Name = "Body" };
-            body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
+            body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
             var sequence = new SequenceSave { Name = "Attack" };
             sequence.Tracks.Add(body);
             save.Sequences.Add(sequence);

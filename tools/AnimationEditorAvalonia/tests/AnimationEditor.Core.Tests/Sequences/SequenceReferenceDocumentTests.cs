@@ -131,7 +131,7 @@ public class SequenceReferenceDocumentTests
         tracks.Select(t => t.Name).ShouldBe(new[] { "Earth", "Body" });
         tracks[0].Reference!.Sequence.ShouldBe("Earth");
         tracks[0].Reference!.Start.ShouldBe(0.25);
-        tracks[0].Reference!.Loops.ShouldBe(1f);
+        tracks[0].Reference!.Length.ShouldBeNull();
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Reference 'Earth'" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Count.ShouldBe(1);
@@ -179,7 +179,7 @@ public class SequenceReferenceDocumentTests
     }
 
     [Fact]
-    public void SetReferenceStartAndLoops_EditTheClip_AndRefuseBadValues()
+    public void SetReferenceStartAndLength_EditTheClip_AndRefuseBadValues()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
@@ -187,13 +187,13 @@ public class SequenceReferenceDocumentTests
         document.AddSequenceReference(undo, 0, "Earth", 0);
 
         document.SetReferenceStart(undo, 0, 0, 1.5).ShouldBeNull();
-        document.SetReferenceLoops(undo, 0, 0, 2.5f).ShouldBeNull();
+        document.SetReferenceLength(undo, 0, 0, 2.5).ShouldBeNull();
         document.SetReferenceStart(undo, 0, 0, -1).ShouldNotBeNull();
-        document.SetReferenceLoops(undo, 0, 0, 0).ShouldNotBeNull();
+        document.SetReferenceLength(undo, 0, 0, 0).ShouldNotBeNull();
 
         var reference = document.Save.Sequences[0].Tracks[0].Reference!;
         reference.Start.ShouldBe(1.5);
-        reference.Loops.ShouldBe(2.5f);
+        reference.Length.ShouldBe(2.5);
     }
 
     [Fact]
@@ -235,9 +235,9 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
 
         document.AddSequenceReference(new UndoManager(), 0, "Earth", 0);
-        document.SetReferenceLoops(new UndoManager(), 0, 0, 9);
+        document.SetReferenceLength(new UndoManager(), 0, 0, 9);
 
-        document.SequenceLength(0).ShouldBe(9, 1e-6);   // 9 cycles of Earth's 1 s, past Body's 0.5 s
+        document.SequenceLength(0).ShouldBe(9, 1e-6);   // 9 s, past Body's 0.5 s
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class SequenceReferenceDocumentTests
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         document.AddSequenceReference(new UndoManager(), 0, "Earth", 0.2);
-        document.SetReferenceLoops(new UndoManager(), 0, 0, 2);   // Earth is 1 s, so the clip runs 0.2 .. 2.2
+        document.SetReferenceLength(new UndoManager(), 0, 0, 2);   // Earth is 1 s, so the clip runs 0.2 .. 2.2
 
         SequenceScene.At(document, 0, 0.1).Any(s => s.Chain.Name == "Spark").ShouldBeFalse("before the clip starts");
         SequenceScene.At(document, 0, 0.3).Any(s => s.Chain.Name == "Spark").ShouldBeTrue();
@@ -317,14 +317,14 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir, earthLoops: false);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 2);
+        document.SetReferenceLength(undo, 0, 0, 2);
 
         SequenceScene.At(document, 0, 1.5).Any(s => s.Chain.Name == "Spark").ShouldBeTrue("held after its one cycle");
         SequenceScene.At(document, 0, 2.5).Any(s => s.Chain.Name == "Spark").ShouldBeFalse();
     }
 
-    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, float loops = 1) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Loops = loops } };
+    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null) =>
+        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
 
     private static bool Shows(SequenceDocument document, int sequence, double time, string chain) =>
         SequenceScene.At(document, sequence, time).Any(s => s.Chain.Name == chain);
@@ -356,7 +356,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 3);
+        document.SetReferenceLength(undo, 0, 0, 3);
 
         document.DeleteSequences(undo, new[] { 1 });
 
@@ -398,12 +398,12 @@ public class SequenceReferenceDocumentTests
         document.AddSequenceReference(undo, 0, "Earth", 0);
 
         document.DuplicateTracks(undo, 0, new[] { 0 });
-        document.SetReferenceLoops(undo, 0, 0, 4).ShouldBeNull();
+        document.SetReferenceLength(undo, 0, 0, 4).ShouldBeNull();
 
         var tracks = document.Save.Sequences[0].Tracks;
         tracks.Count(t => t.Reference?.Sequence == "Earth").ShouldBe(2);
         tracks.Select(t => t.Name).Distinct().Count().ShouldBe(tracks.Count);
-        tracks[1].Reference!.Loops.ShouldBe(1f);
+        tracks[1].Reference!.Length.ShouldBeNull();
         document.SequenceLength(0).ShouldBe(4, 1e-6);
     }
 
@@ -414,7 +414,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 2);
+        document.SetReferenceLength(undo, 0, 0, 2);
 
         undo.Undo();
         undo.Undo();
@@ -425,18 +425,18 @@ public class SequenceReferenceDocumentTests
         undo.Redo();
         Shows(document, 0, 0.1, "Spark").ShouldBeTrue();
         document.SequenceLength(0).ShouldBe(2, 1e-6);
-        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Reference!.Loops.ShouldBe(2f);
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Reference!.Length.ShouldBe(2);
     }
 
     [Fact]
-    public void SetReferenceLoops_Fractional_CutsTheClipPartWayThroughTheTarget()
+    public void SetReferenceLength_ShorterThanTheTarget_CutsTheClipPartWayThroughIt()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0.5);
 
-        document.SetReferenceLoops(undo, 0, 0, 0.5f).ShouldBeNull();
+        document.SetReferenceLength(undo, 0, 0, 0.5).ShouldBeNull();
 
         Clip(document, 0).Length.ShouldBe(0.5, 1e-6);
         document.SequenceLength(0).ShouldBe(1.0, 1e-6);
@@ -480,7 +480,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 3);
+        document.SetReferenceLength(undo, 0, 0, 3);
 
         document.SetTrackVisible(undo, 0, 0, false);
 
@@ -494,7 +494,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 2);
+        document.SetReferenceLength(undo, 0, 0, 2);
 
         document.SetTrackVisible(undo, 1, 0, false);
 
@@ -510,7 +510,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
-        document.SetReferenceLoops(undo, 0, 0, 2);
+        document.SetReferenceLength(undo, 0, 0, 2);
         document.SetLoop(undo, 0, false);
 
         Shows(document, 0, 5, "Spark").ShouldBeTrue("the held final pose is the last instant of the clip");

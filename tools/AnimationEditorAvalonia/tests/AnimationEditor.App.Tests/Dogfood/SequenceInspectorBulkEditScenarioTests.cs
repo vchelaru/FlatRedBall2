@@ -87,12 +87,12 @@ public class SequenceInspectorBulkEditScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task TwoChains_StartAndCyclesShowMixed_AndEditingSetsBoth_SourceAndChainRowsShowTheCommonValue()
+    public async Task TwoChains_StartAndLengthShowMixed_AndEditingSetsBoth_SourceAndChainRowsShowTheCommonValue()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteFixture(editor);
         await editor.OpenAsync(path);
-        // Body Walk@0 and Head Walk@1.5: same chain, different start, same cycles.
+        // Body Walk@0 and Head Walk@1.5: same chain, different start, same length.
         editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 0, 0.25));
         editor.ClickAt(SequenceTimelineMultiSelectScenarioTests.At(editor, 1, 1.75), RawInputModifiers.Control);
         var inspector = Inspector(editor);
@@ -100,17 +100,17 @@ public class SequenceInspectorBulkEditScenarioTests
         inspector.ChainPanel.IsVisible.ShouldBeTrue();
         inspector.ChainStartField.Value.ShouldBeNull();
         inspector.ChainStartField.PlaceholderText.ShouldBe("(mixed)");
-        inspector.ChainLoopsField.Value.ShouldBe(1m);
+        inspector.ChainLengthField.Value.ShouldBe(0.5m);
         inspector.ChainSourceText.Text.ShouldBe("hero.achx");
         SequenceInspectorScenarioTests.ChainCombo(inspector).SelectedItem.ShouldBe("Walk");
 
         editor.TypeAndEnter(BoxOf(inspector.ChainStartField), "3");
         Saved(path).Tracks[0].Chains[0].Start.ShouldBe(3d);
         Saved(path).Tracks[1].Chains[1].Start.ShouldBe(3d);
-        editor.TypeAndEnter(BoxOf(inspector.ChainLoopsField), "2");
-        Saved(path).Tracks[0].Chains[0].Loops.ShouldBe(2f);
-        Saved(path).Tracks[1].Chains[1].Loops.ShouldBe(2f);
-        editor.UndoLabels.ShouldBe(new[] { "Set Start of 2 Chains to 3", "Set Cycles of 2 Chains to 2" });
+        editor.TypeAndEnter(BoxOf(inspector.ChainLengthField), "2");
+        Saved(path).Tracks[0].Chains[0].Length.ShouldBe(2);
+        Saved(path).Tracks[1].Chains[1].Length.ShouldBe(2);
+        editor.UndoLabels.ShouldBe(new[] { "Set Start of 2 Chains to 3", "Set Length of 2 Chains to 2" });
 
         editor.Press(Key.Z, RawInputModifiers.Control);
         editor.Press(Key.Z, RawInputModifiers.Control);

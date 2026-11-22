@@ -21,7 +21,7 @@ public class SequenceTrackNoOffsetSceneTests
         File.WriteAllText(path,
             "{ \"version\": 1, \"sources\": [ \"body.achj\" ], \"sequences\": [ { \"name\": \"Attack\", \"tracks\": [ " +
             "{ \"name\": \"Body\", \"x\": 100, \"y\": -40, " +
-            " \"chains\": [ { \"source\": \"body.achj\", \"chain\": \"Walk\", \"start\": 0, \"loops\": 1 } ] } ] } ] }");
+            " \"chains\": [ { \"source\": \"body.achj\", \"chain\": \"Walk\", \"start\": 0 } ] } ] } ] }");
         return SequenceDocument.Load(path);
     }
 

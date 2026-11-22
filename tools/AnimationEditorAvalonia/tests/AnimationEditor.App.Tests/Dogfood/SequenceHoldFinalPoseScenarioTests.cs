@@ -24,7 +24,7 @@ public class SequenceHoldFinalPoseScenarioTests
         attack.Tracks.Add(new SequenceTrackSave
         {
             Name = "Body",
-            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 } },
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 } },
         });
         save.Sequences.Add(attack);
         save.Save(path);

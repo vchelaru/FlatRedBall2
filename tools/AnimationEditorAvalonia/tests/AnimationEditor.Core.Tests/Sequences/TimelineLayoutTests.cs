@@ -8,8 +8,8 @@ namespace AnimationEditor.Core.Tests.Sequences;
 
 public class TimelineLayoutTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     // Walk is 1 s per cycle, Gone is missing.
     private static double? Cycle(SequenceChainReferenceSave reference) => reference.Chain == "Gone" ? null : 1.0;
@@ -19,7 +19,7 @@ public class TimelineLayoutTests
     [Fact]
     public void Blocks_CutChainKeepsItsFullLength_AndAMissingChainIsAOneSecondPlaceholder()
     {
-        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 3), Ref("Gone", 2) } };
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, length: 3), Ref("Gone", 2) } };
         var sequence = new SequenceSave { Tracks = { track } };
 
         var blocks = TimelineLayout.Blocks(sequence, Cycle);
@@ -38,7 +38,7 @@ public class TimelineLayoutTests
     public void HitTest_BodyEdgeAndCutTail()
     {
         // Walk 0..3 s cut at 2 s by Run (2..3 s).
-        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 3), Ref("Run", 2) } };
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, length: 3), Ref("Run", 2) } };
         var sequence = new SequenceSave { Tracks = { track } };
         var blocks = TimelineLayout.Blocks(sequence, Cycle);
         var viewport = new TimelineViewport();
@@ -80,7 +80,7 @@ public class TimelineLayoutTests
     public void HitTest_InATallLanesEventRow_HitsTheBlockBody_AndNeverACutTail()
     {
         // Walk 0..3 s cut at 2 s by Run: the event row under Walk's cut tail is empty space, under Run it is Run's.
-        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 3), Ref("Run", 2) } };
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, length: 3), Ref("Run", 2) } };
         var sequence = new SequenceSave { Tracks = { track } };
         var blocks = TimelineLayout.Blocks(sequence, Cycle);
         var viewport = new TimelineViewport();
@@ -121,9 +121,9 @@ public class TimelineLayoutTests
     [Fact]
     public void Blocks_EndingAFloatRoundingPastTheNextStart_IsNotCut()
     {
-        // 2.5 float loops of a float-summed 0.1 s × 5 cycle land a hair past 1.25, where the edge magnet put it.
+        // 2.5 cycles of a float-summed 0.1 s × 5 cycle land a hair past 1.25, where the edge magnet put it.
         double cycle = 5 * (double)0.1f;
-        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 2.5f), Ref("Run", 1.25) } };
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, length: 2.5 * cycle), Ref("Run", 1.25) } };
 
         var walk = TimelineLayout.Blocks(new SequenceSave { Tracks = { track } }, _ => cycle)[0];
 

@@ -195,7 +195,7 @@ public sealed partial class SequenceTimelineControl
         bool bypass = modifiers.HasFlag(KeyModifiers.Alt);
         if (_drag == DragKind.RefMove)
         {
-            double length = _dragReference.Loops * _dragReferenceCycle;
+            double length = SequenceTimeline.FullLength(_dragReference.Length, _dragReferenceCycle);
             var snap = TimelineSnap.Move(_dragOriginStart + dt, length > 0 ? length : TimelineLayout.MissingLength, _snapOthers, Viewport.PixelsPerSecond, bypass);
             _dragReference.Start = Math.Max(0, snap.Time);
             _snapGuide = snap.Target;
@@ -205,8 +205,8 @@ public sealed partial class SequenceTimelineControl
             var targets = new List<SnapTarget>(_snapOthers);
             targets.AddRange(TimelineSnap.CycleMarks(_dragOriginStart, _dragReferenceCycle, _dragOriginEdge + dt, Viewport.PixelsPerSecond));
             var snap = TimelineSnap.Edge(_dragOriginEdge + dt, targets, Viewport.PixelsPerSecond, bypass,
-                SequenceTimeline.MinimumEdge(_dragOriginStart, _dragReferenceCycle));
-            _dragReference.Loops = SequenceTimeline.LoopsForEdge(_dragOriginStart, snap.Time, _dragReferenceCycle);
+                SequenceTimeline.MinimumEdge(_dragOriginStart));
+            _dragReference.Length = SequenceTimeline.LengthForEdge(_dragOriginStart, snap.Time);
             _snapGuide = snap.Target;
         }
         Rebuild();
@@ -224,7 +224,7 @@ public sealed partial class SequenceTimelineControl
             return;
         string name = sequence.Tracks[track].Name;
         string description = kind == DragKind.RefEdge
-            ? $"Set Cycles of '{name}' to {reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)}"
+            ? $"Set Length of '{name}' to {reference.Length?.ToString("0.###", CultureInfo.InvariantCulture)}"
             : SequenceLabel.Named("Move", "Track", name);
         _document.CommitGesture(_undo, description, before);
     }
@@ -300,7 +300,7 @@ public sealed partial class SequenceTimelineControl
             double labelWidth = Math.Max(1, body.Width - 26);
             string label = reference.IsBroken
                 ? $"⚠ {reference.Reference.Sequence} ({(reference.IsMissing ? "missing" : "cycle")})"
-                : BlockLabel.Fit(reference.Reference.Sequence, reference.Reference.Loops, reference.Length, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
+                : BlockLabel.Fit(reference.Reference.Sequence, reference.Cycles, reference.Length, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
             using (context.PushClip(body.Deflate(new Thickness(4, 0))))
             {
                 DrawLinkGlyph(context, new Point(body.X + 12, body.Y + TimelineLayout.LabelHeight / 2 + 1), 11, solid);

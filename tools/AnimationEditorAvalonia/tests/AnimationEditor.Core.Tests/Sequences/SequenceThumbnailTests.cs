@@ -36,11 +36,11 @@ public class SequenceThumbnailTests
         list.SaveJson(path);
     }
 
-    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (source, chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
+        foreach (var (source, chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -48,7 +48,7 @@ public class SequenceThumbnailTests
     public void ChooseTime_SomethingVisibleAtZero_IsZero()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1)), Track("Fx", ("fx/fx.achj", "Spark", 0.3, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, null)), Track("Fx", ("fx/fx.achj", "Spark", 0.3, null)));
 
         SequenceThumbnailScene.ChooseTime(document.Save.Sequences[0], document).ShouldBe(0);
     }
@@ -57,7 +57,7 @@ public class SequenceThumbnailTests
     public void ChooseTime_EveryTrackStartsLater_IsTheEarliestStart()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0.6, 1)), Track("Fx", ("fx/fx.achj", "Spark", 0.4, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0.6, null)), Track("Fx", ("fx/fx.achj", "Spark", 0.4, null)));
 
         SequenceThumbnailScene.ChooseTime(document.Save.Sequences[0], document).ShouldBe(0.4);
         // Only the Spark is visible at that instant: Walk has not started.
@@ -67,7 +67,7 @@ public class SequenceThumbnailTests
     // Boss: only a reference to Fx (Spark) at the given start. Fx: one Spark track.
     private static SequenceDocument LoadReferenceOnly(TestHelpers.TempDir dir, double start)
     {
-        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, 1)));
+        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, null)));
         document.Save.Sequences[0].Name = "Fx";
         var boss = new SequenceSave { Name = "Boss" };
         boss.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Fx", Start = start } });
@@ -113,9 +113,9 @@ public class SequenceThumbnailTests
     public void ChooseTime_AHiddenOrUnresolvedTrackDoesNotCount()
     {
         using var dir = new TestHelpers.TempDir();
-        var hidden = Track("Hidden", ("body/body.achj", "Walk", 0, 1));
+        var hidden = Track("Hidden", ("body/body.achj", "Walk", 0, null));
         hidden.Visible = false;
-        var document = Load(dir, hidden, Track("Gone", ("body/body.achj", "NoSuchChain", 0.1, 1)), Track("Fx", ("fx/fx.achj", "Spark", 0.7, 1)));
+        var document = Load(dir, hidden, Track("Gone", ("body/body.achj", "NoSuchChain", 0.1, null)), Track("Fx", ("fx/fx.achj", "Spark", 0.7, null)));
 
         SequenceThumbnailScene.ChooseTime(document.Save.Sequences[0], document).ShouldBe(0.7);
     }
@@ -124,7 +124,7 @@ public class SequenceThumbnailTests
     public void ChooseTime_NothingResolves_IsNull()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Gone", ("missing/missing.achj", "Walk", 0, 1)));
+        var document = Load(dir, Track("Gone", ("missing/missing.achj", "Walk", 0, null)));
 
         SequenceThumbnailScene.ChooseTime(document.Save.Sequences[0], document).ShouldBeNull();
         SequenceThumbnailScene.LayersFor(document.Save.Sequences[0], document).ShouldBeEmpty();
@@ -137,7 +137,7 @@ public class SequenceThumbnailTests
     public void ChooseTime_NestedReferencesStartingLater_IsTheSumOfTheirStarts()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, 1)));
+        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, null)));
         document.Save.Sequences[0].Name = "Fx";
         document.Save.Sequences.Add(new SequenceSave { Name = "Mid", Tracks = { Link("Fx", "Fx", 0.5) } });
         var boss = new SequenceSave { Name = "Boss", Tracks = { Link("Mid", "Mid", 1) } };
@@ -151,7 +151,7 @@ public class SequenceThumbnailTests
     public void LayersFor_BrokenReferences_ShowOnlyTheOwnTracks()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, null)));
         var attack = document.Save.Sequences[0];
         attack.Tracks.Add(Link("Me", "Attack"));
         attack.Tracks.Add(Link("Gone", "Missing"));
@@ -165,7 +165,7 @@ public class SequenceThumbnailTests
     public void LayersFor_TwoTracks_AreBackToFront_TopLaneLast()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, 1)), Track("Body", ("body/body.achj", "Walk", 0, 1)));
+        var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, null)), Track("Body", ("body/body.achj", "Walk", 0, null)));
 
         var layers = SequenceThumbnailScene.LayersFor(document.Save.Sequences[0], document);
 

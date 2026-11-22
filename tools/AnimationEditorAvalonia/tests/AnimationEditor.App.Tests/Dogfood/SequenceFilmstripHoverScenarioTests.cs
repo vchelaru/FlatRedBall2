@@ -27,11 +27,11 @@ public class SequenceFilmstripHoverScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -49,7 +49,7 @@ public class SequenceFilmstripHoverScenarioTests
     public async Task Hovering_NamesTheFrameAndItsStartTime_AtSeveralZoomsAndCycles()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0.5, 2))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0.5, 1.0))));
         var timeline = Timeline(editor);
 
         // Block starts at 0.5 s; 0.75 s is frame 3 of the first cycle, 1.15 s is frame 2 of the second.
@@ -71,7 +71,7 @@ public class SequenceFilmstripHoverScenarioTests
     public async Task LeavingTheFilmstrip_HidesTheCard()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
         double labelY = timeline.Viewport.LaneTop(0) + TimelineLayout.BodyTop + 3;
 
@@ -91,7 +91,7 @@ public class SequenceFilmstripHoverScenarioTests
     public async Task ScrollingOrZooming_HidesTheCard()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(Film(editor, 0, 0.25));
@@ -107,7 +107,7 @@ public class SequenceFilmstripHoverScenarioTests
     public async Task WhileDraggingAChain_NoCardShows()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(Film(editor, 0, 0.25));
@@ -124,7 +124,7 @@ public class SequenceFilmstripHoverScenarioTests
     public async Task WhileDraggingAChip_NoCardShows()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
         var chip = editor.Control<SequenceLibraryControl>("SequenceLibrary").ChipFor("hero.achx", "Run")!;
 
@@ -141,7 +141,7 @@ public class SequenceFilmstripHoverScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Head's block sits where the card (drawn below and right of the pointer) would cover it.
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Head", ("Run", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Head", ("Run", 0, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(Film(editor, 0, 0.25));

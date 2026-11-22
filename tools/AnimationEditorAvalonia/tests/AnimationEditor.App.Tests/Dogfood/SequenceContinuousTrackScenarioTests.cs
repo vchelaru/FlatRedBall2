@@ -28,17 +28,17 @@ public class SequenceContinuousTrackScenarioTests
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack", Loop = true };
-        sequence.Tracks.Add(TrackOf("Body", "Walk", 2.4f, bodyContinuous));
-        sequence.Tracks.Add(TrackOf("Arm", "Run", 6f, false));
+        sequence.Tracks.Add(TrackOf("Body", "Walk", 1.2, bodyContinuous));
+        sequence.Tracks.Add(TrackOf("Arm", "Run", 1.2, false));
         save.Sequences.Add(sequence);
         save.Save(path);
         return path;
     }
 
-    private static SequenceTrackSave TrackOf(string name, string chain, float loops, bool continuous)
+    private static SequenceTrackSave TrackOf(string name, string chain, double length, bool continuous)
     {
         var track = new SequenceTrackSave { Name = name, Continuous = continuous };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0, Loops = loops });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0, Length = length });
         return track;
     }
 

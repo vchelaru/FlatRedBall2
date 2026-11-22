@@ -12,8 +12,8 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// <summary>Copying chains and tracks out of a sequence and pasting them into the same file or another.</summary>
 public class SequenceDocumentTimelinePasteTests
 {
-    private static SequenceChainReferenceSave Chain(string name, double start, string source = "hero.achx", float loops = 1) =>
-        new() { Source = source, Chain = name, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Chain(string name, double start, string source = "hero.achx", double? length = null) =>
+        new() { Source = source, Chain = name, Start = start, Length = length };
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
@@ -145,7 +145,7 @@ public class SequenceDocumentTimelinePasteTests
     public void PasteTracks_GoRightInFrontOfTheSelectedTrack_WithFreeNames_KeepingEverythingTheyHad_AsOneUndoEntry()
     {
         using var dir = new TestHelpers.TempDir();
-        var body = Track("Body", Chain("Walk", 0.5, loops: 2), Chain("Run", 2));
+        var body = Track("Body", Chain("Walk", 0.5, length: 2), Chain("Run", 2));
         body.Visible = false;
         body.UnknownProperties["tag"] = "boss";
         var document = Open(dir.Path, new[] { "hero.achx" }, body, Track("Head"), Track("Tail"));
@@ -158,7 +158,7 @@ public class SequenceDocumentTimelinePasteTests
         var copy = document.Save.Sequences[0].Tracks[1];
         copy.Visible.ShouldBeFalse();
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
-        copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.5, 2f, "hero.achx"), ("Run", 2.0, 1f, "hero.achx") });
+        copy.Chains.Select(c => (c.Chain, c.Start, c.Length, c.Source)).ShouldBe(new (string, double, double?, string)[] { ("Walk", 0.5, 2, "hero.achx"), ("Run", 2.0, null, "hero.achx") });
         result.Tracks.ShouldBe(new[] { 1, 2 });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Paste 2 Tracks" });
         undo.Undo();

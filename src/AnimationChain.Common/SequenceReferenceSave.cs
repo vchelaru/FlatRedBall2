@@ -4,8 +4,8 @@ namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
 /// A track that plays another sequence of the same <c>.seqj</c> instead of chains: the target's tracks are inlined under
-/// this track's name. It is a clip like a chain placement, with a <see cref="Start"/> and a length in <see cref="Loops"/>
-/// cycles of the target, and like a chain it extends the sequence that holds it to its end (see <see cref="SequenceTimeline.Length"/>).
+/// this track's name. It is a clip like a chain placement, with a <see cref="Start"/> and a <see cref="Length"/> (one run of
+/// the target unless set), and like a chain it extends the sequence that holds it to its end (see <see cref="SequenceTimeline.Length"/>).
 /// The target restarts whenever the holding sequence starts, so switching sequences restarts it. A reference whose target
 /// plays the holder back (a cycle) is kept but plays nothing (see <see cref="SequenceReferences.Plays"/>).
 /// </summary>
@@ -21,11 +21,12 @@ public class SequenceReferenceSave
     public double Start { get; set; }
 
     /// <summary>
-    /// The clip's length in cycles of the target's length (<see cref="SequenceTimeline.Length"/>). A target with
+    /// The clip's length in seconds, or null for one run of the target at its current length
+    /// (<see cref="SequenceTimeline.Length"/>), so the clip follows edits to the target. A target with
     /// <see cref="SequenceSave.Loop"/> on repeats across it; one with Loop off plays once, then holds its final pose until
-    /// the clip ends. The JSON key is <c>loops</c>, like a chain's.
+    /// the clip ends. JSON key <c>length</c>, omitted when null, like a chain's.
     /// </summary>
-    public float Loops { get; set; } = 1;
+    public double? Length { get; set; }
 
     /// <summary>
     /// Properties this code does not know, kept as raw JSON and written back unchanged after the known ones. See

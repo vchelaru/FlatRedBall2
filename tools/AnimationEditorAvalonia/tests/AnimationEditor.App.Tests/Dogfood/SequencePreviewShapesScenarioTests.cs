@@ -73,7 +73,7 @@ public class SequencePreviewShapesScenarioTests
         foreach (var (chain, start) in chains)
             track.Chains.Add(new SequenceChainReferenceSave
             {
-                Source = chain == "Spark" ? "fx.achx" : "hero.achx", Chain = chain, Start = start, Loops = 1,
+                Source = chain == "Spark" ? "fx.achx" : "hero.achx", Chain = chain, Start = start,
             });
         return track;
     }

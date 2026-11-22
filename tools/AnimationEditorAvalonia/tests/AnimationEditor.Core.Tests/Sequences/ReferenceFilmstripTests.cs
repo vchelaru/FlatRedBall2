@@ -43,12 +43,12 @@ public class ReferenceFilmstripTests
     private static SequenceTrackSave ChainTrack(string chain, bool visible = true) =>
         new() { Name = chain, Visible = visible, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = chain } } };
 
-    private static SequenceReferenceSave Reference(string target, float loops = 1, double start = 0) =>
-        new() { Sequence = target, Loops = loops, Start = start };
+    private static SequenceReferenceSave Reference(string target, double? length = null, double start = 0) =>
+        new() { Sequence = target, Length = length, Start = start };
 
-    private static (SequenceReferenceSave Reference, SequenceSave Target, List<SequenceSave> File) Setup(SequenceSave target, float loops = 1)
+    private static (SequenceReferenceSave Reference, SequenceSave Target, List<SequenceSave> File) Setup(SequenceSave target, double? length = null)
     {
-        var reference = Reference(target.Name, loops);
+        var reference = Reference(target.Name, length);
         var holder = new SequenceSave { Name = "Holder", Tracks = { new SequenceTrackSave { Name = "Link", Reference = reference } } };
         return (reference, target, new List<SequenceSave> { holder, target });
     }
@@ -79,12 +79,12 @@ public class ReferenceFilmstripTests
     [Fact]
     public void Cells_PartialLastCycle_IsCutAtTheClipEnd_AndSampledAtTheMiddleOfWhatShows()
     {
-        var cells = ReferenceFilmstrip.Cells(1, 1.5f, 100);
+        var cells = ReferenceFilmstrip.Cells(1, 1.5, 100);
 
         cells.Count.ShouldBe(6);
         (cells[^1].X + cells[^1].Width).ShouldBe(150, 1e-9);
         cells[^1].Width.ShouldBe(25, 1e-9);
-        var cut = ReferenceFilmstrip.Cells(1, 1.4f, 100);
+        var cut = ReferenceFilmstrip.Cells(1, 1.4, 100);
         cut[^1].Width.ShouldBe(15, 1e-4);
         cut[^1].FullWidth.ShouldBe(25, 1e-9);
         cut[^1].Time.ShouldBe(1.325, 1e-4);
@@ -158,9 +158,9 @@ public class ReferenceFilmstripTests
     }
 
     [Fact]
-    public void Cells_FractionalLoops_AreCutAtTheClipEnd_AndZeroLoopsHasNone()
+    public void Cells_ClipShorterThanTheTarget_IsCutAtTheClipEnd_AndZeroLengthHasNone()
     {
-        var half = ReferenceFilmstrip.Cells(targetLength: 1, loops: 0.5f, pixelsPerSecond: 100);
+        var half = ReferenceFilmstrip.Cells(targetLength: 1, length: 0.5, pixelsPerSecond: 100);
 
         half.Sum(c => c.Width).ShouldBe(50, 1e-6);
         half.ShouldAllBe(c => c.Cycle == 0);
@@ -170,7 +170,7 @@ public class ReferenceFilmstripTests
     [Fact]
     public void PoseAt_NonLoopingTarget_HoldsItsLastFrameInLaterCycles()
     {
-        var (reference, target, file) = Setup(new SequenceSave { Name = "T", Loop = false, Tracks = { ChainTrack("Walk") } }, loops: 3);
+        var (reference, target, file) = Setup(new SequenceSave { Name = "T", Loop = false, Tracks = { ChainTrack("Walk") } }, length: 3);
 
         var last = ReferenceFilmstrip.PoseAt(reference, target, 0.9, new Lookup(), file)!;
         var held = ReferenceFilmstrip.PoseAt(reference, target, 2.2, new Lookup(), file)!;

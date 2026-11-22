@@ -251,7 +251,7 @@ public class SequenceEditTests : IDisposable
     }
 
     [Fact]
-    public void AddBlock_AppendsWithStartAndLoops_ReportsAddress()
+    public void AddBlock_AppendsWithStartAndLength_ReportsAddress()
     {
         var s = _w.Open();
 
@@ -259,7 +259,7 @@ public class SequenceEditTests : IDisposable
 
         r.ChangedItems.ShouldBe(["Run/Shadow/1"]);
         var block = Seq(s, "Run").Tracks[1].Chains[1];
-        (block.Source, block.Chain, block.Start, block.Loops).ShouldBe(("hero.achj", "Walk", 2.5, 3f));
+        (block.Source, block.Chain, block.Start, block.Length).ShouldBe(("hero.achj", "Walk", 2.5, (double?)3));
     }
 
     [Fact]
@@ -277,17 +277,17 @@ public class SequenceEditTests : IDisposable
     }
 
     [Fact]
-    public void SetBlockStartAndLoops_ChangeBlock_RepeatedEditsAreSeparateSteps()
+    public void SetBlockStartAndLength_ChangeBlock_RepeatedEditsAreSeparateSteps()
     {
         var s = _w.Open();
 
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/1", 4)).Success.ShouldBeTrue();
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/1", 5)).Success.ShouldBeTrue();
-        Run(s, () => SequenceEdit.SetBlockLoops(s.Document, s.Undo, "Run/Body/1", 0.5f)).Success.ShouldBeTrue();
-        Run(s, () => SequenceEdit.SetBlockLoops(s.Document, s.Undo, "Run/Body/1", 0.5f), expectChange: false).Success.ShouldBeTrue();
+        Run(s, () => SequenceEdit.SetBlockLength(s.Document, s.Undo, "Run/Body/1", 0.5)).Success.ShouldBeTrue();
+        Run(s, () => SequenceEdit.SetBlockLength(s.Document, s.Undo, "Run/Body/1", 0.5), expectChange: false).Success.ShouldBeTrue();
 
         var block = Seq(s, "Run").Tracks[0].Chains[1];
-        (block.Start, block.Loops).ShouldBe((5.0, 0.5f));
+        (block.Start, block.Length).ShouldBe((5.0, (double?)0.5));
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class SequenceEditTests : IDisposable
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/2", 1)).CodeAt(0).ShouldBe(EditErrorCode.IndexOutOfRange);
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/0", -1)).CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/0", double.NaN)).CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
-        Run(s, () => SequenceEdit.SetBlockLoops(s.Document, s.Undo, "Run/Body/0", 0)).CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
+        Run(s, () => SequenceEdit.SetBlockLength(s.Document, s.Undo, "Run/Body/0", 0)).CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body", 1)).Success.ShouldBeFalse();
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Run/Body/x", 1)).Success.ShouldBeFalse();
     }
@@ -310,12 +310,12 @@ public class SequenceEditTests : IDisposable
         SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Rest", "Run", 0, null).Success.ShouldBeTrue();
 
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/0", 2)).Success.ShouldBeTrue();
-        Run(s, () => SequenceEdit.SetBlockLoops(s.Document, s.Undo, "Rest/Run/0", 3)).Success.ShouldBeTrue();
+        Run(s, () => SequenceEdit.SetBlockLength(s.Document, s.Undo, "Rest/Run/0", 3)).Success.ShouldBeTrue();
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/1", 2)).CodeAt(0).ShouldBe(EditErrorCode.IndexOutOfRange);
         Run(s, () => SequenceEdit.DeleteBlock(s.Document, s.Undo, "Rest/Run/0")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
 
         var clip = Seq(s, "Rest").Tracks[0].Reference!;
-        (clip.Start, clip.Loops).ShouldBe((2.0, 3f));
+        (clip.Start, clip.Length).ShouldBe((2.0, (double?)3));
     }
 
     [Fact]

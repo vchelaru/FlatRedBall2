@@ -116,7 +116,7 @@ public class SequenceDocumentTests
                 new SequenceTrackSave
                 {
                     Name = "Body",
-                    Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Swing", Start = 0.5, Loops = 1.5f } },
+                    Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Swing", Start = 0.5, Length = 1.5 } },
                 },
             },
         });

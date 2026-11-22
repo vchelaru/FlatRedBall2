@@ -25,7 +25,7 @@ public class SequenceTimelineColumnResizeScenarioTests
         foreach (var name in new[] { LongName, "B" })
         {
             var track = new SequenceTrackSave { Name = name };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 1, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 1 });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);

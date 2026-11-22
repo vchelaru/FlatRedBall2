@@ -18,9 +18,9 @@ public class SequenceLaneOrderTests
     // draw-by-Z rule would put B behind A, and C between them.
     private const string ThreeTracks = """
         { "version": 1, "sources": [ "hero.achj" ], "sequences": [ { "name": "Idle", "tracks": [
-          { "name": "A", "z": 9, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
-          { "name": "B", "z": 0, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
-          { "name": "C", "z": 4, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0, "loops": 1 } ] } ] } ] }
+          { "name": "A", "z": 9, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0 } ] },
+          { "name": "B", "z": 0, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0 } ] },
+          { "name": "C", "z": 4, "chains": [ { "source": "hero.achj", "chain": "Walk", "start": 0 } ] } ] } ] }
         """;
 
     private static SequenceDocument Open(TestHelpers.TempDir dir, string seqj)

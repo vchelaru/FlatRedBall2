@@ -40,7 +40,7 @@ public class SequenceViewParityScenarioTests
     {
         SequenceTrackSave track = new SequenceTrackSave { Name = name };
         foreach ((string chain, double start) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start });
         return track;
     }
 

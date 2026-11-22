@@ -134,13 +134,14 @@ public class SequenceListSave
         var chains = new JsonArray();
         foreach (var reference in track.Chains)
         {
-            chains.Add((JsonNode)AppendUnknown(new JsonObject
+            var chain = new JsonObject
             {
                 ["source"] = reference.Source,
                 ["chain"] = reference.Chain,
                 ["start"] = Clean(reference.Start),
-                ["loops"] = Clean(reference.Loops),
-            }, reference.UnknownProperties));
+            };
+            if (reference.Length is { } length) chain["length"] = Clean(length);
+            chains.Add((JsonNode)AppendUnknown(chain, reference.UnknownProperties));
         }
 
         var result = new JsonObject
@@ -151,12 +152,13 @@ public class SequenceListSave
         if (track.Continuous) result["continuous"] = true;
         if (track.Reference is { } playing)
         {
-            result["reference"] = AppendUnknown(new JsonObject
+            var reference = new JsonObject
             {
                 ["sequence"] = playing.Sequence,
                 ["start"] = Clean(playing.Start),
-                ["loops"] = Clean(playing.Loops),
-            }, playing.UnknownProperties);
+            };
+            if (playing.Length is { } length) reference["length"] = Clean(length);
+            result["reference"] = AppendUnknown(reference, playing.UnknownProperties);
         }
         // A reference track has no chains; the key stays for every other track, as it always was.
         if (track.Reference is null || track.Chains.Count > 0) result["chains"] = chains;
@@ -225,9 +227,9 @@ public class SequenceListSave
             {
                 Sequence = reference.String("sequence"),
                 Start = reference.Double("start"),
-                Loops = reference.Float("loops", fallback: 1),
+                Length = reference.OptionalDouble("length"),
             };
-            CaptureUnknown(reference.Node, track.Reference.UnknownProperties, "sequence", "start", "loops");
+            CaptureUnknown(reference.Node, track.Reference.UnknownProperties, "sequence", "start", "length");
         }
         foreach (var chain in node.Objects("chains"))
         {
@@ -236,9 +238,9 @@ public class SequenceListSave
                 Source = chain.String("source"),
                 Chain = chain.String("chain"),
                 Start = chain.Double("start"),
-                Loops = chain.Float("loops", fallback: 1),
+                Length = chain.OptionalDouble("length"),
             };
-            CaptureUnknown(chain.Node, reference.UnknownProperties, "source", "chain", "start", "loops");
+            CaptureUnknown(chain.Node, reference.UnknownProperties, "source", "chain", "start", "length");
             track.Chains.Add(reference);
         }
         // Readers disagree on which one plays, so the file is refused rather than read one way. An empty "chains" is fine.

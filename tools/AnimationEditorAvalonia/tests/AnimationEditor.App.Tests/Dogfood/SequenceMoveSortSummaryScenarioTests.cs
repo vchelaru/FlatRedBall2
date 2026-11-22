@@ -109,7 +109,7 @@ public class SequenceMoveSortSummaryScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = WriteThreeSequences(editor);
         var save = SequenceListSave.FromFile(path);
-        save.Sequences[1].Tracks.Add(Track("Solo", ("Run", 0, 1)));
+        save.Sequences[1].Tracks.Add(Track("Solo", ("Run", 0, null)));
         save.Save(path);
         await editor.OpenAsync(path);
 

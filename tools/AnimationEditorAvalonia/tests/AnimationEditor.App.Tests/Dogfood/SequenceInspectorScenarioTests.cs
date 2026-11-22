@@ -36,14 +36,14 @@ public class SequenceInspectorScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains) =>
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains) =>
         Track(name, "hero.achx", chains);
 
-    private static SequenceTrackSave Track(string name, string source, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, string source, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -87,7 +87,7 @@ public class SequenceInspectorScenarioTests
     public async Task Selecting_ShowsTheSequenceTrackOrChainFields_OneAtATime()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.5, 2)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.5, 1.0)));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
 
@@ -109,8 +109,8 @@ public class SequenceInspectorScenarioTests
         inspector.ChainSourceText.Text.ShouldBe("hero.achx");
         ChainCombo(inspector).SelectedItem.ShouldBe("Walk");
         inspector.ChainStartField.Value.ShouldBe(0.5m);
-        inspector.ChainLoopsField.Value.ShouldBe(2m);
-        inspector.ChainLengthText.Text.ShouldBe("1 s (0.5 s × 2)");
+        inspector.ChainLengthField.Value.ShouldBe(1m);
+        inspector.ChainCycleText.Text.ShouldBe("0.5 s (×2)");
 
         // Empty timeline space goes back to the sequence.
         editor.ClickAt(editor.PointIn(Timeline(editor), 400, Timeline(editor).Viewport.LaneTop(3)));
@@ -122,7 +122,7 @@ public class SequenceInspectorScenarioTests
     public async Task Selecting_OnTheImagesTab_BringsTheInspectorForward_ButNotOffHistory()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var tabs = editor.Control<TabControl>("SidebarTabs");
 
@@ -138,10 +138,10 @@ public class SequenceInspectorScenarioTests
     // Two sequences, each with a track, so clicking the list changes what is selected.
     private static string WriteTwoSequences(AnimationEditorHarness editor)
     {
-        string path = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string path = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         var save = SequenceListSave.FromFile(path);
         var second = new SequenceSave { Name = "Idle" };
-        second.Tracks.Add(Track("Legs", ("Run", 0, 2)));
+        second.Tracks.Add(Track("Legs", ("Run", 0, 0.4)));
         save.Sequences.Add(second);
         save.Save(path);
         return path;
@@ -231,7 +231,7 @@ public class SequenceInspectorScenarioTests
     public async Task EditingATrack_EachFieldIsOneUndoStep_AndCtrlZRestoresIt()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
         editor.ClickAt(OnHeader(editor, 0));
@@ -256,26 +256,26 @@ public class SequenceInspectorScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task EditingAChain_StartAndLoops_AreUndoable_AndTheTimelineFollows()
+    public async Task EditingAChain_StartAndLength_AreUndoable_AndTheTimelineFollows()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
         editor.ClickAt(OnChain(editor, 0, 0.1));
 
         TypeInto(editor, inspector.ChainStartField, "1.5");
-        TypeInto(editor, inspector.ChainLoopsField, "2.5");
+        TypeInto(editor, inspector.ChainLengthField, "2.5");
 
         var chain = SavedTrack(boss, 0).Chains.Single();
-        (chain.Start, chain.Loops).ShouldBe((1.5, 2.5f));
+        (chain.Start, chain.Length).ShouldBe((1.5, (double?)2.5));
         Timeline(editor).Blocks.Single().Start.ShouldBe(1.5);
         Timeline(editor).Selection.ShouldBe(new TimelineChainId(0, 0));
-        editor.UndoLabels.ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Cycles of 'Walk' to 2.5" });
+        editor.UndoLabels.ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Length of 'Walk' to 2.5" });
 
         editor.Press(Key.Z, RawInputModifiers.Control);
-        SavedTrack(boss, 0).Chains.Single().Loops.ShouldBe(1f);
-        inspector.ChainLoopsField.Value.ShouldBe(1m);
+        SavedTrack(boss, 0).Chains.Single().Length.ShouldBeNull();
+        inspector.ChainLengthField.Value.ShouldBe(0.5m); // unset again: one 0.5 s cycle
         editor.Press(Key.Z, RawInputModifiers.Control);
         SavedTrack(boss, 0).Chains.Single().Start.ShouldBe(0);
     }
@@ -306,14 +306,14 @@ public class SequenceInspectorScenarioTests
     public async Task InvalidValues_ChainNumbersClamp_NamesAreRefusedWithABanner_AndTheFieldGoesBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.5, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.5, null)), Track("Arms"));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
 
         // Out-of-range chain numbers clamp to the field's limits, as the .achx Inspector's Length field does (no banner).
         editor.ClickAt(OnChain(editor, 0, 0.6));
-        TypeInto(editor, inspector.ChainLoopsField, "0");
-        inspector.ChainLoopsField.Value.ShouldBe(0.001m);
+        TypeInto(editor, inspector.ChainLengthField, "0");
+        inspector.ChainLengthField.Value.ShouldBe(0.01m);
         TypeInto(editor, inspector.ChainStartField, "-2");
         inspector.ChainStartField.Value.ShouldBe(0m);
         editor.ProblemText.ShouldBeNull();
@@ -341,14 +341,14 @@ public class SequenceInspectorScenarioTests
         var saved = SequenceListSave.FromFile(boss).Sequences.Single();
         saved.Name.ShouldBe("Attack");
         saved.Tracks.Select(t => t.Name).ShouldBe(new[] { "Body", "Arms" });
-        saved.Tracks[0].Chains.Single().Loops.ShouldBe(1f);
+        saved.Tracks[0].Chains.Single().Length.ShouldBeNull();
     }
 
     [AvaloniaFact]
     public async Task DraggingAChain_UpdatesTheInspectorLive()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms"));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
         var timeline = Timeline(editor);
@@ -373,7 +373,7 @@ public class SequenceInspectorScenarioTests
     public async Task AnEditElsewhere_DoesNotRewriteTheFieldBeingTypedIn()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
         editor.ClickAt(OnChain(editor, 0, 0.1));
@@ -395,7 +395,7 @@ public class SequenceInspectorScenarioTests
     public async Task GoToDefinition_FromTheInspectorButton_OpensTheSourceAndSelectsTheChain()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Run", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Run", 0, null)));
         string hero = Path.Combine(editor.ProjectFolder, "hero.achx");
         await editor.OpenAsync(boss);
         editor.ClickAt(OnChain(editor, 0, 0.05));
@@ -415,7 +415,7 @@ public class SequenceInspectorScenarioTests
     public async Task GoToDefinition_DoubleClickAndMenu_ReachTheSourceToo_AndTheSequenceTabKeepsItsHistory()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1), ("Run", 1, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null), ("Run", 1, null)));
         await editor.OpenAsync(boss);
         editor.ClickAt(OnHeader(editor, 0));
         editor.TypeAndEnter(Inspector(editor).TrackNameBox, "Torso");
@@ -445,7 +445,7 @@ public class SequenceInspectorScenarioTests
     public async Task GoToDefinition_MissingSourceOrChain_ShowsTheBanner_AndOpensNothing()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Gone", 0, 1)), Track("Ghost", "nowhere.achx", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Gone", 0, null)), Track("Ghost", "nowhere.achx", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var inspector = Inspector(editor);
 
@@ -465,7 +465,7 @@ public class SequenceInspectorScenarioTests
     public async Task SwitchingBetweenAchxAndSeqjTabs_ShowsEachKindsInspector()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         string hero = Path.Combine(editor.ProjectFolder, "hero.achx");
         var inspectorTab = editor.Control<TabItem>("InspectorTab");
         await editor.OpenAsync(hero);
@@ -493,7 +493,7 @@ public class SequenceInspectorScenarioTests
     public async Task DeleteKey_WithATrackSelected_DeletesTheTrack_AndCtrlZBringsItBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms"));
         await editor.OpenAsync(boss);
         editor.ClickAt(OnHeader(editor, 1));
 

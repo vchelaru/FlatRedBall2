@@ -57,7 +57,7 @@ public sealed partial class SequenceTimelineControl
                 var visit = FilmstripLayout.VisitAt(cell, Viewport.TimeAt(point.X) - hit.Block.Start);
                 source = (hit.Block.Reference.Source, chain);
                 card = FilmstripReadout.At(hit.Block.Reference.Chain, chain.Frames.Count, hit.Block.Start, cell, visit);
-                _hoverBlockLines = BlockLabel.CardLines(hit.Block.Reference.Loops, hit.Block.Played);
+                _hoverBlockLines = BlockLabel.CardLines(hit.Block.Cycles, hit.Block.Played);
             }
             else if (EventCardAt(point, inLane) is { } eventCard)
             {

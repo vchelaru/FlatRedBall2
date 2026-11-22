@@ -48,21 +48,21 @@ public sealed class SeqWorkspace : IDisposable
             Name = "Body",
             Chains =
             {
-                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Loops = 2 },
-                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 1, Loops = 1 },
+                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 0.8 },
+                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 1 },
             },
         });
         run.Tracks.Add(new SequenceTrackSave
         {
             Name = "Shadow",
-            Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 0, Loops = 1 } },
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 0 } },
         });
         save.Sequences.Add(run);
         var rest = new SequenceSave { Name = "Rest", Loop = false };
         rest.Tracks.Add(new SequenceTrackSave
         {
             Name = "Body",
-            Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 0, Loops = 1 } },
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 0 } },
         });
         save.Sequences.Add(rest);
         return save;

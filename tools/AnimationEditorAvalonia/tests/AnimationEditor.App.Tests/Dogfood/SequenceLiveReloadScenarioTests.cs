@@ -47,7 +47,7 @@ public class SequenceLiveReloadScenarioTests
         var save = new SequenceListSave { Sources = { Source } };
         var attack = new SequenceSave { Name = firstSequence ?? "Attack" };
         var body = new SequenceTrackSave { Name = "Body" };
-        body.Chains.Add(new SequenceChainReferenceSave { Source = Source, Chain = "Walk", Start = 0, Loops = 1 });
+        body.Chains.Add(new SequenceChainReferenceSave { Source = Source, Chain = "Walk", Start = 0 });
         attack.Tracks.Add(body);
         save.Sequences.Add(attack);
         foreach (string name in extraSequences) save.Sequences.Add(new SequenceSave { Name = name });

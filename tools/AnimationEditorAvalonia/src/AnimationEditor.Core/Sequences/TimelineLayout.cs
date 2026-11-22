@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// One chain reference as the timeline draws it. <see cref="Played"/> is what plays after the cut rule;
-/// <see cref="Full"/> is the length its cycle count asks for (repeats or hold), so the part past <see cref="Played"/> is
+/// <see cref="Full"/> is the length it asks for (its set length, else one cycle), so the part past <see cref="Played"/> is
 /// the hatched cut tail.
 /// </summary>
 public sealed record TimelineBlock(
@@ -16,10 +16,13 @@ public sealed record TimelineBlock(
     public double Start => Reference.Start;
     public double PlayedEnd => Start + Played;
     public double FullEnd => Start + Full;
-    // Float loop counts can land a chain a rounding error past the next start; that is not a cut anyone can see.
+    // Summed float frame lengths can land a chain a rounding error past the next start; that is not a cut anyone can see.
     public bool IsCut => Full > Played + 1e-4;
 
-    /// <summary>Whether dragging the right edge changes the length in cycles. A missing or empty chain has no cycle to count.</summary>
+    /// <summary>How many cycles <see cref="Full"/> spans, for labels only; 1 when there is no cycle.</summary>
+    public double Cycles => CycleLength > 0 ? Full / CycleLength : 1;
+
+    /// <summary>Whether dragging the right edge changes the length. A missing or empty chain draws a stand-in length, so it does not.</summary>
     public bool CanResize => !IsMissing && CycleLength > 0;
 }
 
@@ -118,7 +121,7 @@ public static class TimelineLayout
             {
                 var reference = ordered[i];
                 double? cycle = cycleLength(reference);
-                double full = cycle is > 0 ? SequenceTimeline.FullLength(reference.Loops, cycle.Value) : MissingLength;
+                double full = cycle is > 0 ? SequenceTimeline.FullLength(reference.Length, cycle.Value) : MissingLength;
                 double? next = i + 1 < ordered.Count ? ordered[i + 1].Start : null;
                 double played = SequenceTimeline.PlayedLength(reference.Start, full, next);
                 blocks.Add(new TimelineBlock(t, track.Chains.IndexOf(reference), reference, played, full, cycle ?? 0, cycle is null));
@@ -127,7 +130,7 @@ public static class TimelineLayout
         return blocks;
     }
 
-    /// <summary>The latest <see cref="TimelineBlock.FullEnd"/> across <paramref name="track"/>'s blocks (start + loops x cycle length), 0 when it has none.</summary>
+    /// <summary>The latest <see cref="TimelineBlock.FullEnd"/> across <paramref name="track"/>'s blocks (start + length), 0 when it has none.</summary>
     public static double TrackEnd(IReadOnlyList<TimelineBlock> blocks, int track)
     {
         double end = 0;

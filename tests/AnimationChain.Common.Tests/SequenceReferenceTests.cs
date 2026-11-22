@@ -16,23 +16,23 @@ public class SequenceReferenceTests
         return sequence;
     }
 
-    private static SequenceTrackSave ChainTrack(string name, double start = 0, float loops = 1, bool visible = true) =>
-        new() { Name = name, Visible = visible, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start, Loops = loops } } };
+    private static SequenceTrackSave ChainTrack(string name, double start = 0, double? length = null, bool visible = true) =>
+        new() { Name = name, Visible = visible, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start, Length = length } } };
 
-    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, float loops = 1, bool visible = true) =>
-        new() { Name = name, Visible = visible, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Loops = loops } };
+    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null, bool visible = true) =>
+        new() { Name = name, Visible = visible, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
 
     [Fact]
-    public void RoundTrip_ReferenceTrack_KeepsSequenceStartAndLoops()
+    public void RoundTrip_ReferenceTrack_KeepsSequenceStartAndLength()
     {
-        var save = new SequenceListSave { Sequences = { Sequence("Idle", true, RefTrack("Earth", "Earth", start: 0.5, loops: 2)), Sequence("Earth") } };
+        var save = new SequenceListSave { Sequences = { Sequence("Idle", true, RefTrack("Earth", "Earth", start: 0.5, length: 2)), Sequence("Earth") } };
 
         var loaded = SequenceListSave.FromJsonString(save.ToJsonString());
 
         var reference = loaded.Sequences[0].Tracks[0].Reference!;
         reference.Sequence.ShouldBe("Earth");
         reference.Start.ShouldBe(0.5);
-        reference.Loops.ShouldBe(2f);
+        reference.Length.ShouldBe(2);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class SequenceReferenceTests
         var track = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject();
 
         track.Select(p => p.Key).ShouldBe(new[] { "name", "reference" });
-        track["reference"]!.AsObject().Select(p => p.Key).ShouldBe(new[] { "sequence", "start", "loops" });
+        track["reference"]!.AsObject().Select(p => p.Key).ShouldBe(new[] { "sequence", "start", "length" });
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class SequenceReferenceTests
     public void RoundTrip_UnknownPropertyOnReference_IsKept()
     {
         const string json = """
-            { "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B", "start": 0, "loops": 1, "tint": "red" } } ] }, { "name": "B" } ] }
+            { "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B", "start": 0, "length": 1, "tint": "red" } } ] }, { "name": "B" } ] }
             """;
 
         var again = JsonNode.Parse(SequenceListSave.FromJsonString(json).ToJsonString())!["sequences"]![0]!["tracks"]![0]!["reference"]!;
@@ -251,10 +251,10 @@ public class SequenceReferenceTests
     [InlineData(1.5, 0.5)]
     [InlineData(3.0, 0.0)]        // a looping target wraps at its length (2 s)
     [InlineData(4.9, 1.9)]
-    [InlineData(5.0, null)]       // 2 loops of 2 s end at 1 + 4
-    public void ReferenceTime_LoopingTarget_WrapsAndEndsAfterLoopsCycles(double parentTime, double? expected)
+    [InlineData(5.0, null)]       // 4 s of a 2 s target ends at 1 + 4
+    public void ReferenceTime_LoopingTarget_WrapsAndEndsAfterItsLength(double parentTime, double? expected)
     {
-        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Loops = 2 };
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Length = 4 };
 
         var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
 
@@ -265,7 +265,7 @@ public class SequenceReferenceTests
     [Fact]
     public void ReferenceTime_NonLoopingTarget_HoldsItsFinalPoseUntilTheClipEnds()
     {
-        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Loops = 2 };
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Length = 4 };
         var target = new SequenceSave { Name = "T", Loop = false };
 
         var time = SequenceTimeline.ReferenceTime(reference, target, targetLength: 2, parentTime: 3);
@@ -287,7 +287,7 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth", start: 0.5, loops: 10)),
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Earth", "Earth", start: 0.5, length: 10)),
             Sequence("Earth", true, ChainTrack("Body")),
         };
 
@@ -301,8 +301,8 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Gone", "Missing", loops: 5), RefTrack("Loop", "Back", loops: 5)),
-            Sequence("Back", true, ChainTrack("Body", loops: 3), RefTrack("Idle", "Idle")),
+            Sequence("Idle", true, ChainTrack("Body"), RefTrack("Gone", "Missing", length: 5), RefTrack("Loop", "Back", length: 5)),
+            Sequence("Back", true, ChainTrack("Body", length: 3), RefTrack("Idle", "Idle")),
         };
 
         SequenceTimeline.Length(sequences, sequences[0], _ => 1.0).ShouldBe(1.0, 1e-9);
@@ -316,13 +316,13 @@ public class SequenceReferenceTests
         var sequences = new List<SequenceSave>
         {
             Sequence("A", true, RefTrack("b", "B", start: 1)),
-            Sequence("B", true, RefTrack("c", "C", start: 0.5, loops: 2)),
-            Sequence("C", true, ChainTrack("Leaf", loops: 2)),
+            Sequence("B", true, RefTrack("c", "C", start: 0.5, length: 4)),
+            Sequence("C", true, ChainTrack("Leaf", length: 2)),
         };
         double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
         var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single(t => t.Name == "b/c/Leaf");
 
-        // C is 2 s; B's clip of C runs 0.5 + 2 x 2; A's clip of B starts at 1.
+        // C is 2 s; B's clip of C runs 0.5 + 4; A's clip of B starts at 1.
         Length(sequences[1]).ShouldBe(4.5, 1e-9);
         Length(sequences[0]).ShouldBe(5.5, 1e-9);
         SequenceReferences.InlinedTime(leaf, 4.0, Length)!.Value.ShouldBe(0.5, 1e-9);
@@ -347,10 +347,10 @@ public class SequenceReferenceTests
 
     [Theory]
     [InlineData(1.9, 0.9)]
-    [InlineData(2.0, null)]       // half a cycle of a 2 s target ends 1 s after the start
-    public void ReferenceTime_FractionalLoops_EndsPartWayThroughTheCycle(double parentTime, double? expected)
+    [InlineData(2.0, null)]       // a 1 s clip of a 2 s target ends 1 s after the start
+    public void ReferenceTime_ShorterThanTheTarget_EndsPartWayThroughTheCycle(double parentTime, double? expected)
     {
-        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Loops = 0.5f };
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 1, Length = 1 };
 
         var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
 
@@ -359,11 +359,11 @@ public class SequenceReferenceTests
     }
 
     [Theory]
-    [InlineData(0f)]
-    [InlineData(-1f)]
-    public void ReferenceTime_ZeroOrNegativeLoops_IsNeverActive(float loops)
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    public void ReferenceTime_ZeroOrNegativeLength_IsNeverActive(double length)
     {
-        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Loops = loops };
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = 0, Length = length };
         var target = new SequenceSave { Name = "T", Loop = true };
 
         SequenceTimeline.ReferenceTime(reference, target, 2, 0).ShouldBeNull();
@@ -376,7 +376,7 @@ public class SequenceReferenceTests
     [InlineData(1.0, null)]
     public void ReferenceTime_NegativeStartFromDisk_PlaysFromPartWayIn(double parentTime, double? expected)
     {
-        var reference = new SequenceReferenceSave { Sequence = "T", Start = -1, Loops = 1 };
+        var reference = new SequenceReferenceSave { Sequence = "T", Start = -1 };
 
         var time = SequenceTimeline.ReferenceTime(reference, new SequenceSave { Name = "T", Loop = true }, targetLength: 2, parentTime);
 
@@ -385,11 +385,11 @@ public class SequenceReferenceTests
     }
 
     [Fact]
-    public void Length_NonLoopingTarget_ClipStillLastsAllItsLoops()
+    public void Length_NonLoopingTarget_ClipStillLastsItsLength()
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("A", true, RefTrack("b", "B", loops: 3)),
+            Sequence("A", true, RefTrack("b", "B", length: 3)),
             Sequence("B", false, ChainTrack("Body")),
         };
 
@@ -401,7 +401,7 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("A", true, ChainTrack("Body"), RefTrack("b", "B", loops: 4, visible: false)),
+            Sequence("A", true, ChainTrack("Body"), RefTrack("b", "B", length: 4, visible: false)),
             Sequence("B", true, ChainTrack("Body")),
         };
 
@@ -415,7 +415,7 @@ public class SequenceReferenceTests
         {
             Sequence("A", true, RefTrack("b", "B", start: 1)),
             Sequence("B", true, RefTrack("c", "C", start: 0.5)),
-            Sequence("C", true, RefTrack("d", "D", start: 0.25, loops: 2)),
+            Sequence("C", true, RefTrack("d", "D", start: 0.25, length: 2)),
             Sequence("D", true, ChainTrack("Leaf")),
         };
         double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
@@ -435,7 +435,7 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("A", true, RefTrack("b", "B", loops: 1)),
+            Sequence("A", true, RefTrack("b", "B")),
             Sequence("B", true, ChainTrack("Legs"), RefTrack("c", "C")),
             Sequence("C", true, ChainTrack("Arm"), RefTrack("b", "B")),
         };
@@ -491,20 +491,20 @@ public class SequenceReferenceTests
     }
 
     [Fact]
-    public void FromJsonString_ReferenceWithoutStartOrLoops_StartsAtZeroForOneCycle()
+    public void FromJsonString_ReferenceWithoutStartOrLength_StartsAtZeroForOneCycle()
     {
         var loaded = SequenceListSave.FromJsonString(
             """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B" } } ] }, { "name": "B" } ] }""");
 
         var reference = loaded.Sequences[0].Tracks[0].Reference!;
         reference.Start.ShouldBe(0);
-        reference.Loops.ShouldBe(1f);
+        reference.Length.ShouldBeNull();
     }
 
     [Fact]
-    public void RoundTrip_HiddenReferenceTrack_FractionalLoopsAndNegativeStart_AreKept()
+    public void RoundTrip_HiddenReferenceTrack_FractionalLengthAndNegativeStart_AreKept()
     {
-        var save = new SequenceListSave { Sequences = { Sequence("A", true, RefTrack("E", "B", start: -0.5, loops: 0.25f, visible: false)), Sequence("B") } };
+        var save = new SequenceListSave { Sequences = { Sequence("A", true, RefTrack("E", "B", start: -0.5, length: 0.25, visible: false)), Sequence("B") } };
         string json = save.ToJsonString();
 
         var loaded = SequenceListSave.FromJsonString(json);
@@ -512,7 +512,7 @@ public class SequenceReferenceTests
         var track = loaded.Sequences[0].Tracks[0];
         track.Visible.ShouldBeFalse();
         track.Reference!.Start.ShouldBe(-0.5);
-        track.Reference.Loops.ShouldBe(0.25f);
+        track.Reference.Length.ShouldBe(0.25);
         loaded.ToJsonString().ShouldBe(json);
     }
 
@@ -521,14 +521,14 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("A", true, RefTrack("b", "B", loops: 0.5f)),
-            Sequence("B", true, ChainTrack("Pad", loops: 2), RefTrack("c", "C", loops: 5)),
+            Sequence("A", true, RefTrack("b", "B", length: 2.5)),
+            Sequence("B", true, ChainTrack("Pad", length: 2), RefTrack("c", "C", length: 5)),
             Sequence("C", true, ChainTrack("Leaf")),
         };
         double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);
         var leaf = SequenceReferences.Inline(sequences, sequences[0]).Single(t => t.Name == "b/c/Leaf");
 
-        // B is 5 s (its clip of C), so A's half cycle of B ends at 2.5 while C would play on in B until 5.
+        // B is 5 s (its clip of C), so A's 2.5 s clip of B ends at 2.5 while C would play on in B until 5.
         SequenceReferences.InlinedTime(leaf, 2.25, Length)!.Value.ShouldBe(0.25, 1e-9);
         SequenceReferences.InlinedTime(leaf, 3.0, Length).ShouldBeNull();
     }
@@ -538,8 +538,8 @@ public class SequenceReferenceTests
     {
         var sequences = new List<SequenceSave>
         {
-            Sequence("A", true, RefTrack("b", "B", loops: 2)),
-            Sequence("B", false, RefTrack("c", "C", loops: 2)),
+            Sequence("A", true, RefTrack("b", "B", length: 4)),
+            Sequence("B", false, RefTrack("c", "C", length: 2)),
             Sequence("C", true, ChainTrack("Leaf")),
         };
         double Length(SequenceSave s) => SequenceTimeline.Length(sequences, s, _ => 1.0);

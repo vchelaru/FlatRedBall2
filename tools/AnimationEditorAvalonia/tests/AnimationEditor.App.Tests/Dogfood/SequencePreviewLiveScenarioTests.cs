@@ -50,7 +50,7 @@ public class SequencePreviewLiveScenarioTests
     {
         var track = new SequenceTrackSave { Name = name };
         foreach (var (chain, start) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start });
         return track;
     }
 
@@ -296,10 +296,10 @@ public class SequencePreviewLiveScenarioTests
         TypeInto(editor, inspector.ChainStartField, "0.3");
         steps.Check("chain start");
         TypeInto(editor, inspector.ChainStartField, "0");
-        TypeInto(editor, inspector.ChainLoopsField, "2");
-        steps.Check("chain loops");
+        TypeInto(editor, inspector.ChainLengthField, "2");
+        steps.Check("chain length");
         Undo(editor);
-        steps.Check("undo loops");
+        steps.Check("undo length");
 
         editor.ClickAt(At(editor, 2, 0.6));
         editor.Press(Key.Delete);

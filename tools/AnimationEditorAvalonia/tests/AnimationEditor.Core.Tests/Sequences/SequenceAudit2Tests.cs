@@ -73,11 +73,11 @@ public class SequenceAudit2Tests
         // X (3 s) is cut by Y at 1; Z (3 s) is cut by W at 5. Y and W are dragged together, so neither cut end is a place to snap to.
         var sequence = new SequenceSave();
         var first = new SequenceTrackSave { Name = "T0" };
-        first.Chains.Add(new SequenceChainReferenceSave { Chain = "X", Start = 0, Loops = 3 });
-        first.Chains.Add(new SequenceChainReferenceSave { Chain = "Y", Start = 1, Loops = 1 });
+        first.Chains.Add(new SequenceChainReferenceSave { Chain = "X", Start = 0, Length = 3 });
+        first.Chains.Add(new SequenceChainReferenceSave { Chain = "Y", Start = 1 });
         var second = new SequenceTrackSave { Name = "T1" };
-        second.Chains.Add(new SequenceChainReferenceSave { Chain = "Z", Start = 4, Loops = 3 });
-        second.Chains.Add(new SequenceChainReferenceSave { Chain = "W", Start = 5, Loops = 1 });
+        second.Chains.Add(new SequenceChainReferenceSave { Chain = "Z", Start = 4, Length = 3 });
+        second.Chains.Add(new SequenceChainReferenceSave { Chain = "W", Start = 5 });
         sequence.Tracks.Add(first);
         sequence.Tracks.Add(second);
         var blocks = TimelineLayout.Blocks(sequence, _ => 1);
@@ -91,7 +91,7 @@ public class SequenceAudit2Tests
 
     // ---- clipboard envelopes
 
-    private const string OneChain = "[{\"source\":\"hero.achx\",\"chain\":\"Walk\",\"start\":0,\"loops\":1}]";
+    private const string OneChain = "[{\"source\":\"hero.achx\",\"chain\":\"Walk\",\"start\":0}]";
 
     [Fact]
     public void TimelineClipboard_VersionZero_IsADamagedCopy()
@@ -147,8 +147,8 @@ public class SequenceAudit2Tests
 
     // ---- paste and duplicate
 
-    private static SequenceChainReferenceSave Chain(string name, double start, string source = "gone.achx", float loops = 1) =>
-        new() { Source = source, Chain = name, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Chain(string name, double start, string source = "gone.achx", double? length = null) =>
+        new() { Source = source, Chain = name, Start = start, Length = length };
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
@@ -238,7 +238,7 @@ public class SequenceAudit2Tests
     {
         using var dir = new TestHelpers.TempDir();
         var document = Open(dir.Path, Track("Head"));
-        string chains = "[{\"source\":\"x.png\",\"chain\":\"A\",\"start\":0,\"loops\":1},{\"source\":\"x.png\",\"chain\":\"B\",\"start\":1,\"loops\":1}]";
+        string chains = "[{\"source\":\"x.png\",\"chain\":\"A\",\"start\":0},{\"source\":\"x.png\",\"chain\":\"B\",\"start\":1}]";
         var content = Read("{\"kind\":\"frb2-animation-editor-chains\",\"version\":1,\"sources\":[],\"chains\":" + chains + "}");
 
         var result = document.PasteChains(new UndoManager(), 0, content, selectedTrack: 0, time: 0);

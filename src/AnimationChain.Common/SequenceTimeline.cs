@@ -3,7 +3,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <summary>
 /// The timing rules of a <see cref="SequenceSave"/>, shared by the editor and any runtime player so both agree.
 /// <list type="bullet">
-/// <item>A chain reference lasts <see cref="SequenceChainReferenceSave.Loops"/> cycles, or until the next chain on
+/// <item>A chain reference lasts its <see cref="SequenceChainReferenceSave.Length"/> (one cycle when unset), or until the next chain on
 /// its track starts, whichever is first. The cut part never plays and is not resumed. The cut is not stored: move the
 /// next chain away and the earlier one plays in full again.</item>
 /// <item>What fills that length follows the chain's own Loop flag: a looping chain repeats, a non-looping one plays one
@@ -29,8 +29,11 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// </summary>
 public static class SequenceTimeline
 {
-    /// <summary>The smallest loop count <see cref="LoopsForEdge"/> returns, so a chain never shrinks to nothing.</summary>
-    public const float MinimumLoops = 0.05f;
+    /// <summary>
+    /// The shortest length in seconds <see cref="LengthForEdge"/> returns, so a block never shrinks to nothing. Under a
+    /// frame at 60 fps.
+    /// </summary>
+    public const double MinimumLength = 0.01;
 
     /// <summary>
     /// Slack in seconds (at least this, and proportional to the time beyond 1 s) when comparing a time to a block's start or end. Cycle lengths sum float frame lengths, so a block
@@ -42,8 +45,12 @@ public static class SequenceTimeline
     // Float error in a summed block end grows with the number of cycles, so the slack scales with the time.
     private static double Slack(double time) => BoundaryTolerance * Math.Max(1, Math.Abs(time));
 
-    /// <summary>Authored length in seconds: <paramref name="loops"/> cycles of <paramref name="cycleLength"/>. Never negative.</summary>
-    public static double FullLength(float loops, double cycleLength) => Math.Max(0, loops) * cycleLength;
+    /// <summary>
+    /// Authored length in seconds: <paramref name="length"/> when set, else one <paramref name="cycleLength"/>. Never
+    /// negative, and 0 when <paramref name="cycleLength"/> is not positive (a missing chain or target never plays).
+    /// </summary>
+    public static double FullLength(double? length, double cycleLength) =>
+        cycleLength > 0 ? Math.Max(0, length ?? cycleLength) : 0;
 
     /// <summary>
     /// Seconds a chain actually plays: <paramref name="fullLength"/>, cut where <paramref name="nextStart"/> begins.
@@ -54,7 +61,7 @@ public static class SequenceTimeline
 
     /// <summary>Seconds <paramref name="reference"/> plays on <paramref name="track"/> after the cut rule.</summary>
     public static double PlayedLength(SequenceTrackSave track, SequenceChainReferenceSave reference, double cycleLength) =>
-        PlayedLength(reference.Start, FullLength(reference.Loops, cycleLength), NextStart(track, reference));
+        PlayedLength(reference.Start, FullLength(reference.Length, cycleLength), NextStart(track, reference));
 
     /// <summary>The track's references in playback order: by start, ties kept in list order.</summary>
     public static IReadOnlyList<SequenceChainReferenceSave> Ordered(SequenceTrackSave track) =>
@@ -96,7 +103,7 @@ public static class SequenceTimeline
             if (reference.Start > time + Slack(time)) continue;
 
             double? next = i + 1 < ordered.Count ? ordered[i + 1].Start : null;
-            double played = PlayedLength(reference.Start, FullLength(reference.Loops, cycleLength(reference)), next);
+            double played = PlayedLength(reference.Start, FullLength(reference.Length, cycleLength(reference)), next);
             if (time + Slack(time) >= reference.Start + played) return null;
 
             localTime = Math.Max(0, time - reference.Start);
@@ -155,7 +162,7 @@ public static class SequenceTimeline
 
     /// <summary>
     /// Seconds until the sequence ends: the latest end of any clip on any track. A chain ends where it stops playing; a
-    /// reference clip ends <see cref="SequenceReferenceSave.Loops"/> cycles of its target's own length after its start,
+    /// reference clip ends its <see cref="SequenceReferenceSave.Length"/> (one run of its target when unset) after its start,
     /// measured the same way, through every level. A reference that does not <see cref="SequenceReferences.Plays"/> (a
     /// missing target or a cycle) adds nothing. 0 when nothing plays.
     /// </summary>
@@ -180,7 +187,7 @@ public static class SequenceTimeline
             stack.Add(target);
             double targetLength = LengthWithin(sequences, target, cycleLength, stack);
             stack.RemoveAt(stack.Count - 1);
-            end = Math.Max(end, clip.Start + FullLength(clip.Loops, targetLength));
+            end = Math.Max(end, clip.Start + FullLength(clip.Length, targetLength));
         }
         return end;
     }
@@ -211,7 +218,7 @@ public static class SequenceTimeline
     /// <summary>
     /// The time to sample <paramref name="target"/> at when the sequence holding <paramref name="reference"/> is at
     /// <paramref name="parentTime"/>, or null when the clip is not playing: before its start, after
-    /// <see cref="SequenceReferenceSave.Loops"/> cycles of <paramref name="targetLength"/>, or when the target has no length.
+    /// its <see cref="SequenceReferenceSave.Length"/> (one <paramref name="targetLength"/> when unset), or when the target has no length.
     /// The target restarts with the holder (its clock is the holder's minus the clip start). A looping target wraps at its
     /// length; one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. The
     /// holder lasts at least to the clip's end (<see cref="Length"/>), so a looping holder restarts the target only after it.
@@ -221,22 +228,18 @@ public static class SequenceTimeline
         if (targetLength <= 0) return null;
         if (reference.Start > parentTime + Slack(parentTime)) return null;
         double local = Math.Max(0, parentTime - reference.Start);
-        if (parentTime + Slack(parentTime) >= reference.Start + FullLength(reference.Loops, targetLength)) return null;
+        if (parentTime + Slack(parentTime) >= reference.Start + FullLength(reference.Length, targetLength)) return null;
         return PoseTime(WrapTime(local, targetLength, target.Loop), targetLength, target.Loop);
     }
 
-    /// <summary>The earliest a chain's right edge can sit: <see cref="MinimumLoops"/> cycles after <paramref name="start"/>.</summary>
-    public static double MinimumEdge(double start, double cycleLength) => start + MinimumLoops * cycleLength;
+    /// <summary>The earliest a block's right edge can sit: <see cref="MinimumLength"/> after <paramref name="start"/>.</summary>
+    public static double MinimumEdge(double start) => start + MinimumLength;
 
     /// <summary>
-    /// The loop count that puts a chain's right edge at <paramref name="edgeTime"/>. The count is free (fractions
-    /// allowed) and never below <see cref="MinimumLoops"/>. Snapping the edge is <see cref="TimelineSnap"/>'s job; this
-    /// only converts. Returns 1 when <paramref name="cycleLength"/> is not positive, since a missing chain has nothing
-    /// to measure.
+    /// The length that puts a block's right edge at <paramref name="edgeTime"/>, never below <see cref="MinimumLength"/>,
+    /// rounded to 1e-6 s so <c>4.3 - 0.1</c> is 4.2 rather than 4.1999999999999993. Snapping the edge is
+    /// <see cref="TimelineSnap"/>'s job; this only converts.
     /// </summary>
-    public static float LoopsForEdge(double start, double edgeTime, double cycleLength)
-    {
-        if (cycleLength <= 0) return 1;
-        return (float)Math.Max(MinimumLoops, (edgeTime - start) / cycleLength);
-    }
+    public static double LengthForEdge(double start, double edgeTime) =>
+        Math.Max(MinimumLength, Math.Round(edgeTime - start, 6));
 }

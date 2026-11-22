@@ -21,12 +21,13 @@ public class SequenceChainReferenceSave
     public double Start { get; set; }
 
     /// <summary>
-    /// The block's length in playback cycles. One cycle is the chain's full length, twice that for a ping-pong chain. It
-    /// does not override the chain's own Loop flag: a chain with Loop on repeats across the length (a fraction plays part
-    /// of the last cycle), and one with Loop off plays one cycle, then holds its last frame until the length ends. The
-    /// JSON key stays <c>loops</c>.
+    /// The block's length in seconds, or null for one playback cycle of the chain as it is now (the chain's frame lengths
+    /// summed, doubled for ping-pong), so the block follows edits to the chain. A set length keeps the block's end where it
+    /// is when the chain changes. It does not override the chain's own Loop flag: a chain with Loop on repeats across the
+    /// length (cut part way through the last cycle), and one with Loop off plays one cycle, then holds its last frame until
+    /// the length ends. JSON key <c>length</c>, omitted when null.
     /// </summary>
-    public float Loops { get; set; } = 1;
+    public double? Length { get; set; }
 
     /// <summary>
     /// Properties this code does not know, kept as raw JSON and written back unchanged after the known ones. See

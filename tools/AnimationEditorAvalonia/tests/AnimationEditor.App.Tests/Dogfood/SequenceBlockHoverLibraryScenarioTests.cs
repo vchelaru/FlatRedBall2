@@ -23,7 +23,7 @@ public class SequenceBlockHoverLibraryScenarioTests
         foreach (var (name, chain) in new[] { ("A", "Walk"), ("B", "Walk"), ("C", "Idle"), ("D", "Gone") })
         {
             var track = new SequenceTrackSave { Name = name };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = 0 });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);

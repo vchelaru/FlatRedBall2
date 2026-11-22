@@ -30,7 +30,7 @@ public class SequenceTimelineRenderBudgetScenarioTests
         {
             var track = new SequenceTrackSave { Name = $"Actor {t + 1}" };
             for (int c = 0; c < ChainsPerTrack; c++)
-                track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = c * 5, Loops = 3 });
+                track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = c * 5, Length = 1.5 });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);

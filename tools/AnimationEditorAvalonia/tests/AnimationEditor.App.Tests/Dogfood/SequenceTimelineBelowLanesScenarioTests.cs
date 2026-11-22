@@ -190,7 +190,7 @@ public class SequenceTimelineBelowLanesScenarioTests
         string path = Path.Combine(editor.ProjectFolder, "many.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Big" };
-        for (int i = 0; i < 14; i++) sequence.Tracks.Add(Track("T" + i, ("Walk", 0, 1)));
+        for (int i = 0; i < 14; i++) sequence.Tracks.Add(Track("T" + i, ("Walk", 0, null)));
         sequence.Tracks.Add(Track("Last"));
         save.Sequences.Add(sequence);
         save.Save(path);

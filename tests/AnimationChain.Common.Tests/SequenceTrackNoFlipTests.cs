@@ -11,7 +11,7 @@ public class SequenceTrackNoFlipTests
 {
     private const string FileWithFlips = """
         { "version": 1, "sources": [ "Boss.achj" ], "sequences": [ { "name": "Idle", "tracks": [
-          { "name": "Body", "flipHorizontal": true, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
+          { "name": "Body", "flipHorizontal": true, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0 } ] },
           { "name": "Wing", "flipHorizontal": true, "tag": "keep", "visible": false, "chains": [] } ] } ] }
         """;
 

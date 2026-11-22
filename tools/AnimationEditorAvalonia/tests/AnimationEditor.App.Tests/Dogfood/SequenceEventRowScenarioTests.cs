@@ -60,11 +60,11 @@ public class SequenceEventRowScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -95,7 +95,7 @@ public class SequenceEventRowScenarioTests
     public async Task OnlyTracksWithEvents_GetTheEventRow_SoLanesDifferInHeight()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Plain", ("Run", 0, 1)), Track("Body", ("Walk", 0, 1)), Track("Plain2", ("Run", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Plain", ("Run", 0, null)), Track("Body", ("Walk", 0, null)), Track("Plain2", ("Run", 0, null))));
         var viewport = Timeline(editor).Viewport;
 
         new[] { viewport.LaneHeightOf(0), viewport.LaneHeightOf(1), viewport.LaneHeightOf(2) }.ShouldBe(new[] { BaseLane, TallLane, BaseLane });
@@ -106,7 +106,7 @@ public class SequenceEventRowScenarioTests
     public async Task AMissingChain_OrAChainWithNoEvents_AddsNoRow()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Gone", ("Missing", 0, 1)), Track("Run", ("Run", 0, 2))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Gone", ("Missing", 0, null)), Track("Run", ("Run", 0, 0.4))));
         var timeline = Timeline(editor);
 
         timeline.Viewport.LaneHeightOf(0).ShouldBe(BaseLane);
@@ -119,7 +119,7 @@ public class SequenceEventRowScenarioTests
     public async Task Flags_SitAtTheirFramesStart_AndRepeatEachLoop()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0.5, 2))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0.5, 1.0))));
         var timeline = Timeline(editor);
         double pps = timeline.Viewport.PixelsPerSecond;
 
@@ -134,7 +134,7 @@ public class SequenceEventRowScenarioTests
     public async Task ANonLoopingChain_FlagsOnlyItsFirstCycle_NotTheHeldLastFrame()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0.5, 2))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0.5, 1.0))));
         var timeline = Timeline(editor);
         double pps = timeline.Viewport.PixelsPerSecond;
 
@@ -148,7 +148,7 @@ public class SequenceEventRowScenarioTests
     public async Task APingPong_MirrorsItsFlagOnTheReturnHalf()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Pet", ("Chomp", 0, 1.5f))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Pet", ("Chomp", 0, 0.9))));
         var timeline = Timeline(editor);
         double pps = timeline.Viewport.PixelsPerSecond;
 
@@ -164,7 +164,7 @@ public class SequenceEventRowScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk x3 would run to 1.5 s; Run at 0.35 s cuts it, so only the flags before 0.35 s ever fire.
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 3), ("Run", 0.35, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1.5), ("Run", 0.35, null))));
         var timeline = Timeline(editor);
 
         var markers = timeline.EventMarkersOf(BlockOf(timeline, "Walk"));
@@ -177,7 +177,7 @@ public class SequenceEventRowScenarioTests
     public async Task CloseFlags_MergeIntoACount_AndZoomingInSeparatesThem()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Combo", ("Rapid", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Combo", ("Rapid", 0, null))));
         var timeline = Timeline(editor);
         var block = timeline.Blocks.Single();
 
@@ -190,7 +190,7 @@ public class SequenceEventRowScenarioTests
     public async Task HoveringAFlag_ShowsItsNameFrameAndTime_InTheSameCardAsTheFilmstrip()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 1, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 1, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(OnFlag(editor, "Walk", 1));
@@ -204,7 +204,7 @@ public class SequenceEventRowScenarioTests
     public async Task HoveringAMergedFlag_ListsEveryEventItHolds()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Combo", ("Rapid", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Combo", ("Rapid", 0, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(OnFlag(editor, "Rapid", 0));
@@ -216,7 +216,7 @@ public class SequenceEventRowScenarioTests
     public async Task HoveringTheEventRowBetweenFlags_ShowsNoCard()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Walk", 0, null))));
         var timeline = Timeline(editor);
 
         editor.Hover(OnFlag(editor, "Walk", 0));
@@ -230,7 +230,7 @@ public class SequenceEventRowScenarioTests
     public async Task PressingAFlag_OnlySelectsTheChain_AndLeavesPlayheadAndUndoAlone()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Plain", ("Run", 0, 1)), Track("Body", ("Walk", 0, 1)));
+        string boss = WriteFixture(editor, Track("Plain", ("Run", 0, null)), Track("Body", ("Walk", 0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         timeline.Playhead = 0.3;
@@ -247,7 +247,7 @@ public class SequenceEventRowScenarioTests
     public async Task TheEventRowUnderACutTail_IsNotTheTailsResizeEdge()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 3), ("Run", 0.35, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1.5), ("Run", 0.35, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         var walk = BlockOf(timeline, "Walk");
@@ -258,14 +258,14 @@ public class SequenceEventRowScenarioTests
 
         timeline.Selection.ShouldBeNull();
         editor.UndoLabels.ShouldBeEmpty();
-        SavedTrack(boss, 0).Chains.First(c => c.Chain == "Walk").Loops.ShouldBe(3);
+        SavedTrack(boss, 0).Chains.First(c => c.Chain == "Walk").Length.ShouldBe(1.5);
     }
 
     [AvaloniaFact]
     public async Task OnATallThenNormalMix_ClicksSelectTheRightChainInEveryLane()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("A", ("Walk", 0, 1)), Track("B", ("Run", 0, 1)), Track("C", ("Chomp", 0, 1)), Track("D", ("Run", 0, 1))));
+        await editor.OpenAsync(WriteFixture(editor, Track("A", ("Walk", 0, null)), Track("B", ("Run", 0, null)), Track("C", ("Chomp", 0, null)), Track("D", ("Run", 0, null))));
         var timeline = Timeline(editor);
 
         foreach (int lane in new[] { 3, 2, 1, 0 })
@@ -282,7 +282,7 @@ public class SequenceEventRowScenarioTests
     public async Task DroppingAChipAfterATallLane_LandsOnTheTrackUnderThePointer()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("A", ("Walk", 0, 1)), Track("B"));
+        string boss = WriteFixture(editor, Track("A", ("Walk", 0, null)), Track("B"));
         await editor.OpenAsync(boss);
         var chip = editor.Control<SequenceLibraryControl>("SequenceLibrary").ChipFor("hero.achx", "Run")!;
 
@@ -296,7 +296,7 @@ public class SequenceEventRowScenarioTests
     public async Task MovingAChainFromANormalLaneToATallOne_AndDraggingAnEdgeBelowIt_StillWork()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("A", ("Walk", 0, 1)), Track("B", ("Run", 0, 1)), Track("C", ("Run", 2, 1)));
+        string boss = WriteFixture(editor, Track("A", ("Walk", 0, null)), Track("B", ("Run", 0, null)), Track("C", ("Run", 2, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
@@ -305,12 +305,12 @@ public class SequenceEventRowScenarioTests
         SavedTrack(boss, 0).Chains.Select(c => c.Chain).ShouldBe(new[] { "Walk", "Run" });
         SavedTrack(boss, 1).Chains.ShouldBeEmpty();
 
-        // Lane 2 sits below the tall lane 0: drag Run's right edge (0.2 s long, at 2 s) out to 2.6 s for 3 loops.
+        // Lane 2 sits below the tall lane 0: drag Run's right edge (0.2 s long, at 2 s) out to 2.6 s, 0.6 s long.
         var run = timeline.Blocks.Single(b => b.Track == 2);
         double edgeX = timeline.Viewport.XAt(run.PlayedEnd);
         double y = timeline.Viewport.LaneTop(2) + (TimelineLayout.BodyTop + TimelineLayout.BodyBottom) / 2;
         editor.Drag(editor.PointIn(timeline, edgeX - 1, y), editor.PointIn(timeline, timeline.Viewport.XAt(2.6), y));
-        SavedTrack(boss, 2).Chains.Single().Loops.ShouldBe(3, 0.51f);
+        SavedTrack(boss, 2).Chains.Single().Length!.Value.ShouldBe(0.6, 0.1);
         editor.UndoLabels.Count.ShouldBe(2);
     }
 

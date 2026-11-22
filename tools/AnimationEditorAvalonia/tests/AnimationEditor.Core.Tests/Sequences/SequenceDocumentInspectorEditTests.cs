@@ -1,5 +1,6 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System.IO;
@@ -8,7 +9,7 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests.Sequences;
 
-/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's visibility, a chain's start and loops.</summary>
+/// <summary>The inspector's edits on a <see cref="SequenceDocument"/>: a track's visibility, a chain's start and length.</summary>
 public class SequenceDocumentInspectorEditTests
 {
     private static SequenceDocument Load(TestHelpers.TempDir dir)
@@ -16,7 +17,7 @@ public class SequenceDocumentInspectorEditTests
         var save = new SequenceListSave { Sources = { "hero.achj" } };
         var sequence = new SequenceSave { Name = "Attack" };
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0.5, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0.5 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         string path = Path.Combine(dir.Path, "boss.seqj");
@@ -88,6 +89,32 @@ public class SequenceDocumentInspectorEditTests
     }
 
     [Fact]
+    public void ChainLength_Unset_IsOneCycleOfTheChain_AndSetIsTheStoredSeconds()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteHero(dir); // Walk: one 0.25 s frame
+        var document = Load(dir);
+        var reference = document.Save.Sequences[0].Tracks[0].Chains[0];
+
+        document.ChainLength(reference).ShouldBe(0.25);
+        reference.Length = 4.3;
+        document.ChainLength(reference).ShouldBe(4.3);
+    }
+
+    [Fact]
+    public void SetChainsLength_RelativeEditOnAnUnsetLength_AddsToTheChainsCycle()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteHero(dir);
+        var document = Load(dir);
+        NumericEdit.TryParse("+ 1", out var plusOne).ShouldBeTrue();
+
+        document.SetChainsLength(new UndoManager(), 0, new TimelineChainId[] { new(0, 0) }, plusOne).ShouldBeNull();
+
+        SavedTrack(document).Chains.Single().Length!.Value.ShouldBe(1.25, 1e-6);
+    }
+
+    [Fact]
     public void SetChainStart_ValidStart_IsOneUndoStep()
     {
         using var dir = new TestHelpers.TempDir();
@@ -119,20 +146,20 @@ public class SequenceDocumentInspectorEditTests
     }
 
     [Fact]
-    public void SetChainLoops_FractionalLoops_AreKeptAsOneUndoStep()
+    public void SetChainLength_IsOneUndoStep()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetChainLoops(undo, 0, 0, 0, 2.5f).ShouldBeNull();
+        document.SetChainLength(undo, 0, 0, 0, 2.5).ShouldBeNull();
 
-        SavedTrack(document).Chains.Single().Loops.ShouldBe(2.5f);
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
+        SavedTrack(document).Chains.Single().Length.ShouldBe(2.5);
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Length of 'Walk' to 2.5" });
     }
 
     [Fact]
-    public void SetChainLoops_NamesTheCycles_WithADotWhateverTheCulture()
+    public void SetChainLength_NamesTheLength_WithADotWhateverTheCulture()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
@@ -142,35 +169,35 @@ public class SequenceDocumentInspectorEditTests
         {
             System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
 
-            document.SetChainLoops(undo, 0, 0, 0, 2.5f).ShouldBeNull();
+            document.SetChainLength(undo, 0, 0, 0, 2.5).ShouldBeNull();
         }
         finally
         {
             System.Globalization.CultureInfo.CurrentCulture = before;
         }
 
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Cycles of 'Walk' to 2.5" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Length of 'Walk' to 2.5" });
     }
 
     [Theory]
-    [InlineData(0f)]
-    [InlineData(-1f)]
-    [InlineData(float.NaN)]
-    [InlineData(float.PositiveInfinity)]
-    public void SetChainLoops_ZeroNegativeOrNotFinite_IsRefusedWithNoUndoEntry(float loops)
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void SetChainLength_ZeroNegativeOrNotFinite_IsRefusedWithNoUndoEntry(double length)
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetChainLoops(undo, 0, 0, 0, loops).ShouldBe("Cycles must be above 0.");
+        document.SetChainLength(undo, 0, 0, 0, length).ShouldBe("Length must be above 0.");
 
-        SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
+        SavedTrack(document).Chains.Single().Length.ShouldBeNull();
         undo.UndoHistory.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ChainStartAndCycles_StepsOfOneEdit_MergeIntoOneUndoStepEach()
+    public void ChainStartAndLength_StepsOfOneEdit_MergeIntoOneUndoStepEach()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
@@ -178,12 +205,12 @@ public class SequenceDocumentInspectorEditTests
 
         document.SetChainStart(undo, 0, 0, 0, 1);
         document.SetChainStart(undo, 0, 0, 0, 1.5);
-        document.SetChainLoops(undo, 0, 0, 0, 2);
-        document.SetChainLoops(undo, 0, 0, 0, 2.5f);
+        document.SetChainLength(undo, 0, 0, 0, 2);
+        document.SetChainLength(undo, 0, 0, 0, 2.5);
 
-        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Cycles of 'Walk' to 2.5" });
+        undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Set Start of 'Walk' to 1.5", "Set Length of 'Walk' to 2.5" });
         undo.Undo();
-        SavedTrack(document).Chains.Single().Loops.ShouldBe(1f);
+        SavedTrack(document).Chains.Single().Length.ShouldBeNull();
         undo.Undo();
         SavedTrack(document).Chains.Single().Start.ShouldBe(0.5);
     }

@@ -27,7 +27,7 @@ public class SequenceTimelineScrollBarScenarioTests
         for (int i = 0; i < tracks; i++)
         {
             var track = new SequenceTrackSave { Name = "T" + i };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = i == 0 ? lastStart : 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = i == 0 ? lastStart : 0 });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);
