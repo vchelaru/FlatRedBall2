@@ -2066,7 +2066,6 @@
                                                         <!-- Index label; the event flag (or count pill) sits at the cell's left edge, where the frame starts and the event fires, and never covers the thumbnail. -->
                                                         <Grid ColumnDefinitions="Auto,*">
                                                             <viewsControls:EventFlagGlyph IsVisible="{Binding HasEvents}"
-                                                                                          CountText="{Binding EventCountText}"
                                                                                           ToolTip.Tip="{Binding EventTooltip}" />
                                                             <TextBlock Grid.Column="1"
                                                                        Text="{Binding IndexLabel}"

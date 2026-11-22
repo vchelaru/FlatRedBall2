@@ -221,7 +221,7 @@ public class TimelineBuilderTests
     }
 
     [Fact]
-    public void BuildFrameItems_FramesWithEvents_ExposeEventCountAndNames()
+    public void BuildFrameItems_FramesWithEvents_ExposeEventNames()
     {
         var chain = new AnimationChainSave { Name = "Hit" };
         var first = new AnimationFrameSave { FrameLength = 0.1f };
@@ -236,12 +236,9 @@ public class TimelineBuilderTests
         var result = TimelineBuilder.BuildFrameItems(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
         Assert.True(result[0].HasEvents);
-        Assert.Equal("", result[0].EventCountText);
         Assert.Equal("Start", result[0].EventTooltip);
         Assert.False(result[1].HasEvents);
-        Assert.Equal(0, result[1].EventCount);
         Assert.True(result[2].HasEvents);
-        Assert.Equal("2", result[2].EventCountText);
         Assert.Equal("Spark\nBoom", result[2].EventTooltip);
     }
 }
