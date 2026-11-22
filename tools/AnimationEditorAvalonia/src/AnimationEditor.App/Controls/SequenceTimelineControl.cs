@@ -1435,7 +1435,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double x = Snap(Viewport.XAt(_playhead));
         if (x < Viewport.ColumnWidth || x > size.Width) return;
         var brush = Brush("Accent");
-        context.DrawLine(new Pen(brush, 2), new Point(x, 0), new Point(x, size.Height));
+        // 1 px and translucent: centered on the exact time, yet a block starting at the playhead still shows its edge through it.
+        var line = brush is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.55) : brush;
+        context.DrawLine(new Pen(line, 1), new Point(x, 0), new Point(x, size.Height));
         var head = new StreamGeometry();
         using (var g = head.Open())
         {
