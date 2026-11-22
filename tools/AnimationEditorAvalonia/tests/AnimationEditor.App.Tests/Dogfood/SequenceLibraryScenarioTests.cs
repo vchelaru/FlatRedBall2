@@ -10,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -153,6 +154,42 @@ public class SequenceLibraryScenarioTests
         editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("hero.achx");
         editor.Tabs.ActiveTab!.IsPreview.ShouldBeFalse();
         editor.TabLabels.ShouldContain("boss.seqj");
+    }
+
+    // On a sequence tab the single click is inert, so the double-click alone must bring an already-open file's tab to the front.
+    [AvaloniaTheory]
+    [InlineData("other.seqj")]
+    [InlineData("hero.achx")]
+    public async Task OnASequenceTab_DoubleClickingAnAlreadyOpenFileInTheAnimationsBrowser_FocusesItsTab(string target)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string other = editor.WriteSeqj("other.seqj", "Idle");
+        string boss = WriteSeqj(editor);
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(target == "hero.achx" ? hero : other);
+        await editor.OpenAsync(boss);
+        editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("boss.seqj");
+        ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
+
+        // A single click stays put even on an open file, so pressing a row to drag it onto the library never switches tabs.
+        editor.Click(PanelsScenarioTests.RowFor(editor, panel, target));
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+        editor.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("boss.seqj");
+        editor.Control<Grid>("SequenceEditorPane").IsVisible.ShouldBeTrue();
+        editor.SequenceNames.ShouldBe(new[] { "Attack" });
+
+        // Past the double-click window, so this is a fresh double-click, not a second click.
+        Thread.Sleep(600);
+        editor.DoubleClickAt(editor.CenterOf(PanelsScenarioTests.RowFor(editor, panel, target)));
+        editor.WaitUntil(() => editor.Tabs.ActiveTab!.Path.FullPath.EndsWith(target), TimeSpan.FromSeconds(5));
+
+        editor.TabLabels.Count.ShouldBe(2);
+        if (target == "other.seqj")
+            editor.SequenceNames.ShouldBe(new[] { "Idle" });
+        else
+            editor.Control<Grid>("SequenceEditorPane").IsVisible.ShouldBeFalse();
     }
 
     // The title side of a header row, away from the remove button at its right edge.

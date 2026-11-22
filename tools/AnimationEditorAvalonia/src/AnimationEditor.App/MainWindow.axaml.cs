@@ -363,6 +363,7 @@ public partial class MainWindow : Window
         // it to a permanent tab (#841).
         ProjectPanel.FileSelected += entry =>
         {
+            // Inert on a sequence tab (BrowserClickOpensPreview false): pressing a row to drag it onto the library must not switch tabs.
             if (entry.File is DiskEditorFile diskFile && ActivePane.BrowserClickOpensPreview)
                 _ = LoadAnimationFileAsync(diskFile.FullPath, asPreview: true);
         };
@@ -370,8 +371,9 @@ public partial class MainWindow : Window
         {
             if (entry.File is not DiskEditorFile diskFile) return;
             var path = new FilePath(diskFile.FullPath);
-            // The single click opened a preview tab unless the active pane declined it; then open it here.
-            if (_tabManager.Tabs.Any(tab => tab.Path == path))
+            // The single click already opened and showed the file as the preview tab, unless the active pane declined it;
+            // then this is the open, and it focuses the tab when the file is already open, like File > Open.
+            if (_tabManager.ActiveTab?.Path == path)
             {
                 _tabManager.Promote(path);
                 RebuildTabStrip();
