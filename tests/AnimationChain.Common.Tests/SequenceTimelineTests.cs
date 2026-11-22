@@ -6,8 +6,8 @@ namespace AnimationEditorCommon.Tests;
 
 public class SequenceTimelineTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "a.achj", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "a.achj", Chain = chain, Start = start, Length = length };
 
     [Fact]
     public void ActiveAt_LaterChainStartsInsideEarlier_CutsTheEarlierAndNeverResumesIt()
@@ -28,7 +28,7 @@ public class SequenceTimelineTests
     [Fact]
     public void PlayedLength_InterrupterMovesAway_EarlierChainPlaysInFullAgain()
     {
-        var charge = Ref("Charge", start: 0, loops: 2);
+        var charge = Ref("Charge", start: 0, length: 6);
         var hurt = Ref("Hurt", start: 1);
         var track = new SequenceTrackSave { Chains = { charge, hurt } };
 
@@ -63,12 +63,22 @@ public class SequenceTimelineTests
     }
 
     [Fact]
-    public void Length_FloatLoops_EndsPartWayThroughTheLastCycle()
+    public void Length_ExplicitLength_EndsThereWhateverTheCycle()
     {
-        var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { Ref("Walk", start: 1, loops: 2.5f) } } } };
+        var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { Ref("Walk", start: 1, length: 4.3) } } } };
 
-        // A ping-pong chain of 0.4 s forward has a 0.8 s cycle.
-        SequenceTimeline.Length([sequence], sequence, _ => 0.8).ShouldBe(3, 1e-6);
+        // Editing the chain's frames changes its cycle; a set length keeps the block's end.
+        SequenceTimeline.Length([sequence], sequence, _ => 0.25).ShouldBe(5.3, 1e-9);
+        SequenceTimeline.Length([sequence], sequence, _ => 0.4).ShouldBe(5.3, 1e-9);
+    }
+
+    [Fact]
+    public void Length_NoLength_IsOneCycleOfTheCurrentChain()
+    {
+        var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { Ref("Walk", start: 1) } } } };
+
+        SequenceTimeline.Length([sequence], sequence, _ => 0.8).ShouldBe(1.8, 1e-9);
+        SequenceTimeline.Length([sequence], sequence, _ => 1.5).ShouldBe(2.5, 1e-9);
     }
 
     [Theory]
@@ -84,9 +94,10 @@ public class SequenceTimelineTests
     }
 
     [Fact]
-    public void FullLength_NegativeLoops_IsZero()
+    public void FullLength_NegativeLengthOrMissingChain_IsZero()
     {
-        SequenceTimeline.FullLength(loops: -2, cycleLength: 3).ShouldBe(0);
+        SequenceTimeline.FullLength(length: -2, cycleLength: 3).ShouldBe(0);
+        SequenceTimeline.FullLength(length: 5, cycleLength: 0).ShouldBe(0);
     }
 
     [Fact]
@@ -128,7 +139,7 @@ public class SequenceTimelineTests
     [Fact]
     public void Length_AMissingChainCutsTheOneBeforeIt_AndNoChainsIsZero()
     {
-        var long_ = Ref("Long", start: 0, loops: 10);
+        var long_ = Ref("Long", start: 0, length: 10);
         var missing = Ref("Deleted", start: 1);
         var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { long_, missing } } } };
         double Cycle(SequenceChainReferenceSave r) => r == long_ ? 1 : 0;
@@ -139,25 +150,19 @@ public class SequenceTimelineTests
     }
 
     [Fact]
-    public void LoopsForEdge_BeforeTheStart_NeverShrinksBelowTheMinimum()
+    public void LengthForEdge_BeforeTheStart_NeverShrinksBelowTheMinimum()
     {
-        SequenceTimeline.LoopsForEdge(start: 2, edgeTime: 1, cycleLength: 1).ShouldBe(SequenceTimeline.MinimumLoops);
-        SequenceTimeline.LoopsForEdge(start: 2, edgeTime: 2, cycleLength: 1).ShouldBe(SequenceTimeline.MinimumLoops);
-        SequenceTimeline.MinimumEdge(start: 2, cycleLength: 4).ShouldBe(2 + 4 * SequenceTimeline.MinimumLoops, 1e-6);
+        SequenceTimeline.LengthForEdge(start: 2, edgeTime: 1).ShouldBe(SequenceTimeline.MinimumLength);
+        SequenceTimeline.LengthForEdge(start: 2, edgeTime: 2).ShouldBe(SequenceTimeline.MinimumLength);
+        SequenceTimeline.MinimumEdge(start: 2).ShouldBe(2 + SequenceTimeline.MinimumLength, 1e-9);
     }
 
     [Fact]
-    public void LoopsForEdge_NoCycleToMeasure_ReturnsOne()
+    public void LengthForEdge_IsTheEdgeMinusTheStart_WithoutFloatNoise()
     {
-        SequenceTimeline.LoopsForEdge(start: 0, edgeTime: 5, cycleLength: 0).ShouldBe(1);
-    }
-
-    [Fact]
-    public void LoopsForEdge_IsFreeAndNeverMagnetic()
-    {
-        // Snapping lives in TimelineSnap: 2.04 s on a 1 s cycle is 2.04 loops here, and past a next chain is allowed.
-        SequenceTimeline.LoopsForEdge(start: 0, edgeTime: 2.04, cycleLength: 1).ShouldBe(2.04f, 1e-5f);
-        SequenceTimeline.LoopsForEdge(start: 1, edgeTime: 1.4, cycleLength: 4).ShouldBe(0.1f, 1e-5f);
+        // Snapping lives in TimelineSnap; past a next chain is allowed. 4.3 - 0.1 in doubles is 4.1999999999999993.
+        SequenceTimeline.LengthForEdge(start: 0.1, edgeTime: 4.3).ShouldBe(4.2);
+        SequenceTimeline.LengthForEdge(start: 1, edgeTime: 1.4).ShouldBe(0.4);
     }
 
     [Fact]

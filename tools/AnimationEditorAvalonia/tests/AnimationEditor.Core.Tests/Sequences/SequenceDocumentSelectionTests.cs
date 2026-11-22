@@ -139,7 +139,7 @@ public class SequenceDocumentSelectionTests
     public static TheoryData<string> EditsOfSequenceB() => new()
     {
         "SetLoop", "PlaceChainOnTrack", "PlaceChainOnNewTrack", "DeleteChain", "DeleteTrack", "RenameTrack",
-        "SetTrackVisible", "SetChainStart", "SetChainLoops", "MoveGesture", "EdgeGesture",
+        "SetTrackVisible", "SetChainStart", "SetChainLength", "MoveGesture", "EdgeGesture",
     };
 
     [Theory]
@@ -159,12 +159,12 @@ public class SequenceDocumentSelectionTests
             case "RenameTrack": document.RenameTrack(undo, 1, 0, "Torso"); break;
             case "SetTrackVisible": document.SetTrackVisible(undo, 1, 0, false); break;
             case "SetChainStart": document.SetChainStart(undo, 1, 0, 0, 1.5); break;
-            case "SetChainLoops": document.SetChainLoops(undo, 1, 0, 0, 3); break;
+            case "SetChainLength": document.SetChainLength(undo, 1, 0, 0, 3); break;
             case "MoveGesture":
             case "EdgeGesture":
                 string before = document.BeginGesture();
                 var reference = document.Save.Sequences[1].Tracks[0].Chains[0];
-                if (edit == "MoveGesture") reference.Start = 1; else reference.Loops = 3;
+                if (edit == "MoveGesture") reference.Start = 1; else reference.Length = 3;
                 document.CommitGesture(undo, edit, before);
                 break;
         }

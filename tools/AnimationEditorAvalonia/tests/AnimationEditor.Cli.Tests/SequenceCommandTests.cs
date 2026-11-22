@@ -22,8 +22,8 @@ public class SequenceCommandTests : IDisposable
             Continuous = true,
             Chains =
             {
-                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Loops = 2 },
-                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 1, Loops = 1 },
+                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 0.8 },
+                new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 1 },
             },
         });
         save.Sequences.Add(seq);
@@ -45,8 +45,8 @@ public class SequenceCommandTests : IDisposable
         r.Code.ShouldBe(0, r.Err);
         r.Out.ShouldContain("Run  (loop, 1 track, length 1.5)");
         r.Out.ShouldContain("Body  continuous");
-        r.Out.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  loops 2  end 0.8");
-        r.Out.ShouldContain("Run/Body/1  Idle  hero.achj  start 1  loops 1  end 1.5");
+        r.Out.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8  end 0.8");
+        r.Out.ShouldContain("Run/Body/1  Idle  hero.achj  start 1  length auto  end 1.5");
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class SequenceCommandTests : IDisposable
             {"ops":[
               {"op":"add-sequence","name":"Idle"},
               {"op":"add-track","sequence":"Idle","name":"Body"},
-              {"op":"add-block","track":"Idle/Body","source":"hero.achj","chain":"Idle","loops":4},
+              {"op":"add-block","track":"Idle/Body","source":"hero.achj","chain":"Idle","length":2},
               {"op":"set-track-continuous","track":"Run/Body","value":false}
             ]}
             """);
@@ -147,7 +147,7 @@ public class SequenceCommandTests : IDisposable
         r.Code.ShouldBe(0, r.Out + r.Err);
         var save = SequenceListSave.FromFile(file);
         save.Sequences.Select(s => s.Name).ShouldBe(["Run", "Idle"]);
-        save.Sequences[1].Tracks[0].Chains[0].Loops.ShouldBe(4f);
+        save.Sequences[1].Tracks[0].Chains[0].Length.ShouldBe(2);
         save.Sequences[0].Tracks[0].Continuous.ShouldBeFalse();
     }
 

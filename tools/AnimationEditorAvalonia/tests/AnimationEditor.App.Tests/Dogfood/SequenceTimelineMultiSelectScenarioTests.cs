@@ -27,19 +27,19 @@ public class SequenceTimelineMultiSelectScenarioTests
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        sequence.Tracks.Add(Track("Body", ("Walk", 0, 1), ("Walk", 1, 1), ("Run", 2, 1)));
-        sequence.Tracks.Add(Track("Head", ("Run", 0.5, 1), ("Walk", 1.5, 1)));
+        sequence.Tracks.Add(Track("Body", ("Walk", 0, null), ("Walk", 1, null), ("Run", 2, null)));
+        sequence.Tracks.Add(Track("Head", ("Run", 0.5, null), ("Walk", 1.5, null)));
         sequence.Tracks.Add(Track("Tail"));
         save.Sequences.Add(sequence);
         save.Save(path);
         return path;
     }
 
-    internal static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    internal static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 

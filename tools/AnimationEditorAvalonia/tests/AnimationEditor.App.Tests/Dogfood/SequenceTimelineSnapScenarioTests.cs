@@ -32,11 +32,11 @@ public class SequenceTimelineSnapScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -68,7 +68,7 @@ public class SequenceTimelineSnapScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Run plays 0.55 to 0.75 on the other track; Walk's edge starts at 0.5.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
         Zoom(editor, pixelsPerSecond, scroll);
         var timeline = Timeline(editor);
@@ -81,8 +81,7 @@ public class SequenceTimelineSnapScenarioTests
         timeline.SnapGuide!.Value.Track.ShouldBe(1);
         editor.DragRelease(At(editor, 0, 0.75, dx: 1));
 
-        // Loops are a float: the end it gives matches the target to float precision.
-        (Saved(boss, 0, 0).Loops * 0.5).ShouldBe(0.75, 1e-6);
+        Saved(boss, 0, 0).Length.ShouldBe(0.75);
         timeline.SnapGuideTime.ShouldBeNull();
         editor.UndoLabels.Count.ShouldBe(1);
     }
@@ -91,7 +90,7 @@ public class SequenceTimelineSnapScenarioTests
     public async Task DraggingTheRightEdge_AtVeryHighZoom_IsFreeBetweenTargets()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
         Zoom(editor, 2000, 0.4);
 
@@ -99,29 +98,29 @@ public class SequenceTimelineSnapScenarioTests
         editor.Drag(At(editor, 0, 0.5, dx: -2), At(editor, 0, 0.75, dx: 18));
 
         Timeline(editor).SnapGuideTime.ShouldBeNull();
-        (Saved(boss, 0, 0).Loops * 0.5).ShouldBe(0.76, 1e-4);
+        Saved(boss, 0, 0).Length!.Value.ShouldBe(0.76, 1e-4);
     }
 
     [AvaloniaFact]
     public async Task DraggingTheRightEdge_WithAltHeld_DoesNotSnap()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
 
         editor.DragHold(At(editor, 0, 0.5, dx: -2), At(editor, 0, 0.75, dx: 1), RawInputModifiers.Alt);
 
         Timeline(editor).SnapGuideTime.ShouldBeNull();
         editor.DragRelease(At(editor, 0, 0.75, dx: 1), RawInputModifiers.Alt);
-        // 3 px past 0.75 at 120 px/s is 0.775 s, 1.55 loops.
-        Saved(boss, 0, 0).Loops.ShouldBe(1.55f, 1e-3f);
+        // 3 px past 0.75 at 120 px/s is 0.775 s.
+        Saved(boss, 0, 0).Length!.Value.ShouldBe(0.775, 5e-4);
     }
 
     [AvaloniaFact]
-    public async Task Escape_DuringASnappedEdgeDrag_ClearsTheGuide_AndPutsTheLoopsBack()
+    public async Task Escape_DuringASnappedEdgeDrag_ClearsTheGuide_AndPutsTheLengthBack()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         editor.DragHold(At(editor, 0, 0.5, dx: -2), At(editor, 0, 0.75, dx: 1));
@@ -131,7 +130,7 @@ public class SequenceTimelineSnapScenarioTests
         editor.DragRelease(At(editor, 0, 0.75, dx: 1));
 
         timeline.SnapGuideTime.ShouldBeNull();
-        Saved(boss, 0, 0).Loops.ShouldBe(1f);
+        Saved(boss, 0, 0).Length.ShouldBeNull();
         editor.UndoLabels.ShouldBeEmpty();
     }
 
@@ -139,7 +138,7 @@ public class SequenceTimelineSnapScenarioTests
     public async Task DraggingTheRightEdge_AwayFromEveryTarget_ShowsNoGuide()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
 
         editor.DragHold(At(editor, 0, 0.5, dx: -2), At(editor, 0, 0.75, dx: 40));
@@ -153,7 +152,7 @@ public class SequenceTimelineSnapScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk (0.5 s) at 0; Run starts at 2.0 on another track. Walk is dropped with its end 3 px past 2.0.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 2.0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 2.0, null)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
 
@@ -173,7 +172,7 @@ public class SequenceTimelineSnapScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Run plays 1.3 to 1.5 on the Arms track.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 1.2, 1)), Track("Arms", ("Run", 1.3, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 1.2, null)), Track("Arms", ("Run", 1.3, null)));
         await editor.OpenAsync(boss);
         Zoom(editor, pixelsPerSecond, scroll);
 
@@ -188,7 +187,7 @@ public class SequenceTimelineSnapScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Three seconds long, so the playhead can sit at 2.013 (Alt scrub: free).
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.8, 6)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.8, 3.0)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         editor.Drag(OnRuler(editor, 2.0), OnRuler(editor, 2.013), RawInputModifiers.Alt);
@@ -206,7 +205,7 @@ public class SequenceTimelineSnapScenarioTests
     public async Task MovingAChain_WithAltHeld_FollowsThePointerFreely()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 2.0, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 2.0, null)));
         await editor.OpenAsync(boss);
 
         editor.Drag(At(editor, 0, 0.25), At(editor, 0, 1.75, dx: 3), RawInputModifiers.Alt);
@@ -220,7 +219,7 @@ public class SequenceTimelineSnapScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         // Walk plays 0.13 to 0.63; the grid alone would put the chip at 0.65.
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.13, 1)), Track("Arms"));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0.13, null)), Track("Arms"));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         var target = At(editor, 1, 0.63, dx: 3);
@@ -246,7 +245,7 @@ public class SequenceTimelineSnapScenarioTests
     public async Task ScrubbingTheRuler_NextToAChainsEnd_IsFree_AtAnyZoom_WithNoGuide(double pixelsPerSecond, double scroll)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, 1)), Track("Arms", ("Run", 0.55, 1)));
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)), Track("Arms", ("Run", 0.55, null)));
         await editor.OpenAsync(boss);
         Zoom(editor, pixelsPerSecond, scroll);
         var timeline = Timeline(editor);

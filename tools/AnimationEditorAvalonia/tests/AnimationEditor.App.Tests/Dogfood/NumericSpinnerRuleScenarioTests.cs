@@ -20,7 +20,7 @@ public class NumericSpinnerRuleScenarioTests
     // scalars that have always had them. Anything else with visible buttons is a new field that needs a decision.
     private static readonly HashSet<string> FlankerWithButtons = new()
     {
-        "SpeedInput", "SequenceSpeedInput", "GridSizeInput", "PropFrameLen", "ChainStartField", "ChainLoopsField", "ReferenceStartField", "ReferenceLoopsField",
+        "SpeedInput", "SequenceSpeedInput", "GridSizeInput", "PropFrameLen", "ChainStartField", "ChainLengthField", "ReferenceStartField", "ReferenceLengthField",
     };
 
     // NumericUpDown fields allowed to show the chevron spinner. Empty on purpose.
@@ -43,7 +43,7 @@ public class NumericSpinnerRuleScenarioTests
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         save.Save(Path.Combine(editor.ProjectFolder, "boss.seqj"));

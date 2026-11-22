@@ -28,7 +28,7 @@ public class SequenceInspectorParityScenarioTests
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         save.Save(boss);

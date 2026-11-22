@@ -26,13 +26,15 @@ internal readonly struct SeqjObject(JsonObject node, string path)
     public bool Bool(string key, bool fallback = false) =>
         Read(key, node => node is JsonValue value && value.TryGetValue<bool>(out var flag) ? flag : (bool?)null, "true or false", fallback);
 
-    public float Float(string key, float fallback = 0) =>
-        Read(key, node => node is JsonValue value && value.TryGetValue<float>(out var number) && float.IsFinite(number) ? number : (float?)null,
-            "a number", fallback);
-
     public double Double(string key, double fallback = 0) =>
-        Read(key, node => node is JsonValue value && value.TryGetValue<double>(out var number) && double.IsFinite(number) ? number : (double?)null,
-            "a number", fallback);
+        Read(key, Number, "a number", fallback);
+
+    /// <summary>The number under <paramref name="key"/>, or null when absent.</summary>
+    public double? OptionalDouble(string key) =>
+        Node.ContainsKey(key) ? Double(key) : (double?)null;
+
+    private static double? Number(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<double>(out var number) && double.IsFinite(number) ? number : null;
 
     private int Int(string key, int fallback) =>
         Read(key, node => node is JsonValue value && value.TryGetValue<int>(out var number) ? number : (int?)null, "a whole number", fallback);

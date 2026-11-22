@@ -43,11 +43,11 @@ public class SequenceHoldAudit3ScenarioTests
         return path;
     }
 
-    private static SequenceTrackSave Track(string name, params (string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Loops = loops });
+        foreach (var (chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -71,13 +71,13 @@ public class SequenceHoldAudit3ScenarioTests
     // ---- the edge drag magnets follow the chain's Loop flag
 
     [AvaloniaTheory]
-    [InlineData("Walk", true, 1.2f)]
-    [InlineData("Once", false, 1.21f)]
-    public async Task DraggingTheRightEdge_SnapsToAFrameBoundaryInASecondCycle_OnlyWhenTheChainRepeats(string chain, bool snaps, float expectedLoops)
+    [InlineData("Walk", true, 0.6)]
+    [InlineData("Once", false, 0.605)]
+    public async Task DraggingTheRightEdge_SnapsToAFrameBoundaryInASecondCycle_OnlyWhenTheChainRepeats(string chain, bool snaps, double expectedLength)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        // The block is 1.5 cycles (0.75 s). 0.6 s is the second cycle's first frame boundary, which only a repeating chain has.
-        string boss = WriteFixture(editor, Track("Body", (chain, 0, 1.5f)));
+        // The block is 0.75 s, 1.5 cycles. 0.6 s is the second cycle's first frame boundary, which only a repeating chain has.
+        string boss = WriteFixture(editor, Track("Body", (chain, 0, 0.75)));
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
         timeline.Viewport.SetPixelsPerSecond(600);
@@ -96,7 +96,7 @@ public class SequenceHoldAudit3ScenarioTests
             timeline.SnapGuide.ShouldBeNull();
         }
         editor.DragRelease(At(editor, 0, 0.6, dx: 1));
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Chains[0].Loops.ShouldBe(expectedLoops, 1e-3f);
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Chains[0].Length!.Value.ShouldBe(expectedLength, 1e-3);
     }
 
     // ---- the hover card says "held"
@@ -105,7 +105,7 @@ public class SequenceHoldAudit3ScenarioTests
     public async Task HoveringTheHeldTailOfANonLoopingBlock_SaysHeldAndCoversTheWholeHold_WhileAFrameOfTheCycleDoesNot()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 3))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 1.5))));
         var timeline = Timeline(editor);
 
         editor.Hover(Film(editor, 0, 1.0));
@@ -118,18 +118,19 @@ public class SequenceHoldAudit3ScenarioTests
     // ---- the inspector says what the field is
 
     [AvaloniaFact]
-    public async Task TheInspectorsChainField_IsCalledCycles_AndExplainsWhatALoopFlagOffDoes()
+    public async Task TheInspectorsChainField_IsALengthInSeconds_AndExplainsWhatALoopFlagOffDoes()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 3))));
+        await editor.OpenAsync(WriteFixture(editor, Track("Body", ("Once", 0, 1.5))));
         var inspector = editor.Control<SequenceInspectorControl>("SequenceInspector");
 
+        var row = (Grid)inspector.ChainLengthField.Parent!;
+        row.Children.OfType<TextBlock>().Select(t => t.Text).ShouldBe(new[] { "Length", "s" });
         var labels = inspector.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        labels.ShouldContain("Cycles");
+        labels.ShouldNotContain("Cycles");
         labels.ShouldNotContain("Loops");
-        var label = inspector.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Cycles");
-        ToolTip.GetTip(label).ShouldBeOfType<string>().ShouldContain("holds its last frame");
-        ToolTip.GetTip(inspector.ChainLoopsField).ShouldBeOfType<string>().ShouldContain("holds its last frame");
+        ToolTip.GetTip(row.Children.OfType<TextBlock>().First()).ShouldBeOfType<string>().ShouldContain("holds its last frame");
+        ToolTip.GetTip(inspector.ChainLengthField).ShouldBeOfType<string>().ShouldContain("holds its last frame");
     }
 
     // ---- the caches are keyed on the Loop flag
@@ -144,7 +145,7 @@ public class SequenceHoldAudit3ScenarioTests
         list.Save(Path.Combine(folder, "hero.achx"));
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        sequence.Tracks.Add(Track("Body", ("Walk", 0, 3)));
+        sequence.Tracks.Add(Track("Body", ("Walk", 0, 1.5)));
         save.Sequences.Add(sequence);
         string seqj = Path.Combine(folder, "boss.seqj");
         save.Save(seqj);

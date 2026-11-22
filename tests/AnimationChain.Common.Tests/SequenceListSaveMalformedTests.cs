@@ -28,7 +28,7 @@ public class SequenceListSaveMalformedTests
         ("chain", "source", "sequences[0].tracks[0].chains[0].source", Kind.String),
         ("chain", "chain", "sequences[0].tracks[0].chains[0].chain", Kind.String),
         ("chain", "start", "sequences[0].tracks[0].chains[0].start", Kind.Number),
-        ("chain", "loops", "sequences[0].tracks[0].chains[0].loops", Kind.Number),
+        ("chain", "length", "sequences[0].tracks[0].chains[0].length", Kind.Number),
     };
 
     // One value of each JSON kind; the ones a field of that kind accepts are left out for it.
@@ -68,13 +68,13 @@ public class SequenceListSaveMalformedTests
     }
 
     [Theory]
-    [InlineData("1e50")]
-    [InlineData("-1e50")]
-    public void FromJsonString_NumberTooBigForAFloat_ThrowsInsteadOfLoadingInfinity(string raw)
+    [InlineData("1e400")]
+    [InlineData("-1e400")]
+    public void FromJsonString_NumberTooBigForADouble_ThrowsInsteadOfLoadingInfinity(string raw)
     {
-        var error = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(With("chain", "loops", raw)));
+        var error = Should.Throw<JsonException>(() => SequenceListSave.FromJsonString(With("chain", "length", raw)));
 
-        error.Message.ShouldStartWith("sequences[0].tracks[0].chains[0].loops must be");
+        error.Message.ShouldStartWith("sequences[0].tracks[0].chains[0].length must be");
     }
 
     [Theory]
@@ -155,7 +155,7 @@ public class SequenceListSaveMalformedTests
     // A complete, valid document with one property of one object replaced by raw JSON.
     private static string With(string level, string property, string raw)
     {
-        var chain = Parse("""{ "source": "a.achx", "chain": "Walk", "start": 0, "loops": 1 }""");
+        var chain = Parse("""{ "source": "a.achx", "chain": "Walk", "start": 0, "length": 1 }""");
         var track = Parse("""{ "name": "T", "visible": true }""");
         track["chains"] = new JsonArray((JsonNode)chain);
         var sequence = Parse("""{ "name": "S", "loop": false }""");

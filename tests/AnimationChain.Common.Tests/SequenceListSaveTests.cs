@@ -21,7 +21,7 @@ public class SequenceListSaveTests
                 new SequenceTrackSave
                 {
                     Name = "Wing R", Visible = false,
-                    Chains = { new SequenceChainReferenceSave { Source = "Boss.achj", Chain = "WingFlap", Start = 0.25, Loops = 11.5f } },
+                    Chains = { new SequenceChainReferenceSave { Source = "Boss.achj", Chain = "WingFlap", Start = 0.25, Length = 2.875 } },
                 },
             },
         });
@@ -35,7 +35,7 @@ public class SequenceListSaveTests
         var track = sequence.Tracks.ShouldHaveSingleItem();
         (track.Name, track.Visible).ShouldBe(("Wing R", false));
         var reference = track.Chains.ShouldHaveSingleItem();
-        (reference.Source, reference.Chain, reference.Start, reference.Loops).ShouldBe(("Boss.achj", "WingFlap", 0.25, 11.5f));
+        (reference.Source, reference.Chain, reference.Start, reference.Length).ShouldBe(("Boss.achj", "WingFlap", 0.25, (double?)2.875));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class SequenceListSaveTests
                           "source": "Gone.achj",
                           "chain": "Deleted",
                           "start": 1.5,
-                          "loops": 2
+                          "length": 2.5
                         }
                       ]
                     }
@@ -90,9 +90,28 @@ public class SequenceListSaveTests
         var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "tracks": [ { "chains": [ { "chain": "Walk" } ] } ] } ] }""");
 
         var reference = loaded.Sequences[0].Tracks[0].Chains.ShouldHaveSingleItem();
-        reference.Loops.ShouldBe(1f);
+        reference.Length.ShouldBeNull();
         reference.Start.ShouldBe(0);
         loaded.Sources.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ToJsonString_NoLength_WritesNoLengthKey()
+    {
+        var save = new SequenceListSave();
+        save.Sequences.Add(new SequenceSave
+        {
+            Tracks =
+            {
+                new SequenceTrackSave { Chains = { new SequenceChainReferenceSave { Chain = "Walk" } } },
+                new SequenceTrackSave { Reference = new SequenceReferenceSave { Sequence = "Other" } },
+            },
+        });
+
+        var tracks = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]!;
+
+        tracks[0]!["chains"]![0]!.AsObject().ContainsKey("length").ShouldBeFalse();
+        tracks[1]!["reference"]!.AsObject().ContainsKey("length").ShouldBeFalse();
     }
 
     [Fact]
@@ -198,7 +217,7 @@ public class SequenceListSaveTests
                   "name": "Body",
                   {{UnknownProps}},
                   "chains": [
-                    { "source": "A.achj", "chain": "Walk", "start": 0.5, "loops": 2, {{UnknownProps}} }
+                    { "source": "A.achj", "chain": "Walk", "start": 0.5, "length": 2, {{UnknownProps}} }
                   ]
                 }
               ]
@@ -240,7 +259,7 @@ public class SequenceListSaveTests
         root.Select(p => p.Key).Take(3).ShouldBe(new[] { "version", "sources", "sequences" });
         sequence.Select(p => p.Key).Take(3).ShouldBe(new[] { "name", "loop", "tracks" });
         track.Select(p => p.Key).Take(2).ShouldBe(new[] { "name", "chains" });
-        chain.Select(p => p.Key).Take(4).ShouldBe(new[] { "source", "chain", "start", "loops" });
+        chain.Select(p => p.Key).Take(4).ShouldBe(new[] { "source", "chain", "start", "length" });
     }
 
     [Fact]

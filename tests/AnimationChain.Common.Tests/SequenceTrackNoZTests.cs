@@ -11,7 +11,7 @@ public class SequenceTrackNoZTests
 {
     private const string FileWithZ = """
         { "version": 1, "sources": [ "Boss.achj" ], "sequences": [ { "name": "Idle", "tracks": [
-          { "name": "Body", "x": 1, "y": 2, "z": 3, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
+          { "name": "Body", "x": 1, "y": 2, "z": 3, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0 } ] },
           { "name": "Wing", "x": 0, "y": 0, "z": -7, "tag": "keep", "chains": [] } ] } ] }
         """;
 

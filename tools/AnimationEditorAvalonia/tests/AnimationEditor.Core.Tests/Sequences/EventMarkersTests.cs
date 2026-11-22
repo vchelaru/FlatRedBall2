@@ -199,13 +199,13 @@ public class EventMarkersTests
         return EventMarkers.Occurrences(EventMarkers.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), chain.PingPong, chain.Reverse, block.Played, chain.Loop);
     }
 
-    private static SequenceChainReferenceSave Ref(double start, float loops) => new() { Source = "s.achx", Chain = "C", Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(double start, double? length = null) => new() { Source = "s.achx", Chain = "C", Start = start, Length = length };
 
     [Fact]
     public void ABlockRepeatedThreeTimes_FiresAFrameThreeEventInEveryCycle()
     {
         // Frame 3 (index 2) of a 4 x 0.1 s chain: 0.2, 0.6 and 1.0 s from the block start.
-        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3));
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 1.2));
 
         Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6), ("Step", 1.0) });
         occurrences.Select(o => o.Cycle).ShouldBe(new[] { 0, 1, 2 });
@@ -215,7 +215,7 @@ public class EventMarkersTests
     public void ABlockCutByTheNextChain_FiresOnlyTheOccurrencesBeforeTheCut()
     {
         // The next chain starts at 0.7 s: the Step at 0.2 and 0.6 play, the one at 1.0 is in the cut part.
-        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3), Ref(0.7, 1));
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 1.2), Ref(0.7));
 
         Fired(occurrences).ShouldBe(new[] { ("Step", 0.2), ("Step", 0.6) });
     }
@@ -224,7 +224,7 @@ public class EventMarkersTests
     public void ABlockCutInsideAFrame_DoesNotFireTheFrameThatNeverStarts()
     {
         // Cut at 0.55 s: the cycle-two Step frame would start at 0.6 s, after the cut.
-        Fired(FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3), Ref(0.55, 1))).ShouldBe(new[] { ("Step", 0.2) });
+        Fired(FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 1.2), Ref(0.55))).ShouldBe(new[] { ("Step", 0.2) });
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public class EventMarkersTests
         var chain = Chain(4, (0, "Start"), (3, "End"));
         chain.PingPong = true;
 
-        Fired(FiredByFirstBlock(chain, Ref(0, 2))).ShouldBe(new[]
+        Fired(FiredByFirstBlock(chain, Ref(0, 1.6))).ShouldBe(new[]
         {
             ("Start", 0.0), ("End", 0.3), ("Start", 0.7),
             ("End", 1.1), ("Start", 1.5),
@@ -248,7 +248,7 @@ public class EventMarkersTests
         // Sequence Loop off only holds the pose past the length; the hold is no block, so it adds no occurrence.
         var chain = Chain(4, (2, "Step"));
         var track = new SequenceTrackSave { Name = "T" };
-        track.Chains.Add(Ref(0, 2));
+        track.Chains.Add(Ref(0, 0.8));
         var sequence = new SequenceSave { Name = "S", Loop = false };
         sequence.Tracks.Add(track);
 
@@ -262,7 +262,7 @@ public class EventMarkersTests
     [Fact]
     public void TheMarkerRowOfARepeatedBlock_HasAMarkerPerCycle_AndCollidingOnesStillMerge()
     {
-        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 3));
+        var occurrences = FiredByFirstBlock(Chain(4, (2, "Step")), Ref(0, 1.2));
 
         EventMarkers.Group(occurrences, pixelsPerSecond: 100).Select(m => m.Count).ShouldBe(new[] { 1, 1, 1 });
         // Zoomed out to 10 px/s the three are 4 px apart: one flag counting all three.

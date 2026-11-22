@@ -10,8 +10,8 @@ namespace AnimationEditorCommon.Tests;
 /// </summary>
 public class SequenceTimelineContinuousTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "a.achj", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "a.achj", Chain = chain, Start = start, Length = length };
 
     // Chain "A" has a 0.5 s cycle, "B" a 1 s cycle.
     private static double Cycle(SequenceChainReferenceSave reference) => reference.Chain == "A" ? 0.5 : 1;
@@ -37,7 +37,7 @@ public class SequenceTimelineContinuousTests
     public void ActiveAtPass_AFractionalBlock_CarriesItsPhaseAcrossThreeWraps(int pass, double expectedLocal)
     {
         // A x 2.4 = 1.2 s, the whole sequence: every wrap lands mid-cycle.
-        var first = Ref("A", 0, 2.4f);
+        var first = Ref("A", 0, 1.2);
         var track = Track(true, first);
 
         Local(track, 0.15, pass, 1.2, out var active).ShouldBe(expectedLocal, 1e-6);
@@ -48,7 +48,7 @@ public class SequenceTimelineContinuousTests
     [Fact]
     public void ActiveAtPass_AnOrdinaryTrack_RestartsAtEveryWrap()
     {
-        var track = Track(false, Ref("A", 0, 2.4f));
+        var track = Track(false, Ref("A", 0, 1.2));
 
         Local(track, 0.15, pass: 3, length: 1.2, out _).ShouldBe(0.15, 1e-6);
     }
@@ -56,7 +56,7 @@ public class SequenceTimelineContinuousTests
     [Fact]
     public void ActiveAtPass_PassZero_IsActiveAt()
     {
-        var track = Track(true, Ref("A", 0, 2.4f));
+        var track = Track(true, Ref("A", 0, 1.2));
 
         SequenceTimeline.ActiveAt(track, 0.15, Cycle, out double plain);
 
@@ -85,7 +85,7 @@ public class SequenceTimelineContinuousTests
     public void ActiveAtPass_TheSameChainPlayingAsALaterBlock_CarriesThatBlocksPhaseIntoTheFirst()
     {
         // A@0 (0.5 s), B@0.5 (1 s), A@1.5 x2 (1 s): at the 2.5 s wrap, A's third block has played 1.0 s.
-        var track = Track(true, Ref("A", 0), Ref("B", 0.5), Ref("A", 1.5, 2));
+        var track = Track(true, Ref("A", 0), Ref("B", 0.5), Ref("A", 1.5, 1.0));
 
         Local(track, 0.2, pass: 1, length: 2.5, out var first).ShouldBe(1.2, 1e-6);
         first!.Start.ShouldBe(0);
@@ -96,7 +96,7 @@ public class SequenceTimelineContinuousTests
     [Fact]
     public void ActiveAtPass_OnlyTheFirstBlockCarries()
     {
-        var track = Track(true, Ref("A", 0), Ref("B", 0.5), Ref("A", 1.5, 2));
+        var track = Track(true, Ref("A", 0), Ref("B", 0.5), Ref("A", 1.5, 1.0));
 
         Local(track, 0.7, pass: 2, length: 2.5, out var active).ShouldBe(0.2, 1e-6);
 
@@ -106,7 +106,7 @@ public class SequenceTimelineContinuousTests
     [Fact]
     public void ActiveAtPass_AFirstBlockThatDoesNotStartAtZero_Restarts()
     {
-        var track = Track(true, Ref("A", 0.25, 2.3f));
+        var track = Track(true, Ref("A", 0.25, 1.15));
 
         Local(track, 0.4, pass: 2, length: 1.4, out _).ShouldBe(0.15, 1e-6);
     }
@@ -114,7 +114,7 @@ public class SequenceTimelineContinuousTests
     [Fact]
     public void CarryOver_IsTheSequenceLengthPerPass_ForOneFullBlock()
     {
-        var track = Track(true, Ref("A", 0, 2.4f));
+        var track = Track(true, Ref("A", 0, 1.2));
 
         SequenceTimeline.CarryOver(track, 1.2, 0, Cycle).ShouldBe(0);
         SequenceTimeline.CarryOver(track, 1.2, 3, Cycle).ShouldBe(3.6, 1e-6);

@@ -91,11 +91,11 @@ public class SequenceDocumentTimelineTests
         var undo = new UndoManager();
         document.PlaceChain(undo, 0, 0, "hero.achj", "Walk", 0);
         string before = document.BeginGesture();
-        document.Save.Sequences[0].Tracks[0].Chains[0].Loops = 3;
+        document.Save.Sequences[0].Tracks[0].Chains[0].Length = 3;
 
         document.CancelGesture(before);
 
-        document.Save.Sequences[0].Tracks[0].Chains[0].Loops.ShouldBe(1);
+        document.Save.Sequences[0].Tracks[0].Chains[0].Length.ShouldBeNull();
         undo.UndoHistory.Count.ShouldBe(1);
     }
 

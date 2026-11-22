@@ -839,13 +839,28 @@ public sealed class SequenceDocument : ISequenceChainLookup
         FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, UnitOf(reference)) : null;
 
     /// <summary>
-    /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds, playing once, on
-    /// track <paramref name="track"/> of sequence <paramref name="sequence"/>. A null track adds a new track named
-    /// after the chain, as the first track (index 0), so it is drawn in front. The caller selects the placed chain.
+    /// The block's length in seconds as shown and edited: <see cref="SequenceChainReferenceSave.Length"/> when set, else
+    /// one cycle of the chain (rounded to 1e-6 s, so summed float frame lengths show and edit as 0.5, not 0.500000007),
+    /// else 0 for a missing chain.
     /// </summary>
-    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start, float loops = 1)
+    public double ChainLength(SequenceChainReferenceSave reference) => reference.Length ?? Math.Round(CycleLength(reference) ?? 0, 6);
+
+    /// <summary>
+    /// A reference clip's length in seconds as shown and edited: <see cref="SequenceReferenceSave.Length"/> when set, else
+    /// one run of the target (0 when it is missing).
+    /// </summary>
+    public double ClipLength(SequenceReferenceSave reference) =>
+        reference.Length ?? Math.Round(SequenceLength(Save.Sequences.FindIndex(s => s.Name == reference.Sequence)), 6);
+
+    /// <summary>
+    /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds on track
+    /// <paramref name="track"/> of sequence <paramref name="sequence"/>, for <paramref name="length"/> seconds (null: one
+    /// cycle, following the chain). A null track adds a new track named after the chain, as the first track (index 0),
+    /// so it is drawn in front. The caller selects the placed chain.
+    /// </summary>
+    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start, double? length = null)
     {
-        var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start), Loops = loops };
+        var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start), Length = length };
         if (track is { } index)
         {
             string trackName = Save.Sequences[sequence].Tracks[index].Name;
@@ -907,17 +922,19 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
-    /// <summary>Sets a reference track's clip length in cycles of the target. Returns why it was refused (not a reference, zero, negative or not a number), or null.</summary>
-    public string? SetReferenceLoops(IUndoManager undo, int sequence, int track, float loops)
+    /// <summary>Sets a reference track's clip length in seconds. Returns why it was refused (not a reference, zero, negative or not a number), or null.</summary>
+    public string? SetReferenceLength(IUndoManager undo, int sequence, int track, double length)
     {
         if (Save.Sequences[sequence].Tracks[track].Reference is null) return "That track does not play a sequence.";
-        if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
+        if (!double.IsFinite(length) || length <= 0) return LengthRefusal;
         string name = Save.Sequences[sequence].Tracks[track].Name;
-        Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
-            save => save.Sequences[sequence].Tracks[track].Reference!.Loops = loops,
-            coalesceGroup: $"refcycles:{sequence}:{track}");
+        Edit(undo, $"Set Length of '{name}' to {Format(length)}",
+            save => save.Sequences[sequence].Tracks[track].Reference!.Length = length,
+            coalesceGroup: $"reflength:{sequence}:{track}");
         return null;
     }
+
+    private const string LengthRefusal = "Length must be above 0.";
 
     /// <summary>
     /// Adds an empty track as the first track of sequence <paramref name="sequence"/> (index 0, so it is drawn in front of
@@ -1066,17 +1083,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
-    /// <summary><see cref="SetChainLoops"/> for several chains; refused (none changed) when any would end up zero, negative or not a number.</summary>
-    public string? SetChainsLoops(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains, NumericEdit loops)
+    /// <summary>
+    /// <see cref="SetChainLength"/> for several chains; a relative edit ("+ 0.5") applies to each block's shown length
+    /// (<see cref="ChainLength"/>). Refused (none changed) when any would end up zero, negative or not a number.
+    /// </summary>
+    public string? SetChainsLength(IUndoManager undo, int sequence, IReadOnlyList<TimelineChainId> chains, NumericEdit length)
     {
         var set = chains.Distinct().ToList();
         if (set.Count == 0) return null;
-        var targets = set.Select(id => (id, value: loops.Apply(Save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Loops))).ToList();
-        if (targets.Any(t => !float.IsFinite(t.value) || t.value <= 0)) return "Cycles must be above 0.";
-        Edit(undo, $"Set Cycles of {ChainsNamed(sequence, set)}{ToText(loops)}", save =>
+        var targets = set.Select(id => (id, value: (double)length.Apply((decimal)ChainLength(Save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain])))).ToList();
+        if (targets.Any(t => !double.IsFinite(t.value) || t.value <= 0)) return LengthRefusal;
+        Edit(undo, $"Set Length of {ChainsNamed(sequence, set)}{ToText(length)}", save =>
         {
-            foreach (var (id, value) in targets) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Loops = value;
-        }, coalesceGroup: $"cycles:{sequence}:{ChainSetKey(set)}");
+            foreach (var (id, value) in targets) save.Sequences[sequence].Tracks[id.Track].Chains[id.Chain].Length = value;
+        }, coalesceGroup: $"length:{sequence}:{ChainSetKey(set)}");
         return null;
     }
 
@@ -1138,20 +1158,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>
-    /// Sets the block's length in cycles (<see cref="SequenceChainReferenceSave.Loops"/>). Returns why it was refused (zero,
-    /// negative or not a number), or null.
+    /// Sets the block's length in seconds (<see cref="SequenceChainReferenceSave.Length"/>), so its end no longer follows
+    /// the chain. Returns why it was refused (zero, negative or not a number), or null.
     /// </summary>
-    public string? SetChainLoops(IUndoManager undo, int sequence, int track, int chain, float loops)
+    public string? SetChainLength(IUndoManager undo, int sequence, int track, int chain, double length)
     {
-        if (!float.IsFinite(loops) || loops <= 0) return "Cycles must be above 0.";
+        if (!double.IsFinite(length) || length <= 0) return LengthRefusal;
         string name = Save.Sequences[sequence].Tracks[track].Chains[chain].Chain;
-        Edit(undo, $"Set Cycles of '{name}' to {Format(loops)}",
-            save => save.Sequences[sequence].Tracks[track].Chains[chain].Loops = loops,
-            coalesceGroup: $"cycles:{sequence}:{track}:{chain}");
+        Edit(undo, $"Set Length of '{name}' to {Format(length)}",
+            save => save.Sequences[sequence].Tracks[track].Chains[chain].Length = length,
+            coalesceGroup: $"length:{sequence}:{track}:{chain}");
         return null;
     }
 
-    private static string Format(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private static string Format(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Starts a gesture that edits <see cref="Save"/> in place on every pointer move (a drag). Returns the state to pass

@@ -20,9 +20,9 @@ public class SequenceDocumentRelinkChainTests
         save.Sources.Add("hero.achx");
         var sequence = new SequenceSave { Name = "Attack" };
         var track = new SequenceTrackSave { Name = "T" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Loops = 1 });
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 1, Loops = 1 });
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Old", Start = 2, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk" });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Old", Start = 2 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         string path = System.IO.Path.Combine(folder, "boss.seqj");

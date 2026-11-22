@@ -32,7 +32,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         save.Sources.Add("chars/hero.achx");
         save.Sources.AddRange(extraSources);
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk", Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk" });
         var sequence = new SequenceSave { Name = "Attack" };
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
@@ -383,7 +383,7 @@ public class SequenceSaveAsAndRelinkScenarioTests
         string boss = WriteBoss(editor);
         SequenceListSave edit = SequenceListSave.FromFile(boss);
         var second = new SequenceTrackSave { Name = "Tail" };
-        second.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk", Loops = 1 });
+        second.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk" });
         edit.Sequences[0].Tracks.Add(second);
         edit.Save(boss);
         await editor.OpenAsync(boss);

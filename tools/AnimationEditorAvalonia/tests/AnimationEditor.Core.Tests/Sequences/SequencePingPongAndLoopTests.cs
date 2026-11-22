@@ -8,7 +8,7 @@ using Xunit;
 namespace AnimationEditor.Core.Tests.Sequences;
 
 /// <summary>
-/// A ping-pong chain's cycle is twice its frames, and a reference's loops is the block's length in cycles: a chain with Loop on repeats across it, one with Loop
+/// A ping-pong chain's cycle is twice its frames, and a block's length (one cycle unless set) decides what plays: a chain with Loop on repeats across it, one with Loop
 /// off plays once and holds its last frame.
 /// The first round of sequence tests used neither, so both rules were unpinned.
 /// </summary>
@@ -40,10 +40,10 @@ public class SequencePingPongAndLoopTests
         return chain;
     }
 
-    private static SequenceTrackSave Track(string chain, double start, float loops) => new()
+    private static SequenceTrackSave Track(string chain, double start, double? length = null) => new()
     {
         Name = "Body",
-        Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = chain, Start = start, Loops = loops } },
+        Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = chain, Start = start, Length = length } },
     };
 
     [Fact]
@@ -57,15 +57,15 @@ public class SequencePingPongAndLoopTests
     }
 
     [Fact]
-    public void LengthAndBlocks_PingPongWithFloatLoops_UseTheDoubledCycle()
+    public void LengthAndBlocks_PingPongWithAnUnsetLength_UseTheDoubledCycle()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Bounce", start: 1, loops: 2.5f));
+        var document = Load(dir, Track("Bounce", start: 1));
         var sequence = document.Save.Sequences[0];
 
-        SequenceTimeline.Length(document.Save.Sequences, sequence, r => document.CycleLength(r) ?? 0).ShouldBe(1 + 2.5 * 0.6, 1e-6);
+        SequenceTimeline.Length(document.Save.Sequences, sequence, r => document.CycleLength(r) ?? 0).ShouldBe(1 + 0.6, 1e-6);
         var block = TimelineLayout.Blocks(sequence, document.CycleLength).Single();
-        block.Full.ShouldBe(2.5 * 0.6, 1e-6);
+        block.Full.ShouldBe(0.6, 1e-6);
         block.CycleLength.ShouldBe(0.6, 1e-6);
     }
 
@@ -73,7 +73,7 @@ public class SequencePingPongAndLoopTests
     public void At_PingPongChain_PlaysForwardThenBackwardWithinOneCycle()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Bounce", start: 0, loops: 1));
+        var document = Load(dir, Track("Bounce", start: 0));
 
         // Forward 0.0-0.3 shows frames 0,1,2; the way back 0.3-0.6 shows 2,1,0.
         SequenceScene.At(document, 0, 0.05).Single().FrameIndex.ShouldBe(0);
@@ -84,12 +84,11 @@ public class SequencePingPongAndLoopTests
         SequenceScene.At(document, 0, 0.65).ShouldBeEmpty();
     }
 
-    // Was At_ReferenceLoops_OverrideAChainWhoseOwnLoopFlagIsOff: loops no longer override the chain's Loop flag.
     [Fact]
-    public void At_ReferenceLoops_OnAChainWhoseOwnLoopFlagIsOff_HoldTheLastFrameInsteadOfRepeating()
+    public void At_ALongBlock_OnAChainWhoseOwnLoopFlagIsOff_HoldsTheLastFrameInsteadOfRepeating()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Once", start: 0, loops: 3));
+        var document = Load(dir, Track("Once", start: 0, length: 0.9));
 
         SequenceScene.At(document, 0, 0.25).Single().FrameIndex.ShouldBe(2);
         // 0.35 s is 0.05 s past the one cycle: the last frame stays, it does not restart at frame 0.
@@ -100,10 +99,10 @@ public class SequencePingPongAndLoopTests
     }
 
     [Fact]
-    public void At_ReferenceLoops_OnALoopingChain_RestartItEachCycle()
+    public void At_ALongBlock_OnALoopingChain_RestartsItEachCycle()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Spin", start: 0, loops: 3));
+        var document = Load(dir, Track("Spin", start: 0, length: 0.9));
 
         SequenceScene.At(document, 0, 0.25).Single().FrameIndex.ShouldBe(2);
         SequenceScene.At(document, 0, 0.35).Single().FrameIndex.ShouldBe(0);
@@ -116,7 +115,7 @@ public class SequencePingPongAndLoopTests
     {
         using var dir = new TestHelpers.TempDir();
         // Bounce is 0.6 s per cycle (0 1 2 2 1 0) with Loop off; two cycles is 1.2 s.
-        var document = Load(dir, Track("Bounce", start: 0, loops: 2));
+        var document = Load(dir, Track("Bounce", start: 0, length: 1.2));
 
         SequenceScene.At(document, 0, 0.55).Single().FrameIndex.ShouldBe(0);
         SequenceScene.At(document, 0, 0.8).Single().FrameIndex.ShouldBe(0);

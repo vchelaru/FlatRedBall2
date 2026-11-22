@@ -28,7 +28,7 @@ public class SequenceOpsTests : IDisposable
             "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop",
             "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "add-reference-track",
             "add-source", "remove-source", "replace-source",
-            "add-block", "set-block-start", "set-block-loops", "set-block-end", "delete-block",
+            "add-block", "set-block-start", "set-block-length", "set-block-end", "delete-block",
         ], ignoreOrder: true);
     }
 
@@ -47,7 +47,7 @@ public class SequenceOpsTests : IDisposable
             {"ops":[
               {"op":"rename-sequence","sequence":"Run","to":"Sprint"},
               {"op":"add-track","sequence":"Sprint","name":"Arm"},
-              {"op":"add-block","track":"Sprint/Arm","source":"hero.achj","chain":"Idle","start":0.25,"loops":2},
+              {"op":"add-block","track":"Sprint/Arm","source":"hero.achj","chain":"Idle","start":0.25,"length":1},
               {"op":"set-track-continuous","track":"Sprint/Arm","value":true},
               {"op":"set-sequence-loop","sequence":"Rest","value":true}
             ]}
@@ -57,8 +57,8 @@ public class SequenceOpsTests : IDisposable
         var save = Reload();
         save.Sequences.Select(s => s.Name).ShouldBe(["Sprint", "Rest"]);
         var arm = save.Sequences[0].Tracks[0];
-        (arm.Name, arm.Continuous, arm.Chains.Single().Chain, arm.Chains.Single().Start, arm.Chains.Single().Loops)
-            .ShouldBe(("Arm", true, "Idle", 0.25, 2f));
+        (arm.Name, arm.Continuous, arm.Chains.Single().Chain, arm.Chains.Single().Start, arm.Chains.Single().Length)
+            .ShouldBe(("Arm", true, "Idle", 0.25, (double?)1));
         save.Sequences[1].Loop.ShouldBeTrue();
     }
 
@@ -124,7 +124,7 @@ public class SequenceOpsTests : IDisposable
         var run = Apply("""
             {"ops":[
               {"op":"set-track-continuous","track":"Run/*","value":true},
-              {"op":"set-block-loops","block":"Run/Body/*","loops":3},
+              {"op":"set-block-length","block":"Run/Body/*","length":1.2},
               {"op":"delete-block","block":"Run/Body/0-1"},
               {"op":"set-sequence-loop","sequence":"R*","value":false}
             ]}
@@ -189,16 +189,16 @@ public class SequenceOpsTests : IDisposable
         Apply("""
             {"ops":[
               {"op":"add-reference-track","sequence":"Rest","target":"Run","start":1},
-              {"op":"set-block-loops","block":"Rest/Run/0","loops":2}
+              {"op":"set-block-length","block":"Rest/Run/0","length":2}
             ]}
             """).Success.ShouldBeTrue();
 
         var clip = Reload().Sequences[1].Tracks[0].Reference!;
-        (clip.Sequence, clip.Start, clip.Loops).ShouldBe(("Run", 1.0, 2f));
+        (clip.Sequence, clip.Start, clip.Length).ShouldBe(("Run", 1.0, (double?)2));
     }
 
     [Fact]
-    public void SetBlockEnd_ComputesLoops_KeepingFractions()
+    public void SetBlockEnd_SetsTheLengthToEndMinusStart()
     {
         var run = Apply("""
             {"ops":[
@@ -209,8 +209,8 @@ public class SequenceOpsTests : IDisposable
 
         run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
         var tracks = Reload().Sequences[0].Tracks;
-        tracks[1].Chains[0].Loops.ShouldBe(2.5f, 1e-4f); // Idle is 0.5 s
-        tracks[0].Chains[1].Loops.ShouldBe(3f, 1e-4f);   // starts at 1, Walk is 0.4 s
+        tracks[1].Chains[0].Length.ShouldBe(1.25);
+        tracks[0].Chains[1].Length.ShouldBe(1.2); // starts at 1
     }
 
     [Fact]
@@ -219,8 +219,8 @@ public class SequenceOpsTests : IDisposable
         Apply("""{"ops":[{"op":"set-block-end","block":"Run/*/0","end":2}]}""").Success.ShouldBeTrue();
 
         var tracks = Reload().Sequences[0].Tracks;
-        tracks[0].Chains[0].Loops.ShouldBe(5f, 1e-4f);
-        tracks[1].Chains[0].Loops.ShouldBe(4f, 1e-4f);
+        tracks[0].Chains[0].Length.ShouldBe(2);
+        tracks[1].Chains[0].Length.ShouldBe(2);
     }
 
     [Theory]
@@ -235,17 +235,17 @@ public class SequenceOpsTests : IDisposable
     }
 
     [Fact]
-    public void SetBlockEnd_OnAReferenceClip_IsRefused()
+    public void SetBlockEnd_OnAReferenceClip_SetsTheClipLength()
     {
         var run = Apply("""
             {"ops":[
-              {"op":"add-reference-track","sequence":"Rest","target":"Run"},
+              {"op":"add-reference-track","sequence":"Rest","target":"Run","start":0.5},
               {"op":"set-block-end","block":"Rest/Run/0","end":3}
             ]}
             """);
 
-        run.Success.ShouldBeFalse();
-        run.Result.CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        Reload().Sequences[1].Tracks[0].Reference!.Length.ShouldBe(2.5);
     }
 
     private static System.Text.Json.Nodes.JsonNode JsonValue(string v) => System.Text.Json.Nodes.JsonValue.Create(v)!;

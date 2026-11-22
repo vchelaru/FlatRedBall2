@@ -26,7 +26,7 @@ public class SequenceTrackNameTooltipScenarioTests
         foreach (string name in new[] { LongName, "Sun", MediumName })
         {
             var track = new SequenceTrackSave { Name = name };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
             action.Tracks.Add(track);
         }
         save.Sequences.Add(action);

@@ -27,9 +27,9 @@ public class SequenceReferenceScenarioTests
             AnimationEditorHarness.Chain("Run", "sheet.png", (0, 32, 16, 16), (16, 32, 16, 16)));
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
-        save.Sequences.Add(Sequence("Idle", Track("Body", "Walk", 4)));
-        save.Sequences.Add(Sequence("Earth", Track("Ring", "Run", 5), Track("Dust", "Walk", 1)));
-        save.Sequences.Add(Sequence("Action", Track("Hit", "Run", 1)));
+        save.Sequences.Add(Sequence("Idle", Track("Body", "Walk", 2.0)));
+        save.Sequences.Add(Sequence("Earth", Track("Ring", "Run", 1.0), Track("Dust", "Walk")));
+        save.Sequences.Add(Sequence("Action", Track("Hit", "Run")));
         save.Save(path);
         return path;
     }
@@ -41,8 +41,8 @@ public class SequenceReferenceScenarioTests
         return sequence;
     }
 
-    private static SequenceTrackSave Track(string name, string chain, float loops) =>
-        new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Loops = loops } } };
+    private static SequenceTrackSave Track(string name, string chain, double? length = null) =>
+        new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = chain, Length = length } } };
 
     private static ListBox List(AnimationEditorHarness editor) => editor.Control<ListBox>("SequenceList");
 
@@ -82,7 +82,7 @@ public class SequenceReferenceScenarioTests
         tracks.Select(t => t.Name).ShouldBe(new[] { "Earth", "Body" }); // the new track lands in front
         tracks[0].Reference!.Sequence.ShouldBe("Earth");
         tracks[0].Reference!.Start.ShouldBe(0.5, "at the playhead, not where it was dropped");
-        tracks[0].Reference!.Loops.ShouldBe(1f);
+        tracks[0].Reference!.Length.ShouldBeNull();
         editor.UndoLabels.ShouldBe(new[] { "Add Reference 'Earth'" });
         Selected(editor).ShouldBe(new[] { "Idle" }); // the drag did not select the dragged row
         Timeline(editor).SelectedTrack.ShouldBe(0);
@@ -286,13 +286,13 @@ public class SequenceReferenceScenarioTests
         editor.Drag(OnLanes(editor, 0, 0.4), OnLanes(editor, 0, 0.9), RawInputModifiers.Alt);
         Saved(boss, "Idle").Tracks[0].Reference!.Start.ShouldBe(0.5, 0.02);
 
-        // Then its right edge from 1.5 s to 3.5 s: two more cycles.
+        // Then its right edge from 1.5 s to 3.5 s: 3 s long.
         var reference = timeline.References.Single();
         double edge = timeline.Viewport.XAt(reference.End);
         var y = timeline.Viewport.LaneTop(0) + TimelineLayout.BodyTop + 8;
         editor.Drag(editor.PointIn(timeline, edge - 1, y), editor.PointIn(timeline, timeline.Viewport.XAt(reference.End + 2), y), RawInputModifiers.Alt);
 
-        Saved(boss, "Idle").Tracks[0].Reference!.Loops.ShouldBe(3f, 0.05f);
+        Saved(boss, "Idle").Tracks[0].Reference!.Length!.Value.ShouldBe(3, 0.05);
         timeline.SequenceLength.ShouldBe(3.5, 0.05);   // the clip end, past Body's 2 s
         editor.UndoLabels.Count.ShouldBe(3);
     }

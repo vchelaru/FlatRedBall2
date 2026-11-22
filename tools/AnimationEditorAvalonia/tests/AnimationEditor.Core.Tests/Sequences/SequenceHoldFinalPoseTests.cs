@@ -33,15 +33,15 @@ public class SequenceHoldFinalPoseTests
         list.SaveJson(path);
     }
 
-    private static SequenceSave Sequence(string name, bool loop, params (string Track, string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceSave Sequence(string name, bool loop, params (string Track, string Source, string Chain, double Start, double? Length)[] chains)
     {
         var sequence = new SequenceSave { Name = name, Loop = loop };
-        foreach (var (track, source, chain, start, loops) in chains)
+        foreach (var (track, source, chain, start, length) in chains)
         {
             sequence.Tracks.Add(new SequenceTrackSave
             {
                 Name = track,
-                Chains = { new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops } },
+                Chains = { new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length } },
             });
         }
         return sequence;
@@ -55,7 +55,7 @@ public class SequenceHoldFinalPoseTests
     {
         using var dir = new TestHelpers.TempDir();
         // Walk twice: 1 s long, the last frame (index 1) is showing at the end.
-        var document = Load(dir, Sequence("Attack", loop: false, ("Body", "body.achj", "Walk", 0, 2)));
+        var document = Load(dir, Sequence("Attack", loop: false, ("Body", "body.achj", "Walk", 0, 1.0)));
 
         var atLength = SequenceScene.At(document, 0, 1.0);
         var past = SequenceScene.At(document, 0, 6.0);
@@ -71,7 +71,7 @@ public class SequenceHoldFinalPoseTests
         using var dir = new TestHelpers.TempDir();
         // Body ends at 0.5 s, Fx at 1 s (the sequence length): the held pose is Fx alone.
         var document = Load(dir, Sequence("Attack", loop: false,
-            ("Body", "body.achj", "Walk", 0, 1), ("Fx", "fx.achj", "Spark", 0, 1)));
+            ("Body", "body.achj", "Walk", 0, null), ("Fx", "fx.achj", "Spark", 0, null)));
 
         SequenceScene.At(document, 0, 0.3).Select(s => s.Chain.Name).ShouldBe(new[] { "Spark", "Walk" });
         SequenceScene.At(document, 0, 1.0).Select(s => s.Chain.Name).ShouldBe(new[] { "Spark" });
@@ -82,7 +82,7 @@ public class SequenceHoldFinalPoseTests
     public void At_ALoopingSequence_IsUnchanged_NothingShowsAtTheEndInstant()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Sequence("Attack", loop: true, ("Body", "body.achj", "Walk", 0, 2)));
+        var document = Load(dir, Sequence("Attack", loop: true, ("Body", "body.achj", "Walk", 0, 1.0)));
 
         SequenceScene.At(document, 0, 0.3).Single().FrameIndex.ShouldBe(1);
         SequenceScene.At(document, 0, 1.0).ShouldBeEmpty();
@@ -93,8 +93,8 @@ public class SequenceHoldFinalPoseTests
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir,
-            Sequence("Looping", loop: true, ("Body", "body.achj", "Walk", 0, 1)),
-            Sequence("Once", loop: false, ("Fx", "fx.achj", "Spark", 0, 1)));
+            Sequence("Looping", loop: true, ("Body", "body.achj", "Walk", 0, null)),
+            Sequence("Once", loop: false, ("Fx", "fx.achj", "Spark", 0, null)));
 
         // Walk is 0.5 s, Spark 1 s. Both playheads are at their own ends.
         var sprites = SequenceScene.At(document, new[] { new SequenceTime(0, 0.5), new SequenceTime(1, 1.0) });
@@ -108,7 +108,7 @@ public class SequenceHoldFinalPoseTests
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir,
             Sequence("Empty", loop: false),
-            Sequence("Missing", loop: false, ("Body", "body.achj", "Gone", 0, 1)));
+            Sequence("Missing", loop: false, ("Body", "body.achj", "Gone", 0, null)));
 
         SequenceScene.At(document, 0, 0).ShouldBeEmpty();
         SequenceScene.At(document, 0, 5).ShouldBeEmpty();

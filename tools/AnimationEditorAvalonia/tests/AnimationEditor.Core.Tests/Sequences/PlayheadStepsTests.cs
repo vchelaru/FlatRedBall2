@@ -18,8 +18,8 @@ public class PlayheadStepsTests
     private static readonly AnimationChainSave Run = ChainOf("Run", false, 0.1f, 0.1f);
     private static readonly AnimationChainSave Spin = ChainOf("Spin", true, 0.1f, 0.2f);
 
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     private static AnimationChainSave? Find(SequenceChainReferenceSave reference) =>
         reference.Chain switch { "Walk" => Walk, "Run" => Run, "Spin" => Spin, _ => null };
@@ -58,9 +58,9 @@ public class PlayheadStepsTests
     public void Boundaries_OfALoopingChain_RepeatEveryCycle_AndOfANonLoopingOne_OnlyTheFirst()
     {
         // Spin (0.1 + 0.2 = 0.3 per cycle) asked for 2 cycles: cycle starts at 0 and 0.3, cuts at 0.1 and 0.4.
-        Boundaries(Track(true, Ref("Spin", 0, loops: 2))).ShouldBe(new[] { 0, 0.1, 0.3, 0.4, 0.6 });
+        Boundaries(Track(true, Ref("Spin", 0, length: 0.6))).ShouldBe(new[] { 0, 0.1, 0.3, 0.4, 0.6 });
         // Run does not repeat: 3 cycles is one cycle of frames and then a held frame to 0.6.
-        Boundaries(Track(true, Ref("Run", 0, loops: 3))).ShouldBe(new[] { 0, 0.1, 0.6 });
+        Boundaries(Track(true, Ref("Run", 0, length: 0.6))).ShouldBe(new[] { 0, 0.1, 0.6 });
     }
 
     [Fact]

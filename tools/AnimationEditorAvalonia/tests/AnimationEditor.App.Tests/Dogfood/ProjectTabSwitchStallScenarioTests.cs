@@ -42,7 +42,7 @@ public class ProjectTabSwitchStallScenarioTests
             var save = new SequenceListSave { Sources = { "anim0.achx" } };
             var sequence = new SequenceSave { Name = "Attack" };
             var track = new SequenceTrackSave { Name = "Body" };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "anim0.achx", Chain = "Walk", Start = 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "anim0.achx", Chain = "Walk", Start = 0 });
             sequence.Tracks.Add(track);
             save.Sequences.Add(sequence);
             save.Save(Path.Combine(editor.ProjectFolder, $"Group{folder}/boss{folder}.seqj"));

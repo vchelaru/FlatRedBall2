@@ -38,11 +38,11 @@ public class SequenceContinuousTrackTests
         list.SaveJson(path);
     }
 
-    private static SequenceTrackSave Track(string name, bool continuous, params (string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, bool continuous, params (string Source, string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name, Continuous = continuous };
-        foreach (var (source, chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
+        foreach (var (source, chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -127,7 +127,7 @@ public class SequenceContinuousTrackTests
     public void At_AContinuousTrack_ContinuesItsChainsPhaseAcrossPasses(bool continuous, int pass, string expected)
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Sequence(Track("Body", continuous, ("body.achj", "Walk", 0, 2.5f))));
+        var document = Load(dir, Sequence(Track("Body", continuous, ("body.achj", "Walk", 0, 1.25))));
 
         Describe(SequenceScene.At(document, 0, 0.1, pass)).ShouldBe(expected);
     }
@@ -137,8 +137,8 @@ public class SequenceContinuousTrackTests
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir, Sequence(
-            Track("Fx", false, ("fx.achj", "Spark", 0, 1.25f)),
-            Track("Body", true, ("body.achj", "Walk", 0, 2.5f))));
+            Track("Fx", false, ("fx.achj", "Spark", 0, 1.25)),
+            Track("Body", true, ("body.achj", "Walk", 0, 1.25))));
 
         // Spark is 1.25 s long too; Body's frame at pass 1 is Walk's second.
         Describe(SequenceScene.At(document, 0, 0.1, 1)).ShouldBe("1:Walk#1@0.1, 0:Spark#0@0.1");
@@ -149,7 +149,7 @@ public class SequenceContinuousTrackTests
     {
         using var dir = new TestHelpers.TempDir();
         // Walk (0.5 s) then Spark (1 s): Spark is playing when the 1.5 s sequence wraps, so the first block restarts.
-        var document = Load(dir, Sequence(Track("Body", true, ("body.achj", "Walk", 0, 1), ("fx.achj", "Spark", 0.5, 1))));
+        var document = Load(dir, Sequence(Track("Body", true, ("body.achj", "Walk", 0, null), ("fx.achj", "Spark", 0.5, null))));
 
         Describe(SequenceScene.At(document, 0, 0.1, 1)).ShouldBe("0:Walk#0@0.1");
     }
@@ -158,7 +158,7 @@ public class SequenceContinuousTrackTests
     public void At_ANonLoopingSequence_IgnoresThePass()
     {
         using var dir = new TestHelpers.TempDir();
-        var sequence = Sequence(Track("Body", true, ("body.achj", "Walk", 0, 2.5f)));
+        var sequence = Sequence(Track("Body", true, ("body.achj", "Walk", 0, 1.25)));
         sequence.Loop = false;
         var document = Load(dir, sequence);
 
@@ -170,8 +170,8 @@ public class SequenceContinuousTrackTests
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir,
-            Sequence(Track("Body", true, ("body.achj", "Walk", 0, 2.5f))),
-            Sequence(Track("Body", true, ("body.achj", "Walk", 0, 2.5f))));
+            Sequence(Track("Body", true, ("body.achj", "Walk", 0, 1.25))),
+            Sequence(Track("Body", true, ("body.achj", "Walk", 0, 1.25))));
 
         var sprites = SequenceScene.At(document, new[] { new SequenceTime(0, 0.1, 1), new SequenceTime(1, 0.1, 0) });
 
@@ -182,8 +182,8 @@ public class SequenceContinuousTrackTests
 
     private static SequenceDocument LoadTwoTracks(TestHelpers.TempDir dir) =>
         Load(dir, Sequence(
-            Track("Body", false, ("body.achj", "Walk", 0, 1)),
-            Track("Fx", false, ("fx.achj", "Spark", 0, 1))));
+            Track("Body", false, ("body.achj", "Walk", 0, null)),
+            Track("Fx", false, ("fx.achj", "Spark", 0, null))));
 
     private static List<bool> SavedFlags(SequenceDocument document) =>
         SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks.Select(t => t.Continuous).ToList();
@@ -254,7 +254,7 @@ public class SequenceContinuousTrackTests
         TimelineClipboard.TryRead(source.CopyChains(0, new[] { new TimelineChainId(0, 0) }), out var content, out _).ShouldBeTrue();
 
         using var otherDir = new TestHelpers.TempDir();
-        var target = Load(otherDir, Sequence(Track("Fx", false, ("fx.achj", "Spark", 0, 1))));
+        var target = Load(otherDir, Sequence(Track("Fx", false, ("fx.achj", "Spark", 0, null))));
         target.PasteChains(new UndoManager(), 0, content!, selectedTrack: null, time: 0);
 
         var tracks = SequenceListSave.FromFile(target.Path.FullPath).Sequences[0].Tracks;

@@ -31,13 +31,13 @@ public class SequenceAuditScenarioTests
         attack.Tracks.Add(new SequenceTrackSave
         {
             Name = "Body",
-            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Loops = 1 } },
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5 } },
         });
         var idle = new SequenceSave { Name = "Idle" };
         idle.Tracks.Add(new SequenceTrackSave
         {
             Name = "Legs",
-            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Run", Start = 0, Loops = 1 } },
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Run", Start = 0 } },
         });
         save.Sequences.Add(attack);
         save.Sequences.Add(idle);

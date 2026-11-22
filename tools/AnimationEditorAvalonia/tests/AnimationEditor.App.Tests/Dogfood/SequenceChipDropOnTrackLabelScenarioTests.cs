@@ -21,11 +21,11 @@ public class SequenceChipDropOnTrackLabelScenarioTests
         var sequence = new SequenceSave { Name = "Attack" };
         sequence.Tracks.Add(new SequenceTrackSave { Name = "Body" });
         var legs = new SequenceTrackSave { Name = "Legs" };
-        legs.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 2, Loops = 1 });
-        legs.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 1, Loops = 1.5f });
+        legs.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 2 });
+        legs.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 1, Length = 0.3 });
         sequence.Tracks.Add(legs);
         var arms = new SequenceTrackSave { Name = "Arms" };
-        arms.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Loops = 2.5f });
+        arms.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0.5, Length = 0.5 });
         sequence.Tracks.Add(arms);
         save.Sequences.Add(sequence);
         save.Save(path);
@@ -85,7 +85,7 @@ public class SequenceChipDropOnTrackLabelScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task LabelDropOnFractionalLoopsTrack_AppendsAtExactEnd()
+    public async Task LabelDropOnTrackWithAFractionalCycleLength_AppendsAtExactEnd()
     {
         var (editor, boss, chip) = await Open();
         using (editor)

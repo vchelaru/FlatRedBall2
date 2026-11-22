@@ -11,7 +11,7 @@ public class SequenceTrackNoOffsetTests
 {
     private const string FileWithOffsets = """
         { "version": 1, "sources": [ "Boss.achj" ], "sequences": [ { "name": "Idle", "tracks": [
-          { "name": "Body", "x": 12, "y": -3, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0, "loops": 1 } ] },
+          { "name": "Body", "x": 12, "y": -3, "chains": [ { "source": "Boss.achj", "chain": "Walk", "start": 0 } ] },
           { "name": "Wing", "x": 0, "y": 0, "tag": "keep", "visible": false, "chains": [] } ] } ] }
         """;
 

@@ -8,8 +8,8 @@ namespace AnimationEditor.Core.Tests.Sequences;
 
 public class TimelineSnapTargetsTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     // Every chain is 0.5 s per cycle.
     private static double? Cycle(SequenceChainReferenceSave reference) => 0.5;
@@ -34,7 +34,7 @@ public class TimelineSnapTargetsTests
     public void Others_OffersEveryOtherChainsEdgesOnEveryTrack_ThePlayhead_AndZero_NeverTheDraggedChain()
     {
         var dragged = Ref("Walk", 0);
-        var cut = Ref("Run", 1, loops: 4);       // 1..3 asked, cut at 2 by Hurt
+        var cut = Ref("Run", 1, length: 2);      // 1..3 asked, cut at 2 by Hurt
         var hurt = Ref("Hurt", 2);               // 2..2.5
         var other = Ref("Jump", 5);              // on the other track: 5..5.5
         var blocks = Blocks(Track(dragged, cut, hurt), Track(other));
@@ -53,7 +53,7 @@ public class TimelineSnapTargetsTests
     [Fact]
     public void Others_AChainCutByTheDraggedOne_OffersNoPlayedEnd_OnlyItsFullEnd()
     {
-        var early = Ref("Run", 0, loops: 4);     // asks for 0..2, cut at 1 by the dragged Walk
+        var early = Ref("Run", 0, length: 2);    // asks for 0..2, cut at 1 by the dragged Walk
         var dragged = Ref("Walk", 1);
         var blocks = Blocks(Track(early, dragged));
 
@@ -78,8 +78,7 @@ public class TimelineSnapTargetsTests
 
         result.Snap.Time.ShouldBe(1.05, 1e-9);
         result.Snap.Target!.Value.Kind.ShouldBe(SnapKind.ChainEdge);
-        // Loops are a float, so the edge it gives is exact to float precision, not to 1e-9.
-        (0 + result.Loops * 0.5).ShouldBe(1.05, 1e-6);
+        result.Length.ShouldBe(1.05);
     }
 
     [Fact]
@@ -94,7 +93,7 @@ public class TimelineSnapTargetsTests
         var result = TimelineSnapTargets.ResizeEdge(blocks[0], 1.06, others, null, 2000, bypass: false);
 
         result.Snap.Target.ShouldBeNull();
-        (result.Loops * 0.5).ShouldBe(1.06, 1e-6);
+        result.Length.ShouldBe(1.06);
     }
 
     [Fact]
@@ -108,7 +107,7 @@ public class TimelineSnapTargetsTests
         var frame = TimelineSnapTargets.ResizeEdge(blocks[0], 0.7 + 3 / 1500.0, TimelineSnapTargets.Others(blocks, walk, 9), frames, 1500, false);
 
         cycle.Snap.Target!.Value.Kind.ShouldBe(SnapKind.OwnCycle);
-        cycle.Loops.ShouldBe(3f, 1e-6f);
+        cycle.Length.ShouldBe(1.5);
         frame.Snap.Target!.Value.Kind.ShouldBe(SnapKind.FrameBoundary);
         frame.Snap.Time.ShouldBe(0.7, 1e-9);
     }
@@ -140,11 +139,11 @@ public class TimelineSnapTargetsTests
         var result = TimelineSnapTargets.ResizeEdge(blocks[0], 1.0 + 2 / 120.0, TimelineSnapTargets.Others(blocks, walk, 9), null, 120, bypass: true);
 
         result.Snap.Target.ShouldBeNull();
-        result.Loops.ShouldBe((float)((1.0 + 2 / 120.0) / 0.5), 1e-5f);
+        result.Length.ShouldBe(1.0 + 2 / 120.0, 1e-6);
     }
 
     [Fact]
-    public void ResizeEdge_DraggedBeforeTheStart_KeepsTheMinimumLoops_EvenNextToATargetThere()
+    public void ResizeEdge_DraggedBeforeTheStart_KeepsTheMinimumLength_EvenNextToATargetThere()
     {
         var walk = Ref("Walk", 2);
         var other = Ref("Run", 0.5);
@@ -154,8 +153,8 @@ public class TimelineSnapTargetsTests
         var result = TimelineSnapTargets.ResizeEdge(blocks[0], 1.0, TimelineSnapTargets.Others(blocks, walk, 9), null, 120, false);
         var nearTarget = TimelineSnapTargets.ResizeEdge(blocks[0], 0.5, TimelineSnapTargets.Others(blocks, walk, 9), null, 120, false);
 
-        result.Loops.ShouldBe(SequenceTimeline.MinimumLoops);
-        nearTarget.Loops.ShouldBe(SequenceTimeline.MinimumLoops);
+        result.Length.ShouldBe(SequenceTimeline.MinimumLength);
+        nearTarget.Length.ShouldBe(SequenceTimeline.MinimumLength);
         nearTarget.Snap.Target.ShouldBeNull();
     }
 
@@ -168,7 +167,7 @@ public class TimelineSnapTargetsTests
 
         var result = TimelineSnapTargets.ResizeEdge(blocks[0], 1.9, TimelineSnapTargets.Others(blocks, walk, 9), null, 120, false);
 
-        result.Loops.ShouldBe(3.8f, 1e-5f);
+        result.Length.ShouldBe(1.9);
     }
 
     [Fact]

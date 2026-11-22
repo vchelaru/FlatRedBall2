@@ -83,7 +83,7 @@ public class SequenceHoldTailTests
         save.Sources.Add("hero.achx");
         var sequence = new SequenceSave { Name = "Idle" };
         var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Once", Start = 0, Loops = 3 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Once", Start = 0, Length = 0.9 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         string path = Path.Combine(dir, "boss.seqj");

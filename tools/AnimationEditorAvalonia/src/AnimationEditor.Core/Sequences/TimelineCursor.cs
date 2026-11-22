@@ -5,7 +5,7 @@ public enum TimelineCursor
 {
     Default,
 
-    /// <summary>West-east double arrow: a chain's right edge can be dragged to change its length in cycles.</summary>
+    /// <summary>West-east double arrow: a chain's right edge can be dragged to change its length.</summary>
     ResizeHorizontal,
 
     /// <summary>Plain arrow, never a resize arrow: a track, sequence or group is being dragged to a new position.</summary>

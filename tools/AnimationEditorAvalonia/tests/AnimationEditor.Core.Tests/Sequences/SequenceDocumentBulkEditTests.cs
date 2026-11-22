@@ -21,13 +21,13 @@ public class SequenceDocumentBulkEditTests
     {
         var save = new SequenceListSave { Sources = { "hero.achj", "boss.achj" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        void AddTrack(string name, string source, string chain, double start, float loops, bool visible = true)
+        void AddTrack(string name, string source, string chain, double start, double? length, bool visible = true)
         {
             var track = new SequenceTrackSave { Name = name, Visible = visible };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length });
             sequence.Tracks.Add(track);
         }
-        AddTrack("Body", "hero.achj", "Walk", 0.5, 1);
+        AddTrack("Body", "hero.achj", "Walk", 0.5, null);
         AddTrack("Weapon", "hero.achj", "Walk", 1, 2);
         AddTrack("Shadow", "boss.achj", "Idle", 2, 2, visible: false);
         save.Sequences.Add(sequence);
@@ -37,6 +37,9 @@ public class SequenceDocumentBulkEditTests
     }
 
     private static SequenceSave Saved(SequenceDocument document) => SequenceListSave.FromFile(document.Path.FullPath).Sequences[0];
+
+    // No source file exists, so an unset length shows as 0, as SequenceDocument.ChainLength gives for a missing chain.
+    private static double Shown(SequenceChainReferenceSave reference) => reference.Length ?? 0;
 
     private static readonly int[] AllTracks = { 0, 1, 2 };
     private static readonly TimelineChainId[] AllChains = { new(0, 0), new(1, 0), new(2, 0) };
@@ -57,11 +60,11 @@ public class SequenceDocumentBulkEditTests
         using var dir = new TestHelpers.TempDir();
         var sequence = Load(dir).Save.Sequences[0];
 
-        var all = SequenceBulkState.ForChains(sequence, AllChains);
-        (all.Source, all.Chain, all.Start, all.Loops).ShouldBe((null, null, null, null));
-        var two = SequenceBulkState.ForChains(sequence, new TimelineChainId[] { new(0, 0), new(1, 0) });
-        (two.Source, two.Chain, two.Start, two.Loops).ShouldBe(("hero.achj", "Walk", null, null));
-        SequenceBulkState.ForChains(sequence, new TimelineChainId[] { new(1, 0), new(2, 0) }).Loops.ShouldBe(2f);
+        var all = SequenceBulkState.ForChains(sequence, AllChains, Shown);
+        (all.Source, all.Chain, all.Start, all.Length).ShouldBe((null, null, null, null));
+        var two = SequenceBulkState.ForChains(sequence, new TimelineChainId[] { new(0, 0), new(1, 0) }, Shown);
+        (two.Source, two.Chain, two.Start, two.Length).ShouldBe(("hero.achj", "Walk", null, null));
+        SequenceBulkState.ForChains(sequence, new TimelineChainId[] { new(1, 0), new(2, 0) }, Shown).Length.ShouldBe(2);
     }
 
     [Fact]
@@ -100,21 +103,21 @@ public class SequenceDocumentBulkEditTests
     }
 
     [Fact]
-    public void SetChainsLoops_SetsAll_AndRefusesAValueThatWouldBreakAnyChain_ChangingNone()
+    public void SetChainsLength_SetsAll_AndRefusesAValueThatWouldBreakAnyChain_ChangingNone()
     {
         using var dir = new TestHelpers.TempDir();
         var document = Load(dir);
         var undo = new UndoManager();
 
-        document.SetChainsLoops(undo, 0, AllChains, 3m).ShouldBeNull();
-        Saved(document).Tracks.Select(t => t.Chains[0].Loops).ShouldBe(new[] { 3f, 3f, 3f });
-        undo.UndoHistory.Single().Description.ShouldBe("Set Cycles of 3 Chains to 3");
+        document.SetChainsLength(undo, 0, AllChains, 3m).ShouldBeNull();
+        Saved(document).Tracks.Select(t => t.Chains[0].Length).ShouldBe(new double?[] { 3, 3, 3 });
+        undo.UndoHistory.Single().Description.ShouldBe("Set Length of 3 Chains to 3");
         undo.SealCoalescing();
 
         NumericEdit.TryParse("- 3", out var minusThree).ShouldBeTrue();
-        document.SetChainsLoops(undo, 0, new TimelineChainId[] { new(0, 0), new(1, 0) }, minusThree).ShouldBe("Cycles must be above 0.");
-        document.SetChainsLoops(undo, 0, AllChains, 0m).ShouldBe("Cycles must be above 0.");
-        Saved(document).Tracks.Select(t => t.Chains[0].Loops).ShouldBe(new[] { 3f, 3f, 3f });
+        document.SetChainsLength(undo, 0, new TimelineChainId[] { new(0, 0), new(1, 0) }, minusThree).ShouldBe("Length must be above 0.");
+        document.SetChainsLength(undo, 0, AllChains, 0m).ShouldBe("Length must be above 0.");
+        Saved(document).Tracks.Select(t => t.Chains[0].Length).ShouldBe(new double?[] { 3, 3, 3 });
         undo.UndoHistory.Count().ShouldBe(1);
     }
 

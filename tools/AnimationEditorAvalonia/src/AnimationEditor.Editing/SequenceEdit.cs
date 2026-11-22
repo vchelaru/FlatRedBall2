@@ -15,7 +15,7 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class SequenceEdit
 {
-    private const float MaxLoops = 1_000_000f;
+    private const double MaxLength = 1_000_000;
 
     // ---- sequences ----
 
@@ -234,10 +234,11 @@ public static class SequenceEdit
     // ---- blocks ----
 
     /// <summary>
-    /// Appends a block playing <paramref name="chain"/> of a listed source on a chain track, <paramref name="loops"/> cycles
-    /// long from <paramref name="start"/> seconds. The source must be in the library and have the chain.
+    /// Appends a block playing <paramref name="chain"/> of a listed source on a chain track from <paramref name="start"/>
+    /// seconds, <paramref name="length"/> seconds long (null: one cycle, following the chain). The source must be in the
+    /// library and have the chain.
     /// </summary>
-    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string source, string chain, double start, float loops)
+    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string source, string chain, double start, double? length)
     {
         var at = SequenceAddress.ResolveTrack(doc.Save, track);
         if (!at.Ok) return FromAddress(at);
@@ -247,8 +248,8 @@ public static class SequenceEdit
             return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{target.Name}' plays a sequence, so it cannot hold chain blocks.");
         var badStart = CheckStart(start);
         if (badStart is not null) return badStart;
-        var badLoops = CheckLoops(loops);
-        if (badLoops is not null) return badLoops;
+        var badLength = length is { } l ? CheckLength(l) : null;
+        if (badLength is not null) return badLength;
 
         var listed = FindSource(doc, source);
         if (listed is null)
@@ -260,7 +261,7 @@ public static class SequenceEdit
             return Fail(EditErrorCode.NotFound, $"Source '{listed}' has no chain named '{chain}'.");
 
         undo.SealCoalescing();
-        doc.PlaceChain(undo, at.Value.Sequence, at.Value.Track, listed, chain, start, loops);
+        doc.PlaceChain(undo, at.Value.Sequence, at.Value.Track, listed, chain, start, length);
         return Ok($"{owner.Name}/{target.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[at.Value.Track].Chains.Count - 1}");
     }
 
@@ -286,12 +287,15 @@ public static class SequenceEdit
         return refused is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refused);
     }
 
-    /// <summary>Sets a block's length in playback cycles (above 0). On a reference track block 0 is the clip.</summary>
-    public static EditResult SetBlockLoops(SequenceDocument doc, IUndoManager undo, string block, float loops)
+    /// <summary>
+    /// Sets a block's length in seconds (above 0), so its end no longer follows its chain. On a reference track block 0 is
+    /// the clip.
+    /// </summary>
+    public static EditResult SetBlockLength(SequenceDocument doc, IUndoManager undo, string block, double length)
     {
         var at = SequenceAddress.ResolveBlock(doc.Save, block);
         if (!at.Ok) return FromAddress(at);
-        var bad = CheckLoops(loops);
+        var bad = CheckLength(length);
         if (bad is not null) return bad;
         var a = at.Value!;
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
@@ -299,18 +303,18 @@ public static class SequenceEdit
         undo.SealCoalescing();
         if (track.Reference is { } clip)
         {
-            if (clip.Loops == loops) return Ok();
-            var refusedClip = doc.SetReferenceLoops(undo, a.Sequence, a.Track, loops);
+            if (clip.Length == length) return Ok();
+            var refusedClip = doc.SetReferenceLength(undo, a.Sequence, a.Track, length);
             return refusedClip is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refusedClip);
         }
-        if (track.Chains[a.Block].Loops == loops) return Ok();
-        var refused = doc.SetChainLoops(undo, a.Sequence, a.Track, a.Block, loops);
+        if (track.Chains[a.Block].Length == length) return Ok();
+        var refused = doc.SetChainLength(undo, a.Sequence, a.Track, a.Block, length);
         return refused is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refused);
     }
 
     /// <summary>
-    /// Sets a chain block's loops so its own cycles end at <paramref name="end"/> seconds: (end - start) / chain length,
-    /// keeping the fraction. A reference clip is refused, since its length depends on the played sequence.
+    /// Sets a block's length so it ends at <paramref name="end"/> seconds: end - start, from the block's current start.
+    /// On a reference track block 0 is the clip.
     /// </summary>
     public static EditResult SetBlockEnd(SequenceDocument doc, IUndoManager undo, string block, double end)
     {
@@ -318,16 +322,11 @@ public static class SequenceEdit
         if (!at.Ok) return FromAddress(at);
         var a = at.Value!;
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
-        if (track.Reference is not null)
-            return Fail(EditErrorCode.WrongTrackKind, "A track that plays a sequence has no chain length; set its clip's loops with set-block-loops.");
+        double start = track.Reference is { } clip ? clip.Start : track.Chains[a.Block].Start;
+        if (!double.IsFinite(end) || end <= start)
+            return Fail(EditErrorCode.InvalidValue, $"The end {end.ToString(System.Globalization.CultureInfo.InvariantCulture)} must be after the block's start {start.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
 
-        var reference = track.Chains[a.Block];
-        if (!double.IsFinite(end) || end <= reference.Start)
-            return Fail(EditErrorCode.InvalidValue, $"The end {end.ToString(System.Globalization.CultureInfo.InvariantCulture)} must be after the block's start {reference.Start.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
-        if (doc.CycleLength(reference) is not { } cycle || cycle <= 0)
-            return Fail(EditErrorCode.NotFound, $"The chain '{reference.Chain}' of '{reference.Source}' is missing or unreadable, so its length is unknown.");
-
-        return SetBlockLoops(doc, undo, block, (float)((end - reference.Start) / cycle));
+        return SetBlockLength(doc, undo, block, Math.Round(end - start, 6));
     }
 
     /// <summary>Deletes a block of a chain track; later blocks of the track shift down by one. A reference track is deleted whole.</summary>
@@ -357,8 +356,8 @@ public static class SequenceEdit
     private static EditResult? CheckStart(double start) =>
         double.IsFinite(start) && start >= 0 ? null : Fail(EditErrorCode.InvalidValue, "Start must be 0 or more.");
 
-    private static EditResult? CheckLoops(float loops) =>
-        float.IsFinite(loops) && loops > 0 && loops <= MaxLoops ? null : Fail(EditErrorCode.InvalidValue, "Loops must be above 0.");
+    private static EditResult? CheckLength(double length) =>
+        double.IsFinite(length) && length > 0 && length <= MaxLength ? null : Fail(EditErrorCode.InvalidValue, "Length must be above 0.");
 
     /// <summary>The library entry <paramref name="source"/> names, as written in the file (case and slash style ignored), or null.</summary>
     private static string? FindSource(SequenceDocument doc, string source)

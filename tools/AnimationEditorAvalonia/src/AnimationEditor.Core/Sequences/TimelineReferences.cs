@@ -36,12 +36,15 @@ public sealed record TimelineReference(int Track, SequenceReferenceSave Referenc
 
     public double Start => Reference.Start;
 
-    /// <summary>The clip's length: its cycles of the target, or <see cref="TimelineLayout.MissingLength"/> for a broken target or one with no length.</summary>
-    public double Length => TargetLength > 0 ? SequenceTimeline.FullLength(Reference.Loops, TargetLength) : TimelineLayout.MissingLength;
+    /// <summary>The clip's length: its set length, else one run of the target, or <see cref="TimelineLayout.MissingLength"/> for a broken target or one with no length.</summary>
+    public double Length => TargetLength > 0 ? SequenceTimeline.FullLength(Reference.Length, TargetLength) : TimelineLayout.MissingLength;
+
+    /// <summary>How many runs of the target <see cref="Length"/> spans, for labels only; 1 when the target has no length.</summary>
+    public double Cycles => TargetLength > 0 ? Length / TargetLength : 1;
 
     public double End => Start + Length;
 
-    /// <summary>Whether dragging the right edge changes the cycles. A broken or empty target has no cycle to count.</summary>
+    /// <summary>Whether dragging the right edge changes the length. A broken or empty target draws a stand-in length, so it does not.</summary>
     public bool CanResize => !IsBroken && TargetLength > 0;
 
     /// <summary>Whether there is anything to show when the lane is expanded.</summary>
@@ -98,7 +101,7 @@ public static class TimelineReferences
                     : new[]
                     {
                         new InheritedSpan(inlined.Hops[0].Reference.Start,
-                            SequenceTimeline.FullLength(inlined.Hops[0].Reference.Loops, LengthOf(inlined.Hops[0].Target))),
+                            SequenceTimeline.FullLength(inlined.Hops[0].Reference.Length, LengthOf(inlined.Hops[0].Target))),
                     };
                 rows.Add(new InheritedRow(inlined.Name, inlined.Visible, spans));
             }

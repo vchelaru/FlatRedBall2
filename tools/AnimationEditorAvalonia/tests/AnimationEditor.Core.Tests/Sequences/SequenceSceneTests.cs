@@ -39,11 +39,11 @@ public class SequenceSceneTests
         list.SaveJson(path);
     }
 
-    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, float Loops)[] chains)
+    private static SequenceTrackSave Track(string name, params (string Source, string Chain, double Start, double? Length)[] chains)
     {
         var track = new SequenceTrackSave { Name = name };
-        foreach (var (source, chain, start, loops) in chains)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Loops = loops });
+        foreach (var (source, chain, start, length) in chains)
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = chain, Start = start, Length = length });
         return track;
     }
 
@@ -53,8 +53,8 @@ public class SequenceSceneTests
         using var dir = new TestHelpers.TempDir();
         // The first (top) lane is in front, so it is drawn last.
         var document = Load(dir,
-            Track("Fx", ("fx/fx.achj", "Spark", 0, 1)),
-            Track("Body", ("body/body.achj", "Walk", 0, 1)));
+            Track("Fx", ("fx/fx.achj", "Spark", 0, null)),
+            Track("Body", ("body/body.achj", "Walk", 0, null)));
 
         var sprites = SequenceScene.At(document, 0, 0.3);
 
@@ -71,7 +71,7 @@ public class SequenceSceneTests
         // Hidden before the chain on purpose: this is how a sprite appears partway through a sequence.
         // If it showed before its chain, it would always be visible.
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0.4, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0.4, null)));
 
         SequenceScene.At(document, 0, 0).ShouldBeEmpty();
         SequenceScene.At(document, 0, 0.39).ShouldBeEmpty();
@@ -84,7 +84,7 @@ public class SequenceSceneTests
         // Hidden after the chain on purpose: this is how a sprite disappears partway through a sequence.
         using var dir = new TestHelpers.TempDir();
         // Walk is 0.5 s, so this chain plays from 1 s to 1.5 s.
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 1, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 1, null)));
 
         SequenceScene.At(document, 0, 1.2).Single().FrameIndex.ShouldBe(0);
         SequenceScene.At(document, 0, 1.5).ShouldBeEmpty();
@@ -96,7 +96,7 @@ public class SequenceSceneTests
     {
         using var dir = new TestHelpers.TempDir();
         // Walk asks for 2 s (four cycles) but Spark starts at 0.6 s on the same track.
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 4), ("fx/fx.achj", "Spark", 0.6, 1)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 2.0), ("fx/fx.achj", "Spark", 0.6, null)));
 
         SequenceScene.At(document, 0, 0.55).Single().Chain.Name.ShouldBe("Walk");
         SequenceScene.At(document, 0, 0.65).Single().Chain.Name.ShouldBe("Spark");
@@ -106,7 +106,7 @@ public class SequenceSceneTests
     public void At_ALoopingChain_RepeatsAcrossTheBlockLength()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 3)));
+        var document = Load(dir, Track("Body", ("body/body.achj", "Walk", 0, 1.5)));
 
         // 0.6 s is 0.1 s into the second 0.5 s cycle.
         var sprite = SequenceScene.At(document, 0, 0.6).Single();
@@ -124,7 +124,7 @@ public class SequenceSceneTests
         WriteSource(Path.Combine(dir.Path, "body", "body.achj"), "Walk", "body.png", loop: false, 0.25f, 0.25f);
         var save = new SequenceListSave { Sources = { "body/body.achj" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        sequence.Tracks.Add(Track("Body", ("body/body.achj", "Walk", 0, 3)));
+        sequence.Tracks.Add(Track("Body", ("body/body.achj", "Walk", 0, 1.5)));
         save.Sequences.Add(sequence);
         string path = Path.Combine(dir.Path, "boss.seqj");
         save.Save(path);
@@ -143,9 +143,9 @@ public class SequenceSceneTests
     public void At_AHiddenTrack_IsLeftOut_AndTheOtherTrackStays()
     {
         using var dir = new TestHelpers.TempDir();
-        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, 1));
+        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, null));
         fx.Visible = false;
-        var document = Load(dir, fx, Track("Body", ("body/body.achj", "Walk", 0, 1)));
+        var document = Load(dir, fx, Track("Body", ("body/body.achj", "Walk", 0, null)));
 
         SequenceScene.At(document, 0, 0.1).Select(s => s.Chain.Name).ShouldBe(new[] { "Walk" });
     }
@@ -154,8 +154,8 @@ public class SequenceSceneTests
     public void At_EveryTrackHidden_IsEmpty()
     {
         using var dir = new TestHelpers.TempDir();
-        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, 1));
-        var body = Track("Body", ("body/body.achj", "Walk", 0, 1));
+        var fx = Track("Fx", ("fx/fx.achj", "Spark", 0, null));
+        var body = Track("Body", ("body/body.achj", "Walk", 0, null));
         fx.Visible = false;
         body.Visible = false;
         var document = Load(dir, fx, body);

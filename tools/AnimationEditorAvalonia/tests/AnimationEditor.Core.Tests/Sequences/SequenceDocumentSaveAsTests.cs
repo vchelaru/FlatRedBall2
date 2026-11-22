@@ -34,8 +34,8 @@ public class SequenceDocumentSaveAsTests
         var save = new SequenceListSave();
         save.Sources.AddRange(new[] { "chars/hero.achx", "enemy.achx" });
         var track = new SequenceTrackSave { Name = "T" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk", Loops = 1 });
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "enemy.achx", Chain = "Bite", Start = 1, Loops = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "chars/hero.achx", Chain = "Walk" });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "enemy.achx", Chain = "Bite", Start = 1 });
         var sequence = new SequenceSave { Name = "Attack" };
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);

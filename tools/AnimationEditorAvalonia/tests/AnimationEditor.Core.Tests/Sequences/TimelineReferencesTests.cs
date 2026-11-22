@@ -13,12 +13,12 @@ public class TimelineReferencesTests
     private static SequenceTrackSave ChainTrack(string name, double start = 0) =>
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start } } };
 
-    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, float loops = 1) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Loops = loops } };
+    private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null) =>
+        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
 
     private static List<SequenceSave> File() => new()
     {
-        new SequenceSave { Name = "Idle", Tracks = { ChainTrack("Body"), RefTrack("Earth", "Earth", start: 1, loops: 2) } },
+        new SequenceSave { Name = "Idle", Tracks = { ChainTrack("Body"), RefTrack("Earth", "Earth", start: 1, length: 2.5) } },
         new SequenceSave { Name = "Earth", Tracks = { ChainTrack("Ring"), ChainTrack("Dust", start: 0.5) } },
     };
 
@@ -26,7 +26,7 @@ public class TimelineReferencesTests
     private static double? Cycle(SequenceChainReferenceSave _) => 0.75;
 
     [Fact]
-    public void For_ReferenceTrack_ClipIsLoopsCyclesOfTheTargetsLength()
+    public void For_ReferenceTrack_ClipIsItsLength()
     {
         var file = File();
 
@@ -100,7 +100,7 @@ public class TimelineReferencesTests
         var file = new List<SequenceSave>
         {
             new() { Name = "Idle", Tracks = { RefTrack("Mid", "Mid") } },
-            new() { Name = "Mid", Tracks = { ChainTrack("Own"), RefTrack("Fx", "Earth", start: 0.5, loops: 2) } },
+            new() { Name = "Mid", Tracks = { ChainTrack("Own"), RefTrack("Fx", "Earth", start: 0.5, length: 1.5) } },
             new() { Name = "Earth", Tracks = { ChainTrack("Ring") } },
         };
 
@@ -131,7 +131,7 @@ public class TimelineReferencesTests
     {
         var file = new List<SequenceSave>
         {
-            new() { Name = "Idle", Tracks = { RefTrack("Nothing", "Empty", loops: 3) } },
+            new() { Name = "Idle", Tracks = { RefTrack("Nothing", "Empty", length: 3) } },
             new() { Name = "Empty" },
         };
 
@@ -156,10 +156,10 @@ public class TimelineReferencesTests
     }
 
     [Fact]
-    public void For_FractionalLoops_ClipIsThatPartOfTheTarget()
+    public void For_LengthShorterThanTheTarget_ClipIsThatPartOfTheTarget()
     {
         var file = File();
-        file[0].Tracks[1].Reference!.Loops = 0.5f;
+        file[0].Tracks[1].Reference!.Length = 0.625;
 
         TimelineReferences.For(file[0], file, Cycle).Single().Length.ShouldBe(0.625, 1e-9);
     }

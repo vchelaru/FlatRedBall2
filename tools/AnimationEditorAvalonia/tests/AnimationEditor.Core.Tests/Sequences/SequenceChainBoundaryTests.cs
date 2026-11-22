@@ -22,11 +22,11 @@ public class SequenceChainBoundaryTests
         var sequence = new SequenceSave { Name = "Action", Loop = true };
         sequence.Tracks.Add(new SequenceTrackSave
         {
-            Name = "A", Chains = { new SequenceChainReferenceSave { Source = "a.achj", Chain = "Loop", Start = 0, Loops = loops } },
+            Name = "A", Chains = { new SequenceChainReferenceSave { Source = "a.achj", Chain = "Loop", Start = 0, Length = (double)loops * frames * length } },
         });
         sequence.Tracks.Add(new SequenceTrackSave
         {
-            Name = "B", Chains = { new SequenceChainReferenceSave { Source = "a.achj", Chain = "Next", Start = nextStart, Loops = 1 } },
+            Name = "B", Chains = { new SequenceChainReferenceSave { Source = "a.achj", Chain = "Next", Start = nextStart } },
         });
         var save = new SequenceListSave { Sources = { "a.achj" } };
         save.Sequences.Add(sequence);

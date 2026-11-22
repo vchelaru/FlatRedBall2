@@ -7,7 +7,7 @@ namespace AnimationEditor.Editing;
 /// Errors, which a game would trip on: missing-source (a library source whose file is missing or unreadable, or a block
 /// using a source not in the library), missing-chain, missing-reference-target, reference-cycle, duplicate-sequence-name,
 /// duplicate-track-name. Warnings, which are legal but suspect: cut-short (the next block on the track starts before
-/// this one finishes its loops) and unreachable-block (the next block starts at the same time, so this one never plays).
+/// this one reaches its length) and unreachable-block (the next block starts at the same time, so this one never plays).
 /// </summary>
 public static class SequenceCheck
 {
@@ -68,7 +68,7 @@ public static class SequenceCheck
 
                     double cycle = sources.CycleLength(block);
                     if (cycle <= 0) continue;
-                    double full = SequenceTimeline.FullLength(block.Loops, cycle);
+                    double full = SequenceTimeline.FullLength(block.Length, cycle);
                     double played = SequenceTimeline.PlayedLength(track, block, cycle);
                     if (played <= Tolerance && full > Tolerance)
                         issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time."));

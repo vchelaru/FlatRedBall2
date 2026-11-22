@@ -33,10 +33,10 @@ public class SequenceCycleTests
     }
 
     private static SequenceTrackSave ChainTrack(string name, string chain) =>
-        new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "body.achj", Chain = chain, Start = 0, Loops = 1 } } };
+        new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "body.achj", Chain = chain, Start = 0 } } };
 
     private static SequenceTrackSave RefTrack(string name, string target) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = 0, Loops = 1 } };
+        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = 0 } };
 
     [Fact]
     public void CyclicFile_Loads_TheClosingReferenceIsBrokenAndNamesTheCycle_AndSavesUnchanged()

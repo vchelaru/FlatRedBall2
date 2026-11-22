@@ -51,8 +51,8 @@ public class SequenceListSelectionScenarioTests
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var attack = new SequenceSave { Name = "Attack" };
         var body = new SequenceTrackSave { Name = "Body" };
-        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
-        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Run", Start = 1, Loops = 1 });
+        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
+        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Run", Start = 1 });
         attack.Tracks.Add(body);
         save.Sequences.Add(attack);
         save.Sequences.Add(new SequenceSave { Name = "Idle" });

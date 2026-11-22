@@ -44,7 +44,7 @@ public class SequenceProjectTreeThumbnailTests : IDisposable
     private static string Seqj(string sourcesAndTracks) => $$"""{ "version": 1, "sources": ["body/body.achj", "fx/fx.achj"], "sequences": [ { "name": "Attack", "tracks": [ {{sourcesAndTracks}} ] } ] }""";
 
     private static string Track(string name, string source, string chain, double start) =>
-        $$"""{ "name": "{{name}}", "chains": [ { "source": "{{source}}", "chain": "{{chain}}", "start": {{start.ToString(System.Globalization.CultureInfo.InvariantCulture)}}, "loops": 1 } ] }""";
+        $$"""{ "name": "{{name}}", "chains": [ { "source": "{{source}}", "chain": "{{chain}}", "start": {{start.ToString(System.Globalization.CultureInfo.InvariantCulture)}} } ] }""";
 
     private static Project Make(string seqj)
     {

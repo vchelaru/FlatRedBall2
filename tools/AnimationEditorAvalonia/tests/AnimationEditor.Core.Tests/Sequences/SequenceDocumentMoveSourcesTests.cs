@@ -22,7 +22,7 @@ public class SequenceDocumentMoveSourcesTests
         var sequence = new SequenceSave { Name = "Attack" };
         var track = new SequenceTrackSave { Name = "T" };
         foreach (string source in sources)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = 0, Loops = 1 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = 0 });
         sequence.Tracks.Add(track);
         save.Sequences.Add(sequence);
         save.Sequences.Add(new SequenceSave { Name = "Idle" });

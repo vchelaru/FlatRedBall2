@@ -10,7 +10,7 @@ public sealed record TrackBulkState(bool? Visible, bool? Continuous);
 
 /// <summary>What several selected chains share; a null member means they disagree.</summary>
 public sealed record ChainBulkState(
-    string? Source, string? Chain, double? Start, float? Loops);
+    string? Source, string? Chain, double? Start, double? Length);
 
 /// <summary>The "(mixed)" detection for the sequence Inspector's multi-selection, as the .achx Inspector does for frames.</summary>
 public static class SequenceBulkState
@@ -21,11 +21,12 @@ public static class SequenceBulkState
         return new TrackBulkState(MixedState.Common(selected.Select(t => t.Visible)), MixedState.Common(selected.Select(t => t.Continuous)));
     }
 
-    public static ChainBulkState ForChains(SequenceSave sequence, IReadOnlyList<TimelineChainId> chains)
+    /// <summary><paramref name="length"/> is a block's shown length (<see cref="SequenceDocument.ChainLength"/>).</summary>
+    public static ChainBulkState ForChains(SequenceSave sequence, IReadOnlyList<TimelineChainId> chains, System.Func<SequenceChainReferenceSave, double> length)
     {
         var selected = chains.Select(id => sequence.Tracks[id.Track].Chains[id.Chain]).ToList();
         return new ChainBulkState(
             MixedState.Common(selected.Select(c => c.Source)), MixedState.Common(selected.Select(c => c.Chain)),
-            MixedState.Common(selected.Select(c => c.Start)), MixedState.Common(selected.Select(c => c.Loops)));
+            MixedState.Common(selected.Select(c => c.Start)), MixedState.Common(selected.Select(length)));
     }
 }

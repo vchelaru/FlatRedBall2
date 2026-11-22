@@ -9,8 +9,8 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// <summary>Hit-testing priority, viewport clamps, clock edges and title fallbacks the first round left unpinned.</summary>
 public class TimelineAuditTests
 {
-    private static SequenceChainReferenceSave Ref(string chain, double start, float loops = 1) =>
-        new() { Source = "hero.achx", Chain = chain, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
+        new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     [Fact]
     public void HitTest_WhereOneChainEndsAndTheNextStarts_TheLaterChainWins()
@@ -31,7 +31,7 @@ public class TimelineAuditTests
     public void HitTest_ACutChainsBodyEnd_IsNotAResizeEdge_ButItsTailEndIs()
     {
         // Walk asks for 3 s and is cut at 2 s by Run: resizing from the cut point would mean nothing.
-        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, loops: 3), Ref("Run", 2) } };
+        var track = new SequenceTrackSave { Chains = { Ref("Walk", 0, length: 3), Ref("Run", 2) } };
         var blocks = TimelineLayout.Blocks(new SequenceSave { Tracks = { track } }, _ => 1.0);
         var viewport = new TimelineViewport();
         double bodyY = viewport.LaneTop(0) + TimelineLayout.BodyTop + 2;

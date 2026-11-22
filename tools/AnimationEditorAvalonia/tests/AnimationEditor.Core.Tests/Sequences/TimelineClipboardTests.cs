@@ -10,8 +10,8 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// <summary>The clipboard envelopes copied timeline chains and tracks travel in.</summary>
 public class TimelineClipboardTests
 {
-    private static SequenceChainReferenceSave Chain(string source, string name, double start, float loops = 1) =>
-        new() { Source = source, Chain = name, Start = start, Loops = loops };
+    private static SequenceChainReferenceSave Chain(string source, string name, double start, double? length = null) =>
+        new() { Source = source, Chain = name, Start = start, Length = length };
 
     private static CopiedChain Copied(SequenceChainReferenceSave chain, string track = "Body", int lane = 0) =>
         new(chain, new SequenceTrackSave { Name = track, Visible = false }, lane);
@@ -39,7 +39,8 @@ public class TimelineClipboardTests
         var items = json["chains"]!.AsArray();
         items[0]!["source"]!.GetValue<string>().ShouldBe("C:/game/anims/hero.achx");
         items[0]!["start"]!.GetValue<double>().ShouldBe(1.0);
-        items[0]!["loops"]!.GetValue<float>().ShouldBe(3f);
+        items[0]!["length"]!.GetValue<double>().ShouldBe(3);
+        items[1]!.AsObject().ContainsKey("length").ShouldBeFalse();
         items[1]!["start"]!.GetValue<double>().ShouldBe(0.0);
         chains[0].Start.ShouldBe(2.5, "the copied chains are not changed");
         chains[0].Source.ShouldBe("hero.achx");
@@ -91,9 +92,9 @@ public class TimelineClipboardTests
         var body = content.Tracks[0];
         (body.Name, body.Visible).ShouldBe(("Body", false));
         body.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
-        body.Chains.Select(c => (c.Source, c.Chain, c.Start, c.Loops)).ShouldBe(new[]
+        body.Chains.Select(c => (c.Source, c.Chain, c.Start, c.Length)).ShouldBe(new (string, string, double, double?)[]
         {
-            ("C:/game/hero.achx", "Walk", 0.5, 2f), ("C:/game/hero.achx", "Run", 1.5, 1f),
+            ("C:/game/hero.achx", "Walk", 0.5, 2), ("C:/game/hero.achx", "Run", 1.5, null),
         });
         content.Tracks[1].Name.ShouldBe("Head");
     }

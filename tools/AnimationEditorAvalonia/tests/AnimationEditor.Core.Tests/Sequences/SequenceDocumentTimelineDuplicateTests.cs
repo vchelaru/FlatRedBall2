@@ -11,9 +11,9 @@ namespace AnimationEditor.Core.Tests.Sequences;
 /// <summary>Duplicating timeline chains in place (after the selection) and tracks (directly in front of the topmost one).</summary>
 public class SequenceDocumentTimelineDuplicateTests
 {
-    // No source file exists, so every chain is missing, and a missing chain is drawn one second long whatever its loops.
-    private static SequenceChainReferenceSave Chain(string name, double start, float loops = 1) =>
-        new() { Source = "gone.achx", Chain = name, Start = start, Loops = loops };
+    // No source file exists, so every chain is missing, and a missing chain is drawn one second long whatever its length.
+    private static SequenceChainReferenceSave Chain(string name, double start, double? length = null) =>
+        new() { Source = "gone.achx", Chain = name, Start = start, Length = length };
 
     private static SequenceDocument Open(TestHelpers.TempDir dir, params SequenceTrackSave[] tracks)
     {
@@ -58,14 +58,14 @@ public class SequenceDocumentTimelineDuplicateTests
     public void DuplicateChains_AcrossTracks_KeepsEachCopyOnItsOwnTrack_WithTheSameShift()
     {
         using var dir = new TestHelpers.TempDir();
-        var document = Open(dir, Track("Body", Chain("Walk", 0)), Track("Head", Chain("Hat", 0.5, loops: 3)));
+        var document = Open(dir, Track("Body", Chain("Walk", 0)), Track("Head", Chain("Hat", 0.5, length: 3)));
 
         var result = document.DuplicateChains(new UndoManager(), 0, new[] { new TimelineChainId(0, 0), new TimelineChainId(1, 0) });
 
         // Latest end 1.5 (Hat starts at 0.5, 1 s long); earliest start 0, so both shift by 1.5.
         Chains(document, 0).ShouldBe(new[] { ("Walk", 0.0), ("Walk", 1.5) });
         Chains(document, 1).ShouldBe(new[] { ("Hat", 0.5), ("Hat", 2.0) });
-        document.Save.Sequences[0].Tracks[1].Chains[1].Loops.ShouldBe(3f);
+        document.Save.Sequences[0].Tracks[1].Chains[1].Length.ShouldBe(3);
         result.Chains.ShouldBe(new[] { new TimelineChainId(0, 1), new TimelineChainId(1, 1) });
     }
 
@@ -98,7 +98,7 @@ public class SequenceDocumentTimelineDuplicateTests
         var copy = document.Save.Sequences[0].Tracks[0];
         copy.Visible.ShouldBeFalse();
         copy.UnknownProperties["tag"]!.GetValue<string>().ShouldBe("boss");
-        copy.Chains.Select(c => (c.Chain, c.Start, c.Loops, c.Source)).ShouldBe(new[] { ("Walk", 0.25, 2f, "gone.achx") });
+        copy.Chains.Select(c => (c.Chain, c.Start, c.Length, c.Source)).ShouldBe(new (string, double, double?, string)[] { ("Walk", 0.25, 2, "gone.achx") });
         result.Tracks.ShouldBe(new[] { 0, 1 });
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Duplicate 2 Tracks" });
         undo.Undo();

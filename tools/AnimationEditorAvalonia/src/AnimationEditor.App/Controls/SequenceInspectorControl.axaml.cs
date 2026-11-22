@@ -19,7 +19,7 @@ namespace AnimationEditor.App.Controls;
 /// them, as the .achx Inspector does for several frames: a field they disagree on is blank with a "(mixed)" placeholder,
 /// an edit sets it on every one (or, written "+ 4", shifts each by its own value) as one undo entry, and the name and
 /// Go to Definition are for one item. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
-/// entry; a refused value (an empty or taken name, cycles of 0) goes out through <see cref="ErrorRaised"/> and the field
+/// entry; a refused value (an empty or taken name, a length of 0) goes out through <see cref="ErrorRaised"/> and the field
 /// goes back to the document's value. The host calls <see cref="Show"/> whenever the selection or the document changes
 /// (including each step of a drag), which rewrites every field except the one being typed in.
 /// </summary>
@@ -51,13 +51,13 @@ public partial class SequenceInspectorControl : UserControl
         TrackContinuousBox.IsCheckedChanged += (_, _) => CommitContinuous();
 
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
-        ChainLoopsField.ValueChanged += (_, _) => CommitChainLoops();
+        ChainLengthField.ValueChanged += (_, _) => CommitChainLength();
         // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
-        SealOnCommit(ChainStartField, ChainLoopsField, ReferenceStartField, ReferenceLoopsField);
+        SealOnCommit(ChainStartField, ChainLengthField, ReferenceStartField, ReferenceLengthField);
         ReferenceStartField.ValueChanged += (_, _) => CommitReference(start: true);
-        ReferenceLoopsField.ValueChanged += (_, _) => CommitReference(start: false);
+        ReferenceLengthField.ValueChanged += (_, _) => CommitReference(start: false);
         ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
-        ApplyRelativeEditsWith(CommitChainLoops, ChainLoopsField);
+        ApplyRelativeEditsWith(CommitChainLength, ChainLengthField);
         GoToDefinitionButton.Click += (_, _) =>
         {
             if (CurrentChain is { } reference)
@@ -223,14 +223,14 @@ public partial class SequenceInspectorControl : UserControl
         ShowReference(track, force);
     }
 
-    // A track that plays another sequence shows its clip: which sequence, where it starts and for how many cycles.
+    // A track that plays another sequence shows its clip: which sequence, where it starts and how long it lasts.
     private void ShowReference(SequenceTrackSave track, bool force)
     {
         ReferenceSection.IsVisible = track.Reference is not null;
         if (track.Reference is not { } reference) return;
         ReferenceSequenceText.Text = reference.Sequence;
         PutOrMixed(ReferenceStartField, (decimal)reference.Start, force);
-        PutOrMixed(ReferenceLoopsField, (decimal)reference.Loops, force);
+        PutOrMixed(ReferenceLengthField, (decimal)_document!.ClipLength(reference), force);
         var sequences = _document!.Save.Sequences;
         bool missing = SequenceReferences.Find(sequences, reference.Sequence) is null;
         var cycle = !missing && _sequence >= 0 && _sequence < sequences.Count
@@ -249,8 +249,8 @@ public partial class SequenceInspectorControl : UserControl
         if (_refreshing || _track is not { } track) return;
         if (start && ReferenceStartField.Value is { } at)
             Commit(document => document.SetReferenceStart(_undo!, _sequence, track, (double)at));
-        else if (!start && ReferenceLoopsField.Value is { } loops)
-            Commit(document => document.SetReferenceLoops(_undo!, _sequence, track, (float)loops));
+        else if (!start && ReferenceLengthField.Value is { } length)
+            Commit(document => document.SetReferenceLength(_undo!, _sequence, track, (double)length));
     }
 
     private void ShowChain(SequenceChainReferenceSave reference, bool force)
@@ -260,33 +260,39 @@ public partial class SequenceInspectorControl : UserControl
         {
             // Source and Chain show what the chains share, else how many there are; Length, the missing-source warning
             // and Go to Definition belong to one chain.
-            var state = SequenceBulkState.ForChains(CurrentSequence!, chains);
+            var state = SequenceBulkState.ForChains(CurrentSequence!, chains, document.ChainLength);
             ChainSourceText.Text = state.Source ?? MixedPlaceholder;
             ShowChainChoices(state.Source, state.Chain, Plural.Format(chains.Count, "chain"));
             ToolTip.SetTip(ChainSourceText, ChainSourceText.Text);
             PutOrMixed(ChainStartField, state.Start is { } start ? (decimal)start : null, force);
-            PutOrMixed(ChainLoopsField, state.Loops is { } loops ? (decimal)loops : null, force);
-            ChainLengthRow.IsVisible = false;
+            PutOrMixed(ChainLengthField, state.Length is { } length ? (decimal)length : null, force);
+            ChainCycleRow.IsVisible = false;
             ChainMissingText.IsVisible = false;
             GoToDefinitionButton.IsVisible = false;
             return;
         }
-        ChainLengthRow.IsVisible = true;
+        ChainCycleRow.IsVisible = true;
         GoToDefinitionButton.IsVisible = true;
         ChainSourceText.Text = reference.Source;
         ToolTip.SetTip(ChainSourceText, reference.Source);
         ShowChainChoices(reference.Source, reference.Chain, string.Empty);
         PutOrMixed(ChainStartField, (decimal)reference.Start, force);
-        PutOrMixed(ChainLoopsField, (decimal)reference.Loops, force);
-        ChainLengthText.Text = document.CycleLength(reference) is { } cycle
-            ? $"{Seconds(cycle * reference.Loops)} ({Seconds(cycle)} × {reference.Loops.ToString("0.##", CultureInfo.InvariantCulture)})"
-            : "Unknown";
+        PutOrMixed(ChainLengthField, (decimal)document.ChainLength(reference), force);
+        ChainCycleText.Text = ChainCycleLabel(reference.Length, document.CycleLength(reference));
         string? problem = document.LocateDefinition(reference).Error;
         ChainMissingText.Text = problem is null ? null : "⚠ " + problem;
         ChainMissingText.IsVisible = problem is not null;
     }
 
     private static string Seconds(double seconds) => BlockLabel.Seconds(seconds);
+
+    /// <summary>
+    /// The Cycle row: the chain's cycle, then how many cycles a set length spans, or that an unset length follows the
+    /// cycle. "Unknown" for a missing chain.
+    /// </summary>
+    internal static string ChainCycleLabel(double? length, double? cycle) => cycle is not { } c || c <= 0 ? "Unknown"
+        : length is { } l ? $"{Seconds(c)} (×{(l / c).ToString("0.##", CultureInfo.InvariantCulture)})"
+        : $"{Seconds(c)} (length follows it)";
 
     // A focused field is left alone only while it holds text the user typed and has not committed.
     private static void Put(TextBox box, string text, bool force)
@@ -431,17 +437,17 @@ public partial class SequenceInspectorControl : UserControl
             Commit(document => document.SetChainStart(_undo!, _sequence, chain.Track, chain.Chain, (double)start));
     }
 
-    private void CommitChainLoops()
+    private void CommitChainLength()
     {
         if (_refreshing) return;
         if (BulkChains() is { } chains)
         {
-            if (EditOf(ChainLoopsField, ChainLoopsField.Value) is { } edit)
-                Commit(document => document.SetChainsLoops(_undo!, _sequence, chains, edit));
+            if (EditOf(ChainLengthField, ChainLengthField.Value) is { } edit)
+                Commit(document => document.SetChainsLength(_undo!, _sequence, chains, edit));
             return;
         }
-        if (ChainLoopsField.Value is { } loops && _chain is { } chain)
-            Commit(document => document.SetChainLoops(_undo!, _sequence, chain.Track, chain.Chain, (float)loops));
+        if (ChainLengthField.Value is { } length && _chain is { } chain)
+            Commit(document => document.SetChainLength(_undo!, _sequence, chain.Track, chain.Chain, (double)length));
     }
 
     private string? CommitSequenceName(SequenceDocument document, string text) => CurrentSequence is null

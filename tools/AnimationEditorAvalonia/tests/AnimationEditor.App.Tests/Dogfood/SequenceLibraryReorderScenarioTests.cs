@@ -45,7 +45,7 @@ public class SequenceLibraryReorderScenarioTests
         var sequence = new SequenceSave { Name = "Attack" };
         var body = new SequenceTrackSave { Name = "Body" };
         if (placedFrom is not null)
-            body.Chains.Add(new SequenceChainReferenceSave { Source = placedFrom, Chain = "Walk", Start = 0, Loops = 1 });
+            body.Chains.Add(new SequenceChainReferenceSave { Source = placedFrom, Chain = "Walk", Start = 0 });
         sequence.Tracks.Add(body);
         save.Sequences.Add(sequence);
         save.Save(path);

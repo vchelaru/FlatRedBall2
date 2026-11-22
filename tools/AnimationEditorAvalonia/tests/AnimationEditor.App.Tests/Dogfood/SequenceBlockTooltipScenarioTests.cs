@@ -19,10 +19,10 @@ public class SequenceBlockTooltipScenarioTests
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var sequence = new SequenceSave { Name = "Attack" };
-        foreach (var (name, loops) in new[] { ("Body", 2f), ("Once", 1f) })
+        foreach (var (name, length) in new (string, double?)[] { ("Body", 1.0), ("Once", null) })
         {
             var track = new SequenceTrackSave { Name = name };
-            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = loops });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Length = length });
             sequence.Tracks.Add(track);
         }
         save.Sequences.Add(sequence);

@@ -68,7 +68,7 @@ public class FrameLengthUnitSequenceTests
         var msClip = Clip("MsClip", "ms.achx");
         var secClip = Clip("SecClip", "sec.achx");
         var file = new List<SequenceSave> { msClip, secClip };
-        var reference = new SequenceReferenceSave { Sequence = "x", Loops = 1 };
+        var reference = new SequenceReferenceSave { Sequence = "x" };
 
         var msPose = ReferenceFilmstrip.PoseAt(reference, msClip, 0.15, lookup, file);
         var secPose = ReferenceFilmstrip.PoseAt(reference, secClip, 0.15, lookup, file);

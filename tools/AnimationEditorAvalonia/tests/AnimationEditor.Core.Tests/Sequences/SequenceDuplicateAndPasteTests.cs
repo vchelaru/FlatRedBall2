@@ -16,7 +16,7 @@ public class SequenceDuplicateAndPasteTests
     {
         var track = new SequenceTrackSave { Name = "Body" };
         foreach (string source in sources)
-            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = 0.25, Loops = 3 });
+            track.Chains.Add(new SequenceChainReferenceSave { Source = source, Chain = "Walk", Start = 0.25, Length = 3 });
         var sequence = new SequenceSave { Name = name, Loop = true };
         sequence.Tracks.Add(track);
         return sequence;

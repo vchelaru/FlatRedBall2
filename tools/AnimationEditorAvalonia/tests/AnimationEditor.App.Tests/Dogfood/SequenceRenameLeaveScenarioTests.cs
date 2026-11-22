@@ -39,7 +39,7 @@ public class SequenceRenameLeaveScenarioTests
         var save = new SequenceListSave { Sources = { "hero.achx" } };
         var attack = new SequenceSave { Name = "Attack" };
         var body = new SequenceTrackSave { Name = "Body" };
-        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0, Loops = 1 });
+        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
         attack.Tracks.Add(body);
         attack.Tracks.Add(new SequenceTrackSave { Name = "Arms" });
         save.Sequences.Add(attack);

@@ -861,7 +861,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         {
             var result = TimelineSnapTargets.ResizeEdge(_dragBlock, _dragOriginEdge + dt, _snapOthers, _frameBoundaries,
                 Viewport.PixelsPerSecond, bypass, _dragRepeats);
-            _dragged.Loops = result.Loops;
+            _dragged.Length = result.Length;
             _snapGuide = result.Snap.Target;
         }
         Rebuild();
@@ -1158,7 +1158,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         string description;
         if (kind == DragKind.Edge)
         {
-            description = $"Set Cycles of '{dragged.Chain}' to {dragged.Loops.ToString("0.##", CultureInfo.InvariantCulture)}";
+            description = $"Set Length of '{dragged.Chain}' to {dragged.Length?.ToString("0.###", CultureInfo.InvariantCulture)}";
         }
         else if (toNewTrack)
         {
@@ -1716,7 +1716,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double labelWidth = Math.Max(1, body.Width - 12);
         string label = block.IsMissing
             ? $"⚠ {block.Reference.Chain} (missing)"
-            : BlockLabel.Fit(block.Reference.Chain, block.Reference.Loops, block.Played, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
+            : BlockLabel.Fit(block.Reference.Chain, block.Cycles, block.Played, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
             var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, labelWidth);

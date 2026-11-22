@@ -19,7 +19,7 @@ namespace AnimationEditor.Core.Tests.Sequences;
 public class SequenceUndoLabelConventionTests
 {
     private static SequenceChainReferenceSave Chain(string name, double start) =>
-        new() { Source = "hero.achx", Chain = name, Start = start, Loops = 1 };
+        new() { Source = "hero.achx", Chain = name, Start = start };
 
     private static SequenceTrackSave Track(string name, params SequenceChainReferenceSave[] chains)
     {
@@ -105,9 +105,9 @@ public class SequenceUndoLabelConventionTests
         NumericEdit.TryParse("+ 1", out var plusOne).ShouldBeTrue();
         Run((document, undo) => document.SetChainsStart(undo, 0, chains3, three));
         Run((document, undo) => document.SetChainsStart(undo, 0, chains3, plusOne));
-        Run((document, undo) => document.SetChainsLoops(undo, 0, chains2, three));
+        Run((document, undo) => document.SetChainsLength(undo, 0, chains2, three));
         Run((document, undo) => document.SetChainStart(undo, 0, 0, 0, 2));
-        Run((document, undo) => document.SetChainLoops(undo, 0, 0, 0, 2));
+        Run((document, undo) => document.SetChainLength(undo, 0, 0, 0, 2));
         Run((document, undo) => document.PlaceChain(undo, 0, track: 0, "hero.achx", "Jump", 0));
         Run((document, undo) => document.PlaceChain(undo, 0, track: null, "hero.achx", "Jump", 0));
         Run((document, undo) => document.RenameTrack(undo, 0, 0, "Torso"));
