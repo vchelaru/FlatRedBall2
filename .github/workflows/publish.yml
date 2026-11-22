@@ -8,6 +8,12 @@ on:
         required: false
         default: ''
 
+# Trusted Publishing: each push job trades GitHub's OIDC token for a short-lived nuget.org key, so no
+# stored key can expire. The nuget.org policy (owner vchelaru) names this repo and this file.
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   resolve-version:
     runs-on: ubuntu-latest
@@ -63,8 +69,14 @@ jobs:
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
 
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: vchelaru
+
       - name: Publish to NuGet
-        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   # Depends on publish-animationchain-common so FlatRedBall.AnimationChain.Common is already on
   # nuget.org (matching this same resolved version) before FlatRedBall2.Kni's auto-generated
@@ -131,8 +143,15 @@ jobs:
           fi
           echo "Confirmed: nuspec depends on FlatRedBall.AnimationChain.Common $VERSION."
 
+      # Logs in here, not at job start: the key is short-lived and the wait step above can take 30 minutes.
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: vchelaru
+
       - name: Publish to NuGet
-        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   publish-templates:
     needs: resolve-version
@@ -153,6 +172,12 @@ jobs:
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
 
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: vchelaru
+
       - name: Publish Templates to NuGet
-        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
