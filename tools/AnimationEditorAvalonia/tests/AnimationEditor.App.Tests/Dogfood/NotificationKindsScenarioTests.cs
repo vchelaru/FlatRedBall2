@@ -9,7 +9,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// The two pop-up kinds as a user meets them. INFO needs nothing from the user: top-right toast, auto-hides.
-/// PROBLEM means work is not saved or an asked action failed: top-centre banner, dismissable.
+/// PROBLEM means work is not saved or an asked action failed: bottom-centre banner, dismissable.
 /// </summary>
 public class NotificationKindsScenarioTests
 {
@@ -34,7 +34,7 @@ public class NotificationKindsScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task Problem_AppearsTopCentre_AndDismisses()
+    public async Task Problem_AppearsBottomCentre_AndDismisses()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = editor.WriteSeqj("boss.seqj", "Sequence");
@@ -47,7 +47,7 @@ public class NotificationKindsScenarioTests
             editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
             editor.InfoText.ShouldBeNull();
             editor.Notifications.ErrorBanner.HorizontalAlignment.ShouldBe(HorizontalAlignment.Center);
-            editor.Notifications.ErrorBanner.VerticalAlignment.ShouldBe(VerticalAlignment.Top);
+            editor.Notifications.ErrorBanner.VerticalAlignment.ShouldBe(VerticalAlignment.Bottom);
 
             editor.Click(editor.Notifications.ErrorBannerDismissBtn);
 
