@@ -280,9 +280,10 @@ public static class SequenceEdit
     /// <summary>
     /// Appends a block playing <paramref name="chain"/> of a listed source on a chain track from <paramref name="start"/>
     /// seconds, <paramref name="length"/> seconds long (null: one cycle, following the chain). The source must be in the
-    /// library and have the chain.
+    /// library and have the chain. A null <paramref name="start"/> is the end of the block that plays last on the track
+    /// (0 on an empty track); a null <paramref name="source"/> is the library's only source (several is an error that lists them).
     /// </summary>
-    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string source, string chain, double start, double? length)
+    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string? source, string chain, double? start, double? length)
     {
         var at = SequenceAddress.ResolveTrack(doc.Save, track);
         if (!at.Ok) return FromAddress(at);
@@ -290,11 +291,20 @@ public static class SequenceEdit
         var target = owner.Tracks[at.Value.Track];
         if (target.Reference is not null)
             return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{target.Name}' plays a sequence, so it cannot hold chain blocks.");
-        var badStart = CheckStart(start);
+        var badStart = start is { } given ? CheckStart(given) : null;
         if (badStart is not null) return badStart;
         var badLength = length is { } l ? CheckLength(l) : null;
         if (badLength is not null) return badLength;
 
+        if (source is null)
+        {
+            var sources = doc.Save.Sources;
+            if (sources.Count == 0)
+                return Fail(EditErrorCode.NotFound, "The library has no sources; add one with add-source first.");
+            if (sources.Count > 1)
+                return Fail(EditErrorCode.InvalidValue, $"Give source: the library has several ({string.Join(", ", sources)}).");
+            source = sources[0];
+        }
         var listed = FindSource(doc, source);
         if (listed is null)
             return Fail(EditErrorCode.NotFound, $"Source '{source}' is not in the library; add it with add-source first.");
@@ -305,8 +315,17 @@ public static class SequenceEdit
             return Fail(EditErrorCode.NotFound, $"Source '{listed}' has no chain named '{chain}'.");
 
         undo.SealCoalescing();
-        doc.PlaceChain(undo, at.Value.Sequence, at.Value.Track, listed, chain, start, length);
+        doc.PlaceChain(undo, at.Value.Sequence, at.Value.Track, listed, chain, start ?? TrackEnd(doc, target), length);
         return Ok($"{owner.Name}/{target.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[at.Value.Track].Chains.Count - 1}");
+    }
+
+    /// <summary>The end in seconds of the block that starts last on a chain track (its full length, nothing follows to cut it); 0 when empty.</summary>
+    private static double TrackEnd(SequenceDocument doc, SequenceTrackSave track)
+    {
+        var ordered = SequenceTimeline.Ordered(track);
+        if (ordered.Count == 0) return 0;
+        var last = ordered[^1];
+        return Math.Round(last.Start + SequenceTimeline.FullLength(last.Length, doc.CycleLength(last) ?? 0), 6);
     }
 
     /// <summary>Moves a block to <paramref name="start"/> seconds (0 or more). On a reference track block 0 is the clip.</summary>
