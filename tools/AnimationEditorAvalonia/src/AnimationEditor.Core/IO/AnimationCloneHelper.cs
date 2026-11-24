@@ -60,34 +60,5 @@ public static class AnimationCloneHelper
         return copy;
     }
 
-    public static object? CloneShape(object shape)
-    {
-        ShapeSave? copy = shape switch
-        {
-            AARectSave r => new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY },
-            CircleSave c => new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius },
-            PolygonSave p => new PolygonSave { Name = p.Name, X = p.X, Y = p.Y, Points = Utilities.PolygonVertices.CopyPoints(p) },
-            _ => null,
-        };
-        if (copy is null) return null;
-
-        // Keyframe fields (#1478) copy verbatim, including curve names this version does not offer.
-        var source = (ShapeSave)shape;
-        copy.SkipOffsetKeyframe = source.SkipOffsetKeyframe;
-        copy.OffsetInterpolation = source.OffsetInterpolation;
-        copy.OffsetEasing = source.OffsetEasing;
-        if (source is SizedShapeSave sizedSource && copy is SizedShapeSave sizedCopy)
-        {
-            sizedCopy.SkipSizeKeyframe = sizedSource.SkipSizeKeyframe;
-            sizedCopy.SizeInterpolation = sizedSource.SizeInterpolation;
-            sizedCopy.SizeEasing = sizedSource.SizeEasing;
-        }
-        if (source is PolygonSave polySource && copy is PolygonSave polyCopy)
-        {
-            polyCopy.SkipPointsKeyframe = polySource.SkipPointsKeyframe;
-            polyCopy.PointsInterpolation = polySource.PointsInterpolation;
-            polyCopy.PointsEasing = polySource.PointsEasing;
-        }
-        return copy;
-    }
+    public static object? CloneShape(object shape) => (shape as ShapeSave)?.Clone();
 }

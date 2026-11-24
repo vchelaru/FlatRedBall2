@@ -164,6 +164,9 @@ public abstract class ShapeSave : Frb1ShapeData
 
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="OffsetInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? OffsetEasing;
+
+    /// <summary>Returns a deep copy of every stored field, including the <see cref="Frb1ShapeData"/> ones.</summary>
+    public virtual ShapeSave Clone() => (ShapeSave)MemberwiseClone();
 }
 
 /// <summary>A shape with a size that can glide between keyframes: <see cref="AARectSave"/> and <see cref="CircleSave"/>.</summary>
@@ -228,6 +231,14 @@ public class PolygonSave : ShapeSave
 
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="PointsInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? PointsEasing;
+
+    /// <inheritdoc/>
+    public override ShapeSave Clone()
+    {
+        var copy = (PolygonSave)base.Clone();
+        copy.Points = Points.Select(p => new Vector2Save { X = p.X, Y = p.Y }).ToList();
+        return copy;
+    }
 }
 
 /// <summary>Serialized 2D point used by <see cref="PolygonSave"/>.</summary>
