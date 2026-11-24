@@ -18,6 +18,7 @@ using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Layout;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
@@ -1291,6 +1292,8 @@ public partial class MainWindow : Window
 
         _appCommands.ItemsDeleted += label =>
             Dispatcher.UIThread.InvokeAsync(() => ShowItemDeleted(label));
+
+        _appCommands.ChainNamesRemoved += removed => WarnAboutBrokenSequences(_projectManager.FileName, removed);
 
         _appCommands.ExportCompleted += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
@@ -8202,11 +8205,14 @@ public partial class MainWindow : Window
     {
         var source = _pendingCutState.SourceDocument;
         if (source is null) return;
+        var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
         _pendingCutState.RemoveSourcesFrom(source);
 
         var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
         if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
         _appCommands.SaveDocument(source, sourceTab.Path.FullPath, sourceTab.CachedOnDiskCoordinateType);
+        WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
+            namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
     }
 
     private void SyncPendingCutHighlights()

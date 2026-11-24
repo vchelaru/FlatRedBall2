@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Keyframes;
@@ -76,6 +77,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// label for the deleted item(s). The app layer shows an undo toast in response.
         /// </summary>
         event Action<string>? ItemsDeleted;
+
+        /// <summary>
+        /// Raised after a rename, delete or cut leaves the document without chain names it had before: once per user action,
+        /// and never for undo or redo. Anything that refers to the chains by name is now broken.
+        /// </summary>
+        event Action<RemovedChainNames>? ChainNamesRemoved;
 
         /// <summary>
         /// Fired when <see cref="LoadAnimationChain"/> fails — file not found, corrupt XML,
