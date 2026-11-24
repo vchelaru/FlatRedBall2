@@ -105,11 +105,12 @@ public static class SequenceOps
             new("source", "string", true, "Source as listed in the file."),
             new("path", "string", true, "New file, relative to the .seqj or absolute; must exist."),
         ]),
-        new("add-block", "Appends a block (a chain placement) to a chain track. The source must be in the library and have the chain.",
+        new("add-block", "Appends a block to a track: a chain placement on a chain track (the source must be in the library and have the chain), or a clip playing another sequence on a reference track (give sequence). A reference track holds any number of clips, like a chain track holds blocks; the next one cuts the previous one short.",
         [
             new("track", "string", true, TrackAddressDescription),
             new("source", "string", false, "Source as listed in the file. Default: the library's only source; with several sources it is required."),
-            new("chain", "string", true, "Chain name in the source."),
+            new("chain", "string", false, "Chain name in the source. Required on a chain track."),
+            new("sequence", "string", false, "Name of the sequence to play. Required on a reference track, refused on a chain track."),
             new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: the end of the block that starts last on the track (an auto-length block ends after one cycle), 0 on an empty track."),
             new("length", "number", false, "Length in seconds, above 0. Default: none, so the block plays one cycle of the chain and follows edits to it."),
         ]),
@@ -129,7 +130,7 @@ public static class SequenceOps
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("end", "number", true, "Seconds from the sequence start, after the block's start."),
         ]),
-        new("set-block-chain", "Points a block at another chain, keeping its start and length. Give source to take the chain from another library source; default is the block's own source. A reference track's clip has no chain and is refused.",
+        new("set-block-chain", "Points a block at another chain, keeping its start and length. Give source to take the chain from another library source; default is the block's own source. A reference track's clips have no chain and are refused.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("source", "string", false, "Source as listed in the file. Default: the block's current source."),
@@ -255,7 +256,7 @@ public static class SequenceOps
             case "add-source": return SequenceEdit.AddSource(doc, undo, v["path"]);
             case "remove-source": return SequenceEdit.RemoveSource(doc, undo, v["source"]);
             case "replace-source": return SequenceEdit.ReplaceSource(doc, undo, v["source"], v["path"]);
-            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], Opt("source"), v["chain"], v.ContainsKey("start") ? Num("start") : (double?)null, v.ContainsKey("length") ? Num("length") : (double?)null);
+            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], Opt("source"), Opt("chain"), v.ContainsKey("start") ? Num("start") : (double?)null, v.ContainsKey("length") ? Num("length") : (double?)null, Opt("sequence"));
             case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
             case "set-block-length":
                 bool clear = v.TryGetValue("clear", out var c) && c == "true";

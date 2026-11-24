@@ -270,7 +270,7 @@ public class SequenceContinuousTrackTests
         holder.Tracks.Add(new SequenceTrackSave
         {
             Name = "Leg", Continuous = continuous,
-            Reference = new SequenceReferenceSave { Sequence = "Leg", Start = 0, Length = clipLength },
+            References = [new SequenceReferenceSave { Sequence = "Leg", Start = 0, Length = clipLength }],
         });
         return holder;
     }

@@ -36,7 +36,7 @@ public class SequenceCycleTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "body.achj", Chain = chain, Start = 0 } } };
 
     private static SequenceTrackSave RefTrack(string name, string target) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = 0 } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target, Start = 0 }] };
 
     [Fact]
     public void CyclicFile_Loads_TheClosingReferenceIsBrokenAndNamesTheCycle_AndSavesUnchanged()

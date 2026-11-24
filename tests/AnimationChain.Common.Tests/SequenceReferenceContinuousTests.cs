@@ -15,10 +15,10 @@ public class SequenceReferenceContinuousTests
     private const double TargetLength = 1.0;
 
     private static SequenceTrackSave Track(bool continuous, double start = 0, double? length = ParentLength) =>
-        new() { Continuous = continuous, Reference = new SequenceReferenceSave { Sequence = "T", Start = start, Length = length } };
+        new() { Continuous = continuous, References = [new SequenceReferenceSave { Sequence = "T", Start = start, Length = length }] };
 
     private static double? Time(SequenceTrackSave track, bool targetLoops, double parentTime, int pass) =>
-        SequenceTimeline.ReferenceTimeAtPass(track, new SequenceSave { Name = "T", Loop = targetLoops }, TargetLength, parentTime, pass, ParentLength, out _);
+        SequenceTimeline.ReferenceTimeAtPass(track, track.References![0], new SequenceSave { Name = "T", Loop = targetLoops }, TargetLength, parentTime, pass, ParentLength, _ => TargetLength, out _);
 
     [Theory]
     [InlineData(0, 0.3)]
@@ -35,7 +35,8 @@ public class SequenceReferenceContinuousTests
     [InlineData(false, 1, 0)] // not carried: the target runs at pass 0
     public void ReferenceTimeAtPass_CountsTheTargetsOwnWraps_OnlyWhenCarried(bool continuous, int pass, int expectedTargetPass)
     {
-        SequenceTimeline.ReferenceTimeAtPass(Track(continuous), new SequenceSave { Name = "T", Loop = true }, TargetLength, 0.3, pass, ParentLength, out int targetPass);
+        var track = Track(continuous);
+        SequenceTimeline.ReferenceTimeAtPass(track, track.References![0], new SequenceSave { Name = "T", Loop = true }, TargetLength, 0.3, pass, ParentLength, _ => TargetLength, out int targetPass);
 
         targetPass.ShouldBe(expectedTargetPass);
     }
