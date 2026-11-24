@@ -267,9 +267,13 @@ public static class TiledAnimationToAchjMapper
     /// <c>"ID:N"</c> is still correctly reported as not synthetic.</summary>
     private static (string Name, bool IsSynthetic) ChainNameInfo(Tile tile)
     {
-        var name = tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == NamePropertyName)?.Value;
+        var name = FindNameProperty(tile)?.Value;
         return string.IsNullOrEmpty(name) ? (SyntheticChainName(tile.ID), true) : (name, false);
     }
+
+    /// <summary>The <c>Name</c> property the editor reads: the first string one.</summary>
+    internal static StringProperty? FindNameProperty(Tile tile) =>
+        tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == NamePropertyName);
 
     /// <summary>The placeholder chain name used when a native-tsx tile carries no explicit <see
     /// cref="NamePropertyName"/> property -- shared with <see cref="NativeTsxAnimationSync"/> (which
