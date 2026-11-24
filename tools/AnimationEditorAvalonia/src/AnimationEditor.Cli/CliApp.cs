@@ -20,7 +20,8 @@ public static class CliApp
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2 [--pass <n>]) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
-          at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--shapes-only] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
+          at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--shapes-only] [--json]  per visible track at each time: active chain, frame, sampled offset and color, flips, the frame's events and its shapes (position, size)
+          at <file.achx|.achj> --time 0,0.3 [--chain <name>] [--shapes-only] [--json]  the same for one chain (its loop, ping-pong and reverse apply). An event fires when its frame is entered; a time inside the frame lists it but does not mean it fires then
           --schema [--json]                      list the operations and their fields
           --version                              build version, source commit and build time (UTC)
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
@@ -124,6 +125,9 @@ public static class CliApp
 
     private sealed class Invocation(TextWriter stdout, TextWriter stderr, TextReader stdin)
     {
+        private const string ChainIsNotForSequences = "--chain applies to .achx/.achj files; a .seqj takes --sequence and --track.";
+        private const string SequenceAndTrackAreNotForChains = "--sequence and --track apply to .seqj files; an .achx/.achj takes --chain.";
+
         public bool Json { get; set; }
 
         public int Usage(string message, bool showUsage = false)
@@ -153,7 +157,7 @@ public static class CliApp
 
             if (SequenceFileReader.IsSequenceFile(file))
             {
-                if (chain is not null) return Usage("--chain applies to .achx/.achj files; a .seqj takes --sequence and --track.");
+                if (chain is not null) return Usage(ChainIsNotForSequences);
                 var seq = SequenceFileReader.Read(file);
                 if (seq.Document is null) return Failed(seq.Error!);
 
@@ -174,7 +178,7 @@ public static class CliApp
                 return 0;
             }
 
-            if (sequence is not null || track is not null) return Usage("--sequence and --track apply to .seqj files; an .achx/.achj takes --chain.");
+            if (sequence is not null || track is not null) return Usage(SequenceAndTrackAreNotForChains);
             var read = AnimationFileReader.Read(file);
             if (read.Document is null) return Failed(read.Error!);
 
@@ -268,7 +272,9 @@ public static class CliApp
 
         public int At(string file, IReadOnlyDictionary<string, string>? values)
         {
-            if (!SequenceFileReader.IsSequenceFile(file)) return Usage("at needs a .seqj file.");
+            bool isSequence = SequenceFileReader.IsSequenceFile(file);
+            if (!isSequence && Path.GetExtension(file).ToLowerInvariant() is not (".achx" or ".achj"))
+                return Usage("at needs a .seqj, .achx or .achj file.");
             if (values is null || !values.TryGetValue("--time", out var timeText)) return Usage("at needs --time <seconds>[,<seconds>...].");
             var times = new List<double>();
             foreach (var part in timeText.Split(',', StringSplitOptions.TrimEntries))
@@ -277,12 +283,20 @@ public static class CliApp
                     return Usage("--time must be a comma list of times in seconds, 0 or more (0,2.15,4.2).");
                 times.Add(t);
             }
-            values.TryGetValue("--sequence", out var name);
+            values.TryGetValue("--sequence", out var sequence);
             values.TryGetValue("--track", out var track);
-            var report = AtReport.Build(file, name, times, track, values.ContainsKey("--shapes-only"), out var error, out var usage);
+            values.TryGetValue("--chain", out var chain);
+            bool shapesOnly = values.ContainsKey("--shapes-only");
+            if (isSequence && chain is not null) return Usage(ChainIsNotForSequences);
+            if (!isSequence && (sequence is not null || track is not null)) return Usage(SequenceAndTrackAreNotForChains);
+
+            string? error;
+            bool usage;
+            var report = isSequence
+                ? AtReport.BuildSequence(file, sequence, times, track, shapesOnly, out error, out usage)
+                : AtReport.BuildChain(file, chain, times, shapesOnly, out error, out usage);
             if (report is null) return usage ? Usage(error!) : Failed(error!);
-            var (sequence, moments) = report.Value;
-            stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, sequence, moments)) + Environment.NewLine : AtReport.ToText(sequence, moments));
+            stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, report)) + Environment.NewLine : AtReport.ToText(report));
             return 0;
         }
 
