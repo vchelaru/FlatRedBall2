@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using FlatRedBall2.AnimationEditorCommon;
 using System.IO;
 using System.Linq;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -155,5 +156,28 @@ public class ProjectManagerTexturePathPortabilityTests
 
         var reloaded = AnimationChainListSave.FromFile(achxPath);
         Assert.Equal("Sprites/items.png", reloaded.AnimationChains.Single().Frames.Single().TextureName);
+    }
+
+    // #1983: the second save proves the stored name does not degrade one save at a time.
+    [Theory]
+    [InlineData("Props.achx", "//server/share/a.png")]
+    [InlineData("Props.achj", "//server/share/a.png")]
+    [InlineData("Props.achx", @"\\server\share\a.png")]
+    [InlineData("Props.achj", @"\\server\share\a.png")]
+    public void SaveAnimationChainList_TextureOnNetworkShare_KeepsNetworkPath(string fileName, string textureName)
+    {
+        var pm = new ProjectManager { OnDiskCoordinateType = TextureCoordinateType.UV };
+        using var dir = new TestHelpers.TempDir();
+        var path = Path.Combine(dir.Path, fileName);
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = textureName });
+        pm.AnimationChainListSave = new AnimationChainListSave();
+        pm.AnimationChainListSave.AnimationChains.Add(chain);
+
+        pm.SaveAnimationChainList(path);
+        pm.SaveAnimationChainList(path);
+
+        var reloaded = AnimationChainListSave.FromFile(path);
+        reloaded.AnimationChains.Single().Frames.Single().TextureName.ShouldBe("//server/share/a.png");
     }
 }
