@@ -102,8 +102,9 @@ public partial class MainWindow : Window
     // self-promote before the user did anything.
     private bool _suppressPreviewPromotion;
 
-    // ── Tab drag state ────────────────────────────────────────────────────────
     private Border? _activeTabBorder;
+
+    // ── Tab drag state ────────────────────────────────────────────────────────
     private TabEntry? _dragTab;
     private double _dragStartX;
     private bool _isDragging;

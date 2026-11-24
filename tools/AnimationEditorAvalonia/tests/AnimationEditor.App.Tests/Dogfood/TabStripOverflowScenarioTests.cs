@@ -27,6 +27,7 @@ public class TabStripOverflowScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         List<string> names = await OpenTabsAsync(editor, 8);
         ScrollBarOf(editor).IsVisible.ShouldBeTrue("the strip should overflow");
+        ScrollToStart(editor);
         Button close = editor.TabFor(names[2]).GetVisualDescendants().OfType<Button>().First(button => button.Content as string == "✕");
 
         await HoverThenClickAsync(editor, editor.PointIn(close, close.Bounds.Width / 2, close.Bounds.Height - 1), hoverMs);
@@ -43,6 +44,7 @@ public class TabStripOverflowScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         List<string> names = await OpenTabsAsync(editor, 8);
+        ScrollToStart(editor);
         Border tab = editor.TabFor(names[2]);
 
         await HoverThenClickAsync(editor, editor.PointIn(tab, 20, tab.Bounds.Height - 1), hoverMs);
@@ -91,8 +93,6 @@ public class TabStripOverflowScenarioTests
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, names[0]));
         await editor.OpenAsync(Path.Combine(editor.ProjectFolder, names[11]));
 
-        // The close button is only clickable in view, whatever the opens above scrolled to.
-        ScrollViewerOf(editor).ScrollToEnd();
         editor.CloseTab(names[11]);
         await editor.WaitUntilAsync(() => editor.TabLabels.Count == 11, TimeSpan.FromSeconds(2));
 
@@ -116,8 +116,7 @@ public class TabStripOverflowScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         List<string> names = await OpenTabsAsync(editor, 12);
-        ScrollViewerOf(editor).Offset = default;
-        editor.Layout();
+        ScrollToStart(editor);
 
         editor.CloseTab(names[1]);
         await editor.WaitUntilAsync(() => editor.TabLabels.Count == 11, TimeSpan.FromSeconds(2));
@@ -142,6 +141,14 @@ public class TabStripOverflowScenarioTests
 
         ShouldShowActiveTab(editor, names[2]);
         ScrollViewerOf(editor).Offset.X.ShouldBe(50);
+    }
+
+    private static void ScrollToStart(AnimationEditorHarness editor)
+    {
+        ScrollViewerOf(editor).Offset = default;
+        editor.Layout();
+        // Hit-testing is a render tick behind the new offset, see AnimationEditorHarness.ScrollIntoView.
+        editor.Layout();
     }
 
     private static void ShouldShowActiveTab(AnimationEditorHarness editor, string name)
