@@ -1,3 +1,4 @@
+using AnimationEditor.Core;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
@@ -34,8 +35,7 @@ internal static class TsxOpPolicy
                 : null;
 
         if (name == "associate-tileset")
-            return Fail(EditErrorCode.WrongFileKind,
-                "associate-tileset applies to an .achx/.achj; a .tsx cannot be a native project and an association target at once.");
+            return Fail(EditErrorCode.WrongFileKind, ProjectManager.NativeTsxAssociationRefusal);
 
         if (!Supported.Contains(name))
             return Fail(EditErrorCode.NotSupportedInTsx, name switch

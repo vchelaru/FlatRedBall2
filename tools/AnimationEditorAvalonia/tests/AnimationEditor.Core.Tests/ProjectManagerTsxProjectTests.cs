@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -330,6 +331,19 @@ public class ProjectManagerTsxProjectTests : IDisposable
         ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
 
         Assert.True(ctx.ProjectManager.IsNativeTsxProject);
+    }
+
+    // #1999
+    [Fact]
+    public void LoadTsxProject_TiledSyncWithANullList_OpensNormally()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
+        File.WriteAllText(Path.Combine(_dir.Path, "hero.tiledsync"), "{ \"TiledTilesetPaths\": null }");
+
+        ctx.ProjectManager.LoadTsxProject(new FilePath(tsxPath));
+
+        ctx.ProjectManager.IsNativeTsxProject.ShouldBeTrue();
     }
 
     [Fact]
