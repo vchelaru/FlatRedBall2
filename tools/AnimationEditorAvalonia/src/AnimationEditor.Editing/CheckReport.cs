@@ -57,7 +57,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
 
                 if (chain.Frames.Count > 1 && !(frame.FrameLength > 0))
                     issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
-                        $"Frame {chain.Name}/{f} has length {SequenceCheck.Num(frame.FrameLength)} in a chain of {chain.Frames.Count} frames.", frame));
+                        $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames.", frame));
 
                 if (frame.ShapesSave is not { Shapes.Count: > 1 } saved) continue;
                 names.Clear();
