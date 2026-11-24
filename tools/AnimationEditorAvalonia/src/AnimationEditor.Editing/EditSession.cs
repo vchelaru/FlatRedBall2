@@ -27,7 +27,7 @@ public sealed class EditSession
     public ObjectFinder ObjectFinder { get; }
     public UndoManager Undo { get; } = new();
 
-    /// <summary>The loaded document, in the editor's in-memory (UV) representation.</summary>
+    /// <summary>The loaded document, in the editor's in-memory (pixel) representation.</summary>
     public AnimationChainListSave Document => _projectManager.AnimationChainListSave!;
 
     private EditSession(string path)

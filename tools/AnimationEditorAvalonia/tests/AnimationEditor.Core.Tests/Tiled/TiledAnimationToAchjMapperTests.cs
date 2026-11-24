@@ -8,19 +8,14 @@ using Xunit;
 namespace AnimationEditor.Core.Tests.Tiled;
 
 /// <summary>
-/// The in-memory <see cref="AnimationChainListSave"/> model must always be UV (0-1) coordinates
-/// and Second-based durations -- the same invariant every achx load produces via
-/// <c>ProjectManager.NormalizeCoordinatesToUv</c> (see its doc comment: "the in-memory
-/// representation... is always UV so the rendering pipeline can render at any texture size"). A
-/// real-world bug (issue #1140 follow-up) shipped this mapper storing raw pixel values with
-/// CoordinateType=Pixel instead: nothing downstream actually respects that as "leave these alone,"
-/// so every consumer re-multiplied an already-in-pixels value by the texture size again (e.g. a
-/// frame length of 200ms rendered as "200 seconds"; a coordinate of 864px rendered as
-/// 864 * 2048 = 1,769,472). These tests assert the UV/seconds output directly.
+/// The in-memory <see cref="AnimationChainListSave"/> model is always pixel coordinates (#1952) and
+/// Second-based durations. A real-world bug (issue #1140 follow-up) shipped with this mapper and its
+/// readers disagreeing on the unit, so a frame length of 200ms rendered as "200 seconds" and a
+/// coordinate of 864px as 864 * 2048 = 1,769,472. These tests assert the pixel/seconds output directly.
 /// </summary>
 public class TiledAnimationToAchjMapperTests
 {
-    // 4 columns, 16x16 tiles, 64x64 texture (so UV = pixel / 64).
+    // 4 columns, 16x16 tiles, 64x64 texture.
     private static Tileset EmptyTileset() => new()
     {
         Name = "Heroes",
@@ -32,7 +27,7 @@ public class TiledAnimationToAchjMapperTests
     };
 
     [Fact]
-    public void Map_AnyTile_UsesUvCoordinatesAndSecondsBasedDuration()
+    public void Map_AnyTile_UsesPixelCoordinatesAndSecondsBasedDuration()
     {
         var tileset = EmptyTileset();
         var tile = new Tile { ID = 5, Width = 0, Height = 0 };
@@ -41,12 +36,12 @@ public class TiledAnimationToAchjMapperTests
 
         var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
-        Assert.Equal(TextureCoordinateType.UV, acls.CoordinateType);
+        Assert.Equal(TextureCoordinateType.Pixel, acls.CoordinateType);
         Assert.Equal(TimeMeasurementUnit.Second, acls.TimeMeasurementUnit);
         var chain = Assert.Single(acls.AnimationChains);
-        // Tile 5, 4 columns -> column 1, row 1 -> pixel left=16, top=16; texture is 64x64.
-        Assert.Equal(16f / 64f, chain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
-        Assert.Equal(16f / 64f, chain.Frames[0].TopCoordinate, tolerance: 0.0001f);
+        // Tile 5, 4 columns -> column 1, row 1 -> pixel left=16, top=16.
+        Assert.Equal(16f, chain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f, chain.Frames[0].TopCoordinate, tolerance: 0.0001f);
         Assert.Equal(0.2f, chain.Frames[0].FrameLength, tolerance: 0.0001f);
     }
 
@@ -70,10 +65,10 @@ public class TiledAnimationToAchjMapperTests
         var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var frame = Assert.Single(Assert.Single(acls.AnimationChains).Frames);
-        Assert.Equal(19f / 71f, frame.LeftCoordinate, tolerance: 0.0001f);
-        Assert.Equal(19f / 71f, frame.TopCoordinate, tolerance: 0.0001f);
-        Assert.Equal(52f / 71f, frame.RightCoordinate, tolerance: 0.0001f);
-        Assert.Equal(35f / 71f, frame.BottomCoordinate, tolerance: 0.0001f);
+        Assert.Equal(19f, frame.LeftCoordinate, tolerance: 0.0001f);
+        Assert.Equal(19f, frame.TopCoordinate, tolerance: 0.0001f);
+        Assert.Equal(52f, frame.RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(35f, frame.BottomCoordinate, tolerance: 0.0001f);
     }
 
     [Fact]
@@ -82,7 +77,7 @@ public class TiledAnimationToAchjMapperTests
         // Regression for the exact numbers reported against a real file: 128 columns, 16px
         // tiles, 2048px texture, tile at column 54 -> pixel Left=864. The bug produced
         // 864 * 2048 = 1,769,472 downstream by treating an already-pixel value as UV and
-        // reconverting; the correct UV value is 864/2048.
+        // reconverting.
         var tileset = new Tileset
         {
             Name = "ChibiCthulhuTiles",
@@ -100,7 +95,7 @@ public class TiledAnimationToAchjMapperTests
         var acls = TiledAnimationToAchjMapper.Map(tileset, out _, out _, out _);
 
         var chain = Assert.Single(acls.AnimationChains);
-        Assert.Equal(864f / 2048f, chain.Frames[0].LeftCoordinate, tolerance: 0.00001f);
+        Assert.Equal(864f, chain.Frames[0].LeftCoordinate, tolerance: 0.00001f);
         Assert.NotEqual(1769472f, chain.Frames[0].LeftCoordinate);
     }
 
@@ -127,13 +122,13 @@ public class TiledAnimationToAchjMapperTests
 
         // Frame 0: anchor tile 0 -> column 0, row 0; footprint is 2 tiles wide -> right edge at 2*16=32px.
         Assert.Equal(0f, chain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
-        Assert.Equal(32f / 64f, chain.Frames[0].RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(32f, chain.Frames[0].RightCoordinate, tolerance: 0.0001f);
         Assert.Equal(0f, chain.Frames[0].TopCoordinate, tolerance: 0.0001f);
-        Assert.Equal(16f / 64f, chain.Frames[0].BottomCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f, chain.Frames[0].BottomCoordinate, tolerance: 0.0001f);
 
         // Frame 1: anchor tile 1 -> column 1, row 0 -> left edge at 16px, right edge at (1+2)*16=48px.
-        Assert.Equal(16f / 64f, chain.Frames[1].LeftCoordinate, tolerance: 0.0001f);
-        Assert.Equal(48f / 64f, chain.Frames[1].RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f, chain.Frames[1].LeftCoordinate, tolerance: 0.0001f);
+        Assert.Equal(48f, chain.Frames[1].RightCoordinate, tolerance: 0.0001f);
     }
 
     [Fact]
@@ -365,8 +360,8 @@ public class TiledAnimationToAchjMapperTests
         var anchorChain = acls.AnimationChains.Single(c => c.Name == "ID:0");
         Assert.False(satelliteTileIdsByChain.ContainsKey(anchorChain));
         // Anchor's own frame rect must stay 1x1 -- not the wrongly-implied 2x2 footprint.
-        Assert.Equal(16f / 64f, anchorChain.Frames[0].RightCoordinate, tolerance: 0.0001f);
-        Assert.Equal(16f / 64f, anchorChain.Frames[0].BottomCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f, anchorChain.Frames[0].RightCoordinate, tolerance: 0.0001f);
+        Assert.Equal(16f, anchorChain.Frames[0].BottomCoordinate, tolerance: 0.0001f);
     }
 
     [Fact]

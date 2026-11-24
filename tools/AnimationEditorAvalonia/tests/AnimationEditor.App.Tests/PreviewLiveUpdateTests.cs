@@ -87,7 +87,7 @@ public class PreviewLiveUpdateTests
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame);

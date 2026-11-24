@@ -51,7 +51,7 @@ public class WireframeLockedChainDragTests
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f, BottomCoordinate = 1f,
+            RightCoordinate  = 64f, BottomCoordinate = 64f,
             ShapesSave = new ShapesSave(),
         };
         var chain = new AnimationChainSave { Name = "Test", IsLocked = locked };
@@ -117,7 +117,7 @@ public class WireframeLockedChainDragTests
                 startScreenX: 0f, startScreenY: 0f,
                 endScreenX:   8f, endScreenY:   8f);
 
-            Assert.Equal(0.125f, frame.LeftCoordinate, precision: 4);
+            Assert.Equal(8f, frame.LeftCoordinate, precision: 4);
             Assert.True(ctx.UndoManager.CanUndo);
         }
         finally { System.IO.Directory.Delete(dir, true); }
@@ -139,8 +139,8 @@ public class WireframeLockedChainDragTests
             {
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f, BottomCoordinate = 32f,
                 ShapesSave       = new ShapesSave(),
             };
             lockedChain.Frames.Add(lockedFrame);
@@ -155,8 +155,8 @@ public class WireframeLockedChainDragTests
                 startScreenX: 0f, startScreenY: 0f,
                 endScreenX:   8f, endScreenY:   8f);
 
-            Assert.Equal(0.125f, frame.LeftCoordinate, precision: 4); // unlocked chain's frame moved
-            Assert.Equal(0.5f, lockedFrame.LeftCoordinate, precision: 4); // locked chain's frame untouched
+            Assert.Equal(8f, frame.LeftCoordinate, precision: 4); // unlocked chain's frame moved
+            Assert.Equal(32f, lockedFrame.LeftCoordinate, precision: 4); // locked chain's frame untouched
             Assert.Equal(0f, lockedFrame.TopCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
@@ -180,8 +180,8 @@ public class WireframeLockedChainDragTests
             {
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f, BottomCoordinate = 32f,
                 ShapesSave       = new ShapesSave(),
             };
             lockedChain.Frames.Add(lockedFrame);
@@ -200,7 +200,7 @@ public class WireframeLockedChainDragTests
                 endScreenX:   8f, endScreenY:   8f);
 
             Assert.NotEqual(0f, unlockedFrame.LeftCoordinate); // unlocked chain's frame moved
-            Assert.Equal(0.5f, lockedFrame.LeftCoordinate, precision: 4); // locked chain's frame untouched
+            Assert.Equal(32f, lockedFrame.LeftCoordinate, precision: 4); // locked chain's frame untouched
             Assert.Equal(0f, lockedFrame.TopCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }

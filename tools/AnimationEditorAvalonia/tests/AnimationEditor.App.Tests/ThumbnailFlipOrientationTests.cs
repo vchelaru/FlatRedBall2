@@ -42,7 +42,7 @@ public class ThumbnailFlipOrientationTests
         using var sheet = Sheet();
         var frame = new AnimationFrameSave
         {
-            LeftCoordinate = 0f, RightCoordinate = 1f, TopCoordinate = 0f, BottomCoordinate = 1f,
+            LeftCoordinate = 0f, RightCoordinate = 40f, TopCoordinate = 0f, BottomCoordinate = 20f,
             FlipHorizontal = h, FlipVertical = v, FlipDiagonal = d,
         };
 

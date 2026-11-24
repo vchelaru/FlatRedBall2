@@ -50,7 +50,7 @@ public class WireframeEmptyFrameTextureTests
     private static AnimationFrameSave Frame(string textureName) => new()
     {
         TextureName      = textureName,
-        RightCoordinate  = 1f, BottomCoordinate = 1f,
+        RightCoordinate  = 128f, BottomCoordinate = 128f,
         FrameLength      = 0.1f,
         ShapesSave       = new ShapesSave(),
     };

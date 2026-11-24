@@ -54,10 +54,10 @@ public class FrameFillToggleTests
         var frame = new AnimationFrameSave
         {
             TextureName      = Path.GetFileName(png),
-            LeftCoordinate   = 16f / 64f,
-            TopCoordinate    = 16f / 64f,
-            RightCoordinate  = 48f / 64f,
-            BottomCoordinate = 48f / 64f,
+            LeftCoordinate   = 16f,
+            TopCoordinate    = 16f,
+            RightCoordinate  = 48f,
+            BottomCoordinate = 48f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

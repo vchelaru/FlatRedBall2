@@ -111,10 +111,10 @@ public class TutorialMainWindowIntegrationTests
                 $"TextureName should end with 'sprite.png', got: '{frame.TextureName}'");
 
             // UV: pixel (16,16)→(32,32) on 64×64 → UV (0.25, 0.25, 0.5, 0.5)
-            Assert.Equal(0.25f, frame.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.25f, frame.TopCoordinate,    precision: 4);
-            Assert.Equal(0.5f,  frame.RightCoordinate,  precision: 4);
-            Assert.Equal(0.5f,  frame.BottomCoordinate, precision: 4);
+            Assert.Equal(16f, frame.LeftCoordinate,   precision: 4);
+            Assert.Equal(16f, frame.TopCoordinate,    precision: 4);
+            Assert.Equal(32f,  frame.RightCoordinate,  precision: 4);
+            Assert.Equal(32f,  frame.BottomCoordinate, precision: 4);
 
             // SelectedFrame must be set
             Assert.Same(frame, ctx.SelectedState.SelectedFrame);
@@ -167,11 +167,11 @@ public class TutorialMainWindowIntegrationTests
 
             // Cell (0,0)→(16,16) on 64px: UV (0, 0, 0.25, 0.25)
             Assert.Equal(0f,    f0.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.25f, f0.RightCoordinate,  precision: 4);
+            Assert.Equal(16f, f0.RightCoordinate,  precision: 4);
 
             // Cell (16,0)→(32,16): UV (0.25, 0, 0.5, 0.25)
-            Assert.Equal(0.25f, f1.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.5f,  f1.RightCoordinate,  precision: 4);
+            Assert.Equal(16f, f1.LeftCoordinate,   precision: 4);
+            Assert.Equal(32f,  f1.RightCoordinate,  precision: 4);
         }
         finally
         {
@@ -258,7 +258,7 @@ public class TutorialMainWindowIntegrationTests
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0f,    TopCoordinate    = 0f,
-                RightCoordinate  = 0.25f, BottomCoordinate = 0.25f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Idle" };
@@ -330,9 +330,6 @@ public class TutorialMainWindowIntegrationTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             ctx.ProjectManager.FileName = achx;
-            // "idle.png" isn't a real file on disk -- this test is about the save flow creating a
-            // file, not on-disk pixel-coordinate conversion (#1135), so stay in UV.
-            ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
             ctx.AppCommands.SaveCurrentAnimationChainList(achx);
 
             Assert.True(System.IO.File.Exists(achx),
@@ -374,7 +371,7 @@ public class TutorialMainWindowIntegrationTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "idle.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Idle" };

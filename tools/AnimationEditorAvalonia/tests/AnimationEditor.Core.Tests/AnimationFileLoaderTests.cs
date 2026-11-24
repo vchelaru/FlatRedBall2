@@ -24,7 +24,7 @@ public class AnimationFileLoaderTests
     }
 
     [Fact]
-    public void Load_PixelFile_ReturnsUvModelAndRemembersPixelOnDisk()
+    public void Load_PixelFile_ReturnsPixelModelAndRemembersPixelOnDisk()
     {
         using var dir = new TestHelpers.TempDir();
         File.WriteAllBytes(Path.Combine(dir.Path, "hero.png"), MakeFakePng(64, 32));
@@ -41,10 +41,10 @@ public class AnimationFileLoaderTests
         var loaded = AnimationFileLoader.Load(path);
 
         loaded.OnDiskCoordinateType.ShouldBe(TextureCoordinateType.Pixel);
-        loaded.List.CoordinateType.ShouldBe(TextureCoordinateType.UV);
+        loaded.List.CoordinateType.ShouldBe(TextureCoordinateType.Pixel);
         var frame = loaded.List.AnimationChains[0].Frames[0];
         (frame.LeftCoordinate, frame.RightCoordinate, frame.TopCoordinate, frame.BottomCoordinate)
-            .ShouldBe((0.25f, 0.5f, 0.25f, 0.5f));
+            .ShouldBe((16f, 32f, 8f, 16f));
     }
 
     [Fact]

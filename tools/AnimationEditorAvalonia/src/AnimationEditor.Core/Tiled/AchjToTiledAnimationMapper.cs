@@ -96,8 +96,8 @@ public static class AchjToTiledAnimationMapper
 {
     private const float Epsilon = 0.001f;
 
-    /// <param name="achj">The already-parsed animation chain list (in-memory model is always UV
-    /// coordinates for <c>ProjectManager.AnimationChainListSave</c>, but this also accepts Pixel).</param>
+    /// <param name="achj">The already-parsed animation chain list (<c>ProjectManager.AnimationChainListSave</c>
+    /// is always Pixel, but this also accepts UV).</param>
     /// <param name="tilesetInfo">The target tileset's grid geometry and image.</param>
     /// <param name="tallySkips">When <see langword="true"/>, skip/flip reasons are tallied into
     /// <see cref="ChainMappingResult.SkipCounts"/> instead of appended to <see

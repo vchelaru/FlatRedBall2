@@ -381,8 +381,8 @@ public class AppCommandsShapeTests
         var ctx = TestHelpers.SetupFreshAcls();
         SetupProjectWithTexture(ctx, 64, 64);
         var frame = TestHelpers.MakeFrame();
-        frame.LeftCoordinate = 0f; frame.RightCoordinate = 0.5f;   // 32 px wide
-        frame.TopCoordinate = 0f; frame.BottomCoordinate = 0.25f;  // 16 px tall
+        frame.LeftCoordinate = 0f; frame.RightCoordinate = 32f;   // 32 px wide
+        frame.TopCoordinate = 0f; frame.BottomCoordinate = 16f;  // 16 px tall
         var rect = new AARectSave { ScaleX = 3f, ScaleY = 3f };
 
         ctx.AppCommands.MatchRectangleToFrame(rect, frame);
@@ -411,10 +411,10 @@ public class AppCommandsShapeTests
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         chain.Frames[0].TextureName = "Tex.png";
         chain.Frames[1].TextureName = "Tex.png";
-        chain.Frames[0].LeftCoordinate = 0f; chain.Frames[0].RightCoordinate = 0.5f;
-        chain.Frames[0].TopCoordinate = 0f; chain.Frames[0].BottomCoordinate = 0.5f;
-        chain.Frames[1].LeftCoordinate = 0f; chain.Frames[1].RightCoordinate = 0.25f;
-        chain.Frames[1].TopCoordinate = 0f; chain.Frames[1].BottomCoordinate = 1f;
+        chain.Frames[0].LeftCoordinate = 0f; chain.Frames[0].RightCoordinate = 32f;
+        chain.Frames[0].TopCoordinate = 0f; chain.Frames[0].BottomCoordinate = 32f;
+        chain.Frames[1].LeftCoordinate = 0f; chain.Frames[1].RightCoordinate = 16f;
+        chain.Frames[1].TopCoordinate = 0f; chain.Frames[1].BottomCoordinate = 64f;
         var first = new AARectSave { Name = "A", ScaleX = 1f, ScaleY = 1f };
         var second = new AARectSave { Name = "B", ScaleX = 1f, ScaleY = 1f };
         chain.Frames[0].ShapesSave = NewShapesSave(first);

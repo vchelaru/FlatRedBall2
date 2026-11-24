@@ -63,7 +63,7 @@ public class AppCommandsSaveFailedTests : IDisposable
         Assert.Equal([0u], tileset.Tiles.Where(t => t.Animation.Count > 0).Select(t => t.ID));
 
         // Move the copy one row down (tiles 4, 5) -- via the same command the inspector uses.
-        _ctx.AppCommands.SetFramePixelRegion(copy.Frames, pixelX: null, pixelY: 16, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion(copy.Frames, pixelX: null, pixelY: 16, pixelW: null, pixelH: null);
 
         Assert.Equal(SaveState.AutoSaveOn, _ctx.UndoManager.SaveState);
         tileset = DotTiled.Serialization.Loader.Default().LoadTileset(path);

@@ -384,7 +384,7 @@ public class MultiCopyPasteTests
         };
         var xml = ClipboardPayload.SerializeShapes(shapes);
 
-        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out _, out var deserialized));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out _, out var deserialized));
         Assert.Equal(2, deserialized!.OfType<AARectSave>().Count());
         Assert.Single(deserialized!.OfType<CircleSave>());
     }
@@ -404,7 +404,7 @@ public class MultiCopyPasteTests
             out var payload, out _));
 
         var xml = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
+        ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _);
         Assert.Equal(new[] { walkF.TextureName, runF.TextureName },
             frames!.Select(f => f.TextureName));
     }
@@ -427,7 +427,7 @@ public class MultiCopyPasteTests
             ctx.SelectedState, ctx.ObjectFinder, ctx.Acls,
             out var payload, out _));
         var xml = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var clipboardFrames, out _);
+        ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var clipboardFrames, out _);
 
         var (target, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
             ctx.Acls, f2, ctx.ObjectFinder, ctx.SelectedState);

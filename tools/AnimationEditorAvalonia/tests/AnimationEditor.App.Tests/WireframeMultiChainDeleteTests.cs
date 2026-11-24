@@ -55,14 +55,14 @@ public class WireframeMultiChainDeleteTests
             {
                 TextureName      = "sprite.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 1f,
+                RightCoordinate  = 32f, BottomCoordinate = 64f,
                 FrameLength      = 0.1f, ShapesSave = new ShapesSave()
             };
             var f2 = new AnimationFrameSave
             {
                 TextureName      = "sprite.png",
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f,   BottomCoordinate = 1f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f,   BottomCoordinate = 64f,
                 FrameLength      = 0.1f, ShapesSave = new ShapesSave()
             };
 
@@ -114,14 +114,14 @@ public class WireframeMultiChainDeleteTests
             {
                 TextureName      = "sprite.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 1f,
+                RightCoordinate  = 32f, BottomCoordinate = 64f,
                 FrameLength      = 0.1f, ShapesSave = new ShapesSave()
             };
             var f2 = new AnimationFrameSave
             {
                 TextureName      = "sprite.png",
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f,   BottomCoordinate = 1f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f,   BottomCoordinate = 64f,
                 FrameLength      = 0.1f, ShapesSave = new ShapesSave()
             };
 

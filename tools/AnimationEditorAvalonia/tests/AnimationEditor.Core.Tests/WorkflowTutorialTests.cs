@@ -107,20 +107,20 @@ public class WorkflowTutorialTests
     //         circles and drag to resize the frame." → AddFrameFromPixelBounds simulates this.
 
     [Fact]
-    public void Step8_PixelMode_AddFrameFromBounds_UVsMatchPixelRegion()
+    public void Step8_PixelMode_AddFrameFromBounds_RegionMatchesPixelRegion()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run");
 
         // Doc example: first run frame covers roughly the left half of a 128×128 sprite sheet
-        ctx.AppCommands.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128);
 
         var frame = chain.Frames[0];
         Assert.Equal(0f,   frame.LeftCoordinate,   precision: 5);
-        Assert.Equal(0.5f, frame.RightCoordinate,  precision: 5);
+        Assert.Equal(64f, frame.RightCoordinate,  precision: 5);
         Assert.Equal(0f,   frame.TopCoordinate,    precision: 5);
-        Assert.Equal(1f,   frame.BottomCoordinate, precision: 5);
+        Assert.Equal(128f,   frame.BottomCoordinate, precision: 5);
     }
 
     // ── Step 9: Shift frames using RelativeY ──────────────────────────────────

@@ -50,8 +50,8 @@ internal static class UndoLabelsDemo
             bulkFrames.Select(f => new BulkFrameRegionChangedCommand.FrameSnapshot(
                 f,
                 f.LeftCoordinate, f.TopCoordinate, f.RightCoordinate, f.BottomCoordinate,
-                f.LeftCoordinate + 0.05f, f.TopCoordinate + 0.05f,
-                f.RightCoordinate + 0.05f, f.BottomCoordinate + 0.05f)).ToList(),
+                f.LeftCoordinate + 5f, f.TopCoordinate + 5f,
+                f.RightCoordinate + 5f, f.BottomCoordinate + 5f)).ToList(),
             cmds, events));
 
         undo.Execute(new BulkFrameRegionChangedCommand(
@@ -61,14 +61,14 @@ internal static class UndoLabelsDemo
                     walk.Frames[0],
                     walk.Frames[0].LeftCoordinate, walk.Frames[0].TopCoordinate,
                     walk.Frames[0].RightCoordinate, walk.Frames[0].BottomCoordinate,
-                    walk.Frames[0].LeftCoordinate + 0.02f, walk.Frames[0].TopCoordinate,
-                    walk.Frames[0].RightCoordinate + 0.02f, walk.Frames[0].BottomCoordinate),
+                    walk.Frames[0].LeftCoordinate + 2f, walk.Frames[0].TopCoordinate,
+                    walk.Frames[0].RightCoordinate + 2f, walk.Frames[0].BottomCoordinate),
                 new BulkFrameRegionChangedCommand.FrameSnapshot(
                     walk.Frames[1],
                     walk.Frames[1].LeftCoordinate, walk.Frames[1].TopCoordinate,
                     walk.Frames[1].RightCoordinate, walk.Frames[1].BottomCoordinate,
-                    walk.Frames[1].LeftCoordinate + 0.08f, walk.Frames[1].TopCoordinate + 0.03f,
-                    walk.Frames[1].RightCoordinate + 0.08f, walk.Frames[1].BottomCoordinate + 0.03f),
+                    walk.Frames[1].LeftCoordinate + 8f, walk.Frames[1].TopCoordinate + 3f,
+                    walk.Frames[1].RightCoordinate + 8f, walk.Frames[1].BottomCoordinate + 3f),
             },
             cmds, events));
 

@@ -62,7 +62,7 @@ public class WireframeAutoPanTests
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f, BottomCoordinate = 1f,
+            RightCoordinate  = 512f, BottomCoordinate = 512f,
             ShapesSave = new ShapesSave(),
         };
         var chain = new AnimationChainSave { Name = "Test" };

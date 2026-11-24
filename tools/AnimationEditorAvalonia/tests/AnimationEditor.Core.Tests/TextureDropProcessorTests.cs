@@ -4,260 +4,97 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests;
 
+// What each result then does to the document is TextureDropApplierTests'.
 public class TextureDropProcessorTests
 {
-    [Fact]
-    public void ApplyPngDrop_OnFrame_AssignsOnlyThatFrameTexture()
+    private static AnimationChainSave ChainOf(int frames)
     {
         var chain = new AnimationChainSave();
-        var frameA = new AnimationFrameSave { TextureName = "oldA.png" };
-        var frameB = new AnimationFrameSave { TextureName = "oldB.png" };
-        chain.Frames.Add(frameA);
-        chain.Frames.Add(frameB);
+        for (int i = 0; i < frames; i++) chain.Frames.Add(new AnimationFrameSave { TextureName = "old.png" });
+        return chain;
+    }
 
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            frameA,
-            TestPaths.Abs("Project", "Content", "NewTex.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+    private static string Achx => TestPaths.Abs("Project", "Animations", "Player.achx");
 
-        Assert.Equal(TextureDropResult.UpdatedFrame, result);
-        Assert.Equal("../Content/NewTex.png", frameA.TextureName);
-        Assert.Equal("oldB.png", frameB.TextureName);
+    [Fact]
+    public void ComputePngDrop_OnFrame_UpdatesThatFrame_WithARelativeForwardSlashPath()
+    {
+        var chain = ChainOf(2);
+
+        var result = TextureDropProcessor.ComputePngDrop(
+            chain, chain.Frames[0], TestPaths.Abs("Project", "Content", "Sprites", "Hero.png"), Achx, createFrameOnCtrl: false);
+
+        Assert.Equal((TextureDropResult.UpdatedFrame, "../Content/Sprites/Hero.png"), result);
+        Assert.All(chain.Frames, frame => Assert.Equal("old.png", frame.TextureName));
+    }
+
+    [Theory]
+    [InlineData(2, false, TextureDropResult.UpdatedChainFrames)]
+    [InlineData(1, true, TextureDropResult.CreatedFrame)]
+    [InlineData(0, false, TextureDropResult.CreatedFrame)]
+    public void ComputePngDrop_OnChain_UpdatesItsFrames_OrCreatesOneOnCtrlOrWhenEmpty(int frames, bool ctrl, TextureDropResult expected)
+    {
+        var result = TextureDropProcessor.ComputePngDrop(
+            ChainOf(frames), null, TestPaths.Abs("Project", "Content", "Shared.png"), Achx, ctrl);
+
+        Assert.Equal((expected, "../Content/Shared.png"), result);
     }
 
     [Fact]
-    public void ApplyPngDrop_OnChainWithoutCtrl_AssignsAllFrames()
+    public void ComputePngDrop_SameDirectory_ReturnsFileNameOnly()
     {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "oldA.png" });
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "oldB.png" });
+        var chain = ChainOf(1);
 
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "Shared.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        var (_, path) = TextureDropProcessor.ComputePngDrop(
+            chain, chain.Frames[0], TestPaths.Abs("Project", "Tex.png"), TestPaths.Abs("Project", "Player.achx"), createFrameOnCtrl: false);
 
-        Assert.Equal(TextureDropResult.UpdatedChainFrames, result);
-        Assert.All(chain.Frames, frame => Assert.Equal("../Content/Shared.png", frame.TextureName));
+        Assert.Equal("Tex.png", path);
+    }
+
+    // Drag-drop reads the OS drag payload's real-case path directly, never the lowercased
+    // WireframeControl.LoadedTexturePath cache key (#941).
+    [Fact]
+    public void ComputePngDrop_MixedCaseOnDiskTexture_PreservesExactCase()
+    {
+        var result = TextureDropProcessor.ComputePngDrop(
+            ChainOf(0), null, TestPaths.Abs("Project", "Content", "Items.PNG"), Achx, createFrameOnCtrl: false);
+
+        Assert.Equal((TextureDropResult.CreatedFrame, "../Content/Items.PNG"), result);
+    }
+
+    // An unsaved project has no folder to be relative to, so the absolute path is kept.
+    [Theory]
+    [InlineData(0, TextureDropResult.CreatedFrame)]
+    [InlineData(1, TextureDropResult.UpdatedChainFrames)]
+    public void ComputePngDrop_NullAchx_OnChain_UsesAbsolutePath(int frames, TextureDropResult expected)
+    {
+        var dropped = TestPaths.AltAbs("Downloads", "sprite.png");
+
+        Assert.Equal((expected, dropped), TextureDropProcessor.ComputePngDrop(ChainOf(frames), null, dropped, null, false));
     }
 
     [Fact]
-    public void ApplyPngDrop_OnChainWithCtrl_CreatesNewFrame()
+    public void ComputePngDrop_NullAchx_OnFrame_UsesAbsolutePath()
     {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "oldA.png" });
+        var dropped = TestPaths.AltAbs("Downloads", "sprite.png");
 
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "NewFrameTex.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+        Assert.Equal((TextureDropResult.UpdatedFrame, dropped),
+            TextureDropProcessor.ComputePngDrop(null, new AnimationFrameSave(), dropped, null, false));
+    }
 
-        Assert.Equal(TextureDropResult.CreatedFrame, result);
-        Assert.Equal(2, chain.Frames.Count);
-        Assert.Equal("../Content/NewFrameTex.png", chain.Frames.Last().TextureName);
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ComputePngDrop_NonPng_IsIgnored(bool saved)
+    {
+        var result = TextureDropProcessor.ComputePngDrop(
+            ChainOf(1), null, TestPaths.Abs("Project", "Content", "NotTexture.jpg"), saved ? Achx : null, createFrameOnCtrl: false);
+
+        Assert.Equal((TextureDropResult.NotApplied, (string?)null), result);
     }
 
     [Fact]
-    public void ApplyPngDrop_OnEmptyChainWithoutCtrl_CreatesNewFrame()
-    {
-        var chain = new AnimationChainSave();
-
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "FirstFrameTex.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.CreatedFrame, result);
-        Assert.Single(chain.Frames);
-        Assert.Equal("../Content/FirstFrameTex.png", chain.Frames[0].TextureName);
-    }
-
-    // #937: a frame created by dropping a PNG stays shapeless until a shape is actually added,
-    // same as AppCommands.AddFrame/AddFrameFromPixelBounds/BatchFrameBuilder -- otherwise it saves
-    // with an empty shapesSave/ShapeCollectionSave block.
-    [Fact]
-    public void ApplyPngDrop_CreatedFrame_HasNullShapesSave()
-    {
-        var chain = new AnimationChainSave();
-
-        TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "FirstFrameTex.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Null(chain.Frames[0].ShapesSave);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NonPng_IsIgnored()
-    {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "oldA.png" });
-
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "NotTexture.jpg"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.NotApplied, result);
-        Assert.Single(chain.Frames);
-        Assert.Equal("oldA.png", chain.Frames[0].TextureName);
-    }
-
-    // ── TD06: relative path computation ──────────────────────────────────────
-
-    [Fact]
-    public void ApplyPngDrop_SameDirectory_ReturnsFileNameOnly()
-    {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave());
-
-        TextureDropProcessor.ApplyPngDrop(
-            chain,
-            chain.Frames[0],
-            TestPaths.Abs("Project", "Tex.png"),
-            TestPaths.Abs("Project", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        // Same folder → just the filename, no directory prefix
-        Assert.Equal("Tex.png", chain.Frames[0].TextureName);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_Subdirectory_ReturnsRelativeSubPath()
-    {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave());
-
-        TextureDropProcessor.ApplyPngDrop(
-            chain,
-            chain.Frames[0],
-            TestPaths.Abs("Project", "Content", "Sprites", "Hero.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        // FRB FileManager.MakeRelative normalises to forward slashes
-        Assert.Equal("../Content/Sprites/Hero.png", chain.Frames[0].TextureName);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_RelativePathUsesForwardSlashes()
-    {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave());
-
-        TextureDropProcessor.ApplyPngDrop(
-            chain,
-            chain.Frames[0],
-            TestPaths.Abs("Project", "Content", "NewTex.png"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        var tex = chain.Frames[0].TextureName;
-        Assert.DoesNotContain(@"\", tex);
-        Assert.Contains("/", tex);
-    }
-
-    // ── Case preservation (issue #941) ────────────────────────────────────────
-    // Drag-drop reads the OS drag payload's real-case path directly (never through the
-    // lowercased WireframeControl.LoadedTexturePath cache key), so it was never affected by
-    // #941 -- this locks that in as a regression guard.
-
-    [Fact]
-    public void ApplyPngDrop_MixedCaseOnDiskTexture_PreservesExactCase()
-    {
-        var chain = new AnimationChainSave();
-
-        var result = TextureDropProcessor.ApplyPngDrop(
-            chain,
-            null,
-            TestPaths.Abs("Project", "Content", "Items.PNG"),
-            TestPaths.Abs("Project", "Animations", "Player.achx"),
-            createFrameOnCtrl: false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.CreatedFrame, result);
-        Assert.Equal("../Content/Items.PNG", chain.Frames[0].TextureName);
-    }
-
-    // ── Unsaved project (achxFileName == null) ────────────────────────────────
-    // Root cause: these all previously returned NotApplied, silently breaking
-    // drag-drop on projects that hadn't been saved yet.
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_EmptyChain_CreatesFrame()
-    {
-        var chain = new AnimationChainSave();
-
-        var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.CreatedFrame, result);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_EmptyChain_UsesAbsolutePath()
-    {
-        var chain = new AnimationChainSave();
-        TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), chain.Frames[0].TextureName);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_ChainWithFrames_UpdatesAllFrames()
-    {
-        var chain = new AnimationChainSave();
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "old.png" });
-
-        var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.UpdatedChainFrames, result);
-        Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), chain.Frames[0].TextureName);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_TargetFrame_UpdatesThatFrame()
-    {
-        var frame = new AnimationFrameSave();
-
-        var result = TextureDropProcessor.ApplyPngDrop(null, frame,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.UpdatedFrame, result);
-        Assert.Equal(TestPaths.AltAbs("Downloads", "sprite.png"), frame.TextureName);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_NonPng_IsIgnored()
-    {
-        var chain = new AnimationChainSave();
-
-        var result = TextureDropProcessor.ApplyPngDrop(chain, null,
-            TestPaths.AltAbs("Downloads", "sprite.jpg"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.NotApplied, result);
-    }
-
-    [Fact]
-    public void ApplyPngDrop_NullAchx_NullChainAndFrame_IsIgnored()
-    {
-        var result = TextureDropProcessor.ApplyPngDrop(null, null,
-            TestPaths.AltAbs("Downloads", "sprite.png"), null, false, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-
-        Assert.Equal(TextureDropResult.NotApplied, result);
-    }
+    public void ComputePngDrop_NullChainAndFrame_IsIgnored() =>
+        Assert.Equal((TextureDropResult.NotApplied, (string?)null),
+            TextureDropProcessor.ComputePngDrop(null, null, TestPaths.AltAbs("Downloads", "sprite.png"), null, false));
 }

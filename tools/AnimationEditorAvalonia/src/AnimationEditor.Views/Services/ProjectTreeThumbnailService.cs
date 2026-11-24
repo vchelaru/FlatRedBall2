@@ -207,7 +207,7 @@ public sealed class ProjectTreeThumbnailService
         }
 
         using var composite = await SequenceThumbnailRenderer.RenderAsync(
-            layers, lookup.IsPixelFrame, async path => await DecodeOrNullAsync(entry.ParentFolder, path), maxWidth, maxHeight);
+            layers, lookup.IsUvFrame, async path => await DecodeOrNullAsync(entry.ParentFolder, path), maxWidth, maxHeight);
         if (composite is null) return null;
 
         var bitmap = ThumbnailService.ToAvaloniaBitmap(composite);
@@ -256,12 +256,12 @@ public sealed class ProjectTreeThumbnailService
         if (textureBitmap is null)
             return null;
 
-        var uvFrame = acls.CoordinateType == TextureCoordinateType.Pixel
-            ? PixelFrameUvConverter.ToUv(frame, textureBitmap.Width, textureBitmap.Height)
-            : frame;
+        var pixelFrame = acls.CoordinateType == TextureCoordinateType.Pixel
+            ? frame
+            : PixelFrameUvConverter.ToPixel(frame, textureBitmap.Width, textureBitmap.Height);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            textureBitmap, uvFrame, default, maxWidth, maxHeight);
+            textureBitmap, pixelFrame, default, maxWidth, maxHeight);
         return thumb is null ? null : ThumbnailService.ToAvaloniaBitmap(thumb);
     }
 

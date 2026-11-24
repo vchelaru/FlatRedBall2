@@ -261,14 +261,15 @@ public class SequenceLiveReloadScenarioTests
         ChipImageSize(editor).Width.ShouldBe(ChipImageSize(editor).Height);
         PreviewPixels(editor, SKColors.CornflowerBlue).ShouldBeGreaterThan(0);
         PreviewPixels(editor, SKColors.Red).ShouldBe(0);
+        var cells = Timeline(editor).FilmstripCells(Timeline(editor).Blocks.Single());
 
-        // Twice as wide and red: the same UV region is now a 2:1 sprite.
-        editor.WritePng(Path.Combine("art", "sheet.png"), 128, 64, SKColors.Red);
+        // Half a frame wide and red: the chip crops what is left of the 16x16 region, 8x16.
+        editor.WritePng(Path.Combine("art", "sheet.png"), 8, 64, SKColors.Red);
 
-        (await editor.WaitUntilAsync(() => Math.Abs(SpriteWidthOfFirstCell(editor) - 2 * TimelineLayout.FilmHeight) < 1e-6, ReloadTimeout))
-            .ShouldBeTrue("the filmstrip should lay its cells out from the replaced texture");
-        (await editor.WaitUntilAsync(() => ChipImageSize(editor).Width == 2 * ChipImageSize(editor).Height, ReloadTimeout))
-            .ShouldBeTrue("the chip should show the replaced texture's 2:1 sprite");
+        (await editor.WaitUntilAsync(() => !ReferenceEquals(cells, Timeline(editor).FilmstripCells(Timeline(editor).Blocks.Single())), ReloadTimeout))
+            .ShouldBeTrue("the filmstrip should lay its cells out again for the replaced texture");
+        (await editor.WaitUntilAsync(() => ChipImageSize(editor).Height == 2 * ChipImageSize(editor).Width, ReloadTimeout))
+            .ShouldBeTrue("the chip should show the replaced texture's 1:2 sprite");
         (await editor.WaitUntilAsync(() => PreviewPixels(editor, SKColors.Red) > 0, ReloadTimeout))
             .ShouldBeTrue("the composited preview should draw the replaced pixels");
     }

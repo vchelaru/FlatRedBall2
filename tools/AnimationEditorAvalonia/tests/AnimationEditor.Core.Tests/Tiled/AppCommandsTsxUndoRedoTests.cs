@@ -109,7 +109,7 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
     {
         var walk = OpenTsx();
         var copy = _ctx.AppCommands.DuplicateChains([walk]).Single(); // yields Walk's tile 0 at first
-        _ctx.AppCommands.SetFramePixelRegion(copy.Frames, pixelX: null, pixelY: 16, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion(copy.Frames, pixelX: null, pixelY: 16, pixelW: null, pixelH: null);
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], Anim(Disk(), 4));
         _warnings.Clear();
 

@@ -201,16 +201,70 @@ public class EditCommandTests : IDisposable
         d.RootElement.GetProperty("chains")[0].GetProperty("name").GetString().ShouldBe("Run");
     }
 
-    [Fact]
-    public async Task MissingTexture_BlocksSavingAPixelFile_SoNothingIsWritten()
+    // "The whole texture" needs the texture's size, and only a PNG header gives one here. Region 0,0,1,1 would be one pixel.
+    [Theory]
+    [InlineData("add-frame Idle texture=pic.jpg")]
+    [InlineData("set-frame-texture New/0 texture=pic.jpg")]
+    public async Task WholeTexture_OfAnImageWhoseSizeCannotBeRead_IsRefused_AndNothingIsWritten(string op)
     {
-        var before = _w.Bytes("broken.achx");
+        File.WriteAllBytes(_w.PathOf("pic.jpg"), [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46]);
+        var hero = File.ReadAllText(_w.PathOf("hero.achx"));
+        File.WriteAllText(_w.PathOf("hero.achx"), hero.Replace("</AnimationChainArraySave>",
+            "<AnimationChain><Name>New</Name><Frame><TextureName></TextureName><FrameLength>0.1</FrameLength><LeftCoordinate>0</LeftCoordinate>" +
+            "<RightCoordinate>1</RightCoordinate><TopCoordinate>0</TopCoordinate><BottomCoordinate>1</BottomCoordinate></Frame></AnimationChain></AnimationChainArraySave>"));
+        var before = _w.Bytes("hero.achx");
 
+        var r = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", op);
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        r.Out.ShouldContain("pic.jpg");
+        r.Out.ShouldContain("size");
+        _w.Bytes("hero.achx").ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task SetFrameTexture_ToAnImageWhoseSizeCannotBeRead_KeepsASetRegion()
+    {
+        File.WriteAllBytes(_w.PathOf("pic.jpg"), [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46]);
+
+        var r = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", "set-frame-texture Walk/1 texture=pic.jpg");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var region = (await Describe("hero.achx")).RootElement.GetProperty("chains")[0].GetProperty("frames")[1].GetProperty("region");
+        region.GetProperty("x").GetDouble().ShouldBe(16);
+        region.GetProperty("width").GetDouble().ShouldBe(16);
+    }
+
+    // A Pixel file saves as it is stored, so a missing texture no longer blocks it (#1952).
+    [Fact]
+    public async Task MissingTexture_DoesNotBlockSavingAPixelFile_AndKeepsItsRegion()
+    {
         var r = await Edit("broken.achx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
 
-        r.Code.ShouldBe(1);
-        r.Out.ShouldContain("missing.png");
-        _w.Bytes("broken.achx").ShouldBe(before);
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var frame = (await Describe("broken.achx")).RootElement.GetProperty("chains")[0].GetProperty("frames")[1];
+        frame.GetProperty("texture").GetString().ShouldBe("missing.png");
+        frame.GetProperty("region").GetProperty("x").GetDouble().ShouldBe(16);
+        frame.GetProperty("region").GetProperty("width").GetDouble().ShouldBe(16);
+        frame.GetProperty("region").GetProperty("height").GetDouble().ShouldBe(32);
+    }
+
+    // #1934's repro: relinking frames whose PNG was missing used to multiply their pixels by the texture size.
+    [Theory]
+    [InlineData("hero.achx")]
+    [InlineData("hero.achj")]
+    public async Task SetFrameTexture_OnFramesWhosePngIsMissing_KeepsTheirRegions(string file)
+    {
+        Directory.CreateDirectory(_w.PathOf("art"));
+        File.Move(_w.PathOf("sheet.png"), _w.PathOf("art/sheet.png"));
+        var before = (await Describe(file)).RootElement.GetProperty("chains")[0].GetProperty("frames")[1].GetProperty("region").GetRawText();
+
+        var r = await _w.RunAsync("edit", _w.PathOf(file), "--op", "set-frame-texture */* texture=art/sheet.png");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var frame = (await Describe(file)).RootElement.GetProperty("chains")[0].GetProperty("frames")[1];
+        frame.GetProperty("texture").GetString().ShouldBe("art/sheet.png");
+        frame.GetProperty("region").GetRawText().ShouldBe(before);
     }
 
     [Theory]

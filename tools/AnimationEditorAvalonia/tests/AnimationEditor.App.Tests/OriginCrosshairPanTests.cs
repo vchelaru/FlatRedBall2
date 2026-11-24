@@ -218,7 +218,7 @@ public class OriginCrosshairPanTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "dark.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };

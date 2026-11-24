@@ -62,7 +62,10 @@ public class FilmstripRendererTextureReloadTests
         WritePng(folder, "a.png", 128, 64);
         thumbnails.InvalidatePath(sheetA);
 
-        Assert.Equal(80, renderer.CellsFor(document, "a.achx", chainA, 0.1, 100, 40)[0].SpriteWidth, 6);
+        // The frame keeps its 16x16 pixel region on the wider sheet, so only the relayout shows (#1952).
+        var relaid = renderer.CellsFor(document, "a.achx", chainA, 0.1, 100, 40);
+        Assert.NotSame(cellsA, relaid);
+        Assert.Equal(40, relaid[0].SpriteWidth, 6);
         Assert.Same(cellsB, renderer.CellsFor(document, "b.achx", chainB, 0.1, 100, 40));
     }
 }

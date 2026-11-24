@@ -17,7 +17,7 @@ public class ClipboardPayloadUnitTests
     private static List<AnimationFrameSave> RoundTrip(List<AnimationFrameSave> frames, FrameLengthUnit source, FrameLengthUnit destination)
     {
         var text = ClipboardPayload.Serialize(frames, source);
-        Assert.True(ClipboardPayload.TryDeserialize(text, destination, out _, out var pasted, out _));
+        Assert.True(ClipboardPayload.TryDeserialize(text, destination, _ => null, out _, out var pasted, out _));
         return pasted!;
     }
 
@@ -58,7 +58,7 @@ public class ClipboardPayloadUnitTests
         chain.Frames.AddRange(Frames(100f, 300f));
         var text = ClipboardPayload.Serialize(new List<AnimationChainSave> { chain }, FrameLengthUnit.Milliseconds);
 
-        Assert.True(ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, out var chains, out _, out _));
+        Assert.True(ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, _ => null, out var chains, out _, out _));
 
         Assert.Equal(0.1f, chains![0].Frames[0].FrameLength, precision: 4);
         Assert.Equal(0.3f, chains[0].Frames[1].FrameLength, precision: 4);
@@ -71,7 +71,7 @@ public class ClipboardPayloadUnitTests
         var text = ClipboardPayload.SerializeFromPayload(payload, FrameLengthUnit.Milliseconds);
 
         Assert.Contains("Millisecond", text);
-        Assert.True(ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, out _, out var pasted, out _));
+        Assert.True(ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, _ => null, out _, out var pasted, out _));
         Assert.Equal(0.1f, pasted![0].FrameLength, precision: 4);
     }
 

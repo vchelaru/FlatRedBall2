@@ -64,21 +64,21 @@ public class WireframeMultiSelectFramePreviewTests
         {
             TextureName      = "sprite.png",
             LeftCoordinate   = 0f,      TopCoordinate    = 0f,
-            RightCoordinate  = 1f / 3f, BottomCoordinate = 1f,
+            RightCoordinate  = 21.3333f, BottomCoordinate = 64f,
             FrameLength      = 0.1f, ShapesSave = new ShapesSave()
         };
         var f1 = new AnimationFrameSave
         {
             TextureName      = "sprite.png",
-            LeftCoordinate   = 1f / 3f, TopCoordinate    = 0f,
-            RightCoordinate  = 2f / 3f, BottomCoordinate = 1f,
+            LeftCoordinate   = 21.3333f, TopCoordinate    = 0f,
+            RightCoordinate  = 42.6667f, BottomCoordinate = 64f,
             FrameLength      = 0.1f, ShapesSave = new ShapesSave()
         };
         var f2 = new AnimationFrameSave
         {
             TextureName      = "sprite.png",
-            LeftCoordinate   = 2f / 3f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f,      BottomCoordinate = 1f,
+            LeftCoordinate   = 42.6667f, TopCoordinate    = 0f,
+            RightCoordinate  = 64f,      BottomCoordinate = 64f,
             FrameLength      = 0.1f, ShapesSave = new ShapesSave()
         };
 
@@ -171,8 +171,8 @@ public class WireframeMultiSelectFramePreviewTests
             var f0 = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             // Far corner, well clear of f0's handle zone at screen (3,3) — this is a
@@ -181,8 +181,8 @@ public class WireframeMultiSelectFramePreviewTests
             var f1 = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.95f, TopCoordinate = 0.95f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 60.8f, TopCoordinate = 60.8f,
+                RightCoordinate = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -226,8 +226,8 @@ public class WireframeMultiSelectFramePreviewTests
             var f0 = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             // Far corner, well clear of f0's handle zone at screen (3,3) — this is a
@@ -236,8 +236,8 @@ public class WireframeMultiSelectFramePreviewTests
             var f1 = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.95f, TopCoordinate = 0.95f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 60.8f, TopCoordinate = 60.8f,
+                RightCoordinate = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };

@@ -616,10 +616,10 @@ public class GridRenderTests
         {
             TextureName      = System.IO.Path.GetFileName(png),
             // Deliberately off-grid (not divisible by 10): 13, 23, 47, 58 pixels.
-            LeftCoordinate   = 13f / 100f,
-            TopCoordinate    = 23f / 100f,
-            RightCoordinate  = 47f / 100f,
-            BottomCoordinate = 58f / 100f,
+            LeftCoordinate   = 13f,
+            TopCoordinate    = 23f,
+            RightCoordinate  = 47f,
+            BottomCoordinate = 58f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -672,10 +672,10 @@ public class GridRenderTests
             TextureName      = System.IO.Path.GetFileName(png),
             // A tiny 4×4 frame at (13,23) — the issue #538 repro shape. None of the
             // edges land on the 10px grid, so a display-snap would balloon it to a cell.
-            LeftCoordinate   = 13f / 100f,
-            TopCoordinate    = 23f / 100f,
-            RightCoordinate  = 17f / 100f,
-            BottomCoordinate = 27f / 100f,
+            LeftCoordinate   = 13f,
+            TopCoordinate    = 23f,
+            RightCoordinate  = 17f,
+            BottomCoordinate = 27f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -728,10 +728,10 @@ public class GridRenderTests
         var frame = new AnimationFrameSave
         {
             TextureName      = System.IO.Path.GetFileName(png),
-            LeftCoordinate   = 10f / 100f,
-            TopCoordinate    = 20f / 100f,
-            RightCoordinate  = 30f / 100f,
-            BottomCoordinate = 40f / 100f,
+            LeftCoordinate   = 10f,
+            TopCoordinate    = 20f,
+            RightCoordinate  = 30f,
+            BottomCoordinate = 40f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -750,8 +750,8 @@ public class GridRenderTests
             ctrl.SetGrid(true, 10);
 
             // Simulate the property-panel edit: user types Y = 23 (off-grid).
-            frame.TopCoordinate    = 23f / 100f;
-            frame.BottomCoordinate = 43f / 100f;
+            frame.TopCoordinate    = 23f;
+            frame.BottomCoordinate = 43f;
             ctrl.RefreshFrames();
 
             var bounds = ctrl.GetFrameRects()[0].Bounds;
@@ -780,10 +780,10 @@ public class GridRenderTests
         {
             TextureName      = System.IO.Path.GetFileName(png),
             // Already on 10-pixel grid: left=10, top=20, right=50, bottom=60.
-            LeftCoordinate   = 10f / 100f,
-            TopCoordinate    = 20f / 100f,
-            RightCoordinate  = 50f / 100f,
-            BottomCoordinate = 60f / 100f,
+            LeftCoordinate   = 10f,
+            TopCoordinate    = 20f,
+            RightCoordinate  = 50f,
+            BottomCoordinate = 60f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -830,10 +830,10 @@ public class GridRenderTests
         {
             TextureName      = System.IO.Path.GetFileName(png),
             // Deliberately off-grid.
-            LeftCoordinate   = 13f / 100f,
-            TopCoordinate    = 23f / 100f,
-            RightCoordinate  = 47f / 100f,
-            BottomCoordinate = 58f / 100f,
+            LeftCoordinate   = 13f,
+            TopCoordinate    = 23f,
+            RightCoordinate  = 47f,
+            BottomCoordinate = 58f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -881,10 +881,10 @@ public class GridRenderTests
         var frame = new AnimationFrameSave
         {
             TextureName      = System.IO.Path.GetFileName(png),
-            LeftCoordinate   = frameX / 64f,
-            TopCoordinate    = frameY / 64f,
-            RightCoordinate  = (frameX + frameW) / 64f,
-            BottomCoordinate = (frameY + frameH) / 64f,
+            LeftCoordinate   = frameX,
+            TopCoordinate    = frameY,
+            RightCoordinate  = frameX + frameW,
+            BottomCoordinate = frameY + frameH,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -920,10 +920,10 @@ public class GridRenderTests
             ctrl.SimulateGridSnapDoubleClick(20f, 20f);
 
             // Frame becomes the full clicked cell (16,16,32,32) on 64×64.
-            Assert.Equal(16f / 64f, frame.LeftCoordinate,   precision: 5);
-            Assert.Equal(16f / 64f, frame.TopCoordinate,    precision: 5);
-            Assert.Equal(32f / 64f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(32f / 64f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(16f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(16f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(32f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(32f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -947,8 +947,8 @@ public class GridRenderTests
             // (5,5) snaps to the top-left cell (0,0,16,16) on 64×64.
             Assert.Equal(0f,        frame.LeftCoordinate,   precision: 5);
             Assert.Equal(0f,        frame.TopCoordinate,    precision: 5);
-            Assert.Equal(16f / 64f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(16f / 64f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(16f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(16f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -971,10 +971,10 @@ public class GridRenderTests
 
             ctrl.SimulateGridSnapDoubleClick(20f, 20f);
 
-            Assert.Equal(16f / 64f, frame.LeftCoordinate,   precision: 5);
-            Assert.Equal(16f / 64f, frame.TopCoordinate,    precision: 5);
-            Assert.Equal(32f / 64f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(32f / 64f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(16f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(16f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(32f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(32f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -996,8 +996,8 @@ public class GridRenderTests
             // UV should remain at full-sheet values
             Assert.Equal(0f, frame.LeftCoordinate,   precision: 5);
             Assert.Equal(0f, frame.TopCoordinate,    precision: 5);
-            Assert.Equal(1f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(1f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(64f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(64f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -1125,8 +1125,8 @@ public class GridRenderTests
             var frameB = new AnimationFrameSave
             {
                 TextureName      = frameA.TextureName,
-                LeftCoordinate   = 40f / 64f, TopCoordinate    = 40f / 64f,
-                RightCoordinate  = 44f / 64f, BottomCoordinate = 44f / 64f,
+                LeftCoordinate   = 40f, TopCoordinate    = 40f,
+                RightCoordinate  = 44f, BottomCoordinate = 44f,
             };
             chain.Frames.Add(frameB);
             ctx.SelectedState.SelectedFrame = null;   // show the whole chain, not just one frame
@@ -1197,10 +1197,10 @@ public class GridRenderTests
         {
             TextureName      = System.IO.Path.GetFileName(png),
             // Off-grid origin at (13,23); 4×4 → bottom-right at (17,27).
-            LeftCoordinate   = 13f / 100f,
-            TopCoordinate    = 23f / 100f,
-            RightCoordinate  = 17f / 100f,
-            BottomCoordinate = 27f / 100f,
+            LeftCoordinate   = 13f,
+            TopCoordinate    = 23f,
+            RightCoordinate  = 17f,
+            BottomCoordinate = 27f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -1222,10 +1222,10 @@ public class GridRenderTests
             // to 48 (nearest 16); left/top must remain the off-grid 13/23.
             ctrl.SimulateHandleDrag(HandleKind.BotRight, 17f, 27f, 44f, 44f);
 
-            Assert.Equal(13f / 100f, frame.LeftCoordinate,   precision: 5);
-            Assert.Equal(23f / 100f, frame.TopCoordinate,    precision: 5);
-            Assert.Equal(48f / 100f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(48f / 100f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(13f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(23f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(48f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(48f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -1248,10 +1248,10 @@ public class GridRenderTests
         {
             TextureName      = System.IO.Path.GetFileName(png),
             // Off-grid X and width: left=21, right=45 (width 24).
-            LeftCoordinate   = 21f / 100f,
-            TopCoordinate    = 21f / 100f,
-            RightCoordinate  = 45f / 100f,
-            BottomCoordinate = 45f / 100f,
+            LeftCoordinate   = 21f,
+            TopCoordinate    = 21f,
+            RightCoordinate  = 45f,
+            BottomCoordinate = 45f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -1275,7 +1275,7 @@ public class GridRenderTests
             // Frame must stay non-inverted; left edge stays put at 21.
             Assert.True(frame.RightCoordinate > frame.LeftCoordinate,
                 $"Frame inverted: Left={frame.LeftCoordinate}, Right={frame.RightCoordinate}");
-            Assert.Equal(21f / 100f, frame.LeftCoordinate, precision: 5);
+            Assert.Equal(21f, frame.LeftCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }

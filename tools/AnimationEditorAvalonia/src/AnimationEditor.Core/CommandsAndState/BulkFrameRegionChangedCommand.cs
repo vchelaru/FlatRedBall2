@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -39,7 +40,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 var s = snapshots[0];
                 float bW = s.BR - s.BL, bH = s.BB - s.BT;
                 float aW = s.AR - s.AL, aH = s.AB - s.AT;
-                bool sizeChanged = Math.Abs(bW - aW) > 0.0001f || Math.Abs(bH - aH) > 0.0001f;
+                bool sizeChanged = Math.Abs(bW - aW) > FrameRegion.EditTolerance || Math.Abs(bH - aH) > FrameRegion.EditTolerance;
                 return sizeChanged ? "Resize Frame" : "Move Frame";
             }
 
@@ -51,10 +52,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             {
                 float bW = s.BR - s.BL, bH = s.BB - s.BT;
                 float aW = s.AR - s.AL, aH = s.AB - s.AT;
-                bool sizeChanged = Math.Abs(bW - aW) > 0.0001f || Math.Abs(bH - aH) > 0.0001f;
+                bool sizeChanged = Math.Abs(bW - aW) > FrameRegion.EditTolerance || Math.Abs(bH - aH) > FrameRegion.EditTolerance;
                 if (sizeChanged ||
-                    Math.Abs((s.AL - s.BL) - dL) > 0.0001f ||
-                    Math.Abs((s.AT - s.BT) - dT) > 0.0001f)
+                    Math.Abs((s.AL - s.BL) - dL) > FrameRegion.EditTolerance ||
+                    Math.Abs((s.AT - s.BT) - dT) > FrameRegion.EditTolerance)
                 {
                     isChainDrag = false;
                     break;

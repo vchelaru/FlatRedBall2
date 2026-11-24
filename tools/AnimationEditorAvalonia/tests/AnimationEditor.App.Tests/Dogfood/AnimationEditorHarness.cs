@@ -49,7 +49,7 @@ internal sealed class AnimationEditorHarness : IDisposable
         {
             Services.IoManager.RecoveryFilePath = recoveryFilePath;
         }
-        Services.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        Services.ProjectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         Services.ProjectManager.FileName = null;
         ProjectFolder = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(ProjectFolder);
@@ -486,8 +486,8 @@ internal sealed class AnimationEditorHarness : IDisposable
         }
         (float panX, float panY, float zoom) = Wireframe.CameraState;
         (float left, float top, float right, float bottom) = CanvasTransform.TextureRectToScreen(
-            frame.LeftCoordinate * width, frame.TopCoordinate * height,
-            frame.RightCoordinate * width, frame.BottomCoordinate * height, panX, panY, zoom);
+            frame.LeftCoordinate, frame.TopCoordinate,
+            frame.RightCoordinate, frame.BottomCoordinate, panX, panY, zoom);
         Point origin = PointIn(Wireframe, 0, 0);
         return new Rect(origin.X + left, origin.Y + top, right - left, bottom - top);
     }
@@ -521,11 +521,10 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <summary>The pixel rectangle (x, y, width, height) <paramref name="frame"/> covers on its texture.</summary>
     public (int X, int Y, int Width, int Height) PixelRectOf(AnimationFrameSave frame)
     {
-        (int width, int height) = Wireframe.BitmapSize;
-        int left = (int)MathF.Round(frame.LeftCoordinate * width);
-        int top = (int)MathF.Round(frame.TopCoordinate * height);
-        int right = (int)MathF.Round(frame.RightCoordinate * width);
-        int bottom = (int)MathF.Round(frame.BottomCoordinate * height);
+        int left = (int)MathF.Round(frame.LeftCoordinate);
+        int top = (int)MathF.Round(frame.TopCoordinate);
+        int right = (int)MathF.Round(frame.RightCoordinate);
+        int bottom = (int)MathF.Round(frame.BottomCoordinate);
         return (left, top, right - left, bottom - top);
     }
 

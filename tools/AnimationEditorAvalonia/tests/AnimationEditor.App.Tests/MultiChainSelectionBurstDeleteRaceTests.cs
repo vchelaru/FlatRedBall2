@@ -66,11 +66,11 @@ public class MultiChainSelectionBurstDeleteRaceTests
         try
         {
             var chainA = new AnimationChainSave { Name = "A" };
-            chainA.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f });
+            chainA.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 100f, TopCoordinate = 100f, RightCoordinate = 300f, BottomCoordinate = 300f });
             var chainB = new AnimationChainSave { Name = "B" };
-            chainB.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.4f, TopCoordinate = 0.1f, RightCoordinate = 0.6f, BottomCoordinate = 0.3f });
+            chainB.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 400f, TopCoordinate = 100f, RightCoordinate = 600f, BottomCoordinate = 300f });
             var chainC = new AnimationChainSave { Name = "C" };
-            chainC.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.7f, TopCoordinate = 0.1f, RightCoordinate = 0.9f, BottomCoordinate = 0.3f });
+            chainC.Frames.Add(new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 700f, TopCoordinate = 100f, RightCoordinate = 900f, BottomCoordinate = 300f });
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainA);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainB);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainC);

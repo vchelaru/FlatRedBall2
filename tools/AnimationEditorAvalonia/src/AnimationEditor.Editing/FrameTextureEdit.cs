@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -127,8 +128,24 @@ public static class FrameTextureEdit
         if (!probe.CanDecode(absolutePath))
             return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absolutePath}");
 
+        if (CheckWholeTexture(commands, absolutePath, frames) is { } refused) return refused;
+
         commands.SetFrameTextureName(frames, storePath);
         return new EditResult([storePath], [], []);
+    }
+
+    /// <summary>
+    /// The refusal when a frame would have to show the whole of <paramref name="absolutePath"/> and its size cannot be
+    /// read, so no region can be stored; null when there is nothing to refuse. <paramref name="frames"/> are the frames
+    /// taking the texture (only those with no region yet need its size); null for a new frame, which always does.
+    /// </summary>
+    public static EditResult? CheckWholeTexture(IAppCommands commands, string absolutePath, IEnumerable<AnimationFrameSave>? frames = null)
+    {
+        if (frames is not null && !frames.Any(f => FrameRegion.IsUnset(f, commands.GetTextureSize))) return null;
+        return commands.GetTextureSize(absolutePath) is null
+            ? Fail(EditErrorCode.UnsupportedFile,
+                $"A frame showing the whole texture needs the texture's size, which could not be read: {absolutePath}. Use a PNG.")
+            : null;
     }
 
     private static string AchxFolder(IProjectManager projectManager) =>

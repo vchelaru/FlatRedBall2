@@ -4,7 +4,7 @@ namespace AnimationEditor.Core.Rendering;
 
 /// <summary>
 /// Builds a batch of new frames to append to a chain (F12 — Add Multiple Frames).
-/// All UV arithmetic is isolated here so it can be unit-tested independently.
+/// All cell arithmetic is isolated here so it can be unit-tested independently.
 /// </summary>
 public static class BatchFrameBuilder
 {
@@ -18,30 +18,35 @@ public static class BatchFrameBuilder
 
         /// <summary>
         /// <c>true</c> when <see cref="incrementUV"/> was <c>true</c> and at least one
-        /// frame's auto-incremented coordinates would have exceeded [0, 1].
+        /// frame's auto-incremented coordinates would have gone past the texture's bottom.
         /// The frames are still created but the caller may want to warn the user.
         /// </summary>
         public bool ExceededTextureBounds { get; init; }
     }
 
     /// <summary>
-    /// Creates <paramref name="count"/> frames, optionally auto-incrementing the UV
+    /// Creates <paramref name="count"/> frames, optionally auto-incrementing the
     /// cell position row-by-row based on the last frame already in the chain.
     /// </summary>
     /// <param name="lastFrame">
     ///     The last frame already in the chain, used as the copy-from source.
-    ///     <c>null</c> is allowed (all frames get default UV 0/1/0/1, default FrameLength 0.1 s in the file's unit).
+    ///     <c>null</c> is allowed (all frames get an unset region, default FrameLength 0.1 s in the file's unit).
     /// </param>
     /// <param name="count">Number of frames to create (must be ≥ 1).</param>
     /// <param name="incrementUV">
-    ///     <c>true</c> → advance the UV cell left-to-right, wrapping to the next row;
-    ///     <c>false</c> → each new frame copies the UV of <paramref name="lastFrame"/>.
+    ///     <c>true</c> → advance one cell left-to-right, wrapping to the next row;
+    ///     <c>false</c> → each new frame copies the region of <paramref name="lastFrame"/>.
+    /// </param>
+    /// <param name="textureSize">
+    ///     The size of <paramref name="lastFrame"/>'s texture. Without it there is no row to wrap, so the
+    ///     frames copy the region whatever <paramref name="incrementUV"/> says.
     /// </param>
     public static BatchResult BuildBatch(
         AnimationFrameSave? lastFrame,
         int count,
         bool incrementUV,
-        AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit)
+        AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit,
+        (int Width, int Height)? textureSize)
     {
         if (count <= 0)
             return new BatchResult { Frames = [] };
@@ -50,10 +55,10 @@ public static class BatchFrameBuilder
         float frameHeight = lastFrame != null ? lastFrame.BottomCoordinate - lastFrame.TopCoordinate : 1f;
 
         // Guard: degenerate cell sizes fall back to full-texture
-        if (frameWidth  <= 0f) frameWidth  = 1f;
-        if (frameHeight <= 0f) frameHeight = 1f;
+        if (frameWidth  <= 0f) frameWidth  = textureSize?.Width  ?? 1f;
+        if (frameHeight <= 0f) frameHeight = textureSize?.Height ?? 1f;
 
-        float framesPerRow = 1f / frameWidth; // may be fractional — we'll round below
+        float framesPerRow = (textureSize?.Width ?? 0f) / frameWidth; // may be fractional — we'll round below
 
         var result = new List<AnimationFrameSave>(count);
         bool exceeded = false;
@@ -66,7 +71,7 @@ public static class BatchFrameBuilder
 
         for (int i = 0; i < count; i++)
         {
-            if (incrementUV && lastFrame != null)
+            if (incrementUV && lastFrame != null && textureSize is { } size)
             {
                 // Advance to the next cell
                 int currentCellInRow = RoundToInt(currentLeft / frameWidth);
@@ -87,7 +92,7 @@ public static class BatchFrameBuilder
                     currentBottom += frameHeight;
                 }
 
-                if (currentBottom > 1f + 1e-5f)
+                if (currentBottom > size.Height + 0.01f)
                     exceeded = true;
             }
 

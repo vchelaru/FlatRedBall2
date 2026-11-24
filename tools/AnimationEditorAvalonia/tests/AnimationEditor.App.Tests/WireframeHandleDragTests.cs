@@ -71,7 +71,7 @@ public class WireframeHandleDragTests
             TextureName      = "sprite.png",   // relative — achxFolder + "sprite.png" == png
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f, BottomCoordinate = 1f,
+            RightCoordinate  = 64f, BottomCoordinate = 64f,
             ShapesSave = new ShapesSave(),
         };
         var chain = new AnimationChainSave { Name = "Test" };
@@ -109,10 +109,10 @@ public class WireframeHandleDragTests
                 startScreenX: 0f, startScreenY: 0f,
                 endScreenX:   8f, endScreenY:   8f);
 
-            Assert.Equal(0.125f, frame.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.125f, frame.TopCoordinate,    precision: 4);
-            Assert.Equal(1f,     frame.RightCoordinate,  precision: 4);
-            Assert.Equal(1f,     frame.BottomCoordinate, precision: 4);
+            Assert.Equal(8f, frame.LeftCoordinate,   precision: 4);
+            Assert.Equal(8f, frame.TopCoordinate,    precision: 4);
+            Assert.Equal(64f,     frame.RightCoordinate,  precision: 4);
+            Assert.Equal(64f,     frame.BottomCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -137,8 +137,8 @@ public class WireframeHandleDragTests
 
             Assert.Equal(0f,     frame.LeftCoordinate,   precision: 4);
             Assert.Equal(0f,     frame.TopCoordinate,    precision: 4);
-            Assert.Equal(0.875f, frame.RightCoordinate,  precision: 4);
-            Assert.Equal(0.875f, frame.BottomCoordinate, precision: 4);
+            Assert.Equal(56f, frame.RightCoordinate,  precision: 4);
+            Assert.Equal(56f, frame.BottomCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -160,10 +160,10 @@ public class WireframeHandleDragTests
                 startScreenX: 32f, startScreenY: 0f,
                 endScreenX:   32f, endScreenY:   16f);
 
-            Assert.Equal(0.25f, frame.TopCoordinate,    precision: 4);   // 16/64
+            Assert.Equal(16f, frame.TopCoordinate,    precision: 4);
             Assert.Equal(0f,    frame.LeftCoordinate,   precision: 4);
-            Assert.Equal(1f,    frame.RightCoordinate,  precision: 4);
-            Assert.Equal(1f,    frame.BottomCoordinate, precision: 4);
+            Assert.Equal(64f,    frame.RightCoordinate,  precision: 4);
+            Assert.Equal(64f,    frame.BottomCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -194,16 +194,16 @@ public class WireframeHandleDragTests
             {
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
-                LeftCoordinate   = 0.25f, TopCoordinate    = 0.25f,
-                RightCoordinate  = 0.75f, BottomCoordinate = 0.75f,
+                LeftCoordinate   = 16f, TopCoordinate    = 16f,
+                RightCoordinate  = 48f, BottomCoordinate = 48f,
                 ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame);
             ctx.SelectedState.SelectedFrame = frame;
             ctrl.RefreshFrames();
 
-            float preDx = frame.RightCoordinate  - frame.LeftCoordinate;  // 0.5
-            float preDy = frame.BottomCoordinate - frame.TopCoordinate;   // 0.5
+            float preDx = frame.RightCoordinate  - frame.LeftCoordinate;  // 32
+            float preDy = frame.BottomCoordinate - frame.TopCoordinate;   // 32
 
             // Centre of frame at screen (32,32); drag +8px right, +8px down
             ctrl.SimulateHandleDrag(HandleKind.Move,
@@ -218,7 +218,7 @@ public class WireframeHandleDragTests
             Assert.Equal(preDy, postDy, precision: 3);
 
             // Frame must have moved right (left increased from 0.25)
-            Assert.True(frame.LeftCoordinate > 0.25f,
+            Assert.True(frame.LeftCoordinate > 16f,
                 $"Frame should have moved right; LeftCoordinate={frame.LeftCoordinate:F4}");
         }
         finally { System.IO.Directory.Delete(dir, true); }
@@ -348,8 +348,8 @@ public class WireframeHandleDragTests
             {
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f, BottomCoordinate = 32f,
                 ShapesSave       = new ShapesSave(),
             };
             chain2.Frames.Add(frame2);
@@ -434,15 +434,15 @@ public class WireframeHandleDragTests
                 startScreenX: 16f, startScreenY: 16f,
                 endScreenX:   32f, endScreenY:   16f);
 
-            Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
+            Assert.Equal(32f, frame0.RightCoordinate, precision: 4);
 
             // Frame 1 keeps its own Left/Top (its position in the sheet) but must now match
             // frame 0's new 32px width -- otherwise MultiTileToTiledAnimationMapper drops the
             // whole chain's tile animation on save (footprint mismatch).
-            Assert.Equal(0.25f, frame1.LeftCoordinate,   precision: 4);
+            Assert.Equal(16f, frame1.LeftCoordinate,   precision: 4);
             Assert.Equal(0f,    frame1.TopCoordinate,    precision: 4);
-            Assert.Equal(0.75f, frame1.RightCoordinate,  precision: 4);
-            Assert.Equal(0.25f, frame1.BottomCoordinate, precision: 4);
+            Assert.Equal(48f, frame1.RightCoordinate,  precision: 4);
+            Assert.Equal(16f, frame1.BottomCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -558,15 +558,15 @@ public class WireframeHandleDragTests
                 startScreenX: 16f, startScreenY: 16f,
                 endScreenX:   32f, endScreenY:   16f);
 
-            Assert.Equal(0.5f, walk0.RightCoordinate, precision: 4);
-            Assert.Equal(0.5f, run0.RightCoordinate, precision: 4);
-            Assert.Equal(0.75f, walk1.RightCoordinate, precision: 4); // tile 1: left 0.25 + 0.5
-            Assert.Equal(0.75f, run1.RightCoordinate, precision: 4);  // tile 9: left 0.25 + 0.5
+            Assert.Equal(32f, walk0.RightCoordinate, precision: 4);
+            Assert.Equal(32f, run0.RightCoordinate, precision: 4);
+            Assert.Equal(48f, walk1.RightCoordinate, precision: 4); // tile 1: left 16 + 32
+            Assert.Equal(48f, run1.RightCoordinate, precision: 4);  // tile 9: left 16 + 32
 
             ctx.UndoManager.Undo();
 
-            Assert.Equal(0.5f, walk1.RightCoordinate, precision: 4);
-            Assert.Equal(0.5f, run1.RightCoordinate, precision: 4);
+            Assert.Equal(32f, walk1.RightCoordinate, precision: 4);
+            Assert.Equal(32f, run1.RightCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -585,7 +585,7 @@ public class WireframeHandleDragTests
                 TextureName      = "sprite.png",
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 0.25f, BottomCoordinate = 0.25f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame1);

@@ -15,7 +15,7 @@ namespace AnimationEditor.Core.Sequences;
 
 /// <summary>
 /// An open <c>.seqj</c>: its saved data plus the source <c>.achx</c>/<c>.achj</c> files it uses, loaded in the
-/// editor's UV form. Every edit is one undo entry and saves the file right away, like an <c>.achx</c> tab.
+/// editor's pixel form. Every edit is one undo entry and saves the file right away, like an <c>.achx</c> tab.
 /// </summary>
 /// <remarks>
 /// Undo snapshots the whole file as JSON. A <c>.seqj</c> is small, so this stays cheap and needs no per-edit
@@ -254,7 +254,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>True when <paramref name="source"/> is missing or could not be read.</summary>
     public bool IsSourceMissing(string source) => SourceChains(source) is null;
 
-    /// <summary>The chains of <paramref name="source"/>, with UV coordinates, or null when it is missing.</summary>
+    /// <summary>The chains of <paramref name="source"/>, with pixel coordinates, or null when it is missing.</summary>
     public AnimationChainListSave? SourceChains(string source) =>
         _sources.TryGetValue(source, out var list) ? list : null;
 

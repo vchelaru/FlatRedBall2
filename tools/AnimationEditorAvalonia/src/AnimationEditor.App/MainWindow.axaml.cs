@@ -23,6 +23,7 @@ using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
 using AnimationEditor.Views.Dialogs;
 using AnimationEditor.Views.Export;
+using AnimationEditor.Views.Services;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -1050,7 +1051,7 @@ public partial class MainWindow : Window
         {
             // The probe measures what loading a project costs, so it has to start from a window
             // with nothing restored — skip recovery, the CLI file, and saved tabs entirely.
-            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+            _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
             await new MemoryProbeRunner(this, probeOptions!).RunAsync();
 
             // Exit hard rather than Close(): the Closed handler persists recent files and open
@@ -1074,7 +1075,7 @@ public partial class MainWindow : Window
         }
         else if (recovered is null)
         {
-            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+            _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         }
 
         if (recovered is not null)
@@ -1386,6 +1387,11 @@ public partial class MainWindow : Window
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
         string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
+        if (FrameTextureEdit.CheckWholeTexture(_appCommands, absolutePath, frames) is { } refused)
+        {
+            ReportTextureResult(refused);
+            return;
+        }
         _appCommands.SetFrameTextureName(frames, storePath);
         RefreshPropertyPanel();
     }
@@ -1504,6 +1510,7 @@ public partial class MainWindow : Window
             var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
             return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
         };
+        _appCommands.DecodedTextureSize = SkiaFileDecoder.ReadSize;
         // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
         // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
         // animating (IsZoomAnimating == false), not on every frame.
@@ -1963,14 +1970,14 @@ public partial class MainWindow : Window
         if (chainsToAddTo.Count == 1)
         {
             // AddFrameFromPixelBounds selects the new frame — desired behavior for single-chain.
-            _appCommands.AddFrameFromPixelBounds(primaryChain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
+            _appCommands.AddFrameFromPixelBounds(primaryChain, relPath, minX, minY, maxX, maxY);
         }
         else
         {
             // Multi-chain: add to each chain but preserve the current selection.
             var priorFrame = _selectedState.SelectedFrame;
             foreach (var chain in chainsToAddTo)
-                _appCommands.AddFrameFromPixelBounds(chain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
+                _appCommands.AddFrameFromPixelBounds(chain, relPath, minX, minY, maxX, maxY);
             _selectedState.SelectedFrame = priorFrame;
         }
     }
@@ -2847,7 +2854,7 @@ public partial class MainWindow : Window
         // Register the currently-open file (if any) as a tab before we clear it.
         EnsureCurrentEditorContentHasTab();
 
-        OpenAsNewUnsavedDocument(new AnimationChainListSave());
+        OpenAsNewUnsavedDocument(new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel });
 
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
     }
@@ -3870,7 +3877,7 @@ public partial class MainWindow : Window
     private void AddAnimationChainAndBeginInlineRename()
     {
         if (_projectManager.AnimationChainListSave is null)
-            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+            _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
 
         var chain = _appCommands.AddNewAnimationChain();
         if (chain is null) return;
@@ -4071,6 +4078,19 @@ public partial class MainWindow : Window
             targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
         Trace.WriteLine($"[DragDrop] Result={result}");
+
+        var refused = result switch
+        {
+            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath),
+            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, [targetFrame!]),
+            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, targetChain!.Frames),
+            _ => null,
+        };
+        if (refused is not null)
+        {
+            ReportTextureResult(refused);
+            return false;
+        }
 
         bool applied = TextureDropApplier.Apply(_appCommands, _selectedState, targetChain, targetFrame, result, relPath);
         if (!applied)
@@ -6333,10 +6353,10 @@ public partial class MainWindow : Window
                 var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
                 if (bmpW > 0 && bmpH > 0)
                 {
-                    SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f, bmpW)).ToList());
-                    SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f, bmpH)).ToList());
-                    SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f, bmpW)).ToList());
-                    SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f, bmpH)).ToList());
+                    SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f)).ToList());
+                    SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f)).ToList());
+                    SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f)).ToList());
+                    SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f)).ToList());
                 }
 
                 // Read-only tile id readout (#1182), native-tsx projects only -- independent of
@@ -6877,7 +6897,7 @@ public partial class MainWindow : Window
         NumericEdit? w = EditOf(PropPixelW);
         NumericEdit? h = EditOf(PropPixelH);
         if (x is null && y is null && w is null && h is null) return;
-        _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
+        _appCommands.SetFramePixelRegion(frames, x, y, w, h);
         WireframeCtrl.RefreshFrames();
     }
 
@@ -8080,7 +8100,7 @@ public partial class MainWindow : Window
         var text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit,
+        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
             out var chains, out var frames, out var shapes);
         if (!ok) return;
 
@@ -8373,14 +8393,7 @@ public partial class MainWindow : Window
     // ── Adjust Offsets ────────────────────────────────────────────────────────
 
     private Task AskAdjustOffsetsAsync(AnimationChainSave chain) =>
-        EditorDialogs.ShowAdjustOffsetsAsync(
-            _dialogHost, _appCommands, chain, frame =>
-            {
-                var (_, bitmapHeight) = WireframeCtrl.BitmapSize;
-                return bitmapHeight > 0 && !string.IsNullOrEmpty(frame.TextureName)
-                    ? bitmapHeight
-                    : null;
-            });
+        EditorDialogs.ShowAdjustOffsetsAsync(_dialogHost, _appCommands, chain);
 
     // ── Inline rename helpers ─────────────────────────────────────────────────
 

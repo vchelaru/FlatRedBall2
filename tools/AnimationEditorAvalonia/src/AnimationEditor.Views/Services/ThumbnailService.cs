@@ -84,7 +84,7 @@ public sealed class ThumbnailService : IDisposable
     /// bitmap). Lets the Files-panel scope toggle rebuild the tree without re-downscaling every PNG.</summary>
     private readonly Dictionary<FullImageKey, Avalonia.Media.Imaging.Bitmap> _fullImageCache = new();
 
-    /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a UV slider, which
+    /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a frame edge, which
     /// mints a new key per tick) can't grow the cache without bound. Each entry is tiny
     /// (≤ 56×56×4 bytes), so this is a few MB worst case.</summary>
     private const int MaxCachedThumbnails = 512;
@@ -247,9 +247,9 @@ public sealed class ThumbnailService : IDisposable
     /// Returns an Avalonia Bitmap of the frame's texture region, scaled to fit within
     /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (preserving aspect ratio).
     /// Returns <c>null</c> if the texture cannot be resolved, is not loaded, or the frame
-    /// has no valid UV region.
+    /// has no valid region.
     /// <para>
-    /// The result is cached (keyed by resolved texture path + UV region + flips + effective
+    /// The result is cached (keyed by resolved texture path + region + flips + effective
     /// color/alpha + target size) and <em>owned by this service</em> — do not dispose it. Re-calling
     /// with the same frame state returns the same cached instance, so a tab switch re-uses every
     /// unchanged icon and playback never re-renders a cell. The Skia crop is wrapped directly as a
@@ -347,9 +347,9 @@ public sealed class ThumbnailService : IDisposable
 
     /// <summary>
     /// Pure SkiaSharp core of <see cref="GetFrameThumbnail"/>: crops <paramref name="frame"/>'s
-    /// UV region out of <paramref name="source"/>, applies the effective (sticky) <paramref name="color"/>
+    /// pixel region out of <paramref name="source"/>, applies the effective (sticky) <paramref name="color"/>
     /// and alpha, and scales it to fit within <paramref name="maxWidth"/> × <paramref name="maxHeight"/>
-    /// (aspect-preserving). Returns <c>null</c> for a degenerate UV region. Exposed (internal) so tests
+    /// (aspect-preserving). Returns <c>null</c> for a degenerate region. Exposed (internal) so tests
     /// can verify crop/scale/sampling/tint behaviour without going through file decode or Avalonia
     /// bitmap wrapping.
     /// <para>
@@ -362,15 +362,15 @@ public sealed class ThumbnailService : IDisposable
     internal static SKBitmap? RenderFrameThumbnail(
         SKBitmap source, AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
     {
-        float uvW = frame.RightCoordinate  - frame.LeftCoordinate;
-        float uvH = frame.BottomCoordinate - frame.TopCoordinate;
-        if (uvW <= 0f || uvH <= 0f) return null;
+        float regionW = frame.RightCoordinate  - frame.LeftCoordinate;
+        float regionH = frame.BottomCoordinate - frame.TopCoordinate;
+        if (regionW <= 0f || regionH <= 0f) return null;
 
         int tw = source.Width, th = source.Height;
-        int sx = Math.Clamp((int)(frame.LeftCoordinate * tw), 0, tw - 1);
-        int sy = Math.Clamp((int)(frame.TopCoordinate  * th), 0, th - 1);
-        int sw = Math.Clamp((int)(uvW * tw), 1, tw - sx);
-        int sh = Math.Clamp((int)(uvH * th), 1, th - sy);
+        int sx = Math.Clamp((int)frame.LeftCoordinate, 0, tw - 1);
+        int sy = Math.Clamp((int)frame.TopCoordinate, 0, th - 1);
+        int sw = Math.Clamp((int)regionW, 1, tw - sx);
+        int sh = Math.Clamp((int)regionH, 1, th - sy);
 
         // maxWidth x maxHeight is the displayed box. A diagonal flip turns the crop a quarter, so the
         // crop's width fills the displayed height and the output is transposed.

@@ -200,10 +200,10 @@ public class SequenceThumbnailScenarioTests
         (await AllLoadedAsync(editor, "A")).ShouldBeTrue();
         ThumbnailOf(editor, "A")!.PixelSize.Height.ShouldBe(56);
 
-        // Twice as wide: the same UV region is now a 2:1 sprite.
-        editor.WritePng("sheet.png", 128, 64, SKColors.Lime);
+        // Half a frame wide: the row crops what is left of the 16x16 region, 8x16.
+        editor.WritePng("sheet.png", 8, 64, SKColors.Lime);
 
-        (await editor.WaitUntilAsync(() => ThumbnailOf(editor, "A")?.PixelSize.Height == 28, Timeout))
+        (await editor.WaitUntilAsync(() => ThumbnailOf(editor, "A")?.PixelSize.Width == 28, Timeout))
             .ShouldBeTrue("the row should draw the replaced sheet");
     }
 

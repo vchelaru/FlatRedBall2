@@ -59,9 +59,8 @@ public class NativeTsxProjectRoundTripTests
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Contains(acls.AnimationChains, c => c.Name == "ID:0");
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
-        // Anchor tile 8 + satellite tile 9 (one column to the right) -> 32px-wide frame rect;
-        // the achx model is UV, and the fixture's texture is 64px wide, so that's 32/64 = 0.5.
-        Assert.Equal(0.5f, groupChain.Frames[0].RightCoordinate - groupChain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
+        // Anchor tile 8 + satellite tile 9 (one column to the right) -> 32px-wide frame rect.
+        Assert.Equal(32f, groupChain.Frames[0].RightCoordinate - groupChain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
 
         var tilesetInfo = new TilesetAnimationInfo
         {
@@ -246,7 +245,7 @@ public class NativeTsxProjectRoundTripTests
 
         // Shrink the chain's frame rect from 2 tiles wide to 1 tile wide (drops the satellite).
         foreach (var frame in groupChain.Frames)
-            frame.RightCoordinate = frame.LeftCoordinate + (16f / 64f);
+            frame.RightCoordinate = frame.LeftCoordinate + 16f;
 
         var tilesetInfo = new TilesetAnimationInfo
         {
@@ -380,7 +379,7 @@ public class NativeTsxProjectRoundTripTests
 
         // Grow the chain's frame rect from 1 tile wide to 2 tiles wide (gains a satellite).
         foreach (var frame in chain.Frames)
-            frame.RightCoordinate = frame.LeftCoordinate + (32f / 64f);
+            frame.RightCoordinate = frame.LeftCoordinate + 32f;
 
         var tilesetInfo = new TilesetAnimationInfo
         {

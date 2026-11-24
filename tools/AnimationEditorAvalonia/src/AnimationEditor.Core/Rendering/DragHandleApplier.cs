@@ -9,8 +9,7 @@ namespace AnimationEditor.Core.Rendering;
 public readonly record struct BoundsRect(float Left, float Top, float Right, float Bottom);
 
 /// <summary>
-/// Pure, SkiaSharp-free drag-handle math for frame UV rectangles.
-/// Computes new texture-pixel bounds after a handle drag and converts them to UV coords.
+/// Pure, SkiaSharp-free drag-handle math: computes a frame's new texture-pixel bounds after a handle drag.
 /// </summary>
 public static class DragHandleApplier
 {
@@ -120,15 +119,4 @@ public static class DragHandleApplier
         // clamp it so the frame collapses to 1px instead of inverting.
         return ClampDraggedEdgesMinSize(new BoundsRect(l, t, r, b), handle);
     }
-
-    /// <summary>
-    /// Converts texture-pixel bounds to UV coordinates (0…1 relative to bitmap dimensions).
-    /// Returns (left, top, right, bottom) UV tuple.
-    /// </summary>
-    public static (float L, float T, float R, float B) ToUvCoords(
-        BoundsRect bounds, float bitmapWidth, float bitmapHeight) =>
-        (bounds.Left   / bitmapWidth,
-         bounds.Top    / bitmapHeight,
-         bounds.Right  / bitmapWidth,
-         bounds.Bottom / bitmapHeight);
 }

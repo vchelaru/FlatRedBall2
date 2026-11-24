@@ -65,14 +65,14 @@ public class WireframeMultiChainTests
         {
             TextureName      = "sprite.png",
             LeftCoordinate   = 0f,  TopCoordinate    = 0f,
-            RightCoordinate  = 0.5f, BottomCoordinate = 1f,
+            RightCoordinate  = 32f, BottomCoordinate = 64f,
             FrameLength      = 0.1f, ShapesSave = new ShapesSave()
         };
         var f2 = new AnimationFrameSave
         {
             TextureName      = "sprite.png",
-            LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f,   BottomCoordinate = 1f,
+            LeftCoordinate   = 32f, TopCoordinate    = 0f,
+            RightCoordinate  = 64f,   BottomCoordinate = 64f,
             FrameLength      = 0.1f, ShapesSave = new ShapesSave()
         };
 
@@ -131,7 +131,7 @@ public class WireframeMultiChainTests
             {
                 TextureName = "sprite.png",
                 LeftCoordinate = 0f, TopCoordinate = 0f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                RightCoordinate = 64f, BottomCoordinate = 64f,
                 FrameLength = 0.1f, ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Run" };
@@ -157,7 +157,7 @@ public class WireframeMultiChainTests
     /// <summary>
     /// Bulk Right-handle drag: drag the right edge of f1 inward by 8px.
     /// At zoom=1, 8px = 8/64 = 0.125 UV units.
-    /// Both f1 and f2 must have their right coordinate decreased by 0.125.
+    /// Both f1 and f2 must have their right coordinate decreased by 8.
     /// </summary>
     [AvaloniaFact]
     public void BulkHandleDrag_Right_AppliesSameDeltaToBothFrames()
@@ -166,17 +166,17 @@ public class WireframeMultiChainTests
         var (ctrl, _, _, f1, f2, dir) = BuildMultiChainCtrl(ctx);
         try
         {
-            // f1 right edge in screen space at zoom=1: 0.5 * 64 = 32
-            // Drag from screen x=32 to x=24 → dx = -8 → right UV decreases by 8/64 = 0.125
+            // f1 right edge in screen space at zoom=1: 32
+            // Drag from screen x=32 to x=24 → dx = -8 → right decreases by 8
             ctrl.SimulateBulkHandleDrag(f1, HandleKind.MidRight,
                 startScreenX: 32f, startScreenY: 32f,
                 endScreenX:   24f, endScreenY:   32f);
 
-            Assert.Equal(0.5f  - 0.125f, f1.RightCoordinate, precision: 4);
-            Assert.Equal(1f    - 0.125f, f2.RightCoordinate, precision: 4);
+            Assert.Equal(32f - 8f, f1.RightCoordinate, precision: 4);
+            Assert.Equal(64f - 8f, f2.RightCoordinate, precision: 4);
             // Left edges must be unchanged
             Assert.Equal(0f,   f1.LeftCoordinate, precision: 4);
-            Assert.Equal(0.5f, f2.LeftCoordinate, precision: 4);
+            Assert.Equal(32f, f2.LeftCoordinate, precision: 4);
         }
         finally { Directory.Delete(dir, true); }
     }
@@ -196,10 +196,10 @@ public class WireframeMultiChainTests
                 startScreenX: 0f, startScreenY: 0f,
                 endScreenX:   8f, endScreenY:   8f);
 
-            float delta = 8f / 64f; // 0.125
+            float delta = 8f;
 
             Assert.Equal(0f   + delta, f1.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.5f + delta, f2.LeftCoordinate,   precision: 4);
+            Assert.Equal(32f + delta, f2.LeftCoordinate,   precision: 4);
             Assert.Equal(0f   + delta, f1.TopCoordinate,    precision: 4);
             Assert.Equal(0f   + delta, f2.TopCoordinate,    precision: 4);
         }
@@ -250,12 +250,12 @@ public class WireframeMultiChainTests
             float f1L = f1.LeftCoordinate, f1R = f1.RightCoordinate;
             float f2L = f2.LeftCoordinate, f2R = f2.RightCoordinate;
 
-            // Drag 8px to the right → all UV left/right coords shift by 8/64 = 0.125
+            // Drag 8px to the right → all left/right coords shift by 8
             ctrl.SimulateChainDrag(
                 startScreenX: 0f, startScreenY: 0f,
                 endScreenX:   8f, endScreenY:   0f);
 
-            float delta = 8f / 64f;
+            float delta = 8f;
             Assert.Equal(f1L + delta, f1.LeftCoordinate,  precision: 4);
             Assert.Equal(f1R + delta, f1.RightCoordinate, precision: 4);
             Assert.Equal(f2L + delta, f2.LeftCoordinate,  precision: 4);

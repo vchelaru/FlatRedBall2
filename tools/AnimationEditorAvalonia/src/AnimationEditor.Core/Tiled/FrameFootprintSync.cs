@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace AnimationEditor.Core.Tiled;
 /// </summary>
 public static class FrameFootprintSync
 {
-    /// <summary>An axis-aligned UV rect, before or after a resize.</summary>
+    /// <summary>An axis-aligned pixel rect, before or after a resize.</summary>
     public readonly record struct FrameRect(float Left, float Top, float Right, float Bottom);
 
     /// <summary>One sibling frame's before/after rect for a footprint-matching resize.</summary>
@@ -75,6 +76,6 @@ public static class FrameFootprintSync
     /// <summary>Whether a rect change altered the frame's size at all (a pure move keeps every
     /// sibling's footprint valid and so propagates nothing).</summary>
     public static bool SizeChanged(FrameRect before, FrameRect after) =>
-        Math.Abs((before.Right - before.Left) - (after.Right - after.Left)) > 0.0001f
-        || Math.Abs((before.Bottom - before.Top) - (after.Bottom - after.Top)) > 0.0001f;
+        Math.Abs((before.Right - before.Left) - (after.Right - after.Left)) > FrameRegion.EditTolerance
+        || Math.Abs((before.Bottom - before.Top) - (after.Bottom - after.Top)) > FrameRegion.EditTolerance;
 }

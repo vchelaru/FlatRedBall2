@@ -378,7 +378,7 @@ public class InspectorPropertyUndoTests
         chain.Frames.Add(frame);
 
         // Move/resize to pixel rect (4,8,12,16) on a 64x64 texture
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, 4, 8, 12, 16, 64, 64);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, 4, 8, 12, 16);
         Assert.True(ctx.UndoManager.CanUndo);
 
         ctx.UndoManager.Undo();
@@ -397,14 +397,14 @@ public class InspectorPropertyUndoTests
         var frames = chain.Frames.ToList();
         foreach (var f in frames)
         {
-            f.LeftCoordinate = 0f; f.RightCoordinate = 1f;
-            f.TopCoordinate = 0f; f.BottomCoordinate = 1f;
+            f.LeftCoordinate = 0f; f.RightCoordinate = 64f;
+            f.TopCoordinate = 0f; f.BottomCoordinate = 64f;
         }
 
-        ctx.AppCommands.SetFramePixelRegion(frames, 4, 8, 12, 16, 64, 64);
+        ctx.AppCommands.SetFramePixelRegion(frames, 4, 8, 12, 16);
 
-        Assert.All(frames, f => Assert.Equal(4f / 64f, f.LeftCoordinate, precision: 5));
-        Assert.All(frames, f => Assert.Equal(16f / 64f, f.RightCoordinate, precision: 5));
+        Assert.All(frames, f => Assert.Equal(4f, f.LeftCoordinate, precision: 5));
+        Assert.All(frames, f => Assert.Equal(16f, f.RightCoordinate, precision: 5));
         Assert.Single(ctx.UndoManager.UndoHistory);
     }
 
@@ -414,12 +414,12 @@ public class InspectorPropertyUndoTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var frame = TestHelpers.MakeFrame();
-        frame.LeftCoordinate = 0f; frame.RightCoordinate = 1f;
-        frame.TopCoordinate = 0f; frame.BottomCoordinate = 1f;
+        frame.LeftCoordinate = 0f; frame.RightCoordinate = 64f;
+        frame.TopCoordinate = 0f; frame.BottomCoordinate = 64f;
         chain.Frames.Add(frame);
 
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 3, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 32, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 3, pixelY: null, pixelW: null, pixelH: null);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 32, pixelY: null, pixelW: null, pixelH: null);
 
         Assert.Single(ctx.UndoManager.UndoHistory);
         ctx.UndoManager.Undo();
@@ -435,19 +435,19 @@ public class InspectorPropertyUndoTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 2);
         var frames = chain.Frames.ToList();
-        frames[0].LeftCoordinate = 0f / 64; frames[0].RightCoordinate = 8f / 64;
-        frames[0].TopCoordinate = 0f / 64; frames[0].BottomCoordinate = 8f / 64;
-        frames[1].LeftCoordinate = 32f / 64; frames[1].RightCoordinate = 40f / 64;
-        frames[1].TopCoordinate = 16f / 64; frames[1].BottomCoordinate = 32f / 64;
+        frames[0].LeftCoordinate = 0f; frames[0].RightCoordinate = 8f;
+        frames[0].TopCoordinate = 0f; frames[0].BottomCoordinate = 8f;
+        frames[1].LeftCoordinate = 32f; frames[1].RightCoordinate = 40f;
+        frames[1].TopCoordinate = 16f; frames[1].BottomCoordinate = 32f;
 
-        ctx.AppCommands.SetFramePixelRegion(frames, pixelX: 5, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        ctx.AppCommands.SetFramePixelRegion(frames, pixelX: 5, pixelY: null, pixelW: null, pixelH: null);
 
-        Assert.Equal(5f / 64f, frames[0].LeftCoordinate, precision: 5);
-        Assert.Equal(5f / 64f, frames[1].LeftCoordinate, precision: 5);
-        Assert.Equal(0f / 64f, frames[0].TopCoordinate, precision: 5);      // frame 0's own Y preserved
-        Assert.Equal(16f / 64f, frames[1].TopCoordinate, precision: 5);     // frame 1's own Y preserved
-        Assert.Equal(8f / 64f, frames[0].BottomCoordinate - frames[0].TopCoordinate, precision: 5); // width/height untouched
-        Assert.Equal(16f / 64f, frames[1].BottomCoordinate - frames[1].TopCoordinate, precision: 5);
+        Assert.Equal(5f, frames[0].LeftCoordinate, precision: 5);
+        Assert.Equal(5f, frames[1].LeftCoordinate, precision: 5);
+        Assert.Equal(0f, frames[0].TopCoordinate, precision: 5);      // frame 0's own Y preserved
+        Assert.Equal(16f, frames[1].TopCoordinate, precision: 5);     // frame 1's own Y preserved
+        Assert.Equal(8f, frames[0].BottomCoordinate - frames[0].TopCoordinate, precision: 5); // width/height untouched
+        Assert.Equal(16f, frames[1].BottomCoordinate - frames[1].TopCoordinate, precision: 5);
     }
 
     // ── SetRectProps ──────────────────────────────────────────────────────────

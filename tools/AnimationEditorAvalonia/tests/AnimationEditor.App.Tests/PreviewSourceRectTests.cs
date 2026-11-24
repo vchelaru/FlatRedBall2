@@ -35,8 +35,8 @@ public class PreviewSourceRectTests
     [Fact]
     public void ComputeSourceRect_OriginFrame_SxSyAreZero()
     {
-        var frame = Frame(0f, 0.5f, 0f, 0.5f);
-        var (sx, sy, _, _) = PreviewControl.ComputeSourceRect(frame, 256, 256);
+        var frame = Frame(0f, 128f, 0f, 128f);
+        var (sx, sy, _, _) = PreviewControl.ComputeSourceRect(frame);
         Assert.Equal(0, sx);
         Assert.Equal(0, sy);
     }
@@ -49,8 +49,8 @@ public class PreviewSourceRectTests
         // Left = 11/100 = 0.11f → float ≈ 0.10999999940... → * 100 ≈ 10.999...
         // (int) truncation → sx = 10  (WRONG)
         // Math.Round         → sx = 11 (correct)
-        var frame = Frame(11f / 100f, 91f / 100f, 0f, 1f);
-        var (sx, _, _, _) = PreviewControl.ComputeSourceRect(frame, 100, 100);
+        var frame = Frame(11f / 100f * 100f, 91f / 100f * 100f, 0f, 100f);
+        var (sx, _, _, _) = PreviewControl.ComputeSourceRect(frame);
         Assert.Equal(11, sx);
     }
 
@@ -65,8 +65,8 @@ public class PreviewSourceRectTests
         int[] lefts = { 0, 5, 10, 15, 20 };
         foreach (int left in lefts)
         {
-            var frame = Frame(left / 100f, (left + 80) / 100f, 0f, 1f);
-            var (_, _, sw, _) = PreviewControl.ComputeSourceRect(frame, 100, 100);
+            var frame = Frame(left / 100f * 100f, (left + 80) / 100f * 100f, 0f, 100f);
+            var (_, _, sw, _) = PreviewControl.ComputeSourceRect(frame);
             Assert.True(sw == 80, $"sw should be 80 for left={left} but got {sw}");
         }
     }
@@ -78,8 +78,8 @@ public class PreviewSourceRectTests
         int[] tops = { 0, 3, 7, 12, 20 };
         foreach (int top in tops)
         {
-            var frame = Frame(0f, 1f, top / 100f, (top + 60) / 100f);
-            var (_, _, _, sh) = PreviewControl.ComputeSourceRect(frame, 100, 100);
+            var frame = Frame(0f, 100f, top / 100f * 100f, (top + 60) / 100f * 100f);
+            var (_, _, _, sh) = PreviewControl.ComputeSourceRect(frame);
             Assert.True(sh == 60, $"sh should be 60 for top={top} but got {sh}");
         }
     }
@@ -87,8 +87,8 @@ public class PreviewSourceRectTests
     [Fact]
     public void ComputeSourceRect_ZeroSizeRegion_ClampsToOne()
     {
-        var frame = Frame(0.5f, 0.5f, 0.5f, 0.5f);
-        var (_, _, sw, sh) = PreviewControl.ComputeSourceRect(frame, 256, 256);
+        var frame = Frame(128f, 128f, 128f, 128f);
+        var (_, _, sw, sh) = PreviewControl.ComputeSourceRect(frame);
         Assert.Equal(1, sw);
         Assert.Equal(1, sh);
     }
@@ -98,9 +98,9 @@ public class PreviewSourceRectTests
     [Fact]
     public void ComputeSourceRect_PowerOfTwoTexture_ExactValues()
     {
-        // 32×32 frame starting at (64, 48) on a 256×256 texture
-        var frame = Frame(64f / 256f, 96f / 256f, 48f / 256f, 80f / 256f);
-        var (sx, sy, sw, sh) = PreviewControl.ComputeSourceRect(frame, 256, 256);
+        // 32×32 frame starting at (64, 48)
+        var frame = Frame(64f, 96f, 48f, 80f);
+        var (sx, sy, sw, sh) = PreviewControl.ComputeSourceRect(frame);
         Assert.Equal(64, sx);
         Assert.Equal(48, sy);
         Assert.Equal(32, sw);

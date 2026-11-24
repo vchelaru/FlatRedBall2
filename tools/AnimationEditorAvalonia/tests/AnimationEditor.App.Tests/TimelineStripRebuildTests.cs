@@ -35,7 +35,7 @@ public class TimelineStripRebuildTests
         TextureName      = texture,
         FrameLength      = 0.1f,
         LeftCoordinate   = 0f, TopCoordinate    = 0f,
-        RightCoordinate  = 1f, BottomCoordinate = 1f,
+        RightCoordinate  = 32f, BottomCoordinate = 32f,
         ShapesSave       = new ShapesSave(),
     };
 
