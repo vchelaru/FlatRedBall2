@@ -177,7 +177,7 @@ public sealed partial class SequenceTimelineControl
         _dragReferenceCycle = hit.Reference.TargetLength;
         _dragOriginStart = hit.Reference.Start;
         _dragOriginEdge = hit.Reference.End;
-        _snapOthers = TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead);
+        _snapOthers = TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead, _references, _dragReference);
         _gestureBefore = _document!.BeginGesture();
         e.Pointer.Capture(this);
         ShowCursor(point);

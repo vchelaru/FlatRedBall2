@@ -22,15 +22,17 @@ public static class TimelineSnapTargets
     /// <paramref name="dragged"/>, the <paramref name="playhead"/>, and time 0. A chain that <paramref name="dragged"/>
     /// cuts offers no played end, since that end is only where the dragged chain happens to start.
     /// </summary>
-    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, SequenceChainReferenceSave? dragged, double playhead) =>
-        Others(blocks, dragged is null ? Array.Empty<SequenceChainReferenceSave>() : new[] { dragged }, playhead);
+    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, SequenceChainReferenceSave? dragged, double playhead,
+        IReadOnlyList<TimelineReference>? references = null, SequenceReferenceSave? draggedReference = null) =>
+        Others(blocks, dragged is null ? Array.Empty<SequenceChainReferenceSave>() : new[] { dragged }, playhead, references, draggedReference);
 
     /// <summary>
     /// <see cref="Others(IReadOnlyList{TimelineBlock}, SequenceChainReferenceSave?, double)"/> for a drag of several
     /// chains at once: none of them offers an edge, since they all move together, and a chain cut by any of them offers
     /// no played end.
     /// </summary>
-    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, IReadOnlyCollection<SequenceChainReferenceSave> dragged, double playhead)
+    public static IReadOnlyList<SnapTarget> Others(IReadOnlyList<TimelineBlock> blocks, IReadOnlyCollection<SequenceChainReferenceSave> dragged, double playhead,
+        IReadOnlyList<TimelineReference>? references = null, SequenceReferenceSave? draggedReference = null)
     {
         var draggedStarts = new List<double>();
         foreach (var block in blocks)
@@ -47,6 +49,14 @@ public static class TimelineSnapTargets
             if (block.IsCut)
                 targets.Add(new SnapTarget(block.FullEnd, SnapKind.ChainEdge, block.Track, block.Chain));
         }
+        // A reference clip is a block like a chain: its start and end are edges, except for the clip being dragged.
+        if (references is not null)
+            foreach (var clip in references)
+            {
+                if (ReferenceEquals(clip.Reference, draggedReference)) continue;
+                targets.Add(new SnapTarget(clip.Start, SnapKind.ChainEdge, clip.Track));
+                targets.Add(new SnapTarget(clip.End, SnapKind.ChainEdge, clip.Track));
+            }
         targets.Add(new SnapTarget(playhead, SnapKind.Playhead));
         targets.Add(new SnapTarget(0, SnapKind.Zero));
         return targets;
