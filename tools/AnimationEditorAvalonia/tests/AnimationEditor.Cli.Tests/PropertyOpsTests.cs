@@ -120,6 +120,7 @@ public class PropertyOpsTests : IDisposable
     [Theory]
     [InlineData("""{"op":"set-chain-loop","chain":"Nope","value":false}""", "Nope")]
     [InlineData("""{"op":"set-frame-length","frame":"Walk/0","length":0}""", "length")]
+    [InlineData("""{"op":"set-frame-length","frame":"Walk/0","length":1e30}""", "0.001 to 60 seconds")]
     [InlineData("""{"op":"set-frame-length","frame":"Walk/9","length":0.1}""", "range")]
     [InlineData("""{"op":"set-frame-region","frame":"Walk/0","region":"40,0,16,4"}""", "48x32")]
     [InlineData("""{"op":"set-frame-region","frame":"Walk/0","region":"1,2,3"}""", "region")]

@@ -292,6 +292,16 @@ public static class StructureEdit
         return Ok($"{chain.Name}/{index}");
     }
 
+    /// <summary>Reverses a chain's frames. A chain of one frame or none is unchanged.</summary>
+    public static EditResult InvertFrameOrder(IAppCommands commands, AnimationChainSave chain)
+    {
+        if (chain.IsLocked) return LockedFail(chain);
+        if (chain.Frames.Count < 2) return Ok();
+
+        commands.InvertFrameOrder(chain);
+        return Ok(chain.Name);
+    }
+
     private static EditResult? CheckNewChainName(IProjectManager projectManager, string name)
     {
         if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Chain name cannot be empty.");
