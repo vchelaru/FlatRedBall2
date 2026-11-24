@@ -4,7 +4,7 @@ namespace AnimationEditor.Core.Rendering;
 
 /// <summary>
 /// Builds a batch of new frames to append to a chain (F12 — Add Multiple Frames).
-/// All UV arithmetic is isolated here so it can be unit-tested independently.
+/// All cell arithmetic is isolated here so it can be unit-tested independently.
 /// </summary>
 public static class BatchFrameBuilder
 {
@@ -18,14 +18,14 @@ public static class BatchFrameBuilder
 
         /// <summary>
         /// <c>true</c> when <see cref="incrementUV"/> was <c>true</c> and at least one
-        /// frame's auto-incremented coordinates would have exceeded [0, 1].
+        /// frame's auto-incremented coordinates would have gone past the texture's bottom.
         /// The frames are still created but the caller may want to warn the user.
         /// </summary>
         public bool ExceededTextureBounds { get; init; }
     }
 
     /// <summary>
-    /// Creates <paramref name="count"/> frames, optionally auto-incrementing the UV
+    /// Creates <paramref name="count"/> frames, optionally auto-incrementing the
     /// cell position row-by-row based on the last frame already in the chain.
     /// </summary>
     /// <param name="lastFrame">

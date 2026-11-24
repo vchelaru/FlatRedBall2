@@ -1014,13 +1014,8 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
-        /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="tileset"/>,
-        /// including <c>TextureWidth</c>/<c>TextureHeight</c> so <see
-        /// cref="Tiled.MultiTileToTiledAnimationMapper"/> can convert the achx model's UV
-        /// coordinates back to pixels -- both <see cref="SaveTsxProject"/> and <see
-        /// cref="GetChainNamesWithTsxIssues"/> need this identically; omitting the texture size
-        /// here was a real shipped bug (issue #1140 follow-up): every frame silently fell into the
-        /// <c>UvMissingPixelSize</c> skip path instead of mapping.
+        /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="tileset"/>, which
+        /// both <see cref="SaveTsxProject"/> and <see cref="GetChainNamesWithTsxIssues"/> need.
         /// </summary>
         private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
         {

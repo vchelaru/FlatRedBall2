@@ -109,7 +109,7 @@ public class WireframeControl : TextureViewport
         // Frame region rectangles. Fills are batched per selection tier (#817): drawing each
         // frame's semi-transparent fill directly onto the canvas compounds alpha via normal
         // SrcOver blending wherever frames overlap (e.g. a whole-chain selection with duplicate
-        // UV rects), saturating toward solid blue. Instead, each tier's fills are drawn opaque
+        // regions), saturating toward solid blue. Instead, each tier's fills are drawn opaque
         // into an offscreen layer (SaveLayerAlpha) — overlapping opaque draws are idempotent —
         // then the whole layer composites onto the canvas once at the tier's target alpha.
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
@@ -413,7 +413,7 @@ public class WireframeControl : TextureViewport
     // can apply a uniform delta and OnPointerReleased can record a single undo entry.
     private readonly List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> _bulkHandleDragStarts = new();
 
-    // Before-UV snapshot captured at drag start for undo recording
+    // Region snapshot captured at drag start for undo recording
     private float _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB;
 
     // Preview rectangle (magic wand / grid snap hover)
@@ -452,7 +452,7 @@ public class WireframeControl : TextureViewport
 
     // ── Events ────────────────────────────────────────────────────────────────
 
-    /// <summary>Fired after a frame's UV coords have been updated by dragging a handle.</summary>
+    /// <summary>Fired after a frame's region has been updated by dragging a handle.</summary>
     public event Action<AnimationFrameSave>? FrameRegionChanged;
 
     /// <summary>
@@ -996,7 +996,7 @@ public class WireframeControl : TextureViewport
     /// <paramref name="endScreenX"/>,<paramref name="endScreenY"/> in screen space.
     /// <para>
     /// Drives the same <see cref="ApplyHandleDrag"/> code path as real pointer events,
-    /// writes updated UV coordinates back to the frame, and fires
+    /// writes the updated region back to the frame, and fires
     /// <see cref="FrameRegionChanged"/>. No-op when no frame is selected or no texture
     /// is loaded.
     /// </para>

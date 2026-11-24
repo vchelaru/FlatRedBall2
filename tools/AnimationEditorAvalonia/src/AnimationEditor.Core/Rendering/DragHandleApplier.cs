@@ -9,8 +9,7 @@ namespace AnimationEditor.Core.Rendering;
 public readonly record struct BoundsRect(float Left, float Top, float Right, float Bottom);
 
 /// <summary>
-/// Pure, SkiaSharp-free drag-handle math for frame UV rectangles.
-/// Computes new texture-pixel bounds after a handle drag and converts them to UV coords.
+/// Pure, SkiaSharp-free drag-handle math: computes a frame's new texture-pixel bounds after a handle drag.
 /// </summary>
 public static class DragHandleApplier
 {

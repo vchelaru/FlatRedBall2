@@ -84,7 +84,7 @@ public sealed class ThumbnailService : IDisposable
     /// bitmap). Lets the Files-panel scope toggle rebuild the tree without re-downscaling every PNG.</summary>
     private readonly Dictionary<FullImageKey, Avalonia.Media.Imaging.Bitmap> _fullImageCache = new();
 
-    /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a UV slider, which
+    /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a frame edge, which
     /// mints a new key per tick) can't grow the cache without bound. Each entry is tiny
     /// (≤ 56×56×4 bytes), so this is a few MB worst case.</summary>
     private const int MaxCachedThumbnails = 512;
@@ -247,9 +247,9 @@ public sealed class ThumbnailService : IDisposable
     /// Returns an Avalonia Bitmap of the frame's texture region, scaled to fit within
     /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (preserving aspect ratio).
     /// Returns <c>null</c> if the texture cannot be resolved, is not loaded, or the frame
-    /// has no valid UV region.
+    /// has no valid region.
     /// <para>
-    /// The result is cached (keyed by resolved texture path + UV region + flips + effective
+    /// The result is cached (keyed by resolved texture path + region + flips + effective
     /// color/alpha + target size) and <em>owned by this service</em> — do not dispose it. Re-calling
     /// with the same frame state returns the same cached instance, so a tab switch re-uses every
     /// unchanged icon and playback never re-renders a cell. The Skia crop is wrapped directly as a

@@ -45,13 +45,8 @@ public static class TiledAnimationToAchjMapper
     public const string ParentIdPropertyName = "ParentId";
 
     /// <summary>
-    /// Builds the achx-shaped model in UV (0-1) coordinates and Second-based durations -- the
-    /// same invariant every achx load produces (see <c>ProjectManager.NormalizeCoordinatesToUv</c>'s
-    /// doc comment: the in-memory representation is always UV). Storing raw pixel values here
-    /// with <see cref="TextureCoordinateType.Pixel"/> instead was a real shipped bug (issue #1140
-    /// follow-up): nothing downstream treats <c>Pixel</c> as "already converted, leave it alone,"
-    /// so every consumer re-multiplied an already-in-pixels value by the texture size again (a
-    /// 200ms duration rendered as "200 seconds"; a 864px coordinate rendered as 864*2048).
+    /// Builds the achx-shaped model in pixel coordinates and Second-based durations, the same form
+    /// every achx load produces.
     /// </summary>
     /// <param name="entryTileIdsByChain">Every returned chain's own source tile id, keyed by
     /// chain object reference. A native-tsx save (<see cref="MultiTileToTiledAnimationMapper"/>)
