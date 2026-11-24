@@ -76,8 +76,11 @@ public class SequenceListSave
         // JsonNode.Parse(string) rejects a BOM, unlike the stream overload.
         Read(() => JsonNode.Parse(json.TrimStart('﻿')));
 
-    /// <summary>Writes this file as indented JSON. Crash-safe: the old file stays intact until the new one is complete.</summary>
-    public void Save(string path) => AtomicFile.Write(path, stream =>
+    /// <summary>
+    /// Writes this file as indented JSON. Crash-safe: the old file stays intact until the new one is complete. A file
+    /// already at <paramref name="path"/> keeps its line ending and final newline.
+    /// </summary>
+    public void Save(string path) => AtomicFile.WriteKeepingLineEndings(path, stream =>
     {
         using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
         ToJsonNode().WriteTo(writer);

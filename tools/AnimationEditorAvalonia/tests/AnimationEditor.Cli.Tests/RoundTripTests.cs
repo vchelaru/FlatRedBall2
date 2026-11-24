@@ -1,5 +1,7 @@
 using System.Reflection;
+using System.Text;
 using AnimationEditor.Editing;
+using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
 
@@ -23,6 +25,22 @@ public class RoundTripTests : IDisposable
         open.Session!.Save().Success.ShouldBeTrue();
 
         _w.Bytes(file).ShouldBe(before);
+    }
+
+    [Theory]
+    [InlineData("hero.achx", "rename-chain Walk to=Stride", "Walk", "Stride")]
+    [InlineData("hero.achj", "rename-chain Walk to=Stride", "Walk", "Stride")]
+    [InlineData("hero.seqj", "rename-sequence Run to=Dash", "Run", "Dash")]
+    public async Task Edit_LfFile_ChangesOnlyTheRenamedLine(string file, string op, string from, string to)
+    {
+        var path = _w.PathOf(file);
+        if (file.EndsWith("seqj")) new SequenceListSave { Sequences = { new SequenceSave { Name = from } } }.Save(path);
+        var before = File.ReadAllText(path).ReplaceLineEndings("\n") + "\n";
+        File.WriteAllBytes(path, Encoding.UTF8.GetBytes(before));
+
+        (await _w.RunAsync("edit", path, "--op", op)).Code.ShouldBe(0);
+
+        Encoding.UTF8.GetString(_w.Bytes(file)).ShouldBe(before.Replace(from, to));
     }
 
     [Theory]
