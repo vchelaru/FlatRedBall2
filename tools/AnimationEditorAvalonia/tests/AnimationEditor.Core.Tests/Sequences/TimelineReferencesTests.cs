@@ -26,6 +26,21 @@ public class TimelineReferencesTests
     private static double? Cycle(SequenceChainReferenceSave _) => 0.75;
 
     [Fact]
+    public void For_TwoClipsOnOneTrack_NextClipCutsThePreviousOne_AndOnlyTheFirstListsRows()
+    {
+        var file = File();
+        file[0].Tracks[1].References!.Add(new SequenceReferenceSave { Sequence = "Earth", Start = 2 });
+
+        var clips = TimelineReferences.For(file[0], file, Cycle);
+
+        clips.Count.ShouldBe(2);
+        clips[0].End.ShouldBe(2, 1e-9);           // 1 .. 3.5 cut at the second clip's start
+        clips[1].Start.ShouldBe(2);
+        clips[0].Rows.Count.ShouldBeGreaterThan(0);
+        clips[1].Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void For_ReferenceTrack_ClipIsItsLength()
     {
         var file = File();

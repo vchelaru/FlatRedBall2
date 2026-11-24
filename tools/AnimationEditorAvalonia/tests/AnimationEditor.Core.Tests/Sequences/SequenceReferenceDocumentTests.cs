@@ -46,6 +46,26 @@ public class SequenceReferenceDocumentTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = source, Chain = chain } } };
 
     [Fact]
+    public void AddReferenceClip_AppendsToTheTrack_AsOneUndoEntry_AndRefusesACycle()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.AddSequenceReference(undo, 0, "Earth", 0).ShouldBeNull();
+        undo.SealCoalescing();
+        int before = undo.UndoHistory.Count();
+
+        document.AddReferenceClip(undo, 0, 0, "Action", 2).ShouldBeNull();
+
+        document.Save.Sequences[0].Tracks[0].References!.Select(c => (c.Sequence, c.Start)).ShouldBe(new[] { ("Earth", 0.0), ("Action", 2.0) });
+        undo.UndoHistory.Count().ShouldBe(before + 1);
+        document.AddReferenceClip(undo, 0, 1, "Action", 1).ShouldNotBeNull();     // Body is a chain track
+        document.AddReferenceClip(undo, 0, 0, "Idle", 1).ShouldNotBeNull();       // Idle playing itself
+        undo.Undo();
+        document.Save.Sequences[0].Tracks[0].References!.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void ExternalEditGivingAReferenceTrackChains_IsRefused_AndTheReasonNamesTheTrack()
     {
         using var dir = new TestHelpers.TempDir();

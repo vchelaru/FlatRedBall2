@@ -207,6 +207,31 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Edit_ReferenceTrackHoldsSeveralClips_AddedMovedDeleted_AndDescribedInOrder()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "Other", Tracks = { new SequenceTrackSave { Name = "T", Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk" } } } } });
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Sub", References = [new SequenceReferenceSave { Sequence = "Other", Length = 1 }] });
+        save.Save(file);
+
+        var edit = await Edit(file, """{"ops":[{"op":"add-block","track":"Run/Sub","sequence":"Other","start":3},{"op":"set-block-start","block":"Run/Sub/0","start":1},{"op":"add-block","track":"Run/Sub","sequence":"Run"}]}""");
+        var cycle = edit.Code;
+        var ok = await Edit(file, """{"ops":[{"op":"add-block","track":"Run/Sub","sequence":"Other","start":3},{"op":"set-block-start","block":"Run/Sub/0","start":1}]}""");
+        var describe = await _w.RunAsync("describe", file);
+
+        cycle.ShouldBe(1);
+        ok.Code.ShouldBe(0, ok.Out + ok.Err);
+        describe.Out.ShouldContain("Run/Sub/0  plays Other  start 1  length 1  end 2");
+        describe.Out.ShouldContain("Run/Sub/1  plays Other  start 3");
+        SequenceListSave.FromFile(file).Sequences[0].Tracks[1].References!.Count.ShouldBe(2);
+
+        var deleted = await Edit(file, """{"ops":[{"op":"delete-block","block":"Run/Sub/0"}]}""");
+        deleted.Code.ShouldBe(0, deleted.Out + deleted.Err);
+        SequenceListSave.FromFile(file).Sequences[0].Tracks[1].References!.Select(c => c.Start).ShouldBe([3.0]);
+    }
+
+    [Fact]
     public async Task Edit_SetBlockChain_RefusesReferenceClip_UnknownChain_AndUnlistedSource()
     {
         var file = WriteSeq();
