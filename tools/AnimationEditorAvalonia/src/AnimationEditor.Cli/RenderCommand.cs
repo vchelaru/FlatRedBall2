@@ -1,4 +1,5 @@
 using System.Globalization;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Editing;
 using AnimationEditor.Views.Export;
 using AnimationEditor.Views.Services;
@@ -8,6 +9,8 @@ namespace AnimationEditor.Cli;
 /// <summary>What <c>aecli render</c> produced: the files written, or why not. <see cref="UsageError"/> means the command line was malformed.</summary>
 internal sealed record RenderOutcome(IReadOnlyList<string> Files, IReadOnlyList<(string Code, string Message)> Errors, string? UsageError = null)
 {
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
     public bool Success => Errors.Count == 0 && UsageError is null;
 }
 
@@ -81,7 +84,7 @@ internal static class RenderCommand
                 File.WriteAllBytes(path, images.Pngs[i]);
                 files.Add(path);
             }
-            return new RenderOutcome(files, []);
+            return new RenderOutcome(files, []) { Warnings = plan.Warnings };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -100,10 +103,10 @@ internal static class RenderCommand
             string where = $"(frame {layer.Chain.Name}/{layer.Chain.Frames.IndexOf(layer.Frame)})", name = layer.Frame.TextureName;
             if (!File.Exists(path))
                 errors.Add((nameof(EditErrorCode.TextureNotFound), $"Texture '{name}' not found {where}."));
-            else if (SkiaFileDecoder.DecodeFile(path, out var reason) is { } bitmap)
-                bitmap.Dispose();
-            else
-                errors.Add((nameof(EditErrorCode.TextureUndecodable), reason ?? $"Texture '{name}' could not be read as an image {where}."));
+            else if (SkiaFileDecoder.ReadSize(path) is not var (width, height))
+                errors.Add((nameof(EditErrorCode.TextureUndecodable), $"Texture '{name}' could not be read as an image {where}."));
+            else if (ImageSizeLimit.Exceeds(width, height))
+                errors.Add((nameof(EditErrorCode.TextureUndecodable), ImageSizeLimit.Describe(name, width, height)));
         }
         if (errors.Count == 0 && layers.All(l => plan.ResolveTexture(l.Frame) is null))
             errors.Add((nameof(EditErrorCode.Unspecified), "Nothing to draw: the frames shown have no texture."));

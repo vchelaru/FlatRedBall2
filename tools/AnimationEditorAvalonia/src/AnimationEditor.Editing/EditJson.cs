@@ -113,7 +113,7 @@ public static class EditJson
         ".achx/.achj: --chain <name> with --frame 0,1 (named <chain>_frame<N>.png) or --at (named <chain>_<time>.png). --sequence/--chain may be left out when the file has only one. " +
         "Options: --scale <1-16> (default 4), --background transparent|black|white|gray|#RRGGBB (default transparent), " +
         "--bounds auto|x,y,w,h (auto fits every sprite of every image so frames line up; x,y is the lower-left corner in offset units, Y up), --grid (origin axes and a 16-unit grid), --shapes (draw the shapes), --sheet (one <name>_sheet.png with every image as a tile). " +
-        "Prints each written path; --json gives {success, files:[...], errors:[{code,message}]}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
+        "Prints each written path; --json gives {success, files:[...], errors:[{code,message}], warnings}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
 
     /// <summary>The <c>at</c> command is not an op either.</summary>
     public const string AtHelp =

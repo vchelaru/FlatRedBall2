@@ -260,12 +260,16 @@ public static class CliApp
                         w.WriteEndObject();
                     }
                     w.WriteEndArray();
+                    w.WriteStartArray("warnings");
+                    foreach (var warning in outcome.Warnings) w.WriteStringValue(warning);
+                    w.WriteEndArray();
                     w.WriteEndObject();
                 }));
             }
             else
             {
-                foreach (var f in outcome.Files) stdout.WriteLine(f);
+                foreach (var f in outcome.Files) stdout.WriteLine(f); // stdout holds only paths, so a script can read it
+                foreach (var warning in outcome.Warnings) stderr.WriteLine($"aecli: {warning}");
                 foreach (var (_, message) in outcome.Errors) stderr.WriteLine($"aecli: {message}");
             }
             return outcome.Success ? 0 : 1;

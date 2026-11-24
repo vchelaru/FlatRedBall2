@@ -204,6 +204,49 @@ public class MissingContentTests : IDisposable
     }
 
     [Fact]
+    public async Task Render_SomeTimesPastTheEnd_WritesThePngsAndSaysSo_InTextAndJson()
+    {
+        var file = Write(Sequence("Boss", Track("Body", ("Walk", 0))));
+        const string message = "9s is past the end of Boss (0.4s); use --pass for later loops";
+
+        var text = await RenderAsync(file, "0,9");
+        var json = await RenderAsync(file, "0,9", "--json");
+
+        text.Code.ShouldBe(0);
+        text.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(p => Path.GetFileName(p.Trim())).ShouldBe(["Boss_0.png", "Boss_9.png"]);
+        text.Err.Trim().ShouldBe("aecli: " + message);
+        json.Code.ShouldBe(0);
+        using var doc = JsonDocument.Parse(json.Out);
+        doc.RootElement.GetProperty("success").GetBoolean().ShouldBeTrue();
+        doc.RootElement.GetProperty("files").GetArrayLength().ShouldBe(2);
+        doc.RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()).ShouldBe([message]);
+    }
+
+    // Within the slack before the end the sprites are already hidden, so the time is past the end too.
+    [Fact]
+    public async Task PastTheEnd_IncludesTheBoundarySlack()
+    {
+        var file = Write(Sequence("Boss", Track("Body", ("Walk", 0))));
+
+        (await AtAsync(file, "0.3999995")).Out.ShouldContain("is past the end of Boss (0.4s)");
+        (await AtAsync(file, "0.39")).Out.ShouldContain("Walk frame 2");
+    }
+
+    [Fact]
+    public async Task ReferenceCycle_FailsAsCheckSaysIt()
+    {
+        var file = Write(Sequence("A", Track("Body", ("Walk", 0)), Plays("B")), Sequence("B", Track("Body", ("Walk", 0)), Plays("A")), Sequence("C", Track("Body", ("Walk", 0))));
+
+        foreach (var r in new[] { await AtAsync(file, "0", "--sequence", "A", "--json"), await RenderAsync(file, "0", "--sequence", "A", "--json") })
+        {
+            var (code, message) = JsonError(r);
+            code.ShouldBe("WouldCycle");
+            message.ShouldContain("Track 'A/Play' plays 'B', which plays 'A' back.");
+        }
+        (await AtAsync(file, "0", "--sequence", "C")).Code.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task PastTheEnd_WithLoopOff_HoldsThePose_AndAnEmptySequenceIsJustEmpty()
     {
         var held = Sequence("Held", Track("Body", ("Walk", 0)));

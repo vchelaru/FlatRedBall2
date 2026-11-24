@@ -59,8 +59,8 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - `--scale <1-16>` (default 4), `--background transparent|black|white|gray|#RRGGBB` (default transparent), `--grid` (origin axes plus a 16-unit grid).
 - `--shapes` draws the shapes (rect, circle, polygon) over each frame, named, and widens auto bounds to include them. `--sheet` writes one `<name>_sheet.png` with every time as a labelled tile; fails with a lower-`--scale` hint past about 32 million pixels.
 - `--bounds auto` (default) fits one canvas to every sprite across all requested times, so images line up and are the same size. `--bounds x,y,w,h` fixes it: x,y is the lower-left corner in offset units, Y up like frame offsets; sprites outside are cropped.
-- `--json` gives `{success, files, errors:[{code,message}]}`. Unknown names fail with exit 1 and a Did-you-mean; a bad option or missing `--out` is exit 2. A missing or unreadable texture of a frame being drawn fails and is named.
-- A track is hidden outside its chains, so a time can legitimately draw nothing, but all requested times drawing nothing fails, with the reason per time. `at` and `render` do not wrap times: one at or past the end of a looping sequence says so (`--pass` gives later loops). Both fail with the `check` message when the sequence, or one it plays, uses a missing chain, source or sequence, at any time and on hidden tracks too.
+- `--json` gives `{success, files, errors:[{code,message}], warnings}`. Unknown names fail with exit 1 and a Did-you-mean; a bad option or missing `--out` is exit 2. A missing or unreadable texture of a frame being drawn fails and is named.
+- A track is hidden outside its chains, so a time can legitimately draw nothing, but all requested times drawing nothing fails, with the reason per time. `at` and `render` do not wrap times: one at or past the end of a looping sequence says so (`--pass` gives later loops). Both fail with the `check` message when the sequence, or one it plays, uses a missing chain, source or sequence or plays itself, at any time and on hidden tracks too.
 
 ## Sequence files (.seqj)
 
