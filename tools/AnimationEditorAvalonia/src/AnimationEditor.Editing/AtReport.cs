@@ -30,7 +30,8 @@ public sealed record AtMoment(double Time, IReadOnlyList<AtSprite> Sprites);
 
 /// <summary>The report of one sequence or chain.</summary>
 /// <param name="Kind"><c>sequence</c> or <c>chain</c>.</param>
-public sealed record AtResult(string Kind, string Name, IReadOnlyList<AtMoment> Moments);
+/// <param name="Pass">How many times a looping sequence has wrapped; 0 for a chain.</param>
+public sealed record AtResult(string Kind, string Name, IReadOnlyList<AtMoment> Moments, int Pass = 0);
 
 /// <summary>
 /// Builds and prints the <c>aecli at</c> report from <see cref="SequenceScene"/> (a sequence) or <see cref="ChainClock"/> (a chain),
@@ -39,10 +40,11 @@ public sealed record AtResult(string Kind, string Name, IReadOnlyList<AtMoment> 
 public static class AtReport
 {
     /// <summary>The report of a .seqj's sequence, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
+    /// <param name="pass">How many times a looping sequence has wrapped, so continuous tracks show their carried phase.</param>
     /// <param name="trackPattern">Track name or glob (as <c>describe --track</c>); other tracks are left out. A pattern matching no track is an error.</param>
     /// <param name="shapesOnly">Leave out tracks whose active frame has no shapes.</param>
     public static AtResult? BuildSequence(
-        string file, string? sequenceName, IReadOnlyList<double> times, string? trackPattern, bool shapesOnly, out string? error, out bool usage)
+        string file, string? sequenceName, IReadOnlyList<double> times, int pass, string? trackPattern, bool shapesOnly, out string? error, out bool usage)
     {
         error = null; usage = false;
         var read = SequenceFileReader.Read(file);
@@ -65,11 +67,11 @@ public static class AtReport
         if (error is not null) return null;
 
         var moments = times.Select(time => new AtMoment(time,
-            SequenceScene.At(document, index, time).Reverse()
+            SequenceScene.At(document, index, time, pass).Reverse()
                 .Where(sprite => trackPattern is null || (sprite.Track >= 0 && sprite.Track < tracks.Count && filter.Includes(tracks[sprite.Track])))
                 .Select(sprite => ToSprite(sprite, tracks))
                 .Where(sprite => !shapesOnly || sprite.Shapes.Count > 0).ToList())).ToList();
-        return new AtResult("sequence", sequences[index].Name, moments);
+        return new AtResult("sequence", sequences[index].Name, moments, pass);
     }
 
     /// <summary>The report of an .achx/.achj chain, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
@@ -110,7 +112,7 @@ public static class AtReport
         var sb = new StringBuilder();
         foreach (var moment in result.Moments)
         {
-            sb.AppendLine($"{result.Name} at {Num(moment.Time)}s");
+            sb.AppendLine($"{result.Name} at {Num(moment.Time)}s{(result.Pass > 0 ? $" pass {result.Pass}" : "")}");
             if (moment.Sprites.Count == 0) sb.AppendLine("  (nothing visible)");
             foreach (var s in moment.Sprites)
             {
@@ -140,6 +142,7 @@ public static class AtReport
         w.WriteStartObject();
         w.WriteBoolean("success", true);
         w.WriteString(result.Kind, result.Name);
+        if (result.Pass > 0) w.WriteNumber("pass", result.Pass);
         w.WriteStartArray("times");
         foreach (var moment in result.Moments)
         {

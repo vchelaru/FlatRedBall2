@@ -23,6 +23,9 @@ public sealed record RenderPlan(
 /// <summary>Builds a <see cref="RenderPlan"/> from a file with the editor's own scene logic; no drawing happens here.</summary>
 public static class RenderPlanner
 {
+    /// <summary>Why a frame index is refused for a sequence.</summary>
+    public const string FrameIsForChains = "--frame is for chains; use --at with a sequence.";
+
     /// <summary>The plan, or null with <paramref name="error"/>; <paramref name="usage"/> is true when the request itself is malformed.</summary>
     public static RenderPlan? Plan(RenderRequest request, out string? error, out bool usage)
     {
@@ -61,7 +64,7 @@ public static class RenderPlanner
     private static RenderPlan? PlanSequence(RenderRequest request, out string? error, out bool usage)
     {
         error = null; usage = false;
-        if (request.Frames is not null) { usage = true; error = "--frame is for chains; use --at with a sequence."; return null; }
+        if (request.Frames is not null) { usage = true; error = FrameIsForChains; return null; }
         var read = SequenceFileReader.Read(request.File);
         if (read.Document is null) { error = read.Error; return null; }
 

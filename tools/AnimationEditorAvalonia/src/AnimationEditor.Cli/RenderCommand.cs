@@ -15,12 +15,11 @@ internal static class RenderCommand
 {
     public const int MaxScale = 16;
 
-    public static RenderOutcome Run(string file, IReadOnlyDictionary<string, string> values, bool grid)
+    public static RenderOutcome Run(string file, IReadOnlyDictionary<string, string> values)
     {
         if (!values.TryGetValue("--out", out var outDir)) return Usage("render needs --out <dir>.");
-        if (values.ContainsKey("--sequence") && values.ContainsKey("--chain")) return Usage("give --sequence or --chain, not both.");
 
-        bool shapes = values.ContainsKey("--shapes"), sheet = values.ContainsKey("--sheet");
+        bool grid = values.ContainsKey("--grid"), shapes = values.ContainsKey("--shapes"), sheet = values.ContainsKey("--sheet");
         int scale = 4;
         if (values.TryGetValue("--scale", out var scaleText) && !(int.TryParse(scaleText, NumberStyles.None, CultureInfo.InvariantCulture, out scale) && scale is >= 1 and <= MaxScale))
             return Usage($"--scale must be a whole number from 1 to {MaxScale}.");
@@ -52,16 +51,7 @@ internal static class RenderCommand
 
         values.TryGetValue("--sequence", out var name);
         if (name is null) values.TryGetValue("--chain", out name);
-        bool isSequence = SequenceFileReader.IsSequenceFile(file);
-        if (isSequence && values.ContainsKey("--chain")) return Usage("--chain is for .achx/.achj; use --sequence with a .seqj.");
-        if (!isSequence && values.ContainsKey("--sequence")) return Usage("--sequence is for .seqj; use --chain with an .achx/.achj.");
-
-        int pass = 0;
-        if (values.TryGetValue("--pass", out var passText))
-        {
-            if (!isSequence) return Usage("--pass is for .seqj sequences.");
-            if (!(int.TryParse(passText, NumberStyles.None, CultureInfo.InvariantCulture, out pass) && pass >= 0)) return Usage("--pass must be a whole number, 0 or more (the number of loop wraps so far).");
-        }
+        if (!CliCommands.TryPass(values, out int pass, out var passError)) return Usage(passError!);
 
         var plan = RenderPlanner.Plan(new RenderRequest(file, name, times, frames, pass), out var error, out var usage);
         if (plan is null) return usage ? Usage(error!) : Failed(CodeOf(error!), error!);
