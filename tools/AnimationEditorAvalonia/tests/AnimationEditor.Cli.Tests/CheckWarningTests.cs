@@ -182,6 +182,77 @@ public class CheckWarningTests : IDisposable
     }
 
     [Fact]
+    public async Task EditSequence_EveryWarningKind_SurvivesRenamesAndReorders()
+    {
+        File.Delete(_w.PathOf("sheet.png"));
+        var path = WriteSeq(s =>
+        {
+            var blocks = s.Sequences[0].Tracks[0].Chains;
+            blocks[1].Start = 0.5; // cuts the first short
+            blocks.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0.5 }); // the second never plays
+            var once = new SequenceSave { Name = "Long", Loop = false };
+            once.Tracks.Add(new SequenceTrackSave { Name = "Clip", Continuous = true, Reference = new SequenceReferenceSave { Sequence = "Run" } });
+            once.Tracks.Add(new SequenceTrackSave { Name = "Other" });
+            s.Sequences.Add(once);
+        });
+        (await Warnings(path)).Select(w => w.Code).ShouldBe(["missing-texture", "cut-short", "unreachable-block", "continuous-ignored"]);
+
+        (await EditWarnings(path,
+            "rename-track Long/Clip to=Legs", "rename-track Run/Body to=Torso", "rename-sequence Run to=Sprint", "rename-sequence Long to=Wide",
+            "reorder-track Wide/Legs index=1", "reorder-sequence Wide index=0", "add-track Sprint name=Front")).ShouldBeEmpty();
+        (await Warnings(path)).Count.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task EditSequence_OneWarningFixedAndAnotherCaused_ReportsTheNewOne()
+    {
+        var path = WriteSeq(s =>
+        {
+            s.Sequences[0].Tracks[0].Chains[1].Start = 0.5;
+            var other = new SequenceTrackSave { Name = "Other" };
+            other.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 0.8 });
+            other.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 1 });
+            s.Sequences[0].Tracks.Add(other);
+        });
+
+        var added = await EditWarnings(path, "set-block-start Run/Body/1 start=1", "set-block-start Run/Other/1 start=0.5");
+
+        added.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Other/0");
+    }
+
+    [Fact]
+    public async Task EditSequence_CopyOfAWarnedTrack_IsReportedAndTheFileGainsNothingElse()
+    {
+        var path = WriteSeq(s => s.Sequences[0].Tracks[0].Chains[1].Start = 0.5);
+
+        var added = await EditWarnings(path, "duplicate-track Run/Body to=Run index=1");
+
+        added.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Body 2/0");
+        // Built without any edit, so whatever the edit adds to the objects it tracks would show.
+        var saved = SequenceListSave.FromFile(path);
+        saved.Sequences[0].UnknownProperties.ShouldBeEmpty();
+        saved.Sequences[0].Tracks.Count.ShouldBe(2);
+        foreach (var track in saved.Sequences[0].Tracks)
+        {
+            track.UnknownProperties.ShouldBeEmpty();
+            foreach (var block in track.Chains) block.UnknownProperties.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task Edit_TextureChangeThatLeavesARegionOutside_IsReported()
+    {
+        _w.Copy("other.png"); // 48x32
+        var bytes = File.ReadAllBytes(_w.PathOf("other.png"));
+        bytes[19] = 16; // 16 pixels wide
+        File.WriteAllBytes(_w.PathOf("other.png"), bytes);
+
+        var added = await EditWarnings(_w.PathOf("hero.achx"), "set-frame-texture Walk/2 texture=other.png");
+
+        added.ShouldHaveSingleItem().ShouldContain("[region-outside-texture]: Frame Walk/2: the region 32,0,16,32 is not inside the 16x32");
+    }
+
+    [Fact]
     public async Task CheckSequence_SourceWithMissingTexture_Warns()
     {
         var path = WriteSeq();
@@ -194,7 +265,7 @@ public class CheckWarningTests : IDisposable
         message.ShouldContain("sheet.png");
     }
 
-    private string WriteSeq()
+    private string WriteSeq(Action<SequenceListSave>? change = null)
     {
         var save = new SequenceListSave();
         save.Sources.Add("hero.achj");
@@ -204,6 +275,7 @@ public class CheckWarningTests : IDisposable
         var run = new SequenceSave { Name = "Run" };
         run.Tracks.Add(body);
         save.Sequences.Add(run);
+        change?.Invoke(save);
         var path = _w.PathOf("hero.seqj");
         save.Save(path);
         return path;

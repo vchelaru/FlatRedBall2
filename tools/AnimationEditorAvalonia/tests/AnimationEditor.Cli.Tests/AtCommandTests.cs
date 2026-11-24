@@ -115,7 +115,7 @@ public class AtCommandTests : IDisposable
     }
 
     // Walk at 0.1 s per frame: frame 0 glides red 0 to 200 and has two events, frame 1 is flipped, frame 2 has a rect.
-    private string WriteChains(string name, Action<AnimationChainSave>? adjust = null)
+    private string WriteChains(string name, Action<AnimationChainSave>? adjust = null, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
     {
         var chain = new AnimationChainSave { Name = "Walk" };
         for (int i = 0; i < 3; i++)
@@ -130,7 +130,7 @@ public class AtCommandTests : IDisposable
         chain.Frames[1].FlipDiagonal = true;
         (chain.Frames[2].ShapesSave = new ShapesSave()).Add(new AARectSave { Name = "Hitbox", X = 1, Y = 2, ScaleX = 4, ScaleY = 6 });
         adjust?.Invoke(chain);
-        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel, TimeMeasurementUnit = TimeMeasurementUnit.Second };
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel, TimeMeasurementUnit = unit };
         list.AnimationChains.Add(chain);
         list.AnimationChains.Add(new AnimationChainSave { Name = "Empty" });
         var path = _w.PathOf(name);
@@ -203,6 +203,113 @@ public class AtCommandTests : IDisposable
 
         r.Code.ShouldBe(0, r.Err);
         r.Out.ShouldContain($"Walk frame {frame} ");
+    }
+
+    [Theory]
+    [InlineData(true, false, "0.35", 2)] // 0.05 into the way back
+    [InlineData(true, false, "0.9", 0)]  // holds the end of the way back; a loop would be at 0.3, frame 2
+    [InlineData(false, true, "0.35", 0)] // holds the first frame, played last; a loop would be back at frame 2
+    [InlineData(true, true, "0.35", 0)]  // plays 2,1,0 then 0,1,2
+    [InlineData(true, true, "0.9", 2)]   // a loop would be at 0.3, frame 0
+    public async Task Chain_LoopOff_HoldsTheEndOfPingPongAndReverse(bool pingPong, bool reverse, string time, int frame)
+    {
+        var file = WriteChains("fx.achx", c => { c.Loop = false; c.PingPong = pingPong; c.Reverse = reverse; });
+
+        var r = await _w.RunAsync("at", file, "--chain", "Walk", "--time", time);
+
+        r.Code.ShouldBe(0, r.Err);
+        r.Out.ShouldContain($"Walk frame {frame} ");
+    }
+
+    [Fact]
+    public async Task MillisecondFile_TakesTimesInSeconds_AsAChainAndInASequence()
+    {
+        var chains = WriteChains("ms.achx", c => { foreach (var f in c.Frames) f.FrameLength = 100; }, TimeMeasurementUnit.Millisecond);
+        var save = new SequenceListSave { Sources = { "ms.achx" } };
+        save.Sequences.Add(new SequenceSave
+        {
+            Name = "Run",
+            Tracks = { new SequenceTrackSave { Name = "Body", Chains = { new SequenceChainReferenceSave { Source = "ms.achx", Chain = "Walk" } } } },
+        });
+        var sequence = _w.PathOf("ms.seqj");
+        save.Save(sequence);
+
+        foreach (var r in new[]
+        {
+            await _w.RunAsync("at", chains, "--chain", "Walk", "--time", "0.05,0.25"),
+            await _w.RunAsync("at", sequence, "--time", "0.05,0.25"),
+        })
+        {
+            r.Code.ShouldBe(0, r.Err);
+            r.Out.ShouldContain("at 0.05s");
+            r.Out.ShouldContain("Walk frame 0 ");
+            r.Out.ShouldContain("color red=100 operation=Add");
+            r.Out.ShouldContain("Walk frame 2 ");
+        }
+    }
+
+    // Walk is 0.4 s and loops; both tracks cut it to 0.3 s, so the continuous one starts pass 1 at 0.3 s of the chain (frame 2).
+    private string WriteContinuousSequence(bool loop = true)
+    {
+        SequenceTrackSave Track(string name, bool continuous) => new()
+        {
+            Name = name,
+            Continuous = continuous,
+            Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Length = 0.3 } },
+        };
+        var save = new SequenceListSave { Sources = { "hero.achj" } };
+        save.Sequences.Add(new SequenceSave { Name = "Run", Loop = loop, Tracks = { Track("Wings", true), Track("Body", false) } });
+        var path = _w.PathOf("wings.seqj");
+        save.Save(path);
+        return path;
+    }
+
+    [Fact]
+    public async Task Pass_CarriesContinuousTracksAcrossTheWrap_InTextAndJson()
+    {
+        var file = WriteContinuousSequence();
+
+        var first = await _w.RunAsync("at", file, "--time", "0");
+        var second = await _w.RunAsync("at", file, "--time", "0", "--pass", "1");
+        var json = await _w.RunAsync("at", file, "--time", "0", "--pass", "1", "--json");
+        var firstJson = await _w.RunAsync("at", file, "--time", "0", "--pass", "0", "--json");
+
+        first.Out.ShouldContain("Run at 0s" + Environment.NewLine);
+        first.Out.ShouldContain("Wings: Walk frame 0");
+        second.Code.ShouldBe(0, second.Err);
+        second.Out.ShouldContain("Run at 0s pass 1" + Environment.NewLine);
+        second.Out.ShouldContain("Wings: Walk frame 2");
+        second.Out.ShouldContain("Body: Walk frame 0");
+        using var doc = JsonDocument.Parse(json.Out);
+        doc.RootElement.GetProperty("pass").GetInt32().ShouldBe(1);
+        doc.RootElement.GetProperty("times")[0].GetProperty("sprites")[0].GetProperty("frame").GetInt32().ShouldBe(2);
+        using var firstDoc = JsonDocument.Parse(firstJson.Out);
+        firstDoc.RootElement.TryGetProperty("pass", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Pass_OfASequenceThatDoesNotLoop_ChangesNothing()
+    {
+        var r = await _w.RunAsync("at", WriteContinuousSequence(loop: false), "--time", "0", "--pass", "1");
+
+        r.Code.ShouldBe(0, r.Err);
+        r.Out.ShouldContain("Wings: Walk frame 0");
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("1.5")]
+    [InlineData("x")]
+    public async Task BadPass_IsTheSameUsageErrorAsRender(string pass)
+    {
+        var file = WriteContinuousSequence();
+
+        var at = await _w.RunAsync("at", file, "--time", "0", "--pass", pass);
+        var render = await _w.RunAsync("render", file, "--out", _w.PathOf("out"), "--pass", pass);
+
+        at.Code.ShouldBe(2);
+        at.Err.ShouldContain("--pass must be a whole number, 0 or more");
+        at.Err.ShouldBe(render.Err);
     }
 
     [Fact]
