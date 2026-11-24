@@ -42,12 +42,20 @@ public static class AtomicFile
 
     /// <summary>
     /// <see cref="Write"/> for UTF-8 text. A file already at <paramref name="path"/> keeps its line ending (its first
-    /// line's) and whether it ends in a newline; a missing or single-line file gets exactly what
+    /// line's) and whether it ends in a newline; a missing, unreadable or single-line file gets exactly what
     /// <paramref name="writeAction"/> writes, which must not end in a newline.
     /// </summary>
     internal static void WriteKeepingLineEndings(string path, Action<Stream> writeAction)
     {
-        string old = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+        string old = string.Empty;
+        try
+        {
+            if (File.Exists(path)) old = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An unreadable file must not fail a save that would otherwise work: write the default line ending.
+        }
         int firstBreak = old.IndexOf('\n');
         if (firstBreak < 0)
         {

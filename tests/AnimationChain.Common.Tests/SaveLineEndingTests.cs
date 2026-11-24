@@ -90,6 +90,21 @@ public class SaveLineEndingTests : IDisposable
         AnimationChainListSave.FromString(ReadExact(path)).AnimationChains[0].Name.ShouldBe(name);
     }
 
+    // Windows refuses to replace the locked file and Linux allows it; reading its line ending must change neither.
+    [Fact]
+    public void Save_OverUnreadableFile_EndsLikeAPlainWrite()
+    {
+        string plain = WriteFile("achx", Lines("achx", "Walk"));
+        string saved = WriteFile("achj", Lines("achj", "Walk"));
+        using var plainLock = new FileStream(plain, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var savedLock = new FileStream(saved, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Type? expected = Record.Exception(() => AtomicFile.Write(plain, stream => stream.WriteByte(1)))?.GetType();
+
+        Exception? actual = Record.Exception(() => SaveNew(saved, "Stride"));
+
+        actual?.GetType().ShouldBe(expected);
+    }
+
     private static string Lines(string extension, string name) => extension switch
     {
         "achx" => $"""
