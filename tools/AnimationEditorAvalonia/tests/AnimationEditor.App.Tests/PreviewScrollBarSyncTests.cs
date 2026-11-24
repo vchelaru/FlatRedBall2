@@ -76,6 +76,34 @@ public class PreviewScrollBarSyncTests
         Assert.Equal(-(float)vscroll.Minimum, preview.PanOffset.Y, 3);
     }
 
+    // #1979: a 64x16 region with a diagonal flip is drawn 16x64, so it scrolls like a 16x64 one.
+    [AvaloniaFact]
+    public void ScrollRanges_OfADiagonallyFlippedFrame_MatchTheSizeItIsDrawn()
+    {
+        var ctx = ResetSingletons();
+        string texture = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            using (var bitmap = new SkiaSharp.SKBitmap(64, 64))
+            using (var data = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100))
+                File.WriteAllBytes(texture, data.ToArray());
+            ctx.ThumbnailService.GetBitmap(texture);
+            var frame = new AnimationFrameSave { TextureName = texture };
+            ctx.SelectedState.SelectedFrame = frame;
+            var preview = ctx.CreatePreviewControl();
+            preview.Measure(new Avalonia.Size(400, 300));
+            preview.Arrange(new Avalonia.Rect(0, 0, 400, 300));
+            preview.SetZoomPercent(1600);
+
+            (frame.RightCoordinate, frame.BottomCoordinate) = (16f, 64f);
+            var expected = preview.GetScrollBarRanges();
+            (frame.RightCoordinate, frame.BottomCoordinate, frame.FlipDiagonal) = (64f, 16f, true);
+
+            Assert.Equal(expected, preview.GetScrollBarRanges());
+        }
+        finally { File.Delete(texture); }
+    }
+
     // Wheel-zooming with offset content grows the on-screen extent, so the scrollbar range
     // grows too — proving the scrollbars refresh on zoom and derive from the content extent.
     [AvaloniaFact]
