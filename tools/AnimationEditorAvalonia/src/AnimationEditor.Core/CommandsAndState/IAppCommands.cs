@@ -187,9 +187,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Writes a document other than the current one to its own file, in that file's disk
         /// format: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.
-        /// A failure is reported through <see cref="SaveFailed"/>.
+        /// A failure is reported through <see cref="SaveFailed"/> and returns false.
         /// </summary>
-        void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
+        bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
         Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);

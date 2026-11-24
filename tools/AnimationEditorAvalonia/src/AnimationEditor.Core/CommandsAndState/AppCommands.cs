@@ -622,15 +622,17 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc/>
         /// <inheritdoc cref="IAppCommands.SaveDocument"/>
-        public void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat)
+        public bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat)
         {
             try
             {
                 HotReloadWatcher.RunOwnSave(targetPath, () => _pm.SaveAnimationChainList(document, targetPath, diskFormat));
+                return true;
             }
             catch (Exception ex)
             {
                 SaveFailed?.Invoke(ex.Message);
+                return false;
             }
         }
 

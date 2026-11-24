@@ -29,14 +29,11 @@ public partial class MainWindow
     {
         var projectFiles = _projectManager.ProjectFolderPath is null ? null
             : ProjectPanel.IncludedEntries.Select(entry => entry.File).OfType<DiskEditorFile>().Select(file => file.FullPath).ToList();
-        // A tab with unsaved edits stands for its file. It is matched below, on the thread that edits it.
-        var unsaved = _sequencePane.UnsavedDocuments.ToDictionary(open => open.Path);
         var files = await Task.Run(async () =>
         {
             await BrokenSequenceScanGate;
             return BrokenSequenceNotice.FilesToScan(animationPath, projectFiles)
-                .Select(path => new BrokenSequenceFile(path,
-                    unsaved.ContainsKey(new FilePath(path)) ? [] : SeqjChainUsageScanner.FindMatches(path, animationPath, removed.Names)))
+                .Select(path => new BrokenSequenceFile(path, SeqjChainUsageScanner.FindMatches(path, animationPath, removed.Names)))
                 .ToList();
         });
 
@@ -44,6 +41,8 @@ public partial class MainWindow
         var tab = _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(animationPath));
         if (tab is null || _achxPane.HasFailedSave(tab)) return;
 
+        // A tab that now has unsaved edits stands for its file.
+        var unsaved = _sequencePane.UnsavedDocuments.ToDictionary(open => open.Path);
         var message = BrokenSequenceNotice.Message(removed, files.Select(file => file with
         {
             Blocks = (unsaved.TryGetValue(new FilePath(file.Path), out var open)

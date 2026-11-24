@@ -8210,7 +8210,7 @@ public partial class MainWindow : Window
 
         var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
         if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
-        _appCommands.SaveDocument(source, sourceTab.Path.FullPath, sourceTab.CachedOnDiskCoordinateType);
+        if (!_appCommands.SaveDocument(source, sourceTab.Path.FullPath, sourceTab.CachedOnDiskCoordinateType)) return; // the file still has them
         WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
             namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
     }

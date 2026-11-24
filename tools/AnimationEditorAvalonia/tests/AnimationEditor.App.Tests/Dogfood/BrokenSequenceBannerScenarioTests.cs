@@ -1,3 +1,4 @@
+using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -43,6 +44,24 @@ public class BrokenSequenceBannerScenarioTests
         editor.Press(Key.F2);
         editor.TypeAndEnter(editor.InlineRenameBox(editor.ChainNamed(chain)), newName);
         editor.ChainNamed(newName).ShouldNotBeNull();
+    }
+
+    private static async Task<string> OpenFightWithUnsavedEditsAsync(AnimationEditorHarness editor)
+    {
+        string fight = WriteFight(editor, "fight.seqj", "Walk");
+        await editor.OpenAsync(fight);
+        UnusualProjectScenarioTests.MakeUnwritable(fight);
+        try
+        {
+            editor.Click(editor.Control<Button>("AddSequenceButton"));
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
+            editor.Click(editor.Notifications.ErrorBannerDismissBtn);
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(fight);
+        }
+        return fight;
     }
 
     [AvaloniaFact]
@@ -166,19 +185,7 @@ public class BrokenSequenceBannerScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string hero = WriteHero(editor);
-        string fight = WriteFight(editor, "fight.seqj", "Walk");
-        await editor.OpenAsync(fight);
-        UnusualProjectScenarioTests.MakeUnwritable(fight);
-        try
-        {
-            editor.Click(editor.Control<Button>("AddSequenceButton"));
-            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
-            editor.Click(editor.Notifications.ErrorBannerDismissBtn);
-        }
-        finally
-        {
-            UnusualProjectScenarioTests.MakeWritable(fight);
-        }
+        string fight = await OpenFightWithUnsavedEditsAsync(editor);
         await editor.OpenAsync(hero);
         // The file no longer plays Walk, but the tab's unsaved version does.
         File.WriteAllText(fight, File.ReadAllText(fight).Replace("Walk", "Idle"));
@@ -187,5 +194,85 @@ public class BrokenSequenceBannerScenarioTests
 
         (await editor.WaitUntilAsync(() => editor.ProblemText != null, Timeout)).ShouldBeTrue();
         editor.ProblemText.ShouldBe("Renaming 'Walk' broke 1 sequence block: fight.seqj (Attack/Body).");
+    }
+
+    [AvaloniaFact]
+    public async Task RenameWhoseSaveFails_KeepsTheSaveBanner()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteHero(editor);
+        WriteFight(editor, "fight.seqj", "Walk");
+        await editor.OpenAsync(hero);
+        var gate = new TaskCompletionSource();
+        editor.Window.BrokenSequenceScanGate = gate.Task;
+        UnusualProjectScenarioTests.MakeUnwritable(hero);
+        try
+        {
+            Rename(editor, "Walk", "Stride");
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
+
+            gate.SetResult();
+            await editor.Window.BrokenSequenceScan;
+
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(hero);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task CutIntoAnotherFileWhoseSourceSaveFails_KeepsTheSaveBanner()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteHero(editor);
+        WriteFight(editor, "fight.seqj", "Walk");
+        string villain = editor.WriteAchx("villain.achx", AnimationEditorHarness.Chain("Fly", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Press(Key.X, RawInputModifiers.Control);
+        await editor.OpenAsync(villain);
+        editor.ClickRow(editor.ChainNamed("Fly"));
+        var gate = new TaskCompletionSource();
+        editor.Window.BrokenSequenceScanGate = gate.Task;
+        UnusualProjectScenarioTests.MakeUnwritable(hero);
+        try
+        {
+            editor.Press(Key.V, RawInputModifiers.Control);
+            (await editor.WaitUntilAsync(() => editor.ProblemText != null, Timeout)).ShouldBeTrue();
+            editor.ProblemText.ShouldStartWith("Auto save failed");
+
+            gate.SetResult();
+            await editor.Window.BrokenSequenceScan;
+
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(hero);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task UnsavedSeqjTabDiscardedBeforeTheScanEnds_CountsAsItsFile()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = WriteHero(editor);
+        string fight = await OpenFightWithUnsavedEditsAsync(editor);
+        await editor.OpenAsync(hero);
+        // The tab's unsaved version plays Walk; the file it falls back to does not.
+        File.WriteAllText(fight, File.ReadAllText(fight).Replace("Walk", "Idle"));
+        var gate = new TaskCompletionSource();
+        editor.Window.BrokenSequenceScanGate = gate.Task;
+        Rename(editor, "Walk", "Stride");
+        editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
+        editor.CloseTab("fight.seqj");
+        editor.TabLabels.ShouldNotContain("fight.seqj");
+
+        gate.SetResult();
+        await editor.Window.BrokenSequenceScan;
+
+        editor.ProblemText.ShouldBeNull();
     }
 }
