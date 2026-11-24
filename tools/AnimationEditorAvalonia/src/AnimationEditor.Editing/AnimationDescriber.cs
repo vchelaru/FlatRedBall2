@@ -30,6 +30,8 @@ public static class AnimationDescriber
                 var f = chain.Frames[i];
                 sb.AppendLine(FormattableString.Invariant(
                     $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate - f.LeftCoordinate)},{Num(f.BottomCoordinate - f.TopCoordinate)}"));
+                var placement = PlacementText(f);
+                if (placement.Length > 0) sb.AppendLine($"       {placement}");
                 var color = ColorText(f);
                 if (color.Length > 0) sb.AppendLine($"       color {color}");
                 var frameKeys = FrameKeyframeText(chain, f);
@@ -76,6 +78,13 @@ public static class AnimationDescriber
                 w.WriteNumber("width", f.RightCoordinate - f.LeftCoordinate);
                 w.WriteNumber("height", f.BottomCoordinate - f.TopCoordinate);
                 w.WriteEndObject();
+                w.WriteStartObject("offset");
+                w.WriteNumber("x", f.RelativeX);
+                w.WriteNumber("y", f.RelativeY);
+                w.WriteEndObject();
+                w.WriteBoolean("flipHorizontal", f.FlipHorizontal);
+                w.WriteBoolean("flipVertical", f.FlipVertical);
+                w.WriteBoolean("flipDiagonal", f.FlipDiagonal);
                 if (f.Red is not null || f.Green is not null || f.Blue is not null || f.Alpha is not null || f.ColorOperation is not null)
                 {
                     w.WriteStartObject("color");
@@ -161,6 +170,19 @@ public static class AnimationDescriber
         ShapeKeyframeGroup.Size => shape is SizedShapeSave s ? (s.SizeInterpolation, s.SizeEasing) : (null, null),
         _ => shape is PolygonSave p ? (p.PointsInterpolation, p.PointsEasing) : (null, null),
     };
+
+    /// <summary>Offset and flip flags, each only when non-default (<c>offset 3,-2.5  flip H D</c>).</summary>
+    private static string PlacementText(AnimationFrameSave f)
+    {
+        var parts = new List<string>();
+        if (f.RelativeX != 0 || f.RelativeY != 0) parts.Add(FormattableString.Invariant($"offset {Num(f.RelativeX)},{Num(f.RelativeY)}"));
+        var flips = new List<string>();
+        if (f.FlipHorizontal) flips.Add("H");
+        if (f.FlipVertical) flips.Add("V");
+        if (f.FlipDiagonal) flips.Add("D");
+        if (flips.Count > 0) parts.Add("flip " + string.Join(" ", flips));
+        return string.Join("  ", parts);
+    }
 
     /// <summary>Only the color parts a frame sets; parts it leaves out inherit from earlier frames.</summary>
     private static string ColorText(AnimationFrameSave f)
