@@ -406,9 +406,8 @@ namespace AnimationEditor.Core
         /// the tsx's own per-tile animations become <see cref="AnimationChainListSave"/> chains via
         /// <see cref="Tiled.TiledAnimationToAchjMapper"/>, editable the same way achx chains are.
         /// </summary>
-        /// <exception cref="NotSupportedException">The tsx uses a construct (an unwritable tileset feature)
-        /// that would be lost on the first
-        /// save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
+        /// <exception cref="NotSupportedException">The tsx is not UTF-8, or uses a construct (an unwritable
+        /// tileset feature) that would be lost on the first save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
         /// <exception cref="InvalidOperationException">The tsx is corrupt in a way <see
         /// cref="Tiled.TiledAnimationToAchjMapper.Map"/> can't tolerate (e.g. <c>Columns &lt;= 0</c>
         /// or a duplicate tile id) -- or some achx/achj already has a <c>.tiledsync</c> association
@@ -431,11 +430,13 @@ namespace AnimationEditor.Core
                     "(Associate Tiled Tileset). A .tsx cannot be both a native-tsx project and an " +
                     "achx-push target at the same time.");
 
+            if (!Tiled.TsxCompatibilityChecker.CheckEncoding(fileName.FullPath, out var blockingReason))
+                throw CannotOpenTsx(fileName, blockingReason);
+
             var tileset = Tiled.TsxLoader.LoadTileset(fileName.FullPath);
 
-            if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason))
-                throw new NotSupportedException(
-                    $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
+            if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out blockingReason))
+                throw CannotOpenTsx(fileName, blockingReason);
 
             var acls = Tiled.TiledAnimationToAchjMapper.Map(
                 tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out var syntheticNamedChains);
@@ -468,6 +469,9 @@ namespace AnimationEditor.Core
                 : new FilePath[0];
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
         }
+
+        private static NotSupportedException CannotOpenTsx(FilePath fileName, string? blockingReason) =>
+            new($"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
 
         /// <summary>The tileset's single <c>&lt;image source&gt;</c> resolved against the tsx's own
         /// folder (how Tiled resolves it), or <see langword="null"/> when the tileset has no image

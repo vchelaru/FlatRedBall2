@@ -228,9 +228,6 @@ public class TsxCorpusRoundTripTests : IDisposable
         // XML constructs and encodings
         new("UTF-8 byte order mark", Tsx(tile0Attributes: " type=\"Größe 日本\""), Utf8Bom),
         new("non-ASCII text", Tsx(tile0Attributes: " type=\"Größe 日本\"")),
-        new("UTF-16 little endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.Unicode),
-        new("UTF-16 big endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.BigEndianUnicode),
-        new("ISO-8859-1", Tsx(tile0Attributes: " type=\"Größe\"", tiles: "<tile id=\"5\" type=\"Wäter\"/>", prolog: "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"), Encoding.Latin1),
         new("CRLF line endings", Tsx(tiles: "<tile id=\"5\" type=\"Water\">\n  <properties>\n   <property name=\"Notes\">one\ntwo</property>\n  </properties>\n </tile>").Replace("\n", "\r\n")),
         new("tab indentation", Tsx(tiles: "<tile id=\"5\" type=\"Water\"/>").Replace("\n ", "\n\t")),
         new("entities and character references", Tsx(tile0Attributes: " type=\"&lt;a&gt; &amp; &quot;b&quot; &#x1F600;\"", tiles: "<tile id=\"5\" type=\"&lt;&amp;&apos;\"/>")),
@@ -275,6 +272,9 @@ public class TsxCorpusRoundTripTests : IDisposable
         new("objectgroup without id (before 1.2)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\"/>", " draworder=\"index\""))),
         new("object unknown child", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><future/></object>"))),
         new("object capsule (1.12)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><capsule/></object>"))),
+        new("UTF-16 little endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.Unicode),
+        new("UTF-16 big endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.BigEndianUnicode),
+        new("ISO-8859-1", Tsx(tile0Attributes: " type=\"Größe\"", tiles: "<tile id=\"5\" type=\"Wäter\"/>", prolog: "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"), Encoding.Latin1),
         new("no XML declaration", Tsx(prolog: "")),
         new("two wangsets on one line", Tsx(tail: Wangsets($"<wangset name=\"A\" tile=\"-1\">{WangColor}{WangTile}</wangset><wangset name=\"B\" tile=\"-1\">{WangColor}{WangTile}</wangset>"))),
         new("truncated file", Tsx().Replace("</tileset>", "")),
@@ -364,7 +364,6 @@ public class TsxCorpusRoundTripTests : IDisposable
     private const string AfterEditedTile = "#2013 E: what follows an edited tile is removed";
     private const string Rewrite = "#2013 F: rewriting the whole file loses what DotTiled does not model";
     private const string SaveAsLoss = "#2013 G: Save As loses backgroundcolor and the wangset type";
-    private const string EncodingLoss = "#2015 H: a file that is not UTF-8 is corrupted";
     private const string DefaultNamespace = "#2013 I: a default namespace duplicates every tile";
     private const string ImagePath = "#2016 J: Save As to another folder breaks the image path";
 
@@ -401,8 +400,6 @@ public class TsxCorpusRoundTripTests : IDisposable
         [
             "tileset backgroundcolor", "tileset unknown attribute", "wangset", "wangset empty", "wangsets sharing a name",
         ]),
-        new(EncodingLoss, [Op.Save, Op.EditSave], ["UTF-16 little endian", "UTF-16 big endian"]),
-        new(EncodingLoss, EveryOp, ["ISO-8859-1"]),
         new(DefaultNamespace, EveryOp, ["default namespace"]),
     ];
 
@@ -426,7 +423,6 @@ public class TsxCorpusRoundTripTests : IDisposable
     [MemberData(nameof(Cases), AfterEditedTile, Skip = AfterEditedTile)]
     [MemberData(nameof(Cases), Rewrite, Skip = Rewrite)]
     [MemberData(nameof(Cases), SaveAsLoss, Skip = SaveAsLoss)]
-    [MemberData(nameof(Cases), EncodingLoss, Skip = EncodingLoss)]
     [MemberData(nameof(Cases), DefaultNamespace, Skip = DefaultNamespace)]
     public void SaveTsxProject_CorpusFile_KeepsEverything(string rowName, Op op) => RoundTripDiff(rowName, op).ShouldBe("");
 
