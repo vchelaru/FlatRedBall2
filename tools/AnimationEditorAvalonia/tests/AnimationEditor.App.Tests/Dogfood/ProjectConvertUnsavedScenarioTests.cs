@@ -1,7 +1,10 @@
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Views.Controls;
+using AnimationEditor.Views.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -69,6 +72,113 @@ public class ProjectConvertUnsavedScenarioTests
         recycled.ShouldBe(new[] { "hero.achx" });
         editor.TabLabels.ShouldBe(new[] { "boss.achx" });
         editor.Dialogs.Shown.Count.ShouldBe(1, "only the confirm: " + string.Join("; ", editor.Dialogs.Shown));
+        editor.ProblemText.ShouldBeNull("the failed save it reported is done");
+    }
+
+    // Only a banner about a failed save that the convert made good is cleared.
+    [AvaloniaTheory]
+    [InlineData("boss.achx", "Auto save failed — Access to the path is denied.")]
+    [InlineData("hero.achx", "Something else is wrong.")]
+    public async Task ConvertFile_KeepsABannerItDidNotSettle(string convert, string banner)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.Window.ShowProblem(banner);
+
+        PickFromRow(editor, convert, "Convert to .achj");
+
+        recycled.ShouldBe(new[] { convert });
+        editor.ProblemText.ShouldBe(banner);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("hero.achx")]
+    [InlineData("boss.achx")]
+    public async Task ConvertFile_TabWhoseFileChangedOnDisk_IsNotConverted(string inFront)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.ClickTab(inFront);
+        File.AppendAllText(hero, "<!-- edited elsewhere -->");
+        string heroText = File.ReadAllText(hero);
+
+        PickFromRow(editor, "hero.achx", "Convert to .achj");
+
+        editor.ProblemText!.ShouldStartWith("Converted 0, 1 problem: hero.achx: not converted, its unsaved edits could not be saved (");
+        File.ReadAllText(hero).ShouldBe(heroText);
+        File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
+        recycled.ShouldBeEmpty();
+    }
+
+    // Skipped, so its tab stays open, and must know the edits are saved now.
+    [AvaloniaTheory]
+    [InlineData("hero.achx")]
+    [InlineData("boss.achx")]
+    public async Task ConvertFile_TabWithAFailedSave_WhoseAchjExists_IsSaved_AndItsTabKnows(string inFront)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.ClickTab(inFront);
+        File.WriteAllText(Path.ChangeExtension(hero, ".achj"), "another file");
+
+        PickFromRow(editor, "hero.achx", "Convert to .achj");
+
+        File.ReadAllText(Path.ChangeExtension(hero, ".achj")).ShouldBe("another file");
+        recycled.ShouldBeEmpty();
+        SavedX(hero).ShouldBe(8);
+        editor.ClickTab("hero.achx");
+        editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8);
+        editor.UndoManager.SaveState.ShouldBe(SaveState.AutoSaveOn);
+        editor.Dialogs.Shown.Clear();
+        editor.CloseTab("hero.achx");
+        editor.Dialogs.Shown.ShouldBeEmpty();
+    }
+
+    // Closing a tab behind the front one leaves the front document, its failed save and its undo alone.
+    [AvaloniaTheory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ClosingATabBehind_KeepsTheFrontTabsUnsavedEdits(bool byFolderConvert, bool changedOnDisk)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (hero, _, _) = await OpenAndFailASaveAsync(editor);
+        try
+        {
+            if (changedOnDisk)
+            {
+                UnusualProjectScenarioTests.MakeWritable(hero);
+                File.AppendAllText(hero, "<!-- edited elsewhere -->");
+            }
+            // On Linux a file is made unwritable through its folder, which would stop boss.achj too.
+            else if (byFolderConvert && !OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            if (byFolderConvert)
+                PickFromRow(editor, "Sprites", "Convert Animations to .achj");
+            else
+                editor.CloseTab("boss.achx");
+            editor.Wait(TimeSpan.FromMilliseconds(100));
+
+            editor.TabLabels.ShouldBe(new[] { "hero.achx" });
+            editor.UndoManager.SaveState.ShouldBe(SaveState.Failed);
+            editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8, "the unsaved edit is still there");
+            editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Cancel);
+            editor.CloseTab("hero.achx");
+            editor.TabLabels.ShouldBe(new[] { "hero.achx" });
+            editor.Press(Key.Z, RawInputModifiers.Control);
+            editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(0, "its undo history is still there");
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(hero);
+        }
     }
 
     [AvaloniaFact]
