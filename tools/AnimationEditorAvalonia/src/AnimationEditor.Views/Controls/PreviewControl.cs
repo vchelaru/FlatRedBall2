@@ -765,9 +765,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// Scrubs to <paramref name="frameIndex"/> at <paramref name="fraction"/> through that frame:
     /// pauses, seeks playback, and selects that frame so the inspector/wireframe follow. The
     /// selection does not snap the playhead back to the frame start because the seek already set
-    /// the sub-frame position (#432).
+    /// the sub-frame position (#432). With <paramref name="followShape"/> and exactly one shape selected, the
+    /// same-named shape on the new frame is selected too (#1924); a plain frame selection otherwise.
     /// </summary>
-    public void ScrubToFrame(int frameIndex, double fraction)
+    public void ScrubToFrame(int frameIndex, double fraction, bool followShape = true)
     {
         _playback.Pause();
         _playback.SeekToFrame(frameIndex, fraction);
@@ -776,7 +777,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         {
             var frame = chain.Frames[frameIndex];
             if (!ReferenceEquals(_selectedState!.SelectedFrame, frame))
+            {
+                var selected = _selectedState!.SelectedShapes;
+                var follow = followShape && selected.Count == 1 ? ShapeFollowsFrame.Find(selected[0], frame) : null;
                 _selectedState!.SelectedFrame = frame;
+                if (follow is not null) _selectedState!.SelectShape(follow);
+            }
         }
         InvalidateVisual();
     }
