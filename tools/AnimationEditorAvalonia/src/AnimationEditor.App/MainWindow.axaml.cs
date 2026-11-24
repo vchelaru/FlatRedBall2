@@ -2935,7 +2935,6 @@ public partial class MainWindow : Window
         // follow-up Save As dialog is cancelled, since that's the only other path that would
         // have updated it).
         UpdateTitle();
-        UpdateStatusBar();
     }
 
     private void OnLoadClick(object? sender, RoutedEventArgs e) => _ = LoadAsync();

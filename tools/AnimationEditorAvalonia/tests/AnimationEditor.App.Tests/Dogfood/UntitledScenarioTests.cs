@@ -129,7 +129,7 @@ public class UntitledScenarioTests
         editor.Control<Control>("AchxEditorPane").IsVisible.ShouldBeTrue();
         editor.Control<Control>("SequenceEditorPane").IsVisible.ShouldBeFalse();
         editor.Control<Control>("PngPaneGrid").IsVisible.ShouldBeFalse();
-        editor.TitleFileName.ShouldBe("", "the title describes the Untitled document");
+        editor.Control<TextBlock>("TitleFileName").IsVisible.ShouldBeFalse("the title describes the Untitled document");
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Not saved", "the status bar describes the Untitled document");
         editor.Control<TextBlock>("StatusFilename").Text.ShouldBeNullOrEmpty();
         editor.Control<TextBlock>("StatusCounts").Text.ShouldBe(editor.Project.AnimationChains.Count == 0 ? "" : "1 chain · 0 frames · 0.00s");
