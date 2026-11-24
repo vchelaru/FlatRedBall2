@@ -12,17 +12,17 @@ public readonly record struct SpriteBox(int Sequence, int Track, double CenterX,
         x >= CenterX - HalfWidth && x <= CenterX + HalfWidth && y >= CenterY - HalfHeight && y <= CenterY + HalfHeight;
 
     /// <summary>
-    /// The box of <paramref name="sprite"/> for a <paramref name="sourceWidth"/> by <paramref name="sourceHeight"/> frame, with the
+    /// The box of <paramref name="sprite"/> for a <paramref name="displayedWidth"/> by <paramref name="displayedHeight"/> frame, with the
     /// entity origin at (<paramref name="originX"/>, <paramref name="originY"/>) on screen. Offsets draw scaled by
     /// <paramref name="offsetMultiplier"/> and <paramref name="zoom"/>, the frame's pixels by <paramref name="zoom"/> alone; world Y is up, screen Y down.
     /// </summary>
-    public static SpriteBox Of(SequenceSprite sprite, int sourceWidth, int sourceHeight, double zoom, double offsetMultiplier,
+    public static SpriteBox Of(SequenceSprite sprite, int displayedWidth, int displayedHeight, double zoom, double offsetMultiplier,
         double originX, double originY)
     {
         var sample = sprite.Sample();
         double scale = offsetMultiplier * zoom;
         return new SpriteBox(sprite.Sequence, sprite.Track, originX + sample.OffsetX * scale, originY - sample.OffsetY * scale,
-            sourceWidth * zoom / 2, sourceHeight * zoom / 2);
+            displayedWidth * zoom / 2, displayedHeight * zoom / 2);
     }
 }
 

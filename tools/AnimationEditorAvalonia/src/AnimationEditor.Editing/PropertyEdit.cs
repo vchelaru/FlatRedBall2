@@ -88,7 +88,7 @@ public static class PropertyEdit
     }
 
     /// <summary>
-    /// Sets every frame's relative Y so the bottom of its region sits at y = 0; X is left alone. A frame whose region
+    /// Sets every frame's relative Y so the bottom of the sprite as displayed sits at y = 0; X is left alone. A frame whose region
     /// size is unknown fails rather than being skipped (the editor skips it).
     /// </summary>
     public static EditResult JustifyOffsetsBottom(IAppCommands commands, AnimationChainSave chain)

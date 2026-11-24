@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
@@ -48,8 +49,8 @@ internal static class SequenceThumbnailRenderer
             var sizes = new List<ThumbnailSpriteRect>();
             foreach (var (texture, frame, layer) in drawn)
             {
-                float w = frame.RightCoordinate - frame.LeftCoordinate;
-                float h = frame.BottomCoordinate - frame.TopCoordinate;
+                var (w, h) = FrameDisplayValues.DisplayedSize(
+                    frame, frame.RightCoordinate - frame.LeftCoordinate, frame.BottomCoordinate - frame.TopCoordinate);
                 sizes.Add(new ThumbnailSpriteRect(w, h, layer.OffsetX, layer.OffsetY));
             }
             if (ThumbnailLayoutCalculator.Fit(sizes, maxWidth, maxHeight) is not { } layout) return null;

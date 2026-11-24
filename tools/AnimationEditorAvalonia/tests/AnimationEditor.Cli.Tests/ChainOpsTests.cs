@@ -170,6 +170,15 @@ public class ChainOpsTests : InlineBatchTests
     }
 
     [Fact]
+    public async Task JustifyOffsetsBottom_DiagonalFlip_UsesTheDisplayedHeight()
+    {
+        await Ok("hero.achx", "set-frame-flip Walk/1 flipDiagonal=true", "justify-offsets-bottom Walk");
+
+        // A 16 x 32 region: frame 1 is drawn 32 x 16.
+        Frames("hero.achx", "Walk").Select(f => f.RelativeY).ShouldBe([16f, 8f, 16f]);
+    }
+
+    [Fact]
     public async Task JustifyOffsetsBottom_Twice_ChangesNothingTheSecondTime()
     {
         (await Ok("hero.achx", "justify-offsets-bottom *")).ShouldBe(["Walk", "Idle"]);
@@ -216,6 +225,16 @@ public class ChainOpsTests : InlineBatchTests
         var rect = Frames("hero.achx", "Walk")[2].ShapesSave!.AARectSaves.Single();
         (rect.X, rect.Y, rect.ScaleX, rect.ScaleY).ShouldBe((3f, -2f, 8f, 16f));
         (await Ok("hero.achx", "match-frame-size Walk/2/rect/Hitbox")).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task MatchFrameSize_DiagonalFlip_TakesTheDisplayedSize()
+    {
+        await Ok("hero.achx", "set-frame-flip Walk/2 flipDiagonal=true", "match-frame-size Walk/2/rect/Hitbox");
+
+        // A 16 x 32 region, drawn 32 x 16.
+        var rect = Frames("hero.achx", "Walk")[2].ShapesSave!.AARectSaves.Single();
+        (rect.ScaleX, rect.ScaleY).ShouldBe((16f, 8f));
     }
 
     [Fact]

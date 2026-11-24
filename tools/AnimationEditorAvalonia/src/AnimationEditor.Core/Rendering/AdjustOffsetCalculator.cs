@@ -13,7 +13,7 @@ public static class AdjustOffsetCalculator
     /// pixel edge aligns to y = 0, then divides by <paramref name="offsetMultiplier"/>
     /// to match the preview panel's scale.
     ///
-    /// Formula:  RelativeY = (bottom − top) / 2 / offsetMultiplier
+    /// Formula:  RelativeY = displayed height / 2 / offsetMultiplier
     ///
     /// FRB convention: positive Y is up, so placing the bottom edge at 0 requires
     /// an upward offset equal to half the sprite's pixel height.
@@ -31,7 +31,9 @@ public static class AdjustOffsetCalculator
 
         foreach (var frame in frames)
         {
-            frame.RelativeY = ((frame.BottomCoordinate - frame.TopCoordinate) / 2f) / offsetMultiplier;
+            var (_, height) = FrameDisplayValues.DisplayedSize(
+                frame, frame.RightCoordinate - frame.LeftCoordinate, frame.BottomCoordinate - frame.TopCoordinate);
+            frame.RelativeY = (height / 2f) / offsetMultiplier;
         }
     }
 

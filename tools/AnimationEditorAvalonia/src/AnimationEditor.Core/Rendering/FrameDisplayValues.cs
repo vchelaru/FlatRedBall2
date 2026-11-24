@@ -24,5 +24,10 @@ namespace AnimationEditor.Core.Rendering
         public static int GetPixelHeight(AnimationFrameSave frame)
             => Math.Max(1, (int)Math.Round(frame.BottomCoordinate - frame.TopCoordinate));
 
+        /// <summary>
+        /// The size <paramref name="frame"/> is drawn at, given its region's: a diagonal flip turns the region a quarter.
+        /// </summary>
+        public static (T Width, T Height) DisplayedSize<T>(AnimationFrameSave frame, T regionWidth, T regionHeight)
+            => frame.FlipDiagonal ? (regionHeight, regionWidth) : (regionWidth, regionHeight);
     }
 }

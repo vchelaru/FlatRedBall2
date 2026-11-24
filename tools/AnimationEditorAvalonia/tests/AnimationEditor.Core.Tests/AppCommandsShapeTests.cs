@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
 using System.Linq;
@@ -389,6 +390,49 @@ public class AppCommandsShapeTests
 
         rect.ScaleX.ShouldBe(16f);
         rect.ScaleY.ShouldBe(8f);
+    }
+
+    // #1979: the preview draws the region through this matrix, so a diagonal flip turns it a quarter.
+    private static (float Width, float Height) DrawnSize(AnimationFrameSave frame)
+    {
+        var (a, b, c, d) = FlipScaleCalculator.ComputeMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
+        int width = FrameDisplayValues.GetPixelWidth(frame), height = FrameDisplayValues.GetPixelHeight(frame);
+        return (Math.Abs(a * width + b * height), Math.Abs(c * width + d * height));
+    }
+
+    [Theory]
+    [InlineData(false, 32f, 16f)]
+    [InlineData(true, 16f, 32f)]
+    public void MatchRectangleToFrame_TakesTheSizeThePreviewDraws(bool flipDiagonal, float drawnWidth, float drawnHeight)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeFrame();
+        frame.RightCoordinate = 32f; frame.BottomCoordinate = 16f;
+        frame.FlipHorizontal = true;
+        frame.FlipDiagonal = flipDiagonal;
+        var rect = new AARectSave();
+
+        ctx.AppCommands.MatchRectangleToFrame(rect, frame);
+
+        DrawnSize(frame).ShouldBe((drawnWidth, drawnHeight));
+        (rect.ScaleX, rect.ScaleY).ShouldBe((drawnWidth / 2f, drawnHeight / 2f));
+    }
+
+    [Theory]
+    [InlineData(false, 8f)]
+    [InlineData(true, 16f)]
+    public void AdjustOffsetsJustifyBottom_PutsTheBottomEdgeThePreviewDrawsAtZero(bool flipDiagonal, float expectedY)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        frame.RightCoordinate = 32f; frame.BottomCoordinate = 16f;
+        frame.FlipDiagonal = flipDiagonal;
+
+        ctx.AppCommands.AdjustOffsetsJustifyBottom(chain);
+
+        frame.RelativeY.ShouldBe(expectedY);
+        (frame.RelativeY - DrawnSize(frame).Height / 2f).ShouldBe(0f);
     }
 
     [Fact]

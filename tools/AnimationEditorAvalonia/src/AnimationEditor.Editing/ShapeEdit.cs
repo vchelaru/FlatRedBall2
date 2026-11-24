@@ -117,7 +117,7 @@ public static class ShapeEdit
         return Ok(Address(owner.Chain!, owner.Frame!, "rect", rect.Name));
     }
 
-    /// <summary>Centers a rectangle on its frame's offset and gives it the frame's region size, which must be known.</summary>
+    /// <summary>Centers a rectangle on its frame's offset and gives it the frame's displayed size; its region size must be known.</summary>
     public static EditResult MatchFrameSize(IAppCommands commands, IObjectFinder finder, AARectSave rect)
     {
         var owner = Owner(finder, rect);

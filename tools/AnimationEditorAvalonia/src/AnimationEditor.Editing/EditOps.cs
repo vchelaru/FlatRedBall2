@@ -186,7 +186,7 @@ public static class EditOps
         [
             new("chain", "string", true, "Chain name, or a glob (Walk*)."),
         ]),
-        new("justify-offsets-bottom", "Sets every frame's relative Y to half its region height, so each frame's bottom edge is at y = 0; X is left as it is. Fails on a locked chain, or when a frame's region size is unknown (whole texture, size not readable).",
+        new("justify-offsets-bottom", "Sets every frame's relative Y to half its displayed height (its region width under a diagonal flip), so each frame's bottom edge is at y = 0; X is left as it is. Fails on a locked chain, or when a frame's region size is unknown (whole texture, size not readable).",
         [
             new("chain", "string", true, "Chain name, or a glob (Walk*)."),
         ]),
@@ -245,7 +245,7 @@ public static class EditOps
             new("scaleX", "number", false, "Half-width, greater than 0.", Relative: true),
             new("scaleY", "number", false, "Half-height, greater than 0.", Relative: true),
         ]),
-        new("match-frame-size", "Centers a rect on its frame's offset and sizes it to the frame's region. Fails when the region size is unknown (whole texture, size not readable).",
+        new("match-frame-size", "Centers a rect on its frame's offset and sizes it to the frame as displayed (region width and height swapped under a diagonal flip). Fails when the region size is unknown (whole texture, size not readable).",
         [
             new("shape", "string", true, "Rect address or selector: Chain/frameIndex/rect/name."),
         ]),
