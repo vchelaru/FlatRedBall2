@@ -121,7 +121,7 @@ public static class InlineOps
         {
             case "integer" or "number":
                 // A leading + makes the text relative (#1942), so it stays text for the shared parser.
-                return (!text.StartsWith('+') && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && double.IsFinite(d)
+                return (!text.TrimStart().StartsWith('+') && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && double.IsFinite(d)
                     ? JsonValue.Create(d) : JsonValue.Create(text), null);
             case "boolean":
                 return (text is "true" or "false" ? JsonValue.Create(text == "true") : JsonValue.Create(text), null);

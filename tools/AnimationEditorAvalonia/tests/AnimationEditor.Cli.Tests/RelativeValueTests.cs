@@ -110,7 +110,7 @@ public class RelativeValueTests : InlineBatchTests
     [MemberData(nameof(AbsoluteFields))]
     public async Task AbsoluteField_RelativeValue_IsAUsageErrorNamingTheOp(string file, string op, string field)
     {
-        foreach (var value in new[] { "+1", "- 1", "*2" })
+        foreach (var value in new[] { "+1", " +1", "	+1", "- 1", "*2" })
         {
             var error = await UsageError(file, $"{op} {field}=\"{value}\"");
 
@@ -145,6 +145,8 @@ public class RelativeValueTests : InlineBatchTests
     [Theory]
     [InlineData("x=+2", 6f)]
     [InlineData("x=\"- 2\"", 2f)]
+    [InlineData("x=\" +2\"", 6f)]
+    [InlineData("x=\"	+2\"", 6f)]
     [InlineData("x=*2", 8f)]
     [InlineData("x=/2", 2f)]
     [InlineData("x=-2", -2f)]
