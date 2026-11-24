@@ -29,6 +29,10 @@ namespace AnimationEditor.Core
 
         public string? FileName { get; set; }
 
+        /// <summary>Why a tileset cannot be associated while <see cref="IsNativeTsxProject"/>.</summary>
+        public const string NativeTsxAssociationRefusal =
+            "Associating a tileset applies to an .achx/.achj; a .tsx cannot be a native project and an association target at once.";
+
         /// <summary>
         /// The tileset behind a native <c>.tsx</c> project (issue #1140), kept in memory (rather
         /// than re-read from disk) so a load-then-save round trip preserves any tileset content

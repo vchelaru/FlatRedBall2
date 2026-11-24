@@ -43,8 +43,7 @@ public static class TsxEdit
     public static EditResult CheckAssociation(IProjectManager projectManager, string tsxPath)
     {
         if (projectManager.IsNativeTsxProject)
-            return Fail(EditErrorCode.WrongFileKind,
-                "associate-tileset applies to an .achx/.achj; a .tsx cannot be a native project and an association target at once.");
+            return Fail(EditErrorCode.WrongFileKind, ProjectManager.NativeTsxAssociationRefusal);
         if (!string.Equals(Path.GetExtension(tsxPath), ".tsx", StringComparison.OrdinalIgnoreCase))
             return Fail(EditErrorCode.InvalidValue, $"'{tsxPath}' is not a .tsx file.");
         if (!File.Exists(tsxPath))

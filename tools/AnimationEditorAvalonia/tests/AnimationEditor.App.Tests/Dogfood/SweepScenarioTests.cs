@@ -97,6 +97,37 @@ public class SweepScenarioTests
     }
 
     [AvaloniaFact]
+    public void AssociateTiledTileset_NeverSavedProject_ShowsTheProblemBanner()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+
+        editor.ClickMenu("MenuAssociateTiledTileset");
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Save the project as an .achx or .achj first");
+    }
+
+    [AvaloniaFact]
+    public async Task AssociateTiledTileset_NativeTsxOpen_ShowsTheProblemBanner_AndWritesNothing()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string open = Path.Combine(editor.ProjectFolder, "Open.tsx");
+        File.WriteAllText(open, TsxXml);
+        string other = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
+        File.WriteAllText(other, TsxXml);
+        await editor.OpenAsync(open);
+        editor.Services.ProjectManager.IsNativeTsxProject.ShouldBeTrue();
+        editor.Dialogs.AnswerNextOpenFile(other);
+
+        editor.ClickMenu("MenuAssociateTiledTileset");
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("a .tsx cannot be a native project and an association target at once");
+        Directory.GetFiles(editor.ProjectFolder, "*.tiledsync").ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
     public async Task CrashRecovery_UnsavedUntitledEdits_ComeBackOnTheNextStart_WithTheBanner()
     {
         string settingsRoot = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));

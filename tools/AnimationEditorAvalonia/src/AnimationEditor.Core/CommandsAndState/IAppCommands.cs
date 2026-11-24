@@ -196,6 +196,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Whether a tab other than the active one holds this path. Null (no tabs) means none does.</summary>
         Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
 
+        /// <summary>
+        /// Whether the active tab, if any, shows the loaded <c>.achx</c>/<c>.achj</c>/<c>.tsx</c> document: it stays
+        /// loaded behind a <c>.seqj</c> or <c>.png</c> tab. Null (no tabs) means it does.
+        /// </summary>
+        Func<bool>? IsDocumentTabInFront { get; set; }
+
         /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
         event Action<string>? SaveAsRefused;
 
@@ -665,7 +671,9 @@ namespace AnimationEditor.Core.CommandsAndState
         IHotReloadWatcher HotReloadWatcher { get; set; }
 
         /// <summary>
-        /// Subscribe to the hot-reload watcher after it's injected by the app layer.
+        /// Subscribe to the hot-reload watcher after it's injected by the app layer. A changed file reloads only while
+        /// it is the open document, in front (<see cref="IsDocumentTabInFront"/>), and its last save did not fail;
+        /// after a failed save the edits are kept and <see cref="SaveFailed"/> is raised instead.
         /// </summary>
         void WireHotReloadWatcher();
 
@@ -736,7 +744,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <exception cref="InvalidOperationException"><paramref name="tsxAbsolutePath"/> is
         /// currently open as a native-tsx project in another tab (see
         /// <see cref="IsTsxPathOpenAsNativeProject"/>, issue #1147) -- a .tsx cannot be both a
-        /// native-tsx project and an achx-push target at the same time.</exception>
+        /// native-tsx project and an achx-push target at the same time. Also thrown when the open
+        /// project is a native .tsx.</exception>
         /// <remarks>Also throws when the association could not be stored: see
         /// <see cref="IIoManager.AddAssociatedTiledTilesetPath"/>.</remarks>
         void AddAssociatedTiledTileset(string tsxAbsolutePath);
@@ -744,10 +753,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Shows an open-file dialog (via <see cref="FileDialogService"/>) for the user to pick a
         /// <c>.tsx</c> file, then associates it via <see cref="AddAssociatedTiledTileset"/>. The
-        /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled or the
-        /// project has never been saved. Unlike <see cref="AddAssociatedTiledTileset"/>, a failure
-        /// here is reported via <see cref="TiledSyncFailed"/> rather than thrown, since this
-        /// method is the fire-and-forget UI entry point.
+        /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled.
+        /// Unlike <see cref="AddAssociatedTiledTileset"/>, a failure here (including a project that
+        /// has never been saved, which shows no dialog) is reported via <see cref="TiledSyncFailed"/>
+        /// rather than thrown, since this method is the fire-and-forget UI entry point.
         /// </summary>
         Task AddAssociatedTiledTilesetViaDialogAsync();
 

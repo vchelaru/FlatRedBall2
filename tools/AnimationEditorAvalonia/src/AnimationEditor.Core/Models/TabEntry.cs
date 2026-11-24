@@ -67,8 +67,8 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>
         /// Undo/redo stack snapshot saved when this tab was last deactivated.
-        /// Restored after the tab's file is reloaded on re-activation so the user's
-        /// edit history persists across tab switches.
+        /// Restored with the tab's cached model on re-activation so the user's
+        /// edit history persists across tab switches, and dropped when the file is reloaded instead.
         /// </summary>
         public UndoSnapshot? UndoSnapshot { get; set; }
 

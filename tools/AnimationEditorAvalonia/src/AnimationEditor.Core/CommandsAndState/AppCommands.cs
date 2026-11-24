@@ -273,6 +273,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.IsPathOpenInAnotherTab"/>
         public Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
 
+        /// <inheritdoc cref="IAppCommands.IsDocumentTabInFront"/>
+        public Func<bool>? IsDocumentTabInFront { get; set; }
+
         /// <inheritdoc cref="IAppCommands.SaveAsRefused"/>
         public event Action<string>? SaveAsRefused;
 
@@ -600,7 +603,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 return false;
             SaveFailed?.Invoke(
                 $"\"{System.IO.Path.GetFileName(path)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
-                "Saving would overwrite that change. Fix the file so it reloads, or Save As a different file.");
+                "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.");
             return true;
         }
 
@@ -739,13 +742,19 @@ namespace AnimationEditor.Core.CommandsAndState
                     "AnimationEditor project in another tab. Close that tab first, or choose a " +
                     "different .tsx file. A .tsx cannot be both a native-tsx project and an " +
                     "achx-push target at the same time.");
+            if (_pm.IsNativeTsxProject)
+                throw new InvalidOperationException(ProjectManager.NativeTsxAssociationRefusal);
 
             _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
         }
 
         public async Task AddAssociatedTiledTilesetViaDialogAsync()
         {
-            if (string.IsNullOrEmpty(_pm.FileName)) return;
+            if (string.IsNullOrEmpty(_pm.FileName))
+            {
+                TiledSyncFailed?.Invoke("Untitled", new InvalidOperationException("Save the project as an .achx or .achj first."));
+                return;
+            }
 
             var path = await FileDialogService.PickOpenFileAsync(
                 "Associate Tiled Tileset", "tsx", "Tiled Tileset (*.tsx)");
@@ -2951,13 +2960,29 @@ namespace AnimationEditor.Core.CommandsAndState
         public void WireHotReloadWatcher()
         {
             HotReloadWatcher.AchxChangedOnDisk += path =>
-                DoOnUiThread(() => ReloadAchxFromDisk(path));
+                DoOnUiThread(() => OnAchxChangedOnDisk(path));
 
             HotReloadWatcher.PngChangedOnDisk += path =>
                 DoOnUiThread(() => ReloadPngFromDisk(path));
 
             HotReloadWatcher.AchxDeletedOnDisk += path =>
                 DoOnUiThread(() => _events.RaiseAchxDeletedOnDisk(path));
+        }
+
+        private void OnAchxChangedOnDisk(string path)
+        {
+            // A report can outlive its document: queued just before a tab switch, or for the file open before an
+            // Untitled, .seqj or .png tab. The tab it belongs to compares its file when it is switched back to.
+            if (IsDocumentTabInFront?.Invoke() == false
+                || string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path)) return;
+
+            // The document holds edits its file lacks; only File > Reload from Disk drops them.
+            if (_undoManager.SaveState == SaveState.Failed)
+            {
+                RefuseIfChangedOnDisk(path, _diskState);
+                return;
+            }
+            ReloadAchxFromDisk(path);
         }
 
         /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
