@@ -170,9 +170,23 @@ public class EditRollbackTests : IDisposable
         if (OperatingSystem.IsWindows()) r.Out.ShouldContain("was not updated"); // elsewhere the open file is replaced
     }
 
-    // A null character makes the path unusable, which throws.
+    // #1992: the associations in a file that cannot be read stay in it.
     [Fact]
-    public async Task Edit_AnOpThrowsAfterACopy_LeavesTheFolderAsItWas()
+    public async Task Edit_AssociateTilesetWithAnUnreadableSyncFile_SavesAndWarns_AndLeavesTheSyncFile()
+    {
+        const string corrupt = "{ \"TiledTilesetPaths\": [ \"old.tsx\" ";
+        var sync = _w.Write("hero.tiledsync", corrupt);
+
+        var r = await Edit("associate-tileset tiles.tsx");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        r.Out.ShouldContain("Could not read the Tiled sync file hero.tiledsync");
+        File.ReadAllText(sync).ShouldBe(corrupt);
+    }
+
+    // A null character makes a path unusable (#1992).
+    [Fact]
+    public async Task Edit_ANullCharacterAfterACopy_FailsTheOp_AndLeavesTheFolderAsItWas()
     {
         ExistingFar();
         var before = Snapshot();
@@ -180,8 +194,26 @@ public class EditRollbackTests : IDisposable
             new { op = "set-frame-texture", frame = "Idle/0", texture = _far, copy = "overwrite" },
             new { op = "associate-tileset", path = "a\0.tsx" } } });
 
-        try { (await _w.RunWithStdinAsync(ops, "edit", _w.PathOf("hero.achx"), "--ops", "-")).Code.ShouldBe(1); }
-        catch (ArgumentException) { }
+        var r = await _w.RunWithStdinAsync(ops, "edit", _w.PathOf("hero.achx"), "--ops", "-", "--json");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        r.Out.ShouldContain("op 1 (associate-tileset): path");
+        r.Out.ShouldContain("\"InvalidValue\"");
+        Snapshot().ShouldBe(before);
+    }
+
+    // An op without the value it reads stands for any op that throws.
+    [Fact]
+    public async Task Apply_AnOpThrowsAfterACopy_LeavesTheFolderAsItWas()
+    {
+        ExistingFar();
+        var before = Snapshot();
+        var session = (await EditSession.OpenAsync(_w.PathOf("hero.achx"))).Session!;
+        var copy = EditOps.Parse(JsonSerializer.Serialize(new { ops = new object[] {
+            new { op = "set-frame-texture", frame = "Idle/0", texture = _far, copy = "overwrite" } } })).Ops![0];
+        var throwing = new EditOp(1, EditOps.Specs.First(s => s.Name == "associate-tileset"), new Dictionary<string, string>());
+
+        await Should.ThrowAsync<KeyNotFoundException>(() => EditOps.ApplyAsync(session, [copy, throwing]));
 
         Snapshot().ShouldBe(before);
     }
