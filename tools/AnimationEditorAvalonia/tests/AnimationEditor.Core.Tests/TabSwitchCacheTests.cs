@@ -5,6 +5,8 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -98,6 +100,38 @@ public class TabSwitchCacheTests : IDisposable
         await _ctx.AppCommands.ActivateTabContentAsync(tab);
         Assert.Equal(2, _pm.LoadCallCount);
         Assert.Equal("After", _ctx.SelectedState.SelectedChain!.Name);
+    }
+
+    // Two writes in one clock tick share a time, and a copied-in file keeps its own older one.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task TryActivateTabFromCache_WhenDiskContentChangedWithoutANewerTime_ReturnsFalse(int daysFromCaptured)
+    {
+        var captured = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        string path = WriteAchx("stale.achx", "Before");
+        File.SetLastWriteTimeUtc(path, captured);
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("stale.achx", "Behind"); // Same length as "Before".
+        File.SetLastWriteTimeUtc(path, captured.AddDays(daysFromCaptured));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenDiskFileIsNewerWithTheSameContent_ReturnsTrue()
+    {
+        string path = WriteAchx("touched.achx", "Walk");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
     }
 
     [Fact]

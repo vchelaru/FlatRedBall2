@@ -341,7 +341,7 @@ namespace AnimationEditor.Core.Models
             {
                 CachedEditorModel = tab.CachedEditorModel,
                 CachedOnDiskCoordinateType = tab.CachedOnDiskCoordinateType,
-                CachedDiskWriteTimeUtc = tab.CachedDiskWriteTimeUtc,
+                CachedDiskHash = tab.CachedDiskHash,
                 UndoSnapshot = tab.UndoSnapshot,
                 CachedTsxState = tab.CachedTsxState,
                 CachedReferencedPngs = tab.CachedReferencedPngs,
