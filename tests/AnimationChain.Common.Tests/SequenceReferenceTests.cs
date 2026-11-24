@@ -20,7 +20,7 @@ public class SequenceReferenceTests
         new() { Name = name, Visible = visible, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start, Length = length } } };
 
     private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null, bool visible = true) =>
-        new() { Name = name, Visible = visible, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
+        new() { Name = name, Visible = visible, References = [new SequenceReferenceSave { Sequence = target, Start = start, Length = length }] };
 
     [Fact]
     public void RoundTrip_ReferenceTrack_KeepsSequenceStartAndLength()
@@ -29,7 +29,7 @@ public class SequenceReferenceTests
 
         var loaded = SequenceListSave.FromJsonString(save.ToJsonString());
 
-        var reference = loaded.Sequences[0].Tracks[0].Reference!;
+        var reference = loaded.Sequences[0].Tracks[0].References![0];
         reference.Sequence.ShouldBe("Earth");
         reference.Start.ShouldBe(0.5);
         reference.Length.ShouldBe(2);
@@ -42,8 +42,8 @@ public class SequenceReferenceTests
 
         var track = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]![0]!.AsObject();
 
-        track.Select(p => p.Key).ShouldBe(new[] { "name", "reference" });
-        track["reference"]!.AsObject().Select(p => p.Key).ShouldBe(new[] { "sequence", "start", "length" });
+        track.Select(p => p.Key).ShouldBe(new[] { "name", "references" });
+        track["references"]![0]!.AsObject().Select(p => p.Key).ShouldBe(new[] { "sequence", "start", "length" });
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class SequenceReferenceTests
             """);
 
         var track = loaded.Sequences[0].Tracks[0];
-        track.Reference!.Sequence.ShouldBe("Spin");
+        track.References![0].Sequence.ShouldBe("Spin");
         track.Chains.ShouldBeEmpty();
     }
 
@@ -90,7 +90,7 @@ public class SequenceReferenceTests
     {
         var loaded = SequenceListSave.FromJsonString("""{ "sequences": [ { "name": "A", "tracks": [ { "name": "T", "chains": [] } ] } ] }""");
 
-        loaded.Sequences[0].Tracks[0].Reference.ShouldBeNull();
+        loaded.Sequences[0].Tracks[0].References.ShouldBeNull();
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class SequenceReferenceTests
             { "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B", "start": 0, "length": 1, "tint": "red" } } ] }, { "name": "B" } ] }
             """;
 
-        var again = JsonNode.Parse(SequenceListSave.FromJsonString(json).ToJsonString())!["sequences"]![0]!["tracks"]![0]!["reference"]!;
+        var again = JsonNode.Parse(SequenceListSave.FromJsonString(json).ToJsonString())!["sequences"]![0]!["tracks"]![0]!["references"]![0]!;
 
         again["tint"]!.GetValue<string>().ShouldBe("red");
     }
@@ -172,7 +172,7 @@ public class SequenceReferenceTests
         var loaded = SequenceListSave.FromJsonString(
             """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "Gone" } } ] } ] }""");
 
-        loaded.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Gone");
+        loaded.Sequences[0].Tracks[0].References![0].Sequence.ShouldBe("Gone");
     }
 
     [Fact]
@@ -496,7 +496,7 @@ public class SequenceReferenceTests
         var loaded = SequenceListSave.FromJsonString(
             """{ "sequences": [ { "name": "A", "tracks": [ { "name": "E", "reference": { "sequence": "B" } } ] }, { "name": "B" } ] }""");
 
-        var reference = loaded.Sequences[0].Tracks[0].Reference!;
+        var reference = loaded.Sequences[0].Tracks[0].References![0];
         reference.Start.ShouldBe(0);
         reference.Length.ShouldBeNull();
     }
@@ -511,8 +511,8 @@ public class SequenceReferenceTests
 
         var track = loaded.Sequences[0].Tracks[0];
         track.Visible.ShouldBeFalse();
-        track.Reference!.Start.ShouldBe(-0.5);
-        track.Reference.Length.ShouldBe(0.25);
+        track.References![0].Start.ShouldBe(-0.5);
+        track.References![0].Length.ShouldBe(0.25);
         loaded.ToJsonString().ShouldBe(json);
     }
 

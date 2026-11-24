@@ -110,6 +110,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
     /// <summary>The errors of <paramref name="after"/> that <paramref name="before"/> did not already have.</summary>
     public static IReadOnlyList<CheckIssue> NewErrors(CheckReport before, CheckReport after)
     {
+        if (after.Ok) return []; // the usual case; the set below is slow to start up
         var known = before.Errors.Select(i => (i.Code, i.Subject ?? i.Message)).ToHashSet();
         return after.Errors.Where(i => !known.Contains((i.Code, i.Subject ?? i.Message))).ToList();
     }

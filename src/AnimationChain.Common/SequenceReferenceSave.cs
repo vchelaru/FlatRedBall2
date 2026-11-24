@@ -3,10 +3,12 @@ using System.Text.Json.Nodes;
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>
-/// A track that plays another sequence of the same <c>.seqj</c> instead of chains: the target's tracks are inlined under
-/// this track's name. It is a clip like a chain placement, with a <see cref="Start"/> and a <see cref="Length"/> (one run of
-/// the target unless set), and like a chain it extends the sequence that holds it to its end (see <see cref="SequenceTimeline.Length"/>).
-/// The target restarts whenever the holding sequence starts, so switching sequences restarts it. A reference whose target
+/// One clip of a reference track (<see cref="SequenceTrackSave.References"/>): it plays another sequence of the same
+/// <c>.seqj</c>, whose tracks are inlined under the track's name. A clip is like a chain placement, with a
+/// <see cref="Start"/> and a <see cref="Length"/> (one run of the target unless set), and the next clip on the track cuts it
+/// short exactly like the next chain cuts a chain (see <see cref="SequenceTimeline"/>). Like a chain it extends the sequence
+/// that holds it to its end (see <see cref="SequenceTimeline.Length"/>).
+/// The target restarts at the clip's start and whenever the holding sequence starts, so switching sequences restarts it. A reference whose target
 /// plays the holder back (a cycle) is kept but plays nothing (see <see cref="SequenceReferences.Plays"/>).
 /// </summary>
 public class SequenceReferenceSave

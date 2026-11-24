@@ -63,7 +63,7 @@ public static class SequenceScene
     /// <summary>
     /// <see cref="At(SequenceDocument, int, double)"/> for one sequence and any source of chains: the open document, or a
     /// <c>.seqj</c> read without opening it (the Open Project Folder thumbnails). A track that plays another sequence
-    /// (<see cref="SequenceTrackSave.Reference"/>) shows that sequence's sprites in its own place in the stack, sampled by
+    /// (<see cref="SequenceTrackSave.References"/>) shows that sequence's sprites in its own place in the stack, sampled by
     /// <see cref="SequenceTimeline.ReferenceTime"/> and honouring each hidden track on the way; they report the reference
     /// track's index as <see cref="SequenceSprite.Track"/>, so a click selects it. Pass <paramref name="file"/>, the file's
     /// sequences, to resolve references; without it they show nothing. <paramref name="pass"/> counts the wraps of a looping
@@ -95,12 +95,16 @@ public static class SequenceScene
             var track = tracks[t];
             if (!track.Visible) continue;
             int reported = outerTrack ?? t;
-            if (track.Reference is { } playing)
+            if (track.References is not null)
             {
+                if (file is null) continue;
                 // A cycle read from disk plays nothing; the stack check is the backstop for duplicate names.
-                if (file is null || !SequenceReferences.Plays(file, sequence.Name, playing.Sequence)
-                    || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
-                if (SequenceTimeline.ReferenceTimeAtPass(track, target, LengthOf(target, lookup, file), time, pass, length, out int targetPass) is not { } inner) continue;
+                SequenceSave? TargetOf(SequenceReferenceSave clip) =>
+                    SequenceReferences.Plays(file, sequence.Name, clip.Sequence) && SequenceReferences.Find(file, clip.Sequence) is { } found
+                    && !stack.Contains(found) ? found : null;
+                double TargetLength(SequenceReferenceSave clip) => TargetOf(clip) is { } found ? LengthOf(found, lookup, file) : 0;
+                if (SequenceTimeline.ActiveClipAt(track, time, TargetLength) is not { } playing || TargetOf(playing) is not { } target) continue;
+                if (SequenceTimeline.ReferenceTimeAtPass(track, playing, target, TargetLength(playing), time, pass, length, TargetLength, out int targetPass) is not { } inner) continue;
                 stack.Add(target);
                 Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack, targetPass);
                 stack.RemoveAt(stack.Count - 1);

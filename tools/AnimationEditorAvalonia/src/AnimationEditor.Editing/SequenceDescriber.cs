@@ -163,13 +163,20 @@ public static class SequenceDescriber
 
     private static IReadOnlyList<BlockInfo> Blocks(SequenceListSave save, SequenceSave sequence, SequenceTrackSave track, SequenceSources sources)
     {
-        if (track.Reference is { } clip)
+        if (track.References is { } clips)
         {
-            double end = clip.Start;
-            if (SequenceReferences.Plays(save.Sequences, sequence.Name, clip.Sequence)
-                && SequenceReferences.Find(save.Sequences, clip.Sequence) is { } target)
-                end = clip.Start + SequenceTimeline.FullLength(clip.Length, Length(save, target, sources));
-            return [new BlockInfo(0, "", "", clip.Sequence, clip.Start, clip.Length, end, false, false)];
+            var playing = new List<BlockInfo>();
+            for (int c = 0; c < clips.Count; c++)
+            {
+                var clip = clips[c];
+                double end = clip.Start;
+                if (SequenceReferences.Plays(save.Sequences, sequence.Name, clip.Sequence)
+                    && SequenceReferences.Find(save.Sequences, clip.Sequence) is { } target)
+                    end = clip.Start + SequenceTimeline.PlayedLength(clip.Start,
+                        SequenceTimeline.FullLength(clip.Length, Length(save, target, sources)), SequenceTimeline.NextStart(track, clip));
+                playing.Add(new BlockInfo(c, "", "", clip.Sequence, clip.Start, clip.Length, end, false, false));
+            }
+            return playing;
         }
 
         var result = new List<BlockInfo>();

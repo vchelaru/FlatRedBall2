@@ -20,7 +20,7 @@ public static class AnimationDescriber
         if (summary)
         {
             foreach (var chain in Selected(doc, only))
-                sb.AppendLine(FormattableString.Invariant($"{chain.Name}  {chain.Frames.Count} frames  length {Num(chain.Frames.Sum(f => f.FrameLength))}"));
+                sb.AppendLine(FormattableString.Invariant($"{chain.Name}  {chain.Frames.Count} frames  length {Seconds(doc, chain)}s{(chain.IsLocked ? "  locked" : "")}"));
             return sb.ToString();
         }
         sb.AppendLine(FormattableString.Invariant(
@@ -31,8 +31,9 @@ public static class AnimationDescriber
             if (chain.Loop) flags.Add("loop");
             if (chain.PingPong) flags.Add("pingpong");
             if (chain.Reverse) flags.Add("reverse");
+            if (chain.IsLocked) flags.Add("locked");
             sb.AppendLine(FormattableString.Invariant(
-                $"{chain.Name}  ({chain.Frames.Count} frames, length {Num(chain.Frames.Sum(f => f.FrameLength))}{(flags.Count > 0 ? ", " + string.Join(" ", flags) : "")}{(ownerTiles is not null && ownerTiles.TryGetValue(chain, out var owner) ? $", owner tile {owner}" : "")})"));
+                $"{chain.Name}  ({chain.Frames.Count} frames, length {Seconds(doc, chain)}s{(flags.Count > 0 ? ", " + string.Join(" ", flags) : "")}{(ownerTiles is not null && ownerTiles.TryGetValue(chain, out var owner) ? $", owner tile {owner}" : "")})"));
             for (int i = 0; i < chain.Frames.Count; i++)
             {
                 var f = chain.Frames[i];
@@ -74,14 +75,16 @@ public static class AnimationDescriber
             if (summary)
             {
                 w.WriteNumber("frames", chain.Frames.Count);
-                w.WriteNumber("length", Math.Round(AnimationEditor.Core.Rendering.ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Of(doc)), 6));
+                w.WriteNumber("length", Seconds(doc, chain));
+                w.WriteBoolean("locked", chain.IsLocked);
                 w.WriteEndObject();
                 continue;
             }
             w.WriteBoolean("loop", chain.Loop);
             w.WriteBoolean("pingPong", chain.PingPong);
             w.WriteBoolean("reverse", chain.Reverse);
-            w.WriteNumber("length", Math.Round(AnimationEditor.Core.Rendering.ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Of(doc)), 6));
+            w.WriteBoolean("locked", chain.IsLocked);
+            w.WriteNumber("length", Seconds(doc, chain));
             if (ownerTiles is not null && ownerTiles.TryGetValue(chain, out var ownerTile)) w.WriteNumber("ownerTile", ownerTile);
             w.WriteStartArray("frames");
             for (int i = 0; i < chain.Frames.Count; i++)
@@ -98,8 +101,8 @@ public static class AnimationDescriber
                 w.WriteNumber("height", f.BottomCoordinate - f.TopCoordinate);
                 w.WriteEndObject();
                 w.WriteStartObject("offset");
-                w.WriteNumber("x", f.RelativeX);
-                w.WriteNumber("y", f.RelativeY);
+                w.WriteNumber("x", PlainZero(f.RelativeX));
+                w.WriteNumber("y", PlainZero(f.RelativeY));
                 w.WriteEndObject();
                 WriteFlips(w, f.FlipHorizontal, f.FlipVertical, f.FlipDiagonal);
                 WriteColor(w, StoredColor(f));
@@ -123,8 +126,8 @@ public static class AnimationDescriber
                     w.WriteString("address", $"{chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}");
                     w.WriteString("type", EditAddress.TypeName(shape));
                     w.WriteString("name", shape.Name);
-                    w.WriteNumber("x", shape.X);
-                    w.WriteNumber("y", shape.Y);
+                    w.WriteNumber("x", PlainZero(shape.X));
+                    w.WriteNumber("y", PlainZero(shape.Y));
                     switch (shape)
                     {
                         case AARectSave r: w.WriteNumber("scaleX", r.ScaleX); w.WriteNumber("scaleY", r.ScaleY); break;
@@ -134,8 +137,8 @@ public static class AnimationDescriber
                             foreach (var point in p.Points)
                             {
                                 w.WriteStartArray();
-                                w.WriteNumberValue(point.X);
-                                w.WriteNumberValue(point.Y);
+                                w.WriteNumberValue(PlainZero(point.X));
+                                w.WriteNumberValue(PlainZero(point.Y));
                                 w.WriteEndArray();
                             }
                             w.WriteEndArray();
@@ -280,5 +283,13 @@ public static class AnimationDescriber
         _ => string.Empty,
     };
 
-    private static string Num(float v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+    // One cycle in seconds whatever the file's unit, as it plays (ping-pong doubles it).
+    private static double Seconds(AnimationChainListSave doc, AnimationChainSave chain) => Math.Round(AnimationEditor.Core.Rendering.ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Of(doc)), 6);
+
+    private static string Num(float v) => PlainZero(v.ToString("0.###", CultureInfo.InvariantCulture));
+
+    /// <summary>Negative zero, stored by a flip of 0 or left by rounding, prints as 0.</summary>
+    internal static string PlainZero(string number) => number == "-0" ? "0" : number;
+
+    internal static float PlainZero(float v) => v == 0 ? 0 : v;
 }

@@ -15,7 +15,7 @@ public sealed record SeqAddrResult(SeqAddr? Value, string? Error, EditErrorCode 
 /// <summary>
 /// Text addresses for the items of a <c>.seqj</c> (#1811): a sequence by name (<c>Run</c>), a track by name or
 /// zero-based index (<c>Run/Body</c>, <c>Run/0</c>), a block by its zero-based index in the track
-/// (<c>Run/Body/1</c>). A track that plays another sequence has exactly one block, its clip, at index 0. A name
+/// (<c>Run/Body/1</c>). A track that plays sequences has one block per clip, in list order. A name
 /// wins over an index, so a track named "1" is addressed by that name. Segments split on '/', so names containing
 /// '/' cannot be addressed.
 /// </summary>
@@ -61,8 +61,8 @@ public static class SequenceAddress
             : new SeqAddrResult(track.Value with { Block = index }, null);
     }
 
-    /// <summary>The blocks a track has: its chain references, or one clip when it plays a sequence.</summary>
-    public static int BlockCount(SequenceTrackSave track) => track.Reference is not null ? 1 : track.Chains.Count;
+    /// <summary>The blocks a track has: its chain references, or its clips when it plays sequences, in list order.</summary>
+    public static int BlockCount(SequenceTrackSave track) => track.References?.Count ?? track.Chains.Count;
 
     private static SeqAddrResult TrackIn(SequenceListSave save, int sequence, string segment)
     {

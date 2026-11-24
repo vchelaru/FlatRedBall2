@@ -1,9 +1,10 @@
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>One step from a sequence into a sequence its reference track plays.</summary>
+/// <param name="Track">The reference track holding the clip (its other clips cut this one, see <see cref="SequenceTimeline.NextStart(SequenceTrackSave, SequenceReferenceSave)"/>).</param>
 /// <param name="Reference">The reference clip.</param>
 /// <param name="Target">The sequence it plays.</param>
-public sealed record ReferenceHop(SequenceReferenceSave Reference, SequenceSave Target);
+public sealed record ReferenceHop(SequenceTrackSave Track, SequenceReferenceSave Reference, SequenceSave Target);
 
 /// <summary>
 /// A chain track of a sequence with the reference tracks flattened away (<see cref="SequenceReferences.Inline"/>).
@@ -16,7 +17,7 @@ public sealed record ReferenceHop(SequenceReferenceSave Reference, SequenceSave 
 public sealed record InlinedTrack(string Name, SequenceTrackSave Track, bool Visible, IReadOnlyList<ReferenceHop> Hops);
 
 /// <summary>
-/// The rules for tracks that play another sequence (<see cref="SequenceTrackSave.Reference"/>), shared by the editor and
+/// The rules for tracks that play another sequence (<see cref="SequenceTrackSave.References"/>), shared by the editor and
 /// any runtime player: cycle detection, flattening into chain tracks, and the time mapping into the target. A reference
 /// is resolved by sequence name within the one file; the first sequence with the name wins.
 /// </summary>
@@ -44,9 +45,11 @@ public static class SequenceReferences
         stack.Add(sequence);
         foreach (var track in sequence.Tracks)
         {
-            if (track.Reference is { } reference && Find(sequences, reference.Sequence) is { } target
-                && Visit(sequences, target, stack, done) is { } cycle)
-                return cycle;
+            foreach (var reference in track.References ?? [])
+            {
+                if (Find(sequences, reference.Sequence) is { } target && Visit(sequences, target, stack, done) is { } cycle)
+                    return cycle;
+            }
         }
         stack.RemoveAt(stack.Count - 1);
         return null;
@@ -64,7 +67,7 @@ public static class SequenceReferences
         {
             if (from == host) return true;
             if (!seen.Add(from) || Find(sequences, from) is not { } sequence) return false;
-            return sequence.Tracks.Any(track => track.Reference is { } reference && Reaches(reference.Sequence));
+            return sequence.Tracks.Any(track => (track.References ?? []).Any(reference => Reaches(reference.Sequence)));
         }
         return Reaches(target);
     }
@@ -93,8 +96,9 @@ public static class SequenceReferences
             if (Find(sequences, name) is not { } sequence) continue;
             foreach (var track in sequence.Tracks)
             {
-                if (track.Reference is { } reference && !cameFrom.ContainsKey(reference.Sequence))
+                foreach (var reference in track.References ?? [])
                 {
+                    if (cameFrom.ContainsKey(reference.Sequence)) continue;
                     cameFrom[reference.Sequence] = name;
                     queue.Enqueue(reference.Sequence);
                 }
@@ -113,8 +117,8 @@ public static class SequenceReferences
 
     /// <summary>How many references in the file close a cycle (<see cref="CycleThrough"/>).</summary>
     public static int CyclicReferenceCount(IReadOnlyList<SequenceSave> sequences) =>
-        sequences.Sum(sequence => sequence.Tracks.Count(track => track.Reference is { } reference
-            && Find(sequences, reference.Sequence) is not null && WouldCycle(sequences, sequence.Name, reference.Sequence)));
+        sequences.Sum(sequence => sequence.Tracks.Sum(track => (track.References ?? []).Count(reference =>
+            Find(sequences, reference.Sequence) is not null && WouldCycle(sequences, sequence.Name, reference.Sequence))));
 
     /// <summary>The first sequence called <paramref name="name"/>, or null.</summary>
     public static SequenceSave? Find(IReadOnlyList<SequenceSave> sequences, string name) =>
@@ -137,19 +141,24 @@ public static class SequenceReferences
     {
         foreach (var track in sequence.Tracks)
         {
-            if (track.Reference is not { } reference)
+            if (track.References is not { } clips)
             {
                 result.Add(new InlinedTrack(prefix + track.Name, track, visible && track.Visible, hops.ToArray()));
                 continue;
             }
-            // The stack check is a backstop for duplicate names, which Plays (by name) cannot tell apart.
-            if (!Plays(sequences, sequence.Name, reference.Sequence) || Find(sequences, reference.Sequence) is not { } target
-                || stack.Contains(target)) continue;
-            hops.Add(new ReferenceHop(reference, target));
-            stack.Add(target);
-            Collect(sequences, target, prefix + track.Name + "/", visible && track.Visible, hops, stack, result);
-            stack.RemoveAt(stack.Count - 1);
-            hops.RemoveAt(hops.Count - 1);
+            // Clips in playback order. Clips of one track share the prefix, so same-named tracks are one sprite: the cut
+            // rule lets only one clip play at a time.
+            foreach (var reference in SequenceTimeline.OrderedClips(track))
+            {
+                // The stack check is a backstop for duplicate names, which Plays (by name) cannot tell apart.
+                if (!Plays(sequences, sequence.Name, reference.Sequence) || Find(sequences, reference.Sequence) is not { } target
+                    || stack.Contains(target)) continue;
+                hops.Add(new ReferenceHop(track, reference, target));
+                stack.Add(target);
+                Collect(sequences, target, prefix + track.Name + "/", visible && track.Visible, hops, stack, result);
+                stack.RemoveAt(stack.Count - 1);
+                hops.RemoveAt(hops.Count - 1);
+            }
         }
     }
 
@@ -166,7 +175,7 @@ public static class SequenceReferences
         double? current = time;
         foreach (var hop in track.Hops)
         {
-            current = SequenceTimeline.ReferenceTime(hop.Reference, hop.Target, length(hop.Target), current.Value);
+            current = SequenceTimeline.ReferenceTime(hop.Reference, hop.Target, length(hop.Target), current.Value, SequenceTimeline.NextStart(hop.Track, hop.Reference));
             if (current is null) return null;
         }
         return current;

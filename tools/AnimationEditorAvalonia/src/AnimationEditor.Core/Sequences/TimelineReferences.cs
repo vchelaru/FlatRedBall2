@@ -19,17 +19,19 @@ public sealed record InheritedRow(string Name, bool Visible, IReadOnlyList<Inher
 
 /// <summary>
 /// A reference track as the timeline draws it: one clip, <see cref="Start"/> to <see cref="End"/>, with the inherited tracks
-/// listed under it when the lane is expanded. A reference is not cut by anything, so there is no cut tail.
+/// listed under it when the lane is expanded. A lane can hold several clips; the next one cuts the previous one short and
+/// <see cref="Length"/> is the played length.
 /// </summary>
 /// <param name="Track">The lane.</param>
 /// <param name="Reference">The clip, edited in place by a drag.</param>
 /// <param name="TargetLength">The referenced sequence's length in seconds; 0 when it is missing or empty.</param>
 /// <param name="IsMissing">Whether no sequence has the referenced name.</param>
-/// <param name="Rows">The inherited tracks.</param>
+/// <param name="Rows">The inherited tracks. Only the first clip of a lane lists them; the others have none.</param>
+/// <param name="NextStart">When the next clip on the lane starts and so cuts this one short, or null for the last clip.</param>
 /// <param name="Cycle">The names around the cycle this reference closes (<c>A, B, A</c>), or null. A cyclic reference plays
 /// nothing (<see cref="SequenceReferences.Plays"/>), so it has no target length and no rows.</param>
 public sealed record TimelineReference(int Track, SequenceReferenceSave Reference, double TargetLength, bool IsMissing, IReadOnlyList<InheritedRow> Rows,
-    IReadOnlyList<string>? Cycle = null)
+    IReadOnlyList<string>? Cycle = null, double? NextStart = null)
 {
     /// <summary>Whether the clip plays nothing: its target is missing or plays this sequence back. Drawn hatched with a warning.</summary>
     public bool IsBroken => IsMissing || Cycle is not null;
@@ -37,10 +39,12 @@ public sealed record TimelineReference(int Track, SequenceReferenceSave Referenc
     public double Start => Reference.Start;
 
     /// <summary>The clip's length: its set length, else one run of the target, or <see cref="TimelineLayout.MissingLength"/> for a broken target or one with no length.</summary>
-    public double Length => TargetLength > 0 ? SequenceTimeline.FullLength(Reference.Length, TargetLength) : TimelineLayout.MissingLength;
+    public double Length => TargetLength > 0
+        ? SequenceTimeline.PlayedLength(Start, SequenceTimeline.FullLength(Reference.Length, TargetLength), NextStart)
+        : TimelineLayout.MissingLength;
 
     /// <summary>How many runs of the target <see cref="Length"/> spans, for labels only; 1 when the target has no length.</summary>
-    public double Cycles => TargetLength > 0 ? Length / TargetLength : 1;
+    public double Cycles => TargetLength > 0 ? SequenceTimeline.FullLength(Reference.Length, TargetLength) / TargetLength : 1;
 
     public double End => Start + Length;
 
@@ -79,16 +83,26 @@ public static class TimelineReferences
         var result = new List<TimelineReference>();
         for (int t = 0; t < sequence.Tracks.Count; t++)
         {
-            if (sequence.Tracks[t].Reference is not { } reference) continue;
+            if (sequence.Tracks[t].References is null) continue;
+            var lane = sequence.Tracks[t];
+            foreach (var reference in SequenceTimeline.OrderedClips(lane))
+            {
+            bool first = ReferenceEquals(reference, SequenceTimeline.OrderedClips(lane)[0]);
+            double? next = SequenceTimeline.NextStart(lane, reference);
             var target = SequenceReferences.Find(file, reference.Sequence);
             if (target is null)
             {
-                result.Add(new TimelineReference(t, reference, 0, true, Array.Empty<InheritedRow>()));
+                result.Add(new TimelineReference(t, reference, 0, true, Array.Empty<InheritedRow>(), null, next));
                 continue;
             }
             if (SequenceReferences.CycleThrough(file, sequence.Name, target.Name) is { } cycle)
             {
-                result.Add(new TimelineReference(t, reference, 0, false, Array.Empty<InheritedRow>(), cycle));
+                result.Add(new TimelineReference(t, reference, 0, false, Array.Empty<InheritedRow>(), cycle, next));
+                continue;
+            }
+            if (!first)
+            {
+                result.Add(new TimelineReference(t, reference, LengthOf(target), false, Array.Empty<InheritedRow>(), null, next));
                 continue;
             }
             var blocks = TimelineLayout.Blocks(target, cycleLength);
@@ -105,7 +119,8 @@ public static class TimelineReferences
                     };
                 rows.Add(new InheritedRow(inlined.Name, inlined.Visible, spans));
             }
-            result.Add(new TimelineReference(t, reference, LengthOf(target), false, rows));
+            result.Add(new TimelineReference(t, reference, LengthOf(target), false, rows, null, next));
+            }
         }
         return result;
     }

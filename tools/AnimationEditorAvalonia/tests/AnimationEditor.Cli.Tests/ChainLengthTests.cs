@@ -54,4 +54,25 @@ public class ChainLengthTests : IDisposable
         block.GetProperty("chainLength").GetDouble().ShouldBe(0.4, 1e-6);
         block.GetProperty("end").GetDouble().ShouldBe(0.8, 1e-6);
     }
+
+    [Fact]
+    public async Task Text_ChainLengthIsTheJsonSeconds_FrameLengthsStayInTheFileUnit()
+    {
+        _w.Write("ms.achj", """
+            { "fileRelativeTextures": true, "timeMeasurementUnit": "Millisecond", "coordinateType": "Pixel",
+              "animationChains": [ { "name": "Walk", "pingPong": true, "frames": [
+                { "textureName": "sheet.png", "frameLength": 100, "leftCoordinate": 0, "rightCoordinate": 16, "topCoordinate": 0, "bottomCoordinate": 32 },
+                { "textureName": "sheet.png", "frameLength": 300, "leftCoordinate": 0, "rightCoordinate": 16, "topCoordinate": 0, "bottomCoordinate": 32 } ] } ] }
+            """);
+
+        var text = await _w.RunAsync("describe", _w.PathOf("ms.achj"));
+        var summary = await _w.RunAsync("describe", _w.PathOf("ms.achj"), "--summary");
+        var json = await _w.RunAsync("describe", _w.PathOf("ms.achj"), "--json");
+
+        using var d = JsonDocument.Parse(json.Out);
+        d.RootElement.GetProperty("chains")[0].GetProperty("length").GetDouble().ShouldBe(0.8, 1e-6);
+        text.Out.ShouldContain("Walk  (2 frames, length 0.8s, ");
+        text.Out.ShouldContain("sheet.png  length 300  region");
+        summary.Out.Trim().ShouldBe("Walk  2 frames  length 0.8s");
+    }
 }

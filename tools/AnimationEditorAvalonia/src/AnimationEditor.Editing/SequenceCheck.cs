@@ -40,17 +40,35 @@ public static class SequenceCheck
 
             foreach (var track in sequence.Tracks)
             {
-                if (track.Reference is { } clip)
+                if (track.References is { } clips)
                 {
-                    if (SequenceReferences.Find(save.Sequences, clip.Sequence) is null)
-                        issues.Add(new(CheckSeverity.Error, "missing-reference-target",
-                            $"Track '{sequence.Name}/{track.Name}' plays '{clip.Sequence}', which does not exist."));
-                    else if (SequenceReferences.WouldCycle(save.Sequences, sequence.Name, clip.Sequence))
-                        issues.Add(new(CheckSeverity.Error, "reference-cycle",
-                            $"Track '{sequence.Name}/{track.Name}' plays '{clip.Sequence}', which plays '{sequence.Name}' back."));
-                    else if (track.Continuous && ContinuousIgnoredReason(save, sequence, clip, sources) is { } reason)
-                        issues.Add(new(CheckSeverity.Warning, "continuous-ignored",
-                            $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap."));
+                    var first = SequenceTimeline.OrderedClips(track).FirstOrDefault();
+                    for (int c = 0; c < clips.Count; c++)
+                    {
+                        var clip = clips[c];
+                        var where = $"{sequence.Name}/{track.Name}/{c}";
+                        var label = clips.Count == 1 ? $"Track '{sequence.Name}/{track.Name}'" : $"Clip {where}";
+                        if (SequenceReferences.Find(save.Sequences, clip.Sequence) is null)
+                            issues.Add(new(CheckSeverity.Error, "missing-reference-target",
+                                $"{label} plays '{clip.Sequence}', which does not exist."));
+                        else if (SequenceReferences.WouldCycle(save.Sequences, sequence.Name, clip.Sequence))
+                            issues.Add(new(CheckSeverity.Error, "reference-cycle",
+                                $"{label} plays '{clip.Sequence}', which plays '{sequence.Name}' back."));
+                        else
+                        {
+                            var target = SequenceReferences.Find(save.Sequences, clip.Sequence)!;
+                            double targetLength = SequenceTimeline.Length(save.Sequences, target, sources.CycleLength);
+                            double full = SequenceTimeline.FullLength(clip.Length, targetLength);
+                            double played = SequenceTimeline.PlayedLength(clip.Start, full, SequenceTimeline.NextStart(track, clip));
+                            if (played <= Tolerance && full > Tolerance)
+                                issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next clip on the track starts at the same time."));
+                            else if (played < full - Tolerance * Math.Max(1, full))
+                                issues.Add(new(CheckSeverity.Warning, "cut-short", $"{where} is cut short: it plays {Num(played)} of {Num(full)} seconds."));
+                            if (ReferenceEquals(clip, first) && track.Continuous && ContinuousIgnoredReason(save, sequence, track, clip, sources) is { } reason)
+                                issues.Add(new(CheckSeverity.Warning, "continuous-ignored",
+                                    $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap."));
+                        }
+                    }
                     continue;
                 }
 
@@ -87,8 +105,8 @@ public static class SequenceCheck
         return new CheckReport(issues);
     }
 
-    // Why a continuous reference track does not carry its target across the wrap (see SequenceTimeline.CarriesAcrossWrap), or null when it does.
-    private static string? ContinuousIgnoredReason(SequenceListSave save, SequenceSave holder, SequenceReferenceSave clip, SequenceSources sources)
+    // Why a continuous reference track does not carry its first clip's target across the wrap (see SequenceTimeline.ReferenceCarryOver), or null when it does.
+    private static string? ContinuousIgnoredReason(SequenceListSave save, SequenceSave holder, SequenceTrackSave track, SequenceReferenceSave clip, SequenceSources sources)
     {
         var target = SequenceReferences.Find(save.Sequences, clip.Sequence)!;
         double targetLength = SequenceTimeline.Length(save.Sequences, target, sources.CycleLength);
@@ -96,10 +114,17 @@ public static class SequenceCheck
         if (!holder.Loop) return $"'{holder.Name}' does not loop";
         if (!target.Loop) return $"'{target.Name}' does not loop";
         if (clip.Start > Tolerance) return $"the clip starts at {Num(clip.Start)}, not 0";
-        double end = clip.Start + SequenceTimeline.FullLength(clip.Length, targetLength);
-        if (targetLength > 0 && end < holderLength - Tolerance * Math.Max(1, holderLength))
-            return $"the clip ends at {Num(end)}, before '{holder.Name}' ends at {Num(holderLength)} (set the clip length to {Num(holderLength)})";
-        return null;
+        if (targetLength <= 0) return null;
+        double TargetLengthOf(SequenceReferenceSave other) =>
+            SequenceReferences.Find(save.Sequences, other.Sequence) is { } found && !SequenceReferences.WouldCycle(save.Sequences, holder.Name, other.Sequence)
+                ? SequenceTimeline.Length(save.Sequences, found, sources.CycleLength) : 0;
+        double endTime = holderLength - Math.Min(SequenceTimeline.HoldEpsilon, holderLength);
+        var atWrap = SequenceTimeline.ActiveClipAt(track, endTime, TargetLengthOf);
+        if (atWrap is not null && atWrap.Sequence == clip.Sequence) return null;
+        if (atWrap is not null)
+            return $"'{atWrap.Sequence}', not '{clip.Sequence}', is playing when '{holder.Name}' ends at {Num(holderLength)}";
+        double end = clip.Start + SequenceTimeline.PlayedLength(clip.Start, SequenceTimeline.FullLength(clip.Length, targetLength), SequenceTimeline.NextStart(track, clip));
+        return $"the clip ends at {Num(end)}, before '{holder.Name}' ends at {Num(holderLength)} (set the clip length to {Num(holderLength)})";
     }
 
     internal static string Num(double value) => Math.Round(value, 4).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
