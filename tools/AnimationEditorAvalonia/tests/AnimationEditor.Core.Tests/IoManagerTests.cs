@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
+using Shouldly;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -265,10 +266,9 @@ public class IoManagerTests
         using var dir = new TestHelpers.TempDir();
         var syncPath = dir.Path + "/hero.tiledsync";
         File.WriteAllText(syncPath, contents);
-        Exception? reported = null;
-        ctx.IoManager.TiledSyncParseFailed += (_, ex) => reported = ex;
 
-        ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx");
+        var reported = Record.Exception(() =>
+            ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx"));
 
         Assert.Equal(contents, File.ReadAllText(syncPath));
         Assert.Contains("hero.tiledsync", reported?.Message);
@@ -282,14 +282,27 @@ public class IoManagerTests
         using var dir = new TestHelpers.TempDir();
         var syncPath = dir.Path + "/hero.tiledsync";
         File.WriteAllText(syncPath, "{ \"TiledTilesetPaths\": [ \"Enemies.tsx\" ] }");
-        var reported = false;
-        ctx.IoManager.TiledSyncParseFailed += (_, _) => reported = true;
+        Exception? reported;
 
         using (new FileStream(syncPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx");
+            reported = Record.Exception(() =>
+                ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx"));
 
         Assert.Contains("Enemies.tsx", File.ReadAllText(syncPath));
-        Assert.True(reported);
+        Assert.NotNull(reported);
+    }
+
+    // #1996: a missing folder stands for anything that stops the write.
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_TiledSyncFileCannotBeWritten_Throws()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+
+        var ex = Record.Exception(() =>
+            ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/missing/hero.achx", dir.Path + "/Heroes.tsx"));
+
+        ex.ShouldBeOfType<IOException>().Message.ShouldContain("hero.tiledsync");
     }
 
     [Fact]

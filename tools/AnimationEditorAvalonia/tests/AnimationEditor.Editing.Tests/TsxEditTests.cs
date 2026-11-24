@@ -157,6 +157,37 @@ public class TsxEditTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_AssociatedTilesetGone_SavesAndWarnsNamingTheTileset()
+    {
+        Copy("sheet.png");
+        var tsx = Copy("tiles.tsx");
+        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
+        TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, tsx).Success.ShouldBeTrue();
+        File.Delete(tsx);
+
+        var save = s.Save();
+
+        save.Success.ShouldBeTrue(string.Join("; ", save.Errors));
+        save.Warnings.ShouldHaveSingleItem().ShouldStartWith("Associated tileset tiles.tsx was not updated: ");
+    }
+
+    // The .achx is not a tileset, so the warning must not name it as one (#1996).
+    [Fact]
+    public async Task Save_UnreadableSyncFile_SavesAndWarnsNamingTheSyncFile()
+    {
+        Copy("sheet.png");
+        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
+        File.WriteAllText(Path.Combine(_dir, "hero.tiledsync"), "{ not json");
+
+        var save = s.Save();
+
+        save.Success.ShouldBeTrue(string.Join("; ", save.Errors));
+        var warning = save.Warnings.ShouldHaveSingleItem();
+        warning.ShouldStartWith("Associated tilesets were not updated: Could not read the Tiled sync file hero.tiledsync");
+        warning.ShouldNotContain("hero.achx");
+    }
+
+    [Fact]
     public async Task AssociateTileset_MissingFile_FailsAndWritesNothing()
     {
         Copy("sheet.png");

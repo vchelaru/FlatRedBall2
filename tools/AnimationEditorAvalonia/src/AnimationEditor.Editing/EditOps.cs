@@ -517,7 +517,7 @@ public static class EditOps
             warnings.Add($"The file already had {before.Errors.Count()} check error(s) before the edit.");
 
         var tsxBefore = session.IsNativeTsx ? TsxOpPolicy.Take(session) : null;
-        var associations = new List<string>();
+        var associations = new List<(EditOp Op, string TsxPath)>();
         var chainsBefore = BrokenSequenceBlocks.ChainsAtRisk(session.Document, ops);
 
         foreach (var op in ops)
@@ -541,7 +541,7 @@ public static class EditOps
                     return new EditRunResult(
                         new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {check.Errors[0]}"], warnings, check.ErrorCodes),
                         [op.Index]);
-                associations.Add(tsxPath);
+                associations.Add((op, tsxPath));
                 changed.Add(tsxPath);
                 continue;
             }
@@ -588,15 +588,12 @@ public static class EditOps
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
 
-        foreach (var tsxPath in associations)
+        foreach (var (op, tsxPath) in associations)
         {
             try { session.Rollback.Remember(Path.ChangeExtension(session.Path, ".tiledsync")); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // in use: the association reports it
             var associated = TsxEdit.AssociateTileset(session.Commands, session.ProjectManager, tsxPath);
-            if (!associated.Success)
-                return new EditRunResult(
-                    new EditResult([], associated.Errors, warnings, associated.ErrorCodes),
-                    associated.Errors.Select(_ => (int?)null).ToList());
+            if (!associated.Success) return FailedOp(warnings, op, "", associated);
         }
 
         var save = session.Save();

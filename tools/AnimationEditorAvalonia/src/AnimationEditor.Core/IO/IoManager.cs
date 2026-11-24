@@ -81,9 +81,10 @@ namespace AnimationEditor.Core.IO
             }
         }
 
-        /// <summary>The associations of <paramref name="achxFile"/> (none when it has no <c>.tiledsync</c>), or null when
-        /// the file cannot be read, which is reported and must never be written over: it may still hold some.</summary>
-        private AETiledSyncSave? TryLoadTiledSyncSettings(string achxFile)
+        /// <summary>The associations of <paramref name="achxFile"/> (none when it has no <c>.tiledsync</c>).</summary>
+        /// <exception cref="InvalidDataException">The file cannot be read. It must never be written over: it may still
+        /// hold associations.</exception>
+        private AETiledSyncSave LoadTiledSyncSettings(string achxFile)
         {
             var fileToLoad = GetTiledSyncCompanionFileFor(new FilePath(achxFile));
 
@@ -100,18 +101,26 @@ namespace AnimationEditor.Core.IO
             }
             catch (Exception e)
             {
-                // The file exists but is corrupt -- this must not look identical to "no
-                // associations," or Tiled sync silently disables itself with zero indication.
-                TiledSyncParseFailed?.Invoke(achxFile, new InvalidDataException(
-                    $"Could not read the Tiled sync file {fileToLoad.NoPath}, so it was left as it is. Fix or delete it. {e.Message}", e));
-                return null;
+                throw new InvalidDataException(
+                    $"Could not read the Tiled sync file {fileToLoad.NoPath}, so it was left as it is. Fix or delete it. {e.Message}", e);
             }
         }
 
         public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile)
         {
-            var settings = TryLoadTiledSyncSettings(achxFile);
-            if (settings == null || settings.TiledTilesetPaths.Count == 0)
+            AETiledSyncSave settings;
+            try
+            {
+                settings = LoadTiledSyncSettings(achxFile);
+            }
+            catch (InvalidDataException e)
+            {
+                // The file exists but is corrupt -- this must not look identical to "no
+                // associations," or Tiled sync silently disables itself with zero indication.
+                TiledSyncParseFailed?.Invoke(achxFile, e);
+                return Array.Empty<string>();
+            }
+            if (settings.TiledTilesetPaths.Count == 0)
                 return Array.Empty<string>();
 
             var achxFolder = new FilePath(achxFile).GetDirectoryContainingThis();
@@ -126,9 +135,7 @@ namespace AnimationEditor.Core.IO
             var achxFolder = achxFilePath.GetDirectoryContainingThis();
             var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
 
-            var settings = TryLoadTiledSyncSettings(achxFile);
-            if (settings == null) return;
-
+            var settings = LoadTiledSyncSettings(achxFile);
             var alreadyAssociated = settings.TiledTilesetPaths
                 .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
             if (!alreadyAssociated)
@@ -146,7 +153,7 @@ namespace AnimationEditor.Core.IO
                 }
                 catch (Exception e)
                 {
-                    SaveFailed?.Invoke("Could not save Tiled sync companion file " + location + "\n\n" + e, e);
+                    throw new IOException($"Could not write the Tiled sync file {location.NoPath}. {e.Message}", e);
                 }
             }
         }

@@ -731,14 +731,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// currently open as a native-tsx project in another tab (see
         /// <see cref="IsTsxPathOpenAsNativeProject"/>, issue #1147) -- a .tsx cannot be both a
         /// native-tsx project and an achx-push target at the same time.</exception>
+        /// <remarks>Also throws when the association could not be stored: see
+        /// <see cref="IIoManager.AddAssociatedTiledTilesetPath"/>.</remarks>
         void AddAssociatedTiledTileset(string tsxAbsolutePath);
 
         /// <summary>
         /// Shows an open-file dialog (via <see cref="FileDialogService"/>) for the user to pick a
         /// <c>.tsx</c> file, then associates it via <see cref="AddAssociatedTiledTileset"/>. The
         /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled or the
-        /// project has never been saved. Unlike <see cref="AddAssociatedTiledTileset"/>, a coexistence
-        /// conflict here is reported via <see cref="TiledSyncFailed"/> rather than thrown, since this
+        /// project has never been saved. Unlike <see cref="AddAssociatedTiledTileset"/>, a failure
+        /// here is reported via <see cref="TiledSyncFailed"/> rather than thrown, since this
         /// method is the fire-and-forget UI entry point.
         /// </summary>
         Task AddAssociatedTiledTilesetViaDialogAsync();

@@ -101,7 +101,10 @@ public sealed class EditSession
         void OnTsxWarnings(IReadOnlyList<string> notes) => warnings.AddRange(notes);
         void OnSynced(string tsx, int count) => changed.Add(tsx);
         void OnSyncFailed(string target, Exception ex) =>
-            warnings.Add($"Associated tileset {System.IO.Path.GetFileName(target)} was not updated: {ex.Message}");
+            // The target is this file when its .tiledsync cannot be read, so no tileset is known.
+            warnings.Add(target == Path
+                ? $"Associated tilesets were not updated: {ex.Message}"
+                : $"Associated tileset {System.IO.Path.GetFileName(target)} was not updated: {ex.Message}");
         _commands.SaveFailed += OnFailed;
         _commands.TsxSaveCompletedWithWarnings += OnTsxWarnings;
         _commands.TiledSyncSucceeded += OnSynced;
