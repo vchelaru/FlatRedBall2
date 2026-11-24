@@ -152,6 +152,7 @@ public static class SequenceOps
     public static EditRunResult Apply(SequenceSession session, IReadOnlyList<EditOp> ops)
     {
         var doc = session.Document;
+        SequenceEditIds.Add(doc.Save);
         var before = SequenceCheck.Run(doc.Save, session.Path);
         var original = doc.Save.ToJsonString();
         var changed = new List<string>();

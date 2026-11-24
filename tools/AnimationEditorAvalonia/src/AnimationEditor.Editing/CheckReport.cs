@@ -7,7 +7,7 @@ namespace AnimationEditor.Editing;
 public enum CheckSeverity { Error, Warning }
 
 /// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
-/// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name, or the chain or frame object itself, which edits keep); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
+/// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name, or the chain or frame object itself, which edits keep, or a <see cref="SequenceEditIds"/> id); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
 public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message, object? Subject = null);
 
 /// <summary>
@@ -126,8 +126,8 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
     }
 
     /// <summary>
-    /// The warnings of <paramref name="after"/> beyond those <paramref name="before"/> had. Unlike errors, the same code and
-    /// subject can occur many times (every cut-short block of one chain), so they are counted; the ones whose message is new come first.
+    /// The warnings of <paramref name="after"/> beyond those <paramref name="before"/> had. A copied sequence block
+    /// keeps its subject, so the same code and subject can occur more than once; they are counted, and the ones whose message is new come first.
     /// </summary>
     public static IReadOnlyList<CheckIssue> NewWarnings(CheckReport before, CheckReport after)
     {

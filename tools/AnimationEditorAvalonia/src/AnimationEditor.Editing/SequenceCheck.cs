@@ -50,7 +50,7 @@ public static class SequenceCheck
                             $"Track '{sequence.Name}/{track.Name}' plays '{clip.Sequence}', which plays '{sequence.Name}' back."));
                     else if (track.Continuous && ContinuousIgnoredReason(save, sequence, clip, sources) is { } reason)
                         issues.Add(new(CheckSeverity.Warning, "continuous-ignored",
-                            $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap.", track.Name));
+                            $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap.", SequenceEditIds.Of(track.UnknownProperties)));
                     continue;
                 }
 
@@ -78,9 +78,9 @@ public static class SequenceCheck
                     double full = SequenceTimeline.FullLength(block.Length, cycle);
                     double played = SequenceTimeline.PlayedLength(track, block, cycle);
                     if (played <= Tolerance && full > Tolerance)
-                        issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time.", block.Chain));
+                        issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time.", SequenceEditIds.Of(block.UnknownProperties)));
                     else if (played < full - Tolerance * Math.Max(1, full))
-                        issues.Add(new(CheckSeverity.Warning, "cut-short", $"{where} is cut short: it plays {Num(played)} of {Num(full)} seconds.", block.Chain));
+                        issues.Add(new(CheckSeverity.Warning, "cut-short", $"{where} is cut short: it plays {Num(played)} of {Num(full)} seconds.", SequenceEditIds.Of(block.UnknownProperties)));
                 }
             }
         }

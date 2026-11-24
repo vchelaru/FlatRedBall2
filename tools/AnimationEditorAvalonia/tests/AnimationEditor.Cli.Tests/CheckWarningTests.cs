@@ -225,7 +225,7 @@ public class CheckWarningTests : IDisposable
     {
         var path = WriteSeq(s => s.Sequences[0].Tracks[0].Chains[1].Start = 0.5);
 
-        var added = await EditWarnings(path, "duplicate-track Run/Body to=Run index=1");
+        var added = await EditWarnings(path, "duplicate-track Run/Body to=Run");
 
         added.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Body 2/0");
         // Built without any edit, so whatever the edit adds to the objects it tracks would show.
@@ -247,9 +247,18 @@ public class CheckWarningTests : IDisposable
         bytes[19] = 16; // 16 pixels wide
         File.WriteAllBytes(_w.PathOf("other.png"), bytes);
 
-        var added = await EditWarnings(_w.PathOf("hero.achx"), "set-frame-texture Walk/2 texture=other.png");
+        // Walk/2 has no texture yet, so its 32,0,16,32 region could not be compared with anything.
+        var path = _w.PathOf("hero.achx");
+        var text = File.ReadAllText(path);
+        var at = text.IndexOf("<FrameLength>0.2", StringComparison.Ordinal);
+        var name = text.LastIndexOf("sheet.png", at, StringComparison.Ordinal);
+        File.WriteAllText(path, text.Remove(name, "sheet.png".Length));
+        (await Warnings(path)).ShouldBeEmpty();
 
-        added.ShouldHaveSingleItem().ShouldContain("[region-outside-texture]: Frame Walk/2: the region 32,0,16,32 is not inside the 16x32");
+        var added = await EditWarnings(path, "set-frame-texture Walk/2 texture=other.png");
+
+        added.ShouldHaveSingleItem().ShouldContain("[region-outside-texture]: Frame Walk/2");
+        added[0].ShouldContain("16x32 texture 'other.png'");
     }
 
     [Fact]
