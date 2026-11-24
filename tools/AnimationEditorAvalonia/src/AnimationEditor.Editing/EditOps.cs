@@ -489,10 +489,26 @@ public static class EditOps
 
     /// <summary>
     /// Applies <paramref name="ops"/> to <paramref name="session"/>'s document in order and, only if every op
-    /// succeeded and no check error code has more errors than before, saves once. Otherwise nothing is written. An empty or no-change
-    /// batch writes nothing either, so the file stays byte-identical.
+    /// succeeded and no check error code has more errors than before, saves once. Otherwise nothing is written, and a texture an op
+    /// already copied is put back as it was. An empty or no-change batch writes nothing either, so the file stays byte-identical.
     /// </summary>
     public static async Task<EditRunResult> ApplyAsync(EditSession session, IReadOnlyList<EditOp> ops)
+    {
+        EditRunResult run;
+        try
+        {
+            run = await ApplyAllAsync(session, ops);
+        }
+        catch
+        {
+            session.Rollback.Restore();
+            throw;
+        }
+        var notRestored = session.Rollback.Restore();
+        return notRestored.Count == 0 ? run : run with { Result = run.Result with { Warnings = [.. run.Result.Warnings, .. notRestored] } };
+    }
+
+    private static async Task<EditRunResult> ApplyAllAsync(EditSession session, IReadOnlyList<EditOp> ops)
     {
         var before = CheckReport.Run(session.Document, session.Path);
         var changed = new List<string>();
@@ -570,6 +586,8 @@ public static class EditOps
 
         foreach (var tsxPath in associations)
         {
+            try { session.Rollback.Remember(Path.ChangeExtension(session.Path, ".tiledsync")); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // in use: the association reports it
             var associated = TsxEdit.AssociateTileset(session.Commands, session.ProjectManager, tsxPath);
             if (!associated.Success)
                 return new EditRunResult(
@@ -579,7 +597,8 @@ public static class EditOps
 
         var save = session.Save();
         if (!save.Success)
-            return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
+            return new EditRunResult(new EditResult([], save.Errors, warnings, save.ErrorCodes), save.Errors.Select(_ => (int?)null).ToList());
+        session.Rollback.Forget();
 
         // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
         if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
@@ -822,7 +841,18 @@ public static class EditOps
             "overwrite" => TextureCopyChoice.Overwrite,
             _ => TextureCopyChoice.KeepInPlace,
         };
-        return FrameTextureEdit.ResolveForProject(session.ProjectManager, absolute, choice);
+        try
+        {
+            // Copied now, since this op and later ones read the copy's size; a failed batch undoes it.
+            var plan = TextureCopyDecider.PlanCopyForProject(session.ProjectManager, absolute);
+            if (plan is null) return new TextureResolveResult(absolute, new EditResult([], [], []));
+            if (choice is not TextureCopyChoice.KeepInPlace) session.Rollback.Remember(plan.DestinationPath);
+            return FrameTextureEdit.ApplyChoice(plan, choice);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new TextureResolveResult(null, Fail($"Could not copy: {ex.Message}", EditErrorCode.TextureCopyFailed));
+        }
     }
 
     private static EditResult AddFrame(EditSession session, EditOp op)
