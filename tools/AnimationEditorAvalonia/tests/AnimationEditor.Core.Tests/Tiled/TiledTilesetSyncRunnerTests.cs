@@ -2,9 +2,11 @@ using AnimationEditor.Core.Tiled;
 using DotTiled;
 using DotTiled.Serialization;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.IO;
 using System.Linq;
 using Xunit;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Tests.Tiled;
 
@@ -13,7 +15,7 @@ public class TiledTilesetSyncRunnerTests
     // 4 columns, 16x16 tiles, no image pixel size needed since the achx below uses Pixel
     // coordinates (ProjectManager.AnimationChainListSave is always UV in memory, but the mapper
     // itself supports Pixel too -- see AchjToTiledAnimationMapperTests for the UV path).
-    private static string WriteFixtureTileset(string tempDir, string fileName = "Heroes.tsx")
+    private static string WriteFixtureTileset(string tempDir, string fileName = "Heroes.tsx", string imageSource = "Heroes.png")
     {
         var tileset = new Tileset
         {
@@ -22,7 +24,7 @@ public class TiledTilesetSyncRunnerTests
             TileHeight = 16,
             TileCount = 64,
             Columns = 4,
-            Image = new Image { Source = "Heroes.png" },
+            Image = new Image { Source = imageSource },
         };
         var path = Path.Combine(tempDir, fileName);
         TsxWriter.Write(tileset, path);
@@ -64,6 +66,261 @@ public class TiledTilesetSyncRunnerTests
         var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 100), ((uint)1, 100)], tile0.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
+    }
+
+    // No image file exists in any case: the comparison is by path only.
+    [Theory]
+    [InlineData("Hero.achx", "Heroes.png", "Heroes.png", true)]
+    [InlineData("Hero.achx", "Heroes.png", "sub/Heroes.png", false)]
+    [InlineData("Hero.achx", "Heroes.png", "<root>sub/Heroes.png", false)]
+    [InlineData("Hero.achx", "Heroes.png", "<root>Heroes.png", true)]
+    [InlineData("Hero.achx", "<root>Heroes.png", "Heroes.png", true)]
+    [InlineData("Hero.achx", "Heroes.png", "HEROES.PNG", true)]
+    [InlineData("Hero.achx", "Heroes.png", "sub/../Heroes.png", true)]
+    [InlineData("Hero.achx", "images/Heroes.png", "images/Heroes.png", true)]
+    [InlineData("Hero.achx", "images/Heroes.png", "Heroes.png", false)]
+    // A frame's texture is relative to the .achx, the image to the .tsx.
+    [InlineData("anims/Hero.achx", "Heroes.png", "../Heroes.png", true)]
+    [InlineData("anims/Hero.achx", "Heroes.png", "Heroes.png", false)]
+    [InlineData("anims/Hero.achx", "anims/Heroes.png", "Heroes.png", true)]
+    [InlineData("anims/Hero.achx", "images/Heroes.png", "images/Heroes.png", false)]
+    [InlineData("Hero.achx", "//server/share/Heroes.png", "//server/share/heroes.png", true)]
+    [InlineData("Hero.achx", "//server/share/Heroes.png", "//server/other/Heroes.png", false)]
+    public void SyncAll_FrameTexture_IsComparedByResolvedPath(
+        string achxName, string imageSource, string textureName, bool isPushed)
+    {
+        var root = Directory.CreateTempSubdirectory().FullName + Path.DirectorySeparatorChar;
+        var tsxPath = WriteFixtureTileset(root, imageSource: imageSource.Replace("<root>", root));
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = textureName.Replace("<root>", root);
+
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, achxName), [tsxPath]).Single();
+
+        outcome.Error.ShouldBeNull();
+        outcome.AppliedCount.ShouldBe(isPushed ? 1 : 0);
+        outcome.Changed.ShouldBe(isPushed);
+        outcome.Warnings.Count.ShouldBe(isPushed ? 0 : 1);
+    }
+
+    // Pushed as Walk first, then every case but the last leaves tile 0 without an animation.
+    [Theory]
+    [InlineData("Walk", "sub/Heroes.png", "sub/Heroes.png", "Tile 0 was cleared.")]
+    [InlineData("Walk", "sub/HEROES.PNG", "sub/Heroes.png", "Tile 0 was cleared.")]
+    [InlineData("Renamed", "sub/Heroes.png", "sub/Heroes.png", "Tile 0 was cleared.")]
+    [InlineData("Walk", "sub/Heroes.png", "Heroes.png", "Tile 0 was cleared.")] // moves to tile 1
+    [InlineData("Walk", "Heroes.png", "sub/Heroes.png", null)]
+    public void SyncAll_FramesOnASameNamedImage_WarnsNamingBothImagesAndAClearedTile(
+        string chainName, string firstTexture, string secondTexture, string? clearedTile)
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        var chain = achj.AnimationChains[0];
+        chain.Name = chainName;
+        chain.Frames[0].TextureName = firstTexture;
+        chain.Frames[1].TextureName = secondTexture;
+        var warning = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single();
+
+        warning.ShouldContain($"chain \"{chainName}\"");
+        warning.ShouldContain("/sub/heroes.png\"", Case.Insensitive);
+        warning.ShouldContain("image is \"" + new FilePath(Path.Combine(tempDir, "Heroes.png")).FullPath + "\"");
+        if (clearedTile == null) warning.ShouldNotContain("Tile ");
+        else warning.ShouldEndWith(clearedTile);
+        Loader.Default().LoadTileset(tsxPath).Tiles.Any(t => t.ID == 0).ShouldBe(clearedTile == null);
+
+        // Nothing is left to clear, but the frames still are not pushed.
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldNotContain("Tile ");
+    }
+
+    [Fact]
+    public void SyncAll_FramesMovedOneAtATimeToASameNamedImage_NamesEachTileAsItIsCleared()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        var frames = achj.AnimationChains[0].Frames;
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        frames[0].TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+
+        frames[1].TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 1 was cleared.");
+    }
+
+    [Fact]
+    public void SyncAll_FramesMovedToAnotherCellOfASameNamedImage_NamesTheClearedTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        achj.AnimationChains[0].Frames.RemoveAt(1);
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        var frame = achj.AnimationChains[0].Frames[0];
+        frame.TextureName = "sub/Heroes.png";
+        frame.LeftCoordinate = 48;
+        frame.RightCoordinate = 64;
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+    }
+
+    [Fact]
+    public void SyncAll_AnotherChainsTileIsClearedAtACellOfASameNamedFrame_IsNotNamed()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        var idle = new AnimationChainSave { Name = "Idle" };
+        idle.Frames.Add(AchjWithWalkChain().AnimationChains[0].Frames[1]);
+        achj.AnimationChains.Add(idle);
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        // Walk keeps tile 0 through its first frame. Tile 1 is cleared because Idle is gone.
+        achj.AnimationChains.Remove(idle);
+        achj.AnimationChains[0].Frames[1].TextureName = "sub/Heroes.png";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        Loader.Default().LoadTileset(tsxPath).Tiles.Select(t => t.ID).ShouldBe([0u]);
+        outcome.Warnings.Single().ShouldNotContain("cleared");
+    }
+
+    [Fact]
+    public void SyncAll_RenamedChainWithAFrameOnADifferentlyNamedImageFirst_NamesTheClearedTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        var chain = achj.AnimationChains[0];
+        chain.Name = "Renamed";
+        foreach (var frame in chain.Frames)
+            frame.TextureName = "sub/Heroes.png";
+        chain.Frames.Insert(0, new AnimationFrameSave { TextureName = "Other.png", LeftCoordinate = 48, RightCoordinate = 64, BottomCoordinate = 16 });
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        outcome.Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+    }
+
+    [Fact]
+    public void SyncAll_OneAssociatedTilesetCannotBeRead_TheOthersImagesStillDoNotWarn()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var forestTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(tempDir, "forest")).FullName);
+        var caveTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(tempDir, "cave")).FullName);
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "forest/Heroes.png";
+
+        var outcomes = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(tempDir, "Hero.achx"),
+            [Path.Combine(tempDir, "Missing.tsx"), caveTsx, forestTsx]);
+
+        outcomes.Select(o => o.Success).ShouldBe([false, true, true]);
+        outcomes[1].Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SyncAll_FramesPointedBackAtTheImage_ArePushedAgain()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        TiledTilesetSyncRunner.SyncAll(AchjWithWalkChain(), achxPath, [tsxPath]);
+        var pushed = File.ReadAllText(tsxPath);
+        var onACopy = AchjWithWalkChain();
+        foreach (var frame in onACopy.AnimationChains[0].Frames)
+            frame.TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(onACopy, achxPath, [tsxPath]);
+
+        var outcome = TiledTilesetSyncRunner.SyncAll(AchjWithWalkChain(), achxPath, [tsxPath]).Single();
+
+        outcome.Warnings.ShouldBeEmpty();
+        File.ReadAllText(tsxPath).ShouldBe(pushed);
+    }
+
+    [Fact]
+    public void SyncAll_ChainMovedToADifferentlyNamedImage_ClearsTheTileItHadPushedWithoutWarning()
+    {
+        // Most chains of a big project belong to another tileset, so this stays silent.
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "Other.png";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        outcome.Warnings.ShouldBeEmpty();
+        Loader.Default().LoadTileset(tsxPath).Tiles.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SyncAll_TwoChainsOfTheSameNameOneMovedAndOneOnACopy_LeavesNoStaleTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        var second = AchjWithWalkChain().AnimationChains[0];
+        second.Frames.RemoveAt(0);
+        achj.AnimationChains.Add(second);
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        achj.AnimationChains[0].Frames.RemoveAt(1);
+        achj.AnimationChains[0].Frames[0].LeftCoordinate = 48;
+        achj.AnimationChains[0].Frames[0].RightCoordinate = 64;
+        second.Frames[0].TextureName = "sub/Heroes.png";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        Loader.Default().LoadTileset(tsxPath).Tiles.Select(t => t.ID).ShouldBe([3u]);
+        outcome.Warnings.Single().ShouldEndWith("Tiles 0, 1 were cleared.");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SyncAll_TextureIsAnotherAssociatedTilesetsImage_DoesNotWarn(bool bothAssociated)
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var forest = Directory.CreateDirectory(Path.Combine(tempDir, "forest")).FullName;
+        var cave = Directory.CreateDirectory(Path.Combine(tempDir, "cave")).FullName;
+        var forestTsx = WriteFixtureTileset(forest, "tiles.tsx", "tiles.png");
+        var caveTsx = WriteFixtureTileset(cave, "tiles.tsx", "tiles.png");
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "forest/Tiles.png";
+
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(tempDir, "Hero.achx"),
+            bothAssociated ? [caveTsx, forestTsx] : [caveTsx])[0];
+
+        outcome.Warnings.Count.ShouldBe(bothAssociated ? 0 : 1);
+        outcome.Changed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SyncAll_AnotherAssociatedTilesetCannotBeRead_StillWarnsAndPushes()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achj = AchjWithWalkChain();
+        achj.AnimationChains[0].Frames[1].TextureName = "sub/Heroes.png";
+
+        var outcomes = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(tempDir, "Hero.achx"),
+            [Path.Combine(tempDir, "sub", "Missing.tsx"), tsxPath]);
+
+        outcomes.Select(o => o.Success).ShouldBe([false, true]);
+        outcomes[1].AppliedCount.ShouldBe(1);
+        outcomes[1].Warnings.Count.ShouldBe(1);
     }
 
     [Fact]

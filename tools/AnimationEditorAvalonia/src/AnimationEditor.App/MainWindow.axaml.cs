@@ -1230,6 +1230,12 @@ public partial class MainWindow : Window
         _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
                 "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {Plural.Format(appliedCount, "chain")} applied"));
+        _appCommands.TiledSyncWarned += warnings =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (warnings.Count == 0) TiledSyncStatusPanel.IsVisible = false;
+                else UpdateTiledSyncStatus("Tiled sync warning", _unsavedBrush, string.Join("\n", warnings));
+            });
 
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>

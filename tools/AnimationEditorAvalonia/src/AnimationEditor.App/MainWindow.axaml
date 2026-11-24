@@ -674,7 +674,7 @@
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
                     <!-- Tiled tileset sync status (issue #1139), hidden until a sync has
-                         actually written a change or failed. -->
+                         actually written a change, left something out, or failed. -->
                     <StackPanel x:Name="TiledSyncStatusPanel"
                                 Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                                 IsVisible="False">
