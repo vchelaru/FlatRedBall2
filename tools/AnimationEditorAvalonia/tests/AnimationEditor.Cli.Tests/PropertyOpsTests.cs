@@ -64,6 +64,24 @@ public class PropertyOpsTests : IDisposable
         (frames[0].FlipHorizontal, frames[0].FlipVertical, frames[0].FlipDiagonal).ShouldBe((true, false, true));
     }
 
+    [Fact]
+    public async Task TwoOpsTouchingSameFrame_ListEachAddressOnce()
+    {
+        var r = await Edit("hero.achx", """
+            {"ops":[
+              {"op":"set-frame-flip","frame":"Walk/0","flipH":true},
+              {"op":"set-frame-offset","frame":"Walk/2","x":3,"y":-2},
+              {"op":"set-frame-offset","frame":"Walk/0","x":1,"y":1}
+            ]}
+            """, "--json");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        using var doc = JsonDocument.Parse(r.Out);
+        var changed = doc.RootElement.GetProperty("changed").EnumerateArray().Select(e => e.GetString()).ToList();
+        changed.ShouldBe(changed.Distinct().ToList());
+        changed.Count(c => c!.EndsWith("Walk/0")).ShouldBe(1);
+    }
+
     [Theory]
     [InlineData("hero.achx")]
     [InlineData("hero.achj")]
