@@ -70,6 +70,7 @@ public static class EditJson
         w.WriteStartArray("ops");
         foreach (var spec in EditOps.Specs) WriteSpec(w, spec);
         w.WriteEndArray();
+        w.WriteString("render", RenderHelp);
         w.WriteString("sequenceSelectors", SequenceOps.AddressSyntax);
         w.WriteStartArray("sequenceOps");
         foreach (var spec in SequenceOps.Specs) WriteSpec(w, spec);
@@ -102,6 +103,14 @@ public static class EditJson
         w.WriteEndObject();
     }
 
+    /// <summary>The <c>render</c> command is not an op, so the schema describes it in prose.</summary>
+    public const string RenderHelp =
+        "render <file> --out <dir>: writes PNGs, no editor window. .seqj: --sequence <name> --at 0,2.2,4.2 (seconds); one PNG per time, named <sequence>_<time>.png. " +
+        ".achx/.achj: --chain <name> with --frame 0,1 (named <chain>_frame<N>.png) or --at (named <chain>_<time>.png). --sequence/--chain may be left out when the file has only one. " +
+        "Options: --scale <1-16> (default 4), --background transparent|black|white|gray|#RRGGBB (default transparent), " +
+        "--bounds auto|x,y,w,h (auto fits every sprite of every image so frames line up; x,y is the lower-left corner in offset units, Y up), --grid (origin axes and a 16-unit grid). " +
+        "Prints each written path; --json gives {success, files:[...], errors:[{code,message}]}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
+
     public static string SchemaText()
     {
         var sb = new System.Text.StringBuilder();
@@ -116,6 +125,8 @@ public static class EditJson
         sb.AppendLine("Sequence files (.seqj) take these ops instead; the file extension picks the set.");
         sb.AppendLine(SequenceOps.AddressSyntax);
         AppendSpecs(sb, SequenceOps.Specs);
+        sb.AppendLine();
+        sb.AppendLine(RenderHelp);
         return sb.ToString();
     }
 

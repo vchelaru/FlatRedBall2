@@ -17,6 +17,8 @@ public static class CliApp
           new <file> [--json]                    create an empty .achx/.achj/.seqj
           convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
+          render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
+              --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  [--json]
           --schema [--json]                      list the operations and their fields
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
         """;
@@ -50,17 +52,22 @@ public static class CliApp
                 if (parsed.File is null) return cli.Usage("convert needs a file.");
                 if (parsed.To is not ("achj" or "achx")) return cli.Usage("convert needs --to achj or --to achx.");
                 return cli.Convert(parsed.File, parsed.To);
+            case "render":
+                if (parsed.File is null) return cli.Usage("render needs a file.");
+                return cli.Render(parsed.File, parsed.Values, parsed.Grid);
             default:
                 return cli.Usage($"unknown command '{parsed.Command}'.");
         }
     }
 
-    private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error)
+    private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error,
+        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false)
     {
         public static Arguments Parse(string[] args)
         {
             string? command = null, file = null, ops = null, to = null;
-            bool json = false, schema = false;
+            bool json = false, schema = false, grid = false;
+            var values = new Dictionary<string, string>();
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -68,6 +75,11 @@ public static class CliApp
                 {
                     case "--json": json = true; break;
                     case "--schema": schema = true; break;
+                    case "--grid": grid = true; break;
+                    case "--out" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds":
+                        if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
+                        values[a] = args[++i];
+                        break;
                     case "--ops":
                         if (i + 1 >= args.Length) return Bad("--ops needs a file.");
                         ops = args[++i];
@@ -84,7 +96,7 @@ public static class CliApp
                         break;
                 }
             }
-            return new Arguments(command, file, ops, to, json, schema, null);
+            return new Arguments(command, file, ops, to, json, schema, null, values, grid);
 
             static Arguments Bad(string error) => new(null, null, null, null, false, false, error);
         }
@@ -173,6 +185,39 @@ public static class CliApp
                 ? NewFileEdit.CreateSequenceFile(file)
                 : NewFileEdit.CreateAnimationFile(file);
             return Report(result, null, $"Created {file}");
+        }
+
+        public int Render(string file, IReadOnlyDictionary<string, string>? values, bool grid)
+        {
+            var outcome = RenderCommand.Run(file, values ?? new Dictionary<string, string>(), grid);
+            if (outcome.UsageError is not null) return Usage(outcome.UsageError);
+            if (Json)
+            {
+                stdout.WriteLine(EditJson.Render(w =>
+                {
+                    w.WriteStartObject();
+                    w.WriteBoolean("success", outcome.Success);
+                    w.WriteStartArray("files");
+                    foreach (var f in outcome.Files) w.WriteStringValue(f);
+                    w.WriteEndArray();
+                    w.WriteStartArray("errors");
+                    foreach (var (code, message) in outcome.Errors)
+                    {
+                        w.WriteStartObject();
+                        w.WriteString("code", code);
+                        w.WriteString("message", message);
+                        w.WriteEndObject();
+                    }
+                    w.WriteEndArray();
+                    w.WriteEndObject();
+                }));
+            }
+            else
+            {
+                foreach (var f in outcome.Files) stdout.WriteLine(f);
+                foreach (var (_, message) in outcome.Errors) stderr.WriteLine($"aecli: {message}");
+            }
+            return outcome.Success ? 0 : 1;
         }
 
         public int Convert(string file, string to)

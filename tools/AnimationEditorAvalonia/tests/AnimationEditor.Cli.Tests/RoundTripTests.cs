@@ -64,10 +64,11 @@ public class RoundTripTests : IDisposable
     }
 
     [Fact]
-    public void TheCliReferencesNoUiAssemblies()
+    public void TheEditingLogicReferencesNoUiAssemblies()
     {
         var seen = new HashSet<string>();
-        var queue = new Queue<Assembly>([typeof(CliApp).Assembly]);
+        // The CLI itself now references Views for `render`; the editing logic behind every other command stays UI-free.
+        var queue = new Queue<Assembly>([typeof(AnimationEditor.Editing.SequenceFileReader).Assembly]);
         while (queue.Count > 0)
         {
             var asm = queue.Dequeue();

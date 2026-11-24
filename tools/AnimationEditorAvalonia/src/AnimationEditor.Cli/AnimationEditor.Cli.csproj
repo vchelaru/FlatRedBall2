@@ -11,9 +11,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!-- Command-line front end for the editing operations. References only Editing: no Avalonia or SkiaSharp. -->
+  <!-- Command-line front end for the editing operations. References Editing, and Views for the render command (SkiaSharp drawing; Avalonia assemblies ride along, no window is ever created). -->
   <ItemGroup>
     <ProjectReference Include="..\AnimationEditor.Editing\AnimationEditor.Editing.csproj" />
+    <ProjectReference Include="..\AnimationEditor.Views\AnimationEditor.Views.csproj" />
   </ItemGroup>
 
 </Project>
