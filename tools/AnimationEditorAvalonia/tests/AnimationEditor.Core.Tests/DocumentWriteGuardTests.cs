@@ -44,6 +44,7 @@ public class DocumentWriteGuardTests
         ["MainWindow.ConvertToAchjAsync"] = [DocAction.ConvertOpenTabToAchj],
         ["MainWindow.AchxTabPane.PrepareCloseAsync"] = [DocAction.CloseTabWithUnsavedEdits, DocAction.CloseWindowWithUnsavedEdits, DocAction.Detach],
         ["MainWindow.AchxTabPane.ConfirmFailedSaveAsync"] = [DocAction.CloseTabWithUnsavedEdits, DocAction.CloseWindowWithUnsavedEdits],
+        ["MainWindow.AchxTabPane.SaveFailedEdits"] = [DocAction.ConvertOpenTabToAchj],
         ["MainWindow.AchxTabPane.SaveAsync"] = [DocAction.Save],
         ["MainWindow.AchxTabPane.SaveAsAsync"] = [DocAction.SaveAs, DocAction.SaveAsOntoOpenTab],
         ["MainWindow.SequenceTabPane.SaveAsync"] = [DocAction.Save],

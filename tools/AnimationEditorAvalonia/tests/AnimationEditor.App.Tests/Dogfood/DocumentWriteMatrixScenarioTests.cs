@@ -61,8 +61,6 @@ public class DocumentWriteMatrixScenarioTests
     /// <summary>The issue of a row that is a real bug, or null. Such a row is skipped while it fails; the fix deletes its line.</summary>
     private static string? KnownBug(DocAction action, DocType front, DocType background) => (action, front, background) switch
     {
-        (DocAction.ConvertOpenTabToAchj, _, _) => "#2021",
-        (DocAction.CloseBehindOutsideChange, _, _) => "#2027",
         (DocAction.LeaveDuringRename, DocType.Untitled, DocType.Seqj) => "#2023",
         _ => null,
     };
