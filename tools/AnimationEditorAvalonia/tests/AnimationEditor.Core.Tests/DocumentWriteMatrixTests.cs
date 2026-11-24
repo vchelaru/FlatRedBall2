@@ -25,7 +25,7 @@ public class DocumentWriteMatrixTests
     private static bool Applies(DocAction action, DocType front, DocType background) => action switch
     {
         // What is behind plays no part.
-        DocAction.SaveAsToAnotherFolder => background == DocType.Achx,
+        DocAction.SaveAsToAnotherFolder or DocAction.FailedSaveAs => background == DocType.Achx,
         // A name has an extension, so the target is always some file format.
         DocAction.SaveAsOntoAnotherFormat => background != DocType.Untitled,
         // The cross-file cut only saves file-backed tabs of the achx pane.
@@ -118,6 +118,38 @@ public class DocumentWriteMatrixTests
                 File.ReadAllBytes(target).AsSpan().SequenceEqual(old).ShouldBe(!takesIt);
                 editor.Messages.Count.ShouldBe(takesIt ? 0 : 1);
                 written.AddRange([target, "clips.achx"]);
+                break;
+            case DocAction.FailedSaveAs:
+                editor.Edit(current);
+                string? kept = editor.Ctx.ProjectManager.FileName;
+                var saveState = editor.Ctx.UndoManager.SaveState;
+                foreach (Obstacle obstacle in Enum.GetValues<Obstacle>().Where(obstacle => Blocks(obstacle, front)))
+                {
+                    // A folder of its own, so a texture name rewritten for it is wrong where the document still is.
+                    string blockedFolder = Directory.CreateDirectory(Path.Combine(editor.Folder, obstacle.ToString())).FullName;
+                    string blocked = Path.Combine(blockedFolder, "blocked" + (front == DocType.Untitled ? ".achj" : front.Extension()));
+                    using (Block(obstacle, blocked))
+                        await editor.SaveAsAsync(current, blocked, refused: true);
+                    if (current.Sequences is { } sequences) sequences.HasUnsavedEdits.ShouldBeFalse(obstacle.ToString());
+                    else
+                    {
+                        editor.Ctx.ProjectManager.FileName.ShouldBe(kept, obstacle.ToString());
+                        editor.Ctx.UndoManager.SaveState.ShouldBe(saveState, obstacle.ToString());
+                        editor.Ctx.IoManager.RecoveryFileExists().ShouldBe(front == DocType.Untitled, obstacle.ToString());
+                    }
+                    Directory.EnumerateFiles(blockedFolder).Where(file => file != blocked).ShouldBeEmpty($"{obstacle}: nothing is left beside the target");
+                    editor.ShouldBeAsExpected();
+                    editor.Messages.Count.ShouldBe(1, $"{obstacle}: a failed save says so, once");
+                    editor.Messages[0].ShouldStartWith("Could not save blocked.", Case.Sensitive, obstacle.ToString());
+                    editor.Messages.Clear();
+                }
+                editor.Ctx.UndoManager.Undo();
+                editor.Ctx.UndoManager.Redo();
+                // The document still saves where it did.
+                if (front == DocType.Untitled) Documents.ShouldHold(editor.Ctx.IoManager.RecoveryFilePath, current.Expected);
+                editor.Messages.ShouldBeEmpty();
+                written.Add(current.Path);
+                foreach (string extension in new[] { ".achx", ".achj", ".tsx", ".seqj" }) written.Add("blocked" + extension);
                 break;
             case DocAction.SaveBackgroundDocument:
                 var cell = Documents.NewCell(back.Name);
@@ -223,6 +255,44 @@ public class DocumentWriteMatrixTests
 
         editor.ShouldBeAsExpected();
         Documents.Changed(before, editor.Folder).Except(written.Select(Path.GetFileName)).ShouldBeEmpty("a file the action is not about changed");
+    }
+
+    /// <summary>What makes the write of a Save As fail.</summary>
+    private enum Obstacle { ReadOnly, Locked, MissingFolder, IsADirectory }
+
+    private static bool Blocks(Obstacle obstacle, DocType type) => obstacle switch
+    {
+        // Elsewhere a file held open can still be replaced.
+        Obstacle.Locked => OperatingSystem.IsWindows(),
+        // A sequence's Save As makes the folder.
+        Obstacle.MissingFolder => type != DocType.Seqj,
+        _ => true,
+    };
+
+    /// <summary>Puts <paramref name="obstacle"/> at <paramref name="path"/> until disposed.</summary>
+    private static IDisposable Block(Obstacle obstacle, string path)
+    {
+        string folder = Path.GetDirectoryName(path)!;
+        switch (obstacle)
+        {
+            case Obstacle.ReadOnly:
+                File.WriteAllText(path, "");
+                Documents.SetWritable(path, false);
+                return new Unblock(() => Documents.SetWritable(path, true));
+            case Obstacle.Locked:
+                return new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+            case Obstacle.MissingFolder:
+                Directory.Delete(folder);
+                return new Unblock(() => Directory.CreateDirectory(folder));
+            default:
+                Directory.CreateDirectory(path);
+                return new Unblock(() => { });
+        }
+    }
+
+    private sealed class Unblock(Action action) : IDisposable
+    {
+        public void Dispose() => action();
     }
 
     /// <summary>Another program renames what is in the file, and the content that leaves.</summary>

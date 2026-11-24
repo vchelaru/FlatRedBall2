@@ -83,4 +83,21 @@ public class AppCommandsSaveFailedTests : IDisposable
         Assert.Equal(SaveState.Failed, _ctx.UndoManager.SaveState);
         Assert.NotNull(reported);
     }
+
+    // #2036: a Save As onto another file that fails leaves this document as saved as it was; onto its own it does not.
+    [Fact]
+    public async System.Threading.Tasks.Task SaveAs_OntoItsOwnFile_WriteThrows_IsAFailedSaveOfTheDocument()
+    {
+        string own = Path.Combine(_dir.Path, "missing-folder", "Test.achj");
+        _ctx.ProjectManager.FileName = own;
+        _ctx.AppCommands.FileDialogService = new StubFileDialogService(own);
+        int failed = 0, refused = 0;
+        _ctx.AppCommands.SaveFailed += _ => failed++;
+        _ctx.AppCommands.SaveAsRefused += _ => refused++;
+
+        Assert.False(await _ctx.AppCommands.SaveCurrentAnimationChainListAsync());
+
+        Assert.Equal(SaveState.Failed, _ctx.UndoManager.SaveState);
+        Assert.Equal((1, 0), (failed, refused));
+    }
 }

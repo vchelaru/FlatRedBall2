@@ -26,6 +26,7 @@ public enum DocAction
     SaveAs,
     SaveAsToAnotherFolder,
     SaveAsOntoAnotherFormat,
+    FailedSaveAs,
     SaveBackgroundDocument,
     Reload,
     SwitchTabs,
