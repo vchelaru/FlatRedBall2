@@ -170,6 +170,17 @@ public class CheckWarningTests : IDisposable
     }
 
     [Fact]
+    public async Task EditSequence_SeveralClipsOnAReferenceTrack_AreCountedOneByOne()
+    {
+        var path = WriteSeq();
+        await EditWarnings(path, "add-sequence Long", "add-reference-track Long target=Run");
+
+        // Run lasts 1.5 s, so each later clip cuts the one before it.
+        (await EditWarnings(path, "add-block Long/Run sequence=Run start=0.5", "add-block Long/Run sequence=Run start=1"))
+            .ShouldBe(["The edit raised check warnings [cut-short] from 0 to 2; run `aecli check`."]);
+    }
+
+    [Fact]
     public async Task EditSequence_OneWarningFixedAndAnotherCaused_PrintsNothing()
     {
         var path = WriteSeq();
