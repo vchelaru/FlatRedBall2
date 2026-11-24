@@ -209,7 +209,7 @@ public class SequenceOpsTests : IDisposable
             ]}
             """).Success.ShouldBeTrue();
 
-        var clip = Reload().Sequences[1].Tracks[0].Reference!;
+        var clip = Reload().Sequences[1].Tracks[0].References![0];
         (clip.Sequence, clip.Start, clip.Length).ShouldBe(("Run", 1.0, (double?)2));
     }
 
@@ -234,7 +234,7 @@ public class SequenceOpsTests : IDisposable
         run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
         var save = Reload();
         save.Sequences[0].Tracks[0].Chains.ShouldAllBe(c => c.Length == null);
-        save.Sequences[1].Tracks[0].Reference!.Length.ShouldBeNull();
+        save.Sequences[1].Tracks[0].References![0].Length.ShouldBeNull();
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public class SequenceOpsTests : IDisposable
             """);
 
         run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
-        Reload().Sequences[1].Tracks[0].Reference!.Length.ShouldBe(2.5);
+        Reload().Sequences[1].Tracks[0].References![0].Length.ShouldBe(2.5);
     }
 
     private static System.Text.Json.Nodes.JsonNode JsonValue(string v) => System.Text.Json.Nodes.JsonValue.Create(v)!;

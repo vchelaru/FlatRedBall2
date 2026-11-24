@@ -80,9 +80,9 @@ public class SequenceReferenceScenarioTests
 
         var tracks = Saved(boss, "Idle").Tracks;
         tracks.Select(t => t.Name).ShouldBe(new[] { "Earth", "Body" }); // the new track lands in front
-        tracks[0].Reference!.Sequence.ShouldBe("Earth");
-        tracks[0].Reference!.Start.ShouldBe(0.5, "at the playhead, not where it was dropped");
-        tracks[0].Reference!.Length.ShouldBeNull();
+        tracks[0].References![0].Sequence.ShouldBe("Earth");
+        tracks[0].References![0].Start.ShouldBe(0.5, "at the playhead, not where it was dropped");
+        tracks[0].References![0].Length.ShouldBeNull();
         editor.UndoLabels.ShouldBe(new[] { "Add Reference 'Earth'" });
         Selected(editor).ShouldBe(new[] { "Idle" }); // the drag did not select the dragged row
         Timeline(editor).SelectedTrack.ShouldBe(0);
@@ -195,7 +195,7 @@ public class SequenceReferenceScenarioTests
         parent.Items.OfType<MenuItem>().Select(item => (string?)item.Header).ShouldBe(new[] { "Earth", "Action" });
         editor.PickMenuItem(timeline.Menu, "Add Sequence Reference", "Earth");
 
-        Saved(boss, "Idle").Tracks[0].Reference!.Sequence.ShouldBe("Earth");
+        Saved(boss, "Idle").Tracks[0].References![0].Sequence.ShouldBe("Earth");
 
         // Earth now sits inside Idle, so Idle is no longer offered to Earth.
         editor.ClickAt(editor.CenterOf(Row(editor, 1)));
@@ -210,8 +210,8 @@ public class SequenceReferenceScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string boss = WriteFixture(editor);
         var file = SequenceListSave.FromFile(boss);
-        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Ghost", Reference = new SequenceReferenceSave { Sequence = "Nope" } });
-        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Earth", Reference = new SequenceReferenceSave { Sequence = "Earth" } });
+        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Ghost", References = [new SequenceReferenceSave { Sequence = "Nope" }] });
+        file.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Earth", References = [new SequenceReferenceSave { Sequence = "Earth" }] });
         file.Save(boss);
         await editor.OpenAsync(boss);
         var timeline = Timeline(editor);
@@ -284,7 +284,7 @@ public class SequenceReferenceScenarioTests
 
         // Earth is 1 s: the clip spans 0..1 s. Drag its body 0.5 s later.
         editor.Drag(OnLanes(editor, 0, 0.4), OnLanes(editor, 0, 0.9), RawInputModifiers.Alt);
-        Saved(boss, "Idle").Tracks[0].Reference!.Start.ShouldBe(0.5, 0.02);
+        Saved(boss, "Idle").Tracks[0].References![0].Start.ShouldBe(0.5, 0.02);
 
         // Then its right edge from 1.5 s to 3.5 s: 3 s long.
         var reference = timeline.References.Single();
@@ -292,7 +292,7 @@ public class SequenceReferenceScenarioTests
         var y = timeline.Viewport.LaneTop(0) + TimelineLayout.BodyTop + 8;
         editor.Drag(editor.PointIn(timeline, edge - 1, y), editor.PointIn(timeline, timeline.Viewport.XAt(reference.End + 2), y), RawInputModifiers.Alt);
 
-        Saved(boss, "Idle").Tracks[0].Reference!.Length!.Value.ShouldBe(3, 0.05);
+        Saved(boss, "Idle").Tracks[0].References![0].Length!.Value.ShouldBe(3, 0.05);
         timeline.SequenceLength.ShouldBe(3.5, 0.05);   // the clip end, past Body's 2 s
         editor.UndoLabels.Count.ShouldBe(3);
     }

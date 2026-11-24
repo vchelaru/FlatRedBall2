@@ -212,7 +212,7 @@ public class SequenceCommandTests : IDisposable
         var file = WriteSeq();
         var save = SequenceListSave.FromFile(file);
         save.Sequences.Add(new SequenceSave { Name = "Other" });
-        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Sub", Reference = new SequenceReferenceSave { Sequence = "Other" } });
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Sub", References = [new SequenceReferenceSave { Sequence = "Other" }] });
         save.Save(file);
         var before = File.ReadAllBytes(file);
 
@@ -278,7 +278,7 @@ public class SequenceCommandTests : IDisposable
         var file = WriteSeq();
         var save = SequenceListSave.FromFile(file);
         save.Sequences.Add(new SequenceSave { Name = "Idle" });
-        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Play", Reference = new SequenceReferenceSave { Sequence = "Run" } });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Play", References = [new SequenceReferenceSave { Sequence = "Run" }] });
         save.Save(file);
 
         var r = await Edit(file, """
@@ -292,7 +292,7 @@ public class SequenceCommandTests : IDisposable
         var after = SequenceListSave.FromFile(file);
         after.Sequences.Select(s => s.Name).ShouldBe(["Run", "Sprint", "Idle", "Idle 2"]);
         after.Sequences[1].Tracks[0].Chains.Select(c => c.Chain).ShouldBe(["Walk", "Idle"]);
-        after.Sequences[3].Tracks[0].Reference!.Sequence.ShouldBe("Run");
+        after.Sequences[3].Tracks[0].References![0].Sequence.ShouldBe("Run");
     }
 
     [Fact]
@@ -335,7 +335,7 @@ public class SequenceCommandTests : IDisposable
         var file = WriteSeq();
         var save = SequenceListSave.FromFile(file);
         save.Sequences.Add(new SequenceSave { Name = "Idle" });
-        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Run", Reference = new SequenceReferenceSave { Sequence = "Run" } });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Run", References = [new SequenceReferenceSave { Sequence = "Run" }] });
         save.Save(file);
         var before = File.ReadAllBytes(file);
 

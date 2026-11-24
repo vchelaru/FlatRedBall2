@@ -70,7 +70,7 @@ public class SequenceThumbnailTests
         var document = Load(dir, Track("Fx", ("fx/fx.achj", "Spark", 0, null)));
         document.Save.Sequences[0].Name = "Fx";
         var boss = new SequenceSave { Name = "Boss" };
-        boss.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Fx", Start = start } });
+        boss.Tracks.Add(new SequenceTrackSave { Name = "Link", References = [new SequenceReferenceSave { Sequence = "Fx", Start = start }] });
         document.Save.Sequences.Add(boss);
         return document;
     }
@@ -131,7 +131,7 @@ public class SequenceThumbnailTests
     }
 
     private static SequenceTrackSave Link(string name, string target, double start = 0) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target, Start = start }] };
 
     [Fact]
     public void ChooseTime_NestedReferencesStartingLater_IsTheSumOfTheirStarts()

@@ -151,7 +151,7 @@ public class SequenceReferenceDropScenarioTests
         editor.DragRelease(editor.PointIn(timeline, 100, belowLast));
 
         Names(boss, "Idle").ShouldBe(new[] { "Body", "Mid", "Earth" });
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[2].Reference!.Sequence.ShouldBe("Earth");
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[2].References![0].Sequence.ShouldBe("Earth");
         timeline.SelectedTrack.ShouldBe(2);
         timeline.IsReferenceExpanded(2).ShouldBe(expanded, "the expansion follows the track");
         editor.UndoLabels.ShouldBe(new[] { "Add Reference 'Earth'", "Move Track 'Earth'" });

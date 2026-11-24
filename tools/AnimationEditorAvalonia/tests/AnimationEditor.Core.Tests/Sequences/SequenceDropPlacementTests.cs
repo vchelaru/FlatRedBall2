@@ -102,7 +102,7 @@ public class SequenceDropPlacementTests
 
         var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
         tracks.Select(t => t.Name).ShouldBe(expected);
-        tracks[slot].Reference!.Sequence.ShouldBe("Earth");
+        tracks[slot].References![0].Sequence.ShouldBe("Earth");
         document.TakeTrackSelection().ShouldBe(slot);
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Reference 'Earth'" });
         undo.Undo();

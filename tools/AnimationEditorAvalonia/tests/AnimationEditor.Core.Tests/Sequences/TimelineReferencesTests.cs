@@ -14,7 +14,7 @@ public class TimelineReferencesTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start } } };
 
     private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target, Start = start, Length = length }] };
 
     private static List<SequenceSave> File() => new()
     {
@@ -54,7 +54,7 @@ public class TimelineReferencesTests
     public void For_MissingTarget_IsDrawnAtTheMissingLength_AndCannotBeResized()
     {
         var file = File();
-        file[0].Tracks[1].Reference!.Sequence = "Gone";
+        file[0].Tracks[1].References![0].Sequence = "Gone";
 
         var reference = TimelineReferences.For(file[0], file, Cycle).Single();
 
@@ -159,7 +159,7 @@ public class TimelineReferencesTests
     public void For_LengthShorterThanTheTarget_ClipIsThatPartOfTheTarget()
     {
         var file = File();
-        file[0].Tracks[1].Reference!.Length = 0.625;
+        file[0].Tracks[1].References![0].Length = 0.625;
 
         TimelineReferences.For(file[0], file, Cycle).Single().Length.ShouldBe(0.625, 1e-9);
     }

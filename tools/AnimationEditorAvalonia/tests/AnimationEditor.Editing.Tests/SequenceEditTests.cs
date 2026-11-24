@@ -69,7 +69,7 @@ public class SequenceEditTests : IDisposable
         var r = Run(s, () => SequenceEdit.RenameSequence(s.Document, s.Undo, "Run", "Sprint"));
 
         r.Success.ShouldBeTrue();
-        Seq(s, "Rest").Tracks[0].Reference!.Sequence.ShouldBe("Sprint");
+        Seq(s, "Rest").Tracks[0].References![0].Sequence.ShouldBe("Sprint");
     }
 
     [Fact]
@@ -197,8 +197,8 @@ public class SequenceEditTests : IDisposable
         r.Success.ShouldBeTrue();
         var track = Seq(s, "Rest").Tracks[1];
         track.Name.ShouldBe("Run");
-        track.Reference!.Sequence.ShouldBe("Run");
-        track.Reference.Start.ShouldBe(1.5);
+        track.References![0].Sequence.ShouldBe("Run");
+        track.References![0].Start.ShouldBe(1.5);
     }
 
     [Fact]
@@ -383,7 +383,7 @@ public class SequenceEditTests : IDisposable
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/1", 2)).CodeAt(0).ShouldBe(EditErrorCode.IndexOutOfRange);
         Run(s, () => SequenceEdit.DeleteBlock(s.Document, s.Undo, "Rest/Run/0")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
 
-        var clip = Seq(s, "Rest").Tracks[0].Reference!;
+        var clip = Seq(s, "Rest").Tracks[0].References![0];
         (clip.Start, clip.Length).ShouldBe((2.0, (double?)3));
     }
 

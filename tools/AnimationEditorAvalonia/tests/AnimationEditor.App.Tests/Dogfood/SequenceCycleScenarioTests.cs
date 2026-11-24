@@ -29,7 +29,7 @@ public class SequenceCycleScenarioTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk" } } };
 
     private static SequenceTrackSave RefTrack(string name, string target) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target }] };
 
     private static SequenceTimelineControl Timeline(AnimationEditorHarness editor) => editor.Control<SequenceTimelineControl>("SequenceTimeline");
 

@@ -26,19 +26,23 @@ public class SequenceTrackSave
     /// is the same chain (same source and chain name) as the track's first block, which must start at 0. It carries its
     /// playback phase across the wrap instead, so a chain stretched to a fractional number of cycles does not snap back.
     /// If a different chain is playing at the wrap, or none, the track restarts as usual. Tracks then drift against each
-    /// other across passes; that is intended. On a <see cref="Reference"/> track the target keeps running across the wrap
-    /// instead of restarting, when the clip starts at 0, the target loops and the clip lasts to the holder's end
-    /// (<see cref="SequenceTimeline.CarriesAcrossWrap"/>); otherwise the flag is ignored. The chain rule is <see cref="SequenceTimeline.ActiveAtPass"/>. Written to the file
+    /// other across passes; that is intended. On a <see cref="References"/> track the first clip's target keeps running across the wrap
+    /// instead of restarting, when that clip starts at 0, the target loops and the clip playing at the wrap plays the same
+    /// sequence (<see cref="SequenceTimeline.ReferenceCarryOver"/>); otherwise the flag is ignored. The chain rule is <see cref="SequenceTimeline.ActiveAtPass"/>. Written to the file
     /// only when true, so every file without it stays unchanged.
     /// </summary>
     public bool Continuous { get; set; }
 
     /// <summary>
-    /// When set, the track plays another sequence of the file instead of chains (a clip with a start and a loop count,
-    /// see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> must stay empty: reading a file whose track has
-    /// both throws. The target's tracks are inlined under this track's name; <see cref="Visible"/> false hides all of them.
+    /// When not null, the track plays other sequences of the file instead of chains: a list of clips like a chain track's
+    /// blocks (see <see cref="SequenceReferenceSave"/>), and <see cref="Chains"/> must stay empty: reading a file whose
+    /// track has both throws. Null for a chain track; an empty list is a reference track with no clip yet. Playback orders
+    /// the clips by <see cref="SequenceReferenceSave.Start"/>, list order breaking ties, and the next clip cuts the previous
+    /// one (see <see cref="SequenceTimeline"/>). The targets' tracks are inlined under this track's name;
+    /// <see cref="Visible"/> false hides all of them. JSON key <c>references</c>, always an array on write; a legacy single
+    /// <c>reference</c> object reads as a one-clip list.
     /// </summary>
-    public SequenceReferenceSave? Reference { get; set; }
+    public List<SequenceReferenceSave>? References { get; set; }
 
     /// <summary>
     /// Chain references in any order. Playback orders them by <see cref="SequenceChainReferenceSave.Start"/>, and list

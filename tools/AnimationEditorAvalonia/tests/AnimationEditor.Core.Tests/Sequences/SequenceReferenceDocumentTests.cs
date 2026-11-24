@@ -54,7 +54,7 @@ public class SequenceReferenceDocumentTests
         bad.Sequences[0].Tracks.Add(new SequenceTrackSave
         {
             Name = "Earth",
-            Reference = new SequenceReferenceSave { Sequence = "Earth" },
+            References = [new SequenceReferenceSave { Sequence = "Earth" }],
             Chains = { new SequenceChainReferenceSave { Source = "fx.achj", Chain = "Spark" } },
         });
         bad.Save(document.Path.FullPath);
@@ -129,9 +129,9 @@ public class SequenceReferenceDocumentTests
 
         var tracks = SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks;
         tracks.Select(t => t.Name).ShouldBe(new[] { "Earth", "Body" });
-        tracks[0].Reference!.Sequence.ShouldBe("Earth");
-        tracks[0].Reference!.Start.ShouldBe(0.25);
-        tracks[0].Reference!.Length.ShouldBeNull();
+        tracks[0].References![0].Sequence.ShouldBe("Earth");
+        tracks[0].References![0].Start.ShouldBe(0.25);
+        tracks[0].References![0].Length.ShouldBeNull();
         undo.UndoHistory.Select(c => c.Description).ShouldBe(new[] { "Add Reference 'Earth'" });
         undo.Undo();
         document.Save.Sequences[0].Tracks.Count.ShouldBe(1);
@@ -173,9 +173,9 @@ public class SequenceReferenceDocumentTests
 
         document.RenameSequence(undo, 1, "Ground").ShouldBeNull();
 
-        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Ground");
+        document.Save.Sequences[0].Tracks[0].References![0].Sequence.ShouldBe("Ground");
         undo.Undo();
-        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
+        document.Save.Sequences[0].Tracks[0].References![0].Sequence.ShouldBe("Earth");
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class SequenceReferenceDocumentTests
         document.SetReferenceStart(undo, 0, 0, -1).ShouldNotBeNull();
         document.SetReferenceLength(undo, 0, 0, 0).ShouldNotBeNull();
 
-        var reference = document.Save.Sequences[0].Tracks[0].Reference!;
+        var reference = document.Save.Sequences[0].Tracks[0].References![0];
         reference.Start.ShouldBe(1.5);
         reference.Length.ShouldBe(2.5);
     }
@@ -208,7 +208,7 @@ public class SequenceReferenceDocumentTests
 
         document.ClearReferenceLength(undo, 0, 0).ShouldBeNull();
 
-        document.Save.Sequences[0].Tracks[0].Reference!.Length.ShouldBeNull();
+        document.Save.Sequences[0].Tracks[0].References![0].Length.ShouldBeNull();
         undo.UndoHistory.Last().Description.ShouldBe("Clear Length of 'Earth'");
     }
 
@@ -240,8 +240,8 @@ public class SequenceReferenceDocumentTests
 
         document.PasteTracks(undo, 2, content!, selectedTrack: null).Errors.ShouldBeEmpty();
 
-        document.Save.Sequences[2].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
-        document.Save.Sequences[2].Tracks[0].Reference!.Start.ShouldBe(0.5);
+        document.Save.Sequences[2].Tracks[0].References![0].Sequence.ShouldBe("Earth");
+        document.Save.Sequences[2].Tracks[0].References![0].Start.ShouldBe(0.5);
     }
 
     [Fact]
@@ -340,7 +340,7 @@ public class SequenceReferenceDocumentTests
     }
 
     private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target, Start = start, Length = length }] };
 
     private static bool Shows(SequenceDocument document, int sequence, double time, string chain) =>
         SequenceScene.At(document, sequence, time).Any(s => s.Chain.Name == chain);
@@ -360,8 +360,8 @@ public class SequenceReferenceDocumentTests
         var names = document.PasteSequences(undo, content!).Names;
 
         int copy = document.Save.Sequences.FindIndex(s => s.Name == names[0]);
-        document.Save.Sequences[copy].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
-        document.Save.Sequences[copy].Tracks[0].Reference!.Start.ShouldBe(0.5);
+        document.Save.Sequences[copy].Tracks[0].References![0].Sequence.ShouldBe("Earth");
+        document.Save.Sequences[copy].Tracks[0].References![0].Start.ShouldBe(0.5);
         Shows(document, copy, 0.6, "Spark").ShouldBeTrue();
     }
 
@@ -376,7 +376,7 @@ public class SequenceReferenceDocumentTests
 
         document.DeleteSequences(undo, new[] { 1 });
 
-        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Earth", "a missing target is kept as written");
+        document.Save.Sequences[0].Tracks[0].References![0].Sequence.ShouldBe("Earth", "a missing target is kept as written");
         Clip(document, 0).IsMissing.ShouldBeTrue();
         document.SequenceLength(0).ShouldBe(0.5, 1e-6);
         Shows(document, 0, 0.1, "Spark").ShouldBeFalse();
@@ -400,8 +400,8 @@ public class SequenceReferenceDocumentTests
         int copy = document.Save.Sequences.FindIndex(s => s.Name == copyName);
         document.SetReferenceStart(undo, copy, 0, 2).ShouldBeNull();
 
-        document.Save.Sequences[copy].Tracks[0].Reference!.Sequence.ShouldBe("Earth");
-        document.Save.Sequences[0].Tracks[0].Reference!.Start.ShouldBe(0.25);
+        document.Save.Sequences[copy].Tracks[0].References![0].Sequence.ShouldBe("Earth");
+        document.Save.Sequences[0].Tracks[0].References![0].Start.ShouldBe(0.25);
         Shows(document, copy, 2.1, "Spark").ShouldBeTrue();
     }
 
@@ -419,7 +419,7 @@ public class SequenceReferenceDocumentTests
         var tracks = document.Save.Sequences[0].Tracks;
         tracks.Count(t => t.Reference?.Sequence == "Earth").ShouldBe(2);
         tracks.Select(t => t.Name).Distinct().Count().ShouldBe(tracks.Count);
-        tracks[1].Reference!.Length.ShouldBeNull();
+        tracks[1].References![0].Length.ShouldBeNull();
         document.SequenceLength(0).ShouldBe(4, 1e-6);
     }
 
@@ -441,7 +441,7 @@ public class SequenceReferenceDocumentTests
         undo.Redo();
         Shows(document, 0, 0.1, "Spark").ShouldBeTrue();
         document.SequenceLength(0).ShouldBe(2, 1e-6);
-        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].Reference!.Length.ShouldBe(2);
+        SequenceListSave.FromFile(document.Path.FullPath).Sequences[0].Tracks[0].References![0].Length.ShouldBe(2);
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public class SequenceReferenceDocumentTests
 
         document.AddSequenceReference(new UndoManager(), 0, "Earth", start).ShouldBeNull();
 
-        document.Save.Sequences[0].Tracks[0].Reference!.Start.ShouldBe(0);
+        document.Save.Sequences[0].Tracks[0].References![0].Start.ShouldBe(0);
     }
 
     [Fact]
@@ -485,7 +485,7 @@ public class SequenceReferenceDocumentTests
 
         var tracks = document.Save.Sequences[0].Tracks;
         tracks.Count.ShouldBe(2);
-        tracks[1].Reference!.Sequence.ShouldBe("Earth");
+        tracks[1].References![0].Sequence.ShouldBe("Earth");
         tracks[1].Name.ShouldNotBe("Earth");
     }
 
@@ -543,7 +543,7 @@ public class SequenceReferenceDocumentTests
 
         document.MoveTrack(undo, 0, 0, 2).ShouldBe(1);
 
-        document.Save.Sequences[0].Tracks[1].Reference!.Sequence.ShouldBe("Earth");
+        document.Save.Sequences[0].Tracks[1].References![0].Sequence.ShouldBe("Earth");
         SequenceScene.At(document, 0, 0.1).Select(s => (s.Chain.Name, s.Track)).ShouldBe(new[] { ("Spark", 1), ("Walk", 0) });
     }
 
@@ -560,8 +560,8 @@ public class SequenceReferenceDocumentTests
         undo.Undo();
         undo.Redo();
 
-        document.Save.Sequences[0].Tracks[0].Reference!.Sequence.ShouldBe("Ground");
-        document.Save.Sequences[2].Tracks[0].Reference!.Sequence.ShouldBe("Ground");
+        document.Save.Sequences[0].Tracks[0].References![0].Sequence.ShouldBe("Ground");
+        document.Save.Sequences[2].Tracks[0].References![0].Sequence.ShouldBe("Ground");
         Shows(document, 2, 0.1, "Spark").ShouldBeTrue();
     }
 
@@ -572,7 +572,7 @@ public class SequenceReferenceDocumentTests
         var document = Load(dir);
         document.AddSequenceReference(new UndoManager(), 0, "Earth", 0);
         var onDisk = SequenceListSave.FromFile(document.Path.FullPath);
-        onDisk.Sequences[0].Tracks[0].Reference!.Sequence = "Action";
+        onDisk.Sequences[0].Tracks[0].References![0].Sequence = "Action";
         onDisk.Save(document.Path.FullPath);
 
         document.ReloadFromDisk().Changed.ShouldBeTrue();

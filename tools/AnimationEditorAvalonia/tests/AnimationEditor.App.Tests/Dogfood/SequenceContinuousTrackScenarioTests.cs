@@ -169,7 +169,7 @@ public class SequenceContinuousTrackScenarioTests
         string path = WriteFixture(editor, bodyContinuous: false);
         var save = SequenceListSave.FromFile(path);
         save.Sequences.Add(new SequenceSave { Name = "Legs", Loop = true, Tracks = { TrackOf("Leg", "Walk", 1.2, false) } });
-        save.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Legs", Reference = new SequenceReferenceSave { Sequence = "Legs" } });
+        save.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Legs", References = [new SequenceReferenceSave { Sequence = "Legs" }] });
         save.Save(path);
         await editor.OpenAsync(path);
         editor.Layout();
