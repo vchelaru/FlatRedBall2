@@ -158,30 +158,32 @@ public class EditRollbackTests : IDisposable
         Snapshot().ShouldBe(before);
     }
 
-    // The sync file cannot be read or written, so the edit saves and only the sync is reported.
-    [Fact]
-    public async Task Edit_AssociateTilesetWithTheSyncFileInUse_SavesAndWarns()
+    // The sync file cannot be read (#1992) or written (#1996), so the tileset is not associated.
+    [Theory]
+    [InlineData("in use", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }", "read")]
+    [InlineData("corrupt", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ", "read")]
+    [InlineData("unwritable", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }", "write")]
+    public async Task Edit_AssociateTilesetFails_FailsTheOp_AndLeavesTheFolderAsItWas(string state, string contents, string verb)
     {
-        using var held = new FileStream(_w.Write("hero.tiledsync", "{}"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        ExistingFar();
+        var sync = _w.Write("hero.tiledsync", contents);
+        if (state == "unwritable") SetWritable(false, "hero.tiledsync");
+        try
+        {
+            var before = Snapshot();
 
-        var r = await Edit("associate-tileset tiles.tsx");
+            CliOutput r;
+            using (state == "in use" ? new FileStream(sync, FileMode.Open, FileAccess.ReadWrite, FileShare.None) : null)
+                r = await Edit(CopyingOp + "overwrite", "associate-tileset tiles.tsx");
 
-        r.Code.ShouldBe(0, r.Out + r.Err);
-        r.Out.ShouldContain("was not updated");
-    }
-
-    // #1992: the associations in a file that cannot be read stay in it.
-    [Fact]
-    public async Task Edit_AssociateTilesetWithAnUnreadableSyncFile_SavesAndWarns_AndLeavesTheSyncFile()
-    {
-        const string corrupt = "{ \"TiledTilesetPaths\": [ \"old.tsx\" ";
-        var sync = _w.Write("hero.tiledsync", corrupt);
-
-        var r = await Edit("associate-tileset tiles.tsx");
-
-        r.Code.ShouldBe(0, r.Out + r.Err);
-        r.Out.ShouldContain("Could not read the Tiled sync file hero.tiledsync");
-        File.ReadAllText(sync).ShouldBe(corrupt);
+            r.Code.ShouldBe(1, r.Out + r.Err);
+            r.Out.ShouldContain($"op 1 (associate-tileset): Could not {verb} the Tiled sync file hero.tiledsync");
+            r.Out.ShouldContain("\"IoFailed\"");
+            r.Out.ShouldNotContain("was not updated");
+            JsonDocument.Parse(r.Out).RootElement.GetProperty("changed").GetArrayLength().ShouldBe(0);
+            Snapshot().ShouldBe(before);
+        }
+        finally { SetWritable(true, "hero.tiledsync"); }
     }
 
     // A null character makes a path unusable (#1992).
@@ -229,12 +231,12 @@ public class EditRollbackTests : IDisposable
         File.ReadAllBytes(existing).ShouldBe(File.ReadAllBytes(_far));
     }
 
-    private void SetWritable(bool writable)
+    private void SetWritable(bool writable, string file = "hero.achx")
     {
         // A save moves a temp file over the old one, which a read-only file stops on Windows and a read-only folder stops elsewhere.
         if (OperatingSystem.IsWindows())
         {
-            File.SetAttributes(_w.PathOf("hero.achx"), writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
+            File.SetAttributes(_w.PathOf(file), writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
             return;
         }
         var mode = UnixFileMode.UserRead | UnixFileMode.UserExecute;

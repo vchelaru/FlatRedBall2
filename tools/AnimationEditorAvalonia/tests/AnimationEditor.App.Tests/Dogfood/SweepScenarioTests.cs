@@ -69,6 +69,34 @@ public class SweepScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task AssociateTiledTileset_UnwritableSyncFile_ShowsTheProblemBanner_AndLeavesTheFile()
+    {
+        const string contents = "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }";
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
+        File.WriteAllText(tsx, TsxXml);
+        string sync = Path.Combine(editor.ProjectFolder, "hero.tiledsync");
+        File.WriteAllText(sync, contents);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        editor.Dialogs.AnswerNextOpenFile(tsx);
+        UnusualProjectScenarioTests.MakeUnwritable(sync);
+        try
+        {
+            editor.ClickMenu("MenuAssociateTiledTileset");
+            editor.Wait(TimeSpan.FromMilliseconds(200));
+
+            editor.ProblemText.ShouldNotBeNull().ShouldContain("Could not write the Tiled sync file hero.tiledsync");
+            File.ReadAllText(sync).ShouldBe(contents);
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(sync);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task CrashRecovery_UnsavedUntitledEdits_ComeBackOnTheNextStart_WithTheBanner()
     {
         string settingsRoot = Path.Combine(Path.GetTempPath(), "AnimationEditorDogfood", Guid.NewGuid().ToString("N"));
