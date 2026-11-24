@@ -116,8 +116,8 @@ public static class EditJson
 
     /// <summary>The <c>at</c> command is not an op either.</summary>
     public const string AtHelp =
-        "at <file.seqj> --time 0,2.15,4.2 [--sequence <name>]: what a sequence shows at each time (seconds), without the editor: per visible track (front first) the active chain, frame index, sprite offset, " +
-        "and that frame's shapes with offset and size glided by the keyframe curves (rect scaleX/scaleY, circle radius, polygon points). Tracks hidden at that time are left out. " +
+        "at <file.seqj> --time 0,2.15,4.2 [--sequence <name>] [--track <glob>] [--shapes-only]: what a sequence shows at each time (seconds), without the editor: per visible track (front first) the active chain, frame index, sprite offset, " +
+        "and that frame's shapes with offset and size glided by the keyframe curves (rect scaleX/scaleY, circle radius, polygon points). Tracks hidden at that time are left out; --track keeps tracks whose name matches a name or glob (as describe --track; no match is exit 1 with a Did-you-mean) and --shapes-only drops tracks whose active frame has no shapes. " +
         "--json gives {success, sequence, times:[{time, sprites:[{track, trackName, chain, frame, offsetX, offsetY, shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
         "--sequence may be left out when the file has only one; an unknown name fails with exit 1 and a Did-you-mean; a bad --time is exit 2.";
 
