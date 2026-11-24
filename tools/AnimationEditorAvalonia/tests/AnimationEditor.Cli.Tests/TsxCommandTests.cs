@@ -87,6 +87,27 @@ public class TsxCommandTests : IDisposable
         r.Err.ShouldContain("image collection");
     }
 
+    // #2015: the editor's own refusal, for reading and editing alike.
+    [Fact]
+    public async Task NotUtf8Tsx_IsRefusedNamingTheEncodingAndStaysByteIdentical()
+    {
+        File.WriteAllText(_w.PathOf("tiles.tsx"), Raw("tiles.tsx").Replace("UTF-8", "UTF-16"), System.Text.Encoding.Unicode);
+        var before = _w.Bytes("tiles.tsx");
+
+        var describe = await _w.RunAsync("describe", _w.PathOf("tiles.tsx"));
+        var edit = await Edit("tiles.tsx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
+        var associate = await Edit("hero.achx", """{"ops":[{"op":"associate-tileset","path":"tiles.tsx"}]}""");
+
+        foreach (var r in new[] { describe, edit, associate })
+        {
+            r.Code.ShouldBe(1, r.Out + r.Err);
+            (r.Out + r.Err).ShouldContain("encoding is UTF-16");
+        }
+        (describe.Out + describe.Err).ShouldContain("Can't open \"");
+        (edit.Out + edit.Err).ShouldContain("Can't open \"");
+        _w.Bytes("tiles.tsx").ShouldBe(before);
+    }
+
     [Fact]
     public async Task Describe_ReadOnly_NeverTouchesTheFile()
     {

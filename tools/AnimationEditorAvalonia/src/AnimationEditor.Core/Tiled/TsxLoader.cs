@@ -1,5 +1,6 @@
 using DotTiled;
 using DotTiled.Serialization;
+using System;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -18,8 +19,12 @@ public static class TsxLoader
     /// on resave), and <see cref="NativeTsxAnimationSync"/> no longer sees a class-only tile as
     /// empty and deletes it.
     /// </summary>
+    /// <exception cref="NotSupportedException">The file is not UTF-8.</exception>
     public static Tileset LoadTileset(string path)
     {
+        if (!TsxCompatibilityChecker.CheckEncoding(path, out var blockingReason))
+            throw new NotSupportedException(blockingReason);
+
         var tileset = Loader.Default().LoadTileset(path);
 
         var classByTileId = XDocument.Load(path).Root?
