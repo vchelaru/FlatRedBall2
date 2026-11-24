@@ -9,7 +9,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Captured values of every numeric field a bulk frame-edit operation can touch
-    /// (frame length, offsets, UV coordinates, color, keyframe flags and curves). Used by <see cref="BulkFrameEditCommand"/>
+    /// (frame length, offsets, region, color, keyframe flags and curves). Used by <see cref="BulkFrameEditCommand"/>
     /// to snapshot a frame before and after the operation.
     /// </summary>
     internal readonly record struct FrameFieldSnapshot(
@@ -56,7 +56,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// <summary>
     /// Do/undo/redo record for an operation that edits numeric fields across many frames
     /// at once — set-all-frame-lengths, adjust-offsets, scale-frame-times,
-    /// adjust-UV-after-resize. <see cref="Do"/> snapshots the affected frames, runs the
+    /// set-region. <see cref="Do"/> snapshots the affected frames, runs the
     /// supplied mutation, and snapshots them again; undo and redo just replay whichever
     /// snapshot set. <see cref="Do"/> returns <c>false</c> when the mutation changed
     /// nothing, so no empty undo entry is recorded.

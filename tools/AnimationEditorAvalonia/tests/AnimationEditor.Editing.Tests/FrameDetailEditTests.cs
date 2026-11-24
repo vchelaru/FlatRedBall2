@@ -9,7 +9,7 @@ namespace AnimationEditor.Editing.Tests;
 public class FrameDetailEditTests : IDisposable
 {
     private readonly EditingTestGraph _g = new();
-    private readonly AnimationChainListSave _acls = new();
+    private readonly AnimationChainListSave _acls = new() { CoordinateType = TextureCoordinateType.Pixel };
     private readonly AnimationChainSave _walk = new() { Name = "Walk" };
     private readonly AARectSave _rect2 = new() { Name = "B", ScaleX = 1, ScaleY = 1 };
     private readonly AARectSave _rect3 = new() { Name = "C", ScaleX = 1, ScaleY = 1 };

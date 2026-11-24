@@ -75,7 +75,7 @@ public class QaScenarioTests
 
         walk.Frames.Count.ShouldBe(1, "Delete inside a text box must not delete the selected frame");
         editor.Press(Key.Enter);
-        walk.Frames[0].LeftCoordinate.ShouldBe(8f / 64f);
+        walk.Frames[0].LeftCoordinate.ShouldBe(8f);
     }
 
     [AvaloniaFact]
@@ -528,7 +528,7 @@ public class QaScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task OpeningAnAchxWhosePngIsMissing_TakesEdits_ButRefusesToSaveAndSaysWhy()
+    public async Task OpeningAnAchxWhosePngIsMissing_TakesEdits_AndSavesTheRegionsAsTheyAre()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "gone.png", (0, 0, 16, 16)));
@@ -543,12 +543,11 @@ public class QaScenarioTests
 
         walk.Frames.Count.ShouldBe(2);
         editor.Wireframe.BitmapSize.Width.ShouldBe(0, "nothing to draw");
-        // A pixel-coordinate file cannot be written without the texture's size, so the editor
-        // refuses the save and says so, rather than writing a file with made-up coordinates.
-        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
-        editor.ProblemText.ShouldNotBeNull();
-        editor.ProblemText!.ShouldContain("gone.png");
-        AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Count.ShouldBe(1, "the file on disk is left as it was");
+        // Regions are pixels in memory and on disk (#1952), so saving needs no texture size.
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldNotBe("Auto Save Failed");
+        AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames
+            .Select(frame => (frame.LeftCoordinate, frame.TopCoordinate, frame.RightCoordinate, frame.BottomCoordinate))
+            .ShouldBe([(0f, 0f, 16f, 16f), (0f, 0f, 16f, 16f)]);
     }
 
     [AvaloniaFact]
@@ -618,7 +617,7 @@ public class QaScenarioTests
         editor.Type("24");
         editor.Press(Key.Enter);
 
-        walk.Frames[0].TopCoordinate.ShouldBe(24f / 64f);
+        walk.Frames[0].TopCoordinate.ShouldBe(24f);
         walk.Frames[0].LeftCoordinate.ShouldBe(0f);
     }
 

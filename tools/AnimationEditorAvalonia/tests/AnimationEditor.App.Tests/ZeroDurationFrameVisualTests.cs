@@ -71,7 +71,7 @@ public class ZeroDurationFrameVisualTests
                 TextureName      = "red.png",
                 FrameLength      = 0f,          // zero duration — the critical case
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
 
@@ -120,14 +120,14 @@ public class ZeroDurationFrameVisualTests
             {
                 TextureName      = "red.png",  FrameLength = 0f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "green.png", FrameLength = 0f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
 
@@ -212,14 +212,14 @@ public class ZeroDurationFrameVisualTests
             {
                 TextureName      = "red.png",  FrameLength = 0.1f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "blue.png", FrameLength = 0f,   // zero-duration frame 1
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
 

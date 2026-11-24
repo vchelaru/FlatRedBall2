@@ -34,7 +34,7 @@ public class GroupPreviewRenderTests
         {
             TextureName = texturePath,
             FrameLength = 1f,
-            LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+            LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 64f, BottomCoordinate = 64f,
             ShapesSave = new ShapesSave(),
         });
         return chain;

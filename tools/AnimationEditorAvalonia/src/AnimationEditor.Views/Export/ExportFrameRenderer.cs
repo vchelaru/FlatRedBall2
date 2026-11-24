@@ -152,7 +152,7 @@ internal static class ExportFrameRenderer
         if (image is null) return null;
 
         var frame = layer.Frame;
-        var (_, _, sw, sh) = PreviewControl.ComputeSourceRect(frame, image.Width, image.Height);
+        var (_, _, sw, sh) = PreviewControl.ComputeSourceRect(frame);
         int width = (frame.FlipDiagonal ? sh : sw) * scale;
         int height = (frame.FlipDiagonal ? sw : sh) * scale;
         float centerX = layer.OffsetX * offsetMultiplier * scale;

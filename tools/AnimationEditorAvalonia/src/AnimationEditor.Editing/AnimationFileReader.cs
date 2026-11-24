@@ -50,16 +50,6 @@ public static class AnimationFileReader
             var doc = project.AnimationChainListSave!;
             var tileset = TsxLoader.LoadTileset(path);
 
-            // The editor holds a .tsx in UV; every other file reads in pixels here.
-            var (width, height) = TiledAnimationToAchjMapper.GetTextureSize(tileset);
-            foreach (var frame in doc.AnimationChains.SelectMany(c => c.Frames))
-            {
-                frame.LeftCoordinate *= width;
-                frame.RightCoordinate *= width;
-                frame.TopCoordinate *= height;
-                frame.BottomCoordinate *= height;
-            }
-            doc.CoordinateType = TextureCoordinateType.Pixel;
             if (doc.TimeMeasurementUnit == TimeMeasurementUnit.Undefined) doc.TimeMeasurementUnit = TimeMeasurementUnit.Second;
 
             var owners = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);

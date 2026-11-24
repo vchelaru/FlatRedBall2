@@ -1672,7 +1672,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             if (texPath is not null &&
                 _thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) && bm is not null)
             {
-                var (_, _, sw, sh) = ComputeSourceRect(frame, bm.Width, bm.Height);
+                var (_, _, sw, sh) = ComputeSourceRect(frame);
                 Include(frame.RelativeX * om, -frame.RelativeY * om, sw * _zoom / 2f, sh * _zoom / 2f);
             }
 
@@ -1695,7 +1695,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 if (CacheKey(sprite.TexturePath) is { } key &&
                     _thumbnailService!.BitmapCache.TryGetValue(key, out var bitmap) && bitmap is not null)
                 {
-                    var (_, _, sw, sh) = ComputeSourceRect(sprite.Frame, bitmap.Width, bitmap.Height);
+                    var (_, _, sw, sh) = ComputeSourceRect(sprite.Frame);
                     Include(sample.OffsetX * om, -sample.OffsetY * om, sw * _zoom / 2f, sh * _zoom / 2f);
                 }
             }
@@ -2886,7 +2886,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             !_thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) || bm is null)
             return false;
 
-        var (_, _, sw, sh) = ComputeSourceRect(frame, bm.Width, bm.Height);
+        var (_, _, sw, sh) = ComputeSourceRect(frame);
         float om = _appState!.OffsetMultiplier * _zoom;
         float sx = GetCenterX() + frame.RelativeX * om;
         float sy = GetCenterY() - frame.RelativeY * om;
@@ -3892,19 +3892,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             : worldValue.ToString("0.###");
 
     /// <summary>
-    /// Converts the UV coordinates of <paramref name="frame"/> to a pixel source rect for a
-    /// texture of size (<paramref name="texW"/>, <paramref name="texH"/>).
-    /// Uses <see cref="FrameDisplayValues"/> (Math.Round) instead of plain <c>(int)</c>
-    /// truncation so that the returned dimensions are stable across drag positions on
-    /// non-power-of-2 textures (fixes preview jitter — issue #260).
+    /// The whole-pixel source rect of <paramref name="frame"/>. Uses <see cref="FrameDisplayValues"/>
+    /// (Math.Round) instead of plain <c>(int)</c> truncation so that a fractional region keeps stable
+    /// dimensions across drag positions (preview jitter, issue #260).
     /// </summary>
-    internal static (int sx, int sy, int sw, int sh) ComputeSourceRect(
-        AnimationFrameSave frame, int texW, int texH)
+    internal static (int sx, int sy, int sw, int sh) ComputeSourceRect(AnimationFrameSave frame)
     {
-        int sx = FrameDisplayValues.GetPixelX(frame, texW);
-        int sy = FrameDisplayValues.GetPixelY(frame, texH);
-        int sw = FrameDisplayValues.GetPixelWidth(frame, texW);
-        int sh = FrameDisplayValues.GetPixelHeight(frame, texH);
+        int sx = FrameDisplayValues.GetPixelX(frame);
+        int sy = FrameDisplayValues.GetPixelY(frame);
+        int sw = FrameDisplayValues.GetPixelWidth(frame);
+        int sh = FrameDisplayValues.GetPixelHeight(frame);
         return (sx, sy, sw, sh);
     }
 
@@ -3913,7 +3910,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float cx, float cy, float zoom, float alpha, bool showOutline = true, float? snapRenderScaling = null,
         GRContext? gpuContext = null, (float a, float b, float c, float d)? flipMatrixOverride = null)
     {
-        var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
+        var (sx, sy, sw, sh) = ComputeSourceRect(frame);
 
         var src = SKRectI.Create(sx, sy, sw, sh);
         float dw = sw * zoom;

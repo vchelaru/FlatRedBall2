@@ -117,12 +117,12 @@ public class SequenceReportTests : IDisposable
         text.ShouldContain("sheet.seqj");
         text.ShouldContain("hero.achj");
         text.ShouldContain("gone.achj  MISSING");
-        text.ShouldContain("Run  (loop, 2 tracks, length 1.4)");
-        text.ShouldContain("Rest  (no loop, 1 track, length 0.5)");
+        text.ShouldContain("Run  (loop, 2 tracks, length 1.4s)");
+        text.ShouldContain("Rest  (no loop, 1 track, length 0.5s)");
         text.ShouldContain("Body  continuous");
         text.ShouldContain("Run/Body/1  Walk  hero.achj  start 1  length auto  end 1.4");
         text.ShouldContain("Run/Shadow/0  Idle  hero.achj  start 0  length auto  end 0.5");
-        text.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8  end 0.8");
+        text.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8s  end 0.8");
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class SequenceReportTests : IDisposable
         var text = SequenceDescriber.ToText(doc, _w.SeqPath);
 
         text.ShouldContain("Run/Body/1  Fly  hero.achj  start 1  length auto  end 1  MISSING chain");
-        text.ShouldContain("Rest/Inner/0  plays Run  start 0.5  length 2");
+        text.ShouldContain("Rest/Inner/0  plays Run  start 0.5  length 2s");
     }
 
     [Fact]

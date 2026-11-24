@@ -33,8 +33,8 @@ public class WebpRendererTests : IDisposable
     {
         WriteRow(_folder, "sheet.png", SKColors.Red, SKColors.Blue);
         var chain = new AnimationChainSave { Name = "Blink", Loop = true };
-        chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
-        chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 0f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 1f, 2f));
 
         byte[] webp = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 3));
 
@@ -85,8 +85,8 @@ public class WebpRendererTests : IDisposable
     {
         WriteRow(_folder, "sheet.png", SKColors.Red, SKColors.Blue);
         var chain = new AnimationChainSave { Name = "Blink", Loop = true };
-        chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
-        chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 0f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 1f, 2f));
 
         byte[] webp = Render(
             new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) },
@@ -106,7 +106,7 @@ public class WebpRendererTests : IDisposable
             File.WriteAllBytes(Path.Combine(_folder, "wide.png"), bitmap.Encode(SKEncodedImageFormat.Png, 100).ToArray());
         }
         var chain = new AnimationChainSave { Name = "Wide", Loop = true };
-        chain.Frames.Add(Frame("wide.png", 0f, 1f));
+        chain.Frames.Add(Frame("wide.png", 0f, 2000f));
 
         Assert.Throws<InvalidOperationException>(() =>
             Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 16)));

@@ -60,15 +60,15 @@ public class FramePixelCoordsMultiSelectTests
             var f0 = new AnimationFrameSave
             {
                 TextureName = "sprite.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, RightCoordinate = 16f / 64f,
-                TopCoordinate = 0f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, RightCoordinate = 16f,
+                TopCoordinate = 0f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave(),
             };
             var f1 = new AnimationFrameSave
             {
                 TextureName = "sprite.png", FrameLength = 0.1f,
-                LeftCoordinate = 32f / 64f, RightCoordinate = 48f / 64f,
-                TopCoordinate = 0f, BottomCoordinate = 1f,
+                LeftCoordinate = 32f, RightCoordinate = 48f,
+                TopCoordinate = 0f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave(),
             };
             chain.Frames.AddRange(new[] { f0, f1 });
@@ -87,10 +87,10 @@ public class FramePixelCoordsMultiSelectTests
             FlushUi();
 
             // SetX preserves each frame's own width (16px for both here).
-            Assert.Equal(8f / 64f, f0.LeftCoordinate, 3);
-            Assert.Equal(24f / 64f, f0.RightCoordinate, 3);
-            Assert.Equal(8f / 64f, f1.LeftCoordinate, 3);
-            Assert.Equal(24f / 64f, f1.RightCoordinate, 3);
+            Assert.Equal(8f, f0.LeftCoordinate, 3);
+            Assert.Equal(24f, f0.RightCoordinate, 3);
+            Assert.Equal(8f, f1.LeftCoordinate, 3);
+            Assert.Equal(24f, f1.RightCoordinate, 3);
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }
@@ -105,15 +105,15 @@ public class FramePixelCoordsMultiSelectTests
             var f0 = new AnimationFrameSave
             {
                 TextureName = "sprite.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, RightCoordinate = 16f / 64f,
-                TopCoordinate = 0f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, RightCoordinate = 16f,
+                TopCoordinate = 0f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave(),
             };
             var f1 = new AnimationFrameSave
             {
                 TextureName = "sprite.png", FrameLength = 0.1f,
-                LeftCoordinate = 32f / 64f, RightCoordinate = 48f / 64f,
-                TopCoordinate = 0f, BottomCoordinate = 1f,
+                LeftCoordinate = 32f, RightCoordinate = 48f,
+                TopCoordinate = 0f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave(),
             };
             chain.Frames.AddRange(new[] { f0, f1 });
@@ -133,9 +133,9 @@ public class FramePixelCoordsMultiSelectTests
 
             // SetWidth keeps each frame's own Left fixed, only Right moves.
             Assert.Equal(0f, f0.LeftCoordinate, 3);
-            Assert.Equal(24f / 64f, f0.RightCoordinate, 3);
-            Assert.Equal(32f / 64f, f1.LeftCoordinate, 3);
-            Assert.Equal(56f / 64f, f1.RightCoordinate, 3);
+            Assert.Equal(24f, f0.RightCoordinate, 3);
+            Assert.Equal(32f, f1.LeftCoordinate, 3);
+            Assert.Equal(56f, f1.RightCoordinate, 3);
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }

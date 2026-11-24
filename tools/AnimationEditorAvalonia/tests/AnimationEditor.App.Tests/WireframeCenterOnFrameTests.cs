@@ -66,10 +66,10 @@ public class WireframeCenterOnFrameTests
             // Frame at the far corner [0.95, 0.95, 1.0, 1.0] — 25×25 pixels.
             var frame = new AnimationFrameSave
             {
-                LeftCoordinate   = 0.95f,
-                TopCoordinate    = 0.95f,
-                RightCoordinate  = 1.0f,
-                BottomCoordinate = 1.0f,
+                LeftCoordinate   = 475f,
+                TopCoordinate    = 475f,
+                RightCoordinate  = 500f,
+                BottomCoordinate = 500f,
             };
 
             var window = ctx.CreateMainWindow();
@@ -129,10 +129,10 @@ public class WireframeCenterOnFrameTests
             var texPath = WriteSolidPng(dir, "tex.png", 500, 500);
             var frame = new AnimationFrameSave
             {
-                LeftCoordinate   = 0.6f,
-                TopCoordinate    = 0.6f,
-                RightCoordinate  = 0.8f,
-                BottomCoordinate = 0.8f,
+                LeftCoordinate   = 300f,
+                TopCoordinate    = 300f,
+                RightCoordinate  = 400f,
+                BottomCoordinate = 400f,
             };
 
             var window = ctx.CreateMainWindow();

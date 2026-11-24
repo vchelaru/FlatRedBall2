@@ -902,17 +902,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Centres <paramref name="rectangle"/> on <paramref name="animationFrame"/>'s offset and
         /// sizes it to the frame (scale is the half-size in pixels). The size is left alone when
-        /// the frame's texture cannot be read, since the pixel size is unknown then.
+        /// the frame's region is not set.
         /// </summary>
         private IUndoableCommand MatchRectangleToFrameCommand(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
-            var size = _pm.GetTextureSizeInPixels(animationFrame.TextureName);
-            float scaleX = size is { } sizeX
-                ? Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate) * sizeX.Width / 2f
-                : rectangle.ScaleX;
-            float scaleY = size is { } sizeY
-                ? Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate) * sizeY.Height / 2f
-                : rectangle.ScaleY;
+            bool unset = FrameRegion.IsUnset(animationFrame, GetTextureSize);
+            float scaleX = unset ? rectangle.ScaleX : Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate) / 2f;
+            float scaleY = unset ? rectangle.ScaleY : Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate) / 2f;
             return SetShapePropsCommand.ForRect(
                 animationFrame, rectangle, rectangle.Name ?? "",
                 animationFrame.RelativeX, animationFrame.RelativeY, scaleX, scaleY,
@@ -1174,6 +1170,18 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public Func<string?>? CanvasDefaultTexturePath { get; set; }
 
+        public Func<string, (int Width, int Height)?>? DecodedTextureSize { get; set; }
+
+        /// <inheritdoc cref="IAppCommands.GetTextureSize"/>
+        public (int Width, int Height)? GetTextureSize(string textureName)
+        {
+            if (string.IsNullOrEmpty(textureName)) return null;
+            if (_pm.GetTextureSizeInPixels(textureName) is { } size) return size;
+
+            var folder = string.IsNullOrEmpty(_pm.FileName) ? string.Empty : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
+            return DecodedTextureSize?.Invoke(TexturePathHelper.ResolveDisplayPath(textureName, folder));
+        }
+
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             // When no texture is passed, inherit both the texture and the sub-region from a
@@ -1191,34 +1199,30 @@ namespace AnimationEditor.Core.CommandsAndState
             if (string.IsNullOrEmpty(resolvedTextureName))
                 resolvedTextureName = CanvasDefaultTexturePath?.Invoke();
 
-            CreateAndAddFrame(
-                chain, resolvedTextureName ?? string.Empty,
-                source?.LeftCoordinate ?? 0f, source?.TopCoordinate ?? 0f,
-                source?.RightCoordinate ?? 1f, source?.BottomCoordinate ?? 1f);
+            // A region nobody has set shows the whole texture once there is one of a known size.
+            var region = source is null ? FrameRegion.Unset : FrameRegion.Of(source);
+            if ((source is null || FrameRegion.IsUnset(source, GetTextureSize))
+                && !string.IsNullOrEmpty(resolvedTextureName) && GetTextureSize(resolvedTextureName) is { } size)
+                region = FrameRegion.Whole(size);
+
+            CreateAndAddFrame(chain, resolvedTextureName ?? string.Empty, region);
         }
 
         /// <summary>
         /// Shared tail end of <see cref="AddFrame"/> and <see cref="AddFrameFromPixelBounds"/>:
-        /// builds the <see cref="AnimationFrameSave"/> from already-resolved UV coordinates and
-        /// executes the undoable add. The two callers differ only in how they arrive at those UV
-        /// coordinates (a copied/inherited region vs. a pixel rect divided by bitmap size), not in
-        /// what happens once they have them.
+        /// builds the <see cref="AnimationFrameSave"/> from an already-resolved region and
+        /// executes the undoable add.
         /// </summary>
-        private void CreateAndAddFrame(
-            AnimationChainSave chain, string textureName,
-            float left, float top, float right, float bottom)
+        private void CreateAndAddFrame(AnimationChainSave chain, string textureName, FrameRegion region)
         {
             if (IsChainLocked(chain)) return;
 
             var frame = new AnimationFrameSave
             {
-                TextureName      = textureName,
-                LeftCoordinate   = left,
-                TopCoordinate    = top,
-                RightCoordinate  = right,
-                BottomCoordinate = bottom,
-                FrameLength      = CurrentFrameLengthUnit.DefaultFrameLength,
+                TextureName = textureName,
+                FrameLength = CurrentFrameLengthUnit.DefaultFrameLength,
             };
+            region.ApplyTo(frame);
             _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
         }
 
@@ -1898,18 +1902,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Justify (Bottom) — sets each frame's RelativeY so the bottom pixel edge
         /// aligns to y=0, divided by <paramref name="offsetMultiplier"/>.
-        /// Requires the texture height for each frame; callers supply a resolver
-        /// delegate so this method stays free of rendering code.
+        /// A frame whose region is not set is left alone.
         /// </summary>
         /// <param name="chain">Chain whose frames will be adjusted.</param>
-        /// <param name="getTextureHeight">
-        ///     Returns the texture height in pixels for a given frame,
-        ///     or <c>null</c> when no texture is loaded.
-        /// </param>
         /// <param name="offsetMultiplier">Preview offset multiplier (PL12), default 1.0.</param>
         public void AdjustOffsetsJustifyBottom(
             AnimationChainSave chain,
-            Func<AnimationFrameSave, float?> getTextureHeight,
             float offsetMultiplier = 1f)
         {
             if (IsChainLocked(chain)) return;
@@ -1919,9 +1917,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     foreach (var frame in chain.Frames)
                     {
-                        var height = getTextureHeight(frame);
-                        if (height.HasValue)
-                            AdjustOffsetCalculator.ApplyJustifyBottom([frame], height.Value, offsetMultiplier);
+                        if (!FrameRegion.IsUnset(frame, GetTextureSize))
+                            AdjustOffsetCalculator.ApplyJustifyBottom([frame], offsetMultiplier);
                     }
                 },
                 this, _events, refreshWireframe: true,
@@ -1984,8 +1981,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Adds <paramref name="count"/> new frames to <paramref name="chain"/>,
-        /// optionally auto-incrementing UV cells.
-        /// Returns <c>true</c> if any frame's auto-incremented UV exceeded texture
+        /// optionally advancing one cell of the sheet per frame.
+        /// Returns <c>true</c> if any frame's advanced region exceeded texture
         /// bounds (so the UI can warn the user).
         /// </summary>
         public bool AddMultipleFrames(
@@ -1996,7 +1993,9 @@ namespace AnimationEditor.Core.CommandsAndState
             if (IsChainLocked(chain)) return false;
 
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
-            var result    = BatchFrameBuilder.BuildBatch(lastFrame, count, incrementUV, CurrentFrameLengthUnit);
+            var result    = BatchFrameBuilder.BuildBatch(
+                lastFrame, count, incrementUV, CurrentFrameLengthUnit,
+                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName));
 
             var added = result.Frames.ToArray();
             if (added.Length > 0)
@@ -2050,9 +2049,8 @@ namespace AnimationEditor.Core.CommandsAndState
         // ── WF09: Create frame from magic-wand pixel bounds ───────────────────
 
         /// <summary>
-        /// Creates a new <see cref="AnimationFrameSave"/> whose UV coordinates correspond
-        /// to the pixel bounding box returned by the flood-fill (magic wand) tool, then
-        /// appends it to <paramref name="chain"/> and selects it.
+        /// Creates a new <see cref="AnimationFrameSave"/> showing the pixel bounding box returned by the
+        /// flood-fill (magic wand) tool, then appends it to <paramref name="chain"/> and selects it.
         /// </summary>
         /// <param name="chain">Chain to add the frame to.</param>
         /// <param name="textureName">Relative texture path (stored as-is in the frame).</param>
@@ -2060,18 +2058,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <param name="minY">Top pixel bound of the region (inclusive).</param>
         /// <param name="maxX">Right pixel bound of the region (exclusive).</param>
         /// <param name="maxY">Bottom pixel bound of the region (exclusive).</param>
-        /// <param name="bitmapWidth">Full width of the texture in pixels.</param>
-        /// <param name="bitmapHeight">Full height of the texture in pixels.</param>
         public void AddFrameFromPixelBounds(
             AnimationChainSave chain,
             string textureName,
-            int minX, int minY, int maxX, int maxY,
-            int bitmapWidth, int bitmapHeight)
+            int minX, int minY, int maxX, int maxY)
         {
-            CreateAndAddFrame(
-                chain, textureName,
-                minX / (float)bitmapWidth, minY / (float)bitmapHeight,
-                maxX / (float)bitmapWidth, maxY / (float)bitmapHeight);
+            CreateAndAddFrame(chain, textureName, new FrameRegion(minX, minY, maxX, maxY));
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
@@ -2086,7 +2078,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetFrameTextureName(AnimationFrameSave frame, string? textureName)
         {
             if (frame == null || IsFrameLocked(frame)) return;
-            _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
+            _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, GetTextureSize, this, _events));
         }
 
         public void AddFrameEvent(AnimationFrameSave frame, string name, string? data = null)
@@ -2124,7 +2116,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();
             if (unlockedFrames.Length == 0) return;
             var cmds = unlockedFrames
-                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, this, _events))
+                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
             _undoManager.Execute(new CompositeCommand(cmds, "Set Frame Texture"));
         }
@@ -2133,7 +2125,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (chain.Frames.Count == 0 || IsChainLocked(chain)) return;
             var cmds = chain.Frames
-                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, this, _events))
+                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }
@@ -2336,7 +2328,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 : null;
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
-            NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH)
+            NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH)
         {
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             if (unlockedFrames.Count == 0) return;
@@ -2366,15 +2358,15 @@ namespace AnimationEditor.Core.CommandsAndState
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
                         // (possibly just-moved) Left/Top.
-                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f, bmpW)), bmpW);
-                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f, bmpH)), bmpH);
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f)));
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f)));
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
                     }
                     foreach (var f in siblings)
                     {
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f, bmpW)), bmpW);
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f, bmpH)), bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
                     }
                 },
                 this, _events, true, "Set Region", coalesceKind: "PixelRegion"));

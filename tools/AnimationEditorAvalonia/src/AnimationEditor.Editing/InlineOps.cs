@@ -8,17 +8,18 @@ namespace AnimationEditor.Editing;
 
 /// <summary>
 /// One-line form of an op for <c>edit --op</c> (#1907): <c>&lt;op-name&gt; &lt;primary address&gt; key=value ...</c>. Driven entirely by the
-/// <see cref="OpSpec"/>s, so every op (and every future op) has it: the primary address is the op's first required field, written
-/// without a key (<c>key=value</c> also works for it); everything else is <c>key=value</c>. Each inline op is turned into the
-/// same JSON an ops file holds and handed to <see cref="EditOps.Parse(string, IReadOnlyList{OpSpec})"/>, so validation and error
-/// text are the ops file's, plus the expected form of the failing op.
+/// <see cref="OpSpec"/>s, so every op (and every future op) has it: the primary address is the op's first required field (its first
+/// field when none is required), written without a key (<c>key=value</c> also works for it); everything else is <c>key=value</c>.
+/// Each inline op is turned into the same JSON an ops file holds and handed to
+/// <see cref="EditOps.Parse(string, IReadOnlyList{OpSpec})"/>, so validation and error text are the ops file's, plus the expected
+/// form of the failing op.
 /// </summary>
 public static class InlineOps
 {
     /// <summary>How <c>--schema</c> explains the inline form; shared by the text and JSON output.</summary>
     public const string Syntax =
         "Inline form (edit <file> --op \"<op-name> <primary> key=value ...\", repeatable, applied in order; edit <file> --ops - reads the ops file JSON from stdin): "
-        + "the primary address is the op's first required field, written without its name (key=value also works). "
+        + "the primary address is the op's first required field (its first field when none is required), written without its name (key=value also works). "
         + "Values: numbers (-3, 0.5), true/false, text (quote it when it has spaces: name=\"Walk Cycle\" or 'Walk Cycle'), "
         + "and for points a JSON array (points=[[0,0],[8,0],[8,8]]). A text value is always taken literally. Each op shows its form below as 'inline:'.";
 
@@ -38,7 +39,7 @@ public static class InlineOps
 
     private static string FieldHint(OpField f) => f.Values is not null ? string.Join("|", f.Values) : f.Type == "points" ? "[[x,y],...]" : f.Type;
 
-    private static OpField? Primary(OpSpec spec) => spec.Fields.FirstOrDefault(f => f.Required);
+    private static OpField? Primary(OpSpec spec) => spec.Fields.FirstOrDefault(f => f.Required) ?? spec.Fields.FirstOrDefault();
 
     /// <summary>Parses the inline ops (in order) against <paramref name="specs"/>; nothing is applied.</summary>
     public static OpsParse Parse(IReadOnlyList<string> lines, IReadOnlyList<OpSpec> specs)

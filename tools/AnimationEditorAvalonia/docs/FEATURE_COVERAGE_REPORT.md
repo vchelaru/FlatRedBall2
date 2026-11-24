@@ -41,7 +41,7 @@
 
 | # | Feature | Description |
 |---|---------|-------------|
-| F01 | Add frame | Creates frame with UV defaults (L=0, R=1, T=0, B=1), `FrameLength=0.1`, empty `ShapeCollectionSave`, optional texture name |
+| F01 | Add frame | Creates frame showing the whole texture, `FrameLength=0.1`, empty `ShapeCollectionSave`, optional texture name |
 | F02 | Delete frames | Removes frames from selected chain; guarded by confirmation dialog |
 | F03 | Move frame up/down | Reorders frame by ±1; clamped at edges |
 | F04 | Move frame to top | Moves frame to index 0 |

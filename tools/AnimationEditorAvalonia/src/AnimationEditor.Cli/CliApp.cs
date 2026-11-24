@@ -31,18 +31,18 @@ public static class CliApp
     {
         var cli = new Invocation(stdout, stderr, stdin ?? TextReader.Null) { Json = args.Contains("--json") };
         if (args.Length == 0) return cli.Usage("no command given.", showUsage: true);
-        if (args[0] is "-h" or "--help" or "help")
-        {
-            if (args.Skip(1).FirstOrDefault(a => a.StartsWith("--", StringComparison.Ordinal)) is { } extra) return cli.Usage(CliCommands.Help.Refusal(extra));
-            stdout.WriteLine(Usage);
-            return 0;
-        }
+        if (args[0] is "-h" or "--help") args = ["help", .. args.Skip(1)];
 
         var parsed = Arguments.Parse(args);
         if (parsed.Error is not null) return cli.Usage(parsed.Error);
         var command = parsed.Command!;
         cli.Json = parsed.Has("--json");
 
+        if (command.Name == "help")
+        {
+            stdout.WriteLine(Usage);
+            return 0;
+        }
         if (command.Name == "--schema") return cli.Schema();
         if (command.Name == "--version")
         {
@@ -84,7 +84,9 @@ public static class CliApp
             string? name = null, file = null;
             var values = new Dictionary<string, string>();
             var inline = new List<string>();
+            // Every option in order, and beside each the value it took. Two string lists because a struct list costs startup (JIT).
             var given = new List<string>();
+            var taken = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -96,14 +98,13 @@ public static class CliApp
                     continue;
                 }
 
+                var option = CliCommands.FindOption(a);
+                bool needsValue = option?.Needs is not null, missing = needsValue && i + 1 >= args.Length;
+                string value = needsValue && !missing ? args[++i] : "";
                 given.Add(a);
-                if (CliCommands.FindOption(a) is not { } option) return Bad(Refused() ?? $"unknown option '{a}'.");
-                string value = "";
-                if (option.Needs is not null)
-                {
-                    if (i + 1 >= args.Length) return Bad(Refused() ?? option.Needs);
-                    value = args[++i];
-                }
+                taken.Add(value);
+                if (option is null) return Bad(Refused() ?? $"unknown option '{a}'.");
+                if (missing) return Bad(Refused() ?? option.Needs!);
                 if (a == "--op") inline.Add(value);
                 else values[a] = value;
             }
@@ -112,12 +113,16 @@ public static class CliApp
             if (Refused() is { } refused) return Bad(refused);
             return new Arguments(CliCommands.Find(name), file, values, inline, null);
 
-            // The first error the command itself explains: there is no such command, or an option it does not take.
+            // The first error the command itself explains: there is no such command, an option it does not take, one of its
+            // options taken as the value of another, or an option given twice.
             string? Refused()
             {
                 if (name is null) return null;
                 if (CliCommands.Find(name) is not { } command) return $"unknown command '{name}'.";
-                return given.FirstOrDefault(g => command.Options.All(o => o.Name != g)) is { } extra ? command.Refusal(extra) : null;
+                if (given.FirstOrDefault(g => command.Find(g) is null) is { } extra) return command.Refusal(extra);
+                if (taken.FindIndex(t => command.Find(t) is not null) is var i and >= 0)
+                    return $"{command.Find(given[i])!.Needs} {taken[i]} is an option, not its value.";
+                return given.FirstOrDefault(g => g != "--op" && given.IndexOf(g) != given.LastIndexOf(g)) is { } twice ? $"{twice} is given twice." : null;
             }
 
             static Arguments Bad(string error) => new(null, null, new Dictionary<string, string>(), [], error);
@@ -230,7 +235,7 @@ public static class CliApp
             var result = SequenceFileReader.IsSequenceFile(file)
                 ? NewFileEdit.CreateSequenceFile(file)
                 : NewFileEdit.CreateAnimationFile(file);
-            return Report(result, null, $"Created {file}");
+            return Report(result, null, $"Created {file}" + (result.Sequence is null ? "" : $" with sequence '{result.Sequence}'"));
         }
 
         public int Render(string file, IReadOnlyDictionary<string, string> values)

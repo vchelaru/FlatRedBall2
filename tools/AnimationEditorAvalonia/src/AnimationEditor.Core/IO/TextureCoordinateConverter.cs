@@ -1,137 +1,116 @@
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
-/// Converts a whole <see cref="AnimationChainListSave"/> between pixel and UV frame coordinates, reading each
-/// texture's size from its PNG header so Core needs no image-decode dependency. The editor keeps UV in memory;
-/// <see cref="AnimationFileLoader"/> converts on load and <see cref="ProjectManager"/> converts around each Pixel save.
+/// Converts frame regions between the pixels the editor keeps in memory and the fractions (UV) of a legacy file,
+/// reading each texture's size from its PNG header so Core needs no image-decode dependency. Pixel files never
+/// come through here.
 /// </summary>
 internal static class TextureCoordinateConverter
 {
     /// <summary>
-    /// Convert <paramref name="acls"/> to <paramref name="target"/> coordinate space
-    /// in place and return the per-texture size cache used (so a paired round-trip
-    /// can reuse it). No-op if already in <paramref name="target"/> space.
+    /// Converts <paramref name="list"/> from UV to pixels in place; no-op when it already holds pixels. A UV region
+    /// on a texture whose size can't be read has no pixel value, so it becomes <see cref="FrameRegion.Unset"/>; a frame
+    /// with no texture is left alone.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// Converting toward <see cref="TextureCoordinateType.Pixel"/> (i.e. preparing a persisted
-    /// on-disk write) needs every referenced texture's pixel size resolved up front: writing a
-    /// file with <c>CoordinateType=Pixel</c> while a frame's texture size couldn't be resolved
-    /// would leave that frame's coordinates un-converted (still UV-scale) under a header that
-    /// claims otherwise, corrupting the file (#1135). Converting toward UV -- on load, or when
-    /// reversing an in-memory model back after a successful Pixel save -- stays lenient: a
-    /// texture that hasn't been built yet is an expected, tolerated state while editing, and no
-    /// persisted artifact is at risk.
-    /// </exception>
-    internal static Dictionary<string, (int W, int H)> ConvertCoordinates(
-        AnimationChainListSave acls,
-        string achxDirectory,
-        TextureCoordinateType target,
-        Dictionary<string, (int W, int H)>? sizeCache = null)
+    internal static void ToPixels(AnimationChainListSave list, Func<string, (int Width, int Height)?> textureSize)
     {
-        sizeCache ??= new Dictionary<string, (int W, int H)>(System.StringComparer.OrdinalIgnoreCase);
+        if (list.CoordinateType == TextureCoordinateType.Pixel) return;
 
-        if (acls.CoordinateType == target) return sizeCache;
-
-        bool toPixel = target == TextureCoordinateType.Pixel;
-
-        if (toPixel)
+        var sizeOf = Cached(textureSize);
+        foreach (var frame in Frames(list))
         {
-            var unresolved = new List<string>();
-            foreach (var chain in acls.AnimationChains)
-            {
-                foreach (var frame in chain.Frames)
-                {
-                    if (string.IsNullOrEmpty(frame.TextureName)) continue;
-                    if (sizeCache.ContainsKey(frame.TextureName)) continue;
-
-                    if (TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out var size))
-                        sizeCache[frame.TextureName] = size;
-                    else
-                        unresolved.Add(frame.TextureName);
-                }
-            }
-
-            if (unresolved.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    "Cannot save with CoordinateType=Pixel: texture size could not be resolved " +
-                    $"for: {string.Join(", ", unresolved.Distinct())}. Fix or rebuild the missing " +
-                    $"{Plural.Noun(unresolved.Distinct().Count(), "texture")}, or switch the on-disk coordinate format to UV.");
-            }
+            if (string.IsNullOrEmpty(frame.TextureName)) continue;
+            var region = FrameRegion.Of(frame);
+            (sizeOf(frame.TextureName) is { } size ? ToPixels(region, size) : FrameRegion.Unset).ApplyTo(frame);
         }
-
-        foreach (var chain in acls.AnimationChains)
-        {
-            foreach (var frame in chain.Frames)
-            {
-                if (string.IsNullOrEmpty(frame.TextureName)) continue;
-
-                if (!sizeCache.TryGetValue(frame.TextureName, out var size))
-                {
-                    // Only reached when target == UV -- the toPixel branch above already
-                    // guaranteed every frame's texture is in sizeCache or threw.
-                    if (!TryResolveTextureSize(frame.TextureName, achxDirectory, sizeCache, out size))
-                        continue;
-                    sizeCache[frame.TextureName] = size;
-                }
-
-                if (size.W <= 0 || size.H <= 0) continue;
-
-                if (toPixel)
-                {
-                    frame.LeftCoordinate   *= size.W;
-                    frame.RightCoordinate  *= size.W;
-                    frame.TopCoordinate    *= size.H;
-                    frame.BottomCoordinate *= size.H;
-                }
-                else
-                {
-                    frame.LeftCoordinate   /= size.W;
-                    frame.RightCoordinate  /= size.W;
-                    frame.TopCoordinate    /= size.H;
-                    frame.BottomCoordinate /= size.H;
-                }
-            }
-        }
-
-        acls.CoordinateType = target;
-        return sizeCache;
+        list.CoordinateType = TextureCoordinateType.Pixel;
     }
 
     /// <summary>
-    /// Resolves <paramref name="textureName"/> to a pixel size via <paramref name="sizeCache"/>,
-    /// falling back to a PNG header read under <paramref name="achxDirectory"/>. Returns <see langword="false"/>
-    /// without touching <paramref name="sizeCache"/> when neither resolves.
+    /// Runs <paramref name="write"/> with <paramref name="list"/> in <paramref name="format"/>, then restores the list
+    /// exactly as it was. Needs no texture size when the list already is in that format.
     /// </summary>
-    private static bool TryResolveTextureSize(
-        string textureName,
-        string achxDirectory,
-        Dictionary<string, (int W, int H)> sizeCache,
-        out (int W, int H) size)
+    /// <exception cref="InvalidOperationException">
+    /// A region needs the size of a texture that can't be read. Nothing has been changed or written.
+    /// </exception>
+    internal static void WriteAs(
+        AnimationChainListSave list, TextureCoordinateType format, Func<string, (int Width, int Height)?> textureSize, Action write)
     {
-        if (sizeCache.TryGetValue(textureName, out size)) return true;
-
-        var path = System.IO.Path.IsPathRooted(textureName)
-            ? textureName
-            : System.IO.Path.Combine(achxDirectory, textureName);
-
-        var read = TryReadPngSize(path);
-        if (read == null)
+        if (list.CoordinateType == format)
         {
-            size = default;
-            return false;
+            write();
+            return;
         }
 
-        size = read.Value;
-        return true;
+        var sizeOf = Cached(textureSize);
+        ThrowIfUnsized(list, sizeOf, $"save with {format} coordinates");
+
+        var original = list.CoordinateType;
+        var regions = Frames(list).Select(frame => (Frame: frame, Region: FrameRegion.Of(frame))).ToList();
+        try
+        {
+            foreach (var (frame, region) in regions)
+            {
+                if (sizeOf(frame.TextureName) is { } size)
+                    (format == TextureCoordinateType.Pixel ? ToPixels(region, size) : ToUv(region, size)).ApplyTo(frame);
+            }
+            list.CoordinateType = format;
+            write();
+        }
+        finally
+        {
+            foreach (var (frame, region) in regions) region.ApplyTo(frame);
+            list.CoordinateType = original;
+        }
     }
 
-    internal static (int W, int H)? TryReadPngSize(string path)
+    /// <summary>Throws when a frame's region is set but its texture's size can't be read.</summary>
+    internal static void ThrowIfUnsized(AnimationChainListSave list, Func<string, (int Width, int Height)?> textureSize, string action)
+    {
+        var unsized = Frames(list)
+            .Where(frame => !string.IsNullOrEmpty(frame.TextureName) && FrameRegion.Of(frame) != FrameRegion.Unset
+                && textureSize(frame.TextureName) is null)
+            .Select(frame => frame.TextureName).Distinct().ToList();
+        if (unsized.Count > 0)
+            throw new InvalidOperationException(
+                $"Cannot {action}: texture size could not be resolved for: {string.Join(", ", unsized)}. " +
+                $"Fix or rebuild the missing {Plural.Noun(unsized.Count, "texture")}.");
+    }
+
+    /// <summary>Reads sizes of textures named relative to <paramref name="directory"/>; null for an empty name or an unreadable PNG.</summary>
+    internal static Func<string, (int Width, int Height)?> SizesIn(string directory) => name =>
+        string.IsNullOrEmpty(name)
+            ? null
+            : TryReadPngSize(System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name));
+
+    private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size) =>
+        new(uv.Left * size.Width, uv.Top * size.Height, uv.Right * size.Width, uv.Bottom * size.Height);
+
+    private static FrameRegion ToUv(FrameRegion pixels, (int Width, int Height) size) =>
+        new(pixels.Left / size.Width, pixels.Top / size.Height, pixels.Right / size.Width, pixels.Bottom / size.Height);
+
+    private static Func<string, (int Width, int Height)?> Cached(Func<string, (int Width, int Height)?> textureSize)
+    {
+        var sizes = new Dictionary<string, (int Width, int Height)?>(StringComparer.OrdinalIgnoreCase);
+        return name =>
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            if (!sizes.TryGetValue(name, out var size)) sizes[name] = size = textureSize(name);
+            return size;
+        };
+    }
+
+    private static IEnumerable<AnimationFrameSave> Frames(AnimationChainListSave list) =>
+        list.AnimationChains.SelectMany(chain => chain.Frames);
+
+    /// <summary>The size in a PNG's header, or null when the file is missing, not a PNG, or has no area.</summary>
+    internal static (int Width, int Height)? TryReadPngSize(string path)
     {
         try
         {
@@ -146,7 +125,7 @@ internal static class TextureCoordinateConverter
 
             int w = (hdr[16] << 24) | (hdr[17] << 16) | (hdr[18] << 8) | hdr[19];
             int h = (hdr[20] << 24) | (hdr[21] << 16) | (hdr[22] << 8) | hdr[23];
-            return (w, h);
+            return w > 0 && h > 0 ? (w, h) : null;
         }
         catch
         {

@@ -29,7 +29,7 @@ public class ClipboardPayloadTests
         var chains = new List<AnimationChainSave> { MakeChain("Walk"), MakeChain("Run") };
         var text   = ClipboardPayload.Serialize(chains, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
-        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out var gotChains, out _, out _);
 
         Assert.True(ok);
@@ -54,7 +54,7 @@ public class ClipboardPayloadTests
         var frames = new List<AnimationFrameSave> { MakeFrame("a.png"), MakeFrame("b.png") };
         var text   = ClipboardPayload.Serialize(frames, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
-        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out _, out var gotFrames, out _);
 
         Assert.True(ok);
@@ -78,7 +78,7 @@ public class ClipboardPayloadTests
         var rect = new AARectSave { Name = "HitBox", ScaleX = 8, ScaleY = 16, X = 1, Y = 2 };
         var text = ClipboardPayload.Serialize(rect);
 
-        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out _, out _, out var gotShapes);
 
         Assert.True(ok);
@@ -103,7 +103,7 @@ public class ClipboardPayloadTests
         var circle = new CircleSave { Name = "Sensor", Radius = 12, X = 3, Y = -4 };
         var text   = ClipboardPayload.Serialize(circle);
 
-        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out _, out _, out var gotShapes);
 
         Assert.True(ok);
@@ -127,7 +127,7 @@ public class ClipboardPayloadTests
     [InlineData("no colon here")]
     public void TryDeserialize_InvalidInput_ReturnsFalse(string? input)
     {
-        bool ok = ClipboardPayload.TryDeserialize(input, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize(input, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out var c, out var f, out var s);
         Assert.False(ok);
         Assert.Null(c);
@@ -138,7 +138,7 @@ public class ClipboardPayloadTests
     [Fact]
     public void TryDeserialize_UnknownTypeName_ReturnsFalse()
     {
-        bool ok = ClipboardPayload.TryDeserialize("UnknownType:<xml/>", AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize("UnknownType:<xml/>", AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out _, out _, out _);
         Assert.False(ok);
     }
@@ -146,7 +146,7 @@ public class ClipboardPayloadTests
     [Fact]
     public void TryDeserialize_MalformedXml_ReturnsFalse()
     {
-        bool ok = ClipboardPayload.TryDeserialize("CircleSave:<<<NOT XML>>>", AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds,
+        bool ok = ClipboardPayload.TryDeserialize("CircleSave:<<<NOT XML>>>", AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null,
             out _, out _, out _);
         Assert.False(ok);
     }
@@ -157,7 +157,7 @@ public class ClipboardPayloadTests
     public void TryDeserialize_ChainList_OnlyChainsIsPopulated()
     {
         var text = ClipboardPayload.Serialize(new List<AnimationChainSave> { MakeChain("A") }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out var chains, out var frames, out var shapes);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out var chains, out var frames, out var shapes);
         Assert.NotNull(chains);
         Assert.Null(frames);
         Assert.Null(shapes);
@@ -167,7 +167,7 @@ public class ClipboardPayloadTests
     public void TryDeserialize_FrameList_OnlyFramesIsPopulated()
     {
         var text = ClipboardPayload.Serialize(new List<AnimationFrameSave> { MakeFrame("a.png") }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out var chains, out var frames, out var shapes);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out var chains, out var frames, out var shapes);
         Assert.Null(chains);
         Assert.NotNull(frames);
         Assert.Null(shapes);

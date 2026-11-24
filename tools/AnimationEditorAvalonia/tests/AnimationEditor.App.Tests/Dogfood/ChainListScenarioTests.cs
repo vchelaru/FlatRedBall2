@@ -74,8 +74,7 @@ public class ChainListScenarioTests
         editor.Control<NumericUpDown>("PropPixelX").Value.ShouldBe(8, "the typed value should be committed to the box");
         editor.Press(Key.S, RawInputModifiers.Control);
 
-        // The editor holds UV in memory (8 of 64 pixels) and writes pixels to a pixel-coordinate file.
-        walk.Frames[0].LeftCoordinate.ShouldBe(0.125f);
+        walk.Frames[0].LeftCoordinate.ShouldBe(8f);
         AnimationChainListSave saved = AnimationEditorHarness.ReadSaved(path);
         saved.CoordinateType.ShouldBe(TextureCoordinateType.Pixel);
         saved.AnimationChains.Single().Frames.Single().LeftCoordinate.ShouldBe(8);

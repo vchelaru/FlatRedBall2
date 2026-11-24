@@ -25,7 +25,7 @@ public class TsxLossyDataCheckTests
     private static AnimationChainSave CleanChain(string name = "Walk")
     {
         var chain = new AnimationChainSave { Name = name };
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 0.25f, BottomCoordinate = 0.25f });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f });
         return chain;
     }
 
@@ -101,7 +101,7 @@ public class TsxLossyDataCheckTests
     public void Warnings_SeveralKindsAcrossFrames_OneWarningPerChain()
     {
         var chain = CleanChain("Walk");
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 0.25f, BottomCoordinate = 0.25f });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f });
         chain.Frames[0].FlipHorizontal = true;
         chain.Frames[1].RelativeX = 1f;
         chain.Loop = false;

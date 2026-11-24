@@ -25,13 +25,11 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class ThumbnailServiceTests
 {
-    /// <summary>A frame whose UV region is the given rectangle of the source (defaults to the whole sheet).</summary>
-    private static AnimationFrameSave Frame(float left = 0f, float top = 0f, float right = 1f, float bottom = 1f,
-        bool flipH = false, bool flipV = false)
+    /// <summary>A frame showing the top-left <paramref name="width"/>x<paramref name="height"/> pixels of its source.</summary>
+    private static AnimationFrameSave Frame(int width, int height, bool flipH = false, bool flipV = false)
         => new()
         {
-            LeftCoordinate  = left,  TopCoordinate    = top,
-            RightCoordinate = right, BottomCoordinate = bottom,
+            RightCoordinate = width, BottomCoordinate = height,
             FlipHorizontal  = flipH, FlipVertical     = flipV,
         };
 
@@ -64,7 +62,7 @@ public class ThumbnailServiceTests
         using var source = new SKBitmap(64, 64);
         source.Erase(SKColors.Red);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 56, 56);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(64, 64), default, 56, 56);
 
         Assert.NotNull(thumb);
         Assert.Equal(56, thumb!.Width);
@@ -79,7 +77,7 @@ public class ThumbnailServiceTests
         using var source = SplitSheet(16, 8, SKColors.Red, SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(right: 0.5f), default, 56, 56);
+            source, Frame(8, 8), default, 56, 56);
 
         Assert.NotNull(thumb);
         for (int y = 0; y < thumb!.Height; y++)
@@ -99,7 +97,7 @@ public class ThumbnailServiceTests
         // would smear a band of blended pixels across the middle.
         using var source = SplitSheet(2, 1, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 40, 40);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(2, 1), default, 40, 40);
 
         Assert.NotNull(thumb);
         for (int y = 0; y < thumb!.Height; y++)
@@ -127,7 +125,7 @@ public class ThumbnailServiceTests
         // blend at the seam instead of leaving a hard red/blue edge like point sampling would.
         using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 60, 1000);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(40, 2), default, 60, 1000);
 
         Assert.NotNull(thumb);
         var middle = thumb!.GetPixel(thumb.Width / 2, 0);
@@ -142,7 +140,7 @@ public class ThumbnailServiceTests
         // stay point-sampled — no blending near 1x.
         using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 42, 1000);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(40, 2), default, 42, 1000);
 
         Assert.NotNull(thumb);
         AssertNoBlendedPixels(thumb!, "1.05x magnification");
@@ -155,7 +153,7 @@ public class ThumbnailServiceTests
         // stay point-sampled — no needless blur just because 2x is close.
         using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 78, 1000);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(40, 2), default, 78, 1000);
 
         Assert.NotNull(thumb);
         AssertNoBlendedPixels(thumb!, "1.95x magnification");
@@ -168,7 +166,7 @@ public class ThumbnailServiceTests
         // borders the filtered band.
         using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 80, 1000);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(40, 2), default, 80, 1000);
 
         Assert.NotNull(thumb);
         AssertNoBlendedPixels(thumb!, "exact 2x magnification");
@@ -181,7 +179,7 @@ public class ThumbnailServiceTests
         // fix to (the unevenness artifact shrinks as scale grows past 2x) — must stay crisp.
         using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 92, 1000);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(40, 2), default, 92, 1000);
 
         Assert.NotNull(thumb);
         AssertNoBlendedPixels(thumb!, "2.3x magnification");
@@ -212,7 +210,7 @@ public class ThumbnailServiceTests
         // same phase. Filtering must average, giving mid-grey.
         using var source = CheckerSheet(64);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 8, 8);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(64, 64), default, 8, 8);
 
         Assert.NotNull(thumb);
         for (int y = 0; y < thumb!.Height; y++)
@@ -231,7 +229,7 @@ public class ThumbnailServiceTests
         using var source = SplitSheet(16, 8, SKColors.Red, SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(flipH: true), default, 16, 8);
+            source, Frame(16, 8, flipH: true), default, 16, 8);
 
         Assert.NotNull(thumb);
         // Leftmost pixel should be blue (was originally on the right).
@@ -258,7 +256,7 @@ public class ThumbnailServiceTests
         source.Erase(SKColors.White);
         var blue = new ResolvedFrameColor(0, 0, 255, null, ColorOperation.Multiply);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), blue, 8, 8);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(8, 8), blue, 8, 8);
 
         Assert.NotNull(thumb);
         var p = thumb!.GetPixel(4, 4);
@@ -275,7 +273,7 @@ public class ThumbnailServiceTests
         source.Erase(SKColors.White);
         var faded = new ResolvedFrameColor(null, null, null, 64, null);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), faded, 8, 8);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(8, 8), faded, 8, 8);
 
         Assert.NotNull(thumb);
         var p = thumb!.GetPixel(4, 4);
@@ -290,7 +288,7 @@ public class ThumbnailServiceTests
         // tints must not collide on one cached bitmap (that would show a stale/wrong color).
         var svc   = MakeSvc();
         var path  = WriteTempPng(8, 8);
-        var frame = Frame();
+        var frame = Frame(8, 8);
         frame.TextureName = path;
 
         var plain = svc.GetFrameThumbnail(frame, default, 56, 56);
@@ -308,7 +306,7 @@ public class ThumbnailServiceTests
         // A tinted thumbnail must be rendered once and reused (no per-playback-frame re-render).
         var svc   = MakeSvc();
         var path  = WriteTempPng(8, 8);
-        var frame = Frame();
+        var frame = Frame(8, 8);
         frame.TextureName = path;
         var color = new ResolvedFrameColor(255, 0, 0, null, ColorOperation.Multiply);
 
@@ -347,7 +345,7 @@ public class ThumbnailServiceTests
     {
         var svc   = MakeSvc();
         var path  = WriteTempPng(8, 8);
-        var frame = Frame();
+        var frame = Frame(8, 8);
         frame.TextureName = path;
 
         var first = svc.GetFrameThumbnail(frame, default, 56, 56);
@@ -365,7 +363,7 @@ public class ThumbnailServiceTests
     {
         var svc   = MakeSvc();
         var path  = WriteTempPng(8, 8);
-        var frame = Frame();
+        var frame = Frame(8, 8);
         frame.TextureName = path;
 
         var first  = svc.GetFrameThumbnail(frame, default, 56, 56);
@@ -383,7 +381,7 @@ public class ThumbnailServiceTests
         // asked for 56×56 must come back 56×56.
         var svc   = MakeSvc();
         var path  = WriteTempPng(64, 64);
-        var frame = Frame();
+        var frame = Frame(64, 64);
         frame.TextureName = path;
 
         var thumb = svc.GetFrameThumbnail(frame, default, 56, 56);
@@ -604,7 +602,7 @@ public class ThumbnailServiceTests
                 source.SetPixel(x, y, y < 8 ? SKColors.Red : SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(flipV: true), default, 8, 16);
+            source, Frame(8, 16, flipV: true), default, 8, 16);
 
         Assert.NotNull(thumb);
         // Top pixel should be blue (was originally at the bottom).

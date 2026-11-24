@@ -132,8 +132,8 @@ public class TsxFrameResizeRoundTripTests : IDisposable
 
     private static void SetGridRect(AnimationFrameSave frame, int colStart, int colEnd, int rowStart, int rowEnd)
     {
-        const float tileX = 16f / 64f;
-        const float tileY = 16f / 192f;
+        const float tileX = 16f;
+        const float tileY = 16f;
         frame.LeftCoordinate = colStart * tileX;
         frame.RightCoordinate = colEnd * tileX;
         frame.TopCoordinate = rowStart * tileY;

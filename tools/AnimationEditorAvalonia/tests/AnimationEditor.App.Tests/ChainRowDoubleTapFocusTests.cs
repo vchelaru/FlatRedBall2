@@ -107,8 +107,8 @@ public class ChainRowDoubleTapFocusTests
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(new AnimationFrameSave
             {
-                LeftCoordinate = 0.1f, TopCoordinate = 0.1f,
-                RightCoordinate = 0.3f, BottomCoordinate = 0.3f,
+                LeftCoordinate = 100f, TopCoordinate = 100f,
+                RightCoordinate = 300f, BottomCoordinate = 300f,
             });
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 

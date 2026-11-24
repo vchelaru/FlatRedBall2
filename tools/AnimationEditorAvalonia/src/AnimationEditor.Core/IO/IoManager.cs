@@ -188,7 +188,10 @@ namespace AnimationEditor.Core.IO
 
             try
             {
-                return AnimationChainListSave.FromFile(RecoveryFilePath);
+                var recovered = AnimationChainListSave.FromFile(RecoveryFilePath);
+                // A file an editor before #1952 left behind is in UV. An unsaved document's textures are absolute paths.
+                TextureCoordinateConverter.ToPixels(recovered, TextureCoordinateConverter.SizesIn(string.Empty));
+                return recovered;
             }
             catch
             {

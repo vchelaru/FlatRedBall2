@@ -70,10 +70,10 @@ public class MultiChainDeleteClearsOverlayTests
         try
         {
             var chainA = new AnimationChainSave { Name = "A" };
-            var af0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f };
+            var af0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 100f, TopCoordinate = 100f, RightCoordinate = 300f, BottomCoordinate = 300f };
             chainA.Frames.Add(af0);
             var chainB = new AnimationChainSave { Name = "B" };
-            var bf0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.4f, TopCoordinate = 0.1f, RightCoordinate = 0.6f, BottomCoordinate = 0.3f };
+            var bf0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 400f, TopCoordinate = 100f, RightCoordinate = 600f, BottomCoordinate = 300f };
             chainB.Frames.Add(bf0);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainA);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainB);

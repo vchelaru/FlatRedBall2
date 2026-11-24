@@ -267,8 +267,7 @@ public static class EditorDialogs
     }
 
     public static async Task ShowAdjustOffsetsAsync(
-        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain,
-        Func<AnimationFrameSave, float?> getTextureHeight)
+        IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain)
     {
         var justifyBottom = new RadioButton
         {
@@ -325,7 +324,7 @@ public static class EditorDialogs
         var choice = await host.ShowAsync(dialog);
         if (choice is not { } result) return;
         if (result.JustifyBottom)
-            appCommands.AdjustOffsetsJustifyBottom(chain, getTextureHeight);
+            appCommands.AdjustOffsetsJustifyBottom(chain);
         else
             appCommands.AdjustOffsetsAdjustAll(chain, result.X, result.Y, result.Relative);
     }

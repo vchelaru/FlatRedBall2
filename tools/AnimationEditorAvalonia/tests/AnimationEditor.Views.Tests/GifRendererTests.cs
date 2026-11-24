@@ -34,8 +34,8 @@ public class GifRendererTests : IDisposable
     {
         string sheet = WriteRow(_folder, "sheet.png", SKColors.Red, SKColors.Blue);
         var chain = new AnimationChainSave { Name = "Blink", Loop = true };
-        chain.Frames.Add(Frame("sheet.png", 0f, 0.5f));
-        chain.Frames.Add(Frame("sheet.png", 0.5f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 0f, 1f));
+        chain.Frames.Add(Frame("sheet.png", 1f, 2f));
 
         byte[] gif = Render(new[] { new ExportSourceChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds) }, Solid(scale: 3));
 

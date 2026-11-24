@@ -138,10 +138,10 @@ internal static class DocScreenshotManifest
     /// <summary>Crops <paramref name="frame"/> to the (col, row) cell of the 32×32 grid sheet.</summary>
     private static void SetCell(AnimationFrameSave frame, int col, int row)
     {
-        frame.LeftCoordinate   = col * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetWidth;
-        frame.RightCoordinate  = (col + 1) * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetWidth;
-        frame.TopCoordinate    = row * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetHeight;
-        frame.BottomCoordinate = (row + 1) * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetHeight;
+        frame.LeftCoordinate   = col * ScenarioFixtures.CellSize;
+        frame.RightCoordinate  = (col + 1) * ScenarioFixtures.CellSize;
+        frame.TopCoordinate    = row * ScenarioFixtures.CellSize;
+        frame.BottomCoordinate = (row + 1) * ScenarioFixtures.CellSize;
     }
 }
 

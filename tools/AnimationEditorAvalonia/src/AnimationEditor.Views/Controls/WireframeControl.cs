@@ -12,6 +12,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
 using System;
@@ -108,7 +109,7 @@ public class WireframeControl : TextureViewport
         // Frame region rectangles. Fills are batched per selection tier (#817): drawing each
         // frame's semi-transparent fill directly onto the canvas compounds alpha via normal
         // SrcOver blending wherever frames overlap (e.g. a whole-chain selection with duplicate
-        // UV rects), saturating toward solid blue. Instead, each tier's fills are drawn opaque
+        // regions), saturating toward solid blue. Instead, each tier's fills are drawn opaque
         // into an offscreen layer (SaveLayerAlpha) — overlapping opaque draws are idempotent —
         // then the whole layer composites onto the canvas once at the tier's target alpha.
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
@@ -412,7 +413,7 @@ public class WireframeControl : TextureViewport
     // can apply a uniform delta and OnPointerReleased can record a single undo entry.
     private readonly List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> _bulkHandleDragStarts = new();
 
-    // Before-UV snapshot captured at drag start for undo recording
+    // Region snapshot captured at drag start for undo recording
     private float _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB;
 
     // Preview rectangle (magic wand / grid snap hover)
@@ -451,7 +452,7 @@ public class WireframeControl : TextureViewport
 
     // ── Events ────────────────────────────────────────────────────────────────
 
-    /// <summary>Fired after a frame's UV coords have been updated by dragging a handle.</summary>
+    /// <summary>Fired after a frame's region has been updated by dragging a handle.</summary>
     public event Action<AnimationFrameSave>? FrameRegionChanged;
 
     /// <summary>
@@ -995,7 +996,7 @@ public class WireframeControl : TextureViewport
     /// <paramref name="endScreenX"/>,<paramref name="endScreenY"/> in screen space.
     /// <para>
     /// Drives the same <see cref="ApplyHandleDrag"/> code path as real pointer events,
-    /// writes updated UV coordinates back to the frame, and fires
+    /// writes the updated region back to the frame, and fires
     /// <see cref="FrameRegionChanged"/>. No-op when no frame is selected or no texture
     /// is loaded.
     /// </para>
@@ -1081,7 +1082,7 @@ public class WireframeControl : TextureViewport
     /// <paramref name="endScreenX"/>,<paramref name="endScreenY"/> in screen space.
     /// <para>
     /// Drives the same <see cref="ApplyChainDrag"/> code path as real pointer events,
-    /// writes updated UV coordinates back to every frame, and fires
+    /// writes the moved region back to every frame, and fires
     /// <see cref="ChainRegionChanged"/>. No-op when no chain is selected, no frames
     /// are visible, or no texture is loaded.
     /// </para>
@@ -1235,12 +1236,10 @@ public class WireframeControl : TextureViewport
         float vpH = (float)Bounds.Height;
         if (vpW <= 1 || vpH <= 1) return;
 
-        float bmpW = _bitmap.Width;
-        float bmpH = _bitmap.Height;
-        float pixL = frame.LeftCoordinate  * bmpW;
-        float pixT = frame.TopCoordinate   * bmpH;
-        float pixR = frame.RightCoordinate * bmpW;
-        float pixB = frame.BottomCoordinate * bmpH;
+        float pixL = frame.LeftCoordinate;
+        float pixT = frame.TopCoordinate;
+        float pixR = frame.RightCoordinate;
+        float pixB = frame.BottomCoordinate;
 
         if (!CanvasTransform.RectExceedsViewport(pixR - pixL, pixB - pixT, _zoom, vpW, vpH))
             return;
@@ -1266,13 +1265,10 @@ public class WireframeControl : TextureViewport
         if (_bitmap is null) return;
         CancelZoomAnimation();   // double-click centring overrides any in-flight wheel ease
 
-        float bmpW = _bitmap.Width;
-        float bmpH = _bitmap.Height;
-
-        float pixL = frame.LeftCoordinate  * bmpW;
-        float pixT = frame.TopCoordinate   * bmpH;
-        float pixR = frame.RightCoordinate * bmpW;
-        float pixB = frame.BottomCoordinate * bmpH;
+        float pixL = frame.LeftCoordinate;
+        float pixT = frame.TopCoordinate;
+        float pixR = frame.RightCoordinate;
+        float pixB = frame.BottomCoordinate;
 
         float texCX = (pixL + pixR) / 2f;
         float texCY = (pixT + pixB) / 2f;
@@ -1307,17 +1303,14 @@ public class WireframeControl : TextureViewport
         float vpH = (float)Bounds.Height;
         if (vpW <= 1 || vpH <= 1) return;
 
-        float bmpW = _bitmap.Width;
-        float bmpH = _bitmap.Height;
-
         float unionL = float.MaxValue, unionT = float.MaxValue;
         float unionR = float.MinValue, unionB = float.MinValue;
         foreach (var frame in chain.Frames)
         {
-            unionL = Math.Min(unionL, frame.LeftCoordinate   * bmpW);
-            unionT = Math.Min(unionT, frame.TopCoordinate    * bmpH);
-            unionR = Math.Max(unionR, frame.RightCoordinate  * bmpW);
-            unionB = Math.Max(unionB, frame.BottomCoordinate * bmpH);
+            unionL = Math.Min(unionL, frame.LeftCoordinate);
+            unionT = Math.Min(unionT, frame.TopCoordinate);
+            unionR = Math.Max(unionR, frame.RightCoordinate);
+            unionB = Math.Max(unionB, frame.BottomCoordinate);
         }
 
         CancelZoomAnimation();   // this fit overrides any in-flight wheel ease
@@ -2102,8 +2095,8 @@ public class WireframeControl : TextureViewport
     private static bool RegionChanged(
         float bL, float bT, float bR, float bB,
         float aL, float aT, float aR, float aB)
-        => Math.Abs(aL - bL) > 0.0001f || Math.Abs(aT - bT) > 0.0001f ||
-           Math.Abs(aR - bR) > 0.0001f || Math.Abs(aB - bB) > 0.0001f;
+        => Math.Abs(aL - bL) > FrameRegion.EditTolerance || Math.Abs(aT - bT) > FrameRegion.EditTolerance ||
+           Math.Abs(aR - bR) > FrameRegion.EditTolerance || Math.Abs(aB - bB) > FrameRegion.EditTolerance;
 
     private void ApplyHandleDrag(Point pos)
     {
@@ -2123,18 +2116,15 @@ public class WireframeControl : TextureViewport
 
         _draggingRect.Bounds = new SKRect(nb.Left, nb.Top, nb.Right, nb.Bottom);
 
-        // Write UV coords back to the primary frame
-        var (l, t, r, b) = DragHandleApplier.ToUvCoords(nb, _bitmap.Width, _bitmap.Height);
         var f = _draggingRect.Frame;
-        f.LeftCoordinate   = l;
-        f.RightCoordinate  = r;
-        f.TopCoordinate    = t;
-        f.BottomCoordinate = b;
+        f.LeftCoordinate   = nb.Left;
+        f.RightCoordinate  = nb.Right;
+        f.TopCoordinate    = nb.Top;
+        f.BottomCoordinate = nb.Bottom;
 
         // Apply the same delta to all other frames in bulk mode
         if (_bulkHandleDragStarts.Count > 0)
         {
-            float texW = _bitmap.Width, texH = _bitmap.Height;
             foreach (var (fr, startB, _, _, _, _) in _bulkHandleDragStarts)
             {
                 if (fr == _draggingRect) continue;
@@ -2142,11 +2132,10 @@ public class WireframeControl : TextureViewport
                 var nb2 = DragHandleApplier.Apply(_draggingHandle, dx, dy, sb);
                 nb2 = DragHandleApplier.SnapEdges(nb2, _draggingHandle, snapGrid);
                 fr.Bounds = new SKRect(nb2.Left, nb2.Top, nb2.Right, nb2.Bottom);
-                var (l2, t2, r2, b2) = DragHandleApplier.ToUvCoords(nb2, texW, texH);
-                fr.Frame.LeftCoordinate   = l2;
-                fr.Frame.RightCoordinate  = r2;
-                fr.Frame.TopCoordinate    = t2;
-                fr.Frame.BottomCoordinate = b2;
+                fr.Frame.LeftCoordinate   = nb2.Left;
+                fr.Frame.RightCoordinate  = nb2.Right;
+                fr.Frame.TopCoordinate    = nb2.Top;
+                fr.Frame.BottomCoordinate = nb2.Bottom;
             }
         }
 
@@ -2169,9 +2158,6 @@ public class WireframeControl : TextureViewport
         dx = MathF.Round(dx / snapGrid.StrideX) * snapGrid.StrideX;
         dy = MathF.Round(dy / snapGrid.StrideY) * snapGrid.StrideY;
 
-        float texW = _bitmap.Width;
-        float texH = _bitmap.Height;
-
         foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
             // Defense-in-depth: population above already skips locked frames.
@@ -2183,10 +2169,10 @@ public class WireframeControl : TextureViewport
             float newB = startBounds.Bottom + dy;
 
             fr.Bounds = new SKRect(newL, newT, newR, newB);
-            fr.Frame.LeftCoordinate   = newL / texW;
-            fr.Frame.TopCoordinate    = newT / texH;
-            fr.Frame.RightCoordinate  = newR / texW;
-            fr.Frame.BottomCoordinate = newB / texH;
+            fr.Frame.LeftCoordinate   = newL;
+            fr.Frame.TopCoordinate    = newT;
+            fr.Frame.RightCoordinate  = newR;
+            fr.Frame.BottomCoordinate = newB;
         }
 
         InvalidateVisual();
@@ -2309,11 +2295,9 @@ public class WireframeControl : TextureViewport
     {
         if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
         var frame = _selectedState!.SelectedFrame;
-        float w = _bitmap.Width, h = _bitmap.Height;
-
         float bL = frame.LeftCoordinate, bT = frame.TopCoordinate;
         float bR = frame.RightCoordinate, bB = frame.BottomCoordinate;
-        float aL = minX / w, aT = minY / h, aR = maxX / w, aB = maxY / h;
+        float aL = minX, aT = minY, aR = maxX, aB = maxY;
 
         frame.LeftCoordinate   = aL;
         frame.RightCoordinate  = aR;
@@ -2382,9 +2366,6 @@ public class WireframeControl : TextureViewport
 
         var highlightedFrames = ComputeHighlightedFrames();
 
-        float w = _bitmap.Width;
-        float h = _bitmap.Height;
-
         foreach (var frame in framesToShow)
         {
             if (string.IsNullOrEmpty(frame.TextureName)) continue;
@@ -2396,13 +2377,13 @@ public class WireframeControl : TextureViewport
                 if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
             }
 
-            // Displayed bounds always reflect the frame's true UV pixel bounds.
+            // Displayed bounds always reflect the frame's own region.
             // Grid must never snap or resize an existing frame's display — it only
             // affects active drags and click-to-place (issue #538).
-            float pixL = frame.LeftCoordinate   * w;
-            float pixT = frame.TopCoordinate    * h;
-            float pixR = frame.RightCoordinate  * w;
-            float pixB = frame.BottomCoordinate * h;
+            float pixL = frame.LeftCoordinate;
+            float pixT = frame.TopCoordinate;
+            float pixR = frame.RightCoordinate;
+            float pixB = frame.BottomCoordinate;
 
             _frameRects.Add(new FrameRect
             {
@@ -2435,9 +2416,6 @@ public class WireframeControl : TextureViewport
             ? null
             : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
 
-        float w = _bitmap.Width;
-        float h = _bitmap.Height;
-
         foreach (var frame in frames)
         {
             if (string.IsNullOrEmpty(frame.TextureName)) continue;
@@ -2447,10 +2425,10 @@ public class WireframeControl : TextureViewport
                 if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
             }
 
-            float pixL = frame.LeftCoordinate   * w;
-            float pixT = frame.TopCoordinate    * h;
-            float pixR = frame.RightCoordinate  * w;
-            float pixB = frame.BottomCoordinate * h;
+            float pixL = frame.LeftCoordinate;
+            float pixT = frame.TopCoordinate;
+            float pixR = frame.RightCoordinate;
+            float pixB = frame.BottomCoordinate;
             result.Add(new SKRect(pixL, pixT, pixR, pixB));
         }
         return result;
@@ -2496,8 +2474,8 @@ public class WireframeControl : TextureViewport
         var chain = _selectedState!.SelectedChain;
         if (chain?.Frames == null || chain.Frames.Count == 0) return (0, 0);
         var last = chain.Frames[chain.Frames.Count - 1];
-        int w = (int)Math.Round((last.RightCoordinate  - last.LeftCoordinate)  * _bitmap.Width);
-        int h = (int)Math.Round((last.BottomCoordinate - last.TopCoordinate)   * _bitmap.Height);
+        int w = (int)Math.Round(last.RightCoordinate - last.LeftCoordinate);
+        int h = (int)Math.Round(last.BottomCoordinate - last.TopCoordinate);
         return (w, h);
     }
 

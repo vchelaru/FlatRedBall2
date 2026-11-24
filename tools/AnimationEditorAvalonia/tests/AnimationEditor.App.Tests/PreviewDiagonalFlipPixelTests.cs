@@ -20,7 +20,7 @@ public class PreviewDiagonalFlipPixelTests
         using var sheet = SKImage.FromBitmap(sheetBmp);
         var frame = new AnimationFrameSave
         {
-            LeftCoordinate = 0f, RightCoordinate = 1f, TopCoordinate = 0f, BottomCoordinate = 1f,
+            LeftCoordinate = 0f, RightCoordinate = 20f, TopCoordinate = 0f, BottomCoordinate = 10f,
             FlipHorizontal = h, FlipVertical = v, FlipDiagonal = d,
         };
         var target = new SKBitmap(60, 60);

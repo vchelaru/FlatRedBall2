@@ -70,7 +70,7 @@ public class PngDropApplyTests
         try
         {
             var chain = new AnimationChainSave { Name = "Walk" };
-            var frame = new AnimationFrameSave { TextureName = "old.png" };
+            var frame = new AnimationFrameSave { TextureName = "old.png", RightCoordinate = 16, BottomCoordinate = 16 };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             ctx.SelectedState.SelectedFrame = frame;

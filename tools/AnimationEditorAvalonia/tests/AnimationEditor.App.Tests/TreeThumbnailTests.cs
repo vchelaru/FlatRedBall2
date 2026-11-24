@@ -63,7 +63,7 @@ public class TreeThumbnailTests
     {
         TextureName     = textureName,
         LeftCoordinate  = 0f, TopCoordinate    = 0f,
-        RightCoordinate = 1f, BottomCoordinate = 1f,
+        RightCoordinate = 16f, BottomCoordinate = 16f,
     };
 
     // ── Tests ─────────────────────────────────────────────────────────────────

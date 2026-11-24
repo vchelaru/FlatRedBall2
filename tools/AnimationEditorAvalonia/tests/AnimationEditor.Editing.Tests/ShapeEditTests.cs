@@ -8,7 +8,7 @@ namespace AnimationEditor.Editing.Tests;
 public class ShapeEditTests : IDisposable
 {
     private readonly EditingTestGraph _g = new();
-    private readonly AnimationChainListSave _acls = new();
+    private readonly AnimationChainListSave _acls = new() { CoordinateType = TextureCoordinateType.Pixel };
     private readonly AnimationChainSave _walk = new() { Name = "Walk" };
     private readonly AnimationFrameSave _f0 = new() { TextureName = "a.png", FrameLength = 0.1f, RelativeX = 3, RelativeY = 4 };
     private readonly AnimationFrameSave _f1 = new() { TextureName = "b.png", FrameLength = 0.1f };

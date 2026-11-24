@@ -98,8 +98,8 @@ public class WireframeFrameBoxDoubleClickSelectTests
         Directory.CreateDirectory(dir);
 
         var chain = new AnimationChainSave { Name = "Walk" };
-        var frameA = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 10f / 100f, TopCoordinate = 10f / 100f, RightCoordinate = 30f / 100f, BottomCoordinate = 30f / 100f };
-        var frameB = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 60f / 100f, TopCoordinate = 60f / 100f, RightCoordinate = 80f / 100f, BottomCoordinate = 80f / 100f };
+        var frameA = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 10f, TopCoordinate = 10f, RightCoordinate = 30f, BottomCoordinate = 30f };
+        var frameB = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 60f, TopCoordinate = 60f, RightCoordinate = 80f, BottomCoordinate = 80f };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

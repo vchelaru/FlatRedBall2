@@ -42,7 +42,7 @@ internal sealed class TestServices
         AppCommands       = new AppCommands(ProjectManager, SelectedState, ApplicationEvents,
                                             IoManager, ObjectFinder, UndoManager);
 
-        Acls = new AnimationChainListSave();
+        Acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         ProjectManager.AnimationChainListSave = Acls;
         ProjectManager.FileName = null;
 

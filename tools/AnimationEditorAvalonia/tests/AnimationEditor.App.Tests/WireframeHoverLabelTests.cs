@@ -55,16 +55,16 @@ public class WireframeHoverLabelTests
         {
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
-            LeftCoordinate   = 0.0f, TopCoordinate    = 0.0f,
-            RightCoordinate  = 0.2f, BottomCoordinate = 0.2f,
+            LeftCoordinate   = 0f, TopCoordinate    = 0f,
+            RightCoordinate  = 20f, BottomCoordinate = 20f,
             ShapesSave = new ShapesSave(),
         };
         var frameB = new AnimationFrameSave
         {
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
-            LeftCoordinate   = 0.6f, TopCoordinate    = 0.6f,
-            RightCoordinate  = 0.8f, BottomCoordinate = 0.8f,
+            LeftCoordinate   = 60f, TopCoordinate    = 60f,
+            RightCoordinate  = 80f, BottomCoordinate = 80f,
             ShapesSave = new ShapesSave(),
         };
 

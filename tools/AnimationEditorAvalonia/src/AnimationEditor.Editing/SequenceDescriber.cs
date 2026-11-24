@@ -9,7 +9,7 @@ namespace AnimationEditor.Editing;
 /// Human and machine readable dump of a sequence file as stored on disk (#1811): the sources (and whether each file is
 /// there), the sequences with their length, the tracks with their flags, and every block with its address, start, length
 /// and computed end (<see cref="SequenceTimeline"/>: the next block on the track can cut it short). A block whose
-/// source or chain is missing is flagged. A track that plays another sequence shows its clip as block 0.
+/// source or chain is missing is flagged. A track that plays other sequences shows one block per clip.
 /// </summary>
 public static class SequenceDescriber
 {
@@ -41,7 +41,7 @@ public static class SequenceDescriber
             foreach (var (sequence, track) in SummaryRows(save, filter))
             {
                 var blocks = Blocks(save, sequence, track, sources);
-                sb.AppendLine(FormattableString.Invariant($"{sequence.Name}/{track.Name}  {blocks.Count} block{(blocks.Count == 1 ? "" : "s")}  length {Num(blocks.Count == 0 ? 0 : blocks.Max(b => b.End))}"));
+                sb.AppendLine(FormattableString.Invariant($"{sequence.Name}/{track.Name}  {blocks.Count} block{(blocks.Count == 1 ? "" : "s")}  length {Num(blocks.Count == 0 ? 0 : blocks.Max(b => b.End))}s"));
             }
             return sb.ToString();
         }
@@ -53,7 +53,7 @@ public static class SequenceDescriber
         foreach (var sequence in save.Sequences.Where(filter.Includes))
         {
             var count = sequence.Tracks.Count;
-            sb.AppendLine($"{sequence.Name}  ({(sequence.Loop ? "loop" : "no loop")}, {count} track{(count == 1 ? "" : "s")}, length {Num(Length(save, sequence, sources))})");
+            sb.AppendLine($"{sequence.Name}  ({(sequence.Loop ? "loop" : "no loop")}, {count} track{(count == 1 ? "" : "s")}, length {Num(Length(save, sequence, sources))}s)");
             foreach (var track in sequence.Tracks.Where(filter.Includes))
             {
                 var flags = new List<string>();
@@ -65,7 +65,7 @@ public static class SequenceDescriber
                 {
                     var tail = b.PlaysSequence is not null ? "" : b.MissingSource ? "  MISSING source" : b.MissingChain ? "  MISSING chain" : "";
                     var what = b.PlaysSequence is not null ? $"plays {b.PlaysSequence}" : $"{b.Chain}  {b.Source}";
-                    sb.AppendLine(FormattableString.Invariant($"    {sequence.Name}/{track.Name}/{b.Index}  {what}  start {Num(b.Start)}  length {(b.Length is { } length ? Num(length) : "auto")}  end {Num(b.End)}{tail}"));
+                    sb.AppendLine(FormattableString.Invariant($"    {sequence.Name}/{track.Name}/{b.Index}  {what}  start {Num(b.Start)}  length {(b.Length is { } length ? Num(length) + "s" : "auto")}  end {Num(b.End)}{tail}"));
                 }
             }
         }

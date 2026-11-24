@@ -179,4 +179,101 @@ public class OptionValidationTests : IDisposable
         r.Code.ShouldBe(2);
         r.Err.ShouldContain(message);
     }
+
+    [Theory]
+    [MemberData(nameof(Commands))]
+    public async Task OptionsValueThatIsAnotherOptionOfTheCommand_IsUsageError(string command)
+    {
+        File.Copy(_w.PathOf("hero.achx"), _w.PathOf("only.achx"));
+        var before = Directory.GetFiles(_w.Dir).Order().ToArray();
+
+        foreach (var option in Takes[command].Except(Flags))
+        foreach (var swallowed in Takes[command])
+        {
+            var r = await _w.RunAsync([command, _w.PathOf("only.achx"), option, swallowed]);
+
+            r.Code.ShouldBe(2, r.Out + r.Err);
+            // --json counts even where it is swallowed, so that error is JSON.
+            var message = swallowed == "--json" ? r.Out : r.Err;
+            message.ShouldContain($"{option} needs ");
+            message.ShouldContain($"{swallowed} is an option, not its value");
+        }
+        Directory.GetFiles(_w.Dir).Order().ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task SwallowedOption_BeforeTheCommand_IsUsageError()
+    {
+        var r = await _w.RunAsync("--chain", "--summary", "describe", _w.PathOf("hero.achx"));
+
+        r.Code.ShouldBe(2);
+        r.Err.ShouldContain("--summary is an option, not its value");
+    }
+
+    [Theory]
+    [MemberData(nameof(Commands))]
+    public async Task RepeatedOption_IsUsageError_ExceptOp(string command)
+    {
+        File.Copy(_w.PathOf("hero.achx"), _w.PathOf("only.achx"));
+        var bytes = _w.Bytes("only.achx");
+
+        string[] line = command == "--schema" ? [command] : [command, _w.PathOf("only.achx")];
+
+        foreach (var option in Takes[command].Except(["--op"]))
+        {
+            string[] once = Flags.Contains(option) ? [option] : [option, "1"];
+
+            var r = await _w.RunAsync([.. line, .. once, .. once]);
+
+            r.Code.ShouldBe(2, r.Out + r.Err);
+            (option == "--json" ? r.Out : r.Err).ShouldContain($"{option} is given twice");
+        }
+        _w.Bytes("only.achx").ShouldBe(bytes);
+
+        if (command != "edit") return;
+        (await _w.RunAsync("edit", _w.PathOf("only.achx"), "--op", "add-chain A", "--op", "add-chain B")).Code.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("-8,-8,16,16")]
+    [InlineData("--8,-8,16,16")]
+    public async Task ValueStartingWithADash_IsAValue(string bounds)
+    {
+        var r = await _w.RunAsync([.. Working("render"), "--bounds", bounds]);
+
+        // A value that is not an option of the command reaches the command, which takes or refuses it itself.
+        (r.Code == 0).ShouldBe(bounds == "-8,-8,16,16", r.Err);
+        r.Err.ShouldNotContain("is an option");
+    }
+
+    [Theory]
+    [InlineData("--schema", 0)]
+    [InlineData("--version", 0)]
+    [InlineData("help", 0)]
+    [InlineData("--help", 0)]
+    [InlineData("-h", 0)]
+    [InlineData("--schema extra", 2)]
+    [InlineData("--version extra", 2)]
+    [InlineData("help edit", 2)]
+    [InlineData("--help edit", 2)]
+    [InlineData("-h edit", 2)]
+    public async Task CommandsWithoutAFile_RefuseAnExtraArgument(string line, int code)
+    {
+        var r = await _w.RunAsync(line.Split(' '));
+
+        r.Code.ShouldBe(code);
+        if (code == 2) r.Err.ShouldContain("unexpected argument");
+        else r.Out.ShouldNotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("edit", "--schema")]
+    [InlineData("describe", "--version")]
+    public async Task StandaloneCommandGivenAsAnOption_PointsToTheCommand(string command, string option)
+    {
+        var r = await _w.RunAsync(command, option);
+
+        r.Code.ShouldBe(2);
+        r.Err.ShouldContain($"run 'aecli {option}' on its own");
+    }
 }

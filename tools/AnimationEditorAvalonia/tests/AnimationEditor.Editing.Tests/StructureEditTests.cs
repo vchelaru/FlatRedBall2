@@ -9,7 +9,7 @@ namespace AnimationEditor.Editing.Tests;
 public class StructureEditTests : IDisposable
 {
     private readonly EditingTestGraph _g = new();
-    private readonly AnimationChainListSave _acls = new();
+    private readonly AnimationChainListSave _acls = new() { CoordinateType = TextureCoordinateType.Pixel };
     private readonly AnimationChainSave _walk = new() { Name = "Walk" };
     private readonly AnimationChainSave _run = new() { Name = "Run" };
     private readonly AnimationChainSave _idle = new() { Name = "Idle" };
@@ -188,7 +188,7 @@ public class StructureEditTests : IDisposable
         r.ChangedItems.ShouldBe(["Walk/3"]);
         var f = _walk.Frames[3];
         f.TextureName.ShouldBe("d.png");
-        (f.LeftCoordinate, f.TopCoordinate, f.RightCoordinate, f.BottomCoordinate).ShouldBe((0f, 0f, 1f, 1f));
+        (f.LeftCoordinate, f.TopCoordinate, f.RightCoordinate, f.BottomCoordinate).ShouldBe((0f, 0f, 48f, 32f));
         f.FrameLength.ShouldBe(FrameLengthUnit.Of(_acls).DefaultFrameLength);
         _g.Undo.Undo();
         _walk.Frames.Count.ShouldBe(3);
@@ -201,10 +201,10 @@ public class StructureEditTests : IDisposable
 
         r.Success.ShouldBeTrue(string.Join(";", r.Errors));
         var f = _walk.Frames[3];
-        f.LeftCoordinate.ShouldBe(16f / 48, 0.0001f);
-        f.RightCoordinate.ShouldBe(32f / 48, 0.0001f);
-        f.TopCoordinate.ShouldBe(8f / 32, 0.0001f);
-        f.BottomCoordinate.ShouldBe(24f / 32, 0.0001f);
+        f.LeftCoordinate.ShouldBe(16f, 0.0001f);
+        f.RightCoordinate.ShouldBe(32f, 0.0001f);
+        f.TopCoordinate.ShouldBe(8f, 0.0001f);
+        f.BottomCoordinate.ShouldBe(24f, 0.0001f);
         f.FrameLength.ShouldBe(0.25f);
     }
 
