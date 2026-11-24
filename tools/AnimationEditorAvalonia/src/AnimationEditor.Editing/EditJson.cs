@@ -113,7 +113,7 @@ public static class EditJson
         ".achx/.achj: --chain <name> with --frame 0,1 (named <chain>_frame<N>.png) or --at (named <chain>_<time>.png). --sequence/--chain may be left out when the file has only one. " +
         "Options: --scale <1-16> (default 4), --background transparent|black|white|gray|#RRGGBB (default transparent), " +
         "--bounds auto|x,y,w,h (auto fits every sprite of every image so frames line up; x,y is the lower-left corner in offset units, Y up), --grid (origin axes and a 16-unit grid), --shapes (draw the shapes), --sheet (one <name>_sheet.png with every image as a tile). " +
-        "Prints each written path; --json gives {success, files:[...], errors:[{code,message}]}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
+        "Prints each written path; --json gives {success, files:[...], errors:[{code,message}], warnings}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
 
     /// <summary>The <c>at</c> command is not an op either.</summary>
     public const string AtHelp =
@@ -121,7 +121,7 @@ public static class EditJson
         "and that frame's shapes with offset and size glided by the keyframe curves (rect scaleX/scaleY, circle radius, polygon points). Tracks hidden at that time are left out; --track keeps tracks whose name matches a name or glob (as describe --track; no match is exit 1 with a Did-you-mean) and --shapes-only drops tracks whose active frame has no shapes; --pass <n> is the moment after n loop wraps, as render --pass. " +
         "at <file.achx|.achj> --time 0,0.3 [--chain <name>] [--shapes-only]: the same for one chain, with its loop, ping-pong and reverse as render --at plays them. " +
         "An event fires when its frame is entered; a time inside the frame lists it but does not mean it fires at that instant. " +
-        "--json gives {success, sequence | chain, pass (when above 0), times:[{time, sprites:[{track, trackName (sequences only), chain, frame, offsetX, offsetY, flipHorizontal, flipVertical, flipDiagonal, color:{red, green, blue, alpha, operation}, events:[{name, data}], shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
+        "--json gives {success, sequence | chain, pass (when above 0), times:[{time, message (only when past the end of a looping sequence), sprites:[{track, trackName (sequences only), chain, frame, offsetX, offsetY, flipHorizontal, flipVertical, flipDiagonal, color:{red, green, blue, alpha, operation}, events:[{name, data}], shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
         "--sequence or --chain may be left out when the file has only one; an unknown name fails with exit 1 and a Did-you-mean; a bad --time is exit 2.";
 
     public static string SchemaText()

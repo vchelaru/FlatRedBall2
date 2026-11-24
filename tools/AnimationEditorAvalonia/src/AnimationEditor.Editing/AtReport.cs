@@ -26,7 +26,8 @@ public sealed record AtSprite(
     ResolvedFrameColor Color, bool FlipHorizontal, bool FlipVertical, bool FlipDiagonal, IReadOnlyList<AnimationFrameEvent> Events);
 
 /// <summary>What <c>aecli at</c> reports at one time; a sequence's sprites are front to back (track 0 first), a chain has one.</summary>
-public sealed record AtMoment(double Time, IReadOnlyList<AtSprite> Sprites);
+/// <param name="Message">Why there are no sprites when the time is past the end of a looping sequence; null otherwise.</param>
+public sealed record AtMoment(double Time, IReadOnlyList<AtSprite> Sprites, string? Message = null);
 
 /// <summary>The report of one sequence or chain.</summary>
 /// <param name="Kind"><c>sequence</c> or <c>chain</c>.</param>
@@ -46,31 +47,22 @@ public static class AtReport
     public static AtResult? BuildSequence(
         string file, string? sequenceName, IReadOnlyList<double> times, int pass, string? trackPattern, bool shapesOnly, out string? error, out bool usage)
     {
-        error = null; usage = false;
-        var read = SequenceFileReader.Read(file);
-        if (read.Document is null) { error = read.Error; return null; }
-
-        SequenceDocument document;
-        try { document = SequenceDocument.Load(file); }
-        catch (Exception ex) { error = $"Could not read {Path.GetFileName(file)}: {ex.Message}"; return null; }
+        if (RenderPlanner.OpenSequence(file, sequenceName, out error, out usage) is not var (document, index)) return null;
 
         var sequences = document.Save.Sequences;
-        int index = RenderPlanner.Pick(sequenceName, sequences.Select(s => s.Name).ToList(), "sequence", "--sequence", "sequences", out error, out usage);
-        if (index < 0) return null;
-
-        var missing = document.Save.Sources.Where(document.IsSourceMissing).ToList();
-        if (missing.Count > 0) { error = $"Missing or unreadable source(s): {string.Join(", ", missing)}."; return null; }
-
         var tracks = sequences[index].Tracks;
         var filter = new SequenceDescriber.Filter([sequences[index].Name], trackPattern);
         error = SequenceDescriber.CheckTrackFilter(document.Save, filter);
         if (error is not null) return null;
 
-        var moments = times.Select(time => new AtMoment(time,
-            SequenceScene.At(document, index, time, pass).Reverse()
+        var moments = times.Select(time =>
+        {
+            var sprites = SequenceScene.At(document, index, time, pass).Reverse()
                 .Where(sprite => trackPattern is null || (sprite.Track >= 0 && sprite.Track < tracks.Count && filter.Includes(tracks[sprite.Track])))
                 .Select(sprite => ToSprite(sprite, tracks))
-                .Where(sprite => !shapesOnly || sprite.Shapes.Count > 0).ToList())).ToList();
+                .Where(sprite => !shapesOnly || sprite.Shapes.Count > 0).ToList();
+            return new AtMoment(time, sprites, sprites.Count == 0 ? RenderPlanner.PastEnd(document, index, time) : null);
+        }).ToList();
         return new AtResult("sequence", sequences[index].Name, moments, pass);
     }
 
@@ -113,7 +105,7 @@ public static class AtReport
         foreach (var moment in result.Moments)
         {
             sb.AppendLine($"{result.Name} at {Num(moment.Time)}s{(result.Pass > 0 ? $" pass {result.Pass}" : "")}");
-            if (moment.Sprites.Count == 0) sb.AppendLine("  (nothing visible)");
+            if (moment.Sprites.Count == 0) sb.AppendLine("  " + (moment.Message ?? "(nothing visible)"));
             foreach (var s in moment.Sprites)
             {
                 string track = s.Track is { } t ? $"track {t}{(s.TrackName.Length > 0 ? " " + s.TrackName : "")}: " : "";
@@ -148,6 +140,7 @@ public static class AtReport
         {
             w.WriteStartObject();
             w.WriteNumber("time", moment.Time);
+            if (moment.Message is not null) w.WriteString("message", moment.Message);
             w.WriteStartArray("sprites");
             foreach (var s in moment.Sprites)
             {
