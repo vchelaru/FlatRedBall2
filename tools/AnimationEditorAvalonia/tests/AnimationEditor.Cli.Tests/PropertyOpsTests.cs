@@ -218,4 +218,20 @@ public class PropertyOpsTests : IDisposable
         var color = ops["set-frame-color"].GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!);
         color["operation"].GetProperty("values").EnumerateArray().Select(v => v.GetString()).ShouldBe(["multiply", "add"]);
     }
+
+    [Theory]
+    [InlineData("hero.achx", "flipH=true flipV=true")]
+    [InlineData("hero.achj", "flipH=true flipV=true")]
+    [InlineData("hero.achx", "flipH=true flipDiagonal=true")]
+    public async Task SetFrameFlip_ZeroOffsetsStayPlainZeroOnDisk(string file, string flips)
+    {
+        (await _w.RunAsync("edit", _w.PathOf(file), "--op", "add-shape Walk/2 type=polygon")).Code.ShouldBe(0);
+        var before = _w.Bytes(file);
+
+        (await _w.RunAsync("edit", _w.PathOf(file), "--op", $"set-frame-flip Walk/2 {flips}")).Code.ShouldBe(0);
+
+        File.ReadAllText(_w.PathOf(file)).ShouldNotMatch(@"-0(?![.\d])");
+        (await _w.RunAsync("edit", _w.PathOf(file), "--op", $"set-frame-flip Walk/2 {flips.Replace("true", "false")}")).Code.ShouldBe(0);
+        _w.Bytes(file).ShouldBe(before);
+    }
 }

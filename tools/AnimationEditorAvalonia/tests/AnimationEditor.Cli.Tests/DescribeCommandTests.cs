@@ -113,4 +113,51 @@ public class DescribeCommandTests : IDisposable
         r.Code.ShouldBe(2);
         r.Err.ShouldContain("describe");
     }
+
+    [Theory]
+    [InlineData("hero.achx")]
+    [InlineData("hero.achj")]
+    public async Task Locked_InTextOnlyWhenSet_InJsonAlways(string file)
+    {
+        (await _w.RunAsync("edit", _w.PathOf(file), "--op", "set-chain-locked Walk value=true")).Code.ShouldBe(0);
+
+        foreach (var args in new string[][] { [], ["--summary"] })
+        {
+            var text = await _w.RunAsync(["describe", _w.PathOf(file), .. args]);
+            var json = await _w.RunAsync(["describe", _w.PathOf(file), "--json", .. args]);
+
+            var lines = text.Out.Split('\n');
+            lines.Single(l => l.StartsWith("Walk  ")).ShouldContain("locked");
+            lines.Single(l => l.StartsWith("Idle  ")).ShouldNotContain("locked");
+            using var doc = JsonDocument.Parse(json.Out);
+            doc.RootElement.GetProperty("chains").EnumerateArray().Select(c => c.GetProperty("locked").GetBoolean()).ShouldBe([true, false]);
+        }
+    }
+
+    [Fact]
+    public async Task NegativeZero_PrintsAsZero_TextAndJson()
+    {
+        // Files flipped by an older editor hold -0; -0.0001 rounds to it.
+        _w.Write("neg.achj", """
+            { "fileRelativeTextures": true, "timeMeasurementUnit": "Second", "coordinateType": "Pixel",
+              "animationChains": [ { "name": "Walk", "frames": [
+                { "textureName": "sheet.png", "frameLength": 0.1, "leftCoordinate": 0, "rightCoordinate": 16, "topCoordinate": 0, "bottomCoordinate": 32,
+                  "relativeX": -0.0, "relativeY": 5, "shapes": {
+                  "rectangles": [ { "name": "Hit", "x": -0.0, "y": -0.0001, "scaleX": 8, "scaleY": 8 } ],
+                  "polygons": [ { "name": "Pol", "x": -0.0, "y": 0, "points": [ { "x": -0.0, "y": 1 }, { "x": 2, "y": -0.0 }, { "x": 3, "y": 3 } ] } ] } } ] } ] }
+            """);
+
+        foreach (string[] command in new string[][] { ["describe", _w.PathOf("neg.achj")], ["at", _w.PathOf("neg.achj"), "--time", "0"] })
+        {
+            var text = await _w.RunAsync(command);
+            var json = await _w.RunAsync([.. command, "--json"]);
+
+            text.Code.ShouldBe(0, text.Err);
+            text.Out.ShouldContain("offset 0,5");
+            text.Out.ShouldMatch("Hit +at 0,0 scale 8x8");
+            text.Out.ShouldContain("points 0,1 2,0 3,3");
+            json.Out.ShouldContain("\"Pol\"");
+            json.Out.ShouldNotMatch(@"-0(?![.\d])");
+        }
+    }
 }
