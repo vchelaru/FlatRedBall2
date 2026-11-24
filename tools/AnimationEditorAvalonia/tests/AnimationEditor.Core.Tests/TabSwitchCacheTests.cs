@@ -135,6 +135,55 @@ public class TabSwitchCacheTests : IDisposable
     }
 
     [Fact]
+    public async Task TryActivateTabFromCache_WhenLockedOnLeaveThenEdited_ReturnsFalse()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        using (Lock(path))
+            _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("locked.achx", "After");
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenEditedAndLockedOnReturn_ReturnsFalse()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("locked.achx", "After");
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        using (Lock(path))
+            _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    // A lock is what usually makes a save fail, so the edits that save lost must survive the switch.
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenSaveFailedOnALockedFile_KeepsTheEdits()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _pm.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        _ctx.UndoManager.MarkSaveFailed();
+        using (Lock(path))
+            _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        _pm.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe("Renamed");
+        tab.SaveFailed.ShouldBeTrue();
+    }
+
+    private static FileStream Lock(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.None);
+
+    [Fact]
     public async Task TryActivateTabFromCache_WithSelectedFrame_RestoresFrameSelection()
     {
         const string chainName = "Walk";

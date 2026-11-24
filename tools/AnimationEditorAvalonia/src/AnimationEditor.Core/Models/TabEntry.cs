@@ -98,6 +98,12 @@ namespace AnimationEditor.Core.Models
         public byte[]? CachedDiskHash { get; set; }
 
         /// <summary>
+        /// UTC last-write time of <see cref="Path"/> when <see cref="CachedEditorModel"/> was
+        /// captured. Compared only when a hash is missing, since a locked file still has a time.
+        /// </summary>
+        public DateTime? CachedDiskWriteTimeUtc { get; set; }
+
+        /// <summary>
         /// Snapshot of this tab's native-tsx state (see <see cref="IProjectManager.CaptureTsxState"/>),
         /// captured alongside <see cref="CachedEditorModel"/> so a cache-hit tab switch restores
         /// <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileGrid"/>

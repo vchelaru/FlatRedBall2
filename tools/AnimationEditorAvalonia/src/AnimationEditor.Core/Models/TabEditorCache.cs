@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Paths;
 using System;
+using System.IO;
 
 namespace AnimationEditor.Core.Models
 {
@@ -18,6 +19,7 @@ namespace AnimationEditor.Core.Models
             tab.CachedEditorModel = pm.AnimationChainListSave;
             tab.CachedOnDiskCoordinateType = pm.OnDiskCoordinateType;
             tab.CachedDiskHash = TryHashDisk(tab.Path);
+            tab.CachedDiskWriteTimeUtc = TryReadDiskWriteTimeUtc(tab.Path);
             tab.CachedTsxState = pm.CaptureTsxState();
             tab.CachedReferencedPngs = pm.ReferencedPngs;
         }
@@ -25,21 +27,26 @@ namespace AnimationEditor.Core.Models
         /// <summary>
         /// Returns <c>true</c> when <paramref name="tab"/> has a cached model and the on-disk
         /// file's content has not changed since the cache was captured. Not its write time: two
-        /// writes in one clock tick share a time, and a copied-in file keeps its own older one.
+        /// writes in one clock tick share a time, and a copied-in file keeps its own older one. The
+        /// time decides only when the content can't be read (another process holds the file).
         /// </summary>
         public static bool HasFreshCache(TabEntry tab)
         {
             if (tab.CachedEditorModel == null)
                 return false;
 
-            if (tab.CachedDiskHash == null)
-                return true;
-
             var diskHash = TryHashDisk(tab.Path);
-            if (diskHash == null)
+            if (diskHash != null && tab.CachedDiskHash != null)
+                return diskHash.AsSpan().SequenceEqual(tab.CachedDiskHash);
+
+            if (tab.CachedDiskWriteTimeUtc == null)
                 return true;
 
-            return diskHash.AsSpan().SequenceEqual(tab.CachedDiskHash);
+            var diskTime = TryReadDiskWriteTimeUtc(tab.Path);
+            if (diskTime == null)
+                return true;
+
+            return diskTime.Value <= tab.CachedDiskWriteTimeUtc.Value;
         }
 
         /// <summary>Discards the cached model so the next activation reloads from disk.</summary>
@@ -47,6 +54,7 @@ namespace AnimationEditor.Core.Models
         {
             tab.CachedEditorModel = null;
             tab.CachedDiskHash = null;
+            tab.CachedDiskWriteTimeUtc = null;
             tab.SaveFailed = false;
         }
 
@@ -62,5 +70,13 @@ namespace AnimationEditor.Core.Models
 
         private static byte[]? TryHashDisk(FilePath path) =>
             string.IsNullOrEmpty(path.Original) ? null : HotReload.HotReloadWatcher.TryHash(path.FullPath);
+
+        private static DateTime? TryReadDiskWriteTimeUtc(FilePath path)
+        {
+            if (string.IsNullOrEmpty(path.Original) || !path.Exists())
+                return null;
+
+            return File.GetLastWriteTimeUtc(path.FullPath);
+        }
     }
 }
