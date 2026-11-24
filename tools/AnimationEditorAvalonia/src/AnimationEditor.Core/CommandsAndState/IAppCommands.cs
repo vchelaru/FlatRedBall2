@@ -196,6 +196,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Whether a tab other than the active one holds this path. Null (no tabs) means none does.</summary>
         Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
 
+        /// <summary>
+        /// Whether the active tab, if any, shows the loaded <c>.achx</c>/<c>.achj</c>/<c>.tsx</c> document: it stays
+        /// loaded behind a <c>.seqj</c> or <c>.png</c> tab. Null (no tabs) means it does.
+        /// </summary>
+        Func<bool>? IsDocumentTabInFront { get; set; }
+
         /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
         event Action<string>? SaveAsRefused;
 
@@ -660,8 +666,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Subscribe to the hot-reload watcher after it's injected by the app layer. A changed file reloads only while
-        /// it is the open document and that document's last save did not fail; after a failed save the edits are kept
-        /// and <see cref="SaveFailed"/> is raised instead.
+        /// it is the open document, in front (<see cref="IsDocumentTabInFront"/>), and its last save did not fail;
+        /// after a failed save the edits are kept and <see cref="SaveFailed"/> is raised instead.
         /// </summary>
         void WireHotReloadWatcher();
 

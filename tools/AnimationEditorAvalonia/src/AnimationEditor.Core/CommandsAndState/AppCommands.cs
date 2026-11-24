@@ -273,6 +273,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.IsPathOpenInAnotherTab"/>
         public Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
 
+        /// <inheritdoc cref="IAppCommands.IsDocumentTabInFront"/>
+        public Func<bool>? IsDocumentTabInFront { get; set; }
+
         /// <inheritdoc cref="IAppCommands.SaveAsRefused"/>
         public event Action<string>? SaveAsRefused;
 
@@ -2928,8 +2931,9 @@ namespace AnimationEditor.Core.CommandsAndState
         private void OnAchxChangedOnDisk(string path)
         {
             // A report can outlive its document: queued just before a tab switch, or for the file open before an
-            // Untitled tab. The tab it belongs to compares its file when it is switched back to.
-            if (string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path)) return;
+            // Untitled, .seqj or .png tab. The tab it belongs to compares its file when it is switched back to.
+            if (IsDocumentTabInFront?.Invoke() == false
+                || string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path)) return;
 
             // The document holds edits its file lacks; only File > Reload from Disk drops them.
             if (_undoManager.SaveState == SaveState.Failed)
