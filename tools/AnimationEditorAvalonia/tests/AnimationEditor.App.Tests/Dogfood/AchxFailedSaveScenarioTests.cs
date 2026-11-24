@@ -1,6 +1,7 @@
 using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
@@ -242,6 +243,67 @@ public class AchxFailedSaveScenarioTests
         {
             UnusualProjectScenarioTests.MakeWritable(hero);
         }
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchingBackToATabWithAFailedSave_WhoseFileChanged_KeepsTheEditAndTheFileUntilAReload()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        (string hero, _) = await OpenTwoTabsAndFailTheFirstSave(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (32, 0, 16, 16)));
+
+        editor.ClickTab("hero.achx");
+
+        editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8, "the unsaved edit is kept");
+        editor.ProblemText!.ShouldContain("\"hero.achx\" changed on disk");
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
+
+        EditFirstFrame(editor, "12");
+        SavedX(hero).ShouldBe(32, "the next edit must not overwrite the newer file");
+
+        editor.ClickMenu("MenuReloadFromDisk");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
+        EditFirstFrame(editor, "4");
+        SavedX(hero).ShouldBe(4);
+    }
+
+    [AvaloniaFact]
+    public async Task CuttingFromATabWithAFailedSaveIntoAnother_SavesIt_SoClosingDoesNotAsk()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        (string hero, _) = await OpenTwoTabsAndFailTheFirstSave(editor);
+        editor.ClickTab("hero.achx");
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Press(Key.X, RawInputModifiers.Control);
+        editor.ClickTab("boss.achx");
+        editor.Press(Key.V, RawInputModifiers.Control);
+        editor.WaitUntil(() => editor.Project.AnimationChains.Count == 2, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains.ShouldBeEmpty();
+
+        editor.ClickTab("hero.achx");
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
+        editor.CloseTab("hero.achx");
+
+        editor.Dialogs.Shown.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task LeavingATabRightAfterAnExternalEdit_ShowsTheEditOnReturn()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = await OpenAsync(editor, "hero.achx");
+        await OpenAsync(editor, "boss.achx");
+        editor.ClickTab("hero.achx");
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (32, 0, 16, 16)));
+
+        editor.ClickTab("boss.achx");
+        editor.ClickTab("hero.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+
+        editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(32);
     }
 
     [AvaloniaFact]

@@ -138,7 +138,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Swaps the editor to <paramref name="tab"/>'s cached in-memory model when the cache
-        /// is fresh. Does not clear or restore undo — the app layer handles that.
+        /// is fresh: the file holds what the editor last read from or wrote to it. A tab whose last save
+        /// failed is kept even when the file changed; saving to that file is then refused (raising <see
+        /// cref="SaveFailed"/>, once here too) until it is reloaded. Does not clear or restore undo; the app
+        /// layer handles that.
         /// </summary>
         /// <returns><c>true</c> when the cache was applied; <c>false</c> when a disk load is needed.</returns>
         bool TryActivateTabFromCache(TabEntry tab);
@@ -180,9 +183,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Writes a document other than the current one to its own file, in that file's disk
         /// format: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.
-        /// A failure is reported through <see cref="SaveFailed"/>.
+        /// A failure, or a file saving is paused for, is reported through <see cref="SaveFailed"/> and
+        /// returns false.
         /// </summary>
-        void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
+        bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
         Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
