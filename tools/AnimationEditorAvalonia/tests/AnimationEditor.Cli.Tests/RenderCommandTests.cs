@@ -68,6 +68,16 @@ public class RenderCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Sequence_PassArgument_NamesFilesByPass_AndIsRejectedForChains()
+    {
+        var r = await _w.RunAsync("render", WriteSequence(), "--sequence", "Run", "--at", "0", "--pass", "2", "--out", _w.PathOf("out"), "--json");
+
+        r.Code.ShouldBe(0, r.Err);
+        File.Exists(_w.PathOf("out/Run_0_pass2.png")).ShouldBeTrue();
+        (await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--pass", "1", "--out", _w.PathOf("out2"))).Code.ShouldNotBe(0);
+    }
+
+    [Fact]
     public async Task ExplicitBounds_SetTheCanvasSize()
     {
         var r = await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--bounds", "-5,-10,10,20", "--scale", "2", "--out", _w.PathOf("out"));

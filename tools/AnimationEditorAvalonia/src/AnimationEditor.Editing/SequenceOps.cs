@@ -80,7 +80,7 @@ public static class SequenceOps
             new("track", "string", true, TrackAddressDescription),
             new("index", "integer", true, "Final zero-based position, 0 to track count - 1."),
         ]),
-        new("set-track-continuous", "Sets the per-track continuous flag. At the wrap of a looping sequence a continuous track keeps its playback phase if the same chain is playing, instead of restarting.",
+        new("set-track-continuous", "Sets the per-track continuous flag. At the wrap of a looping sequence a continuous chain track keeps its playback phase if the same chain is playing, instead of restarting. A continuous reference track keeps its target running across the wrap, if the clip starts at 0, the target loops and the clip lasts to the sequence end (set its length to the sequence length; check warns when ignored).",
         [
             new("track", "string", true, TrackAddressDescription + " Takes selectors."),
             new("value", "boolean", true, "true for continuous."),

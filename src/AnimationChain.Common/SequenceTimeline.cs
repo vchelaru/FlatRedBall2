@@ -20,6 +20,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <item>Outside every chain, the track's sprite is hidden. That includes the time before the first chain starts,
 /// on purpose: it is how a sprite appears partway through a sequence. If it showed before its chain, it would always
 /// be visible.</item>
+/// <item>A <see cref="SequenceTrackSave.Continuous"/> reference track carries its target's phase across the wrap of a looping holder (<see cref="CarriesAcrossWrap"/>): the target keeps running instead of restarting.</item>
 /// <item>A sequence with <see cref="SequenceSave.Loop"/> off does not end by going blank: it stops at its length and holds
 /// its final pose (<see cref="PoseTime"/>). The hold is the composite of the last instant, so a track whose chains finished
 /// earlier stays hidden. With Loop on the sequence repeats from 0.</item>
@@ -230,6 +231,46 @@ public static class SequenceTimeline
         double local = Math.Max(0, parentTime - reference.Start);
         if (parentTime + Slack(parentTime) >= reference.Start + FullLength(reference.Length, targetLength)) return null;
         return PoseTime(WrapTime(local, targetLength, target.Loop), targetLength, target.Loop);
+    }
+
+    /// <summary>
+    /// Whether a <see cref="SequenceTrackSave.Continuous"/> reference track carries its target across the wrap of a looping
+    /// holder of <paramref name="sequenceLength"/> seconds. All of these must hold, otherwise the flag is ignored and the
+    /// target restarts at each wrap: the track is continuous, the clip starts at 0, the target loops
+    /// (<see cref="SequenceSave.Loop"/>), and the clip is still playing at the wrap: it ends (its start plus
+    /// <see cref="SequenceReferenceSave.Length"/>, or one <paramref name="targetLength"/> when unset) no earlier than the
+    /// holder's length. A clip of the default length therefore carries only when the target is as long as the holder; to
+    /// carry a shorter looping target, set the clip's length to the holder's length.
+    /// </summary>
+    public static bool CarriesAcrossWrap(SequenceTrackSave track, SequenceSave target, double targetLength, double sequenceLength)
+    {
+        if (!track.Continuous || track.Reference is not { } clip || sequenceLength <= 0 || targetLength <= 0 || !target.Loop) return false;
+        if (clip.Start > Slack(0)) return false;
+        return FullLength(clip.Length, targetLength) >= sequenceLength - Slack(sequenceLength);
+    }
+
+    /// <summary>
+    /// <see cref="ReferenceTime"/> for pass <paramref name="pass"/> of a looping holder of <paramref name="sequenceLength"/>
+    /// seconds (0 = first run through, 1 = after the first wrap, counted by the player), where <paramref name="parentTime"/>
+    /// is the time inside that pass. The clip's start and end are checked against that in-pass time, as in pass 0. When the
+    /// track <see cref="CarriesAcrossWrap"/>, the target's clock does not restart at the wrap: it is
+    /// <c>pass * sequenceLength + parentTime</c> (the clip starts at 0), so the target keeps its phase. The target is then a
+    /// looping sequence playing continuously: its own wraps count as passes, returned in <paramref name="targetPass"/> and
+    /// used for the target's own continuous tracks (chain or reference), and the returned time is inside the current one.
+    /// Otherwise <paramref name="targetPass"/> is 0 and this is exactly <see cref="ReferenceTime"/>: a played sequence runs
+    /// at pass 0. Null when the clip is not playing or the track has no reference.
+    /// </summary>
+    public static double? ReferenceTimeAtPass(SequenceTrackSave track, SequenceSave target, double targetLength, double parentTime,
+        int pass, double sequenceLength, out int targetPass)
+    {
+        targetPass = 0;
+        if (track.Reference is not { } clip) return null;
+        double? plain = ReferenceTime(clip, target, targetLength, parentTime);
+        if (plain is null || !CarriesAcrossWrap(track, target, targetLength, sequenceLength)) return plain;
+
+        double elapsed = Math.Max(0, pass) * sequenceLength + parentTime;
+        targetPass = (int)(elapsed / targetLength);
+        return elapsed % targetLength;
     }
 
     /// <summary>The earliest a block's right edge can sit: <see cref="MinimumLength"/> after <paramref name="start"/>.</summary>

@@ -228,8 +228,6 @@ public partial class SequenceInspectorControl : UserControl
         Put(TrackNameBox, track.Name, force);
         TrackVisibleBox.IsChecked = track.Visible;
         TrackContinuousBox.IsChecked = track.Continuous;
-        // Continuous is about chains; a track that plays another sequence has none to carry.
-        TrackContinuousBox.IsVisible = track.Reference is null;
         ShowReference(track, force);
     }
 

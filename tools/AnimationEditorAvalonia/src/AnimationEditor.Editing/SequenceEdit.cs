@@ -196,7 +196,7 @@ public static class SequenceEdit
 
     /// <summary>
     /// Sets the track's continuous flag: at the wrap of a looping sequence the track keeps its playback phase when the same
-    /// chain is playing, instead of restarting.
+    /// chain is playing, instead of restarting. On a reference track the target keeps running across the wrap (see SequenceTimeline.CarriesAcrossWrap).
     /// </summary>
     public static EditResult SetTrackContinuous(SequenceDocument doc, IUndoManager undo, string track, bool continuous)
     {

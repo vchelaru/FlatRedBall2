@@ -18,7 +18,7 @@ public static class CliApp
           convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
-          render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
+          render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2 [--pass <n>]) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
           at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--shapes-only] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
           --schema [--json]                      list the operations and their fields
@@ -92,7 +92,7 @@ public static class CliApp
                     case "--grid": grid = true; break;
                     case "--shapes" or "--sheet" or "--shapes-only": values[a] = ""; break;
                     case "--summary": summary = true; break;
-                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time":
+                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time" or "--pass":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
                         values[a] = args[++i];
                         break;

@@ -12,7 +12,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 | Command | Does |
 |---|---|
 | `describe <file> [--chain G] [--sequence G] [--track G] [--summary] [--json]` | `--chain` (.achx) or `--sequence`/`--track` (.seqj) take names or globs and show only those; `--summary` is one line per chain (frames, length) or track (blocks, length); a filter matching nothing fails with Did-you-mean. Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
-| `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
+| `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks and ignored continuous reference tracks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
 | `render <file> --out <dir> [options]` | Writes PNGs without the editor, see Rendering below. |
@@ -54,7 +54,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 ## Rendering (`render`)
 
-`render hero.seqj --sequence Run --at 0,0.4 --out shots` writes `Run_0.png`, `Run_0.4.png` (composited like the editor's sequence preview: track 0 in front) and prints the paths. `.achx/.achj`: `--chain Walk --frame 0,1` (`Walk_frame0.png`) or `--at 0.3` (`Walk_0.3.png`). `--sequence`/`--chain` may be left out when the file has only one; `--at` defaults to 0, `--frame` to 0.
+`render hero.seqj --sequence Run --at 0,0.4 --out shots` writes `Run_0.png`, `Run_0.4.png` (composited like the editor's sequence preview: track 0 in front) and prints the paths. `.achx/.achj`: `--chain Walk --frame 0,1` (`Walk_frame0.png`) or `--at 0.3` (`Walk_0.3.png`). `--sequence`/`--chain` may be left out when the file has only one; `--pass <n>` (sequences) renders after n loop wraps, showing what continuous tracks carry (file stem `Run_0.4_pass1`); `--at` defaults to 0, `--frame` to 0.
 
 - `--scale <1-16>` (default 4), `--background transparent|black|white|gray|#RRGGBB` (default transparent), `--grid` (origin axes plus a 16-unit grid).
 - `--shapes` draws the shapes (rect, circle, polygon) over each frame, named, and widens auto bounds to include them. `--sheet` writes one `<name>_sheet.png` with every time as a labelled tile; fails with a lower-`--scale` hint past about 32 million pixels.

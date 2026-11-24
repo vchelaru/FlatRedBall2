@@ -161,4 +161,24 @@ public class SequenceContinuousTrackScenarioTests
         // 0.15 s into the second pass: Walk's second frame, Run's second frame.
         Shown(editor).ShouldBe(new[] { "Run:1", "Walk:1" });
     }
+
+    [AvaloniaFact]
+    public async Task TheCheckbox_IsShownOnAReferenceTrack_AndTogglesItsFlag()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = WriteFixture(editor, bodyContinuous: false);
+        var save = SequenceListSave.FromFile(path);
+        save.Sequences.Add(new SequenceSave { Name = "Legs", Loop = true, Tracks = { TrackOf("Leg", "Walk", 1.2, false) } });
+        save.Sequences[0].Tracks.Insert(0, new SequenceTrackSave { Name = "Legs", Reference = new SequenceReferenceSave { Sequence = "Legs" } });
+        save.Save(path);
+        await editor.OpenAsync(path);
+        editor.Layout();
+        var inspector = Inspector(editor);
+        editor.ClickAt(Header(editor, 0));
+
+        inspector.TrackContinuousBox.IsVisible.ShouldBeTrue();
+        editor.Click(inspector.TrackContinuousBox);
+
+        SavedFlag(path, 0).ShouldBeTrue();
+    }
 }
