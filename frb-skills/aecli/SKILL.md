@@ -11,7 +11,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 
 | Command | Does |
 |---|---|
-| `describe <file> [--json]` | Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
+| `describe <file> [--chain G] [--sequence G] [--track G] [--summary] [--json]` | `--chain` (.achx) or `--sequence`/`--track` (.seqj) take names or globs and show only those; `--summary` is one line per chain (frames, length) or track (blocks, length); a filter matching nothing fails with Did-you-mean. Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
 | `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |

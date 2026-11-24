@@ -13,20 +13,48 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class SequenceDescriber
 {
-    public static string ToText(SequenceListSave save, string path)
+    /// <summary>Which sequences and tracks to show; <c>null</c> shows all. <see cref="Summary"/> is one line per track.</summary>
+    public sealed record Filter(IReadOnlyCollection<string>? Sequences = null, string? Track = null, bool Summary = false)
     {
+        public bool Includes(SequenceSave s) => Sequences is null || Sequences.Contains(s.Name);
+        public bool Includes(SequenceTrackSave t) => Track is null || (EditSelectors.IsGlob(Track) ? EditSelectors.GlobMatches(Track, t.Name) : t.Name == Track);
+    }
+
+    /// <summary>An error (with a name hint) when the filter's track pattern matches no track of the selected sequences, else <c>null</c>.</summary>
+    public static string? CheckTrackFilter(SequenceListSave save, Filter filter)
+    {
+        if (filter.Track is null) return null;
+        var tracks = save.Sequences.Where(filter.Includes).SelectMany(s => s.Tracks).ToList();
+        return tracks.Any(filter.Includes) ? null : $"No track matches '{filter.Track}'." + NameHints.For(filter.Track, tracks.Select(t => t.Name), "tracks");
+    }
+
+    private static IEnumerable<(SequenceSave Sequence, SequenceTrackSave Track)> SummaryRows(SequenceListSave save, Filter filter) =>
+        save.Sequences.Where(filter.Includes).SelectMany(s => s.Tracks.Where(filter.Includes).Select(t => (s, t)));
+
+    public static string ToText(SequenceListSave save, string path, Filter? filter = null)
+    {
+        filter ??= new Filter();
         var sources = new SequenceSources(save, path);
         var sb = new StringBuilder();
+        if (filter.Summary)
+        {
+            foreach (var (sequence, track) in SummaryRows(save, filter))
+            {
+                var blocks = Blocks(save, sequence, track, sources);
+                sb.AppendLine(FormattableString.Invariant($"{sequence.Name}/{track.Name}  {blocks.Count} block{(blocks.Count == 1 ? "" : "s")}  length {Num(blocks.Count == 0 ? 0 : blocks.Max(b => b.End))}"));
+            }
+            return sb.ToString();
+        }
         sb.AppendLine(FormattableString.Invariant(
             $"{Path.GetFileName(path)}  version={save.Version}  sources={save.Sources.Count}  sequences={save.Sequences.Count}"));
         foreach (var source in save.Sources)
             sb.AppendLine($"source {source}{(sources.Chains(source) is null ? "  MISSING" : "")}");
 
-        foreach (var sequence in save.Sequences)
+        foreach (var sequence in save.Sequences.Where(filter.Includes))
         {
             var count = sequence.Tracks.Count;
             sb.AppendLine($"{sequence.Name}  ({(sequence.Loop ? "loop" : "no loop")}, {count} track{(count == 1 ? "" : "s")}, length {Num(Length(save, sequence, sources))})");
-            foreach (var track in sequence.Tracks)
+            foreach (var track in sequence.Tracks.Where(filter.Includes))
             {
                 var flags = new List<string>();
                 if (track.Continuous) flags.Add("continuous");
@@ -44,12 +72,30 @@ public static class SequenceDescriber
         return sb.ToString();
     }
 
-    public static void WriteJson(Utf8JsonWriter w, SequenceListSave save, string path)
+    public static void WriteJson(Utf8JsonWriter w, SequenceListSave save, string path, Filter? filter = null)
     {
+        filter ??= new Filter();
         var sources = new SequenceSources(save, path);
         w.WriteStartObject();
         w.WriteString("kind", "sequences");
         w.WriteString("file", Path.GetFileName(path));
+        if (filter.Summary)
+        {
+            w.WriteStartArray("tracks");
+            foreach (var (sequence, track) in SummaryRows(save, filter))
+            {
+                var blocks = Blocks(save, sequence, track, sources);
+                w.WriteStartObject();
+                w.WriteString("sequence", sequence.Name);
+                w.WriteString("name", track.Name);
+                w.WriteNumber("blocks", blocks.Count);
+                w.WriteNumber("length", Math.Round(blocks.Count == 0 ? 0 : blocks.Max(b => b.End), 6));
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteEndObject();
+            return;
+        }
         w.WriteNumber("version", save.Version);
         w.WriteStartArray("sources");
         foreach (var source in save.Sources)
@@ -61,14 +107,14 @@ public static class SequenceDescriber
         }
         w.WriteEndArray();
         w.WriteStartArray("sequences");
-        foreach (var sequence in save.Sequences)
+        foreach (var sequence in save.Sequences.Where(filter.Includes))
         {
             w.WriteStartObject();
             w.WriteString("name", sequence.Name);
             w.WriteBoolean("loop", sequence.Loop);
             w.WriteNumber("length", Math.Round(Length(save, sequence, sources), 6));
             w.WriteStartArray("tracks");
-            foreach (var track in sequence.Tracks)
+            foreach (var track in sequence.Tracks.Where(filter.Includes))
             {
                 w.WriteStartObject();
                 w.WriteString("name", track.Name);
