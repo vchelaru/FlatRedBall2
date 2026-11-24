@@ -1,7 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.CommandsAndState.Commands;
-using AnimationEditor.Core.Tiled;
+using AnimationEditor.Core.IO;
 using Shouldly;
 using System;
 using System.IO;
@@ -353,11 +353,11 @@ public sealed class TsxInPlaceSaveTests : IDisposable
     }
 
     [Fact]
-    public void RebasePath_AnotherDrive_LeavesThePath()
+    public void Rebase_AnotherDrive_LeavesThePath()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        TsxWriter.RebasePath("art/Heroes.png", new FilePath("C:/a/"), new FilePath("D:/a/")).ShouldBe("art/Heroes.png");
-        TsxWriter.RebasePath("art/Heroes.png", new FilePath("C:/a/"), new FilePath("C:/b/")).ShouldBe("../a/art/Heroes.png");
+        TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("D:/a/")).ShouldBe("art/Heroes.png");
+        TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("C:/b/")).ShouldBe("../a/art/Heroes.png");
     }
 }

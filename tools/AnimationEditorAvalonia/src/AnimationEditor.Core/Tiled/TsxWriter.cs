@@ -347,21 +347,12 @@ public sealed class TsxWriter
         {
             var isPath = (element, name) is ("image", "source") or ("object", "template") or ("export", "target")
                 || (element is "property" or "item" && name == "value" && type == "file");
-            if (!isPath || RebasePath(value, fromFolder, toFolder) is not { } rebased || rebased == value)
+            if (!isPath || TexturePathHelper.Rebase(value, fromFolder, toFolder) is not { } rebased || rebased == value)
                 continue;
             var (valueStart, valueEnd) = ValueSpan(text, start);
             result.Append(text, position, valueStart - position).Append(Escape(rebased));
             position = valueEnd;
         }
         return result.Append(text, position, text.Length - position).ToString();
-    }
-
-    /// <summary>A relative path as seen from another folder; unchanged when it is absolute, a URL, or on another drive.</summary>
-    internal static string RebasePath(string path, FilePath fromFolder, FilePath toFolder)
-    {
-        if (path.Length == 0 || path.Contains("://") || path[0] is '/' or '\\' || path.AsSpan(1).StartsWith(":"))
-            return path;
-        var rebased = TexturePathHelper.ComputeStorePath(TexturePathHelper.ResolveDisplayPath(path, fromFolder.FullPath), toFolder.FullPath);
-        return rebased == new FilePath(rebased).FullPath ? path : rebased;
     }
 }

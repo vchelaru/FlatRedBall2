@@ -39,81 +39,7 @@ namespace AnimationEditor.Core
         /// </summary>
         private DotTiled.Tileset? _tsxTileset;
 
-        private TsxFile? _tsxFile;
-
-        /// <summary>
-        /// The file <see cref="_tsxTileset"/> is saved to. A document's captured states share one, because what is on
-        /// disk is not undone with an edit.
-        /// </summary>
-        private sealed class TsxFile(FilePath path, Tiled.TsxSource source, DotTiled.Tileset tileset)
-        {
-            public FilePath Path { get; private set; } = path;
-
-            /// <summary>The image as the tileset names it, relative to <see cref="Path"/>.</summary>
-            public string ImageSource { get; private set; } =
-                tileset.Image is { HasValue: true, Value: { Source.HasValue: true } image } ? image.Source.Value : string.Empty;
-
-            /// <summary>The text as opened. Every save starts from it, so an undone edit leaves the opened bytes.</summary>
-            private Tiled.TsxSource _opened = source;
-            private DotTiled.Tileset _openedTileset = tileset;
-
-            /// <summary>What was last read from or written to <see cref="Path"/>.</summary>
-            private string _diskText = source.Text;
-            private DotTiled.Tileset _diskTileset = tileset;
-
-            /// <summary>What the last <see cref="Save"/> wrote, to either file.</summary>
-            private string _writtenText = source.Text;
-
-            /// <summary>A save went into a change another program made. The document has it only after a reload.</summary>
-            public bool LacksOutsideChange { get; private set; }
-
-            public void Save(DotTiled.Tileset tileset, FilePath target)
-            {
-                if (target == Path && target.Exists() && File.ReadAllText(target.FullPath) != _diskText)
-                {
-                    // Another program, usually Tiled, wrote the file and the reload has not run yet: what this save
-                    // changes goes into that text.
-                    Tiled.TsxSource disk;
-                    try
-                    {
-                        (disk, var diskTileset) = ReadTsx(target);
-                        if (Layout(diskTileset) != Layout(_openedTileset) with { ImageSource = ImageSource })
-                            throw new InvalidOperationException("its tile grid or image is not the open one");
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new InvalidOperationException(ChangedOnDiskMessage(target, ex.Message), ex);
-                    }
-                    var merged = disk.WithText(Tiled.TsxWriter.Render(disk, _diskTileset, tileset));
-                    Tiled.TsxWriter.Write(merged, merged.Text, target);
-                    (_opened, _openedTileset, _diskText, _diskTileset) = (merged, tileset, merged.Text, tileset);
-                    _writtenText = merged.Text;
-                    LacksOutsideChange = true;
-                    return;
-                }
-
-                var text = Tiled.TsxWriter.Render(_opened, _openedTileset, tileset);
-                _writtenText = Tiled.TsxWriter.Write(_opened, text, target);
-                if (target == Path)
-                    (_diskText, _diskTileset) = (_writtenText, tileset);
-            }
-
-            /// <summary>What decides which tile an animation's rects are on.</summary>
-            private static (int, int, int, int, int, int, string ImageSource, int, int) Layout(DotTiled.Tileset tileset)
-            {
-                var image = tileset.Image.Value;
-                return (tileset.TileWidth, tileset.TileHeight, tileset.Columns, tileset.TileCount, tileset.Spacing, tileset.Margin,
-                    image.Source.HasValue ? image.Source.Value : string.Empty,
-                    image.Width.HasValue ? image.Width.Value : 0, image.Height.HasValue ? image.Height.Value : 0);
-            }
-
-            /// <summary>Makes the file a Save As just wrote <paramref name="tileset"/> to this one.</summary>
-            public void MoveTo(FilePath path, DotTiled.Tileset tileset)
-            {
-                ImageSource = Tiled.TsxWriter.RebasePath(ImageSource, Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
-                (Path, _diskText, _diskTileset) = (path, _writtenText, tileset);
-            }
-        }
+        private Tiled.TsxFile? _tsxFile;
 
         /// <summary>Each native-tsx chain's own tile id, keyed by chain object reference (survives
         /// a rename, unlike keying by name) -- populated on <see cref="LoadTsxProject"/> from what
@@ -513,7 +439,7 @@ namespace AnimationEditor.Core
                 tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out var syntheticNamedChains);
 
             _tsxTileset = tileset;
-            _tsxFile = new TsxFile(fileName, source, tileset);
+            _tsxFile = new Tiled.TsxFile(fileName, source, tileset);
             _tsxUserProperties = Tiled.TsxUserProperties.Read(tileset);
             AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
@@ -543,7 +469,7 @@ namespace AnimationEditor.Core
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
         }
 
-        private static (Tiled.TsxSource Source, DotTiled.Tileset Tileset) ReadTsx(FilePath fileName)
+        internal static (Tiled.TsxSource Source, DotTiled.Tileset Tileset) ReadTsx(FilePath fileName)
         {
             try
             {
@@ -814,8 +740,8 @@ namespace AnimationEditor.Core
 
             var (from, to) = (_tsxFile.Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
             foreach (var frame in AnimationChainListSave.AnimationChains.SelectMany(chain => chain.Frames))
-                frame.TextureName = Tiled.TsxWriter.RebasePath(frame.TextureName, from, to);
-            _tsxFile.MoveTo(path, _tsxTileset);
+                frame.TextureName = TexturePathHelper.Rebase(frame.TextureName, from, to);
+            _tsxFile.SetPath(path, _tsxTileset);
             return from != to;
         }
 
@@ -904,7 +830,7 @@ namespace AnimationEditor.Core
         /// always replace these fields wholesale rather than mutating them in place.</summary>
         private sealed record TsxState(
             DotTiled.Tileset Tileset,
-            TsxFile? File,
+            Tiled.TsxFile? File,
             Tiled.TsxUserProperties? UserProperties,
             Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
             Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain,
