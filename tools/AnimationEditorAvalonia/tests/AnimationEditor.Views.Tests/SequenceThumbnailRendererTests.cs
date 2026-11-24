@@ -19,7 +19,7 @@ public class SequenceThumbnailRendererTests
     }
 
     private static SequenceThumbnailLayer Layer(string texture, float offsetX = 0, float offsetY = 0) =>
-        new(new AnimationFrameSave { TextureName = texture, RightCoordinate = 1, BottomCoordinate = 1 }, texture, offsetX, offsetY, default);
+        new(new AnimationFrameSave { TextureName = texture, RightCoordinate = 16, BottomCoordinate = 16 }, texture, offsetX, offsetY, default);
 
     private static Task<SKBitmap?> Decode(string path) =>
         Task.FromResult<SKBitmap?>(path == "red" ? Solid(16, SKColors.Red) : path == "blue" ? Solid(16, SKColors.Blue) : null);

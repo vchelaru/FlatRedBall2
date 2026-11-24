@@ -1,5 +1,8 @@
+using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Shouldly;
@@ -136,5 +139,147 @@ public class PixelDocumentTests : IDisposable
         _ctx.ProjectManager.SaveAnimationChainList(path);
 
         File.ReadAllBytes(path).ShouldBe(before);
+    }
+
+    // ── A region nobody has set (0,0,1,1) shows the whole texture once its size is known ──
+
+    [Fact]
+    public void AddFrame_WithATexture_ShowsTheWholeTexture()
+    {
+        WritePng("sheet.png", 48, 32);
+        var path = WriteFile("hero.achx", Frame("sheet.png", 0, 0, 16, 32));
+        Open(path);
+        var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0];
+
+        _ctx.AppCommands.AddFrame(chain, "sheet.png");
+
+        Region(chain.Frames[^1]).ShouldBe((0f, 0f, 48f, 32f));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("missing.png")]
+    public void SetFrameTextureName_UnsetRegion_ShowsTheWholeTexture_AndUndoRestoresTheUnsetRegion(string texture)
+    {
+        WritePng("sheet.png", 48, 32);
+        var path = WriteFile("hero.achx", Frame(texture, 0, 0, 1, 1));
+        var frames = Open(path);
+
+        _ctx.AppCommands.SetFrameTextureName(new[] { frames[0] }, "sheet.png");
+        Region(frames[0]).ShouldBe((0f, 0f, 48f, 32f));
+        _ctx.UndoManager.Undo();
+        Region(frames[0]).ShouldBe((0f, 0f, 1f, 1f));
+        _ctx.UndoManager.Redo();
+
+        Region(SaveAndRead(path)[0]).ShouldBe((0f, 0f, 48f, 32f));
+    }
+
+    [Fact]
+    public void SetFrameTextureName_UnreadableTexture_KeepsTheUnsetRegion()
+    {
+        var path = WriteFile("hero.achx", Frame("", 0, 0, 1, 1));
+        var frames = Open(path);
+
+        _ctx.AppCommands.SetFrameTextureName(new[] { frames[0] }, "photo.jpg");
+
+        Region(SaveAndRead(path)[0]).ShouldBe((0f, 0f, 1f, 1f));
+    }
+
+    [Fact]
+    public void SetFrameTextureName_ClearedAndSetAgain_KeepsThePixelRegion()
+    {
+        WritePng("sheet.png", 48, 32);
+        WritePng("tall.png", 48, 64);
+        var path = WriteFile("hero.achx", Frame("sheet.png", 16, 8, 32, 24));
+        var frames = Open(path);
+
+        _ctx.AppCommands.SetFrameTextureName(new[] { frames[0] }, string.Empty);
+        Region(SaveAndRead(path)[0]).ShouldBe((16f, 8f, 32f, 24f));
+        frames = Open(path);
+        _ctx.AppCommands.SetFrameTextureName(new[] { frames[0] }, "tall.png");
+
+        Region(SaveAndRead(path)[0]).ShouldBe((16f, 8f, 32f, 24f));
+    }
+
+    // ── UV files convert at the boundary ──
+
+    private string WriteUvFile(string texture)
+    {
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(Frame(texture, 0.25f, 0f, 0.5f, 0.75f));
+        list.AnimationChains.Add(chain);
+        list.Save(PathOf("old.achx"));
+        return PathOf("old.achx");
+    }
+
+    [Fact]
+    public void LoadAnimationChain_UvFile_HoldsPixels_AndSavesTheSameUv()
+    {
+        WritePng("sheet.png", 64, 32);
+        var path = WriteUvFile("sheet.png");
+        var before = File.ReadAllBytes(path);
+
+        var frames = Open(path);
+
+        _ctx.ProjectManager.AnimationChainListSave!.CoordinateType.ShouldBe(TextureCoordinateType.Pixel);
+        Region(frames[0]).ShouldBe((16f, 0f, 32f, 24f));
+        _ctx.ProjectManager.SaveAnimationChainList(path);
+        File.ReadAllBytes(path).ShouldBe(before);
+        Region(frames[0]).ShouldBe((16f, 0f, 32f, 24f));
+    }
+
+    [Fact]
+    public void LoadAnimationChain_UvFileWithAMissingTexture_IsRefused_AndTheOpenDocumentStays()
+    {
+        var open = Open(WriteFile("hero.achx", Frame("sheet.png", 0, 0, 16, 32)));
+        var path = WriteUvFile("gone.png");
+
+        Should.Throw<InvalidOperationException>(() => Open(path)).Message.ShouldContain("gone.png");
+
+        _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].ShouldBeSameAs(open[0]);
+    }
+
+    [Fact]
+    public void RecoveryFile_LeftInUvByAnOlderEditor_IsReadAsPixels()
+    {
+        WritePng("sheet.png", 64, 32);
+        _ctx.IoManager.RecoveryFilePath = WriteUvFile(PathOf("sheet.png"));
+
+        var recovered = _ctx.IoManager.TryReadRecoveryFile()!;
+
+        Region(recovered.AnimationChains[0].Frames[0]).ShouldBe((16f, 0f, 32f, 24f));
+    }
+
+    // ── Clipboard ──
+
+    [Fact]
+    public void Clipboard_PixelText_KeepsTheRegion_EvenWhenTheTextureIsMissing()
+    {
+        var copied = new List<AnimationFrameSave> { Frame("sheet.png", 3, 5, 16, 32) };
+
+        var text = ClipboardPayload.Serialize(copied, FrameLengthUnit.Seconds);
+
+        ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, _ => null, out _, out var pasted, out _).ShouldBeTrue();
+        Region(pasted!.Single()).ShouldBe((3f, 5f, 16f, 32f));
+    }
+
+    // Text an editor before #1952 copied: the list's own UV header, or none at all.
+    [Theory]
+    [InlineData("<CoordinateType>UV</CoordinateType>")]
+    [InlineData("")]
+    public void Clipboard_OldUvText_ConvertsToPixels_AndIsUnsetWhenTheTextureIsMissing(string header)
+    {
+        var text = $"List<AnimationChainSave>:<AnimationChainArraySave>{header}<AnimationChain><Name>Walk</Name>" +
+            "<Frame><TextureName>sheet.png</TextureName><LeftCoordinate>0.25</LeftCoordinate><RightCoordinate>0.5</RightCoordinate>" +
+            "<TopCoordinate>0</TopCoordinate><BottomCoordinate>0.75</BottomCoordinate></Frame>" +
+            "<Frame><TextureName>gone.png</TextureName><LeftCoordinate>0.25</LeftCoordinate><RightCoordinate>0.5</RightCoordinate>" +
+            "<TopCoordinate>0</TopCoordinate><BottomCoordinate>0.75</BottomCoordinate></Frame></AnimationChain></AnimationChainArraySave>";
+
+        ClipboardPayload.TryDeserialize(text, FrameLengthUnit.Seconds, name => name == "sheet.png" ? (64, 32) : null,
+            out var chains, out _, out _).ShouldBeTrue();
+
+        Region(chains!.Single().Frames[0]).ShouldBe((16f, 0f, 32f, 24f));
+        Region(chains!.Single().Frames[1]).ShouldBe((0f, 0f, 1f, 1f));
     }
 }

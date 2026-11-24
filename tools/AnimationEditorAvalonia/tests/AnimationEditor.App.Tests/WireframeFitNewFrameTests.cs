@@ -57,7 +57,7 @@ public class WireframeFitNewFrameTests
         {
             TextureName      = texPath,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
-            RightCoordinate  = 1f, BottomCoordinate = 1f,
+            RightCoordinate  = 2048f, BottomCoordinate = 2048f,
             FrameLength      = 0.1f,
             ShapesSave       = new ShapesSave(),
         };

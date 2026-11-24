@@ -68,18 +68,18 @@ public class WireframeFitChainToViewTests
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(new AnimationFrameSave
             {
-                LeftCoordinate = 0.1f, TopCoordinate = 0.1f,
-                RightCoordinate = 0.3f, BottomCoordinate = 0.3f,
+                LeftCoordinate = 100f, TopCoordinate = 100f,
+                RightCoordinate = 300f, BottomCoordinate = 300f,
             });
             chain.Frames.Add(new AnimationFrameSave
             {
-                LeftCoordinate = 0.7f, TopCoordinate = 0.5f,
-                RightCoordinate = 0.9f, BottomCoordinate = 0.7f,
+                LeftCoordinate = 700f, TopCoordinate = 500f,
+                RightCoordinate = 900f, BottomCoordinate = 700f,
             });
             chain.Frames.Add(new AnimationFrameSave
             {
-                LeftCoordinate = 0.4f, TopCoordinate = 0.2f,
-                RightCoordinate = 0.6f, BottomCoordinate = 0.4f,
+                LeftCoordinate = 400f, TopCoordinate = 200f,
+                RightCoordinate = 600f, BottomCoordinate = 400f,
             });
 
             var window = ctx.CreateMainWindow();

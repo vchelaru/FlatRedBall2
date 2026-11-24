@@ -26,9 +26,6 @@ public class AppCommandsTiledSyncTests
         var tileset = new Tileset
         {
             Name = "Heroes", TileWidth = 16, TileHeight = 16, TileCount = 64, Columns = 4,
-            // Width/height are required for the mapper to convert the achx's UV frame
-            // coordinates back to pixels -- ProjectManager.AnimationChainListSave is always UV
-            // in memory (see ProjectManager's own doc comment), so this test's frame is UV too.
             Image = new Image { Source = "Heroes.png", Width = 64, Height = 16 },
         };
         var path = Path.Combine(tempDir, "Heroes.tsx");

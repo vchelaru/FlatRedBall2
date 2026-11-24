@@ -98,8 +98,8 @@ public class WireframeMagicWandModeTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -156,7 +156,7 @@ public class WireframeMagicWandModeTests
             {
                 TextureName = png, FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                RightCoordinate = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -183,15 +183,15 @@ public class WireframeMagicWandModeTests
             // Sub-pixel tolerance only (float rounding), not a whole-pixel fudge factor —
             // a 1-pixel tolerance here would mask the off-by-one bug from issue #577
             // where RightCoordinate/BottomCoordinate landed one pixel short.
-            const float Eps = 0.25f / 64f;
-            Assert.True(Math.Abs(frame.LeftCoordinate   - IslandMin / 64f) < Eps,
-                $"LeftCoordinate expected ≈{IslandMin}/64 but was {frame.LeftCoordinate}");
-            Assert.True(Math.Abs(frame.TopCoordinate    - IslandMin / 64f) < Eps,
-                $"TopCoordinate expected ≈{IslandMin}/64 but was {frame.TopCoordinate}");
-            Assert.True(Math.Abs(frame.RightCoordinate  - IslandMax / 64f) < Eps,
-                $"RightCoordinate expected ≈{IslandMax}/64 but was {frame.RightCoordinate}");
-            Assert.True(Math.Abs(frame.BottomCoordinate - IslandMax / 64f) < Eps,
-                $"BottomCoordinate expected ≈{IslandMax}/64 but was {frame.BottomCoordinate}");
+            const float Eps = 0.25f;
+            Assert.True(Math.Abs(frame.LeftCoordinate   - IslandMin) < Eps,
+                $"LeftCoordinate expected ≈{IslandMin} but was {frame.LeftCoordinate}");
+            Assert.True(Math.Abs(frame.TopCoordinate    - IslandMin) < Eps,
+                $"TopCoordinate expected ≈{IslandMin} but was {frame.TopCoordinate}");
+            Assert.True(Math.Abs(frame.RightCoordinate  - IslandMax) < Eps,
+                $"RightCoordinate expected ≈{IslandMax} but was {frame.RightCoordinate}");
+            Assert.True(Math.Abs(frame.BottomCoordinate - IslandMax) < Eps,
+                $"BottomCoordinate expected ≈{IslandMax} but was {frame.BottomCoordinate}");
         }
         finally { Directory.Delete(dir, recursive: true); }
     }

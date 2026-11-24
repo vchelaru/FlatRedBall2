@@ -201,16 +201,36 @@ public class EditCommandTests : IDisposable
         d.RootElement.GetProperty("chains")[0].GetProperty("name").GetString().ShouldBe("Run");
     }
 
+    // A Pixel file saves as it is stored, so a missing texture no longer blocks it (#1952).
     [Fact]
-    public async Task MissingTexture_BlocksSavingAPixelFile_SoNothingIsWritten()
+    public async Task MissingTexture_DoesNotBlockSavingAPixelFile_AndKeepsItsRegion()
     {
-        var before = _w.Bytes("broken.achx");
-
         var r = await Edit("broken.achx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
 
-        r.Code.ShouldBe(1);
-        r.Out.ShouldContain("missing.png");
-        _w.Bytes("broken.achx").ShouldBe(before);
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var frame = (await Describe("broken.achx")).RootElement.GetProperty("chains")[0].GetProperty("frames")[1];
+        frame.GetProperty("texture").GetString().ShouldBe("missing.png");
+        frame.GetProperty("region").GetProperty("x").GetDouble().ShouldBe(16);
+        frame.GetProperty("region").GetProperty("width").GetDouble().ShouldBe(16);
+        frame.GetProperty("region").GetProperty("height").GetDouble().ShouldBe(32);
+    }
+
+    // #1934's repro: relinking frames whose PNG was missing used to multiply their pixels by the texture size.
+    [Theory]
+    [InlineData("hero.achx")]
+    [InlineData("hero.achj")]
+    public async Task SetFrameTexture_OnFramesWhosePngIsMissing_KeepsTheirRegions(string file)
+    {
+        Directory.CreateDirectory(_w.PathOf("art"));
+        File.Move(_w.PathOf("sheet.png"), _w.PathOf("art/sheet.png"));
+        var before = (await Describe(file)).RootElement.GetProperty("chains")[0].GetProperty("frames")[1].GetProperty("region").GetRawText();
+
+        var r = await _w.RunAsync("edit", _w.PathOf(file), "--op", "set-frame-texture */* texture=art/sheet.png");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var frame = (await Describe(file)).RootElement.GetProperty("chains")[0].GetProperty("frames")[1];
+        frame.GetProperty("texture").GetString().ShouldBe("art/sheet.png");
+        frame.GetProperty("region").GetRawText().ShouldBe(before);
     }
 
     [Theory]

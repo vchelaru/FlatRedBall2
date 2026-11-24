@@ -51,8 +51,8 @@ public class WireframeLockedChainCursorTests
         {
             TextureName      = png,
             FrameLength      = 0.1f,
-            LeftCoordinate   = 0.125f, TopCoordinate    = 0.125f,
-            RightCoordinate  = 0.875f, BottomCoordinate = 0.875f,
+            LeftCoordinate   = 8f, TopCoordinate    = 8f,
+            RightCoordinate  = 56f, BottomCoordinate = 56f,
             ShapesSave = new ShapesSave(),
         };
         var chain = new AnimationChainSave { Name = "Test", IsLocked = locked };

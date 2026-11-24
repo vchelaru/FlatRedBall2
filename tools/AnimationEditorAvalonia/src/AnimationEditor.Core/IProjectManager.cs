@@ -37,7 +37,7 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Writes <paramref name="document"/>, which need not be the current one (a background
         /// tab's model after a cross-document cut), to <paramref name="targetPath"/> in
-        /// <paramref name="diskFormat"/>. The in-memory document stays in pixels.
+        /// <paramref name="diskFormat"/>. The in-memory document is left as it was.
         /// </summary>
         void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
 

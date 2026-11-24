@@ -166,14 +166,14 @@ public class VisualRenderTests
             {
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
+                RightCoordinate  = 32f, BottomCoordinate = 32f,
                 ShapesSave = new ShapesSave()
             });
             chain.Frames.Add(new AnimationFrameSave
             {
                 TextureName      = "sheet.png",
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f,   BottomCoordinate = 0.5f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f,   BottomCoordinate = 32f,
                 ShapesSave = new ShapesSave()
             });
 
@@ -209,7 +209,7 @@ public class VisualRenderTests
             {
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
+                RightCoordinate  = 32f, BottomCoordinate = 32f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Run" };
@@ -346,7 +346,7 @@ public class VisualRenderTests
             {
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -397,7 +397,7 @@ public class VisualRenderTests
             {
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chainSingle = new AnimationChainSave { Name = "Single" };
@@ -419,14 +419,14 @@ public class VisualRenderTests
             {
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var frame2 = new AnimationFrameSave
             {
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chainDouble = new AnimationChainSave { Name = "Double" };
@@ -480,14 +480,14 @@ public class VisualRenderTests
             {
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 1f,
+                RightCoordinate  = 32f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "sheet.png",
-                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f,   BottomCoordinate = 1f,
+                LeftCoordinate   = 32f, TopCoordinate    = 0f,
+                RightCoordinate  = 64f,   BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Walk" };
@@ -548,7 +548,7 @@ public class VisualRenderTests
             {
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-                RightCoordinate  = 0.5f, BottomCoordinate = 1f,   // left half only
+                RightCoordinate  = 32f, BottomCoordinate = 64f,   // left half only
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Half" };
@@ -634,7 +634,7 @@ public class VisualRenderTests
             {
                 TextureName      = "red.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 FrameLength      = 0.1f,
                 ShapesSave = new ShapesSave()
             };
@@ -685,7 +685,7 @@ public class VisualRenderTests
             {
                 TextureName      = "hsplit.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 FrameLength      = 0.1f,
                 FlipHorizontal   = true,
                 ShapesSave = new ShapesSave()
@@ -739,7 +739,7 @@ public class VisualRenderTests
             {
                 TextureName      = "vsplit.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
-                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                RightCoordinate  = 16f, BottomCoordinate = 16f,
                 FrameLength      = 0.1f,
                 FlipVertical     = true,
                 ShapesSave = new ShapesSave()
@@ -803,13 +803,13 @@ public class VisualRenderTests
             var frame0 = new AnimationFrameSave
             {
                 TextureName = "red.png",   FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName = "lime.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 8f, BottomCoordinate = 8f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -863,13 +863,13 @@ public class VisualRenderTests
             var frame0 = new AnimationFrameSave
             {
                 TextureName = "red.png",  FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName = "lime.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -920,7 +920,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "hsplit.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 0.5f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 32f,
                 ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
@@ -961,7 +961,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "hsplit.png", FrameLength = 0.1f,
-                LeftCoordinate = 0.5f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 16f, TopCoordinate = 0f, RightCoordinate = 32f, BottomCoordinate = 32f,
                 ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
@@ -1003,7 +1003,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
@@ -1055,7 +1055,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
@@ -1143,16 +1143,16 @@ public class VisualRenderTests
             WriteColorPng(png, SKColors.Green, size: 128);
 
             var chain = new AnimationChainSave { Name = "Idle" };
-            int cellW = 32, cellH = 64, texW = 128, texH = 128;
+            int cellW = 32, cellH = 64;
             for (int row = 0; row < 2; row++)
                 for (int col = 0; col < 4; col++)
                     chain.Frames.Add(new AnimationFrameSave
                     {
                         TextureName      = "Idle.png",
-                        LeftCoordinate   = (float)(col * cellW) / texW,
-                        RightCoordinate  = (float)(col * cellW + cellW) / texW,
-                        TopCoordinate    = (float)(row * cellH) / texH,
-                        BottomCoordinate = (float)(row * cellH + cellH) / texH,
+                        LeftCoordinate   = col * cellW,
+                        RightCoordinate  = col * cellW + cellW,
+                        TopCoordinate    = row * cellH,
+                        BottomCoordinate = row * cellH + cellH,
                         FrameLength      = 0.1f,
                         ShapesSave = new ShapesSave()
                     });
@@ -1185,16 +1185,16 @@ public class VisualRenderTests
             WriteColorPng(png, SKColors.Green, size: 128);
 
             var chain = new AnimationChainSave { Name = "Idle" };
-            int cellW = 32, cellH = 64, texW = 128, texH = 128;
+            int cellW = 32, cellH = 64;
             for (int row = 0; row < 2; row++)
                 for (int col = 0; col < 4; col++)
                     chain.Frames.Add(new AnimationFrameSave
                     {
                         TextureName      = "Idle.png",
-                        LeftCoordinate   = (float)(col * cellW) / texW,
-                        RightCoordinate  = (float)(col * cellW + cellW) / texW,
-                        TopCoordinate    = (float)(row * cellH) / texH,
-                        BottomCoordinate = (float)(row * cellH + cellH) / texH,
+                        LeftCoordinate   = col * cellW,
+                        RightCoordinate  = col * cellW + cellW,
+                        TopCoordinate    = row * cellH,
+                        BottomCoordinate = row * cellH + cellH,
                         FrameLength      = 0.1f,
                         ShapesSave = new ShapesSave()
                     });
@@ -1247,7 +1247,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 RelativeY = 8f,
                 ShapesSave = new ShapesSave()
             };
@@ -1297,7 +1297,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 RelativeX = 8f,
                 ShapesSave = new ShapesSave()
             };
@@ -1348,7 +1348,7 @@ public class VisualRenderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 RelativeY = 8f,
                 ShapesSave = new ShapesSave()
             };
@@ -1401,14 +1401,14 @@ public class VisualRenderTests
             var onionFrame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 RelativeY = 8f,
                 ShapesSave = new ShapesSave()
             };
             var mainFrame = new AnimationFrameSave
             {
                 TextureName = "green.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 RelativeY = 0f,
                 ShapesSave = new ShapesSave()
             };

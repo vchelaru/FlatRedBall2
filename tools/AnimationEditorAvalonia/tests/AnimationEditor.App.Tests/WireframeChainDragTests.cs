@@ -63,15 +63,15 @@ public class WireframeChainDragTests
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f,   TopCoordinate    = 0f,
-            RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
+            RightCoordinate  = 32f, BottomCoordinate = 32f,
             ShapesSave = new ShapesSave(),
         };
         var frameB = new AnimationFrameSave
         {
             TextureName      = "sprite.png",
             FrameLength      = 0.1f,
-            LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
-            RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+            LeftCoordinate   = 32f, TopCoordinate    = 0f,
+            RightCoordinate  = 64f, BottomCoordinate = 32f,
             ShapesSave = new ShapesSave(),
         };
 
@@ -111,20 +111,20 @@ public class WireframeChainDragTests
         try
         {
             // Pre-drag frame sizes
-            float widthA  = frameA.RightCoordinate  - frameA.LeftCoordinate;   // 0.5
-            float heightA = frameA.BottomCoordinate - frameA.TopCoordinate;    // 0.5
-            float widthB  = frameB.RightCoordinate  - frameB.LeftCoordinate;   // 0.5
-            float heightB = frameB.BottomCoordinate - frameB.TopCoordinate;    // 0.5
+            float widthA  = frameA.RightCoordinate  - frameA.LeftCoordinate;   // 32
+            float heightA = frameA.BottomCoordinate - frameA.TopCoordinate;    // 32
+            float widthB  = frameB.RightCoordinate  - frameB.LeftCoordinate;   // 32
+            float heightB = frameB.BottomCoordinate - frameB.TopCoordinate;    // 32
 
             // Drag start inside the composite bounding rect; +16px right, +16px down
             ctrl.SimulateChainDrag(startScreenX: 16f, startScreenY: 8f,
                                    endScreenX:   32f, endScreenY:   24f);
 
             // Both frames must have moved +16px in each axis (UV delta = 16/64 = 0.25)
-            Assert.Equal(0.25f, frameA.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.25f, frameA.TopCoordinate,    precision: 4);
-            Assert.Equal(0.75f, frameB.LeftCoordinate,   precision: 4);
-            Assert.Equal(0.25f, frameB.TopCoordinate,    precision: 4);
+            Assert.Equal(16f, frameA.LeftCoordinate,   precision: 4);
+            Assert.Equal(16f, frameA.TopCoordinate,    precision: 4);
+            Assert.Equal(48f, frameB.LeftCoordinate,   precision: 4);
+            Assert.Equal(16f, frameB.TopCoordinate,    precision: 4);
 
             // Frame sizes must be preserved
             Assert.Equal(widthA,  frameA.RightCoordinate  - frameA.LeftCoordinate,  precision: 4);

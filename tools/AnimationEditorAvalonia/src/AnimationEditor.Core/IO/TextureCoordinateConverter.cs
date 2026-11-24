@@ -25,48 +25,46 @@ internal static class TextureCoordinateConverter
         foreach (var frame in Frames(list))
         {
             var region = FrameRegion.Of(frame);
-            var pixels = sizeOf(frame.TextureName) is { } size
-                ? new FrameRegion(region.Left * size.Width, region.Top * size.Height, region.Right * size.Width, region.Bottom * size.Height)
-                : FrameRegion.Unset;
-            pixels.ApplyTo(frame);
+            (sizeOf(frame.TextureName) is { } size ? ToPixels(region, size) : FrameRegion.Unset).ApplyTo(frame);
         }
         list.CoordinateType = TextureCoordinateType.Pixel;
     }
 
     /// <summary>
-    /// Runs <paramref name="write"/> with <paramref name="list"/> in UV, then restores its pixels exactly. A list
-    /// already in UV is written as it is.
+    /// Runs <paramref name="write"/> with <paramref name="list"/> in <paramref name="format"/>, then restores the list
+    /// exactly as it was. Needs no texture size when the list already is in that format.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A region needs the size of a texture that can't be read. Nothing has been changed or written.
     /// </exception>
-    internal static void WriteAsUv(AnimationChainListSave list, Func<string, (int Width, int Height)?> textureSize, Action write)
+    internal static void WriteAs(
+        AnimationChainListSave list, TextureCoordinateType format, Func<string, (int Width, int Height)?> textureSize, Action write)
     {
-        if (list.CoordinateType == TextureCoordinateType.UV)
+        if (list.CoordinateType == format)
         {
             write();
             return;
         }
 
         var sizeOf = Cached(textureSize);
-        ThrowIfUnsized(list, sizeOf, "save with UV coordinates");
+        ThrowIfUnsized(list, sizeOf, $"save with {format} coordinates");
 
-        var pixels = Frames(list).Select(frame => (Frame: frame, Region: FrameRegion.Of(frame))).ToList();
+        var original = list.CoordinateType;
+        var regions = Frames(list).Select(frame => (Frame: frame, Region: FrameRegion.Of(frame))).ToList();
         try
         {
-            foreach (var (frame, region) in pixels)
+            foreach (var (frame, region) in regions)
             {
                 if (sizeOf(frame.TextureName) is { } size)
-                    new FrameRegion(region.Left / size.Width, region.Top / size.Height, region.Right / size.Width, region.Bottom / size.Height)
-                        .ApplyTo(frame);
+                    (format == TextureCoordinateType.Pixel ? ToPixels(region, size) : ToUv(region, size)).ApplyTo(frame);
             }
-            list.CoordinateType = TextureCoordinateType.UV;
+            list.CoordinateType = format;
             write();
         }
         finally
         {
-            foreach (var (frame, region) in pixels) region.ApplyTo(frame);
-            list.CoordinateType = TextureCoordinateType.Pixel;
+            foreach (var (frame, region) in regions) region.ApplyTo(frame);
+            list.CoordinateType = original;
         }
     }
 
@@ -88,6 +86,12 @@ internal static class TextureCoordinateConverter
         string.IsNullOrEmpty(name)
             ? null
             : TryReadPngSize(System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name));
+
+    private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size) =>
+        new(uv.Left * size.Width, uv.Top * size.Height, uv.Right * size.Width, uv.Bottom * size.Height);
+
+    private static FrameRegion ToUv(FrameRegion pixels, (int Width, int Height) size) =>
+        new(pixels.Left / size.Width, pixels.Top / size.Height, pixels.Right / size.Width, pixels.Bottom / size.Height);
 
     private static Func<string, (int Width, int Height)?> Cached(Func<string, (int Width, int Height)?> textureSize)
     {

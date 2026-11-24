@@ -53,7 +53,7 @@ public class HotReloadTimelineTests
                 TextureName    = pngPath,
                 FrameLength    = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate    = 0f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave     = new ShapesSave(),
             });
             chain.Frames.Add(new AnimationFrameSave
@@ -61,7 +61,7 @@ public class HotReloadTimelineTests
                 TextureName    = pngPath,
                 FrameLength    = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate    = 0f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave     = new ShapesSave(),
             });
 
@@ -123,7 +123,7 @@ public class HotReloadTimelineTests
                 TextureName     = pngPath,
                 FrameLength     = 0.1f,
                 LeftCoordinate  = 0f, TopCoordinate    = 0f,
-                RightCoordinate = 1f, BottomCoordinate = 1f,
+                RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave      = new ShapesSave(),
             });
 

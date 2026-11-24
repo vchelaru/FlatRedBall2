@@ -150,6 +150,17 @@ public class BatchFrameBuilderTests
         Assert.False(result.ExceededTextureBounds);
     }
 
+    // Without the texture's size there is no row to wrap, and advancing would write a guessed rectangle.
+    [Fact]
+    public void WithIncrement_UnknownTextureSize_CopiesTheRegion()
+    {
+        var last = MakeLastFrame(16f, 32f, 0f, 16f);
+        var result = BatchFrameBuilder.BuildBatch(last, 2, incrementUV: true, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, null);
+
+        Assert.All(result.Frames, f => Assert.Equal((16f, 32f), (f.LeftCoordinate, f.RightCoordinate)));
+        Assert.False(result.ExceededTextureBounds);
+    }
+
     // ── ShapesSave left null until a shape is actually added (#937) ─────────
 
     [Fact]

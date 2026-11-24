@@ -78,8 +78,8 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -126,8 +126,8 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -168,7 +168,7 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -211,8 +211,8 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -262,8 +262,8 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
-                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                LeftCoordinate = 8f, TopCoordinate = 8f,
+                RightCoordinate = 56f, BottomCoordinate = 56f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test", IsLocked = true };
@@ -393,7 +393,7 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "dark.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -450,7 +450,7 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "red.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -504,7 +504,7 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = "dark.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
@@ -560,8 +560,8 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0.25f, TopCoordinate = 0.25f,
-                RightCoordinate = 0.75f, BottomCoordinate = 0.75f,
+                LeftCoordinate = 16f, TopCoordinate = 16f,
+                RightCoordinate = 48f, BottomCoordinate = 48f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Walk" };
@@ -606,7 +606,7 @@ public class WireframeHandlesAndBorderTests
             var frame = new AnimationFrameSave
             {
                 TextureName = png, FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 64f, BottomCoordinate = 64f,
                 ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };

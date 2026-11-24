@@ -25,8 +25,8 @@ public class PreviewFrameEdgeBleedTests
 
     private static AnimationFrameSave TopLeftFrame() => new()
     {
-        LeftCoordinate = 0f, RightCoordinate = 0.5f,
-        TopCoordinate = 0f, BottomCoordinate = 0.5f,
+        LeftCoordinate = 0f, RightCoordinate = 10f,
+        TopCoordinate = 0f, BottomCoordinate = 10f,
     };
 
     private static SKBitmap Draw(SKImage sheet, float zoom)

@@ -9,7 +9,7 @@ namespace AnimationEditor.Editing.Tests;
 public class PropertyEditTests : IDisposable
 {
     private readonly EditingTestGraph _g = new();
-    private readonly AnimationChainListSave _acls = new() { TimeMeasurementUnit = TimeMeasurementUnit.Second };
+    private readonly AnimationChainListSave _acls = new() { CoordinateType = TextureCoordinateType.Pixel, TimeMeasurementUnit = TimeMeasurementUnit.Second };
     private readonly AnimationChainSave _walk = new() { Name = "Walk" };
     private readonly AnimationChainSave _run = new() { Name = "Run" };
     private readonly string _folder;
@@ -22,7 +22,7 @@ public class PropertyEditTests : IDisposable
             _walk.Frames.Add(new AnimationFrameSave
             {
                 TextureName = "sheet.png", FrameLength = 0.1f * (i + 1),
-                LeftCoordinate = i / 3f, RightCoordinate = (i + 1) / 3f, TopCoordinate = 0, BottomCoordinate = 1,
+                LeftCoordinate = i * 16f, RightCoordinate = (i + 1) * 16f, TopCoordinate = 0f, BottomCoordinate = 32f,
             });
         _run.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FrameLength = 0.5f });
         _acls.AnimationChains.Add(_walk);
@@ -184,13 +184,13 @@ public class PropertyEditTests : IDisposable
 
         r.Success.ShouldBeTrue(string.Join(";", r.Errors));
         r.ChangedItems.ShouldBe(["Walk/0"]);
-        F(0).LeftCoordinate.ShouldBe(16f / 48, 0.0001f);
-        F(0).RightCoordinate.ShouldBe(32f / 48, 0.0001f);
-        F(0).TopCoordinate.ShouldBe(8f / 32, 0.0001f);
-        F(0).BottomCoordinate.ShouldBe(24f / 32, 0.0001f);
+        F(0).LeftCoordinate.ShouldBe(16f, 0.0001f);
+        F(0).RightCoordinate.ShouldBe(32f, 0.0001f);
+        F(0).TopCoordinate.ShouldBe(8f, 0.0001f);
+        F(0).BottomCoordinate.ShouldBe(24f, 0.0001f);
         _g.Undo.Undo();
         F(0).LeftCoordinate.ShouldBe(0f);
-        F(0).RightCoordinate.ShouldBe(1f / 3, 0.0001f);
+        F(0).RightCoordinate.ShouldBe(16f, 0.0001f);
         _g.Undo.CanUndo.ShouldBeFalse();
     }
 

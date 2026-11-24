@@ -105,8 +105,8 @@ public class HeaderTextDoubleTapTests
             const float texCX = 350f, texCY = 350f;
             var frame = new AnimationFrameSave
             {
-                LeftCoordinate  = 0.6f, TopCoordinate    = 0.6f,
-                RightCoordinate = 0.8f, BottomCoordinate = 0.8f,
+                LeftCoordinate  = 300f, TopCoordinate    = 300f,
+                RightCoordinate = 400f, BottomCoordinate = 400f,
             };
             var vm = new TreeNodeVm { Data = frame };
 

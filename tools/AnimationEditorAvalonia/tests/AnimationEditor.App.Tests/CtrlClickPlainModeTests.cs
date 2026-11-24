@@ -120,8 +120,8 @@ public class CtrlClickPlainModeTests
             FrameLength         = 0.1f,
             LeftCoordinate      = 0f,
             TopCoordinate       = 0f,
-            RightCoordinate     = 0.5f,   // 32px wide
-            BottomCoordinate    = 1.0f,   // 64px tall
+            RightCoordinate     = 32f,   // 32px wide
+            BottomCoordinate    = 64f,   // 64px tall
             ShapesSave = new ShapesSave(),
         };
         chain.Frames.Add(lastFrame);

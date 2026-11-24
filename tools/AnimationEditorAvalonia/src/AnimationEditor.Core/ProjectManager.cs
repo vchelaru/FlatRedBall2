@@ -171,7 +171,7 @@ namespace AnimationEditor.Core
         /// Save the current animation chain list to <paramref name="targetPath"/>, as .achj
         /// (JSON) or .achx (XML) depending on <paramref name="targetPath"/>'s extension, in the
         /// coordinate format specified by <see cref="OnDiskCoordinateType"/>. The in-memory document
-        /// holds pixels, so only a UV write converts, and the document is in pixels again afterwards.
+        /// holds pixels, so only a UV write converts, and the in-memory document is left as it was.
         /// </summary>
         /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
         /// <see cref="AnimationChainListSave"/> is a view over Tiled tileset data for a native tsx
@@ -193,20 +193,7 @@ namespace AnimationEditor.Core
             NormalizeFrameTextureNames(acls, achxDirectory);
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
-            var sizes = TextureCoordinateConverter.SizesIn(achxDirectory);
-            if (diskFormat == TextureCoordinateType.UV)
-            {
-                TextureCoordinateConverter.WriteAsUv(acls, sizes, Write);
-                return;
-            }
-
-            // A list that is still in UV did not come through this class's load path.
-            if (acls.CoordinateType == TextureCoordinateType.UV)
-            {
-                TextureCoordinateConverter.ThrowIfUnsized(acls, sizes, "convert UV coordinates to pixels");
-                TextureCoordinateConverter.ToPixels(acls, sizes);
-            }
-            Write();
+            TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
         }
 
         /// <summary>True when <paramref name="path"/> has a .achj (JSON) extension; false for .achx or anything else.</summary>
