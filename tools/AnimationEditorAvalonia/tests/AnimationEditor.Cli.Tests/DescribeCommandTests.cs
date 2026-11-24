@@ -53,6 +53,49 @@ public class DescribeCommandTests : IDisposable
         shapes[1].GetProperty("type").GetString().ShouldBe("circle");
     }
 
+    private async Task SetOffsetAndFlip() =>
+        (await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--ops", _w.Write("ops.json", """
+            {"ops":[
+              {"op":"set-frame-flip","frame":"Walk/2","flipH":true,"flipDiagonal":true},
+              {"op":"set-frame-offset","frame":"Walk/2","x":3,"y":-2.5}
+            ]}
+            """))).Code.ShouldBe(0);
+
+    [Fact]
+    public async Task Text_ShowsOffsetAndFlipOnlyWhenNonDefault()
+    {
+        await SetOffsetAndFlip();
+
+        var r = await _w.RunAsync("describe", _w.PathOf("hero.achx"));
+
+        var lines = r.Out.Split('\n');
+        var walk2 = string.Join(" ", lines.SkipWhile(l => !l.StartsWith("  2  ")).Skip(1).TakeWhile(l => l.StartsWith("       ")));
+        walk2.ShouldContain("offset 3,-2.5");
+        walk2.ShouldContain("flip H D");
+        var walk0 = string.Join(" ", lines.SkipWhile(l => !l.StartsWith("  0  ")).Skip(1).TakeWhile(l => l.StartsWith("       ")));
+        walk0.ShouldNotContain("offset");
+        walk0.ShouldNotContain("flip");
+    }
+
+    [Fact]
+    public async Task Json_HasOffsetAndFlipFlagsOnEveryFrame()
+    {
+        await SetOffsetAndFlip();
+
+        var r = await _w.RunAsync("describe", _w.PathOf("hero.achx"), "--json");
+
+        using var doc = JsonDocument.Parse(r.Out);
+        var frames = doc.RootElement.GetProperty("chains")[0].GetProperty("frames");
+        var f2 = frames[2];
+        f2.GetProperty("offset").GetProperty("x").GetDouble().ShouldBe(3);
+        f2.GetProperty("offset").GetProperty("y").GetDouble().ShouldBe(-2.5);
+        f2.GetProperty("flipHorizontal").GetBoolean().ShouldBeTrue();
+        f2.GetProperty("flipVertical").GetBoolean().ShouldBeFalse();
+        f2.GetProperty("flipDiagonal").GetBoolean().ShouldBeTrue();
+        frames[0].GetProperty("offset").GetProperty("x").GetDouble().ShouldBe(0);
+        frames[0].GetProperty("flipHorizontal").GetBoolean().ShouldBeFalse();
+    }
+
     [Fact]
     public async Task MissingFile_ExitsNonZeroWithMessage()
     {
