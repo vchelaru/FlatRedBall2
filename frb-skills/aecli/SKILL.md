@@ -52,6 +52,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 `render hero.seqj --sequence Run --at 0,0.4 --out shots` writes `Run_0.png`, `Run_0.4.png` (composited like the editor's sequence preview: track 0 in front) and prints the paths. `.achx/.achj`: `--chain Walk --frame 0,1` (`Walk_frame0.png`) or `--at 0.3` (`Walk_0.3.png`). `--sequence`/`--chain` may be left out when the file has only one; `--at` defaults to 0, `--frame` to 0.
 
 - `--scale <1-16>` (default 4), `--background transparent|black|white|gray|#RRGGBB` (default transparent), `--grid` (origin axes plus a 16-unit grid).
+- `--shapes` draws the shapes (rect, circle, polygon) over each frame, named, and widens auto bounds to include them. `--sheet` writes one `<name>_sheet.png` with every time as a labelled tile; fails with a lower-`--scale` hint past about 32 million pixels.
 - `--bounds auto` (default) fits one canvas to every sprite across all requested times, so images line up and are the same size. `--bounds x,y,w,h` fixes it: x,y is the lower-left corner in offset units, Y up like frame offsets; sprites outside are cropped.
 - `--json` gives `{success, files, errors:[{code,message}]}`. Unknown names fail with exit 1 and a Did-you-mean; a bad option or missing `--out` is exit 2.
 - A track is hidden outside its chains, so a time can legitimately draw nothing, but all requested times drawing nothing fails.

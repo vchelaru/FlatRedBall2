@@ -101,4 +101,39 @@ public class RenderCommandTests : IDisposable
         r.Code.ShouldBe(2);
         r.Err.ShouldContain("--out");
     }
+
+    [Fact]
+    public async Task Shapes_AreDrawnOverTheFrame()
+    {
+        var plain = await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--frame", "2", "--scale", "2", "--out", _w.PathOf("plain"));
+        var shaped = await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--frame", "2", "--scale", "2", "--shapes", "--out", _w.PathOf("shaped"));
+
+        plain.Code.ShouldBe(0, plain.Err);
+        shaped.Code.ShouldBe(0, shaped.Err);
+        _w.Bytes("shaped/Walk_frame2.png").ShouldNotBe(_w.Bytes("plain/Walk_frame2.png"));
+    }
+
+    [Fact]
+    public async Task Sheet_WritesOnePngWithATilePerTime()
+    {
+        var r = await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--frame", "0,1", "--scale", "1", "--sheet", "--out", _w.PathOf("out"));
+
+        r.Code.ShouldBe(0, r.Err);
+        r.Out.Trim().ShouldBe(Path.GetFullPath(_w.PathOf("out/Walk_sheet.png")));
+        Directory.GetFiles(_w.PathOf("out")).Length.ShouldBe(1);
+        // Two 16x32 tiles side by side: 8 px gaps, a 20 px caption strip under each.
+        PngSize(_w.PathOf("out/Walk_sheet.png")).ShouldBe((8 + 2 * (16 + 8), 8 + 32 + 20 + 8));
+    }
+
+    [Fact]
+    public async Task Sheet_TooLarge_FailsAndSuggestsLowerScale()
+    {
+        var frames = string.Join(",", Enumerable.Repeat("0", 16));
+        var r = await _w.RunAsync("render", _w.PathOf("hero.achj"), "--chain", "Walk", "--frame", frames, "--bounds", "0,0,100,100", "--scale", "16", "--sheet", "--out", _w.PathOf("out"));
+
+        r.Code.ShouldBe(1);
+        r.Err.ShouldContain("contact sheet");
+        r.Err.ShouldContain("--scale");
+        Directory.Exists(_w.PathOf("out")).ShouldBeFalse();
+    }
 }

@@ -34,7 +34,8 @@ internal static class ExportFrameRenderer
     /// <param name="offsetMultiplier">The editor's unit multiplier from stored offsets to pixels.</param>
     /// <param name="maxDimension">The format's limit for either side of the canvas.</param>
     /// <param name="fixedCanvas">Replaces the fitted canvas when set; sprites that fall outside are cropped.</param>
-    /// <param name="overlay">Drawn over every frame with the output pixel position of the entity origin (x, y).</param>
+    /// <param name="overlay">Drawn over every frame with the frame's index and the output pixel position of the entity origin (x, y).</param>
+    /// <param name="extraExtent">Also kept inside a fitted canvas (offset space), for what the overlay draws beyond the sprites.</param>
     /// <exception cref="InvalidOperationException">Nothing drawable, or the result would be too large.</exception>
     public static RenderedAnimation Render(
         IReadOnlyList<ExportTimelineFrame> timeline,
@@ -43,7 +44,8 @@ internal static class ExportFrameRenderer
         AnimationExportOptions options,
         int maxDimension,
         CanvasRect? fixedCanvas = null,
-        Action<SKCanvas, float, float>? overlay = null)
+        Action<SKCanvas, int, float, float>? overlay = null,
+        CanvasRect? extraExtent = null)
     {
         if (options.Scale < 1 || options.Scale > AnimationExportOptions.MaxScale)
             throw new ArgumentOutOfRangeException(nameof(options), $"Scale must be 1 to {AnimationExportOptions.MaxScale}.");
@@ -93,6 +95,16 @@ internal static class ExportFrameRenderer
                 minTop = placements.SelectMany(p => p).Min(p => p.Top);
                 width = placements.SelectMany(p => p).Max(p => p.Left + p.Width) - minLeft;
                 height = placements.SelectMany(p => p).Max(p => p.Top + p.Height) - minTop;
+                if (extraExtent is { } extra)
+                {
+                    int left = (int)Math.Floor(extra.X * options.Scale), top = (int)Math.Floor(-(extra.Y + extra.Height) * options.Scale);
+                    int right = (int)Math.Ceiling((extra.X + extra.Width) * options.Scale), bottom = (int)Math.Ceiling(-extra.Y * options.Scale);
+                    int newLeft = Math.Min(minLeft, left), newTop = Math.Min(minTop, top);
+                    width = Math.Max(minLeft + width, right) - newLeft;
+                    height = Math.Max(minTop + height, bottom) - newTop;
+                    minLeft = newLeft;
+                    minTop = newTop;
+                }
             }
             if (width > maxDimension || height > maxDimension)
                 throw new InvalidOperationException($"The image would be {width} x {height} pixels, over this format's {maxDimension} pixel limit. Lower the scale.");
@@ -118,7 +130,7 @@ internal static class ExportFrameRenderer
                         cx: p.Left - minLeft + p.Width / 2f, cy: p.Top - minTop + p.Height / 2f,
                         zoom: options.Scale, alpha: 1f, showOutline: false);
                 }
-                overlay?.Invoke(canvas, -minLeft, -minTop);
+                overlay?.Invoke(canvas, i, -minLeft, -minTop);
                 if (!surface.ReadPixels(readback, pixels.GetPixels(), pixels.RowBytes, 0, 0))
                     throw new InvalidOperationException("Could not read back a rendered frame.");
                 frames.Add(new RenderedFrame(pixels.Bytes, timeline[i].DelayTicks));
