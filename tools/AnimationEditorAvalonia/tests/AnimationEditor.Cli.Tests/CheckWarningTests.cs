@@ -143,6 +143,37 @@ public class CheckWarningTests : IDisposable
         json.ShouldBe(["The edit raised check warnings [empty-chain] from 0 to 2; run `aecli check`."]);
     }
 
+    [Theory]
+    [InlineData("hero.achj", "add-chain Run")]
+    [InlineData("hero.seqj", "set-block-start Run/Body/1 start=0.5")]
+    public async Task Edit_SaveThatFails_PrintsNoRaisedWarnings(string file, string op)
+    {
+        WriteSeq();
+        var path = _w.PathOf(file);
+        var before = File.ReadAllBytes(path);
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            var r = await _w.RunAsync("edit", path, "--op", op);
+
+            r.Code.ShouldBe(1);
+            r.Out.ShouldContain("error: Could not save");
+            r.Out.ShouldNotContain("raised check warnings");
+            File.ReadAllBytes(path).ShouldBe(before);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+    }
+
+    [Fact]
+    public async Task Edit_Tsx_PrintsNoRaisedWarnings()
+    {
+        // A tileset cannot hold a chain with no frames, so the saved file has no such warning.
+        (await EditWarnings(_w.Copy("tiles.tsx"), "add-chain Run")).ShouldAllBe(w => !w.Contains("raised check warnings"));
+    }
+
     [Fact]
     public async Task Edit_FileWithWarnings_PrintsOnlyCodesWhoseCountRose()
     {

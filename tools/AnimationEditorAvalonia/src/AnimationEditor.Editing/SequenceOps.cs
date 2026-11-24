@@ -189,11 +189,10 @@ public static class SequenceOps
 
         if (changed.Count == 0 || doc.Save.ToJsonString() == original)
             return new EditRunResult(new EditResult([], [], warnings), []);
-        warnings.AddRange(CheckReport.RaisedWarnings(before, after));
 
         var save = session.Save();
         return save.Success
-            ? new EditRunResult(new EditResult(changed.Distinct().ToList(), [], warnings), [])
+            ? new EditRunResult(new EditResult(changed.Distinct().ToList(), [], [.. warnings, .. CheckReport.RaisedWarnings(before, after)]), [])
             : new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
     }
 

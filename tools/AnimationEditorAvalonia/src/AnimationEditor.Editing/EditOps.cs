@@ -499,7 +499,6 @@ public static class EditOps
 
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
-        warnings.AddRange(CheckReport.RaisedWarnings(before, after));
 
         foreach (var tsxPath in associations)
         {
@@ -514,6 +513,8 @@ public static class EditOps
         if (!save.Success)
             return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
 
+        // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
+        if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
         var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }
