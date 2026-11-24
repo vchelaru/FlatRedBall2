@@ -82,6 +82,23 @@ public static class ShapeEdit
             : Fail(EditErrorCode.Refused, $"Could not duplicate shape '{shape.Name}'.");
     }
 
+    /// <summary>
+    /// Appends a copy of <paramref name="shape"/>, under the same name, to every frame of <paramref name="targets"/>.
+    /// A target that already has a shape of that name fails. Only the target chains must be unlocked.
+    /// </summary>
+    public static EditResult DuplicateShapeTo(IAppCommands commands, ShapeSave shape, IReadOnlyList<FrameRef> targets)
+    {
+        foreach (var (chain, frame) in targets)
+        {
+            if (chain.IsLocked) return StructureEdit.LockedFail(chain);
+            if (frame.ShapesSave?.Shapes.OfType<ShapeSave>().Any(s => s.Name == shape.Name) == true)
+                return Fail(EditErrorCode.DuplicateName, $"A shape named '{shape.Name}' already exists in {chain.Name}/{chain.Frames.IndexOf(frame)}.");
+        }
+
+        commands.PasteShapes(targets.Select(t => t.Frame).ToList(), [shape]);
+        return Ok(targets.Select(t => Address(t.Chain, t.Frame, EditAddress.TypeName(shape), shape.Name)).ToArray());
+    }
+
     /// <summary>Sets any of a rectangle's center and half-extents; a null field is left as it is.</summary>
     public static EditResult SetRect(
         IAppCommands commands, IObjectFinder finder, AARectSave rect, float? x, float? y, float? scaleX, float? scaleY)

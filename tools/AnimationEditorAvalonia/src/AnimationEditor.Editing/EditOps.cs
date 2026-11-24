@@ -45,17 +45,20 @@ public static class EditOps
     private static readonly IReadOnlyList<string> CurveValues =
         ["snap", "linear", "ease-in", "ease-out", "ease-in-out", "anticipate", "overshoot", "bounce"];
     private const string EventAddressDescription = "Event address: Chain/frameIndex/event/eventIndex (zero-based).";
+    private const string EventSelectorDescription = "Event address or selector: Chain/frameIndex/event/eventIndex (zero-based), such as */*/event/*.";
+    private const string TargetFramesDescription = "Destination frames: a frame address or frame selector (Walk/2-5, Attack*/*). Default: the source's own frame. Must be unlocked; the source's chain may be locked.";
     private const string ShapeAddressDescription = "Shape address: Chain/frameIndex/rect|circle|polygon/name.";
     /// <summary>How <c>--schema</c> explains bulk addressing; shared by the text and JSON output.</summary>
     public const string SelectorSyntax =
         "Bulk selectors: where an op takes a frame address, the index may be * (every frame), a range (Walk/2-5), "
         + "or a list of numbers and ranges (Walk/0,3,7 or Walk/0,2-3,6), and the chain may be a glob with * and ? (Walk*/0-2). "
         + "Shape addresses take the same frame selector, and the shape name may be * or a glob (Walk/*/rect/Hitbox). "
-        + "Chain ops set-chain-loop, set-chain-pingpong, set-chain-reverse and set-chain-locked take a glob (Walk*, *). "
-        + "Selectors work on every op that addresses a frame, event or shape except reorder-frame, reorder-shape, rename-shape and the add-/delete-/duplicate-/reorder-/rename-chain ops; those take one exact address. "
-        + "A selector expands when its op starts, in chain order then in the order written; delete-frame and duplicate-frame run from the highest index down so earlier targets keep their index. "
+        + "Event addresses take the same frame selector, and the event index takes the same forms as a frame index (*/*/event/*, Walk/0/event/1-2). "
+        + "Chain ops delete-chain, set-chain-loop, set-chain-pingpong, set-chain-reverse and set-chain-locked take a glob (Walk*, *). "
+        + "Selectors work on every op that addresses a frame, event or shape except reorder-frame, reorder-shape, rename-shape and the add-/duplicate-/reorder-/rename-chain ops; those take one exact address. "
+        + "A selector expands when its op starts, in chain order then in the order written; delete-frame, duplicate-frame and delete-frame-event run from the highest index down so every index means the state before the op. "
         + "A selector that matches nothing is an error (NoMatch), as is any index past a chain's end. Any failing target fails the whole batch and nothing is written. "
-        + "Shape selectors skip frames that lack the shape. A chain whose name really contains * or ? cannot be addressed by glob.";
+        + "Shape and event selectors skip frames that lack the shape or event. A chain whose name really contains * or ? cannot be addressed by glob.";
 
     /// <summary>How <c>--schema</c> explains Tiled .tsx files; shared by the text and JSON output.</summary>
     public static string TsxNote =>
@@ -90,7 +93,7 @@ public static class EditOps
         ]),
         new("delete-chain", "Deletes a chain and its frames.",
         [
-            new("chain", "string", true, "Chain name."),
+            new("chain", "string", true, "Chain name, or a glob (Walk*) to delete every match."),
         ]),
         new("duplicate-chain", "Inserts a copy of a chain right after it, frames and shapes included.",
         [
@@ -127,9 +130,11 @@ public static class EditOps
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
         ]),
-        new("duplicate-frame", "Inserts a copy of a frame right after it, shapes included.",
+        new("duplicate-frame", "Inserts a copy of a frame: texture, region, length, offset, flips, color, keyframes, events, and shapes with their geometry and keyframes. Without to and index it lands right after the source; with either, the selected frames land as one block per destination chain, in the order written. Move a frame by duplicating it and deleting the source in the same batch.",
         [
-            new("frame", "string", true, "Frame address: Chain/frameIndex."),
+            new("frame", "string", true, "Frame address: Chain/frameIndex, or a frame selector (Walk/2-5)."),
+            new("to", "string", false, "Destination chain, one exact name. Default: the source's own chain. Must be unlocked; the source's chain may be locked."),
+            new("index", "integer", false, "Zero-based position in the destination, 0 to its frame count. Default with to: the end."),
         ]),
         new("reorder-frame", "Moves a frame so it ends up at the given position in its chain.",
         [
@@ -198,9 +203,10 @@ public static class EditOps
         [
             new("shape", "string", true, ShapeAddressDescription),
         ]),
-        new("duplicate-shape", "Appends a copy of a shape to its frame under a unique name (Hitbox becomes Hitbox2).",
+        new("duplicate-shape", "Appends a copy of a shape to its frame under a unique name (Hitbox becomes Hitbox2), or with to, to other frames under the same name. A target frame that already has that name fails the batch.",
         [
-            new("shape", "string", true, ShapeAddressDescription),
+            new("shape", "string", true, "Shape address or selector: Chain/frameIndex/rect|circle|polygon/name."),
+            new("to", "string", false, TargetFramesDescription),
         ]),
         new("set-rect", "Sets a rect's center and half-extents. Give at least one; omitted ones are left as they are.",
         [
@@ -242,9 +248,14 @@ public static class EditOps
             new("name", "string", false, "New event name."),
             new("data", "string", false, "New payload; empty clears it."),
         ]),
-        new("delete-frame-event", "Deletes one event; later events of the frame shift down by one.",
+        new("duplicate-frame-event", "Appends a copy of an event to its frame, or with to, to other frames. A frame may hold several events of one name.",
         [
-            new("event", "string", true, EventAddressDescription),
+            new("event", "string", true, EventSelectorDescription),
+            new("to", "string", false, TargetFramesDescription),
+        ]),
+        new("delete-frame-event", "Deletes an event; later events of the frame shift down by one.",
+        [
+            new("event", "string", true, EventSelectorDescription),
         ]),
         new("set-frame-keyframe", "Turns a frame's offset or color keyframe on or off. A chain's first frame is always a keyframe. Frames that are not keyframes glide between their neighbours.",
         [
@@ -559,6 +570,8 @@ public static class EditOps
                 return Task.FromResult(AddFramesGrid(session, op));
             case "delete-frame":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) => StructureEdit.DeleteFrame(session.Commands, chain, frame)));
+            case "duplicate-frame" when op.Values.ContainsKey("to") || op.Values.ContainsKey("index"):
+                return Task.FromResult(DuplicateFramesTo(session, op));
             case "duplicate-frame":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) => StructureEdit.DuplicateFrame(session.Commands, chain, frame)));
             case "reorder-frame":
@@ -592,6 +605,9 @@ public static class EditOps
                     ShapeEdit.AddShape(session.Commands, session.ObjectFinder, frame, op.Values["type"], op.Values.GetValueOrDefault("name"))));
             case "delete-shape":
                 return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => ShapeEdit.DeleteShape(session.Commands, session.ObjectFinder, shape)));
+            case "duplicate-shape" when op.Values.ContainsKey("to"):
+                return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape =>
+                    WithTargetFrames(doc, op, targets => ShapeEdit.DuplicateShapeTo(session.Commands, shape, targets!))));
             case "duplicate-shape":
                 return Task.FromResult(WithShape<ShapeSave>(doc, op, "shape", shape => ShapeEdit.DuplicateShape(session.Commands, session.ObjectFinder, shape)));
             case "set-rect":
@@ -612,6 +628,9 @@ public static class EditOps
             case "set-frame-event":
                 return Task.FromResult(WithEvent(doc, op, e => FrameDetailEdit.SetFrameEvent(
                     session.Commands, e.Chain, e.Frame, e.Index, op.Values.GetValueOrDefault("name"), op.Values.GetValueOrDefault("data"))));
+            case "duplicate-frame-event":
+                return Task.FromResult(WithEvent(doc, op, e =>
+                    WithTargetFrames(doc, op, targets => FrameDetailEdit.DuplicateFrameEvent(session.Commands, e, targets))));
             case "delete-frame-event":
                 return Task.FromResult(WithEvent(doc, op, e => FrameDetailEdit.DeleteFrameEvent(session.Commands, e.Chain, e.Frame, e.Index)));
             case "set-frame-keyframe":
@@ -723,6 +742,29 @@ public static class EditOps
             session.ProjectManager, session.Commands, chain.Value!, resolved.AbsolutePath,
             Integer(op, "cellWidth")!.Value, Integer(op, "cellHeight")!.Value, Integer(op, "columns")!.Value, Integer(op, "rows")!.Value,
             Integer(op, "start") ?? 0, Integer(op, "count"), Number(op, "frameLength"), new HeaderTextureProbe());
+    }
+
+    private static EditResult DuplicateFramesTo(EditSession session, EditOp op)
+    {
+        var sources = SelectorExpander.ResolveFrames(session.Document, op.Values["frame"]);
+        if (sources.Frames is null) return Fail(sources.Error!, sources.Code);
+
+        AnimationChainSave? to = null;
+        if (op.Values.TryGetValue("to", out var name))
+        {
+            var chain = EditAddress.ResolveChain(session.Document, name);
+            if (!chain.Ok) return Fail(chain.Error!, chain.Code);
+            to = chain.Value;
+        }
+        return StructureEdit.DuplicateFramesTo(session.Commands, sources.Frames, to, Integer(op, "index"));
+    }
+
+    /// <summary>Runs <paramref name="apply"/> with the frames the op's <c>to</c> names, or null when it has none.</summary>
+    private static EditResult WithTargetFrames(AnimationChainListSave doc, EditOp op, Func<IReadOnlyList<FrameRef>?, EditResult> apply)
+    {
+        if (!op.Values.TryGetValue("to", out var address)) return apply(null);
+        var targets = SelectorExpander.ResolveFrames(doc, address);
+        return targets.Frames is null ? Fail(targets.Error!, targets.Code) : apply(targets.Frames);
     }
 
     private static EditResult SetFrameRegion(EditSession session, EditOp op)
