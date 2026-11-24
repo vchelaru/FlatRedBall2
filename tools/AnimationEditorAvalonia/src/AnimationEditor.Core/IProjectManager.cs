@@ -52,6 +52,10 @@ namespace AnimationEditor.Core
         /// non-empty. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
         IReadOnlyList<string> SaveTsxProject(string? targetPath = null);
 
+        /// <summary>The chains the last <see cref="SaveTsxProject"/> did not store in full.
+        /// See <see cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>
+        IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved { get; }
+
         /// <summary>Names of chains with a tsx validation issue; empty when no tsx project is
         /// loaded or nothing is wrong. See <see cref="ProjectManager.GetChainNamesWithTsxIssues"/>.</summary>
         IReadOnlyList<string> GetChainNamesWithTsxIssues();
