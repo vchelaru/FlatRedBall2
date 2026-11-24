@@ -659,7 +659,9 @@ namespace AnimationEditor.Core.CommandsAndState
         IHotReloadWatcher HotReloadWatcher { get; set; }
 
         /// <summary>
-        /// Subscribe to the hot-reload watcher after it's injected by the app layer.
+        /// Subscribe to the hot-reload watcher after it's injected by the app layer. A changed file reloads only while
+        /// it is the open document and that document's last save did not fail; after a failed save the edits are kept
+        /// and <see cref="SaveFailed"/> is raised instead.
         /// </summary>
         void WireHotReloadWatcher();
 

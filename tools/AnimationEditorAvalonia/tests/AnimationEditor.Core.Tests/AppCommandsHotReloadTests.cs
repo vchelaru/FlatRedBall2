@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.HotReload;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -147,6 +148,110 @@ public class AppCommandsHotReloadTests : IDisposable
         Assert.False(fired);
     }
 
+    // ── The watcher's report ────────────────────────────────────────────────
+
+    private SpyHotReloadWatcher WireSpy()
+    {
+        var spy = new SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = spy;
+        _ctx.AppCommands.WireHotReloadWatcher();
+        return spy;
+    }
+
+    private string OnlyChainName => _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.ShouldHaveSingleItem().Name;
+
+    private void Rewrite(string path, string chainName) =>
+        File.Copy(WriteMinimalAchx(chainName), path, overwrite: true);
+
+    [Fact]
+    public void AchxChangedOnDisk_AfterAFailedSave_KeepsTheEditsAndTheFile_UntilAReload()
+    {
+        var spy = WireSpy();
+        var path = WriteMinimalAchx("Before");
+        _ctx.AppCommands.LoadAnimationChain(path);
+        _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        _ctx.UndoManager.MarkSaveFailed();
+        var problems = new List<string>();
+        _ctx.AppCommands.SaveFailed += problems.Add;
+        Rewrite(path, "Outside");
+
+        spy.RaiseAchxChanged(path);
+
+        OnlyChainName.ShouldBe("Renamed");
+        problems.ShouldHaveSingleItem().ShouldContain("Use File > Reload from Disk");
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Outside");
+
+        _ctx.AppCommands.ReloadAchxFromDisk(path);
+        OnlyChainName.ShouldBe("Outside");
+        Rewrite(path, "Later");
+        spy.RaiseAchxChanged(path);
+        OnlyChainName.ShouldBe("Later");
+    }
+
+    // The save pause after a reload that failed is a failed save too.
+    [Fact]
+    public void AchxChangedOnDisk_WhenABrokenFileWithEditsPausedIsFixed_KeepsTheEdits()
+    {
+        var spy = WireSpy();
+        var path = WriteMinimalAchx("Before");
+        _ctx.AppCommands.LoadAnimationChain(path);
+        File.WriteAllText(path, "<AnimationChainArrayS");
+        spy.RaiseAchxChanged(path);
+        _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        var problems = new List<string>();
+        _ctx.AppCommands.SaveFailed += problems.Add;
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        Rewrite(path, "Fixed");
+
+        spy.RaiseAchxChanged(path);
+
+        OnlyChainName.ShouldBe("Renamed");
+        problems.Count.ShouldBe(2);
+        problems.ShouldAllBe(p => p.Contains("File > Reload from Disk"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)] // An Untitled document has no file; the watcher still has the previous one's.
+    public void AchxChangedOnDisk_ForAFileThatIsNoLongerOpen_IsIgnored(bool nextHasAFile)
+    {
+        var spy = WireSpy();
+        var queue = new List<Action>();
+        _ctx.AppCommands.DoOnUiThread = queue.Add;
+        var left = WriteMinimalAchx("Left");
+        _ctx.AppCommands.LoadAnimationChain(left);
+        spy.RaiseAchxChanged(left);
+        if (nextHasAFile)
+            _ctx.AppCommands.LoadAnimationChain(WriteMinimalAchx("Next"));
+        else
+        {
+            _ctx.ProjectManager.ResetToBlankDocument();
+            _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(new AnimationChainSave { Name = "Next" });
+        }
+        string? open = _ctx.ProjectManager.FileName;
+
+        queue.ForEach(action => action());
+
+        OnlyChainName.ShouldBe("Next");
+        _ctx.ProjectManager.FileName.ShouldBe(open);
+    }
+
+    // The watcher reports a canonical path, the document keeps the path it was opened with.
+    [Fact]
+    public void AchxChangedOnDisk_UnderAnotherSpellingOfTheOpenPath_Reloads()
+    {
+        var spy = WireSpy();
+        var path = WriteMinimalAchx("Before");
+        Directory.CreateDirectory(Path.Combine(_dir.Path, "sub"));
+        _ctx.AppCommands.LoadAnimationChain(Path.Combine(_dir.Path, "sub", "..", "Before.achx"));
+        Rewrite(path, "Outside");
+
+        spy.RaiseAchxChanged(path.Replace('\\', '/'));
+
+        OnlyChainName.ShouldBe("Outside");
+    }
+
     // ── SyncHotReloadWatcher: watcher start/update behavior ──────────────────
 
     [Fact]
@@ -238,7 +343,8 @@ public class AppCommandsHotReloadTests : IDisposable
         public string? LastStartAchxPath;
         public List<string>? LastStartPngPaths;
 
-        public event Action<string>? AchxChangedOnDisk { add { } remove { } }
+        public event Action<string>? AchxChangedOnDisk;
+        public void RaiseAchxChanged(string path) => AchxChangedOnDisk?.Invoke(path);
         public event Action<string>? PngChangedOnDisk { add { } remove { } }
         public event Action<string>? AchxDeletedOnDisk { add { } remove { } }
         public event Action<string>? SourceChangedOnDisk { add { } remove { } }

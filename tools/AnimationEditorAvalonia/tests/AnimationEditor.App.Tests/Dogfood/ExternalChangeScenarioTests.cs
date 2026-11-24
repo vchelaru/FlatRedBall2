@@ -56,6 +56,28 @@ public class ExternalChangeScenarioTests
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk", "Run" });
     }
 
+    // The history's commands hold objects of the model the reload replaced, so undoing one would change nothing shown.
+    [AvaloniaFact]
+    public async Task SwitchingBackToATabWhoseFileChanged_ReloadsItWithoutItsOldHistory()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string boss = editor.WriteAchx("boss.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(hero);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Press(Key.Delete);
+        editor.UndoLabels.Count.ShouldBe(1);
+        await editor.OpenAsync(boss);
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
+
+        editor.ClickTab("hero.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+
+        editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Run" });
+        editor.UndoLabels.ShouldBeEmpty();
+    }
+
     [AvaloniaFact]
     public async Task OwnSave_DoesNotTriggerAReload_ThatDropsTheSelection()
     {
