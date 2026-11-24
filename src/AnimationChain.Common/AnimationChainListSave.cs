@@ -236,7 +236,8 @@ public class AnimationChainListSave
     /// so existing .achx files in the wild keep their byte shape.
     /// </summary>
     /// <remarks>
-    /// Output is byte-faithful to FRB1: no UTF-8 BOM, CRLF newlines, floats written as the shortest
+    /// Output is byte-faithful to FRB1: no UTF-8 BOM, CRLF newlines (a file already at <paramref name="path"/> keeps
+    /// its own line ending and final newline), floats written as the shortest
     /// round-trippable decimal (the "R" format, matching FRB1's XmlConvert output), shapes in
     /// FRB1's typed lists, and per-shape Z/Alpha/Red/Green/Blue preserved verbatim (see
     /// <see cref="Frb1ShapeData"/>). Opening and re-saving an unedited file is a no-op diff.
@@ -253,7 +254,7 @@ public class AnimationChainListSave
     /// </remarks>
     public void Save(string path)
     {
-        AtomicFile.Write(path, Save);
+        AtomicFile.WriteKeepingLineEndings(path, Save);
     }
 
     /// <summary>
@@ -312,10 +313,11 @@ public class AnimationChainListSave
     /// Writes this save as a .achj file. JSON counterpart of <see cref="Save(string)"/>. Unlike
     /// the XML dialect, .achj has no legacy byte-format to match, so property names are camelCase
     /// and optional/default fields are omitted the same way the XML writer omits them (small diffs).
+    /// A file already at <paramref name="path"/> keeps its line ending and final newline.
     /// </summary>
     public void SaveJson(string path)
     {
-        AtomicFile.Write(path, SaveJson);
+        AtomicFile.WriteKeepingLineEndings(path, SaveJson);
     }
 
     /// <summary>
