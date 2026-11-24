@@ -120,15 +120,4 @@ public static class DragHandleApplier
         // clamp it so the frame collapses to 1px instead of inverting.
         return ClampDraggedEdgesMinSize(new BoundsRect(l, t, r, b), handle);
     }
-
-    /// <summary>
-    /// Converts texture-pixel bounds to UV coordinates (0…1 relative to bitmap dimensions).
-    /// Returns (left, top, right, bottom) UV tuple.
-    /// </summary>
-    public static (float L, float T, float R, float B) ToUvCoords(
-        BoundsRect bounds, float bitmapWidth, float bitmapHeight) =>
-        (bounds.Left   / bitmapWidth,
-         bounds.Top    / bitmapHeight,
-         bounds.Right  / bitmapWidth,
-         bounds.Bottom / bitmapHeight);
 }

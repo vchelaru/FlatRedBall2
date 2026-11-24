@@ -52,23 +52,23 @@ public static class FilmstripLayout
     }
 
     /// <summary>
-    /// <paramref name="chain"/>'s frames as the filmstrip needs them. <paramref name="textureSize"/> returns a frame's
-    /// texture size in pixels, or null when it can't be read (the frame then has no sprite size).
+    /// <paramref name="chain"/>'s frames as the filmstrip needs them. A frame for which <paramref name="hasTexture"/> is
+    /// false draws no sprite, so it has no sprite size.
     /// </summary>
-    public static IReadOnlyList<FilmstripFrame> FramesOf(AnimationChainSave chain, FrameLengthUnit unit, Func<AnimationFrameSave, (int Width, int Height)?> textureSize)
+    public static IReadOnlyList<FilmstripFrame> FramesOf(AnimationChainSave chain, FrameLengthUnit unit, Func<AnimationFrameSave, bool> hasTexture)
     {
         var frames = new FilmstripFrame[chain.Frames.Count];
         for (int i = 0; i < frames.Length; i++)
         {
             var frame = chain.Frames[i];
             double duration = PlaybackController.FrameSeconds(frame, unit);
-            if (textureSize(frame) is not { } size || size.Width <= 0 || size.Height <= 0)
+            if (!hasTexture(frame))
             {
                 frames[i] = new FilmstripFrame(duration, 0, 0);
                 continue;
             }
-            double width = Math.Abs(frame.RightCoordinate - frame.LeftCoordinate) * size.Width;
-            double height = Math.Abs(frame.BottomCoordinate - frame.TopCoordinate) * size.Height;
+            double width = Math.Abs(frame.RightCoordinate - frame.LeftCoordinate);
+            double height = Math.Abs(frame.BottomCoordinate - frame.TopCoordinate);
             frames[i] = frame.FlipDiagonal ? new FilmstripFrame(duration, height, width) : new FilmstripFrame(duration, width, height);
         }
         return frames;

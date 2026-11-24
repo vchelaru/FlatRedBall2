@@ -92,7 +92,7 @@ public static class PropertyEdit
                 $"The region {region.X},{region.Y},{region.Width},{region.Height} is not inside the {w}x{h} texture.");
 
         var before = Coordinates(frame);
-        commands.SetFramePixelRegion([frame], region.X, region.Y, region.Width, region.Height, w, h);
+        commands.SetFramePixelRegion([frame], region.X, region.Y, region.Width, region.Height);
         return Coordinates(frame) == before ? Ok() : Ok(Address(chain, frame));
     }
 

@@ -24,14 +24,14 @@ public static class ClipboardPayload
 
     public static string Serialize(List<AnimationChainSave> chains, FrameLengthUnit sourceUnit)
     {
-        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit };
+        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit, CoordinateType = TextureCoordinateType.Pixel };
         acls.AnimationChains.AddRange(chains);
         return $"{TypeName<List<AnimationChainSave>>()}:{acls.ToXmlString()}";
     }
 
     public static string Serialize(List<AnimationFrameSave> frames, FrameLengthUnit sourceUnit)
     {
-        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit };
+        var acls = new AnimationChainListSave { TimeMeasurementUnit = sourceUnit.Unit, CoordinateType = TextureCoordinateType.Pixel };
         var chain = new AnimationChainSave();
         chain.Frames.AddRange(frames);
         acls.AnimationChains.Add(chain);
@@ -119,9 +119,14 @@ public static class ClipboardPayload
             || typeName.SequenceEqual(nameof(CircleSave));
     }
 
+    /// <param name="textureSize">
+    /// Reads a texture's size, to convert text an editor before #1952 copied, whose regions are UV. Such a region
+    /// whose texture size can't be read becomes <see cref="FrameRegion.Unset"/>.
+    /// </param>
     public static bool TryDeserialize(
         string? text,
         FrameLengthUnit destinationUnit,
+        System.Func<string, (int Width, int Height)?> textureSize,
         out List<AnimationChainSave>? chains,
         out List<AnimationFrameSave>? frames,
         out List<object>? shapes)
@@ -142,6 +147,7 @@ public static class ClipboardPayload
             if (typeName == TypeName<List<AnimationChainSave>>())
             {
                 var chainList = AnimationChainListSave.FromString(payload);
+                TextureCoordinateConverter.ToPixels(chainList, textureSize);
                 chains = chainList.AnimationChains;
                 ConvertLengths(chains.SelectMany(c => c.Frames), FrameLengthUnit.Of(chainList), destinationUnit);
                 return true;
@@ -149,6 +155,7 @@ public static class ClipboardPayload
             if (typeName == TypeName<List<AnimationFrameSave>>())
             {
                 var frameList = AnimationChainListSave.FromString(payload);
+                TextureCoordinateConverter.ToPixels(frameList, textureSize);
                 frames = frameList
                     .AnimationChains.SelectMany(c => c.Frames).ToList();
                 ConvertLengths(frames, FrameLengthUnit.Of(frameList), destinationUnit);

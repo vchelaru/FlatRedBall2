@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 
@@ -6,8 +7,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     public sealed class FrameRegionChangedCommand : IUndoableCommand
     {
         private readonly AnimationFrameSave _frame;
-        private readonly float _bL, _bT, _bR, _bB;  // before UV
-        private readonly float _aL, _aT, _aR, _aB;  // after UV
+        private readonly float _bL, _bT, _bR, _bB;  // before
+        private readonly float _aL, _aT, _aR, _aB;  // after
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
@@ -27,7 +28,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             float bW = bR - bL, bH = bB - bT;
             float aW = aR - aL, aH = aB - aT;
-            bool sizeChanged = Math.Abs(bW - aW) > 0.0001f || Math.Abs(bH - aH) > 0.0001f;
+            bool sizeChanged = Math.Abs(bW - aW) > FrameRegion.EditTolerance || Math.Abs(bH - aH) > FrameRegion.EditTolerance;
             Description = sizeChanged ? "Resize Frame" : "Move Frame";
         }
 

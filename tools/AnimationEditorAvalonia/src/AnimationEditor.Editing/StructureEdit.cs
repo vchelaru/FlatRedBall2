@@ -92,23 +92,22 @@ public static class StructureEdit
         if (length is { } l && !(l > 0f))
             return Fail(EditErrorCode.InvalidValue, "A frame length must be greater than zero.");
 
-        (int W, int H) size = default;
         if (region is { } r)
         {
             var read = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
             if (read is null)
                 return Fail(EditErrorCode.UnsupportedFile, "A region needs the texture's size, which is only read from PNG files.");
-            size = read.Value;
-            if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X + r.Width > size.W || r.Y + r.Height > size.H)
+            var size = read.Value;
+            if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X + r.Width > size.Width || r.Y + r.Height > size.Height)
                 return Fail(EditErrorCode.InvalidValue,
-                    $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.W}x{size.H} texture.");
+                    $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.Width}x{size.Height} texture.");
         }
 
         var folder = string.IsNullOrEmpty(projectManager.FileName) ? string.Empty : Path.GetDirectoryName(projectManager.FileName) ?? string.Empty;
         var stored = folder.Length == 0 ? absoluteTexture : TexturePathHelper.ComputeStorePath(absoluteTexture, folder);
 
         if (region is { } rect)
-            commands.AddFrameFromPixelBounds(chain, stored, rect.X, rect.Y, rect.X + rect.Width, rect.Y + rect.Height, size.W, size.H);
+            commands.AddFrameFromPixelBounds(chain, stored, rect.X, rect.Y, rect.X + rect.Width, rect.Y + rect.Height);
         else
             commands.AddFrame(chain, stored);
 
@@ -139,9 +138,9 @@ public static class StructureEdit
         var size = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
         if (size is null)
             return Fail(EditErrorCode.UnsupportedFile, "A grid needs the texture's size, which is only read from PNG files.");
-        if ((long)columns * cellWidth > size.Value.W || (long)rows * cellHeight > size.Value.H)
+        if ((long)columns * cellWidth > size.Value.Width || (long)rows * cellHeight > size.Value.Height)
             return Fail(EditErrorCode.InvalidValue,
-                $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells does not fit the {size.Value.W}x{size.Value.H} texture.");
+                $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells does not fit the {size.Value.Width}x{size.Value.Height} texture.");
 
         var cells = columns * rows;
         if (start < 0 || start >= cells)

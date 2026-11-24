@@ -347,9 +347,9 @@ public sealed class ThumbnailService : IDisposable
 
     /// <summary>
     /// Pure SkiaSharp core of <see cref="GetFrameThumbnail"/>: crops <paramref name="frame"/>'s
-    /// UV region out of <paramref name="source"/>, applies the effective (sticky) <paramref name="color"/>
+    /// pixel region out of <paramref name="source"/>, applies the effective (sticky) <paramref name="color"/>
     /// and alpha, and scales it to fit within <paramref name="maxWidth"/> × <paramref name="maxHeight"/>
-    /// (aspect-preserving). Returns <c>null</c> for a degenerate UV region. Exposed (internal) so tests
+    /// (aspect-preserving). Returns <c>null</c> for a degenerate region. Exposed (internal) so tests
     /// can verify crop/scale/sampling/tint behaviour without going through file decode or Avalonia
     /// bitmap wrapping.
     /// <para>
@@ -362,15 +362,15 @@ public sealed class ThumbnailService : IDisposable
     internal static SKBitmap? RenderFrameThumbnail(
         SKBitmap source, AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
     {
-        float uvW = frame.RightCoordinate  - frame.LeftCoordinate;
-        float uvH = frame.BottomCoordinate - frame.TopCoordinate;
-        if (uvW <= 0f || uvH <= 0f) return null;
+        float regionW = frame.RightCoordinate  - frame.LeftCoordinate;
+        float regionH = frame.BottomCoordinate - frame.TopCoordinate;
+        if (regionW <= 0f || regionH <= 0f) return null;
 
         int tw = source.Width, th = source.Height;
-        int sx = Math.Clamp((int)(frame.LeftCoordinate * tw), 0, tw - 1);
-        int sy = Math.Clamp((int)(frame.TopCoordinate  * th), 0, th - 1);
-        int sw = Math.Clamp((int)(uvW * tw), 1, tw - sx);
-        int sh = Math.Clamp((int)(uvH * th), 1, th - sy);
+        int sx = Math.Clamp((int)frame.LeftCoordinate, 0, tw - 1);
+        int sy = Math.Clamp((int)frame.TopCoordinate, 0, th - 1);
+        int sw = Math.Clamp((int)regionW, 1, tw - sx);
+        int sh = Math.Clamp((int)regionH, 1, th - sy);
 
         // maxWidth x maxHeight is the displayed box. A diagonal flip turns the crop a quarter, so the
         // crop's width fills the displayed height and the output is transposed.

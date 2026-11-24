@@ -9,7 +9,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Captured values of every numeric field a bulk frame-edit operation can touch
-    /// (frame length, offsets, UV coordinates, color, keyframe flags and curves). Used by <see cref="BulkFrameEditCommand"/>
+    /// (frame length, offsets, region, color, keyframe flags and curves). Used by <see cref="BulkFrameEditCommand"/>
     /// to snapshot a frame before and after the operation.
     /// </summary>
     internal readonly record struct FrameFieldSnapshot(

@@ -361,7 +361,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Deep-copies <paramref name="source"/> and inserts the copy immediately after it
-        /// in <paramref name="chain"/>. All UV coordinates, timing, flip flags, relative offsets,
+        /// in <paramref name="chain"/>. The region, timing, flip flags, relative offsets,
         /// and attached shapes are copied. Undoable.
         /// </summary>
         AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain);
@@ -373,7 +373,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         object? DuplicateShape(object source);
         void SortAnimationsAlphabetically();
-        void AdjustOffsetsJustifyBottom(AnimationChainSave chain, Func<AnimationFrameSave, float?> getTextureHeight, float offsetMultiplier = 1f);
+        void AdjustOffsetsJustifyBottom(AnimationChainSave chain, float offsetMultiplier = 1f);
         void AdjustOffsetsAdjustAll(AnimationChainSave chain, float? deltaX, float? deltaY, bool relative);
         void ScaleFrameTimesProportional(AnimationChainSave chain, float targetTotalDuration);
         void ScaleFrameTimesSetAllSame(AnimationChainSave chain, float targetTotalDuration);
@@ -400,7 +400,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// writes a recovery file for a nameless document.
         /// </summary>
         void HandleApplicationClosing();
-        void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
+        void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
         /// <summary>
@@ -500,7 +500,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// inspector field is showing "(mixed)" and the user only edited one of the four. See
         /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
-        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH, int bmpW, int bmpH);
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, NumericEdit? pixelX, NumericEdit? pixelY, NumericEdit? pixelW, NumericEdit? pixelH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 

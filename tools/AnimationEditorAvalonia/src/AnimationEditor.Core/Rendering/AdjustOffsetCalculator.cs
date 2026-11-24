@@ -13,28 +13,25 @@ public static class AdjustOffsetCalculator
     /// pixel edge aligns to y = 0, then divides by <paramref name="offsetMultiplier"/>
     /// to match the preview panel's scale.
     ///
-    /// Formula:  RelativeY = (textureHeight * (bottom − top)) / 2 / offsetMultiplier
+    /// Formula:  RelativeY = (bottom − top) / 2 / offsetMultiplier
     ///
     /// FRB convention: positive Y is up, so placing the bottom edge at 0 requires
     /// an upward offset equal to half the sprite's pixel height.
     /// </summary>
     /// <param name="frames">The frames to adjust (modified in place).</param>
-    /// <param name="textureHeightPixels">Height of the source texture in pixels.</param>
     /// <param name="offsetMultiplier">
     ///     Preview offset multiplier (PL12, default 1.0).
     ///     Pass 1.0 when no multiplier is active.
     /// </param>
     public static void ApplyJustifyBottom(
         IEnumerable<AnimationFrameSave> frames,
-        float textureHeightPixels,
         float offsetMultiplier = 1f)
     {
         if (offsetMultiplier == 0f) offsetMultiplier = 1f; // guard divide-by-zero
 
         foreach (var frame in frames)
         {
-            float spriteHeightInTexels = textureHeightPixels * (frame.BottomCoordinate - frame.TopCoordinate);
-            frame.RelativeY = (spriteHeightInTexels / 2f) / offsetMultiplier;
+            frame.RelativeY = ((frame.BottomCoordinate - frame.TopCoordinate) / 2f) / offsetMultiplier;
         }
     }
 

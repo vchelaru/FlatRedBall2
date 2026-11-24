@@ -127,8 +127,7 @@ namespace AnimationEditor.Core
         /// The coordinate format the .achx should be written with. Set from the loaded
         /// file so a UV-format file round-trips as UV; defaults to <see cref="TextureCoordinateType.Pixel"/>
         /// for new files, since that is the preferred format going forward. Independent
-        /// of the in-memory representation, which is always UV so the rendering pipeline
-        /// can render at any texture size.
+        /// of the in-memory representation, which is always pixels.
         /// </summary>
         public TextureCoordinateType OnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
@@ -171,10 +170,8 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Save the current animation chain list to <paramref name="targetPath"/>, as .achj
         /// (JSON) or .achx (XML) depending on <paramref name="targetPath"/>'s extension, in the
-        /// coordinate format specified by <see cref="OnDiskCoordinateType"/>. The editor stores
-        /// frame coordinates as UV internally (so the rendering pipeline can render at
-        /// any texture size); when writing as Pixel, this method converts just for the
-        /// on-disk write and then converts back so the in-memory model stays UV.
+        /// coordinate format specified by <see cref="OnDiskCoordinateType"/>. The in-memory document
+        /// holds pixels, so only a UV write converts, and the document is in pixels again afterwards.
         /// </summary>
         /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
         /// <see cref="AnimationChainListSave"/> is a view over Tiled tileset data for a native tsx
@@ -196,23 +193,20 @@ namespace AnimationEditor.Core
             NormalizeFrameTextureNames(acls, achxDirectory);
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
-            // No conversion needed when on-disk format matches the in-memory format (UV).
+            var sizes = TextureCoordinateConverter.SizesIn(achxDirectory);
             if (diskFormat == TextureCoordinateType.UV)
             {
-                Write();
+                TextureCoordinateConverter.WriteAsUv(acls, sizes, Write);
                 return;
             }
 
-            var sizes = TextureCoordinateConverter.ConvertCoordinates(acls, achxDirectory, diskFormat);
-            try
+            // A list that is still in UV did not come through this class's load path.
+            if (acls.CoordinateType == TextureCoordinateType.UV)
             {
-                Write();
+                TextureCoordinateConverter.ThrowIfUnsized(acls, sizes, "convert UV coordinates to pixels");
+                TextureCoordinateConverter.ToPixels(acls, sizes);
             }
-            finally
-            {
-                // Convert back to UV so the in-memory model continues to be UV.
-                TextureCoordinateConverter.ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV, sizes);
-            }
+            Write();
         }
 
         /// <summary>True when <paramref name="path"/> has a .achj (JSON) extension; false for .achx or anything else.</summary>
@@ -222,8 +216,7 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Resolves <paramref name="textureName"/> (relative to the loaded .achx's directory, or
         /// absolute) to its pixel size by reading the PNG header. Returns <c>null</c> when the name
-        /// is empty or the PNG can't be read. Used by exporters that need pixel rects while the
-        /// in-memory model holds UV coordinates.
+        /// is empty or the PNG can't be read.
         /// </summary>
         public (int Width, int Height)? GetTextureSizeInPixels(string textureName)
         {
@@ -236,8 +229,7 @@ namespace AnimationEditor.Core
                 ? textureName
                 : System.IO.Path.Combine(dir, textureName);
 
-            var size = TextureCoordinateConverter.TryReadPngSize(path);
-            return size == null ? null : (size.Value.W, size.Value.H);
+            return TextureCoordinateConverter.TryReadPngSize(path);
         }
 
 
@@ -838,7 +830,7 @@ namespace AnimationEditor.Core
         /// <inheritdoc/>
         public void ResetToBlankDocument()
         {
-            AnimationChainListSave = new AnimationChainListSave();
+            AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
             FileName = null;
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
             RestoreTsxState(null);
@@ -1046,9 +1038,6 @@ namespace AnimationEditor.Core
         private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
         {
             var image = tileset.Image;
-            // Same size the load side used to build the UV rects (falls back to the tile grid's
-            // extent when <image> carries no width/height), so UV -> pixel conversion on save
-            // inverts it exactly instead of dereferencing a missing size.
             var (textureWidth, textureHeight) = Tiled.TiledAnimationToAchjMapper.GetTextureSize(tileset);
             return new Tiled.TilesetAnimationInfo
             {

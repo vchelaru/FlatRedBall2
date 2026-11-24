@@ -26,7 +26,7 @@ internal static class ReferenceCellRenderer
         foreach (var layer in pose.Layers)
         {
             if (string.IsNullOrEmpty(layer.Texture) || sheetOf(layer.Texture) is not { } sheet) continue;
-            float w = Math.Abs(layer.Right - layer.Left) * sheet.Width, h = Math.Abs(layer.Bottom - layer.Top) * sheet.Height;
+            float w = Math.Abs(layer.Right - layer.Left), h = Math.Abs(layer.Bottom - layer.Top);
             if (w <= 0 || h <= 0) continue;
             sprites.Add((layer, sheet));
             sizes.Add(layer.FlipD ? new ThumbnailSpriteRect(h, w, layer.OffsetX, layer.OffsetY) : new ThumbnailSpriteRect(w, h, layer.OffsetX, layer.OffsetY));
