@@ -151,7 +151,7 @@ public class CheckWarningTests : IDisposable
         WriteSeq();
         var path = _w.PathOf(file);
         var before = File.ReadAllBytes(path);
-        File.SetAttributes(path, FileAttributes.ReadOnly);
+        SetWritable(path, false);
         try
         {
             var r = await _w.RunAsync("edit", path, "--op", op);
@@ -163,8 +163,20 @@ public class CheckWarningTests : IDisposable
         }
         finally
         {
-            File.SetAttributes(path, FileAttributes.Normal);
+            SetWritable(path, true);
         }
+    }
+
+    // A save moves a temp file over the old one, which a read-only file stops on Windows and a read-only folder stops elsewhere.
+    private static void SetWritable(string path, bool writable)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
+            return;
+        }
+        var mode = UnixFileMode.UserRead | UnixFileMode.UserExecute;
+        File.SetUnixFileMode(Path.GetDirectoryName(path)!, writable ? mode | UnixFileMode.UserWrite : mode);
     }
 
     [Fact]
