@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
 
@@ -7,17 +8,27 @@ internal static class BrokenSequenceBlocks
 {
     private const int MaxListed = 10;
 
+    /// <summary>The chain names of <paramref name="document"/> before <paramref name="ops"/> run, or null when no op renames or deletes a chain.</summary>
+    public static IReadOnlyList<string>? ChainsAtRisk(AnimationChainListSave document, IReadOnlyList<EditOp> ops)
+    {
+        foreach (var op in ops)
+            if (op.Spec.Name is "rename-chain" or "delete-chain")
+                return document.AnimationChains.Select(c => c.Name).ToList();
+        return null;
+    }
+
     /// <summary>
     /// One warning per .seqj beside <paramref name="animationPath"/> (not in subfolders) with blocks playing one of
-    /// <paramref name="missingChains"/>, names the animation file no longer has. An unreadable .seqj is skipped.
+    /// <paramref name="chainsBefore"/> that <paramref name="document"/> no longer has. An unreadable .seqj is skipped.
     /// </summary>
-    public static IEnumerable<string> Warnings(string animationPath, IReadOnlyCollection<string> missingChains)
+    public static IEnumerable<string> Warnings(AnimationChainListSave document, string animationPath, IReadOnlyList<string> chainsBefore)
     {
-        if (missingChains.Count == 0) yield break;
+        var missing = chainsBefore.Except(document.AnimationChains.Select(c => c.Name)).ToHashSet();
+        if (missing.Count == 0) yield break;
 
         foreach (var seqj in SequenceFilesIn(Path.GetDirectoryName(animationPath)!))
         {
-            var blocks = SeqjChainUsageScanner.FindMatches(seqj, animationPath, missingChains);
+            var blocks = SeqjChainUsageScanner.FindMatches(seqj, animationPath, missing);
             if (blocks.Count == 0) continue;
             var listed = string.Join(", ", blocks.Take(MaxListed).Select(b => $"{b.Address} '{b.Chain}'"))
                 + (blocks.Count > MaxListed ? $" and {blocks.Count - MaxListed} more" : "");
