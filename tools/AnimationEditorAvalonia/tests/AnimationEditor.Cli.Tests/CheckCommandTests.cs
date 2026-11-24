@@ -96,4 +96,38 @@ public class CheckCommandTests : IDisposable
 
         added.Select(i => i.Code).ShouldBe(["duplicate-chain-name"]);
     }
+
+    [Fact]
+    public void NewErrors_AddedErrorReadsLikeAnExistingOne_ReturnsAllOfItsCode()
+    {
+        var issue = new CheckIssue(CheckSeverity.Error, "missing-chain", "Run/Body/0: no chain 'Gone'.");
+
+        CheckReport.NewErrors(new([issue]), new([issue, issue])).ShouldBe([issue, issue]);
+        CheckReport.NewErrors(new([issue, issue]), new([issue])).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Edit_RenameChainOfABrokenFile_IsNotRefused_ButATakenNameIs()
+    {
+        var path = _w.PathOf("broken.achx"); // two chains named Idle, and Walk/1 has a missing texture
+
+        (await _w.RunAsync("edit", path, "--op", "rename-chain Walk to=Stride")).Code.ShouldBe(0);
+        var taken = await _w.RunAsync("edit", path, "--op", "rename-chain Stride to=Idle");
+
+        taken.Code.ShouldBe(1);
+        (await _w.RunAsync("check", path)).Out.ShouldContain("2 chains are named 'Idle'");
+    }
+
+    [Fact]
+    public async Task Edit_CopyOfAFrameWithDuplicateShapeNames_IsRefused()
+    {
+        // "Foot" becomes a second "Hitbox" in Walk/2.
+        var path = _w.Write("shapes.achx", File.ReadAllText(_w.PathOf("broken.achx")).Replace("<Name>Foot<", "<Name>Hitbox<"));
+
+        var r = await _w.RunAsync("edit", path, "--op", "duplicate-frame Walk/2");
+
+        r.Code.ShouldBe(1);
+        r.Out.ShouldContain("[duplicate-shape-name]: 2 shapes are named 'Hitbox' in frame Walk/3.");
+        r.Out.ShouldNotContain("Walk/2");
+    }
 }
