@@ -185,6 +185,19 @@ public class PixelDocumentTests : IDisposable
         Region(SaveAndRead(path)[0]).ShouldBe((0f, 0f, 1f, 1f));
     }
 
+    // Only exactly 0,0,1,1 means unset.
+    [Fact]
+    public void SetFrameTextureName_NoTextureButARealRegion_KeepsThePixelRegion()
+    {
+        WritePng("sheet.png", 48, 32);
+        var path = WriteFile("hero.achx", Frame("", 0, 0, 16, 32));
+        var frames = Open(path);
+
+        _ctx.AppCommands.SetFrameTextureName(new[] { frames[0] }, "sheet.png");
+
+        Region(SaveAndRead(path)[0]).ShouldBe((0f, 0f, 16f, 32f));
+    }
+
     [Fact]
     public void SetFrameTextureName_ClearedAndSetAgain_KeepsThePixelRegion()
     {
