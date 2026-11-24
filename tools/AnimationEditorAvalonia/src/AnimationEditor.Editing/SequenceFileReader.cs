@@ -42,12 +42,14 @@ internal sealed class SequenceSources(SequenceListSave save, string sequencePath
 
     public bool IsListed(string source) => save.Sources.Any(s => string.Equals(s, source, StringComparison.OrdinalIgnoreCase));
 
-    public bool Exists(string source) => File.Exists(Path.Combine(_folder, source));
+    public string FullPath(string source) => Path.Combine(_folder, source);
+
+    public bool Exists(string source) => File.Exists(FullPath(source));
 
     public AnimationChainListSave? Chains(string source)
     {
         if (!_loaded.TryGetValue(source, out var list))
-            _loaded[source] = list = AnimationFileReader.Read(Path.Combine(_folder, source)).Document;
+            _loaded[source] = list = AnimationFileReader.Read(FullPath(source)).Document;
         return list;
     }
 

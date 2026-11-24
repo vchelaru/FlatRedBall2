@@ -178,7 +178,8 @@ public static class SequenceOps
             }
         }
 
-        var added = CheckReport.NewErrors(before, SequenceCheck.Run(doc.Save, session.Path));
+        var after = SequenceCheck.Run(doc.Save, session.Path);
+        var added = CheckReport.NewErrors(before, after);
         if (added.Count > 0)
             return new EditRunResult(
                 new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
@@ -187,6 +188,7 @@ public static class SequenceOps
 
         if (changed.Count == 0 || doc.Save.ToJsonString() == original)
             return new EditRunResult(new EditResult([], [], warnings), []);
+        warnings.AddRange(CheckReport.NewWarningLines(before, after));
 
         var save = session.Save();
         return save.Success

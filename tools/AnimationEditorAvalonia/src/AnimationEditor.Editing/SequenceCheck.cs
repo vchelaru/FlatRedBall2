@@ -7,7 +7,7 @@ namespace AnimationEditor.Editing;
 /// Errors, which a game would trip on: missing-source (a library source whose file is missing or unreadable, or a block
 /// using a source not in the library), missing-chain, missing-reference-target, reference-cycle, duplicate-sequence-name,
 /// duplicate-track-name. Warnings, which are legal but suspect: continuous-ignored (a continuous reference track whose target cannot carry across the wrap), cut-short (the next block on the track starts before
-/// this one reaches its length) and unreachable-block (the next block starts at the same time, so this one never plays).
+/// this one reaches its length), unreachable-block (the next block starts at the same time, so this one never plays) and missing-texture (a source names a texture that is not there).
 /// </summary>
 public static class SequenceCheck
 {
@@ -23,6 +23,9 @@ public static class SequenceCheck
             if (sources.Chains(source) is null)
                 issues.Add(new(CheckSeverity.Error, "missing-source",
                     sources.Exists(source) ? $"Source '{source}' could not be read." : $"Source '{source}' not found.", source));
+            else
+                foreach (var texture in CheckReport.MissingTextures(sources.Chains(source)!, sources.FullPath(source)))
+                    issues.Add(new(CheckSeverity.Warning, "missing-texture", $"Source '{source}': texture '{texture}' not found.", texture));
         }
 
         foreach (var group in save.Sequences.GroupBy(s => s.Name).Where(g => g.Count() > 1))
@@ -47,7 +50,7 @@ public static class SequenceCheck
                             $"Track '{sequence.Name}/{track.Name}' plays '{clip.Sequence}', which plays '{sequence.Name}' back."));
                     else if (track.Continuous && ContinuousIgnoredReason(save, sequence, clip, sources) is { } reason)
                         issues.Add(new(CheckSeverity.Warning, "continuous-ignored",
-                            $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap."));
+                            $"Track '{sequence.Name}/{track.Name}' is continuous but {reason}, so '{clip.Sequence}' restarts at each wrap.", track.Name));
                     continue;
                 }
 
@@ -75,9 +78,9 @@ public static class SequenceCheck
                     double full = SequenceTimeline.FullLength(block.Length, cycle);
                     double played = SequenceTimeline.PlayedLength(track, block, cycle);
                     if (played <= Tolerance && full > Tolerance)
-                        issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time."));
+                        issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time.", block.Chain));
                     else if (played < full - Tolerance * Math.Max(1, full))
-                        issues.Add(new(CheckSeverity.Warning, "cut-short", $"{where} is cut short: it plays {Num(played)} of {Num(full)} seconds."));
+                        issues.Add(new(CheckSeverity.Warning, "cut-short", $"{where} is cut short: it plays {Num(played)} of {Num(full)} seconds.", block.Chain));
                 }
             }
         }

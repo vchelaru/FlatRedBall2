@@ -484,7 +484,8 @@ public static class EditOps
             }
         }
 
-        var added = CheckReport.NewErrors(before, CheckReport.Run(session.Document, session.Path));
+        var after = CheckReport.Run(session.Document, session.Path);
+        var added = CheckReport.NewErrors(before, after);
         if (added.Count > 0)
             return new EditRunResult(
                 new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
@@ -498,6 +499,7 @@ public static class EditOps
 
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
+        warnings.AddRange(CheckReport.NewWarningLines(before, after));
 
         foreach (var tsxPath in associations)
         {
