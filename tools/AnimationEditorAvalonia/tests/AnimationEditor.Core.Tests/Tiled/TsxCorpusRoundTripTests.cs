@@ -48,7 +48,8 @@ public class TsxCorpusRoundTripTests : IDisposable
     private sealed record Row(
         string Name, string Xml, Encoding? FileEncoding = null, string? TemplateXml = null, bool RefusedOnOneLine = false);
 
-    /// <summary>Rows that lose something today. <see cref="Issue"/> is the issue that fixes it.</summary>
+    /// <summary>Rows that lose something today. <see cref="Issue"/> is the issue that fixes it. What each
+    /// one loses is listed in <c>Fixtures/TsxCorpusKnownLosses.txt</c>.</summary>
     private sealed record Loss(string Issue, Op[] Ops, string[] Rows);
 
     private const string Animation =
@@ -121,6 +122,9 @@ public class TsxCorpusRoundTripTests : IDisposable
             + "<property name=\"O\" type=\"object\" value=\"3\"/>"))),
         new("property type string written out", Tsx(tile0Before: Properties("<property name=\"S\" type=\"string\" value=\"text\"/>"))),
         new("property color without alpha", Tsx(tile0Before: Properties("<property name=\"C\" type=\"color\" value=\"#00ff00\"/>"))),
+        new("property color translucent", Tsx(
+            head: "<properties>\n  <property name=\"C\" type=\"color\" value=\"#80ff0000\"/>\n </properties>",
+            tile0Before: Properties("<property name=\"C\" type=\"color\" value=\"#80ff0000\"/>"))),
         new("property color empty", Tsx(tile0Before: Properties("<property name=\"C\" type=\"color\" value=\"\"/>"))),
         new("property float with many digits", Tsx(tile0Before: Properties("<property name=\"F\" type=\"float\" value=\"0.123456789012345\"/>"))),
         new("property large int", Tsx(tile0Before: Properties("<property name=\"I\" type=\"int\" value=\"2147483647\"/>"))),
@@ -431,36 +435,70 @@ public class TsxCorpusRoundTripTests : IDisposable
     [MemberData(nameof(Cases), SaveAsLoss, Skip = SaveAsLoss)]
     [MemberData(nameof(Cases), EncodingLoss, Skip = EncodingLoss)]
     [MemberData(nameof(Cases), DefaultNamespace, Skip = DefaultNamespace)]
-    public void SaveTsxProject_CorpusFile_KeepsEverything(string rowName, Op op) => AssertKeepsEverything(rowName, op);
+    public void SaveTsxProject_CorpusFile_KeepsEverything(string rowName, Op op) => RoundTripDiff(rowName, op).ShouldBe("");
 
     [Fact(Skip = ImagePath)]
-    public void SaveTsxProject_SaveAsToAnotherFolder_ImageStillResolves() => AssertImageResolvesAfterSaveAsElsewhere();
+    public void SaveTsxProject_SaveAsToAnotherFolder_ImageStillResolves() => ImageSourceAfterSaveAsElsewhere().ShouldBe("../Heroes.png");
 
-    /// <summary>A pin that no longer loses anything must be deleted, so its row guards the fix. One whose
-    /// file no longer opens moves to <see cref="RefusedRows"/>.</summary>
+    /// <summary>
+    /// A pinned case must lose exactly what the fixture lists: no more, and no less. After a fix, remove
+    /// the case from <see cref="KnownLosses"/> (and move a file that no longer opens to
+    /// <see cref="RefusedRows"/>), then replace the fixture with the file the failure names.
+    /// </summary>
     [Fact]
-    public void KnownLosses_EveryPinnedCase_StillLoses()
+    public void KnownLosses_EveryPinnedCase_LosesWhatTheFixtureLists()
     {
-        var pinned = KnownLosses.SelectMany(loss => loss.Rows.SelectMany(row => loss.Ops.Select(op => (row, op)))).ToList();
+        var actual = new List<string>();
+        foreach (var row in KnownLosses.SelectMany(l => l.Rows).Distinct().OrderBy(name => name, StringComparer.Ordinal))
+            foreach (var same in KnownLosses.Where(l => l.Rows.Contains(row)).SelectMany(l => l.Ops).GroupBy(op => DiffOrException(row, op)))
+                actual.AddRange([$"## {row} [{string.Join(", ", same)}]", .. same.Key.Split('\n')]);
+        actual.AddRange(["## Save As to another folder", ImageSourceAfterSaveAsElsewhere()]);
+        var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TsxCorpusKnownLosses.txt");
+        var actualPath = Path.ChangeExtension(fixture, ".actual.txt");
+        File.WriteAllLines(actualPath, actual);
 
-        var fixedCases = pinned.Where(c => Record.Exception(() => AssertKeepsEverything(c.row, c.op)) is null)
-            .Select(c => $"{c.row}, {c.op}").ToList();
-        if (Record.Exception(AssertImageResolvesAfterSaveAsElsewhere) is null)
-            fixedCases.Add(nameof(SaveTsxProject_SaveAsToAnotherFolder_ImageStillResolves));
-
-        fixedCases.AddRange(pinned.Select(c => c.row).Distinct().Where(name => Record.Exception(() => Open(name)) is not null)
-            .Select(name => $"{name}, refused"));
-
-        fixedCases.ShouldBeEmpty("These cases lose nothing now: remove them from KnownLosses.");
+        Diff(File.ReadAllLines(fixture), [.. actual]).ShouldBe("", actualPath);
     }
 
-    private void Open(string rowName)
+    // The tree comparison ignores whitespace, so these compare the text.
+    [Theory]
+    [InlineData("\n", true)]
+    [InlineData("\r\n", true)]
+    [InlineData("\r\n", false)]
+    public void SaveTsxProject_KeptFile_KeepsLineEndingsAndFinalNewline(string newline, bool finalNewline)
     {
-        var row = Rows.Single(r => r.Name == rowName);
-        new ProjectManager().LoadTsxProject(new FilePath(WriteFile(row, row.Xml)));
+        var xml = Tsx(
+            tile0Before: Properties("<property name=\"S\" value=\"a\"/>"), tiles: "<tile id=\"5\" type=\"Water\"/>").Replace("\n", newline);
+        var row = new Row("", finalNewline ? xml : xml.TrimEnd());
+        var path = WriteFile(row, row.Xml);
+        var pm = new ProjectManager();
+        pm.LoadTsxProject(new FilePath(path));
+
+        pm.SaveTsxProject();
+        var saved = File.ReadAllBytes(path);
+        pm.AnimationChainListSave!.AnimationChains[0].Frames[0].FrameLength = 0.3f;
+        pm.SaveTsxProject();
+        var edited = File.ReadAllText(path);
+
+        saved.ShouldBe(Encoding.UTF8.GetBytes(row.Xml));
+        // The regenerated tile closes its empty elements with " />", Tiled with "/>".
+        edited.Replace(" />", "/>").ShouldBe(row.Xml.Replace("duration=\"200\"", "duration=\"300\""));
     }
 
-    private void AssertKeepsEverything(string rowName, Op op)
+    private string DiffOrException(string rowName, Op op)
+    {
+        try
+        {
+            return RoundTripDiff(rowName, op);
+        }
+        catch (Exception exception)
+        {
+            return "throws " + exception.GetType().Name;
+        }
+    }
+
+    /// <summary>What <paramref name="op"/> changes in the row's file, or "" when it keeps everything.</summary>
+    private string RoundTripDiff(string rowName, Op op)
     {
         var row = Rows.Single(r => r.Name == rowName);
         var xml = op == Op.EditSaveOneLine ? Regex.Replace(row.Xml, @">\s+<", "><") : row.Xml;
@@ -482,22 +520,21 @@ public class TsxCorpusRoundTripTests : IDisposable
             savedPath = Path.Combine(Path.GetDirectoryName(path)!, "Copy.tsx");
         pm.SaveTsxProject(savedPath);
 
-        Dump(XDocument.Load(savedPath)).ShouldBe(Dump(expected), Diff(Dump(expected), Dump(XDocument.Load(savedPath))));
+        // DotTiled's reader is stricter than XDocument's, so a file it refuses is caught only here.
+        new ProjectManager().LoadTsxProject(new FilePath(savedPath));
+        return Diff(Dump(expected), Dump(XDocument.Load(savedPath)));
     }
 
-    private void AssertImageResolvesAfterSaveAsElsewhere()
+    private string ImageSourceAfterSaveAsElsewhere()
     {
         var path = WriteFile(Rows[0], Rows[0].Xml);
-        var folder = Path.GetDirectoryName(path)!;
-        var copyFolder = Directory.CreateDirectory(Path.Combine(folder, "Copies")).FullName;
-        var copyPath = Path.Combine(copyFolder, "Copy.tsx");
+        var copyPath = Path.Combine(Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(path)!, "Copies")).FullName, "Copy.tsx");
         var pm = new ProjectManager();
         pm.LoadTsxProject(new FilePath(path));
 
         pm.SaveTsxProject(copyPath);
 
-        var source = (string)XDocument.Load(copyPath).Root!.Element("image")!.Attribute("source")!;
-        Path.GetFullPath(Path.Combine(copyFolder, source)).ShouldBe(Path.Combine(folder, "Heroes.png"));
+        return (string)XDocument.Load(copyPath).Root!.Element("image")!.Attribute("source")!;
     }
 
     public static TheoryData<string> RefusedCases() => [.. RefusedRows.Select(r => r.Name)];
@@ -542,7 +579,7 @@ public class TsxCorpusRoundTripTests : IDisposable
                     break;
                 // A CDATA section and plain text hold the same characters.
                 case XText text when !string.IsNullOrWhiteSpace(text.Value):
-                    lines.Add($"{indent}\"{text.Value}\"");
+                    lines.Add($"{indent}\"{text.Value.Replace("\n", "\\n")}\"");
                     break;
                 case XComment comment:
                     lines.Add($"{indent}<!--{comment.Value}-->");
@@ -557,6 +594,24 @@ public class TsxCorpusRoundTripTests : IDisposable
         return [.. lines];
     }
 
-    private static string Diff(string[] expected, string[] actual) =>
-        string.Join("\n", expected.Except(actual).Select(l => "- " + l.Trim()).Concat(actual.Except(expected).Select(l => "+ " + l.Trim())));
+    /// <summary>Line diff by longest common subsequence, so a moved or repeated line shows too.</summary>
+    private static string Diff(string[] expected, string[] actual)
+    {
+        var common = new int[expected.Length + 1, actual.Length + 1];
+        for (var i = expected.Length - 1; i >= 0; i--)
+            for (var j = actual.Length - 1; j >= 0; j--)
+                common[i, j] = expected[i] == actual[j] ? common[i + 1, j + 1] + 1 : Math.Max(common[i + 1, j], common[i, j + 1]);
+
+        var lines = new List<string>();
+        for (int i = 0, j = 0; i < expected.Length || j < actual.Length;)
+        {
+            if (i < expected.Length && j < actual.Length && expected[i] == actual[j])
+                (i, j) = (i + 1, j + 1);
+            else if (j == actual.Length || (i < expected.Length && common[i + 1, j] >= common[i, j + 1]))
+                lines.Add("- " + expected[i++]);
+            else
+                lines.Add("+ " + actual[j++]);
+        }
+        return string.Join("\n", lines);
+    }
 }
