@@ -12,7 +12,7 @@ public static class CliApp
 {
     private const string Usage = """
         usage: aecli <command> [options]
-          describe <file> [--json]               chains, frames and shapes of an .achx/.achj; sequences, tracks and blocks of a .seqj
+          describe <file> [--chain|--sequence|--track <glob>] [--summary] [--json]  chains, frames and shapes of an .achx/.achj; sequences, tracks and blocks of a .seqj
           check <file> [--json]                  validate; exit 1 on errors
           new <file> [--json]                    create an empty .achx/.achj/.seqj
           convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
@@ -41,7 +41,7 @@ public static class CliApp
 
         switch (parsed.Command)
         {
-            case "describe": return parsed.File is null ? cli.Usage("describe needs a file.") : cli.Describe(parsed.File);
+            case "describe": return parsed.File is null ? cli.Usage("describe needs a file.") : cli.Describe(parsed.File, parsed.Values, parsed.Summary);
             case "check": return parsed.File is null ? cli.Usage("check needs a file.") : cli.Check(parsed.File);
             case "new": return parsed.File is null ? cli.Usage("new needs a file.") : cli.New(parsed.File);
             case "edit":
@@ -61,12 +61,12 @@ public static class CliApp
     }
 
     private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error,
-        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false)
+        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false, bool Summary = false)
     {
         public static Arguments Parse(string[] args)
         {
             string? command = null, file = null, ops = null, to = null;
-            bool json = false, schema = false, grid = false;
+            bool json = false, schema = false, grid = false, summary = false;
             var values = new Dictionary<string, string>();
             for (int i = 0; i < args.Length; i++)
             {
@@ -76,7 +76,8 @@ public static class CliApp
                     case "--json": json = true; break;
                     case "--schema": schema = true; break;
                     case "--grid": grid = true; break;
-                    case "--out" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds":
+                    case "--summary": summary = true; break;
+                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
                         values[a] = args[++i];
                         break;
@@ -96,7 +97,7 @@ public static class CliApp
                         break;
                 }
             }
-            return new Arguments(command, file, ops, to, json, schema, null, values, grid);
+            return new Arguments(command, file, ops, to, json, schema, null, values, grid, summary);
 
             static Arguments Bad(string error) => new(null, null, null, null, false, false, error);
         }
@@ -126,24 +127,50 @@ public static class CliApp
             return 0;
         }
 
-        public int Describe(string file)
+        public int Describe(string file, IReadOnlyDictionary<string, string>? values, bool summary)
         {
+            string? Value(string key) => values is not null && values.TryGetValue(key, out var v) ? v : null;
+            string? chain = Value("--chain"), sequence = Value("--sequence"), track = Value("--track");
+
             if (SequenceFileReader.IsSequenceFile(file))
             {
+                if (chain is not null) return Usage("--chain applies to .achx/.achj files; a .seqj takes --sequence and --track.");
                 var seq = SequenceFileReader.Read(file);
                 if (seq.Document is null) return Failed(seq.Error!);
+
+                IReadOnlyCollection<string>? sequences = null;
+                if (sequence is not null)
+                {
+                    var expanded = SequenceSelectors.ExpandSequences(seq.Document, sequence);
+                    if (!expanded.Ok)
+                        return Failed(expanded.Error! + (expanded.Code == EditErrorCode.NoMatch ? NameHints.For(sequence, seq.Document.Sequences.Select(s => s.Name), "sequences") : ""));
+                    sequences = expanded.Targets!.ToList();
+                }
+                var filter = new SequenceDescriber.Filter(sequences, track, summary);
+                if (SequenceDescriber.CheckTrackFilter(seq.Document, filter) is { } trackError) return Failed(trackError);
+
                 stdout.Write(Json
-                    ? EditJson.Render(w => SequenceDescriber.WriteJson(w, seq.Document, file)) + Environment.NewLine
-                    : SequenceDescriber.ToText(seq.Document, file));
+                    ? EditJson.Render(w => SequenceDescriber.WriteJson(w, seq.Document, file, filter)) + Environment.NewLine
+                    : SequenceDescriber.ToText(seq.Document, file, filter));
                 return 0;
             }
 
+            if (sequence is not null || track is not null) return Usage("--sequence and --track apply to .seqj files; an .achx/.achj takes --chain.");
             var read = AnimationFileReader.Read(file);
             if (read.Document is null) return Failed(read.Error!);
 
+            IReadOnlyCollection<string>? only = null;
+            if (chain is not null)
+            {
+                var expanded = EditSelectors.ExpandChains(read.Document, chain);
+                if (!expanded.Ok)
+                    return Failed(expanded.Error! + (expanded.Code == EditErrorCode.NoMatch ? NameHints.For(chain, read.Document.AnimationChains.Select(c => c.Name), "chains") : ""));
+                only = expanded.Targets!.ToList();
+            }
+
             stdout.Write(Json
-                ? EditJson.Render(w => AnimationDescriber.WriteJson(w, read.Document, file, read.OwnerTiles)) + Environment.NewLine
-                : AnimationDescriber.ToText(read.Document, file, read.OwnerTiles));
+                ? EditJson.Render(w => AnimationDescriber.WriteJson(w, read.Document, file, read.OwnerTiles, only, summary)) + Environment.NewLine
+                : AnimationDescriber.ToText(read.Document, file, read.OwnerTiles, only, summary));
             return 0;
         }
 
