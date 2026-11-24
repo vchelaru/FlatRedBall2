@@ -24,8 +24,10 @@ public sealed record AtMoment(double Time, IReadOnlyList<AtSprite> Sprites);
 public static class AtReport
 {
     /// <summary>The sequence and its moments, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
+    /// <param name="trackPattern">Track name or glob (as <c>describe --track</c>); other tracks are left out. A pattern matching no track is an error.</param>
+    /// <param name="shapesOnly">Leave out tracks whose active frame has no shapes.</param>
     public static (string Sequence, IReadOnlyList<AtMoment> Moments)? Build(
-        string file, string? sequenceName, IReadOnlyList<double> times, out string? error, out bool usage)
+        string file, string? sequenceName, IReadOnlyList<double> times, string? trackPattern, bool shapesOnly, out string? error, out bool usage)
     {
         error = null; usage = false;
         var read = SequenceFileReader.Read(file);
@@ -43,8 +45,15 @@ public static class AtReport
         if (missing.Count > 0) { error = $"Missing or unreadable source(s): {string.Join(", ", missing)}."; return null; }
 
         var tracks = sequences[index].Tracks;
+        var filter = new SequenceDescriber.Filter([sequences[index].Name], trackPattern);
+        error = SequenceDescriber.CheckTrackFilter(document.Save, filter);
+        if (error is not null) return null;
+
         var moments = times.Select(time => new AtMoment(time,
-            SequenceScene.At(document, index, time).Reverse().Select(sprite => ToSprite(sprite, tracks)).ToList())).ToList();
+            SequenceScene.At(document, index, time).Reverse()
+                .Where(sprite => trackPattern is null || (sprite.Track >= 0 && sprite.Track < tracks.Count && filter.Includes(tracks[sprite.Track])))
+                .Select(sprite => ToSprite(sprite, tracks))
+                .Where(sprite => !shapesOnly || sprite.Shapes.Count > 0).ToList())).ToList();
         return (sequences[index].Name, moments);
     }
 

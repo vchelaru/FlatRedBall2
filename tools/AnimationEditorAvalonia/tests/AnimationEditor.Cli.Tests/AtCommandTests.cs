@@ -60,6 +60,37 @@ public class AtCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task TrackGlob_KeepsMatchingTracksOnly_AndNoMatchFailsWithDidYouMean()
+    {
+        var file = WriteSequence();
+
+        var some = await _w.RunAsync("at", file, "--time", "1.2", "--track", "Fx*");
+        var none = await _w.RunAsync("at", file, "--time", "1.2", "--track", "Bdy");
+
+        some.Code.ShouldBe(0, some.Err);
+        some.Out.ShouldContain("track 1 Fx");
+        some.Out.ShouldNotContain("Body");
+        none.Code.ShouldBe(1);
+        none.Err.ShouldContain("No track matches 'Bdy'");
+        none.Err.ShouldContain("Did you mean 'Body'?");
+    }
+
+    [Fact]
+    public async Task ShapesOnly_DropsTracksWhoseActiveFrameHasNoShapes_InTextAndJson()
+    {
+        var file = WriteSequence();
+
+        var early = await _w.RunAsync("at", file, "--time", "0", "--shapes-only");
+        var late = await _w.RunAsync("at", file, "--time", "0.25", "--shapes-only", "--json");
+
+        early.Code.ShouldBe(0, early.Err);
+        early.Out.ShouldNotContain("track 0");
+        late.Code.ShouldBe(0, late.Err);
+        using var doc = JsonDocument.Parse(late.Out);
+        doc.RootElement.GetProperty("times")[0].GetProperty("sprites").GetArrayLength().ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Schema_DescribesAt()
     {
         var r = await _w.RunAsync("--schema");

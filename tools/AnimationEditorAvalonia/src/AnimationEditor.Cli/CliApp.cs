@@ -20,7 +20,7 @@ public static class CliApp
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
-          at <file.seqj> --time 0,4.2 [--sequence <name>] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
+          at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--shapes-only] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
           --schema [--json]                      list the operations and their fields
           --version                              build version, source commit and build time (UTC)
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
@@ -90,7 +90,7 @@ public static class CliApp
                     case "--json": json = true; break;
                     case "--schema": schema = true; break;
                     case "--grid": grid = true; break;
-                    case "--shapes" or "--sheet": values[a] = ""; break;
+                    case "--shapes" or "--sheet" or "--shapes-only": values[a] = ""; break;
                     case "--summary": summary = true; break;
                     case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
@@ -278,7 +278,8 @@ public static class CliApp
                 times.Add(t);
             }
             values.TryGetValue("--sequence", out var name);
-            var report = AtReport.Build(file, name, times, out var error, out var usage);
+            values.TryGetValue("--track", out var track);
+            var report = AtReport.Build(file, name, times, track, values.ContainsKey("--shapes-only"), out var error, out var usage);
             if (report is null) return usage ? Usage(error!) : Failed(error!);
             var (sequence, moments) = report.Value;
             stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, sequence, moments)) + Environment.NewLine : AtReport.ToText(sequence, moments));
