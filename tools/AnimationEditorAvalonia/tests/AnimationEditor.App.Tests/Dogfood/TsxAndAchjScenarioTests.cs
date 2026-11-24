@@ -262,6 +262,93 @@ public class TsxAndAchjScenarioTests
         editor.ProblemText.ShouldNotBeNull().ShouldContain("collision shape");
     }
 
+    public static TheoryData<string, Action<AnimationChainSave>, bool> WhatATsxCannotStore => new()
+    {
+        { "other texture", chain => chain.Frames[0].TextureName = "other.png", false },
+        { "off the tile grid", chain => chain.Frames[0].LeftCoordinate += 1, false },
+        { "a tile another animation owns", chain => (chain.Frames[0].LeftCoordinate, chain.Frames[0].RightCoordinate,
+            chain.Frames[0].TopCoordinate, chain.Frames[0].BottomCoordinate) = (0, 16, 0, 16), false },
+        { "no frames", chain => chain.Frames.Clear(), false },
+        { "flip", chain => chain.Frames[0].FlipHorizontal = true, true },
+        { "color", chain => chain.Frames[0].Red = 77, true },
+        { "event", chain => chain.Frames[0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Footstep" }), true },
+        { "shape", chain => (chain.Frames[0].ShapesSave = new ShapesSave()).Add(new AARectSave { Name = "Hit", ScaleX = 4, ScaleY = 4 }), true },
+    };
+
+    [AvaloniaTheory]
+    [MemberData(nameof(WhatATsxCannotStore))]
+    public async Task Tsx_PastingACutChainItCannotStoreInFull_LeavesTheChainInItsFile(
+        string _, Action<AnimationChainSave> edit, bool tilesAreWritten)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
+        editor.WritePng("other.png", 64, 64);
+        AnimationChainSave walk = AnimationEditorHarness.Chain("Walk", "Heroes.png", (32, 32, 16, 16));
+        edit(walk);
+        string achx = editor.WriteAchx("hero.achx", walk);
+        string achxBefore = File.ReadAllText(achx);
+        await editor.OpenAsync(achx);
+
+        CutAndPaste(editor, editor.ChainNamed("Walk"), "Heroes.tsx", () => tsxChain);
+
+        editor.Project.AnimationChains.Count.ShouldBe(2, "it was pasted");
+        File.ReadAllText(tsx).Contains("<tile id=\"10\">").ShouldBe(tilesAreWritten);
+        File.ReadAllText(achx).ShouldBe(achxBefore);
+        if (walk.Frames.Count > 0)
+            editor.ProblemText.ShouldNotBeNull().ShouldContain("Saved Heroes.tsx, but not every change applied");
+        editor.ClickTab("hero.achx");
+        editor.ChainNamed("Walk").ShouldNotBeNull();
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_PastingACutFrameItCannotStore_LeavesTheFrameInItsFile()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        editor.WritePng("other.png", 64, 64);
+        string achx = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "other.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(achx);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+
+        CutAndPaste(editor, walk.Frames[0], "Heroes.tsx", () => tsxChain);
+
+        tsxChain.Frames.Count.ShouldBe(3);
+        AnimationEditorHarness.ReadSaved(achx).AnimationChains.Single().Frames.Count.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_PastingACutChainItStoresInFull_MovesIt_EvenWhenAnotherAnimationIsNotSaved()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        tsxChain.Loop = false;
+        string achx = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "Heroes.png", (32, 32, 16, 16)));
+        await editor.OpenAsync(achx);
+
+        CutAndPaste(editor, editor.ChainNamed("Walk"), "Heroes.tsx", () => tsxChain);
+
+        File.ReadAllText(Path.Combine(editor.ProjectFolder, "Heroes.tsx")).ShouldContain("<tile id=\"10\">");
+        AnimationEditorHarness.ReadSaved(achx).AnimationChains.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_WarningFromTheSaveOfABackgroundTab_NamesTheTileset()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        tsxChain.Loop = false;
+        string achx = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "Heroes.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(achx);
+        editor.ClickTab("Heroes.tsx");
+        editor.Expand(tsxChain);
+
+        CutAndPaste(editor, tsxChain.Frames[1], "hero.achx", () => editor.ChainNamed("Walk"));
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Saved Heroes.tsx, but not every change applied");
+    }
+
     [AvaloniaFact]
     public async Task Tsx_FrameLengthEdit_WritesTheDurationBackInMilliseconds()
     {

@@ -104,7 +104,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         tab.CachedEditorModel!.AnimationChains.RemoveAt(0);
         tab.CachedEditorModel.AnimationChains[0].Loop = false;
         IReadOnlyList<string> warnings = [];
-        _ctx.AppCommands.TsxSaveCompletedWithWarnings += raised => warnings = raised;
+        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, raised) => warnings = raised;
 
         _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
 
@@ -121,6 +121,37 @@ public class TabSwitchCacheTsxTests : IDisposable
         static IEnumerable<uint> AnimatedTileIds(string tsx) =>
             DotTiled.Serialization.Loader.Default().LoadTileset(tsx).Tiles
                 .Where(tile => tile.Animation.Count > 0).Select(tile => tile.ID);
+    }
+
+    [Fact]
+    public async Task SaveDocument_BackgroundTsxTabThatCannotBeWritten_KeepsTheFileAndTheCurrentDocument()
+    {
+        // Tile 5 belongs to an associated .achx, so a chain moved onto it makes the save throw.
+        string path = Path.Combine(_dir.Path, "Heroes.tsx");
+        File.WriteAllText(path, TsxFixtureXml.Replace("</tileset>",
+            $" <tile id=\"5\"><properties><property name=\"{AnimationEditor.Core.Tiled.TilesetAnimationSync.SourceFilePropertyName}\" value=\"a.achx\"/></properties></tile></tileset>"));
+        byte[] before = File.ReadAllBytes(path);
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("Other.achx", "Idle"));
+        var currentModel = _ctx.ProjectManager.AnimationChainListSave;
+        var tabTsxState = tab.CachedTsxState;
+        var onTile5 = new AnimationChainSave { Name = "New" };
+        onTile5.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f,
+            LeftCoordinate = 16, RightCoordinate = 32, TopCoordinate = 16, BottomCoordinate = 32 });
+        tab.CachedEditorModel!.AnimationChains.Add(onTile5);
+        string? failure = null;
+        _ctx.AppCommands.SaveFailed += message => failure = message;
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+
+        tab.SaveFailed.ShouldBeTrue();
+        failure.ShouldNotBeNull().ShouldContain("Heroes.tsx");
+        File.ReadAllBytes(path).ShouldBe(before);
+        tab.CachedTsxState.ShouldBe(tabTsxState);
+        _ctx.ProjectManager.AnimationChainListSave.ShouldBeSameAs(currentModel);
+        _ctx.ProjectManager.IsNativeTsxProject.ShouldBeFalse();
     }
 
     [Fact]

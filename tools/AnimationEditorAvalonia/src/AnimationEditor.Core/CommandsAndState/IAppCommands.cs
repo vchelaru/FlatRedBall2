@@ -58,9 +58,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// cref="ProjectManager.SaveTsxProject"/>). The chain's previously-written tile is left
         /// untouched rather than cleared, but the edit that caused the failure was NOT written; the
         /// app layer should surface these as a toast so the user knows the save didn't fully apply.
-        /// Never raised for an achx/achj save or a tsx save with no warnings.
+        /// Never raised for an achx/achj save or a tsx save with no warnings. The first argument is the tsx path.
         /// </summary>
-        event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+        event Action<string, IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
 
         /// <summary>
         /// Raised when <see cref="SaveCurrentAnimationChainList"/> could not write the file at all
@@ -206,6 +206,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// cref="SaveFailed"/> and returns false. Sets <see cref="TabEntry.SaveFailed"/> either way.
         /// </summary>
         bool SaveDocument(TabEntry tab);
+
+        /// <summary>
+        /// True when the current document's last save wrote <paramref name="chains"/> in full. A cut into this
+        /// document removes its source only then. An untitled document, which has no file to fail, counts as stored.
+        /// </summary>
+        bool LastSaveStored(IEnumerable<AnimationChainSave> chains);
         Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);

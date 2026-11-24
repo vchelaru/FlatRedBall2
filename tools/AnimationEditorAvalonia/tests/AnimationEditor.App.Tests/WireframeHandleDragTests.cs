@@ -496,7 +496,7 @@ public class WireframeHandleDragTests
                 ctx.ApplicationEvents.RaiseAnimationChainsChanged();
             };
             var warnings = new System.Collections.Generic.List<string>();
-            ctx.AppCommands.TsxSaveCompletedWithWarnings += w => warnings.AddRange(w);
+            ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, w) => warnings.AddRange(w);
 
             ctrl.SimulateHandleDrag(HandleKind.BotRight,
                 startScreenX: 16f, startScreenY: 16f,

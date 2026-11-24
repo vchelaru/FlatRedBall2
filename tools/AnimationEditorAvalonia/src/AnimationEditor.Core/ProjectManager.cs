@@ -483,6 +483,12 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
+        /// The chains the last <see cref="SaveTsxProject"/> did not store in full: not written at all (a mapping
+        /// warning, or no frames), or written without data the format can't hold.
+        /// </summary>
+        public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved { get; private set; } = new HashSet<AnimationChainSave>();
+
+        /// <summary>
         /// Saves the current <see cref="AnimationChainListSave"/> back to the tsx opened by <see
         /// cref="LoadTsxProject"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and <see
         /// cref="Tiled.NativeTsxAnimationSync"/>. No-op (returns an empty list) if no tsx project is
@@ -688,6 +694,10 @@ namespace AnimationEditor.Core
             _tsxSatelliteTileIdsByChain = updatedSatellites;
             _tsxLastNonEmptyFramesByChain = updatedLastFrames;
             _tsxDormantHintsByChain = updatedDormant;
+
+            TsxChainsNotFullySaved = mapped
+                .Where(r => r.Warnings.Count > 0 || r.EntryTileId == null || Tiled.TsxLossyDataCheck.DroppedKinds(r.SourceChain).Count > 0)
+                .Select(r => r.SourceChain).ToHashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
 
             return mapped.SelectMany(r => r.Warnings)
                 .Concat(Tiled.TsxLossyDataCheck.Warnings(AnimationChainListSave))

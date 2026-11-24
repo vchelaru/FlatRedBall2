@@ -68,7 +68,9 @@ public interface IPendingCutState
     /// bypassing the undo manager entirely (#1026). Use only when <paramref name="acls"/> is a
     /// document other than the currently active one -- the undo stack only ever tracks the active
     /// document, so a cross-document delete can never be made undoable the normal way.
+    /// Frames and shapes in a locked chain stay, as in a same-document cut.
     /// </summary>
+    /// <returns>False when nothing was removed.</returns>
     bool RemoveSourcesFrom(AnimationChainListSave acls);
 
     /// <summary>
@@ -150,7 +152,7 @@ public sealed class PendingCutState : IPendingCutState
                 bool removedAnyFrame = false;
                 foreach (var frame in _payload.Frames)
                 {
-                    if (ChainContaining(acls, frame) is { } chain && chain.Frames.Remove(frame))
+                    if (ChainContaining(acls, frame) is { IsLocked: false } chain && chain.Frames.Remove(frame))
                         removedAnyFrame = true;
                 }
                 return removedAnyFrame;
@@ -159,8 +161,8 @@ public sealed class PendingCutState : IPendingCutState
                 bool removedAnyShape = false;
                 foreach (var shape in _payload.Shapes)
                 {
-                    if (FrameContaining(acls, shape) is { ShapesSave: { } shapes } &&
-                        shapes.Remove(shape))
+                    if (FrameContaining(acls, shape) is { ShapesSave: { } shapes } frame &&
+                        ChainContaining(acls, frame)?.IsLocked != true && shapes.Remove(shape))
                         removedAnyShape = true;
                 }
                 return removedAnyShape;
