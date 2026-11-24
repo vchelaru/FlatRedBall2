@@ -42,7 +42,7 @@ public class FilePath : IComparable, IEquatable<FilePath>
 
     private string? _fullPathCache;
     /// <summary>
-    /// Forward-slashed, ../-collapsed, current-dir-prepended-if-relative. Case preserved. A network
+    /// Forward-slashed, ../-collapsed (never past the root), current-dir-prepended-if-relative. Case preserved. A network
     /// path keeps its root (<c>//server/share/a.png</c>), and ../ stops at the share.
     /// </summary>
     public string FullPath => _fullPathCache ??= Standardize(Original ?? "");
@@ -101,7 +101,7 @@ public class FilePath : IComparable, IEquatable<FilePath>
         }
         catch (InvalidOperationException)
         {
-            // Too many ../'s walked past the root.
+            // Too many ../'s in a drive-relative path (C:a/../../b), which has no root to stop at.
             return false;
         }
     }
@@ -221,11 +221,18 @@ public class FilePath : IComparable, IEquatable<FilePath>
         {
             s = s.Replace('\\', '/');
             int idx = GetDotDotSlashIndex(s);
-            while (idx > 0)
+            while (idx >= 0)
             {
-                idx++; // shift "/../" -> "../"
-                int prev = s.LastIndexOf('/', idx - 2, idx - 2);
-                s = s.Remove(prev + 1, idx - prev + 2);
+                // "/../" and "C:/../" have no folder to remove, so ".." stays at the root.
+                if (idx == 0 || (idx == 2 && s[1] == ':'))
+                {
+                    s = s.Remove(idx, 3);
+                }
+                else
+                {
+                    int prev = s.LastIndexOf('/', idx - 1);
+                    s = s.Remove(prev + 1, idx - prev + 3);
+                }
                 idx = GetDotDotSlashIndex(s);
             }
         }

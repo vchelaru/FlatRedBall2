@@ -131,6 +131,27 @@ public class FilePathTests
         Assert.Equal("c:/games/hero.achx", path.Standardized);
     }
 
+    // #1987: ".." that reaches the root stays there, as Windows and Unix resolve it.
+    [Theory]
+    [InlineData("/a/../b.png", "/b.png")]
+    [InlineData("/a/../../b.png", "/b.png")]
+    [InlineData("/../b.png", "/b.png")]
+    [InlineData("C:/../a.png", "C:/a.png")]
+    [InlineData(@"C:\a\..\..\b.png", "C:/b.png")]
+    [InlineData("C:/a/../b.png", "C:/b.png")]
+    public void FullPath_DotDotReachesRoot_KeepsRoot(string path, string expected) =>
+        new FilePath(path).FullPath.ShouldBe(expected);
+
+    // Enough ".." to pass the root from any current directory.
+    [Fact]
+    public void FullPath_RelativeDotDotPastRoot_KeepsRootOfCurrentDirectory()
+    {
+        string path = "a/" + string.Concat(System.Linq.Enumerable.Repeat("../", 60)) + "b.png";
+        string root = System.IO.Path.GetPathRoot(System.Environment.CurrentDirectory)!.Replace('\\', '/');
+
+        new FilePath(path).FullPath.ShouldBe(root + "b.png");
+    }
+
     // #1983: a network path (\\server\share\...) keeps its double-slash root however it is spelled.
     [Theory]
     [InlineData(@"//server/share/Art/a.png", "//server/share/Art/a.png")]
