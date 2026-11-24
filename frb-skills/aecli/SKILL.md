@@ -45,6 +45,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - Frame indexes shift after `delete-frame`, `duplicate-frame` and `add-frame`; address later frames of the same batch by their new index.
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
+- A batch that renames or deletes a chain warns once per `.seqj` in the same folder (not subfolders), naming the blocks that now play a missing chain (`Run/Body/0 'Walk'`). It changes no `.seqj`; fix the blocks with `set-block-chain` or `delete-block`.
 - A file that already has check errors can still be edited, including one with a missing texture: regions are pixels, so `set-frame-texture` to a PNG of any size keeps them.
 - `edit` writes nothing unless every op succeeds and no `check` error code has more errors than before (so renaming or moving something already broken works). New `check` warnings do not stop it; each code whose count rose comes back in `warnings` (`The edit raised check warnings [cut-short] from 1 to 2`), and an edit that fixes one and causes another of the same code says nothing. A batch that changes nothing leaves the file byte-identical.
 - A file in legacy UV coordinates is refused. Open and save it in the editor once.

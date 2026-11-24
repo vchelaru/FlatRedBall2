@@ -65,6 +65,16 @@ public class SequenceUsageWarningTests : IDisposable
     }
 
     [Fact]
+    public async Task Edit_DeleteChainByGlob_WarnsAboutEveryDeletedName()
+    {
+        WriteSeq("a.seqj", ("hero.achx", "Walk"), ("hero.achx", "Idle"));
+
+        var warning = (await WarningsOf("delete-chain *")).ShouldHaveSingleItem();
+
+        warning.ShouldEndWith(": Run/Body/0 'Walk', Run/Body/1 'Idle'.");
+    }
+
+    [Fact]
     public async Task Edit_ManyBrokenBlocks_ListsTenAndCountsTheRest()
     {
         WriteSeq("a.seqj", [.. Enumerable.Repeat(("hero.achx", "Walk"), 12)]);
