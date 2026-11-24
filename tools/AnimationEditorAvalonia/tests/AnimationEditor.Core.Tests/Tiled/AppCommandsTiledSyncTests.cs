@@ -271,6 +271,9 @@ public class AppCommandsTiledSyncTests
         Assert.False(succeeded);
     }
 
+    private static AnimationFrameSave Tile0Frame(string textureName) =>
+        new() { TextureName = textureName, FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
+
     [Fact]
     public void SaveCurrentAnimationChainList_ChainLeftOutOfTheTileset_WarnsOnEverySaveUntilItIsFixed()
     {
@@ -279,25 +282,125 @@ public class AppCommandsTiledSyncTests
         var achxPath = Path.Combine(dir.Path, "Hero.achx");
         ctx.ProjectManager.FileName = achxPath;
         ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir.Path));
-        var frame = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
+        var frame = Tile0Frame("Heroes.png");
         TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(frame);
         var raised = new List<IReadOnlyList<string>>();
         ctx.AppCommands.TiledSyncWarned += raised.Add;
+        IReadOnlyList<int> Save()
+        {
+            raised.Clear();
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            return raised.Select(r => r.Count).ToList();
+        }
 
-        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        raised.ShouldBeEmpty();
+        Save().ShouldBeEmpty();
 
         frame.TextureName = "sub/Heroes.png";
-        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        raised.Count.ShouldBe(2);
-        raised[1].Single().ShouldStartWith("Heroes.tsx: chain \"Walk\": ");
+        Save().ShouldBe([1]);
+        raised[0].Single().ShouldStartWith("Heroes.tsx: chain \"Walk\": ");
+        Save().ShouldBe([0, 1]);
 
         frame.TextureName = "Heroes.png";
+        Save().ShouldBe([0]);
+        Save().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SaveCurrentAnimationChainList_AfterAWarning_WithNothingToWarnOf_ClearsTheWarningBeforeAnythingElse(bool hasOtherTileset)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir.Path));
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("sub/Heroes.png"));
         ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        File.Delete(Path.Combine(dir.Path, "Hero.tiledsync"));
+        if (hasOtherTileset) ctx.AppCommands.AddAssociatedTiledTileset(Path.Combine(dir.Path, "Missing.tsx"));
+        var order = new List<string>();
+        ctx.AppCommands.TiledSyncWarned += w => order.Add($"warned {w.Count}");
+        ctx.AppCommands.TiledSyncFailed += (_, _) => order.Add("failed");
+
         ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        raised.Count.ShouldBe(3);
-        raised[2].ShouldBeEmpty();
+
+        order.ShouldBe(hasOtherTileset ? ["warned 0", "failed"] : ["warned 0"]);
+    }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_UnreadableSyncFileAfterAWarning_ClearsTheWarningBeforeTheFailure()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir.Path));
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("sub/Heroes.png"));
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        File.WriteAllText(Path.Combine(dir.Path, "Hero.tiledsync"), "{ not valid json");
+        var order = new List<string>();
+        ctx.AppCommands.TiledSyncWarned += w => order.Add($"warned {w.Count}");
+        ctx.AppCommands.TiledSyncFailed += (_, _) => order.Add("failed");
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        order.ShouldBe(["warned 0", "failed"]);
+    }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_TwoTilesetsWithTheSameFileName_WarningsTellThemApart()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        foreach (var folder in new[] { "forest", "cave" })
+            ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(dir.Path, folder)).FullName));
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("Heroes.png"));
+        IReadOnlyList<string> raised = [];
+        ctx.AppCommands.TiledSyncWarned += w => raised = w;
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        raised.Select(w => w.Split(':')[0]).ShouldBe(["forest/Heroes.tsx", "cave/Heroes.tsx"]);
+    }
+
+    // Before textures were compared by path, a chain on forest's image was also pushed into cave's tileset.
+    [Fact]
+    public void SaveCurrentAnimationChainList_TileAnotherTilesetsChainHadPushedByName_IsRemovedWithoutWarning()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        var forestTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(dir.Path, "forest")).FullName);
+        var caveTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(dir.Path, "cave")).FullName);
+        var cave = Loader.Default().LoadTileset(caveTsx);
+        cave.Tiles.Add(new Tile
+        {
+            ID = 0, Width = 0, Height = 0,
+            Animation = [new Frame { TileID = 0, Duration = 100 }],
+            Properties =
+            [
+                new StringProperty { Name = "achjAnimationName", Value = "Tree" },
+                new StringProperty { Name = "achjSourceFile", Value = "../Hero.achx" },
+            ],
+        });
+        AnimationEditor.Core.Tiled.TsxWriter.Write(cave, caveTsx);
+        ctx.AppCommands.AddAssociatedTiledTileset(forestTsx);
+        ctx.AppCommands.AddAssociatedTiledTileset(caveTsx);
+        TestHelpers.MakeChain(ctx.Acls, "Tree").Frames.Add(Tile0Frame("forest/Heroes.png"));
+        var order = new List<string>();
+        ctx.AppCommands.TiledSyncSucceeded += (path, _) => order.Add("success " + new FilePath(path).RelativeTo(new FilePath(dir.Path)));
+        ctx.AppCommands.TiledSyncWarned += _ => order.Add("warning");
+        ctx.AppCommands.TiledSyncFailed += (_, _) => order.Add("failure");
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        order.ShouldBe(["success forest/Heroes.tsx", "success cave/Heroes.tsx"]);
+        Loader.Default().LoadTileset(caveTsx).Tiles.ShouldBeEmpty();
+        Loader.Default().LoadTileset(forestTsx).Tiles.Single().ID.ShouldBe(0u);
     }
 
     [Fact]

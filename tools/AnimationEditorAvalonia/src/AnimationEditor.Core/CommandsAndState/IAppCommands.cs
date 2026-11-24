@@ -797,9 +797,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Raised after a save whose sync left something out of an associated .tsx, with one message per problem,
-        /// each starting with the .tsx's file name. Raised with an empty list by the first later save that has none.
-        /// Comes after every <see cref="TiledSyncSucceeded"/> of the save and before any <see cref="TiledSyncFailed"/>,
-        /// so a status indicator that shows the last event shows the worst one.
+        /// each starting with the .tsx's path relative to the saved file. Comes after every <see cref="TiledSyncSucceeded"/>
+        /// of the save and before any <see cref="TiledSyncFailed"/>, so a status indicator that shows the last event shows
+        /// the worst one. The next save, of any file, first raises it with an empty list to take the warning back.
         /// </summary>
         event Action<IReadOnlyList<string>>? TiledSyncWarned;
     }

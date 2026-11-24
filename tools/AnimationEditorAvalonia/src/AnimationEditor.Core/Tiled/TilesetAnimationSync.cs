@@ -69,24 +69,15 @@ public static class TilesetAnimationSync
 
         var changed = false;
 
-        // A chain that is wholly on another image of the same name keeps the tile it wrote before: the image may be a
-        // copy of the tileset's, so the animation may still be wanted. It is reported below.
-        var chainsOnASameNamedImage = results
-            .Where(r => r.EntryTileId is null && r.SkippedTexture is { IsSameFileName: true })
-            .Select(r => r.ChainName)
-            .ToHashSet();
-        var keptTileIds = new Dictionary<string, uint>();
-
+        var clearedTileIds = new HashSet<uint>();
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
         {
             var staleTile = tilesById[staleTileId];
-            if (GetStringProperty(staleTile, AnimationNamePropertyName) is { } chainName && chainsOnASameNamedImage.Contains(chainName))
-            {
-                keptTileIds[chainName] = staleTileId;
-                continue;
-            }
             if (ClearTile(staleTile))
+            {
                 changed = true;
+                clearedTileIds.Add(staleTileId);
+            }
             if (IsTileEmpty(staleTile))
             {
                 tileset.Tiles.Remove(staleTile);
@@ -99,10 +90,10 @@ public static class TilesetAnimationSync
         foreach (var result in results)
         {
             warnings.AddRange(result.Warnings);
-            // Any other texture is silent, because most chains of a big project belong to another tileset.
-            if (result.SkippedTexture is { IsSameFileName: true } skipped)
-                warnings.Add($"chain \"{result.ChainName}\": frames on \"{skipped.Texture}\" were not pushed, because the tileset's image is \"{skipped.Image}\"." +
-                    (keptTileIds.TryGetValue(result.ChainName, out var keptTileId) ? $" Tile {keptTileId} keeps its animation." : ""));
+            // A differently named texture is silent, because most chains of a big project belong to another tileset.
+            if (result.SameNamedTexture is { } sameNamed)
+                warnings.Add($"chain \"{result.ChainName}\": frames on \"{sameNamed.Texture}\" were not pushed, because the tileset's image is \"{sameNamed.Image}\"." +
+                    (sameNamed.EntryTileId is { } lostTileId && clearedTileIds.Contains(lostTileId) ? $" Tile {lostTileId} was cleared." : ""));
             if (result.EntryTileId is not { } tileId)
                 continue;
 

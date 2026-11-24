@@ -785,6 +785,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private void SyncAssociatedTiledTilesets(string achxPath)
         {
+            if (_tiledSyncWarned)
+            {
+                _tiledSyncWarned = false;
+                TiledSyncWarned?.Invoke([]);
+            }
+
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
@@ -817,11 +823,16 @@ namespace AnimationEditor.Core.CommandsAndState
             foreach (var outcome in outcomes.Where(o => o.Success && o.Changed))
                 TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
 
+            // Relative to the .achx, because two tilesets can have the same file name.
+            var achxFolder = new FilePath(achxPath).GetDirectoryContainingThis();
             var warnings = outcomes
-                .SelectMany(o => o.Warnings.Select(w => $"{new FilePath(o.TsxPath).NoPath}: {w}"))
+                .SelectMany(o => o.Warnings.Select(w => $"{new FilePath(o.TsxPath).RelativeTo(achxFolder)}: {w}"))
                 .ToList();
-            if (warnings.Count > 0 || _tiledSyncWarned) TiledSyncWarned?.Invoke(warnings);
-            _tiledSyncWarned = warnings.Count > 0;
+            if (warnings.Count > 0)
+            {
+                _tiledSyncWarned = true;
+                TiledSyncWarned?.Invoke(warnings);
+            }
 
             foreach (var outcome in outcomes.Where(o => !o.Success))
                 TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);

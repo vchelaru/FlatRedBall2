@@ -42,6 +42,8 @@ public static class TiledTilesetSyncRunner
         AnimationChainListSave achj, string achxFilePath, IReadOnlyList<string> tsxAbsolutePaths)
     {
         var outcomes = new List<TiledTilesetSyncOutcome>();
+        // Lazy, because it is only read when a texture has an image's file name but another path.
+        var images = new Lazy<HashSet<FilePath>>(() => LoadImages(tsxAbsolutePaths));
 
         foreach (var tsxPath in tsxAbsolutePaths)
         {
@@ -50,7 +52,8 @@ public static class TiledTilesetSyncRunner
                 var tileset = TsxLoader.LoadTileset(tsxPath);
                 var achxFile = new FilePath(achxFilePath);
                 var tsxFolder = new FilePath(tsxPath).GetDirectoryContainingThis();
-                var tilesetInfo = BuildTilesetInfo(tileset, tsxFolder, achxFile.GetDirectoryContainingThis());
+                var tilesetInfo = BuildTilesetInfo(tileset, tsxFolder, achxFile.GetDirectoryContainingThis())
+                    with { IsAnotherTilesetsImage = path => images.Value.Contains(path) };
                 var sourceLabel = achxFile.RelativeTo(tsxFolder);
 
                 var results = AchjToTiledAnimationMapper.Map(achj, tilesetInfo, tallySkips: true);
@@ -69,6 +72,29 @@ public static class TiledTilesetSyncRunner
         return outcomes;
     }
 
+    private static HashSet<FilePath> LoadImages(IReadOnlyList<string> tsxPaths)
+    {
+        var images = new HashSet<FilePath>();
+        foreach (var tsxPath in tsxPaths)
+        {
+            try
+            {
+                var tsxFolder = new FilePath(tsxPath).GetDirectoryContainingThis();
+                images.Add(new FilePath(ResolveImage(TsxLoader.LoadTileset(tsxPath), tsxFolder)));
+            }
+            catch
+            {
+                // Its own sync reports it.
+            }
+        }
+        return images;
+    }
+
+    private static string ResolveImage(Tileset tileset, FilePath tsxFolder) =>
+        tileset.Image.HasValue && tileset.Image.Value.Source.HasValue
+            ? TexturePathHelper.ResolveDisplayPath(tileset.Image.Value.Source.Value, tsxFolder.FullPath)
+            : "";
+
     /// <summary>The image is resolved here, against the .tsx folder, because the frames' texture names are
     /// relative to <paramref name="achxFolder"/> instead.</summary>
     private static TilesetAnimationInfo BuildTilesetInfo(Tileset tileset, FilePath tsxFolder, FilePath achxFolder)
@@ -82,7 +108,7 @@ public static class TiledTilesetSyncRunner
             TileCount = tileset.TileCount,
             Margin = tileset.Margin,
             TileSpacing = tileset.Spacing,
-            ImageFileName = image?.Source.HasValue == true ? TexturePathHelper.ResolveDisplayPath(image.Source.Value, tsxFolder.FullPath) : "",
+            ImageFileName = ResolveImage(tileset, tsxFolder),
             Folder = achxFolder.FullPath,
             TextureWidth = image?.Width.HasValue == true ? image.Width.Value : null,
             TextureHeight = image?.Height.HasValue == true ? image.Height.Value : null,

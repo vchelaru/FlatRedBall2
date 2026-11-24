@@ -403,6 +403,21 @@ public class StatusBarTests
 
             Assert.Equal("Tiled sync warning", label.Text);
             Assert.Contains("Heroes.tsx: chain \"Walk\"", ToolTip.GetTip(label) as string);
+            var dot = window.FindControl<Ellipse>("TiledSyncDot")!;
+            Assert.Equal(Avalonia.Media.Color.FromRgb(0xf0, 0xc6, 0x74), ((Avalonia.Media.ISolidColorBrush)dot.Fill!).Color);
+
+            File.Move(Path.Combine(dir, "Hero.tiledsync"), Path.Combine(dir, "Hero.tiledsync.bak"));
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
+
+            File.Move(Path.Combine(dir, "Hero.tiledsync.bak"), Path.Combine(dir, "Hero.tiledsync"));
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync warning", label.Text);
+            Assert.True(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
 
             frame.TextureName = "Heroes.png";
             ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
